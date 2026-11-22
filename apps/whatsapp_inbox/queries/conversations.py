@@ -19,7 +19,7 @@ from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Conversation, Message, name_key
 from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.reads import actor_id, live_conversations, page, person_name
-from apps.whatsapp_inbox.schemas import (
+from apps.whatsapp_inbox.schemas.conversations import (
     AwaitingCountIn,
     AwaitingCountOut,
     ByPhoneIn,
@@ -27,12 +27,12 @@ from apps.whatsapp_inbox.schemas import (
     ConversationDetailOut,
     ConversationListIn,
     ConversationPage,
-    ConversationRefIn,
     NoticesIn,
     NoticesOut,
     SummaryIn,
     SummaryOut,
 )
+from apps.whatsapp_inbox.schemas.fields import ConversationRefIn
 from base.ordering import list_order
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")

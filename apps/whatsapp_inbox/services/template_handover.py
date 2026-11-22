@@ -19,15 +19,14 @@ from apps.whatsapp_inbox.queries.reasons import (
     TEMPLATE_REFUSED_CODE,
 )
 from apps.whatsapp_inbox.queries.templates import templates_of
-from apps.whatsapp_inbox.schemas import (
+from apps.whatsapp_inbox.schemas.deliveries import RecordOut
+from apps.whatsapp_inbox.schemas.template_handover import (
     ClaimTemplateDeletionOut,
     ClaimTemplateOut,
-    RecordOut,
     RecordTemplateDeletionIn,
     RecordTemplateIn,
-    TemplateRefIn,
-    template_variables,
 )
+from apps.whatsapp_inbox.schemas.templates import TemplateRefIn, template_variables
 from base import outbound
 from base.files import STORE_ERRORS
 

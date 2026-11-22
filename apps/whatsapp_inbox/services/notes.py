@@ -11,7 +11,7 @@ from apps.whatsapp_inbox.models import Note
 from apps.whatsapp_inbox.queries.conversations import find_conversation
 from apps.whatsapp_inbox.queries.notes import NOTE_NOT_FOUND, may_delete_note, note_out
 from apps.whatsapp_inbox.queries.reads import actor_id, person_name
-from apps.whatsapp_inbox.schemas import NoteAddIn, NoteDeletedOut, NoteOut, NoteRefIn
+from apps.whatsapp_inbox.schemas.notes import NoteAddIn, NoteDeletedOut, NoteOut, NoteRefIn
 from base.services.sessions import acting_hub_user
 
 NOTE_NOT_YOURS = _("You may only delete your own notes.")

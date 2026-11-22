@@ -10,7 +10,7 @@ from live.operations import INTERNAL, operation
 from apps.whatsapp_inbox.models import Note
 from apps.whatsapp_inbox.queries.conversations import find_conversation
 from apps.whatsapp_inbox.queries.reads import actor_id, page
-from apps.whatsapp_inbox.schemas import NoteListIn, NoteOut, NotePage, NoteRefIn
+from apps.whatsapp_inbox.schemas.notes import NoteListIn, NoteOut, NotePage, NoteRefIn
 
 NOTE_NOT_FOUND = _("That note no longer exists.")
 
@@ -64,8 +64,8 @@ def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
     return page(rows, params, lambda note: note_out(ctx, note, me))
 
 
-# Not an assistant tool: what names a note on the card of ``whatsapp_inbox.note.delete`` (``schemas.A_NOTE``), by its
-# text; the model finds the notes of a conversation in their list.
+# Not an assistant tool: what names a note on the card of ``whatsapp_inbox.note.delete`` (``schemas.fields.A_NOTE``),
+# by its text; the model finds the notes of a conversation in their list.
 @operation(
     "whatsapp_inbox.note.get",
     kind="query",

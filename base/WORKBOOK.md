@@ -664,7 +664,8 @@ Pasos:
      historial de Ventas: «Completada» en verde, «Anulada» en rojo, «Devuelta» en ámbar y «Otro» en gris
      para un estado que esta pantalla aún no conoce.
   3. Busca con «Buscar actividad…» (venta, cliente o método), filtra por método o estado, ordena, cambia a
-     tarjetas o elige columnas; 15 por página.
+     tarjetas o elige columnas; 15 por página. Una venta cobrada con varios medios dice todos en «Método»
+     («Efectivo + Tarjeta»); el filtro de método ofrece cada medio una vez y la encuentra por cualquiera.
   4. Una venta cobrada en otro dispositivo aparece sola, sin recargar.
 Entra: las ventas de la app Ventas, si está encendida, con los permisos de quien mira. Solo ventas: los
 demás movimientos del negocio no salen aquí.

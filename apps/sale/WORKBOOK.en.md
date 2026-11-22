@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:af798b629c3e82c8692aa05f8b49e44aa4e59f9309b9ce3484e5e0416c681774 -->
+<!-- generated from WORKBOOK.md sha256:5fec128cde8e010e8edbff92cf9f5bb1cf81f6da9e0429c304235a0ca3c7ce58 -->
 
 ## What it is for and who it is for
 
@@ -1053,8 +1053,10 @@ Steps:
    days", under the figures, what was sold on each of those days, from oldest to today ("Wed 14 ·
    €120.50").
 3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "€5.00 left to
-   refund" if part was refunded) and Total. Search with "Search number or customer…", filter by status,
-   payment, date or total, or sort.
+   refund" if part was refunded) and Total. A sale charged with several methods shows them all under
+   "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
+   number or customer…", filter by status, payment, date or total, or sort; the payment filter finds a
+   sale by any of its methods.
 4. Tap a row to see its document. The table reloads by itself when a sale is charged, voided
    or refunded.
 5. Today's figures are also on **Home**, on the board: "Today's sales" and
@@ -1106,8 +1108,9 @@ Steps:
    later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
    name and the rest the address. On an invoice, under "Customer", its tax ID and its address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
-   (an exempt one says its cause: "Exempt (E1)"), total, payment method, tendered and change, and the
-   footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
+   (an exempt one says its cause: "Exempt (E1)"), total, payment method (charged with several methods,
+   all of them: "Cash + Card"), tendered and change, and the footer. With **VeriFactu**, before the
+   footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
    and "Scan it to check this receipt at the AEAT" ("…this invoice…" if it is an invoice); once the AEAT
    has answered, its code ("CSV: …") instead of that sentence. While VeriFactu has no record of that
    document, the paper comes out without a QR. A receipt with its fiscal document (issued or pending)

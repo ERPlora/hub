@@ -1567,7 +1567,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     artículo da las mismas candidatas, paginadas; `suggest_image` es la herramienta del asistente. Lista:
     columna `photo` (`ItemImage` de 40 px) en `ProductsPage.vue`; ficha: 128 px arriba en
     `ProductDetailModal.vue`. Tests: `base/frontend/lib/item-image.test.ts`, `base/frontend/components/ItemImage.test.ts`,
-    `ImageLibraryModal.test.ts`, `ImageField.test.ts`, `frontend/components/ProductFormModal.test.ts`
+    `ImageLibraryModal.test.ts`, `ImageField.test.ts`, `frontend/components/ProductFormModal.photo.test.ts`
     («ProductFormModal: photo»), `ProductDetailModal.test.ts`, `frontend/pages/ProductsPage.test.ts`, las baldosas
     en `apps/sale/frontend/components/pos/*Tile*.test.ts`, y en Chrome `tests/e2e/inventory-photo.spec.ts` (F30, F31
     y F32 a 390, 834 y 1440). F33: `base/tests/test_blueprint_images.py`.

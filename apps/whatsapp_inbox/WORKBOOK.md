@@ -1330,11 +1330,11 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   `message.notify`) y `submit_key` (`template.create`, `template.update`) por su marca `attempt_key`
   (PLAN-HUB §47), aunque lleguen vacías o sin forma de UUID, y nombra el archivo de la cabecera
   (`header_sample`) por el nombre con que se eligió, con la lectura `template_sample.detail` (marca `refers`
-  de `A_SAMPLE` en `schemas.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
+  de `A_SAMPLE` en `schemas/fields.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
   automatización sin persona delante, lo deja fuera, nunca por su id
   (`tests/test_integration_assistant.py`).
 - **La misma tarjeta nombra el registro que toca cada escritura** (hub#571) con las marcas `refers` de
-  `schemas.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
+  `schemas/fields.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
   `ConversationRefIn` y de `SendIn`) por su `display_name` con `conversation.detail`; la ficha que se une
   (`A_CUSTOMER`) con `customer.customer.detail` de Clientes, que es requisito; el mensaje que se reintenta
   (`A_MESSAGE`) con `message.get`, por su texto, si no su pie, su archivo o su plantilla; la nota que se

@@ -15,14 +15,8 @@ from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.queries.agents import team
 from apps.whatsapp_inbox.queries.conversations import conversation_out, find_conversation
 from apps.whatsapp_inbox.queries.reads import actor_id, person_name
-from apps.whatsapp_inbox.schemas import (
-    AssignIn,
-    ConversationOut,
-    ConversationRefIn,
-    FlaggedOut,
-    LinkCustomerIn,
-    SetStatusIn,
-)
+from apps.whatsapp_inbox.schemas.conversations import AssignIn, ConversationOut, FlaggedOut, LinkCustomerIn, SetStatusIn
+from apps.whatsapp_inbox.schemas.fields import ConversationRefIn
 from base.models import HubUser
 from base.services.sessions import acting_hub_user
 
