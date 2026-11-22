@@ -3,6 +3,7 @@
 // empties them; the server keeps them, or copies the picked card's.
 import { describe, expect, it } from 'vitest';
 
+import { pick as pickIn } from '../../../../base/frontend/__tests__/date-time-fields';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { openBookingPanel } from '../__tests__/booking-panel';
 import { click, ionValue, settle, WITHOUT_CONTACT } from '../__tests__/mount-reservation';
@@ -62,7 +63,7 @@ describe('ReservationFormModal: the guest’s contact details it was not given',
     expect(await pick(LUCIA)).toEqual([]);
     expect(await pick(null)).toEqual(['guest_phone', 'guest_email']);
     expect(await pick(LUCIA)).toEqual([]);
-    await ionValue(s.field('time'), '21:00', 'ionInput');
+    await pickIn(s.field('time'), '21:00');
     s.answer(201, reservationRow());
     await click(s.inDoc('reservation-form-submit')!);
     const [booked] = s.bodies('/api/reservation/reservations') as Record<string, unknown>[];
