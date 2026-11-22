@@ -128,6 +128,17 @@ def test_the_search_text_is_kept_on_every_save():
     assert customer.search_text.endswith("peluqueria sol")
 
 
+def test_the_search_text_without_contact_leaves_out_the_email_and_phone_on_every_save():
+    customer = make_customer("Ana García", email="ana@example.com", phone="+34600111222", tax_id="12345678Z")
+    customer.refresh_from_db()
+    assert customer.search_text_without_contact == "ana garcia 12345678z"
+
+    customer.phone, customer.company_name = "+34600999888", "Peluquería Sol"
+    customer.save(update_fields=["phone", "company_name"])
+    customer.refresh_from_db()
+    assert customer.search_text_without_contact == "ana garcia 12345678z peluqueria sol"
+
+
 def test_live_leaves_out_the_deleted_merged_and_erased_cards():
     alive = make_customer("Alive")
     inactive = make_customer("Inactive", is_active=False)

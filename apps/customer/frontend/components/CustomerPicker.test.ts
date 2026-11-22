@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { customerRow, pageOf } from '../__tests__/fixtures';
-import { errorFrame, flush, type MountOptions, mountCustomer, subId } from '../__tests__/mount-customer';
+import { errorFrame, flush, type MountOptions, mountCustomer, subId, WITHOUT_CONTACT } from '../__tests__/mount-customer';
 import { namesGiven } from '../__tests__/searchbar-name';
 import CustomerPicker from './CustomerPicker.vue';
 import source from './CustomerPicker.vue?raw';
@@ -131,5 +131,14 @@ describe('CustomerPicker', () => {
 
   it('has no OutfitKit tag', () => {
     expect(source).not.toMatch(/<ok[-]/);
+  });
+});
+
+describe('CustomerPicker: the customers\' contact details (BASE-F119)', () => {
+  it('whoever does not see them is told the search looks into name, tax ID and company, and sees no contact line', async () => {
+    const s = await setup({}, { session: WITHOUT_CONTACT });
+    expect((s.testid('search').element as HTMLElement & { placeholder?: string }).placeholder).toBe('Search by name, tax ID, company…');
+    await s.result(s.call, LIST, pageOf([customerRow('c1', 'Ana García', { email: null, phone: null })]));
+    expect(s.results()[0].find('p').exists()).toBe(false);
   });
 });

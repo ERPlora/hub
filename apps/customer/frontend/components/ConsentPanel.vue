@@ -85,7 +85,7 @@ async function takeBack(channel: ConsentChannel): Promise<void> {
 
 const stateLabel = (row: ConsentStateRow | undefined): string =>
   row ? t(row.state === 'granted' ? 'customer.consent.granted' : 'customer.consent.withdrawn') : t('customer.consent.neverAsked');
-const when = (occurredAt: string, extra: string): string =>
+const when = (occurredAt: string, extra: string | null): string =>
   [formatDateTime(occurredAt, locale.value), extra].filter(Boolean).join(' · ');
 </script>
 

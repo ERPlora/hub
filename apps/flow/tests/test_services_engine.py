@@ -158,6 +158,22 @@ def test_a_step_reads_the_event_and_what_earlier_steps_left():
     ]
 
 
+def test_a_step_reads_the_customer_s_contact_details_to_write_to_them():
+    # Only the owner and the administrator save an automation, and they see every datum of the business: its steps
+    # read what they read, the customer's email and phone included (a WhatsApp to the customer goes to that phone).
+    make_flow(
+        steps=[
+            {"id": "s1", "kind": "query", "operation": "customer.customer.detail", "params": {"id": "input.id"}},
+            TASK_STEP | {"id": "s2", "params": {"title": "Call {{steps.s1.phone}} or write to {{steps.s1.email}}"}},
+        ],
+        grants=["customer.customer.detail", "task.task.create"],
+    )
+    customer = Customer.objects.create(name="Ana López", phone="+34600111222", email="ana@example.com")
+    deliver(payload={"id": str(customer.id)})
+    assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+    assert Task.objects.get().title == "Call +34600111222 or write to ana@example.com"
+
+
 def test_a_read_that_finds_nothing_carries_on():
     make_flow(
         steps=[

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Customers → Customers (WORKBOOK «Pantallas · Clientes»; CUSTOMER-F01, F02, F07, F08, F09): the four
-// figures, then the live `customer.customer.list` in a server-side DataTable — Name, Email, Phone,
-// Stage, Spent —, search on the server (name, phone, email, tax id and company; a phone however it is
-// typed), filters behind the table's funnel, sort by any column, 50 a page. «Add» and «Import CSV» to whoever manages cards,
+// figures, then the live `customer.customer.list` in a server-side DataTable — Name, Email and Phone for whoever sees
+// the customers' contact details, Stage, Spent —, search on the server (name, tax id and company, and phone and email
+// for whoever sees them; a phone however it is typed), filters behind the table's funnel, sort by any column but the
+// contact details, 50 a page. «Add» and «Import CSV» to whoever manages cards,
 // «Export CSV» to whoever exports; a row opens the card; «Delete» on a row asks first. Nothing here
 // refetches: a write anywhere re-runs the queries on the server and the results arrive by the stream.
 import {
@@ -43,6 +44,8 @@ const session = useSession();
 const canManage = computed(() => session.can('customer.manage'));
 const canExport = computed(() => session.can('customer.export'));
 const canDelete = computed(() => session.can('customer.delete'));
+/** The customers' email and phone reach only whoever sees them: for anyone else they come empty, so no column. */
+const canContact = computed(() => session.can('base.view_customer_contact'));
 const { t, locale } = useCustomerI18n();
 
 const list = useListState({ sort: 'name' });
@@ -67,8 +70,12 @@ const exportFilters = computed(() => query.value);
 
 const columns = computed<DataTableColumn<CustomerRow>[]>(() => [
   { key: 'name', label: t('customer.list.columns.name'), sortable: true, priority: 'high', cell: 'name' },
-  { key: 'email', label: t('customer.list.columns.email'), sortable: true },
-  { key: 'phone', label: t('customer.list.columns.phone'), sortable: true, cell: 'phone' },
+  ...(canContact.value
+    ? [
+        { key: 'email', label: t('customer.list.columns.email') },
+        { key: 'phone', label: t('customer.list.columns.phone'), cell: 'phone' },
+      ]
+    : []),
   {
     key: 'lifecycle_stage',
     label: t('customer.list.columns.stage'),
@@ -205,7 +212,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
         :error="status === 'error' ? error?.message : undefined"
         :addable="canManage"
         :actions="actions"
-        :search-placeholder="$t('customer.list.search')"
+        :search-placeholder="$t(canContact ? 'customer.list.search' : 'customer.list.searchWithoutContact')"
         :labels="{ add: $t('customer.common.add'), loadError: $t('customer.list.loadError'), retry: $t('customer.live.retry') }"
         :columns="columns"
         @page-change="list.goToPage"

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:093cef165cc9a692ccd43188c3a47a081056947cb316f995a1041ab694148b69 -->
+<!-- generated from WORKBOOK.md sha256:3b55c34ad79ead9c0f5abc6f9f41ae744dce374d390eeb8f486329b36c459322 -->
 
 ## What it is for and who it is for
 
@@ -30,6 +30,11 @@ all of them learn when two cards are merged or a person's data is erased. Custom
 - The **employee** (also at the till): looks up, adds, edits the card, imports, adds notes, assigns
   groups and tags, records consent and puts the customer on the sale. With a manager's PIN, on their
   own device, merges duplicates (BASE-F84). Groups, tags and fields they do not open: by its address, "No access" (BASE-F118).
+- The customers' **email and phone** reach only whoever holds the data permission "View customer contact details"
+  (BASE-F119), which the four roles hold today. Whoever lacks it sees the customers by their name, without their
+  email or phone, on no screen, export, API or answer of the assistant, and cannot search, filter or sort them by
+  those. The address, city, postal code and country are not contact details: they are the tax details the sale
+  copies for its invoice (CUSTOMER-F17), like the tax ID, and everyone who sees the card sees them.
 - The **customer** does not use these screens: their data comes in at the counter, at the till or
   through their WhatsApp.
 
@@ -95,7 +100,9 @@ your notes, their advertising permission, their allergies and their purchases.
 At the top, four figures: "Customers", "Active", "VIP" and "Revenue" (what the live cards have spent, only to whoever sees the business totals).
 Below, the table: "Name", "Email", "Phone", "Stage" and "Spent"; search "Search name, phone or email…"
 (it also searches tax ID and company); filters by stage, source, active and spent ("From / To", in the
-business's currency); sort by any column; 50 per page. In the bar, **Add** and **Import CSV** for whoever
+business's currency); sort by any column but "Email" and "Phone"; 50 per page. Whoever does not see the
+customers' contact details gets the table without "Email" or "Phone" and the search "Search name, tax ID or
+company…", which does not look into the email or the phone. In the bar, **Add** and **Import CSV** for whoever
 may manage cards, and **Export CSV** for whoever may export. Tapping a row opens the card.
 
 #### Customer card
@@ -104,7 +111,8 @@ data** (the employee sees **Merge with…**, which they do with a manager's PIN)
 Purchases, Spent, Last purchase, Active, internal notes, birthday, anniversary and custom fields);
 "Groups" and "Tags" with checkboxes; "Marketing consent" with one line per channel and "Everything that
 was decided"; "Add note"; "Activity"; "Purchases" (each sale with its amount and its status); and at the
-end the blocks of other apps (today, the "Visit history" of Appointments).
+end the blocks of other apps (today, the "Visit history" of Appointments). Whoever does not see the customers'
+contact details gets the card without "Email" or "Phone" and the consent without the address it was given for.
 
 ### Groups
 Groups sort your customers, for example "Members" or "Companies". Here you create them, change their name or
@@ -223,14 +231,15 @@ Steps:
 1. Type in the search. It searches at once in name, email, phone, tax ID and company, ignoring case and
    accents ("garcia" finds "García"). A term made only of digits and phone signs (with spaces, dashes or
    brackets, with the + or the 00 in front) is searched by its digits, without the 00 or the national zero,
-   so the card is found however it is written.
+   so the card is found however it is written. Whoever does not see the customers' contact details
+   searches only in name, tax ID and company: a phone or an email finds nobody for them.
 2. With the filters: stage, source, active and spent by range ("From / To", in the business's currency,
    the one of its country in Settings → Business, with its decimals: the yen has none; with or without its
    symbol, "12,50 zł"). The amount is typed as in any amount field of the Hub and as in the other lists:
    with or without thousands separators ("1.000,50", "1,000.50", "2 500"); in euros "1.000"
    could be a thousand euros or one euro, and it asks for the decimals.
-3. Sort by name, email, phone, stage, spent, last purchase or date added. To begin with, by name from A
-   to Z, 50 per page (at most 100).
+3. Sort by name, stage, spent, last purchase or date added (never by email or phone: the order would tell the
+   contact details to whoever does not see them). To begin with, by name from A to Z, 50 per page (at most 100).
 4. Tap a row to open its card.
 In: the text, the filters and the sort.
 Out: nothing; read only. Cards that are deleted, merged into another or with their data erased do not
@@ -238,8 +247,10 @@ show; those marked as not active do.
 If it fails: the table shows the error with "Retry". No results: "No customers.". A spent amount it cannot
 read does not filter and says so under its box, in the words of the amount field: "This is not an amount.
 Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000", "This amount can be
-read in two ways…".
-Involved: none
+read in two ways…". Through the API or the assistant, filtering by email or phone without seeing the customers'
+contact details is refused without searching anything, as an action without permission, and sorting by them does
+not exist.
+Involved: BASE-F119
 
 ### CUSTOMER-F03 Open a customer's card
 Status: done
@@ -251,7 +262,9 @@ Steps:
    groups and tags, its consent per channel, the
    activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
    name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
-   records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps.
+   records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
+   email, the phone and the address each consent was given for, only to whoever sees the customers' contact
+   details.
 3. **← Back** returns to the list.
 In: the card and, apart, its activity, its purchases and its consent history.
 Out: nothing; read only. If another person changes it while it is open, the change is seen without
@@ -268,7 +281,9 @@ Steps:
 1. On the card tap **Edit**: the details become the add form, plus the business's "Custom fields" (each
    with its shape: text, number, date, yes/no, select or long text; the required ones carry an asterisk) and the
    "Active" checkbox.
-2. Change what is needed. Emptying a field is also a change.
+2. Change what is needed. Emptying a field is also a change. Whoever does not see the customers' contact
+   details has no "Email" or "Phone" in the form: they do not change what they do not see, and saving leaves
+   them as they were.
 3. Tap **Save**. "Customer updated" shows.
 In: the changed details and the value of each custom field. The phone is stored in the international
 format, as when adding.
@@ -387,7 +402,8 @@ Out: a file with the columns `name`, `email`, `phone`, `tax_id`, `company_name`,
 `total_spent` (in the business's currency, with its decimals: two in euros or in złoty, none in yen),
 `last_purchase_at`, `created_at`, `groups` and `tags`. A value that starts with `=`, `+`, `-` or `@` (a
 phone, for example) comes out with an apostrophe in front so the spreadsheet does not read it as a
-formula; the import removes it.
+formula; the import removes it. For whoever does not see the customers' contact details (BASE-F119) it comes out
+without the `email` and `phone` columns.
 If it fails: without permission to export, the server refuses it even if called through the API. With no
 cards, a file with only the headers comes out.
 Involved: BASE-F112 (inside the app)
@@ -411,7 +427,9 @@ In: the number as it arrives.
 Out: the cards that match (name, email and phone), by name. If there are two or more, whoever asks
 decides.
 If it fails: an empty number, with letters or that is not possible in its country matches nobody (it
-never returns the whole list). Cards that are deleted, merged or with their data erased do not show.
+never returns the whole list). Cards that are deleted, merged or with their data erased do not show. Asking whose
+a number is reads the contact details: whoever does not see the customers' contact details (BASE-F119) gets 403
+`permission_denied`. An automation does ask: the owner or the administrator, who see them, save it.
 Involved: RESERVATION-F06, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F11 Store the phone in the international format (E.164)
@@ -462,7 +480,7 @@ Actor: owner, administrator, manager; the employee, with a manager's PIN
 Screen: Customer card
 Steps:
 1. Open the card that is going to STAY and tap **Merge with…**.
-2. Look for the duplicate (name, email, phone, tax ID or company) and tap it.
+2. Look for the duplicate as in the **Customers** list and tap it.
 3. Read the warning, which names both cards: "Ana G. will be merged into Ana García: its appointments,
    sales, bookings, conversations, prepaid packages, notes and consents move to Ana García, empty fields are
    filled from it, and Ana G. disappears from the list. This cannot be undone.".
@@ -495,7 +513,7 @@ Screen: Customer card
 Steps:
 1. In "Marketing consent" there is a line for Email, WhatsApp and SMS (and another for each channel with
    something recorded: Phone, Post), with its state: "Never asked", "Given" or "Withdrawn", and the date
-   and the address if there are any.
+   and the address if there are any (the address, only to whoever sees the customers' contact details).
 2. Tap **Record consent**. The sentence "I want to receive offers and news from this business through
    this channel. I can unsubscribe whenever I want." shows with the hint "Read it out loud and only press
    if they say yes. This exact sentence is what gets stored as the record, together with your name and
@@ -598,8 +616,9 @@ In: name and phone.
 Out: the card with source "Walk-in", the phone in E.164, the card-created notice and the sale with a
 customer.
 If it fails: without a name it cannot be tapped; a phone that is not of its country shows inside the
-form; if it cannot be looked up who has that phone, the card is created (the sale is not blocked; if it
-was the same person they are joined with CUSTOMER-F13).
+form; if it cannot be looked up who has that phone, or whoever creates it does not see the customers' contact
+details (BASE-F119), the card is created without asking (the sale is not blocked; if it was the same person they
+are joined with CUSTOMER-F13).
 Involved: SALE-F05, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F19 Link the customer to the open order
@@ -817,8 +836,13 @@ Steps:
    the card itself.
 2. Customers answers with the card: name, email, phone, tax ID, company, address, city, postal code,
    country, notes, birthday, anniversary, preferred channel, stage, source, whether it is active, the
-   purchase totals, its groups, its tags, its custom fields and its consent per channel.
-In: the card's identifier and the permission to view customers.
+   purchase totals, its groups, its tags, its custom fields and its consent per channel. The email, the phone
+   and the address of each consent come empty if whoever asks does not see the customers' contact details
+   (BASE-F119); an automation gets them. The sale's tax copy (name, tax ID, address and country) is
+   not contact details: it always arrives.
+In: the card's identifier and the permission to view customers. Asking for it by its exact phone or email instead
+of the identifier only works for whoever sees the customers' contact details; for anyone else those words only
+match a name.
 Out: nothing stored; read only.
 If it fails: a card that does not exist, is deleted, merged into another or with its data erased is not
 returned: "This customer is no longer available.". A deactivated card is returned.
@@ -972,7 +996,7 @@ confirmation card is shown.
 | The cards, with search, filters, sort and pages | view | F02, F17 | yes | `customer.customer.list` |
 | The full card, with groups, tags, fields and consent per channel | view | F03, F30 | yes | `customer.customer.detail` |
 | The figures: customers, active, VIP and revenue | view | F02, F31 | yes | `customer.customer.stats` |
-| The cards that carry a phone number | view | F10, F12, F18 | no | `customer.customer.by_phone` |
+| The cards that carry a phone number | view, and view the customers' contact details | F10, F12, F18 | no | `customer.customer.by_phone` |
 | The CSV of all the cards that match the search | export | F09 | no | `customer.customer.export` |
 | The groups, with how many cards each one has | view | F06, F27 | yes | `customer.group.list` |
 | The tags, with how many cards each one has | view | F06, F28 | yes | `customer.tag.list` |
@@ -1076,6 +1100,7 @@ who use the services of Customers.
 | Note in the activity what other apps bring | yes | yes | yes | no | `customer.record_activity` |
 | Delete cards, groups and tags | yes | yes | no | no | `customer.delete` |
 | Erase personal data | yes | yes | no | no | `customer.erase` |
+| View the customers' email and phone (a data permission of the platform, BASE-F119) | yes | yes | yes | yes | `base.view_customer_contact` |
 
 "With PIN": the employee does it if a manager approves it on the spot with their PIN (or their badge) on
 the same device (BASE-F84): what the manager holds, another profile does with

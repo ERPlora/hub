@@ -813,7 +813,8 @@ la que solo se le autorizó reservar.
   cliente, a `customer.Customer` (`PROTECT`, como Citas); el horario se lee con la operación
   `schedule.hours.for_range`, con `schedule.view` añadido al contexto solo para esa lectura (como
   Citas); la ficha por teléfono (`card_for_phone`, al reservar y en la lista de espera) se busca y se
-  crea con `customer.view` y `customer.manage` añadidos solo para esas dos llamadas (`card_keeper`): un
+  crea con `customer.view`, `customer.manage` y `base.view_customer_contact` (el teléfono que da el invitado se busca
+  entre el contacto de los clientes) añadidos solo para esas dos llamadas (`card_keeper`): un
   paso de una automatización, que solo lleva el permiso de su operación y las lecturas de Reservas
   (FLOW-F12), reserva por teléfono sin recibir permisos de Clientes. Sentar (`reservation.reservation.seat`)
   declara `ai.in_person`: Automatizaciones no lo ofrece ni lo concede (`flow.high_risk`), porque abre la

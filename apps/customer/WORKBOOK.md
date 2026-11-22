@@ -39,6 +39,11 @@ otra app.
   asigna grupos y etiquetas, registra el consentimiento y pone el cliente a la venta. Con el PIN de un
   responsable, en su mismo dispositivo, une duplicados (BASE-F84). Grupos, etiquetas y campos no los
   abre: por su dirección, «Sin acceso» (BASE-F118).
+- El **email y el teléfono** de los clientes solo los ve quien tiene el permiso de dato «Ver el contacto de los
+  clientes» (BASE-F119), que hoy tienen los cuatro roles. Quien no lo tiene ve a los clientes por su nombre, sin su
+  email ni su teléfono, en ninguna pantalla, exportación, API ni respuesta del asistente, y no los busca, filtra ni
+  ordena por ellos. La dirección, la ciudad, el código postal y el país no son contacto: son los datos fiscales que
+  la venta copia para su factura (CUSTOMER-F17), como el NIF, y los ve todo el que ve la ficha.
 - El **cliente** no usa estas pantallas: sus datos entran por el mostrador, el TPV o su WhatsApp.
 
 ## Referencia adoptada
@@ -103,7 +108,9 @@ publicidad, sus alergias y sus compras.
 Arriba, cuatro cifras: «Clientes», «Activos», «VIP» e «Ingresos» (lo gastado por las fichas vivas, solo a quien ve los totales del negocio).
 Debajo, la tabla: «Nombre», «Email», «Teléfono», «Etapa» y «Gastado»; buscador «Buscar nombre,
 teléfono o email…» (busca también NIF y empresa); filtros por etapa, origen, activo y gastado
-(«Desde / Hasta», en la moneda del negocio); orden por cualquier columna; 50 por página. En la barra, **Añadir** e
+(«Desde / Hasta», en la moneda del negocio); orden por cualquier columna menos «Email» y «Teléfono»; 50 por página.
+Quien no ve el contacto de los clientes tiene la tabla sin «Email» ni «Teléfono» y el buscador «Buscar nombre, NIF o
+empresa…», que no mira el email ni el teléfono. En la barra, **Añadir** e
 **Importar CSV** a quien puede gestionar fichas, y **Exportar CSV** a quien puede exportar. Tocar
 una fila abre la ficha.
 
@@ -115,7 +122,8 @@ Etapa, Origen, Canal preferido, Compras, Gastado, Última compra, Activo, notas 
 aniversario y campos personalizados); «Grupos» y «Etiquetas» con casillas; «Consentimiento de
 marketing» con una línea por canal y «Todo lo que se decidió»; «Añadir nota»; «Actividad»;
 «Compras» (cada venta con su importe y su estado); y al final los bloques de otras apps (hoy, el
-«Historial de visitas» de Citas).
+«Historial de visitas» de Citas). Quien no ve el contacto de los clientes tiene la ficha sin «Email» ni «Teléfono»
+y el consentimiento sin la dirección para la que se dio.
 
 ### Grupos
 Los grupos ordenan a tus clientes, por ejemplo «Socios» o «Empresas». Aquí los creas, les cambias el nombre o el
@@ -236,14 +244,15 @@ Pasos:
 1. Escribe en el buscador. Busca a la vez en nombre, email, teléfono, NIF y empresa, sin distinguir
    mayúsculas ni acentos («garcia» encuentra «García»). Un término hecho solo de cifras y signos de
    teléfono (con espacios, guiones o paréntesis, con el + o el 00 delante) se busca por sus cifras, sin
-   el 00 ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
+   el 00 ni el cero nacional, así que la ficha se encuentra se escriba como se escriba. Quien no ve el contacto de
+   los clientes busca solo en nombre, NIF y empresa: un teléfono o un email no le encuentran a nadie.
 2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en la moneda del negocio,
    la de su país en Ajustes → Negocio, con sus decimales: el yen no tiene; con o sin su símbolo, «12,50 zł»).
    El importe se escribe como en cualquier campo de importe del Hub y como en las demás listas: con
    o sin puntos de miles («1.000,50», «1,000.50», «2 500»); «1.000» en euros puede ser mil euros o un euro, y
    pide escribir los decimales.
-3. Ordena por nombre, email, teléfono, etapa, gastado, última compra o fecha de alta. De entrada, por
-   nombre de la A a la Z, 50 por página (como mucho 100).
+3. Ordena por nombre, etapa, gastado, última compra o fecha de alta (nunca por email ni por teléfono: el orden
+   diría el contacto a quien no lo ve). De entrada, por nombre de la A a la Z, 50 por página (como mucho 100).
 4. Toca una fila para abrir su ficha.
 Entra: el texto, los filtros y el orden.
 Sale: nada; solo lectura. Las fichas eliminadas, unidas a otra o con los datos borrados no salen;
@@ -251,8 +260,9 @@ las marcadas como no activas, sí.
 Si falla: la tabla enseña el error con «Reintentar». Sin resultados: «Sin clientes.». Un gastado que no se
 puede leer no filtra y lo dice bajo su caja, con las palabras del campo de importe: «Esto no es un importe.
 Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000», «Este importe
-se puede leer de dos maneras…».
-Implicados: ninguno
+se puede leer de dos maneras…». Por la API o el asistente, filtrar por email o por teléfono sin ver el contacto de los
+clientes se rechaza sin buscar nada, como una acción sin permiso, y ordenar por ellos no existe.
+Implicados: BASE-F119
 
 ### CUSTOMER-F03 Abrir la ficha de un cliente
 Estado: hecho
@@ -265,7 +275,8 @@ Pasos:
    consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
    cuándo y quién: la persona o la API key por su nombre, o «Lo hizo la plataforma» cuando no la hizo
    nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
-   desde una copia aparte), sus compras y los bloques de otras apps.
+   desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
+   que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
 3. **← Volver** regresa a la lista.
 Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentimientos.
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin
@@ -281,7 +292,8 @@ Pasos:
 1. En la ficha pulsa **Editar**: los datos pasan a ser el formulario del alta, más los «Campos
    personalizados» del negocio (cada uno con su forma: texto, número, fecha, sí/no, lista o texto
    largo; los obligatorios llevan un asterisco) y la casilla «Activo».
-2. Cambia lo que haga falta. Vaciar un campo también es un cambio.
+2. Cambia lo que haga falta. Vaciar un campo también es un cambio. Quien no ve el contacto de los clientes no
+   tiene «Email» ni «Teléfono» en el formulario: no cambia lo que no ve, y guardar los deja como estaban.
 3. Pulsa **Guardar**. Sale «Cliente actualizado».
 Entra: los datos cambiados y el valor de cada campo personalizado. El teléfono se guarda en formato
 internacional, como en el alta.
@@ -402,7 +414,8 @@ Sale: un fichero con las columnas `name`, `email`, `phone`, `tax_id`, `company_n
 `total_purchases`, `total_spent` (en la moneda del negocio, con sus decimales: dos en euros o en złoty,
 ninguno en yenes), `last_purchase_at`, `created_at`,
 `groups` y `tags`. Un valor que empieza por `=`, `+`, `-` o `@` (un teléfono, por ejemplo) sale con
-un apóstrofo delante para que la hoja de cálculo no lo lea como una fórmula; la importación lo quita.
+un apóstrofo delante para que la hoja de cálculo no lo lea como una fórmula; la importación lo quita. A quien no
+ve el contacto de los clientes (BASE-F119) le sale sin las columnas `email` ni `phone`.
 Si falla: sin permiso de exportar, el servidor lo rechaza aunque se llame por la API. Sin fichas,
 sale un fichero solo con las cabeceras.
 Implicados: BASE-F112 (dentro de la app)
@@ -426,7 +439,9 @@ Entra: el número tal como llegue.
 Sale: las fichas que casan (nombre, email y teléfono), por nombre. Si son dos o más, decide quien
 pregunta.
 Si falla: un número vacío, con letras o que no es posible en su país no casa con nadie (nunca
-devuelve la lista entera). Las fichas eliminadas, unidas o con los datos borrados no salen.
+devuelve la lista entera). Las fichas eliminadas, unidas o con los datos borrados no salen. Preguntar de quién es
+un número es leer el contacto: quien no ve el contacto de los clientes (BASE-F119) recibe 403
+`permission_denied`. Una automatización sí pregunta: la guardan el propietario o el administrador, que lo ven.
 Implicados: RESERVATION-F06, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F11 Guardar el teléfono en formato internacional (E.164)
@@ -473,7 +488,7 @@ Actor: propietario, administrador, responsable; el empleado, con el PIN de un re
 Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha que se va a QUEDAR y pulsa **Fusionar con…**.
-2. Busca la duplicada (nombre, email, teléfono, NIF o empresa) y tócala.
+2. Busca la duplicada como en la lista de **Clientes** y tócala.
 3. Lee el aviso, que nombra las dos fichas: «Ana G. se fusionará en Ana García: sus citas, ventas, reservas,
    conversaciones, bonos, notas y consentimientos pasan a Ana García, los datos que falten se
    completan con los suyos y Ana G. desaparece de la lista. No se puede deshacer.».
@@ -506,7 +521,7 @@ Pantalla: Ficha de cliente
 Pasos:
 1. En «Consentimiento de marketing» hay una línea para Email, WhatsApp y SMS (y otra por cada canal
    con algo apuntado: Teléfono, Correo postal), con su estado: «Nunca se le ha preguntado», «Dado» o
-   «Retirado», y la fecha y la dirección si las hay.
+   «Retirado», y la fecha y la dirección si las hay (la dirección, solo a quien ve el contacto de los clientes).
 2. Pulsa **Registrar consentimiento**. Sale la frase «Quiero recibir ofertas y novedades de este
    negocio por este canal. Puedo darme de baja cuando quiera.» con la indicación «Léelo en voz alta y
    pulsa solo si dice que sí. Esta frase exacta es la que queda guardada como prueba, junto a tu
@@ -606,8 +621,8 @@ Entra: nombre y teléfono.
 Sale: la ficha con origen «En el local», el teléfono en E.164, el aviso de ficha creada y la venta
 con cliente.
 Si falla: sin nombre no se puede pulsar; un teléfono que no es de su país sale dentro del formulario;
-si no se puede consultar quién tiene ese teléfono, la ficha se crea (la venta no se bloquea; si era la
-misma persona se juntan con CUSTOMER-F13).
+si no se puede consultar quién tiene ese teléfono, o quien la crea no ve el contacto de los clientes (BASE-F119),
+la ficha se crea sin preguntar (la venta no se bloquea; si era la misma persona se juntan con CUSTOMER-F13).
 Implicados: SALE-F05, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F19 Enlazar el cliente al pedido abierto
@@ -828,8 +843,12 @@ Pasos:
 2. Clientes contesta con la ficha: nombre, email, teléfono, NIF, empresa, dirección, ciudad, código
    postal, país, notas, cumpleaños, aniversario, canal preferido, etapa, origen, si está activa, los
    acumulados de compra, sus grupos, sus etiquetas, sus campos personalizados y su consentimiento
-   por canal.
-Entra: el identificador de la ficha y el permiso de ver clientes.
+   por canal. El email, el teléfono y la dirección de cada consentimiento van vacíos si quien pregunta no ve el
+   contacto de los clientes (BASE-F119); una automatización los recibe. La copia fiscal de la
+   venta (nombre, NIF, dirección y país) no es contacto: llega siempre.
+Entra: el identificador de la ficha y el permiso de ver clientes. Pedirla por su teléfono o su email exactos en
+lugar del identificador solo vale a quien ve el contacto de los clientes; a quien no, esas palabras solo le casan
+con un nombre.
 Sale: nada guardado; solo lectura.
 Si falla: una ficha que no existe, eliminada, unida a otra o con los datos borrados no se devuelve:
 «Este cliente ya no está disponible.». Una ficha desactivada sí se devuelve.
@@ -980,7 +999,7 @@ nada y sale la tarjeta nueva.
 | Las fichas, con búsqueda, filtros, orden y páginas | ver | F02, F17 | sí | `customer.customer.list` |
 | La ficha completa, con grupos, etiquetas, campos y consentimiento por canal | ver | F03, F30 | sí | `customer.customer.detail` |
 | Las cifras: clientes, activos, VIP e ingresos | ver | F02, F31 | sí | `customer.customer.stats` |
-| Las fichas que llevan un número de teléfono | ver | F10, F12, F18 | no | `customer.customer.by_phone` |
+| Las fichas que llevan un número de teléfono | ver, y ver el contacto de los clientes | F10, F12, F18 | no | `customer.customer.by_phone` |
 | El CSV de todas las fichas que cumplen la búsqueda | exportar | F09 | no | `customer.customer.export` |
 | Los grupos, con cuántas fichas tiene cada uno | ver | F06, F27 | sí | `customer.group.list` |
 | Las etiquetas, con cuántas fichas tiene cada una | ver | F06, F28 | sí | `customer.tag.list` |
@@ -1084,6 +1103,7 @@ ellas las que usan los servicios de Clientes.
 | Anotar en la actividad lo que traen otras apps | sí | sí | sí | no | `customer.record_activity` |
 | Eliminar fichas, grupos y etiquetas | sí | sí | no | no | `customer.delete` |
 | Borrar datos personales | sí | sí | no | no | `customer.erase` |
+| Ver el email y el teléfono de los clientes (permiso de dato de la plataforma, BASE-F119) | sí | sí | sí | sí | `base.view_customer_contact` |
 
 «Con PIN»: el empleado lo hace si un responsable lo aprueba en el momento con su PIN (o su placa) en
 el mismo dispositivo (BASE-F84): lo que tiene el responsable, otro perfil
@@ -1199,7 +1219,16 @@ asistente.
   con el control del «sí» que toca solo el registro del id). Las listas `groups` y `tags` de `set_groups` y
   `set_tags` no van con `unless`: la escritura usa los nombres junto a los ids.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
-  sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
+  sin acentos) y `search_text_without_contact` (lo mismo sin email ni teléfono), recalculados en `Customer.save()`;
+  así no hace falta la extensión `unaccent`. La lista, la exportación y la auditoría de cifras buscan en el segundo a
+  quien no tiene `base.view_customer_contact` (`queries/contact.py`), y `find_customer` solo lee una referencia como
+  teléfono o email exactos con ese permiso.
+- Contacto (BASE-F119): la marca `CUSTOMER_CONTACT` (`base/sensitive.py`) va en `email` y `phone` de `CustomerRow` (y
+  lo que hereda), de `PhoneMatch` y de la fila de la exportación (`schemas/exports.py`, que escribe solo las columnas
+  de `visible_columns`), en el `contact_point` de los consentimientos, en los filtros `email` y `phone` y en la
+  entrada de `customer.customer.by_phone`; el orden no tiene ni `email` ni `phone`. La dirección, la ciudad, el código
+  postal y el país no llevan marca: son la copia fiscal de la venta. Un paso de Automatizaciones lee con los permisos
+  de dato de base (`apps/flow/services/engine.py`).
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
   con los datos borrados (`erased_at`). Las lecturas solo ven las vivas.
 - La nota y su actividad son UNA fila de `Activity` (`kind = note_added`), como el «chatter» de Odoo.
