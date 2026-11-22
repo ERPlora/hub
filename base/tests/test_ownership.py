@@ -70,11 +70,12 @@ class TestMe:
         assert me(ctx_of(actor)) is None
 
 
-class TestOwned:
-    @pytest.fixture
-    def items(self):
-        return {name: Item.objects.create(name=name).pk for name in ("ana", "bea")}
+@pytest.fixture
+def items():
+    return {name: Item.objects.create(name=name).pk for name in ("ana", "bea")}
 
+
+class TestOwned:
     def test_a_person_without_the_all_permission_reads_only_theirs(self, items):
         assert set(ITEMS.visible(ctx_of(person("ana"))).values_list("pk", flat=True)) == {items["ana"]}
 
@@ -100,3 +101,24 @@ class TestOwned:
         ana = person("ana")
         assert (ITEMS.sees_all(ctx_of(ana)), ITEMS.sees_all(ctx_of(ana, "demo.view_all_items"))) == (False, True)
         assert ITEMS.sees_all(dataclasses.replace(ctx_of(ana), actor=None)) is True
+
+
+class TestCounted:
+    """The rows a caller's figures add up: a period's totals, a day's takings, the close by person."""
+
+    @pytest.mark.parametrize(
+        ("permissions", "counted"),
+        [
+            ((), {"ana"}),
+            (("demo.view_all_items",), {"ana"}),
+            (("base.view_business_totals",), {"ana"}),
+            (("demo.view_all_items", "base.view_business_totals"), {"ana", "bea"}),
+        ],
+        ids=["neither", "everyones rows without the business totals", "the business totals of only theirs", "both"],
+    )
+    def test_a_person_counts_the_whole_business_only_with_both_permissions(self, items, permissions, counted):
+        rows = ITEMS.counted(ctx_of(person("ana"), *permissions))
+        assert set(rows.values_list("name", flat=True)) == counted
+
+    def test_a_caller_that_is_not_a_person_counts_what_its_permission_opens(self, items):
+        assert ITEMS.counted(ctx_of("flow:7")).count() == 2
