@@ -1,6 +1,6 @@
 """Events of the service app (``service.<entity>.<fact>``) and its reactions to Staff's and Customers' events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that
+services/ records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. They carry ids (and a service's name), never a reason for voiding or
 adjusting a voucher (free text that may name the customer).
 

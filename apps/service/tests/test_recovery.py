@@ -30,12 +30,8 @@ from live.operations import get
 from apps.service import queries
 from apps.service.models import Assignment, Category, Service
 from apps.service.schemas import CategoryRecoverIn, ServiceRecoverIn
-from apps.service.services import (
-    MEMBER_TERMINATED_LEFT,
-    SERVICE_CHANGED_LEFT,
-    SERVICE_MOVED_LEFT,
-    SUBCATEGORY_CHANGED_LEFT,
-)
+from apps.service.services.category_recovery import SERVICE_CHANGED_LEFT, SERVICE_MOVED_LEFT, SUBCATEGORY_CHANGED_LEFT
+from apps.service.services.service_recovery import MEMBER_TERMINATED_LEFT
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of, giving_back
