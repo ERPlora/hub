@@ -29,6 +29,8 @@ SAMPLE = """## Pantallas
 
 - The footer says «Guardar» and «Ajustes
   guardados.»; the list opens on «Activas» and the form on «Ajustes guardados».
+- A cut quote can wrap a line too: «Ajustes
+  guardad».
 
 #### A smaller heading stays inside: «Cargando»
 
@@ -81,7 +83,7 @@ def misquotes(text: str, known: set[str]) -> list[tuple[int, str]]:
 def test_only_a_quote_of_the_section_that_no_screen_text_says_whole_is_reported():
     known = {"Guardar", "Ajustes guardados.", "Activas", "Cargando…"}
 
-    assert misquotes(SAMPLE, known) == [(8, "Ajustes guardados"), (10, "Cargando")]
+    assert misquotes(SAMPLE, known) == [(8, "Ajustes guardados"), (9, "Ajustes guardad"), (12, "Cargando")]
     assert misquotes(SAMPLE.replace("### Cómo son", "### Cómo eran"), known) == []
 
 
