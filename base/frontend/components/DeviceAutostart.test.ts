@@ -28,7 +28,7 @@ async function mounted(locale: 'en' | 'es' = 'en') {
   return m;
 }
 
-/** An Ionic control's state is a property of its element, not an attribute. */
+/** The switch's element, whose `checked` and `disabled` are what the person sees. */
 const toggle = (m: Awaited<ReturnType<typeof mounted>>) => m.wrapper.get(TOGGLE).element as HTMLElement & { checked: boolean; disabled: boolean };
 
 /** A person's tap: the switch moves first, then it tells. */

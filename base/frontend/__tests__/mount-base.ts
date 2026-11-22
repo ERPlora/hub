@@ -67,6 +67,10 @@ export function installedApp(distribution: string, answers: Record<string, () =>
   return invoke;
 }
 
+/** An Ionic control's state (`checked`, `value`, `disabled`), a property of its element, not an attribute. */
+export const ionProp = (wrapper: { get: (s: string) => { element: Element } }, testid: string, name: string): unknown =>
+  (wrapper.get(`[data-testid="${testid}"]`).element as unknown as Record<string, unknown>)[name];
+
 export function leaveInstalledApp(): void {
   delete (window as TauriWindow).__TAURI__;
   forgetAppDistribution();

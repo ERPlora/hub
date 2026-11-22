@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, installedApp, ionProp, leaveInstalledApp, mountBase, subId } from '../__tests__/mount-base';
 import type { DeviceCurrent } from '../operations/devices';
 import DeviceModeCard from './DeviceModeCard.vue';
 
@@ -18,10 +18,6 @@ async function card(data: DeviceCurrent | null = SHARED, options: Parameters<typ
   return { ...mounted, call, choose, sent };
 }
 
-/** An Ionic control's state is a property of its element, not an attribute. */
-const prop = (wrapper: { get: (s: string) => { element: Element } }, testid: string, name: string): unknown =>
-  (wrapper.get(`[data-testid="${testid}"]`).element as unknown as Record<string, unknown>)[name];
-
 afterEach(() => {
   leaveInstalledApp();
   document.body.innerHTML = '';
@@ -35,27 +31,27 @@ describe('DeviceModeCard', () => {
     const choices = wrapper.findAll('ion-radio ion-label').map((label) => label.element.innerHTML);
     expect(choices[0]).toContain('Shared — a till or tablet several people use');
     expect(choices[1]).toContain('Personal — a device only you use');
-    expect(prop(wrapper, 'device-mode', 'value')).toBe('shared');
+    expect(ionProp(wrapper, 'device-mode', 'value')).toBe('shared');
   });
 
   it('an administrator changes it, and the mark is the Hub’s answer', async () => {
     const { wrapper, choose, sent } = await card();
     await choose('personal');
     expect(sent()).toEqual([{ mode: 'personal' }]);
-    expect(prop(wrapper, 'device-mode', 'value')).toBe('personal');
+    expect(ionProp(wrapper, 'device-mode', 'value')).toBe('personal');
   });
 
   it('a refusal leaves the mark where it was and says so', async () => {
     const refuse = () => Response.json({ error: { code: 'unexpected', message: 'boom' } }, { status: 500 });
     const { wrapper, choose } = await card(SHARED, {}, refuse);
     await choose('personal');
-    expect(prop(wrapper, 'device-mode', 'value')).toBe('shared');
+    expect(ionProp(wrapper, 'device-mode', 'value')).toBe('shared');
     expect(wrapper.get('[data-testid="device-mode-error"]').text()).toContain('Could not change this device.');
   });
 
   it('whoever does not run the hub sees it, disabled, and why', async () => {
     const { wrapper } = await card(SHARED, { session: EMPLOYEE });
-    expect([prop(wrapper, 'device-mode-shared', 'disabled'), prop(wrapper, 'device-mode-personal', 'disabled')]).toEqual([true, true]);
+    expect([ionProp(wrapper, 'device-mode-shared', 'disabled'), ionProp(wrapper, 'device-mode-personal', 'disabled')]).toEqual([true, true]);
     expect(wrapper.text()).toContain('Only an administrator can change how people enter on this device.');
   });
 
