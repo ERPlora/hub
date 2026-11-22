@@ -13,7 +13,7 @@ import { roleKey } from '../lib/people';
 import type { RolePermission } from '../operations/people';
 import '../settings.css';
 
-const TONES: Record<RolePermission['state'], StatusPillTone> = { yes: 'success', approval: 'warning', no: 'neutral' };
+const TONES: Record<RolePermission['state'], StatusPillTone> = { on: 'success', approval: 'warning', off: 'neutral' };
 
 const { t, locale } = useBaseI18n();
 const route = useRoute();

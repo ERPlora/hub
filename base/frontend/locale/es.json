@@ -926,9 +926,9 @@
       "retry": "Reintentar",
       "notFound": "Este rol no existe en este negocio.",
       "state": {
-        "yes": "Sí",
+        "on": "Permitido",
         "approval": "Con aprobación",
-        "no": "No"
+        "off": "No"
       }
     },
     "person": {

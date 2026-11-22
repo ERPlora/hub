@@ -14,21 +14,21 @@ function employee(fields: Partial<RoleDetail> = {}): RoleDetail {
       {
         app: 'base',
         name: 'El negocio',
-        permissions: [{ permission: 'base.view_home', phrase: 'Ver el Inicio y sus paneles', state: 'yes' }],
+        permissions: [{ permission: 'base.view_home', phrase: 'Ver el Inicio y sus paneles', state: 'on' }],
       },
       {
         app: 'sale',
         name: 'Ventas / TPV',
         permissions: [
-          { permission: 'sale.take_payment', phrase: 'Cobrar', state: 'yes' },
+          { permission: 'sale.take_payment', phrase: 'Cobrar', state: 'on' },
           { permission: 'sale.void_sale', phrase: 'Anular una venta', state: 'approval' },
-          { permission: 'sale.view_all_sales', phrase: 'Ver las ventas de todos', state: 'no' },
+          { permission: 'sale.view_all_sales', phrase: 'Ver las ventas de todos', state: 'off' },
         ],
       },
       {
         app: 'sensitive',
         name: 'Datos sensibles',
-        permissions: [{ permission: 'base.view_costs', phrase: 'Ver costes', state: 'no' }],
+        permissions: [{ permission: 'base.view_costs', phrase: 'Ver costes', state: 'off' }],
       },
     ],
     ...fields,
@@ -72,7 +72,7 @@ describe('RolePage', () => {
     ]);
     expect(line(m, 'sale.void_sale').text()).toContain('Anular una venta');
     expect(line(m, 'sale.void_sale').text()).toContain('Con aprobación');
-    expect(line(m, 'sale.take_payment').text()).toContain('Sí');
+    expect(line(m, 'sale.take_payment').text()).toContain('Permitido');
     expect(line(m, 'sale.view_all_sales').text()).toContain('No');
     expect(m.wrapper.text()).toContain('Lo que este rol deja hacer en este negocio, app por app.');
     expect(m.wrapper.get('[data-testid="role-members"]').text()).toBe('Personas con este rol: 2');
@@ -82,7 +82,7 @@ describe('RolePage', () => {
     const m = await open();
     await m.result(m.call, 'base.role.detail', employee());
     expect(line(m, 'sale.void_sale').text()).toContain('With approval');
-    expect(line(m, 'sale.take_payment').text()).toContain('Yes');
+    expect(line(m, 'sale.take_payment').text()).toContain('Allowed');
     expect(m.wrapper.get('[data-testid="role-members"]').text()).toBe('People with this role: 2');
   });
 

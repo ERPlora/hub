@@ -99,5 +99,5 @@ def _approvable(configs: Iterable[LiveAppConfig]) -> frozenset[str]:
 
 def _state(permission: str, given: Collection[str], approved: Collection[str]) -> str:
     if permission in given:
-        return "yes"
-    return "approval" if permission in approved else "no"
+        return "on"
+    return "approval" if permission in approved else "off"

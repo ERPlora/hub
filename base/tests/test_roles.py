@@ -1,6 +1,6 @@
 """«What it allows» of a basic role (``base.role.detail``, BASE-F82): app by app, each permission with its phrase in the
-reader's language and what the role does with it: ``yes``, ``approval`` (a manager approves it there and then) or
-``no``."""
+reader's language and what the role does with it: ``on``, ``approval`` (a manager approves it there and then) or
+``off``, the words a role of the business keeps its own states in."""
 
 import json
 
@@ -67,26 +67,26 @@ class TestWhatABasicRoleAllows:
         assert group(answer, "sensitive")["name"] == "Datos sensibles"
         assert answer["label"] == "Empleado"
 
-    def test_what_the_role_holds_is_yes_and_what_nobody_approves_for_it_is_no(self):
+    def test_what_the_role_holds_is_on_and_what_nobody_approves_for_it_is_off(self):
         employee = states(read("hub_employee"))
 
-        assert employee["sale.take_payment"] == "yes"
-        assert employee["sale.view_all_sales"] == "no"
-        assert employee["base.view_customer_contact"] == "yes"
-        assert employee["base.view_costs"] == "no"
+        assert employee["sale.take_payment"] == "on"
+        assert employee["sale.view_all_sales"] == "off"
+        assert employee["base.view_customer_contact"] == "on"
+        assert employee["base.view_costs"] == "off"
 
     def test_the_states_follow_what_each_role_is_given(self):
         for role in Membership.Role.values:
             given = permissions_of_role(role)
             for permission, state in states(read(role)).items():
-                assert (state == "yes") == (permission in given), (role, permission, state)
+                assert (state == "on") == (permission in given), (role, permission, state)
 
     def test_the_owner_holds_everything_and_the_administrator_all_but_owning_the_business(self):
         owner = states(read("hub_owner"))
         admin = states(read("hub_admin"))
 
-        assert set(owner.values()) == {"yes"}
-        assert {permission for permission, state in admin.items() if state != "yes"} == set(OWNER_ONLY)
+        assert set(owner.values()) == {"on"}
+        assert {permission for permission, state in admin.items() if state != "on"} == set(OWNER_ONLY)
 
     def test_the_business_comes_first_and_the_sensitive_data_last_each_with_its_own(self):
         answer = read("hub_manager")
@@ -107,6 +107,7 @@ class TestWhatABasicRoleAllows:
 
     def test_it_says_how_many_people_have_the_role(self, client, eva, make_user):
         make_user("saas:7", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Javi")
+        make_user("saas:8", host=A.key, role=Membership.Role.MANAGER, first_name="Marta")
         client.force_login(eva)
 
         answer = detail(client, "hub_employee").json()

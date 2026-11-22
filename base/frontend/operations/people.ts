@@ -55,8 +55,8 @@ export interface HubRoleRow {
 export interface RolePermission {
   permission: string;
   phrase: string;
-  /** yes: the role holds it; approval: a manager approves it there and then with their PIN; no: not at all. */
-  state: 'yes' | 'approval' | 'no';
+  /** on: the role holds it; approval: a manager approves it there and then with their PIN; off: not at all. */
+  state: 'on' | 'approval' | 'off';
 }
 
 /** `base.RoleAppOut`: one panel of «What it allows»: the business, an app that is on, or the sensitive data. */

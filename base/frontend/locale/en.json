@@ -926,9 +926,9 @@
       "retry": "Retry",
       "notFound": "This role does not exist in this business.",
       "state": {
-        "yes": "Yes",
+        "on": "Allowed",
         "approval": "With approval",
-        "no": "No"
+        "off": "No"
       }
     },
     "person": {

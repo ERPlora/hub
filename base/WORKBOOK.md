@@ -259,7 +259,7 @@ Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y
 
 ### Empleados · Roles · Qué permite
 Un rol básico, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
-y si lo da («Sí»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
+y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
 
 ### Empleados · API keys
 Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
@@ -2237,7 +2237,7 @@ Pasos:
   4. Al tocar un rol se abre «Qué permite», con el nombre del rol arriba, «Lo que este rol deja hacer en este negocio,
      app por app. Se da en erplora.com y aquí no se cambia.» y «Personas con este rol: 2». Debajo, un panel por app:
      «El negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la
-     frase de cada permiso y su estado: «Sí», «Con aprobación» (lo hace si un responsable lo aprueba con su PIN en ese
+     frase de cada permiso y su estado: «Permitido», «Con aprobación» (lo hace si un responsable lo aprueba con su PIN en ese
      momento, BASE-F84) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con
      aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada.
   5. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
@@ -4406,8 +4406,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
 - Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
-  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.list` (rutas `/api/people…`,
-  `/api/roles`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
+  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail}` (rutas `/api/people…`,
+  `/api/roles`, `/api/roles/detail`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
@@ -4711,6 +4711,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
 | `base.role.list` | F82, F83 |
+| `base.role.detail` | F82 |
 | `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |
 | `base.approval.list`, `base.approval.export` | F85 |
 | `base.api_key.create` | F86 |

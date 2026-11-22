@@ -2,7 +2,7 @@
 // flow: BASE-F82
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, collectProblems, EMPLOYEE, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
+import { A, capture, collectProblems, EMPLOYEE, horizontalOverflow, hostPage, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   375: { width: 375, height: 667 },
@@ -18,7 +18,7 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
   await expect(shown(page).locator('[data-testid$="-loading"]:visible')).toHaveCount(0);
   await untilStill(page);
   expect(await horizontalOverflow(page), `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`BASE-F82-${key}-${width}`), fullPage: true });
+  await capture(page, `BASE-F82-${key}-${width}`, { fullPage: true });
 }
 
 /** What the role does with ``permission``: its phrase and its pill's tone. */

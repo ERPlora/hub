@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3b95f96614869e6dc3a1fe9c8b16a0d59857512153d042a85dd92b03220b1f22 -->
+<!-- generated from WORKBOOK.md sha256:854d7e4ba638086715deaa456cbcabf2893b46596a233356cf1d0f34c0ab7ab4 -->
 
 ## What it is for and who it is for
 
@@ -245,7 +245,7 @@ give. Tapping one opens "What it allows".
 
 ### Employees · Roles · What it allows
 A basic role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
-and whether the role gives it ("Yes"), lets a person do it with a manager's approval ("With approval") or not ("No").
+and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
 The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
@@ -2226,7 +2226,7 @@ Steps:
   4. Tapping a role opens "What it allows", with the role's name at the top, "What this role lets a person do in this
      business, app by app. It is given on erplora.com and is not changed here." and "People with this role: 2".
      Below, a panel per app: "The business" first, then each app that is on by its name and "Sensitive data" last.
-     In each panel, the phrase of each permission and its state: "Yes", "With approval" (the person does it if a
+     In each panel, the phrase of each permission and its state: "Allowed", "With approval" (the person does it if a
      manager approves it with their PIN there and then, BASE-F84) or "No". For example, the employee sees in "Sales
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
      changed here.

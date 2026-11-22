@@ -14,8 +14,8 @@ class RoleDetailIn(Schema):
 class RolePermissionOut(Schema):
     permission: str
     phrase: str = Field(description="What the permission lets a person do, in business words and the reader's language.")
-    state: Literal["yes", "approval", "no"] = Field(
-        description="yes: the role holds it; approval: a manager approves it there and then with their PIN; no: not at all."
+    state: Literal["on", "approval", "off"] = Field(
+        description="on: the role holds it; approval: a manager approves it there and then with their PIN; off: not at all."
     )
 
 
