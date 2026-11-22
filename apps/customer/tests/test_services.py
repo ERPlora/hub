@@ -2662,5 +2662,5 @@ def test_who_wrote_it_is_the_persons_name_never_their_account_id():
         ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes."),
         actor=nameless,
     )
-    assert fact.recorded_by == "luis@example.com"
+    assert fact.recorded_by == "luis"
     assert grant_health(ana, actor=clara).consent_by == "Clara Ruiz"
