@@ -7,6 +7,8 @@ be named by id or by name (the assistant speaks names): ``resolve_member``.
 
 import datetime as dt
 from decimal import ROUND_HALF_UP, Decimal
+from functools import reduce
+from operator import or_
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +27,7 @@ from base.business import babel_locale, business_zone
 from base.models import HubUser, Membership
 from base.queries.people import hub_user_of
 from base.ordering import list_order_for
+from base.sensitive import VIEW_TEAM_CONTACT
 from apps.staff.schemas.accounts import AccountListIn, AccountPage
 from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
 from apps.staff.schemas.commissions import CommissionPage, CommissionReportIn, CommissionReportOut, CommissionSummaryIn
@@ -74,8 +77,6 @@ MEMBER_ORDER = {
     "name": ("first_name", "last_name"),
     "first_name": ("first_name",),
     "last_name": ("last_name",),
-    "email": ("email",),
-    "phone": ("phone",),
     "role_name": ("role__name",),
     "status": ("status",),
     "is_bookable": ("is_bookable",),
@@ -93,6 +94,25 @@ ROLE_ORDER = {
     "member_count": ("member_count",),
     "id": (),
 }
+# The model lookup behind each filter of the directory; a filter left out keeps every record.
+MEMBER_FILTERS = {
+    "first_name": "first_name__icontains",
+    "last_name": "last_name__icontains",
+    "email": "email__icontains",
+    "phone": "phone__icontains",
+    "status": "status",
+    "role_id": "role_id",
+    "role_name": "role__name__iexact",
+    "is_bookable": "is_bookable",
+    "hire_date_from": "hire_date__gte",
+    "hire_date_to": "hire_date__lte",
+    "color": "color__iexact",
+    "user_id": "user_id",
+}
+NO_FILTER = (None, "")
+# The columns the directory's search looks into, and the contact ones only for whoever sees the team's contact.
+MEMBER_SEARCH = ("search_name", "employee_number", "role__name")
+CONTACT_SEARCH = ("email", "phone")
 TIME_OFF_ORDER = {
     "start_date": ("start_date",),
     "end_date": ("end_date",),
@@ -133,42 +153,19 @@ TIME_OFF_ORDER = {
 )
 def list_members(ctx: OperationContext, params: MemberListIn) -> dict:
     """The directory with the old table's filters and sorts; never the pay (STAFF-F09)."""
-    members = filter_members(live_members(), params)
+    members = filter_members(live_members(), params, contact=ctx.has(VIEW_TEAM_CONTACT))
     return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
 
 
-def filter_members(members: QuerySet[Member], params: MemberListIn) -> QuerySet[Member]:  # noqa: C901
-    """The directory's search and filters, shared by the pay sheet so both give the same rows."""
+def filter_members(members: QuerySet[Member], params: MemberListIn, *, contact: bool) -> QuerySet[Member]:
+    """The directory's search and filters, shared by the pay sheet so both give the same rows. The search looks into
+    the email and the phone only when ``contact``: the caller sees the team's contact details."""
     members = members.annotate(search_name=Concat("first_name", Value(" "), "last_name"))
     if params.search:
-        members = members.filter(
-            Q(search_name__icontains=params.search)
-            | Q(email__icontains=params.search)
-            | Q(phone__icontains=params.search)
-            | Q(employee_number__icontains=params.search)
-            | Q(role__name__icontains=params.search)
-        )
-    for field in ("first_name", "last_name", "email", "phone"):
-        value = getattr(params, field)
-        if value:
-            members = members.filter(**{f"{field}__icontains": value})
-    if params.status:
-        members = members.filter(status=params.status)
-    if params.role_id:
-        members = members.filter(role_id=params.role_id)
-    if params.role_name:
-        members = members.filter(role__name__iexact=params.role_name)
-    if params.is_bookable is not None:
-        members = members.filter(is_bookable=params.is_bookable)
-    if params.hire_date_from:
-        members = members.filter(hire_date__gte=params.hire_date_from)
-    if params.hire_date_to:
-        members = members.filter(hire_date__lte=params.hire_date_to)
-    if params.color:
-        members = members.filter(color__iexact=params.color)
-    if params.user_id:
-        members = members.filter(user_id=params.user_id)
-    return members
+        columns = MEMBER_SEARCH + (CONTACT_SEARCH if contact else ())
+        members = members.filter(reduce(or_, (Q(**{f"{column}__icontains": params.search}) for column in columns)))
+    given = {name: getattr(params, name) for name in MEMBER_FILTERS}
+    return members.filter(**{MEMBER_FILTERS[name]: value for name, value in given.items() if value not in NO_FILTER})
 
 
 @operation(
@@ -268,7 +265,7 @@ def current_record(ctx: OperationContext, data: CurrentMemberIn) -> dict:
 def compensation(ctx: OperationContext, params: CompensationListIn) -> dict:
     """Pay and HR notes of each record, with both ids a person's sales can carry (STAFF-F21). Same
     filters, sort and pages as the directory: a screen reads the pay of exactly the rows it shows."""
-    members = filter_members(live_members(), params)
+    members = filter_members(live_members(), params, contact=ctx.has(VIEW_TEAM_CONTACT))
     if params.id:
         members = members.filter(pk=params.id)
     return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
