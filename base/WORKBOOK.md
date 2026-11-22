@@ -228,8 +228,9 @@ foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz
 «PIN».
 
 ### Ajustes · General
-Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
-«Pinpad», para quien administra «Dispositivos» y, al final, «Documentación de la API».
+Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»
+(en la app de ERPlora de un ordenador, también «Arrancar al iniciar sesión»), «Pinpad», para quien administra
+«Dispositivos» y, al final, «Documentación de la API».
 
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
@@ -299,8 +300,8 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 |---|---|
 | Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
-| Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
-| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
+| Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». En la app de un ordenador, «No se pudo cambiar el ajuste de arranque al iniciar sesión.» (BASE-F120). |
+| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.»), salvo «Arrancar al iniciar sesión», que es del ordenador y no del negocio, y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
 
@@ -460,6 +461,7 @@ En la pantalla Archivos:
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
+| BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3469,6 +3471,23 @@ Sale: nada guardado.
 Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
 Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+
+### BASE-F120 Arrancar ERPlora al iniciar sesión en el ordenador
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes · General
+Pasos:
+  1. En la app de ERPlora de un ordenador, **Ajustes › General** lleva en «Este dispositivo» el interruptor
+     «Arrancar al iniciar sesión» («Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre
+     tengan dónde imprimirse.»), apagado de fábrica. En un navegador y en la app de Android no sale.
+  2. Al moverlo, el Hub se lo pide a la app, que lo apunta en el sistema y vuelve a leer qué dice (HUB_APP-F27);
+     mientras tanto, el interruptor espera.
+  3. El interruptor queda donde dice el sistema, no donde se movió.
+Entra: el interruptor, en el propio ordenador.
+Sale: el arranque del sistema de este ordenador, no del negocio. En el Hub no se guarda nada.
+Si falla: debajo, «No se pudo cambiar el ajuste de arranque al iniciar sesión.», y el interruptor vuelve a lo que
+dice el sistema. Una app anterior a esta orden no lo enseña.
+Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ## Para quien lo mantiene
 
