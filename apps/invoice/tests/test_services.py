@@ -18,7 +18,9 @@ from live.context import system_context
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
+from apps.invoice import services
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
+from apps.invoice.services import writes
 from apps.invoice.tests.conftest import A, HUB_DB, ISSUER, ctx_for, run
 from apps.sale.tests.test_integration_tax import where_rules_are_made
 
@@ -52,6 +54,15 @@ def manual(series_code=None, lines=None, **more):
 
 def events(name):
     return list(OutboxEvent.objects.filter(name=name).order_by("created_at", "id"))
+
+
+def at(monkeypatch, moment: dt.datetime):
+    """Moves the clock the operations read (the business day follows Madrid), in every module of the writes that
+    reads it."""
+    clock = writes._now
+    for module in vars(services).values():
+        if getattr(module, "_now", None) is clock:
+            monkeypatch.setattr(module, "_now", lambda: moment)
 
 
 # ── The issuer (INVOICE-F21, F22) ───────────────────────────────────────────────────────────────
