@@ -1,94 +1,15 @@
-"""What the tests of scripts/ecs_deploy.py deploy with: a fake aws CLI and a fake git first on the PATH, fixtures for
-what they answer, and the deploy run as the workflow runs it, in a process of its own.
+"""What the tests of scripts/ecs_deploy.py deploy with: the fake aws CLI of ecs_doubles and a fake git first on the
+PATH, and fixtures for what they answer.
 
 The fake aws records every call and answers from the fixtures; the fake git answers deploy/app-env.json of the commit
-abc123 from its fixture. Inside the deploy's process time.sleep only records the pause, so no test waits for real, and
-gives up after 500 of them, so a loop that never times out fails its test instead of hanging. AWS's configuration and
-credentials point to /dev/null: nothing here can reach AWS.
+abc123 from its fixture.
 """
 
 import json
-import os
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import unittest
-from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "ecs_deploy.py"
-CLUSTER_SCOPED = re.compile(r"^ecs (describe-services|run-task|describe-tasks|update-service|wait) ")
-NOT_INHERITED = ("CLUSTER", "PROJECT", "POLL_SECONDS", "MIGRATE_TIMEOUT_SECONDS", "ROLLOUT_TIMEOUT_SECONDS",
-                 "CONFIRM_PROTECTED", "AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN")
+from ecs_doubles import APP_ENV, FAKE_AWS_END, FAKE_AWS_START, SCRIPTS, ScriptCase, one
 
-BOOT = """\
-import os, runpy, sys, time
-
-def sleep(seconds):
-    with open(os.environ["SLEEP_LOG"], "a", encoding="utf-8") as log:
-        log.write(f"{seconds}\\n")
-    with open(os.environ["SLEEP_LOG"], encoding="utf-8") as log:
-        if len(log.readlines()) > 500:
-            sys.exit("fake sleep: more than 500 pauses")
-
-time.sleep = sleep
-runpy.run_path(sys.argv[1], run_name="__main__")
-"""
-
-# Imports only what each answer needs: the fake answers every aws call of every test, and Python starts slowly.
-FAKE_AWS = r'''
-import os
-import sys
-
-args = sys.argv[1:]
-env = os.environ
-fixtures = env["FIXTURES"]
-with open(env["CALLS_LOG"], "a", encoding="utf-8", errors="surrogateescape") as calls:
-    calls.write(" ".join(args) + "\n")
-
-
-def value(flag):
-    return next((args[i + 1] for i in range(len(args) - 1) if args[i] == flag), "")
-
-
-def read(path):
-    with open(path, "rb") as found:
-        return found.read()
-
-
-def refuse(message):
-    print(message, file=sys.stderr)
-    sys.exit(254)
-
-
-def answer(name):
-    sys.stdout.buffer.write(os.environb[name.encode()] + b"\n")
-
-
-def nth(counter, answers):
-    # The next of a list of answers, counted per counter; the last one repeats.
-    path = os.path.join(os.path.dirname(fixtures), f"polls.{counter}")
-    n = int(read(path)) if os.path.exists(path) else 0
-    with open(path, "w", encoding="utf-8") as polls:
-        polls.write(str(n + 1))
-    answers = answers.split()
-    return answers[min(n, len(answers) - 1)]
-
-
-def describe_task_definition():
-    path = os.path.join(fixtures, f"{value('--task-definition')}.json")
-    if not os.path.isfile(path):
-        refuse("An error occurred (ClientException): Unable to describe task definition.")
-    if value("--include") == "TAGS":
-        sys.stdout.buffer.write(read(path))
-        return
-    # Tags only come back when asked for.
-    import json
-    definition = json.loads(read(path))
-    definition.pop("tags", None)
-    print(json.dumps(definition, indent=4))
-
+FAKE_AWS = FAKE_AWS_START + r'''
 
 def register_task_definition():
     import json
@@ -140,21 +61,6 @@ def describe_tasks():
         answer("FAKE_STOPPED_REASON") if "FAKE_STOPPED_REASON" in env else print("Essential container in task exited")
 
 
-def get_parameter():
-    # /erplora/prod/hub/app_env answers the fixture erplora_prod_hub_app_env.json.
-    path = os.path.join(fixtures, value("--name").strip("/").replace("/", "_") + ".json")
-    if not os.path.isfile(path):
-        refuse("An error occurred (ParameterNotFound) when calling the GetParameter operation: ")
-    sys.stdout.buffer.write(read(path))
-
-
-def put_parameter():
-    if value("--name").endswith("/app_env"):
-        with open(env["APP_ENV_PUT"], "w", encoding="utf-8", errors="surrogateescape") as put:
-            put.write(value("--value") + "\n")
-    print('{"Version": 2, "Tier": "Standard"}')
-
-
 def update_service():
     print(f'{{"service": {{"serviceName": "{value("--service")}"}}}}')
 
@@ -164,13 +70,7 @@ COMMANDS = {
     "ecs describe-services": describe_services, "ecs run-task": run_task, "ecs describe-tasks": describe_tasks,
     "ssm get-parameter": get_parameter, "ssm put-parameter": put_parameter, "ecs update-service": update_service,
 }
-command = " ".join(args[:2])
-if env.get("FAKE_KILLED_ON") == command:
-    os.kill(os.getpid(), 9)
-if env.get("FAKE_FAILS_ON") == command:
-    refuse(f"An error occurred (AccessDeniedException) when calling {command}")
-COMMANDS.get(command, lambda: None)()
-'''
+''' + FAKE_AWS_END
 
 # git answers deploy/app-env.json of abc123 (or FAKE_COMMIT) from its fixture, and fails as git does without it.
 FAKE_GIT = r'''
@@ -195,52 +95,19 @@ else:
 sys.exit(128)
 '''
 
-# deploy/app-env.json of the commit deployed (abc123): the settings in force of each environment are the same.
-APP_ENV = {
-    "prod": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
-             "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"}},
-    "pre": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false",
-                    "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"},
-            "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false",
-                       "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"}},
-}
 # Terraform's variables and the settings in force of prod's apps.
 PROD_APP = [{"name": "DEBUG", "value": "False"}, {"name": "PLATFORM_HUB_SLUG", "value": "erplora"},
             {"name": "VERIFACTU_PRODUCTION_ENABLED", "value": "true"}]
 
 
-def task_definition(family, containers, environment=None, task_role=None, execution_role=None):
-    """A task definition as `describe-task-definition --include TAGS` returns it, with the roles and the Environment tag
-    Terraform gives it (ERPlora/aws modules/ecs-service: erplora-<env>-<name>-task and -execution); the tag ("" = none)
-    and the roles may be overridden."""
-    environment = family.split("-")[1] if environment is None else environment
-    tags = [{"key": "Project", "value": "erplora"}, {"key": "ManagedBy", "value": "terraform"}]
-    return {
-        "taskDefinition": {
-            "family": family, "taskDefinitionArn": f"arn:td/{family}:1", "revision": 1, "status": "ACTIVE",
-            "requiresAttributes": [], "compatibilities": ["FARGATE"], "registeredAt": "t", "registeredBy": "u",
-            "taskRoleArn": task_role or f"arn:aws:iam::123456789012:role/{family}-task",
-            "executionRoleArn": execution_role or f"arn:aws:iam::123456789012:role/{family}-execution",
-            "containerDefinitions": containers,
-        },
-        "tags": tags + ([{"key": "Environment", "value": environment}] if environment else []),
-    }
+class DeployCase(ScriptCase):
+    """A fresh fake AWS for each test: prod's and pre's families on their own image, and deploy/app-env.json of the
+    commit deployed equal to the settings in force."""
 
-
-def one(name, image, **more):
-    return [{"name": name, "image": f"reg.example/erplora/{image}", **more}]
-
-
-class DeployCase(unittest.TestCase):
-    """A fresh fake AWS for each test: prod's and pre's families on their own image, the settings in force equal to
-    deploy/app-env.json and the SaaS's latest revision charging real money."""
+    script = SCRIPTS / "ecs_deploy.py"
 
     def setUp(self):
-        self.work = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.work)
-        self.fixtures = self.work / "fixtures"
-        for folder in (self.work / "bin", self.fixtures):
-            folder.mkdir()
+        super().setUp()
         # The hub and the worker run the app plus its pgbouncer sidecar, both on the hub image; the hub fixture also
         # carries containers of other images, which must stay as they are.
         self.fixture("erplora-prod-hub", [
@@ -257,77 +124,18 @@ class DeployCase(unittest.TestCase):
         self.fixture("erplora-pre-hub-migrate", one("hub-migrate", "hub-pre:bootstrap"))
         self.fixture("erplora-pre-db-bootstrap", one("db-bootstrap", "hub:bootstrap"))
         self.write("app-env.json", APP_ENV)
-        for environment in ("prod", "pre"):
-            self.write(f"erplora_{environment}_hub_app_env.json", APP_ENV[environment])
-        self.saas_charging("true")
-        for name, fake in (("aws", FAKE_AWS), ("git", FAKE_GIT)):
-            path = self.work / "bin" / name
-            path.write_text(f"#!{sys.executable} -IS\n{fake}")
-            path.chmod(0o755)
-
-    def write(self, name, data):
-        (self.fixtures / name).write_text(json.dumps(data))
-
-    def fixture(self, family, containers, *rest):
-        self.write(f"{family}.json", task_definition(family, containers, *rest))
-
-    def edit(self, name, change):
-        """Changes the fixture <name> with <change>, a function that edits its data in place."""
-        data = json.loads((self.fixtures / name).read_text())
-        change(data)
-        self.write(name, data)
-
-    def saas_charging(self, charging):
-        """The SaaS's latest revision, with PLATFORM_INVOICING_ENABLED=<charging>."""
-        self.fixture("erplora-prod-saas", one("saas", "saas:live", environment=[
-            {"name": "PLATFORM_INVOICING_ENABLED", "value": charging}]))
-
-    def environ(self, unset, env):
-        environ = {key: value for key, value in os.environ.items() if key not in NOT_INHERITED}
-        environ.update(PATH=f"{self.work / 'bin'}:{os.environ['PATH']}", AWS_REGION="eu-south-2",
-                       REGISTRY="reg.example", IMAGE_TAG="abc123", ENVIRONMENT="prod", FIXTURES=str(self.fixtures),
-                       CALLS_LOG=str(self.work / "calls.log"), REGISTERED_LOG=str(self.work / "registered.log"),
-                       SLEEP_LOG=str(self.work / "sleep.log"), GIT_LOG=str(self.work / "git.log"),
-                       APP_ENV_PUT=str(self.work / "app-env-put.json"), AWS_CONFIG_FILE=os.devnull,
-                       AWS_SHARED_CREDENTIALS_FILE=os.devnull)
-        environ.update(env)
-        for name in unset:
-            environ.pop(name, None)
-        return environ
+        self.install("aws", FAKE_AWS)
+        self.install("git", FAKE_GIT)
 
     def deploy(self, *unset, apart=False, **env):
         """Deploys abc123 to prod with the fakes; <env> overrides the environment and <unset> takes variables out of
         it. stdout and stderr land together in self.out, or apart in self.stdout and self.stderr. The logs and the
         fake's counters start empty."""
-        for log in ("calls.log", "registered.log", "sleep.log", "git.log"):
+        for log in ("registered.log", "git.log"):
             (self.work / log).write_text("")
-        for leftover in (*self.work.glob("polls.*"), self.work / "app-env-put.json"):
-            leftover.unlink(missing_ok=True)
-        done = subprocess.run([sys.executable, "-c", BOOT, str(SCRIPT)], env=self.environ(unset, env),
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE if apart else subprocess.STDOUT,
-                              timeout=120, check=False)
-        self.stdout, self.stderr = done.stdout, done.stderr
-        self.out = done.stdout.decode("utf-8", "replace")
-        self.status = done.returncode
-        return done.returncode
-
-    def calls(self):
-        return (self.work / "calls.log").read_text(errors="replace").splitlines()
-
-    def lines(self, pattern):
-        return [n for n, call in enumerate(self.calls(), 1) if re.search(pattern, call)]
-
-    def line_of(self, pattern):
-        return self.lines(pattern)[0]
-
-    def last_line_of(self, pattern):
-        return self.lines(pattern)[-1]
-
-    def called(self, pattern):
-        return bool(self.lines(pattern))
-
-    def pauses(self):
-        return (self.work / "sleep.log").read_text().split()
+        environ = self.environ(unset, env, REGISTRY="reg.example", IMAGE_TAG="abc123",
+                               REGISTERED_LOG=str(self.work / "registered.log"), GIT_LOG=str(self.work / "git.log"))
+        return self.execute(environ, apart)
 
     def git_calls(self):
         return (self.work / "git.log").read_text().splitlines()
@@ -345,18 +153,6 @@ class DeployCase(unittest.TestCase):
         container = next(c for c in self.registered()[family]["containerDefinitions"] if c["name"] == name)
         return {variable["name"]: variable["value"] for variable in container.get("environment", [])}
 
-    def recorded_settings(self):
-        return json.loads((self.work / "app-env-put.json").read_text())
-
-    def clusters_named(self):
-        """The clusters the cluster-scoped ECS calls named, without repeats ("-" for one without --cluster)."""
-        named = set()
-        for call in self.calls():
-            if CLUSTER_SCOPED.search(call):
-                words = call.split()
-                named.add(words[words.index("--cluster") + 1] if "--cluster" in words[:-1] else "-")
-        return named
-
     def assertNothingRegistered(self, error=None):
         """The deploy failed, registered and ran nothing and recorded no settings; <error>, when given, is a pattern its
         ::error:: line matches."""
@@ -366,9 +162,3 @@ class DeployCase(unittest.TestCase):
         self.assertFalse((self.work / "app-env-put.json").exists())
         if error is not None:
             self.assertRegex(self.out, f"::error::{error}")
-
-    def assertFailsBeforeAnyCall(self, *names):
-        self.assertNotEqual(0, self.status)
-        self.assertEqual([], self.calls())
-        for name in names:
-            self.assertIn(name, self.out)

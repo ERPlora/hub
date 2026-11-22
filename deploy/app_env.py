@@ -328,7 +328,7 @@ def apply(workdir, environment, commit, region, confirm):
 
 
 def write_settings(workdir, settings):
-    """What ecs_deploy.py and ecs-rollback.sh record in app_env once they succeed: compact JSON, keys sorted."""
+    """What ecs_deploy.py and ecs_rollback.py record in app_env once they succeed: compact JSON, keys sorted."""
     (workdir / "app_env.json").write_text(json.dumps(settings, sort_keys=True, separators=(",", ":")))
 
 
