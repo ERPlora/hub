@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ed7ca668de6827420bad96d7c173827f6beea40b394f088a7bf4ead778dd8380 -->
+<!-- generated from WORKBOOK.md sha256:6d21af784085f7b3f5d3d39253da4478e66a59126aef25db55d630eb8b590ad8 -->
 
 ## What it is for and who it is for
 
@@ -726,12 +726,15 @@ Steps:
    Staff: left on «Me», this sale counts for nobody."
 3. The lines added from then on are stamped with that person. To correct a line already in, tap the
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
+   A line that arrives with its professional (an appointment's, one of a check built on another device or
+   before a reload) also shows their name, the one Staff gives.
 4. Charge. With the chip on "Me", the sale is attributed to your Staff record; a line with its own
    professional (an appointment's, the one you moved) keeps them. Afterwards, the chip goes back to "me".
 5. With the assistant: "Lucía is serving table 6's check". It stays saved on the check until it is charged,
    also on the new check if it is split: the kitchen order sent carries their name and the sale
    is theirs, whoever charges it; the lines already in keep whoever they had.
-In: the Staff team (active records) and the record of whoever is signed in.
+In: the Staff team (active records), the record of whoever is signed in and the name of each line's
+person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
@@ -739,7 +742,9 @@ sends it.
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
 the kitchen is not reassigned. With the assistant, someone not on the team: "That staff member does not
-exist in this business."; without Staff active: "Staff is not active in this business.".
+exist in this business."; without Staff active: "Staff is not active in this business.". If Staff cannot
+say whose a line is (off, no permission or a record that is gone), the line says "the assigned
+professional".
 Involved: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Park a check and retrieve it
@@ -1612,8 +1617,9 @@ the quick notes and what is refundable can be followed live.
   check with its customer is kept by Customers (`customer.order.link`).
 - **Inventory** (optional): the sale catalog, the price, the unit and the tax category of each article,
   read with its own queries when the line is added.
-- **Staff** (optional): the team for the "Served by" chip and the record of whoever is signed in
-  (`staff.member.current`, without Staff's permission), to which the charge attributes "Me".
+- **Staff** (optional): the team for the "Served by" chip, the record of whoever is signed in
+  (`staff.member.current`, without Staff's permission), to which the charge attributes "Me", and the name
+  of the person of a line not chosen on that screen (`staff.member.detail`).
 - **Services** (optional): its services on offer (`service.service.list_for_sale`, and
   `service.service.get` when the line is added and while the notice of a refused one lasts), the client's
   vouchers for a service

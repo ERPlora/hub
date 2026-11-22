@@ -732,20 +732,24 @@ Pasos:
    Personal: si lo dejas en «Yo», esta venta no contará para nadie.»
 3. Las líneas que se añadan a partir de ahí quedan selladas con esa persona. Para corregir una línea
    ya puesta, toca el nombre que sale debajo de ella («De quién es esta línea») y elige otra persona o
-   «El profesional de la cuenta».
+   «El profesional de la cuenta». Una línea que llega con su profesional (la de una cita, la de una cuenta
+   hecha en otro dispositivo o antes de recargar) dice también su nombre, el que le da Personal.
 4. Cobra. Con el chip en «Yo», la venta se atribuye a tu ficha de Personal; una línea con su propio
    profesional (la de una cita, la que moviste) se queda con él. Después, el chip vuelve a «yo».
 5. Con el asistente: «la cuenta de la mesa 6 la atiende Lucía». Queda guardado en la cuenta hasta cobrarla,
    también en la cuenta nueva si se divide: la comanda que se envíe lleva su nombre y la venta es
    suya, la cobre quien la cobre; las líneas ya puestas se quedan con quien tenían.
-Entra: el equipo de Personal (fichas activas) y la ficha de quien tiene la sesión.
+Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesión y el nombre de la persona
+de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
 La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
 cocina no se reasigna. Con el asistente, alguien que no está en el equipo: «Ese miembro del personal no
-existe en este negocio.»; sin Personal activo: «Personal no está activo en este negocio.».
+existe en este negocio.»; sin Personal activo: «Personal no está activo en este negocio.». Si Personal no
+puede decir de quién es una línea (apagado, sin permiso o una ficha que ya no está), la línea dice «el
+profesional asignado».
 Implicados: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
@@ -1615,8 +1619,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
   enlace de la cuenta con su cliente lo guarda Clientes (`customer.order.link`).
 - **Inventario** (opcional): el catálogo de venta, el precio, la unidad y la categoría fiscal de cada
   artículo, leídos con sus propias consultas al añadir la línea.
-- **Personal** (opcional): el equipo para el chip «Atiende» y la ficha de quien tiene la sesión
-  (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo».
+- **Personal** (opcional): el equipo para el chip «Atiende», la ficha de quien tiene la sesión
+  (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo», y el nombre de la
+  persona de una línea que no se eligió en esa pantalla (`staff.member.detail`).
 - **Servicios** (opcional): sus servicios en oferta (`service.service.list_for_sale`, y
   `service.service.get` al añadir la línea y mientras dura el aviso de uno rechazado), los bonos de la
   clienta para un servicio
