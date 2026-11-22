@@ -3,7 +3,7 @@ dropped and purged by the worker once its hour is up.
 
 ``base.demo.create`` (``POST /internal/demos``) gives a browser, named by the sha256 of its SaaS token, its live demo
 or a new ``demo-<8 hex>`` up to ``MAX_CONCURRENT_DEMOS``, ``requested`` until the worker makes its database
-(``base/tenancy/tests/test_provision.py``; here :func:`ready` stands in for it); ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
+(``base/tenancy/tests/test_provision_demos.py``; here :func:`ready` stands in for it); ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
 of a minute for the browser that owns it, which the demo's ``/auth/callback`` redeems here (``redeem_demo_code``) and
 turns into a session as ``demo:<slug>``, the owner (``open_demo_session``). ``base.demo.expire`` ends one now; the
 reaper (``reap_demos``) purges those that ended and, after ``DEMO_TOMBSTONE_DAYS``, forgets them.
@@ -104,8 +104,8 @@ def a_request(rf):
 
 def open_session(request, hub: Hub, *, inside: Hub | None = None):
     """``open_demo_session`` as the demo's ``/auth/callback`` runs it: inside the demo's own database, or the one that
-    stands in for it here (``inside``) when the worker never made the demo's (``base/tenancy/tests/test_provision.py``):
-    a test case reaches only the databases its mark names."""
+    stands in for it here (``inside``) when the worker never made the demo's
+    (``base/tenancy/tests/test_provision_demos.py``): a test case reaches only the databases its mark names."""
     with use_hub(inside or hub):
         return open_demo_session(request, hub)
 

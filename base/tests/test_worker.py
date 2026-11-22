@@ -9,7 +9,7 @@ control's steps, takes control's own outbox, purges the demos that ended once a 
 hubs due. Here every tick is such a pass; when they run is ``test_control_pace.py``'s. A pass that fails is logged and
 the next tick tries again. No database here: ``register_apps``, the scheduler, the relay, the reaper, the registry and
 the due pass are replaced; their own tests are ``test_register_apps.py``, ``test_scheduler.py``, ``test_relay.py``,
-``test_services_demo.py`` and ``base/tenancy/tests/test_provision.py``.
+``test_services_demo.py`` and ``base/tenancy/tests/test_provision_due.py``.
 """
 
 
