@@ -42,7 +42,7 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await expect(view.locator(`[data-testid^=staff-members-row-${member.data.id}-]`)).toHaveCount(0);
     await expect(view.locator('[role=columnheader]', { hasText: 'Rate/h' })).toHaveCount(0);
     await expect(ownerView.locator('[role=columnheader]', { hasText: 'Rate/h' })).toBeVisible();
-    await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(4);
+    await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules']);
     await employee.page.screenshot({ path: shot('staff-employee-members') });
 
     for (const [path, table] of [
