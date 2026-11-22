@@ -1059,7 +1059,7 @@ Pasos:
    todos, una vez cada uno y en el orden en que se cobraron: «Efectivo + Tarjeta». Busca con
    «Buscar número o cliente…», filtra por estado, pago, fecha o total, u ordena; el filtro de pago
    encuentra una venta por cualquiera de sus medios. Un empleado solo ve sus ventas: las que cobró él y
-   las que se atribuyeron a su ficha de Personal («Atiende», SALE-F16). El responsable, el propietario y
+   las que se atribuyeron a su ficha de Personal (el chip «Atiende»). El responsable, el propietario y
    el administrador ven las de todos.
 4. Toca una fila para ver su documento. La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.

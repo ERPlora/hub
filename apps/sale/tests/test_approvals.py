@@ -24,7 +24,7 @@ from live.operations import get as operation
 
 from apps.invoice.models import Invoice
 from apps.sale.models import Order, OrderLine, Sale, SaleLine
-from apps.sale.tests.conftest import HOST, HUB_DB, run
+from apps.sale.tests.conftest import HOST, HUB_DB, ctx_for, run
 from apps.sale.tests.test_integration_invoice import ISSUER
 from apps.sale.tests.test_integration_service import charged_with_voucher
 from apps.service.models import Redemption
@@ -113,10 +113,21 @@ def manager(make_user):
 
 
 @pytest.fixture
-def cashier(client, make_user, manager):
-    """Eva, an employee (the old cashier) on the till's device, with Mario there to approve."""
-    client.force_login(make_user("eva", role="hub_employee"))
+def eva(make_user, manager):
+    """Eva, an employee (the old cashier), with Mario there to approve."""
+    return make_user("eva", role="hub_employee")
+
+
+@pytest.fixture
+def cashier(client, eva):
+    """Eva on the till's device."""
+    client.force_login(eva)
     return client
+
+
+def at_the_till_of(person):
+    """``person``'s context at the till: an employee voids or refunds only the sales they charged (SALE-F30, F31)."""
+    return ctx_for("hub_employee", actor=person)
 
 
 @pytest.fixture
@@ -193,12 +204,12 @@ class TestVoid:
         assert code(post(cashier, "/sale/sales/void", body, **with_pass(token))) == "requires_elevation"
         assert len(events("sale.sale.voided")) == 1
 
-    def test_an_approved_void_gives_the_vouchers_sessions_back(self, cashier, product, customer):
+    def test_an_approved_void_gives_the_vouchers_sessions_back(self, cashier, eva, product, customer):
         haircut = run(
             "service.service.create",
             {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
         )
-        grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"))
+        grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"), ctx=at_the_till_of(eva))
         voided = through_approval(cashier, "/sale/sales/void", {"sale_id": str(sale.id), "reason": "wrong customer"})
         assert voided.status_code == 200, voided.content
         session = Redemption.objects.get(pk=SaleLine.objects.get(pk=line.id).voucher_session_id)
@@ -242,12 +253,12 @@ class TestRefund:
         assert Sale.objects.get(pk=sale["id"]).status == "refunded"
         assert len(events("sale.sale.refunded")) == 1
 
-    def test_an_approved_refund_gives_the_voucher_session_back(self, cashier, customer):
+    def test_an_approved_refund_gives_the_voucher_session_back(self, cashier, eva, customer):
         haircut = run(
             "service.service.create",
             {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
         )
-        grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"))
+        grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"), ctx=at_the_till_of(eva))
         body = {"sale_id": str(sale.id), "reason": "did not come", "lines": [{"line_id": str(line.id)}]}
         refunded = through_approval(cashier, "/sale/sales/refund", body)
         assert refunded.status_code == 200, refunded.content
@@ -528,12 +539,13 @@ def while_running(seen: list, name: str) -> list:
 
 
 @pytest.fixture
-def haircut_with_shampoo(product, customer):
-    """A haircut paid with a voucher session and a shampoo by card, charged with Invoicing's ticket: Lucía's sale."""
+def haircut_with_shampoo(product, customer, eva):
+    """A haircut paid with a voucher session and a shampoo by card, charged at Eva's till with Invoicing's ticket:
+    Lucía's sale."""
     run("invoice.issuer.update", ISSUER)
     product("Shampoo", "SHA", 1200, "product.generic")
     haircut = run("service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"})
-    _grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"), product=True)
+    _grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"), product=True, ctx=at_the_till_of(eva))
     return sale, line
 
 
@@ -542,7 +554,6 @@ def the_cashiers_context(*, approved: str | None = None):
     it for a command a manager approved; ``None``: no approval and no request."""
     from types import SimpleNamespace
 
-    from apps.sale.tests.conftest import ctx_for
     from base.approvals import Approved
 
     ctx = ctx_for("hub_employee", actor="eva")

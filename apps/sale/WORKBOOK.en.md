@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:14c1099cb01b7904e44461a23880aefeebc8dd98884c55ef374e33fb04185817 -->
+<!-- generated from WORKBOOK.md sha256:59a03a94275dc4b7515b7dc55159a6e2d087839c25fef655384654df6c7bf25c -->
 
 ## What it is for and who it is for
 
@@ -1061,7 +1061,7 @@ Steps:
    "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
    number or customer…", filter by status, payment, date or total, or sort; the payment filter finds a
    sale by any of its methods. An employee only sees their own sales: the ones they charged and the ones
-   attributed to their Staff record ("Served by", SALE-F16). The manager, the owner and the administrator
+   attributed to their Staff record (the "Served by" chip). The manager, the owner and the administrator
    see everyone's.
 4. Tap a row to see its document. The table reloads by itself when a sale is charged, voided
    or refunded.

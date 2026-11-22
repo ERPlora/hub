@@ -27,6 +27,7 @@ PERMISSIONS = [
     "sale.refund_sale",
     "sale.view_paymentmethod",
     "sale.add_paymentmethod",
+    "sale.view_all_sales",
     "sale.view_reports",
     "sale.manage_settings",
 ]
@@ -87,7 +88,7 @@ def test_roles():
     for role in ("hub_owner", "hub_admin", "hub_manager"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
     # The old cashier (the employee who also charges) is the employee now: it builds the check,
-    # charges it and reads the sales; voiding, refunding, figures and settings are the manager's.
+    # charges it and reads its own sales; everyone's, voiding, refunding, figures and settings are the manager's.
     assert permissions_for_role([config], "hub_employee") == {
         "sale.view_sale",
         "sale.add_sale",
