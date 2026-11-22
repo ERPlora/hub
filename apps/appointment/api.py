@@ -95,7 +95,7 @@ async def appointment_notices(request, params: Query[NoticesIn]):
 
 @bind(router, "appointment.appointment.create", "/appointment/appointments", status=201)
 async def appointment_create(request, data: AppointmentCreateIn):
-    return await run_operation(request, services.create_appointment, data)
+    return await run_operation(request, services.booking.create_appointment, data)
 
 
 @bind(
@@ -105,34 +105,34 @@ async def appointment_create(request, data: AppointmentCreateIn):
     status=201,
 )
 async def appointment_bulk_create(request, data: BulkCreateIn):
-    return await run_operation(request, services.bulk_create, data)
+    return await run_operation(request, services.booking.bulk_create, data)
 
 
 @bind(
     router, "appointment.appointment.reschedule", "/appointment/appointments/reschedule"
 )
 async def appointment_reschedule(request, data: RescheduleIn):
-    return await run_operation(request, services.reschedule, data)
+    return await run_operation(request, services.moving.reschedule, data)
 
 
 @bind(router, "appointment.appointment.update", "/appointment/appointments/update")
 async def appointment_update(request, data: UpdateIn):
-    return await run_operation(request, services.update_appointment, data)
+    return await run_operation(request, services.moving.update_appointment, data)
 
 
 @bind(router, "appointment.appointment.confirm", "/appointment/appointments/confirm")
 async def appointment_confirm(request, data: AppointmentRefIn):
-    return await run_operation(request, services.confirm, data)
+    return await run_operation(request, services.states.confirm, data)
 
 
 @bind(router, "appointment.appointment.start", "/appointment/appointments/start")
 async def appointment_start(request, data: AppointmentRefIn):
-    return await run_operation(request, services.start, data)
+    return await run_operation(request, services.states.start, data)
 
 
 @bind(router, "appointment.appointment.complete", "/appointment/appointments/complete")
 async def appointment_complete(request, data: AppointmentRefIn):
-    return await run_operation(request, services.complete, data)
+    return await run_operation(request, services.states.complete, data)
 
 
 @bind(
@@ -141,17 +141,17 @@ async def appointment_complete(request, data: AppointmentRefIn):
     "/appointment/appointments/mark_no_show",
 )
 async def appointment_mark_no_show(request, data: AppointmentRefIn):
-    return await run_operation(request, services.mark_no_show, data)
+    return await run_operation(request, services.states.mark_no_show, data)
 
 
 @bind(router, "appointment.appointment.cancel", "/appointment/appointments/cancel")
 async def appointment_cancel(request, data: CancelIn):
-    return await run_operation(request, services.cancel, data)
+    return await run_operation(request, services.states.cancel, data)
 
 
 @bind(router, "appointment.appointment.delete", "/appointment/appointments/delete")
 async def appointment_delete(request, data: AppointmentRefIn):
-    return await run_operation(request, services.delete_appointment, data)
+    return await run_operation(request, services.deleting.delete_appointment, data)
 
 
 @bind(
@@ -160,12 +160,12 @@ async def appointment_delete(request, data: AppointmentRefIn):
     "/appointment/appointments/bulk_delete",
 )
 async def appointment_bulk_delete(request, data: BulkDeleteIn):
-    return await run_operation(request, services.bulk_delete, data)
+    return await run_operation(request, services.deleting.bulk_delete, data)
 
 
 @bind(router, "appointment.appointment.charge", "/appointment/appointments/charge")
 async def appointment_charge(request, data: AppointmentRefIn):
-    return await run_operation(request, services.charge, data)
+    return await run_operation(request, services.charging.charge, data)
 
 
 # The agenda and the free times
@@ -198,12 +198,12 @@ async def blocked_time_list(request, params: Query[BlockedTimeListIn]):
     router, "appointment.blocked_time.create", "/appointment/blocked_times", status=201
 )
 async def blocked_time_create(request, data: BlockedTimeCreateIn):
-    return await run_operation(request, services.create_blocked_time, data)
+    return await run_operation(request, services.blocked_times.create_blocked_time, data)
 
 
 @bind(router, "appointment.blocked_time.delete", "/appointment/blocked_times/delete")
 async def blocked_time_delete(request, data: BlockedTimeRefIn):
-    return await run_operation(request, services.delete_blocked_time, data)
+    return await run_operation(request, services.blocked_times.delete_blocked_time, data)
 
 
 # Series
@@ -221,32 +221,32 @@ async def recurring_get(request, params: Query[RecurringGetIn]):
 
 @bind(router, "appointment.recurring.create", "/appointment/recurring", status=201)
 async def recurring_create(request, data: RecurringCreateIn):
-    return await run_operation(request, services.create_series, data)
+    return await run_operation(request, services.series.create_series, data)
 
 
 @bind(router, "appointment.recurring.materialize", "/appointment/recurring/materialize")
 async def recurring_materialize(request, data: MaterializeIn):
-    return await run_operation(request, services.materialize, data)
+    return await run_operation(request, services.series.materialize, data)
 
 
 @bind(router, "appointment.recurring.update", "/appointment/recurring/update")
 async def recurring_update(request, data: RecurringUpdateIn):
-    return await run_operation(request, services.update_series, data)
+    return await run_operation(request, services.series_update.update_series, data)
 
 
 @bind(router, "appointment.recurring.activate", "/appointment/recurring/activate")
 async def recurring_activate(request, data: RecurringRefIn):
-    return await run_operation(request, services.activate_series, data)
+    return await run_operation(request, services.series_states.activate_series, data)
 
 
 @bind(router, "appointment.recurring.deactivate", "/appointment/recurring/deactivate")
 async def recurring_deactivate(request, data: RecurringRefIn):
-    return await run_operation(request, services.deactivate_series, data)
+    return await run_operation(request, services.series_states.deactivate_series, data)
 
 
 @bind(router, "appointment.recurring.delete", "/appointment/recurring/delete")
 async def recurring_delete(request, data: RecurringRefIn):
-    return await run_operation(request, services.delete_series, data)
+    return await run_operation(request, services.series_states.delete_series, data)
 
 
 # Settings
@@ -259,4 +259,4 @@ async def settings_get(request):
 
 @bind(router, "appointment.settings.update", "/appointment/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)

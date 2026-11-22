@@ -796,7 +796,7 @@ la que solo se le autorizó reservar.
   descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
   por lista.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `engine.py` (la puerta del
-  alta sin base de datos), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  alta sin base de datos), `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_table.py`, `tests/test_integration_customer.py`,
   `tests/test_integration_schedule.py` (las apps reales, sin dobles) y `tests/test_concurrency.py`

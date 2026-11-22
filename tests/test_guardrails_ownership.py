@@ -1,7 +1,8 @@
 """Guardrail of «only mine or all»: a model whose rows belong to someone is read through its ``Owned`` declaration.
 
 An app declares in ``apps/<app>/queries/ownership.py`` whose each row of a model is (``base.queries.ownership.Owned``),
-and its reads go through ``<DECLARATION>.visible(ctx)``: a person without the «see all» permission gets only theirs.
+and its reads go through ``<DECLARATION>.visible(ctx)`` (its figures, through ``<DECLARATION>.counted(ctx)``): a person
+without the «see all» permission gets only theirs.
 ``<Model>.objects`` in a ``queries`` door skips that, so here every such read is in :data:`UNSCOPED_READS`, closed and
 with its reason; what the list names must still be there, so it never rots; and a planted read is caught, so a scan
 that found nothing is never taken for a clean tree.
@@ -25,8 +26,6 @@ DECLARATIONS = "apps/*/queries/ownership.py"
 OTHER_APPS_WRITE = "another app's write"
 #: Nobody reads a row: a count or a yes/no about the whole table.
 NO_ROW_READ = "no row read"
-#: A screen of the whole business that its own permission opens to the roles that see everyone's.
-BUSINESS_WIDE = "the whole business"
 #: The record of a check, a table or a register session being worked on, not the history of sales.
 PART_OF_THE_WORK = "part of the work at hand"
 #: A customer's public page, by the signed code printed on their own paper.
@@ -50,23 +49,6 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
     ("apps/sale/queries/receipt_codes.py", "sale_of_code"): (
         PUBLIC_BY_CODE,
         "The page where the customer asks for the full invoice of their ticket, opened by the code signed on it.",
-    ),
-    ("apps/sale/queries/figures.py", "stats"): (
-        BUSINESS_WIDE,
-        "The figures of a period, which only sale.view_reports opens: the roles that hold it see every sale.",
-    ),
-    ("apps/sale/queries/figures.py", "_revenue_by_day"): (
-        BUSINESS_WIDE,
-        "What each day sold, for the figures and the Home's panel that sale.view_reports opens.",
-    ),
-    ("apps/sale/queries/figures.py", "today"): (
-        BUSINESS_WIDE,
-        "Today's sales and tickets, for the figures and the Home's panels that sale.view_reports opens.",
-    ),
-    ("apps/sale/queries/figures.py", "_refunded_by_staff"): (
-        BUSINESS_WIDE,
-        "What refunds gave back on each professional's lines, for the close by professional that sale.view_reports "
-        "opens.",
     ),
     ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
@@ -169,14 +151,16 @@ def unscoped_reads(root: Path) -> set[tuple[str, str]]:
 
 
 def test_the_declarations_are_found():
-    assert owned_models(REPO)["Sale"] == "sale"
+    found = owned_models(REPO)
+    assert (found["Sale"], found["VoucherSession"]) == ("sale", "sale")
 
 
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():
     skipped = unscoped_reads(REPO) - set(UNSCOPED_READS)
     assert skipped == set(), (
-        f"{sorted(skipped)} read an owned model with <Model>.objects: read it with <DECLARATION>.visible(ctx) (or "
-        "visible_sale in Sales), or add it to UNSCOPED_READS with a reason a reviewer can weigh"
+        f"{sorted(skipped)} read an owned model with <Model>.objects: read it with <DECLARATION>.visible(ctx) (a "
+        "figure with <DECLARATION>.counted(ctx); visible_sale in Sales), or add it to UNSCOPED_READS with a reason a "
+        "reviewer can weigh"
     )
 
 
@@ -186,7 +170,7 @@ def test_what_the_list_names_still_reads_without_the_declaration():
 
 
 def test_every_reason_is_one_of_the_kinds_and_says_why():
-    kinds = {OTHER_APPS_WRITE, NO_ROW_READ, BUSINESS_WIDE, PART_OF_THE_WORK, PUBLIC_BY_CODE}
+    kinds = {OTHER_APPS_WRITE, NO_ROW_READ, PART_OF_THE_WORK, PUBLIC_BY_CODE}
     for read, (kind, why) in UNSCOPED_READS.items():
         assert kind in kinds and why.endswith("."), read
 

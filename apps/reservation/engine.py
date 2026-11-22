@@ -1,4 +1,4 @@
-"""The book's gate without a database: services.py reads what it needs and asks ``verdict``.
+"""The book's gate without a database: services/gate.py reads what it needs and asks ``verdict``.
 
 **Can this reservation be taken?** The first reason that refuses wins, in this order (the old module's
 pre-check and gate, plus the opening hours and the table):

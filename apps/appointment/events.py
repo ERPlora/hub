@@ -1,7 +1,7 @@
 """Events of the appointment app (``appointment.<entity>.<fact>``) and its reactions to the events of
 Customers, Staff and Sales.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids, the number and the time, never notes nor a reason (free text that may
 hold health data).
 
