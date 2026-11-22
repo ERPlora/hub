@@ -62,6 +62,7 @@ class RunTaskAnswerTest(DeployCase):
         for answer, failures in (('{"tasks": [], "failures": []}', "[]"), ('{"tasks": [{}]}', "null"),
                                  ('{"tasks": [{"taskArn": false}]}', "null"), ('{"tasks": [{"taskArn": ""}]}', "null"),
                                  ('{"tasks": [{"taskArn": null}], "failures": {"a": "ñ"}}', '{"a":"ñ"}'),
+                                 ('{"tasks": [], "failures": "ñ"}', '"ñ"'),
                                  ("null", "null"), ("", ""), ("  ", "")):
             with self.subTest(answer):
                 self.assertEqual(1, self.deploy(FAKE_RUN_TASK_ANSWER=answer))
@@ -70,11 +71,12 @@ class RunTaskAnswerTest(DeployCase):
 
     def test_a_task_that_is_no_text_is_written_as_jq_writes_it(self):
         for answer, task in (('{"tasks": [{"taskArn": 5}]}', "5"), ('{"tasks": [{"taskArn": true}]}', "true"),
+                             ('{"tasks": [{"taskArn": 0}]}', "0"),
                              ('{"tasks": [{"taskArn": {"a": [1]}}]}', '{\n  "a": [\n    1\n  ]\n}'),
                              ('{"tasks": [{"taskArn": "arn:t\\n\\n"}]}', "arn:t")):
             with self.subTest(answer):
                 self.assertEqual(0, self.deploy(FAKE_RUN_TASK_ANSWER=answer))
-                self.assertIn(f"running hub-migrate: {task}\n", self.out)
+                self.assertIn(f"running hub-migrate: {task}\nupdated hub\n", self.out)
 
     def test_an_answer_that_cannot_be_read_ends_the_deploy_with_jq_s_code(self):
         for answer in ("not json", "[]", '{"tasks": "s"}', '{"tasks": ["s"]}', '"s"', '{"tasks": {}}'):

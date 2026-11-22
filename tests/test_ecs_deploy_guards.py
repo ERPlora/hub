@@ -7,6 +7,7 @@ the deploy with jq's exit code for it, 5.
 """
 
 import json
+import re
 
 from ecs_deploy_doubles import DeployCase, one, task_definition
 
@@ -83,6 +84,16 @@ class RefusedRevisionTest(DeployCase):
         self.edit("erplora-prod-hub.json", lambda found: found["taskDefinition"].update(taskRoleArn=5))
         self.assertEqual(1, self.deploy())
         self.assertNothingRegistered("erplora-prod-hub is no revision of prod \\(Environment=prod, task role 5, ")
+
+
+    def test_a_role_that_is_no_text_is_said_as_jq_says_it(self):
+        for role, said in ((0, "0"), (False, "none"), (None, "none"), ("", ""), (["a"], '["a"]')):
+            with self.subTest(role):
+                self.edit("erplora-prod-hub.json", lambda found, role=role: found["taskDefinition"].update(
+                    taskRoleArn=role))
+                self.assertEqual(1, self.deploy())
+                self.assertNothingRegistered(f"erplora-prod-hub is no revision of prod \\(Environment=prod, task role "
+                                             f"{re.escape(said)}, execution role arn:")
 
 
 class ReadLikeJqTest(DeployCase):
@@ -166,7 +177,8 @@ class HubImageTest(DeployCase):
 
     def test_containers_or_an_image_that_cannot_be_read_stop_the_deploy(self):
         for change in ({"containerDefinitions": None}, {"containerDefinitions": "s"},
-                       {"containerDefinitions": ["s"]}, {"containerDefinitions": [{"image": 5}]}):
+                       {"containerDefinitions": ["s"]}, {"containerDefinitions": [{"image": 5}]},
+                       {"containerDefinitions": [{"image": 0}]}):
             with self.subTest(change):
                 self.edit("erplora-prod-hub.json", lambda found, change=change: found["taskDefinition"].update(change))
                 self.assertEqual(5, self.deploy())

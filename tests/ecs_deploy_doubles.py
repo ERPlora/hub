@@ -152,12 +152,17 @@ def put_parameter():
     if value("--name").endswith("/app_env"):
         with open(env["APP_ENV_PUT"], "w", encoding="utf-8", errors="surrogateescape") as put:
             put.write(value("--value") + "\n")
+    print('{"Version": 2, "Tier": "Standard"}')
+
+
+def update_service():
+    print(f'{{"service": {{"serviceName": "{value("--service")}"}}}}')
 
 
 COMMANDS = {
     "ecs describe-task-definition": describe_task_definition, "ecs register-task-definition": register_task_definition,
     "ecs describe-services": describe_services, "ecs run-task": run_task, "ecs describe-tasks": describe_tasks,
-    "ssm get-parameter": get_parameter, "ssm put-parameter": put_parameter,
+    "ssm get-parameter": get_parameter, "ssm put-parameter": put_parameter, "ecs update-service": update_service,
 }
 command = " ".join(args[:2])
 if env.get("FAKE_KILLED_ON") == command:

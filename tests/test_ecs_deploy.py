@@ -203,6 +203,21 @@ class SettingsOfTheRunTest(DeployCase):
         self.assertFalse(self.called("saas"))
 
 
+class OutputTest(DeployCase):
+    def test_its_lines_come_in_order_with_what_aws_says(self):
+        self.assertEqual(254, self.deploy(FAKE_FAILS_ON="ecs update-service"))
+        self.assertEqual(
+            "registered arn:td/erplora-prod-hub:2\nregistered arn:td/erplora-prod-worker:2\n"
+            "registered arn:td/erplora-prod-hub-migrate:2\nrunning hub-migrate: arn:task/erplora-prod/migrate1\n"
+            "An error occurred (AccessDeniedException) when calling ecs update-service\n", self.out)
+
+    def test_what_it_is_given_is_said_as_the_bytes_it_was_given(self):
+        self.assertEqual(1, self.deploy(ENVIRONMENT="pr\udcffd"))
+        self.assertEqual(b"::error::ENVIRONMENT must be prod or pre, not 'pr\xffd'\n", self.stdout)
+        self.assertEqual(1, self.deploy(FAKE_MIGRATE_EXIT="None", FAKE_STOPPED_REASON="\u00f1 \udcff exited"))
+        self.assertIn(b"::error::hub-migrate stopped without running: \xc3\xb1 \xff exited\n", self.stdout)
+
+
 class FailingCallTest(DeployCase):
     def test_an_aws_call_that_fails_ends_the_deploy_with_its_exit_code(self):
         self.assertEqual(254, self.deploy(FAKE_FAILS_ON="ecs update-service"))

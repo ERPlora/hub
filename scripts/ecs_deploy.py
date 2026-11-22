@@ -185,13 +185,12 @@ def each(value: object) -> list:
 
 
 def tags(found: object) -> list:
-    """jq's `.tags[]?`: tags that cannot be iterated are none, but a revision that cannot be indexed cannot be read."""
+    """jq's `.tags[]?`: tags that cannot be iterated are none (a revision that is no object fails where its definition
+    is read)."""
     try:
         return each(key(found, "tags"))
     except TypeError:
-        if found is None or isinstance(found, dict):
-            return []
-        raise
+        return []
 
 
 def otherwise(value: object, default: object) -> object:
@@ -209,10 +208,8 @@ def text(value: object) -> str:
 
 
 def role_is(found: dict, name: str, prefix: str) -> bool:
-    arn = otherwise(key(key(found, "taskDefinition"), name), "")
-    if not isinstance(arn, str):
-        raise TypeError(f"{text(arn)} cannot be matched, as it is not a string")
-    return re.search(rf"^arn:aws[a-z-]*:iam::[0-9]+:role/{prefix}-", arn) is not None
+    arn = key(key(found, "taskDefinition"), name)
+    return isinstance(arn, str) and re.search(rf"^arn:aws[a-z-]*:iam::[0-9]+:role/{prefix}-", arn) is not None
 
 
 def of_its_environment(found: list, deploy: Deploy) -> bool:
