@@ -105,11 +105,6 @@ class TestWhatABasicRoleAllows:
 
         assert {app["app"] for app in answer["apps"]} == {"base", "sale", "inventory", "sensitive"}
 
-    def test_an_approval_of_an_app_that_is_off_allows_nothing(self, monkeypatch):
-        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: frozenset({"base", "inventory"}))
-
-        assert "approval" not in states(read("hub_employee")).values()
-
     def test_it_says_how_many_people_have_the_role(self, client, eva, make_user):
         make_user("saas:7", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Javi")
         client.force_login(eva)

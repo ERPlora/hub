@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { RoleDetail } from '../operations/people';
@@ -112,5 +112,8 @@ describe('RolePage', () => {
     await flush();
     expect(other.wrapper.get('[data-testid="role-error"]').text()).toContain('No se pudo cargar lo que permite este rol.');
     expect(other.wrapper.get('[data-testid="role-error"]').text()).toContain('Reintentar');
+    const reconnect = vi.spyOn(other.client.stream, 'reconnect');
+    await other.wrapper.get('[data-testid="role-error"] ion-button').trigger('click');
+    expect(reconnect).toHaveBeenCalledTimes(1);
   });
 });
