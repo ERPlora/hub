@@ -331,7 +331,7 @@ describe('FloorPlanPage · edit plan', () => {
     await s.mode('edit');
     expect(s.zoneNames()).toEqual(['Dining room', 'Terrace', 'Old bar']);
     expect(s.tiles()).toEqual(['t1', 't4', 't9']);
-    expect(s.el('hint').text()).toBe('Drag to position · click a table to edit or delete it. Changes are saved instantly.');
+    expect(s.el('hint').text()).toBe('Drag to position · tap a table to edit or delete it. Changes are saved instantly.');
     s.canvas().vm.$emit('select', FREE);
     await flush();
     const form = s.wrapper.findComponent(TableFormModal);
@@ -376,6 +376,6 @@ describe('FloorPlanPage · edit plan', () => {
     expect(s.labels('table-floor-mode-')).toEqual(['Servicio', 'Editar plano']);
     expect(s.el('hint').text()).toBe('Toca una mesa para sentarla o abrir su cuenta · mantenla pulsada (o haz clic derecho) para transferir, fusionar y más.');
     await s.mode('edit');
-    expect(s.el('hint').text()).toBe('Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.');
+    expect(s.el('hint').text()).toBe('Arrastra para colocar · toca una mesa para editarla o borrarla. Los cambios se guardan al momento.');
   });
 });

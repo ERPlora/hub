@@ -98,7 +98,7 @@
     },
     "presence": {
       "title": "Clocked in now",
-      "count": "{n} clocked in",
+      "count": "{n} clocked in | {n} clocked in",
       "since": "since {time}",
       "onBreak": "On break",
       "empty": "Nobody is clocked in right now.",

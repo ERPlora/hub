@@ -61,9 +61,9 @@ describe('HistoryModal (ATTENDANCE-F09)', () => {
   it("tells each correction on the business's clock (hub#779)", async () => {
     const s = await setup([200, { rows: TRAIL, total: 2, limit: 100, offset: 0 }], 'en', 'Atlantic/Canary');
     const item = s.inDoc('attendance-history-list')?.querySelector('[data-testid="attendance-history-item"]')?.textContent;
-    expect(item).toContain('Marta Jefa · 2026-10-06 09:00');
-    expect(item).toContain('Before: 2026-10-05 08:00 → — (Needs review)');
-    expect(item).toContain('After: 2026-10-05 08:00 → 2026-10-05 16:00 (Closed)');
+    expect(item).toContain('Marta Jefa · Tue, Oct 6 · 09:00');
+    expect(item).toContain('Before: 08:00 → — (Needs review)');
+    expect(item).toContain('After: 08:00 → 16:00 (Closed)');
   });
 
   it('asks for the history of the day when it opens and lists it newest first', async () => {
@@ -72,9 +72,9 @@ describe('HistoryModal (ATTENDANCE-F09)', () => {
     expect(s.inDoc('attendance-history')?.getAttribute('aria-label')).toBe('Correction history');
     const items = [...(s.inDoc('attendance-history-list')?.querySelectorAll('[data-testid="attendance-history-item"]') ?? [])].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
     expect(items).toHaveLength(2);
-    expect(items[0]).toContain('Marta Jefa · 2026-10-06 10:00');
-    expect(items[0]).toContain('Before: 2026-10-05 09:00 → — (Needs review)');
-    expect(items[0]).toContain('After: 2026-10-05 09:00 → 2026-10-05 17:00 (Closed)');
+    expect(items[0]).toContain('Marta Jefa · Tue, Oct 6 · 10:00');
+    expect(items[0]).toContain('Before: 09:00 → — (Needs review)');
+    expect(items[0]).toContain('After: 09:00 → 17:00 (Closed)');
     expect(items[0]).toContain('Reason: Forgot to clock out');
     expect(items[1]).toContain('System');
   });
@@ -102,5 +102,21 @@ describe('HistoryModal (ATTENDANCE-F09)', () => {
     expect(first).toContain('Antes:');
     expect(first).toContain('(Por revisar)');
     expect(first).toContain('Sistema');
+  });
+
+  it('writes its dates and times as the rest of the screen does, in Spanish too (hub#2045)', async () => {
+    const s = await setup([200, { rows: TRAIL, total: 2, limit: 100, offset: 0 }], 'es');
+    const first = s.inDoc('attendance-history-list')?.querySelector('[data-testid="attendance-history-item"]')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(first).toContain('Marta Jefa · mar, 6 oct · 10:00');
+    expect(first).toContain('Antes: 09:00 → — (Por revisar)');
+    expect(first).toContain('Después: 09:00 → 17:00 (Cerrada)');
+    expect(first).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it('a time on another day than the working day says which (a night shift)', async () => {
+    const night: CorrectionOut = { ...TRAIL[0], new_clock_out_at: '2026-10-06T01:30:00Z' };
+    const s = await setup([200, { rows: [night], total: 1, limit: 100, offset: 0 }], 'es');
+    const item = s.inDoc('attendance-history-list')?.querySelector('[data-testid="attendance-history-item"]')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(item).toContain('Después: 09:00 → 03:30 (6/10) (Cerrada)');
   });
 });

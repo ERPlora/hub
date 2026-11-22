@@ -1,5 +1,5 @@
-// The summary of «Import CSV» (CUSTOMER-F08): «Import: {total} rows — {created} created, {skipped}
-// skipped.», each skipped row with its reasons, the rows to review and any refused block; it stays
+// The summary of «Import CSV» (CUSTOMER-F08): «Import: 3 rows — 2 created, 1 skipped.», each count
+// in singular when it is 1, each skipped row with its reasons, the rows to review and any refused block; it stays
 // on screen until «Close» or the next import.
 import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
@@ -62,8 +62,20 @@ describe('ImportReport', () => {
   });
 
   it('speaks Spanish', async () => {
-    const s = await setup({ ...CLEAN, skipped: [{ line: 2, reasons: ['Falta el nombre.'] }] }, 'es');
-    expect(s.wrapper.get('[data-testid="customer-import-summary"]').text()).toBe('Importación: 3 filas — 3 creadas, 1 omitidas.');
+    const s = await setup({ ...CLEAN, created: 2, skipped: [{ line: 2, reasons: ['Falta el nombre.'] }] }, 'es');
+    expect(s.wrapper.get('[data-testid="customer-import-summary"]').text()).toBe('Importación: 3 filas — 2 creadas, 1 omitida.');
     expect(s.wrapper.get('[data-testid="customer-import-skipped"] li').text()).toBe('Fila 2: Falta el nombre.');
+  });
+
+  it.each([
+    ['en', 1, 1, 0, 'Import: 1 row — 1 created, 0 skipped.'],
+    ['en', 2, 0, 2, 'Import: 2 rows — 0 created, 2 skipped.'],
+    ['es', 1, 1, 0, 'Importación: 1 fila — 1 creada, 0 omitidas.'],
+    ['es', 1, 0, 1, 'Importación: 1 fila — 0 creadas, 1 omitida.'],
+    ['es', 5, 3, 2, 'Importación: 5 filas — 3 creadas, 2 omitidas.'],
+  ] as const)('says each count in singular only when it is 1 (%s: %i rows, %i created, %i skipped)', async (locale, total, created, skippedCount, summary) => {
+    const skipped = Array.from({ length: skippedCount }, (_, i) => ({ line: i + 2, reasons: ['x'] }));
+    const s = await setup({ ...CLEAN, total, created, skipped }, locale);
+    expect(s.wrapper.get('[data-testid="customer-import-summary"]').text()).toBe(summary);
   });
 });
