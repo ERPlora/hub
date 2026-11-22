@@ -10,7 +10,8 @@ import { spanishMobile } from './customer-helpers';
 import { A, api, capture, EMPLOYEE, saveSessionForTheSweep, shown } from './helpers';
 import { cast, keepTheBusiness } from './online-booking-helpers';
 import { FLOW_VIEWPORTS, ownerPage, post } from './service-helpers';
-import { recordOf, signedIn } from './task-helpers';
+import { recordOf } from './staff-helpers';
+import { signedIn } from './task-helpers';
 
 const TAG = 'E2E OBContact';
 
@@ -26,7 +27,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await saveSessionForTheSweep(employee.context);
       const day = aMonday(index + 3);
       const { service } = await cast(owner.context, `${TAG} ${vp.label}`, day);
-      const bea = await recordOf(owner.context, EMPLOYEE.email, 'Bea');
+      const bea = await recordOf(owner.context, EMPLOYEE.email, `${TAG} Bea`);
       await post(owner.context, '/service/assignments/assign', { service_id: service.id, member_id: bea.id }, 200);
       const mobile = spanishMobile();
       const email = `ob.contact.${vp.label}.${Date.now().toString(36)}@example.com`;
