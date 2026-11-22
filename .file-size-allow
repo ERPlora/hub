@@ -6,7 +6,6 @@
 227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 382 .github/scripts/nightly-e2e.sh ERPlora/erplora-next#74
-529 apps/appointment/frontend/components/AppointmentFormModal.test.ts ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1660 apps/appointment/queries.py ERPlora/erplora-next#74
