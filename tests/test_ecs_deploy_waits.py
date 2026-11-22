@@ -17,6 +17,12 @@ class MigrationTest(DeployCase):
         self.assertEqual(0, self.deploy(POLL_SECONDS="5", FAKE_TASK_STATUSES="RUNNING STOPPED"))
         self.assertEqual(["5"], self.pauses())
 
+    def test_empty_seconds_take_their_default(self):
+        self.assertEqual(1, self.deploy(POLL_SECONDS="", MIGRATE_TIMEOUT_SECONDS="", ROLLOUT_TIMEOUT_SECONDS="",
+                                        FAKE_TASK_STATUSES="RUNNING STOPPED", FAKE_ROLLOUT_STATES="IN_PROGRESS"))
+        self.assertEqual(["15"] * 41, self.pauses())
+        self.assertIn("::error::rollout of hub did not complete in 600 s;", self.out)
+
     def test_a_timeout_of_0_fails_on_a_migration_that_is_not_stopped_and_leaves_it_running(self):
         self.assertEqual(1, self.deploy(MIGRATE_TIMEOUT_SECONDS="0", apart=True))
         self.assertFalse(self.called("update-service|put-parameter|stop-task"))

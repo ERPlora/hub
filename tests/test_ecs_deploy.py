@@ -174,8 +174,10 @@ class SettingsOfTheRunTest(DeployCase):
                 self.assertFailsBeforeAnyCall(f"::error::{name} is required\n")
 
     def test_the_first_missing_setting_is_the_one_named(self):
-        self.deploy(AWS_REGION="", IMAGE_TAG="", ENVIRONMENT="x")
+        self.deploy(AWS_REGION="", REGISTRY="", IMAGE_TAG="", ENVIRONMENT="x")
         self.assertEqual("::error::AWS_REGION is required\n", self.out)
+        self.deploy(REGISTRY="", IMAGE_TAG="", ENVIRONMENT="")
+        self.assertEqual("::error::REGISTRY is required\n", self.out)
 
     def test_a_number_of_seconds_that_is_none_fails_before_any_aws_call(self):
         for name in ("POLL_SECONDS", "MIGRATE_TIMEOUT_SECONDS", "ROLLOUT_TIMEOUT_SECONDS"):
