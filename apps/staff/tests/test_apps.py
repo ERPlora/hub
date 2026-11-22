@@ -161,18 +161,20 @@ def tabbar() -> list[tuple[str, str]]:
 
 
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
-    # The help window and the menu's highlight follow these entries, so they are the tab bar's sections but Settings,
-    # which the help adds. The first one is the app's entry and its people icon the launcher's (base.home.shell_icon).
+    # The help window and the menu's highlight follow these entries, so they are the tab bar's sections, each with the
+    # permission that opens it. The first one is the app's entry and its people icon the launcher's
+    # (base.home.shell_icon).
     entries = staff().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [(entry.id, str(entry.label), entry.path, entry.icon) for entry in entries] == [
-        ("staff", "Staff", "/staff/members", "ion:people-outline"),
-        ("roles", "Roles", "/staff/roles", "ion:shield-outline"),
-        ("time_off", "Time Off", "/staff/time-off", "ion:calendar-outline"),
-        ("schedules", "Schedules", "/staff/schedules", "ion:time-outline"),
-        ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline"),
+    assert [(entry.id, str(entry.label), entry.path, entry.icon, entry.permission) for entry in entries] == [
+        ("staff", "Staff", "/staff/members", "ion:people-outline", "staff.view"),
+        ("roles", "Roles", "/staff/roles", "ion:shield-outline", "staff.manage_settings"),
+        ("time_off", "Time Off", "/staff/time-off", "ion:calendar-outline", "staff.view_time_off"),
+        ("schedules", "Schedules", "/staff/schedules", "ion:time-outline", "staff.view"),
+        ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline", "staff.view_compensation"),
+        ("settings", "Settings", "/staff/settings", "ion:settings-outline", "staff.manage_settings"),
     ]
-    assert [(entry.id, entry.path) for entry in entries] == tabbar()[:-1]
+    assert [(entry.id, entry.path) for entry in entries] == tabbar()
     assert home.shell_icon(staff()) == "ion:people-outline"
     shell = shell_icon_registry()
     for entry in entries:

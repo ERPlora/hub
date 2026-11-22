@@ -80,16 +80,15 @@ def test_what_each_role_gets():
     assert permissions_for_role([config], "hub_employee") == EMPLOYEE
 
 
-def test_navigation_is_the_four_sections_of_the_old_module_with_registered_icons():
+def test_navigation_is_the_four_sections_of_the_old_module_and_its_settings_with_registered_icons():
     entries = kitchen().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [
-        (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
-    ] == [
-        ("display", "Display", "ion:desktop-outline", "/kitchen/display"),
-        ("tickets", "Tickets", "ion:list-outline", "/kitchen/tickets"),
-        ("stations", "Stations", "ion:layers-outline", "/kitchen/stations"),
-        ("history", "History", "ion:time-outline", "/kitchen/history"),
+    assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [
+        ("display", "Display", "ion:desktop-outline", "/kitchen/display", "kitchen.view_ticket"),
+        ("tickets", "Tickets", "ion:list-outline", "/kitchen/tickets", "kitchen.view_ticket"),
+        ("stations", "Stations", "ion:layers-outline", "/kitchen/stations", "kitchen.manage_station"),
+        ("history", "History", "ion:time-outline", "/kitchen/history", "kitchen.view_log"),
+        ("settings", "Settings", "ion:settings-outline", "/kitchen/settings", "kitchen.change_settings"),
     ]
 
 

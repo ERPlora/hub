@@ -55,8 +55,8 @@ class PaymentConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only (UI-REQUESTS.md).
     navigation = [
-        Nav("payments", _("Payments"), "lucide:send", "/payment/payments"),
-        Nav("methods", _("Methods"), "ion:wallet-outline", "/payment/methods"),
+        Nav("payments", _("Payments"), "lucide:send", "/payment/payments", permission="payment.add_payment"),
+        Nav("methods", _("Methods"), "ion:wallet-outline", "/payment/methods", permission="payment.add_payment"),
     ]
     help = Help()
 

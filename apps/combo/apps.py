@@ -47,7 +47,7 @@ class ComboConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry, no tabbar.
-    navigation = [Nav("menus", _("Menus"), "ion:layers-outline", "/combo/menus")]
+    navigation = [Nav("menus", _("Menus"), "ion:layers-outline", "/combo/menus", permission="combo.manage")]
     help = Help(videos={"es": "lD2ucK9wKq8", "en": "O7MO-x7zeZA"})
 
     def recoverable_from_copy(self) -> list:

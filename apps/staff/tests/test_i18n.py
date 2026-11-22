@@ -74,6 +74,7 @@ def test_spanish_texts_are_the_old_modules():
             "Ausencias",
             "Horarios",
             "Comisiones",
+            "Ajustes",
         ]
         assert [str(label) for label in Member.Status.labels] == [
             "Activo",

@@ -1,27 +1,14 @@
 // The pricing app's `routes.ts`: its one menu entry (the lists and the rules) and a list's detail → their
 // pages, behind a session, and nothing else (main.ts reads the default export; menu, permissions and
 // active apps come from the server).
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
+import { menuPaths, routeChecks } from '../../../base/frontend/__tests__/app-routes';
 import routes from './routes';
 
-// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
-// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
-// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
-// this file does not stub.
+// The pages, stubbed: `routeChecks` checks which one each route loads (app-routes.ts says why).
 vi.mock('./pages/ListsPage.vue', () => ({ default: { name: 'ListsPage' } }));
 vi.mock('./pages/ListDetailPage.vue', () => ({ default: { name: 'ListDetailPage' } }));
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-
-async function load(r: RouteRecordRaw): Promise<RouteComponent> {
-  const loader = r.component as () => Promise<{ default: RouteComponent }>;
-  return (await loader()).default;
-}
 
 describe('pricing routes.ts', () => {
   it('maps the lists and a list’s detail, both behind a session, the id as a prop', () => {
@@ -31,20 +18,10 @@ describe('pricing routes.ts', () => {
     ]);
   });
 
-  it('loads each page on demand (one chunk per page), not at boot', async () => {
-    for (const r of routes) expect(typeof r.component).toBe('function');
-    expect(await load(routes[0])).toEqual({ name: 'ListsPage' });
-    expect(await load(routes[1])).toEqual({ name: 'ListDetailPage' });
-  });
-
-  it('imports types only: Vite hoists the eager glob of main.ts above the shell boot hooks', () => {
-    const source = readFileSync(join(HERE, 'routes.ts'), 'utf8');
-    expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
-  });
+  routeChecks(import.meta.url, routes, ['ListsPage', 'ListDetailPage']);
 
   it('serves the path of the menu entry of apps.py', () => {
-    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/Nav\(.*"(\/pricing\/[a-z]+)"\)/g)].map((m) => m[1]);
+    const paths = menuPaths('pricing');
     expect(paths).toEqual(['/pricing/lists']);
     expect(routes.map((r) => r.path)).toContain(paths[0]);
   });

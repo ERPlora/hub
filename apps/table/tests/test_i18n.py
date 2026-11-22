@@ -101,6 +101,7 @@ def test_spanish_texts_of_the_workbook():
             "Zonas",
             "Mesas",
             "Sesiones",
+            "Ajustes",
         ]
         assert str(services.TABLE_HAS_OPEN_SESSION) == (
             "Esa mesa tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa."

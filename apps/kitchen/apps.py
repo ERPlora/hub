@@ -87,13 +87,20 @@ class KitchenConfig(LiveAppConfig):
         ],
     }
     # Positional (id, label, icon, path). Registered icons only: `tv`, `clipboard-outline` and
-    # `flame-outline` wait in UI-REQUESTS.md. The same icons as the tabbar (frontend/tabs.ts), which
-    # adds Settings for whoever may save them.
+    # `flame-outline` wait in UI-REQUESTS.md. The same icons as the tabbar (frontend/tabs.ts). Each entry opens with its
+    # permission: Stations and Settings, to whoever may change them.
     navigation = [
-        Nav("display", _("Display"), "ion:desktop-outline", "/kitchen/display"),
-        Nav("tickets", _("Tickets"), "ion:list-outline", "/kitchen/tickets"),
-        Nav("stations", _("Stations"), "ion:layers-outline", "/kitchen/stations"),
-        Nav("history", pgettext_lazy("kitchen menu", "History"), "ion:time-outline", "/kitchen/history"),
+        Nav("display", _("Display"), "ion:desktop-outline", "/kitchen/display", permission="kitchen.view_ticket"),
+        Nav("tickets", _("Tickets"), "ion:list-outline", "/kitchen/tickets", permission="kitchen.view_ticket"),
+        Nav("stations", _("Stations"), "ion:layers-outline", "/kitchen/stations", permission="kitchen.manage_station"),
+        Nav(
+            "history", pgettext_lazy("kitchen menu", "History"), "ion:time-outline", "/kitchen/history",
+            permission="kitchen.view_log",
+        ),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/kitchen/settings",
+            permission="kitchen.change_settings",
+        ),
     ]
     # KITCHEN-F05/F16: every new ticket tells the installed device; a tap opens the kitchen display.
     notices = [

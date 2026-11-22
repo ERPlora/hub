@@ -105,6 +105,7 @@ def test_spanish_texts_of_the_workbook():
             "Servicios",
             "Categorías",
             "Bonos y paquetes",
+            "Ajustes",
         ]
         assert (
             str(services.CATEGORY_NAME_TAKEN)

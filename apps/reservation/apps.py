@@ -88,21 +88,30 @@ class ReservationConfig(LiveAppConfig):
         }
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
-    # as the module's own icon. Three sections; Settings is a tab of the pages (frontend/tabs.ts), shown
-    # only to whoever may save them.
+    # as the module's own icon. Each entry opens with its permission: Availability and Settings, to whoever may change
+    # them.
     navigation = [
         Nav(
             "reservations",
             _("Reservations"),
             "ion:calendar-outline",
             "/reservation/reservations",
+            permission="reservation.view_reservation",
         ),
-        Nav("waitlist", _("Waitlist"), "ion:people-outline", "/reservation/waitlist"),
+        Nav(
+            "waitlist", _("Waitlist"), "ion:people-outline", "/reservation/waitlist",
+            permission="reservation.view_waitlistentry",
+        ),
         Nav(
             "availability",
             _("Availability"),
             "ion:time-outline",
             "/reservation/availability",
+            permission="reservation.change_timeslot",
+        ),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/reservation/settings",
+            permission="reservation.manage_settings",
         ),
     ]
     help = Help()

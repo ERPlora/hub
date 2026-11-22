@@ -1730,7 +1730,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 - `frontend/routes.ts`: `/flow/automations` (lista, borradores y galería; `?template=` abre una
   tarjeta), `/flow/automations/new` (`?draft=` carga un borrador), `/flow/automations/:id` (`?tab=`) y
-  `/flow/guide`.
+  `/flow/automations/guide` (la guía cuelga de la entrada del menú, como toda pantalla de una app).
 - La lista es `DataTable` en servidor con `useLiveList`/`useServerTable`, casillas y acciones de fila;
   `AutomationsPage` la monta siempre y la oculta (`v-show`) sin automatizaciones, para que su suscripción vaya
   en el único flujo vivo de la página: montada al llegar el recuento, el SDK cerraría el flujo y abriría otro

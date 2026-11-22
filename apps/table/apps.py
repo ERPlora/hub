@@ -111,11 +111,13 @@ class TableConfig(LiveAppConfig):
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: `map-outline` waits in UI-REQUESTS.md.
-    # The same icons as the tabbar (frontend/tabs.ts), which adds Settings for whoever may save them.
+    # The same icons as the tabbar (frontend/tabs.ts). Each entry opens with its permission: Zones, Tables and Settings,
+    # to whoever may change them.
     navigation = [
-        Nav("floor_plan", _("Floor plan"), "ion:apps-outline", "/table/floor-plan"),
-        Nav("zones", _("Zones"), "ion:layers-outline", "/table/zones"),
-        Nav("tables", _("Tables"), "ion:grid-outline", "/table/tables"),
-        Nav("sessions", _("Sessions"), "ion:time-outline", "/table/sessions"),
+        Nav("floor_plan", _("Floor plan"), "ion:apps-outline", "/table/floor-plan", permission="table.view_table"),
+        Nav("zones", _("Zones"), "ion:layers-outline", "/table/zones", permission="table.change_zone"),
+        Nav("tables", _("Tables"), "ion:grid-outline", "/table/tables", permission="table.change_table"),
+        Nav("sessions", _("Sessions"), "ion:time-outline", "/table/sessions", permission="table.view_session"),
+        Nav("settings", _("Settings"), "ion:settings-outline", "/table/settings", permission="table.manage_settings"),
     ]
     help = Help()

@@ -65,12 +65,14 @@ class OnlineBookingConfig(LiveAppConfig):
             _("Bookings"),
             "ion:calendar-outline",
             "/online_booking/bookings",
+            permission="online_booking.view_booking",
         ),
         Nav(
             "settings",
             _("Settings"),
             "ion:settings-outline",
             "/online_booking/settings",
+            permission="online_booking.manage_settings",
         ),
     ]
     help = Help()

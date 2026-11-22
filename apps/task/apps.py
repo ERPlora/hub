@@ -59,7 +59,7 @@ class TaskConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts).
     navigation = [
-        Nav("tasks", _("Tasks"), "ion:checkbox-outline", "/task/tasks"),
-        Nav("projects", _("Projects"), "ion:folder-outline", "/task/projects"),
+        Nav("tasks", _("Tasks"), "ion:checkbox-outline", "/task/tasks", permission="task.view"),
+        Nav("projects", _("Projects"), "ion:folder-outline", "/task/projects", permission="task.view"),
     ]
     help = Help()

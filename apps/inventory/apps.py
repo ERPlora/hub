@@ -98,10 +98,20 @@ class InventoryConfig(LiveAppConfig):
     # them and the assistant links each one by its name. The first keeps the cube: it is the launcher's and «My apps»'
     # icon, and its screen is where «/inventory» lands.
     navigation = [
-        Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard"),
-        Nav("products", _("Products"), "ion:cube-outline", "/inventory/products"),
-        Nav("movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements"),
-        Nav("categories", _("Categories"), "ion:list-outline", "/inventory/categories"),
+        Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard", permission="inventory.view_stock"),
+        Nav("products", _("Products"), "ion:cube-outline", "/inventory/products", permission="inventory.view_product"),
+        Nav(
+            "movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements",
+            permission="inventory.view_stock",
+        ),
+        Nav(
+            "categories", _("Categories"), "ion:list-outline", "/inventory/categories",
+            permission="inventory.view_category",
+        ),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/inventory/settings",
+            permission="inventory.manage_settings",
+        ),
     ]
     help = Help(videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"})
     # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
