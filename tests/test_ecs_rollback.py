@@ -63,6 +63,8 @@ class ProdRollbackTest(RollbackCase):
             # The same family of another region is another family.
             "erplora-prod-hub:9": [TD.replace("eu-south-2", "eu-west-1") + "/erplora-prod-hub:11",
                                    "erplora-prod-hub:9"],
+            # A revision that is no number is none of them.
+            "erplora-prod-hub:8": ["erplora-prod-hub:latest", "erplora-prod-hub:8"],
         }
         for previous, listed in cases.items():
             with self.subTest(previous):
@@ -70,6 +72,13 @@ class ProdRollbackTest(RollbackCase):
                 self.listed("erplora-prod-hub", "erplora-prod-hub:12", *listed)
                 self.assertEqual(0, self.rollback())
                 self.assertTrue(self.called(f"update-service .*--service hub --task-definition {arn(previous)} "))
+
+    def test_only_the_first_line_of_the_answer_lists_revisions(self):
+        self.revision("erplora-prod-hub:9", image="reg.example/erplora/hub:tag-10")
+        listed = f"{arn('erplora-prod-hub:12')}\t{arn('erplora-prod-hub:9')}\n{arn('erplora-prod-hub:11')}"
+        (self.fixtures / "list-erplora-prod-hub").write_text(listed)
+        self.assertEqual(0, self.rollback())
+        self.assertTrue(self.called(f"update-service .*--service hub --task-definition {arn('erplora-prod-hub:9')} "))
 
     def test_revisions_are_compared_as_numbers(self):
         self.primary["hub"] = arn("erplora-prod-hub:100")
@@ -89,7 +98,8 @@ class ProdRollbackTest(RollbackCase):
     def test_a_service_that_runs_no_revision_of_its_family_changes_nothing(self):
         running_now = dict(self.primary)
         for service, running in (("worker", "None"), ("hub", arn("erplora-prod-hub-migrate:11")),
-                                 ("hub", arn("erplora-prod-hub:12x")), ("hub", arn("erplora-prod-hub:"))):
+                                 ("hub", arn("old-erplora-prod-hub:12")), ("hub", arn("erplora-prod-hub:12x")),
+                                 ("hub", arn("erplora-prod-hub:"))):
             with self.subTest(running):
                 self.primary = {**running_now, service: running}
                 self.rollback()
@@ -103,6 +113,7 @@ class ProdRollbackTest(RollbackCase):
         self.assertChangedNothing()
         self.assertIn("::error::the previous revisions run different tags (tag-10 tag-9); nothing was changed\n",
                       self.out)
+        self.assertFalse(self.called("get-parameter|erplora-prod-saas"))
 
     def test_a_previous_revision_without_the_hub_image_changes_nothing(self):
         for image in ("other.example/thing:1", "reg.example/erplora/hub-pre:tag-10", "reg.example/xerplora/hub:tag-10",
