@@ -254,7 +254,12 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
+Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan. Tocar uno abre
+«Qué permite».
+
+### Empleados · Roles · Qué permite
+Un rol básico, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
+y si lo da («Sí»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
 
 ### Empleados · API keys
 Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
@@ -417,7 +422,7 @@ En la pantalla Archivos:
 | BASE-F79 | Dar de alta o retirar la placa de una persona | hecho |
 | BASE-F80 | Reincorporar a una persona que salió del negocio | hecho |
 | BASE-F81 | Entender cómo entra cada persona | hecho |
-| BASE-F82 | Ver los roles del negocio | hecho |
+| BASE-F82 | Ver los roles del negocio y lo que permite cada uno | hecho |
 | BASE-F83 | Asignar un rol a una persona | hecho |
 | BASE-F84 | Aprobar con el PIN de un responsable | hecho |
 | BASE-F85 | Consultar quién aprobó qué | hecho |
@@ -2214,25 +2219,33 @@ Sale: nada guardado. Se pone al día sola cuando alguien elige o pierde su PIN o
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar».
 Implicados: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
-### BASE-F82 Ver los roles del negocio
+### BASE-F82 Ver los roles del negocio y lo que permite cada uno
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado, gestoría
-Pantalla: Empleados · Roles
+Pantalla: Empleados · Roles; Empleados · Roles · Qué permite
 Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
-     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cinco, los de
-     erplora.com: ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
+     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son los roles básicos de erplora.com:
+     cada app aporta lo que da a cada rol básico en ella, y una app puede traer un rol básico propio cuando su
+     funcionalidad lo pida.
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
      facturas y no cambia ningún ajuste, y no ocupa plaza del plan (BASE-F77).
-  4. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
-Entra: los roles y las personas del negocio.
+  4. Al tocar un rol se abre «Qué permite», con el nombre del rol arriba, «Lo que este rol deja hacer en este negocio,
+     app por app. Se da en erplora.com y aquí no se cambia.» y «Personas con este rol: 2». Debajo, un panel por app:
+     «El negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la
+     frase de cada permiso y su estado: «Sí», «Con aprobación» (lo hace si un responsable lo aprueba con su PIN en ese
+     momento, BASE-F84) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con
+     aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada.
+  5. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
+Entra: los roles, las personas del negocio, las apps encendidas y lo que cada app da a cada rol.
 Sale: nada guardado.
-Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
-Implicados: BASE-F83
+Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; en «Qué permite», «No se pudo cargar lo que
+permite este rol.» con «Reintentar», y un rol que no es de los cinco, «Este rol no existe en este negocio.».
+Implicados: BASE-F83, BASE-F84
 
 ### BASE-F83 Asignar un rol a una persona
 Estado: hecho
@@ -2406,9 +2419,9 @@ En las pantallas de Empleados y en la Documentación de la API:
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
+| Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; «Cargando lo que permite este rol…» en «Qué permite»; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
 | Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía nadie ha tenido que autorizar nada en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
-| Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
+| Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar lo que permite este rol.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
 | Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
 
 ### BASE-F92 Abrir y cerrar el panel del asistente
@@ -4767,8 +4780,9 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
-- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cinco de
-  erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
+- No deja que el negocio cree, ajuste ni encienda o apague roles: tiene los roles básicos de erplora.com, que se dan
+  al invitar; cada app aporta lo que da a cada rol básico en ella y puede traer un rol básico propio cuando su
+  funcionalidad lo pida, y «Qué permite» lo enseña sin dejar cambiarlo (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

@@ -14,7 +14,7 @@ Para qué: que cada persona entre como le toca (cuenta, PIN o placa), con su rol
 ## Recorrido
 
 1. BASE-F81 — cómo entra cada persona.
-2. BASE-F82, BASE-F83 — Marta pasa a responsable.
+2. BASE-F82, BASE-F83 — antes del cambio, «Qué permite» de Encargado; Marta pasa a responsable.
 3. BASE-F119 — Marta, ya responsable, ve el email de todos en Personal; Javi, empleado, no ve el de nadie.
 4. BASE-F77 — el tope de personas del plan.
 5. BASE-F66 — el PIN del negocio, de cuatro dígitos.
