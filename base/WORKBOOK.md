@@ -449,6 +449,7 @@ En la pantalla Archivos:
 | BASE-F116 | Leer las novedades de ERPlora | hecho |
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
+| BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -615,7 +616,8 @@ Pasos:
      el año si es de otro. Al dejar el puntero encima sale la fecha entera. Con el Inicio abierto, lo de hoy
      pasa a ayer al cambiar el día.
   5. De entrada salen los que cada app marca como recomendados para el sector del negocio.
-  6. Solo salen los paneles de las apps encendidas que esta persona puede ver.
+  6. Solo salen los paneles de las apps encendidas que esta persona puede ver, y no sale ninguno cuya cifra es un
+     dato que su rol no ve (BASE-F119).
 Entra: los paneles que declara cada app encendida; los datos de cada uno, pedidos con los permisos de
 quien mira.
 Sale: nada guardado en el hub.
@@ -625,7 +627,7 @@ disponible»: nunca una cifra vieja o inventada. Una fila de una lista con barra
 como una sesión de caja cerrada sin recuento, sale con una raya (—) y sin barra, nunca como un cero; un cero
 de verdad sí sale como cero (0,00 €). Si no se puede leer el tablero: «No se han podido cargar los paneles»
 con «Reintentar».
-Implicados: ninguno
+Implicados: BASE-F119
 
 ### BASE-F07 Personalizar el tablero de paneles
 Estado: hecho
@@ -2183,8 +2185,8 @@ Actor: propietario, administrador, encargado, empleado
 Pantalla: Empleados · Personal
 Pasos:
   1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya;
-     en una fila, un nombre que no cabe se corta y sale entero al pasar por encima), «Email» (solo para quien
-     administra), «Rol», «Acceso» y «Estado».
+     en una fila, un nombre que no cabe se corta y sale entero al pasar por encima), «Email» (solo para quien ve el
+     contacto del equipo: propietario, administrador y encargado; BASE-F119), «Rol», «Acceso» y «Estado».
   2. «Acceso» dice cómo entra: «Cuenta» siempre, y «PIN» y «Placa» si los tiene (por ejemplo, «Cuenta + PIN +
      Placa»).
   3. «Estado» dice «Activo» o, si erplora.com ya la invitó y aún no ha entrado, «Aún no ha entrado».
@@ -2192,7 +2194,7 @@ Pasos:
 Entra: las personas del negocio.
 Sale: nada guardado. Se pone al día sola cuando alguien elige o pierde su PIN o su placa.
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar».
-Implicados: BASE-F77, BASE-F78, BASE-F79
+Implicados: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 Ver los roles del negocio
 Estado: hecho
@@ -3394,8 +3396,39 @@ suscripción), sale su motivo (BASE-F26). El Hub rechaza igual lo que esa pantal
 una pantalla de errores.
 Implicados: BASE-F26, HUBS-F26 (erplora.com)
 
+### BASE-F119 Lo que se ve según los permisos de dato
+Estado: hecho
+Actor: propietario, administrador, encargado, empleado
+Pantalla: Empleados · Personal, Inicio · Resumen
+Pasos:
+  1. Además de lo que puede hacer, cada rol dice qué datos delicados ve, con cuatro permisos de dato: ver los costes,
+     ver el contacto de los clientes, ver el contacto del equipo y ver los totales del negocio. El propietario, el
+     administrador y el encargado tienen los cuatro; el empleado, solo el contacto de los clientes, que necesita
+     para atenderlos.
+  2. Quien no tiene un permiso de dato no recibe ese dato por ningún camino: ni en la pantalla, ni por la API, ni en
+     lo que contesta el asistente. Donde iría, el dato llega vacío y la pantalla no lo enseña.
+  3. En **Empleados › Personal**, la columna «Email» solo sale a quien ve el contacto del equipo. Un empleado no ve
+     el email de nadie, tampoco el suyo, ni dentro de un nombre: una cuenta de erplora.com sin nombre sale con lo que
+     va antes de la @.
+  4. Un panel de Inicio cuya cifra es un dato que la persona no ve no le sale en el tablero ni entre los que puede
+     añadir.
+Entra: el rol de la persona en este negocio.
+Sale: nada guardado.
+Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
+con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
+Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
+
 ## Para quien lo mantiene
 
+- **Permisos de dato** (BASE-F119; `base/sensitive.py`, `base/visibility.py`, `live.sensitive`): un campo de un
+  esquema se marca con `Field(json_schema_extra=COSTS)` (o `CUSTOMER_CONTACT`, `TEAM_CONTACT`, `BUSINESS_TOTALS`) y, en
+  una respuesta, admite nulo (`live.E026`). live lo pone a nulo a quien no tiene el permiso en `Operation.__call__`,
+  también cuando una operación corre dentro de otra: un cálculo con costes los lee por su propia puerta, nunca llamando
+  a otra operación con el contexto de la persona. Una entrada que rellena un campo marcado (un filtro, el orden) se
+  rechaza con 403 `permission_denied`. Un panel de Inicio no sale a quien no tiene el permiso de un campo marcado que
+  lee su `map` (`visibility.widget_open`). `tests/test_guardrails_sensitive.py` exige la marca en todo campo de
+  respuesta con nombre de coste, contacto o sueldo, o su entrada en `UNMARKED` con su motivo (la lista solo encoge), y
+  la misma marca en el filtro o el orden de una lectura que lo nombra.
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
   `base.middleware.CustomDomainMiddleware`): `ALLOWED_HOSTS` no cambia. El SaaS nombra el dominio en la foto
   (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
