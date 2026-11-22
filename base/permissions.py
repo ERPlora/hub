@@ -25,8 +25,7 @@ OPEN_MANAGEMENT = "base.open_management"
 #: Owning the business: buying for it on erplora.com (the plan, an app of the Store), resetting it and its copies. Only
 #: its owner, as on erplora.com, where the plan, the billing and the hand-over are the owner's alone.
 OWN_BUSINESS = "base.own_business"
-#: What the owner holds and no other role does, whatever an app grants it: an administrator runs the business, it does
-#: not own it.
+#: What the owner holds and no other role does: an administrator runs the business, it does not own it.
 OWNER_ONLY = frozenset({OWN_BUSINESS})
 
 
@@ -51,14 +50,14 @@ def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
 def permissions_of_role(role: str) -> frozenset[str]:
     """What ``role`` (a ``Membership.Role``) gives on a host: the owner, every permission declared by every app; an
     administrator, all of them but ``OWNER_ONLY``; manager and employee, what each app's ``role_permissions`` gives
-    them, never ``OWNER_ONLY``."""
+    them, which never names ``OWNER_ONLY`` (``base/tests/test_permissions.py``)."""
     configs = all_live_app_configs()
     declared = frozenset(permission for config in configs for permission in config.permissions)
     if role == Membership.Role.OWNER:
         return declared
     if role == Membership.Role.ADMIN:
         return declared - OWNER_ONLY
-    return permissions_for_role(configs, role) - OWNER_ONLY
+    return permissions_for_role(configs, role)
 
 
 def reload_user(user: Any) -> Any:
