@@ -607,7 +607,7 @@ cuatro apps (`db_constraint=False`) y el `RunPython` de `attendance/0002`: donde
 
 ### Migraciones que conviven con el código anterior
 
-`ecs-deploy.sh` corre `hub-migrate` (`migrate_hubs`: control, plantillas y hubs atrasados; espera hasta
+`scripts/ecs_deploy.py` corre `hub-migrate` (`migrate_hubs`: control, plantillas y hubs atrasados; espera hasta
 `MIGRATE_TIMEOUT_SECONDS`, 3600 s por defecto) **antes** de cambiar los servicios, y un rollback devuelve el código anterior
 sobre el esquema ya migrado: durante un rato, el código anterior lee y escribe las tablas del nuevo (expand/contract,
 PLAN-DB §7). Por eso, en una migración:

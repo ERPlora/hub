@@ -3,13 +3,11 @@
 # the issue is ERPlora/erplora-next#74, which tracks splitting them. The list only shrinks: a listed file may change but
 # never grows past its number, the number comes down to the file's size as it shrinks, a file leaves the list once it
 # fits its cap, and no path or higher number is ever added.
-227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1660 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
 1127 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
-2257 apps/appointment/services.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 880 apps/attendance/queries.py ERPlora/erplora-next#74
 711 apps/attendance/services.py ERPlora/erplora-next#74
@@ -36,14 +34,13 @@
 555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1064 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
 463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
-1350 apps/invoice/queries/__init__.py ERPlora/erplora-next#74
+1348 apps/invoice/queries/__init__.py ERPlora/erplora-next#74
 1031 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
 1754 apps/invoice/services/__init__.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
-1589 apps/kitchen/queries.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
-1711 apps/kitchen/services.py ERPlora/erplora-next#74
+1700 apps/kitchen/services.py ERPlora/erplora-next#74
 830 apps/modifier/queries/__init__.py ERPlora/erplora-next#74
 666 apps/modifier/schemas/__init__.py ERPlora/erplora-next#74
 687 apps/modifier/services/__init__.py ERPlora/erplora-next#74
@@ -62,7 +59,6 @@
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
 1031 apps/reservation/queries.py ERPlora/erplora-next#74
 891 apps/reservation/schemas.py ERPlora/erplora-next#74
-1521 apps/reservation/services.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
 604 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
@@ -84,14 +80,13 @@
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
 612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
-1162 apps/staff/queries.py ERPlora/erplora-next#74
+1162 apps/staff/queries/__init__.py ERPlora/erplora-next#74
 1065 apps/staff/services.py ERPlora/erplora-next#74
 1299 apps/staff/tests/test_queries.py ERPlora/erplora-next#74
 1489 apps/staff/tests/test_services.py ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
 893 apps/table/queries/__init__.py ERPlora/erplora-next#74
 825 apps/table/schemas/__init__.py ERPlora/erplora-next#74
-1677 apps/table/services.py ERPlora/erplora-next#74
 612 apps/task/queries.py ERPlora/erplora-next#74
 645 apps/task/services.py ERPlora/erplora-next#74
 311 apps/tax/frontend/operations.d.ts ERPlora/erplora-next#74

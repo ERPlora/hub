@@ -1,13 +1,13 @@
 // Inventory for an employee and on a phone (apps/inventory/WORKBOOK.md «Quién puede qué», «Ajustes»):
 //   - the employee (`hub_employee`) sees products, movements and categories, but nothing that writes:
 //     no «+», no CSV, «Yes»/«No» instead of the switch, only «Details»; no Settings tab, and its
-//     address says «This page does not exist»; the API refuses every write with 403;
+//     address says «No access» (BASE-F118); the API refuses every write with 403;
 //   - what a product costs is not theirs (base.view_costs): no «Inventory value» on the dashboard, the cost empty;
 //   - on a phone (390×844) the products list is cards that load more at their end, a product's sheet opens, and
 //     the form fits as a sheet.
 import { expect, test } from '@playwright/test';
 
-import { A, api, capture, EMPLOYEE, hostPage, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, hostPage, shot, shown, testid } from './helpers';
 import { cleanInventory, createProduct, dialog, productRow, productsReady, searchProducts, stamp } from './inventory-helpers';
 import { offersRowAction } from './service-helpers';
 
@@ -54,9 +54,9 @@ test('an employee sees the inventory but writes nothing, by the screens or by th
     await page.waitForURL(/\/inventory\/categories$/);
     await expect(shown(page).locator('[data-testid=inventory-categories-add]')).toHaveCount(0);
 
-    // Settings by its address: «This page does not exist».
+    // Settings by its address: «No access» (BASE-F118).
     await page.goto(`${A}/inventory/settings`);
-    await expect(shown(page).locator('[data-testid=inventory-settings-not-found]')).toBeVisible();
+    await expect(testid(page, 'no-access')).toBeVisible();
     await expect(shown(page).locator('[data-testid=inventory-settings-form]')).toHaveCount(0);
     await page.screenshot({ path: shot('inventory-employee-settings') });
 

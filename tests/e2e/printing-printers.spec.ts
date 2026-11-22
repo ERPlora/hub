@@ -7,11 +7,11 @@
 // every flow in the three viewports. The printers and jobs made here are deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shown, testid } from './helpers';
 import { dialog, fill, pick } from './inventory-helpers';
 import { claim, fail, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
-import { offersRowAction, rowAction } from './service-helpers';
+import { rowAction } from './service-helpers';
 
 // One printer goes through every test, in order: a failure stops the rest instead of a new worker's names.
 test.describe.configure({ mode: 'serial' });
@@ -216,12 +216,10 @@ test('PRINTING-F02: inside the app «Search printers» lists what the device fou
   await expect(modal.locator('[data-testid=printing-discover-row-0-add]')).toHaveCount(0);
 });
 
-test('PRINTING-F03: the employee sees the printers without adding or editing', async ({ page, context }) => {
+test('PRINTING-F03: the employee does not open the printers: «No access» by their address, with no add', async ({ page }) => {
   await login(page, A, '/printing/printers', EMPLOYEE);
-  const till = await byName(context, TILL);
-  await printersReady(page);
+  // Not in an employee's menu (BASE-F118): the till prints without opening them.
+  await expect(testid(page, 'no-access')).toBeVisible();
   await expect(shown(page).locator('[data-testid=printing-printers-add]')).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=printing-printers-discover]')).toHaveCount(0);
-  await expect(shown(page).locator('[data-testid=printing-printers-row]').filter({ hasText: TILL })).toBeVisible();
-  expect(await offersRowAction(page, 'printing-printers', till.id, 'edit')).toBe(false);
 });

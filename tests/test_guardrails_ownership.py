@@ -1,7 +1,8 @@
 """Guardrail of «only mine or all»: a model whose rows belong to someone is read through its ``Owned`` declaration.
 
 An app declares in ``apps/<app>/queries/ownership.py`` whose each row of a model is (``base.queries.ownership.Owned``),
-and its reads go through ``<DECLARATION>.visible(ctx)``: a person without the «see all» permission gets only theirs.
+and its reads go through ``<DECLARATION>.visible(ctx)`` (its figures, through ``<DECLARATION>.counted(ctx)``): a person
+without the «see all» permission gets only theirs.
 ``<Model>.objects`` in a ``queries`` door skips that, so here every such read is in :data:`UNSCOPED_READS`, closed and
 with its reason; what the list names must still be there, so it never rots; and a planted read is caught, so a scan
 that found nothing is never taken for a clean tree.
@@ -25,12 +26,16 @@ DECLARATIONS = "apps/*/queries/ownership.py"
 OTHER_APPS_WRITE = "another app's write"
 #: Nobody reads a row: a count or a yes/no about the whole table.
 NO_ROW_READ = "no row read"
-#: A screen of the whole business that its own permission opens to the roles that see everyone's.
-BUSINESS_WIDE = "the whole business"
 #: The record of a check, a table or a register session being worked on, not the history of sales.
 PART_OF_THE_WORK = "part of the work at hand"
 #: A customer's public page, by the signed code printed on their own paper.
 PUBLIC_BY_CODE = "public, by its code"
+#: A record reached through another the caller already sees by its declaration: a document's links, a sale's document.
+REACHED_THROUGH = "reached through one the caller sees"
+#: The numbering of a whole series, which a gap or the book of numbers is: numbers, never a customer or an amount.
+WHOLE_SERIES = "the whole series"
+#: Only the platform runs it: no person is ever the caller.
+ONLY_THE_SYSTEM = "only the system"
 
 #: Every read of an owned model in a ``queries`` door that skips its declaration: ``(path, function) → (kind, why)``.
 UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
@@ -51,23 +56,6 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         PUBLIC_BY_CODE,
         "The page where the customer asks for the full invoice of their ticket, opened by the code signed on it.",
     ),
-    ("apps/sale/queries/figures.py", "stats"): (
-        BUSINESS_WIDE,
-        "The figures of a period, which only sale.view_reports opens: the roles that hold it see every sale.",
-    ),
-    ("apps/sale/queries/figures.py", "_revenue_by_day"): (
-        BUSINESS_WIDE,
-        "What each day sold, for the figures and the Home's panel that sale.view_reports opens.",
-    ),
-    ("apps/sale/queries/figures.py", "today"): (
-        BUSINESS_WIDE,
-        "Today's sales and tickets, for the figures and the Home's panels that sale.view_reports opens.",
-    ),
-    ("apps/sale/queries/figures.py", "_refunded_by_staff"): (
-        BUSINESS_WIDE,
-        "What refunds gave back on each professional's lines, for the close by professional that sale.view_reports "
-        "opens.",
-    ),
     ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
         "The tenders of the sales charged and voided while a register session was open: the session's takings.",
@@ -79,6 +67,69 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
     ("apps/table/queries/__init__.py", "sessions_now"): (
         PART_OF_THE_WORK,
         "What the check of each table of the room charged, to say whether it is paid.",
+    ),
+    ("apps/invoice/queries/__init__.py", "with_links"): (
+        NO_ROW_READ,
+        "Whether each document of a list the caller sees was replaced by a full invoice.",
+    ),
+    ("apps/invoice/queries/__init__.py", "_loaded"): (
+        REACHED_THROUGH,
+        "The document the caller opened, read again with the documents it rectifies, replaces or is rectified by, "
+        "which its detail names as links.",
+    ),
+    ("apps/invoice/queries/__init__.py", "invoice_detail"): (
+        REACHED_THROUGH,
+        "The full invoice that replaced the ticket the caller opened, which its detail names as a link.",
+    ),
+    ("apps/invoice/queries/__init__.py", "document_of_sale"): (
+        REACHED_THROUGH,
+        "The document of a sale the caller reached through its declaration (by_source looks it up with "
+        "visible_sale), and the one Sales' void and refund rectify.",
+    ),
+    ("apps/invoice/queries/__init__.py", "series_started"): (
+        NO_ROW_READ,
+        "Whether a series numbered any document, which freezes its prefix, format and next number.",
+    ),
+    ("apps/invoice/queries/__init__.py", "list_series"): (
+        NO_ROW_READ,
+        "Whether each listed series numbered any document.",
+    ),
+    ("apps/invoice/queries/__init__.py", "rectifiable"): (
+        NO_ROW_READ,
+        "Whether a ticket was already replaced by a full invoice, which is then the one to rectify.",
+    ),
+    ("apps/invoice/queries/__init__.py", "numbering_gaps"): (
+        WHOLE_SERIES,
+        "The gaps of a series' numbering, which only the whole series can tell.",
+    ),
+    ("apps/invoice/queries/__init__.py", "allocations"): (
+        WHOLE_SERIES,
+        "The book of numbers handed out in a series, with the type and date of each document.",
+    ),
+    ("apps/invoice/queries/__init__.py", "find_platform_invoice"): (
+        ONLY_THE_SYSTEM,
+        "ERPlora's own invoices on its platform hub, which the SaaS issues and asks about by their reference.",
+    ),
+    ("apps/invoice/queries/fiscal_archive.py", "keeps_fiscal_documents"): (
+        NO_ROW_READ,
+        "Whether the business's database holds any invoice at all, which the platform asks before a database can go.",
+    ),
+    ("apps/invoice/queries/fiscal_archive.py", "invoices"): (
+        ONLY_THE_SYSTEM,
+        "Every invoice of a business that left, for the fiscal archive the platform keeps of it.",
+    ),
+    ("apps/invoice/queries/public.py", "ticket_of_code"): (
+        PUBLIC_BY_CODE,
+        "The page where the customer asks for the full invoice of their ticket, opened by the code signed on it.",
+    ),
+    ("apps/invoice/queries/public.py", "public_ticket"): (
+        PUBLIC_BY_CODE,
+        "The ticket that code opens and, once issued, its full invoice, shown on that same page.",
+    ),
+    ("apps/verifactu/queries/records.py", "find_invoice"): (
+        OTHER_APPS_WRITE,
+        "VeriFactu seals or corrects the record of the document it is given (and of its test invoice); who may is "
+        "VeriFactu's own permission.",
     ),
 }
 
@@ -169,14 +220,17 @@ def unscoped_reads(root: Path) -> set[tuple[str, str]]:
 
 
 def test_the_declarations_are_found():
-    assert owned_models(REPO)["Sale"] == "sale"
+    found = owned_models(REPO)
+    assert (found["Sale"], found["VoucherSession"]) == ("sale", "sale")
+    assert found["Invoice"] == "invoice"
 
 
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():
     skipped = unscoped_reads(REPO) - set(UNSCOPED_READS)
     assert skipped == set(), (
-        f"{sorted(skipped)} read an owned model with <Model>.objects: read it with <DECLARATION>.visible(ctx) (or "
-        "visible_sale in Sales), or add it to UNSCOPED_READS with a reason a reviewer can weigh"
+        f"{sorted(skipped)} read an owned model with <Model>.objects: read it with <DECLARATION>.visible(ctx) (a "
+        "figure with <DECLARATION>.counted(ctx); visible_sale in Sales), or add it to UNSCOPED_READS with a reason a "
+        "reviewer can weigh"
     )
 
 
@@ -186,7 +240,15 @@ def test_what_the_list_names_still_reads_without_the_declaration():
 
 
 def test_every_reason_is_one_of_the_kinds_and_says_why():
-    kinds = {OTHER_APPS_WRITE, NO_ROW_READ, BUSINESS_WIDE, PART_OF_THE_WORK, PUBLIC_BY_CODE}
+    kinds = {
+        OTHER_APPS_WRITE,
+        NO_ROW_READ,
+        PART_OF_THE_WORK,
+        PUBLIC_BY_CODE,
+        REACHED_THROUGH,
+        WHOLE_SERIES,
+        ONLY_THE_SYSTEM,
+    }
     for read, (kind, why) in UNSCOPED_READS.items():
         assert kind in kinds and why.endswith("."), read
 
@@ -214,6 +276,13 @@ def test_a_read_under_another_name_in_another_apps_queries_file_is_caught(tmp_pa
     relative = "from ..models import Sale\n\n\ndef peek():\n    return Sale._default_manager.all()\n"
     root = tree_with(tmp_path, {"apps/shop/queries.py": peek, "apps/sale/queries/other.py": relative})
     assert unscoped_reads(root) == {("apps/shop/queries.py", "peek"), ("apps/sale/queries/other.py", "peek")}
+
+
+def test_a_planted_read_of_an_invoice_is_caught(tmp_path):
+    declared = "from apps.invoice.models import Invoice\nfrom base.queries.ownership import Owned\n\nINVOICES = Owned(Invoice)\n"
+    peek = "from ..models import Invoice\n\n\ndef peek():\n    return Invoice.objects.filter(status='paid')\n"
+    root = tree_with(tmp_path, {"apps/invoice/queries/ownership.py": declared, "apps/invoice/queries/peek.py": peek})
+    assert unscoped_reads(root) == {("apps/invoice/queries/peek.py", "peek")}
 
 
 def test_the_declaration_a_services_door_and_another_model_called_alike_are_not_reads(tmp_path):

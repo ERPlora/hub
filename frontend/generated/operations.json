@@ -3019,6 +3019,10 @@
     "method": "get",
     "path": "/api/approvals"
   },
+  "base.access.grantors": {
+    "method": "get",
+    "path": "/api/access/grantors"
+  },
   "base.approval.approvers": {
     "method": "get",
     "path": "/api/approvals/approvers"

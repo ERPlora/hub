@@ -31,7 +31,7 @@ dispositivo no se lleva el papel de nadie. Si algo no sale, la cola lo dice y de
 - El **propietario** y el **administrador**: todo; además reintentan y cancelan trabajos atascados.
 - El **responsable**: da de alta y cambia impresoras, los dispositivos que imprimen y los ajustes, y pide
   impresiones.
-- El **empleado**: ve impresoras, ajustes y cola, y pide impresiones (una prueba, un tique).
+- El **empleado**: no abre sus pantallas (por su dirección, «Sin acceso» (BASE-F118)); pide impresiones desde donde trabaja (un tique en el TPV).
 
 Sirve igual a la peluquería y al restaurante: los dos imprimen el tique y las etiquetas; la comanda de
 cocina y barra es solo del restaurante.
@@ -192,8 +192,8 @@ cobrar» y «Copias del tique» (1, 2 o 3); otra «Impresora de cada función» 
 función («Recibo», «Cocina», «Barra», «Etiqueta»): «La primera activa con esa función» o una de sus
 impresoras activas. La nota «El encabezado y el pie del tique forman parte de los ajustes de Ventas,
 que es de donde sale el tique.» con el enlace «Abrir los ajustes del tique» (si Ventas está encendida). «Guardar ajustes» guarda lo que
-cambió y dice «Ajustes guardados.». Quien no puede cambiarlos los ve bloqueados con «No tienes permiso
-para cambiar estos ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los
+cambió y dice «Ajustes guardados.». Quien no puede cambiarlos no los abre:
+por su dirección, «Sin acceso» (BASE-F118). Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los
 ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.» con el motivo, también
 debajo de la función cuya impresora rechaza (PRINTING-F06).
 
@@ -206,7 +206,7 @@ debajo de la función cuya impresora rechaza (PRINTING-F06).
 | Error | El aviso de su pantalla con «Reintentar»; un rechazo de una acción sale en su ventana, junto a su campo, o en un aviso. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva | «Impresión no está activa en este negocio.» |
-| Sin permiso | No aparece lo que no puede hacer (en Dispositivos, ni «Imprimir desde este dispositivo», ni «Editar», ni «Retirar»); los ajustes salen bloqueados con «No tienes permiso para cambiar estos ajustes.». |
+| Sin permiso | No aparece lo que no puede hacer (en Dispositivos, ni «Imprimir desde este dispositivo», ni «Editar», ni «Retirar»); los ajustes, por su dirección, «Sin acceso» (BASE-F118). |
 
 ## Cambios sin guardar en Android
 
@@ -244,7 +244,7 @@ cierra sin preguntar (BASE-F05).
 
 ### PRINTING-F01 Ver cómo va la impresión
 Estado: hecho
-Actor: administrador, responsable, empleado
+Actor: administrador, responsable; el empleado, solo en el Inicio
 Pantalla: Inicio, Impresoras, Cola
 Pasos:
 1. En el **Inicio**, mientras ningún dispositivo dado de alta llega a una impresora de recibos activa,
@@ -355,7 +355,7 @@ Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25, PRINTING-F22
 
 ### PRINTING-F05 Hacer una prueba de impresión
 Estado: hecho
-Actor: administrador, responsable, empleado
+Actor: administrador, responsable
 Pantalla: Impresoras
 Pasos:
 1. Pulsa «Probar» en la fila de la impresora.
@@ -390,7 +390,7 @@ Si falla: «No se pudieron guardar los ajustes.» con el motivo; si nombra la im
 función. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
 una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
 se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si la lectura falla, la
-pantalla no enseña valores y ofrece «Reintentar». Sin permiso, bloqueados y sin «Guardar ajustes».
+pantalla no enseña valores y ofrece «Reintentar». Sin permiso, «Sin acceso».
 Implicados: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Imprimir el tique al cobrar

@@ -36,7 +36,7 @@ Quién la usa:
 
 - El **propietario**, el **administrador** y el **responsable** crean categorías, reglas y alias, ponen
   fecha de fin a una regla y la desactivan o reactivan.
-- El **empleado** solo consulta y calcula.
+- El **empleado** no abre sus pantallas (por su dirección, «Sin acceso» (BASE-F118)); el TPV y el asistente calculan con sus reglas.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «desactiva la regla
   de la cerveza en Alemania», «pon fin al tipo reducido el 31 de diciembre». Antes de una acción pide
   confirmar con su tarjeta (BASE-F97), que nombra cada regla como la distingue la lista de Reglas, nunca

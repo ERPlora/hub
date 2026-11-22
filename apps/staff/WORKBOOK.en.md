@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d2b19f49173c00a6431af13cb32dbba76a94f8920ea7c98297533bb8812e7d75 -->
+<!-- generated from WORKBOOK.md sha256:c46f2f31c9d1a16656e6b23e8562172a37c78f4cbae0aaf6a28656575c736c22 -->
 
 ## What it is for and who it is for
 
@@ -535,7 +535,7 @@ In: each record's rate and commission and, from Sales, each professional's produ
 already taken off: what comes back goes to whoever sold it; the vouchers they sold left out and the value of
 their voucher sessions added). Sales is optional.
 Out: read only.
-If it fails: without the pay permission, "You do not have permission"; without Sales, "Commissions come
+If it fails: without the pay permission, its address says "No access"; without Sales, "Commissions come
 from the sales"; with "To" before "From", "The end date cannot be before the start date." under "To";
 with only one day, "A period of your own needs its first and its last day."; with more than two years,
 "Ask for at most 731 days at a time.".

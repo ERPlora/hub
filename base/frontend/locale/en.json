@@ -235,6 +235,19 @@
       },
       "toApps": "Go to Apps"
     },
+    "noAccess": {
+      "title": "No access",
+      "heading": "You do not have access to this screen",
+      "body": "Your role in this business does not open it.",
+      "checking": "Looking for who can give you access…",
+      "ask": "Ask one of these people to give you access:",
+      "nobody": "Ask whoever runs the business to give you access.",
+      "error": {
+        "heading": "We could not find out who can give you access",
+        "body": "Ask whoever runs the business, or try again."
+      },
+      "home": "Go to Home"
+    },
     "systemPlan": {
       "title": "System",
       "tabs": {

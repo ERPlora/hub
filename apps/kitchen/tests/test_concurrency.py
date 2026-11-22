@@ -33,7 +33,8 @@ from apps.kitchen.models import (
     Ticket,
     TicketItem,
 )
-from apps.kitchen.queries import STATION_NOT_FOUND, TICKET_NOT_FOUND
+from apps.kitchen.queries.scope import STATION_NOT_FOUND
+from apps.kitchen.queries.tickets import TICKET_NOT_FOUND
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import at_once, in_a_thread, meanwhile
 

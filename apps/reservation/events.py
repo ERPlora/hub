@@ -1,6 +1,6 @@
 """Events of the reservation app (``reservation.<entity>.<fact>``) and its reactions to Customers' events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. ``status_changed`` and ``updated`` are the contract Tables listens to (TABLE-F25–F27): they
 carry the table, the day and time, the guests and the guest's name and card, which Tables paints on the
 hold. The rest carry ids and numbers, never a name or a free note (WORKBOOK «Lo que avisa»).

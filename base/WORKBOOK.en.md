@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3b8c73ea2870cd87d97020ebb8c35768768f59905e293199c360675289cb3341 -->
+<!-- generated from WORKBOOK.md sha256:659cc2cef114be4fe55ab922e87766d0757fcc175bdf4244183a28e8d5ddacc1 -->
 
 ## What it is for and who it is for
 
@@ -150,6 +150,11 @@ In the same address as the app's screen, the reason: "Subscription needed" or "T
 this business", with "Go to Apps" (and "Upgrade plan" for the owner, in the
 browser).
 
+### No access
+In the same address as a screen the person's role does not open, a padlock with "You do not have access to this
+screen" — "Your role in this business does not open it.", the names of who can give them access, each with their
+avatar, and "Go to Home".
+
 ### Settings · Business
 The second of the tabs at the bottom of "Settings" ("General", "Business", "Printing" and "Data and backups").
 The "Your business" card shows, with no fields to fill in, "Business name", "Country", "Time
@@ -276,7 +281,7 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 | Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
 | Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
-| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". |
+| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". A screen of an app their role does not open, opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
 
@@ -443,6 +448,7 @@ On the Employees screens and the API documentation:
 | BASE-F115 | See the help of a module's screen | done |
 | BASE-F116 | Read what is new in ERPlora | done |
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
+| BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 
 ### BASE-F01 See what the business still has to set up
@@ -1033,8 +1039,9 @@ In: what the business has of each app.
 Out: nothing.
 If it fails: "We could not check why this app does not open" — "Check the connection and try again." with
 "Retry": never a made-up reason. An address that does not exist in the hub says it does not exist, like any
-other. An app the person cannot see opens anyway and each screen says they have no permission.
-Involved: none
+other. A screen the person's role does not open says "No access" (BASE-F118); if the whole app does not open in the
+business, this reason rules, since it holds for everyone.
+Involved: BASE-F118
 
 ### BASE-F27 See a paid app blocked
 Status: done
@@ -3371,6 +3378,30 @@ If it fails: a manager or an employee does not see the notice. If the photo does
 comes without a date: "Pay it on erplora.com: if it is not paid soon, the business is suspended. Nothing is deleted.".
 If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
+
+### BASE-F118 Open a screen without permission: "No access" and whom to ask
+Status: done
+Actor: manager, employee
+Screen: No access
+Steps:
+  1. They open by its address (a link, the history, a tab left open or typing it) a screen of an app their role does
+     not open: an entry that does not show in their menu, such as Taxes' "Rules" for an employee, or any screen that
+     hangs from it.
+  2. Instead of the screen, in the same address, "No access" shows: "You do not have access to this screen" — "Your
+     role in this business does not open it.". While it looks for whom to ask: "Looking for who can give you access…".
+  3. Below, "Ask one of these people to give you access:" and the name of each one, with their avatar: whoever can
+     change their role on erplora.com (HUBS-F26). An employee sees the owner and the administrators; a manager, only
+     the owner. Only the name: neither the email nor the phone. Those invited who have not entered yet count too.
+  4. "Go to Home" leads to the Home.
+In: the person's session, which says which screens of each app their role closes (the same ones that do not show in
+their menu); the people of the business with their role, from erplora.com's last photo.
+Out: nothing.
+If it fails: if it cannot find out whom to ask, "We could not find out who can give you access" — "Ask whoever runs
+the business, or try again." with "Retry", and the screen still says they have no access. With nobody to name: "Ask
+whoever runs the business to give you access.". If the whole app does not open in the business (turned off or without
+its subscription), its reason shows (BASE-F26). The Hub refuses what that screen would ask all the same: "No access"
+only spares a screen of errors.
+Involved: BASE-F26, HUBS-F26 (erplora.com)
 
 ### BASE-F119 What each person sees by their data permissions
 Status: done

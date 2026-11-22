@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:428de823adef0c33fe2ab4c66e32b9866b4be483266f342d2cc2f583a5d111a2 -->
+<!-- generated from WORKBOOK.md sha256:dd99e54bf8d08b43ddeea0fe1fa3c398ac17c516dec84d9888db913b0feab015 -->
 
 ## What it is for and who it is for
 
@@ -70,7 +70,7 @@ Initial setup, step by step:
 ## Screens
 
 The **Cash register** menu has two tabs: **Cash register** and **Settings**, this one only for whoever can change
-the settings. The buttons the profile cannot use do not show.
+the settings; the others, by its address, see "No access" (BASE-F118). The buttons the profile cannot use do not show.
 
 ### Cash register
 Here you open and close the cash shifts and look back at the earlier ones. At the top you see the cash there should
@@ -150,7 +150,7 @@ Menu **Cash register → Settings**. A "Cash register" card with "Turn on the ca
 opening float", "Require a count to close", "Allow a negative balance", "Blind count", "Daily auto-close"
 and "Auto-close time" (from 00:00 to 23:00, on the hour), and "Save". Below, the "Drawers" card: the list
 of drawers (name, active) with "Add drawer", "Rename" and "Deactivate"/"Activate". Whoever cannot change
-the settings sees them locked with "You do not have permission to change these settings.". Loading:
+the settings does not open them: by its address, "No access" (BASE-F118). Loading:
 "Loading settings…". Error: "Could not load the settings." with "Retry"; when saving, "Could not save the
 settings.". Saved: "Settings saved.".
 "Save" turns on when something changes and, while the settings have never been saved, also with no
@@ -220,7 +220,7 @@ the first save with no changes). Never saved, the default ones apply and "Your c
 opening a session does not count it as done.
 If it fails: "Could not save the settings." with the reason, and the settings stay as they were. If the
 reading fails, the screen shows no values (never the default ones as if they were the business's) and
-offers "Retry". Without the settings permission, the fields show locked, there is no "Save" and the
+offers "Retry". Without the settings permission, the screen says "No access" and the
 Home does not show the step "Your cash drawer".
 Involved: CASH_REGISTER-F03, F05, F07, F09, F10
 

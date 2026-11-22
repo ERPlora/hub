@@ -12,6 +12,7 @@ from live.context import OperationContext
 from live.meta import all_live_app_configs
 
 from base.apps_on import active_apps
+from base.sensitive import VIEW_BUSINESS_TOTALS
 
 from .people import is_a_person
 
@@ -52,7 +53,19 @@ class Owned:
         return ctx.has(self.all_permission) or not is_a_person(ctx.actor)
 
     def visible(self, ctx: OperationContext) -> QuerySet:
-        rows = self.model.objects.all()
         if self.sees_all(ctx):
-            return rows
-        return rows.filter(self.mine(me(ctx)))
+            return self.model.objects.all()
+        return self.theirs(me(ctx))
+
+    def theirs(self, person: Me) -> QuerySet:
+        """The rows that are ``person``'s, whatever the caller holds: what a model whose rows follow these reads them
+        by (an invoice is whoever's its sale is)."""
+        return self.model.objects.filter(self.mine(person))
+
+    def counted(self, ctx: OperationContext) -> QuerySet:
+        """The rows a caller's figures add up (a period's totals, a day's takings, the close by person): the whole
+        business's only with ``base.view_business_totals`` besides the «see all» permission. A person without both
+        counts their own, even if they may open everyone's rows one by one."""
+        if ctx.has(VIEW_BUSINESS_TOTALS) or not is_a_person(ctx.actor):
+            return self.visible(ctx)
+        return self.model.objects.filter(self.mine(me(ctx)))

@@ -997,7 +997,7 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
 )
 def substitute(ctx: OperationContext, data: SubstituteIn) -> dict:
     card = _chosen_card(ctx, data)
-    ticket = find_invoice(data.invoice_id, data.number, lock=True)
+    ticket = find_invoice(ctx, data.invoice_id, data.number, lock=True)
     if ticket.invoice_type != "F2":
         raise Conflict(str(NOT_A_TICKET), code="invoice.not_a_ticket")
     existing = Invoice.objects.filter(substitutes=ticket).first()
@@ -1143,7 +1143,7 @@ def _rectify(  # noqa: PLR0913
     },
 )
 def rectify(ctx: OperationContext, data: RectifyIn) -> dict:
-    original = find_invoice(data.invoice_id, data.number, lock=True)
+    original = find_invoice(ctx, data.invoice_id, data.number, lock=True)
     left_over = rectifiable(original, _today(), data.issue_date)
     rectification = _rectify(
         ctx,
@@ -1353,7 +1353,7 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
     },
 )
 def mark_paid(ctx: OperationContext, data: MarkPaidIn) -> dict:
-    invoice = find_invoice(data.invoice_id, data.number, lock=True)
+    invoice = find_invoice(ctx, data.invoice_id, data.number, lock=True)
     if invoice.is_rectification or invoice.status != Invoice.Status.ISSUED:
         raise Conflict(str(CANNOT_MARK_PAID), code="invoice.cannot_mark_paid")
     invoice.status = Invoice.Status.PAID
@@ -1734,7 +1734,7 @@ def _qr_of(ctx: OperationContext, invoice: Invoice) -> dict | None:
     },
 )
 def print_invoice(ctx: OperationContext, data: DocumentIn) -> dict:
-    invoice = find_invoice(data.invoice_id, data.number)
+    invoice = find_invoice(ctx, data.invoice_id, data.number)
     try:
         qr = _qr_of(ctx, invoice)
     except _Unprintable:
