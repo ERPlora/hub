@@ -63,8 +63,8 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     by GET), like the rehearsal (``dry_run``) of the apps' imports.
     """
     with translation.override(ctx.language):
-        bundle, seed = blueprint.open_source(data.template, data.file_base64)
-        return blueprint.summary(ctx, bundle, seed=seed)
+        bundle, seed = blueprint.preview.open_source(data.template, data.file_base64)
+        return blueprint.preview.summary(ctx, bundle, seed=seed)
 
 
 @operation(
@@ -112,16 +112,16 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             retried = ImportBatch.objects.select_for_update().filter(pk=data.retry_of).first()
             if retried is None:
                 raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
-            blocked = blueprint.retry_state(ctx, retried)
+            blocked = blueprint.loads.retry_state(ctx, retried)
             if blocked:
-                code, message = blueprint.RETRY_BLOCKED[blocked]
+                code, message = blueprint.loads.RETRY_BLOCKED[blocked]
                 raise Conflict(str(message), code=code)
-            bundle, seed = blueprint.open_source(retried.template_key, "")
+            bundle, seed = blueprint.preview.open_source(retried.template_key, "")
             apps = list(retried.apps)
             # What it still waited for (an app whose setup failed) is this load's now: one report, one load of it.
-            _stop_waiting(ctx, [retried], None, blueprint.STOPPED_RETRIED)
+            _stop_waiting(ctx, [retried], None, blueprint.loads.STOPPED_RETRIED)
         else:
-            bundle, seed = blueprint.open_source(data.template, data.file_base64)
+            bundle, seed = blueprint.preview.open_source(data.template, data.file_base64)
             apps = list(dict.fromkeys(data.apps)) if data.apps is not None else []
         # A hub is born with every app off. The apps the blueprint lists are turned on first, and
         # what loads reads its rows, never the cache of the apps off kept before this change.
@@ -129,9 +129,9 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             refused = _turn_on_listed(ctx, bundle.manifest["apps"], set(apps))
             waiting = _being_set_up(ctx, bundle.manifest["apps"], set(apps)) - refused.keys()
             if seed is None:
-                refused |= dict.fromkeys(waiting, str(blueprint.FILE_BEING_SET_UP))
+                refused |= dict.fromkeys(waiting, str(blueprint.loads.FILE_BEING_SET_UP))
                 waiting = set()
-            applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused, waiting=waiting)
+            applied = blueprint.loading.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused, waiting=waiting)
         load = ImportBatch.objects.create(
             name=bundle.manifest["name"],
             source=ImportBatch.Source.CATALOG if seed else ImportBatch.Source.FILE,
@@ -146,7 +146,7 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             retry_of=retried,
         )
         record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
-        return blueprint.describe_load(ctx, load)
+        return blueprint.loads.describe_load(ctx, load)
 
 
 @operation(
@@ -176,8 +176,8 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
             raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
         if load.undone_at is not None:
             raise Conflict(gettext("This load was undone already."), code="base.import_undone")
-        removed = blueprint.undo(ctx, load.created_rows)
-        _stop_waiting(ctx, [load], None, blueprint.STOPPED_UNDONE)
+        removed = blueprint.removal.undo(ctx, load.created_rows)
+        _stop_waiting(ctx, [load], None, blueprint.loads.STOPPED_UNDONE)
         load.undone_at = timezone.now()
         load.save(update_fields=["undone_at"])
         record_event(ctx, events.IMPORT_UNDONE, {"id": str(load.pk)})
@@ -199,7 +199,7 @@ def _waiting_loads() -> list[ImportBatch]:
     """The loads of this business still waiting for an app, oldest first, locked as what is written on them is."""
     return list(
         ImportBatch.objects.select_for_update()
-        .filter(report__apps__contains=[{"status": blueprint.WAITING}], undone_at__isnull=True)
+        .filter(report__apps__contains=[{"status": blueprint.loading.WAITING}], undone_at__isnull=True)
         .order_by("created_at", "id")
     )
 
@@ -207,9 +207,9 @@ def _waiting_loads() -> list[ImportBatch]:
 def _stop_waiting(ctx: OperationContext, loads: Iterable[ImportBatch], apps: Collection[str] | None, reason: Any) -> None:
     """``loads`` stop waiting for ``apps`` (``None``: for any): their report says ``reason``, and they load nothing."""
     for load in loads:
-        waited = [app for app in blueprint.waiting_apps(load) if apps is None or app in apps]
+        waited = [app for app in blueprint.loads.waiting_apps(load) if apps is None or app in apps]
         if waited:
-            blueprint.stop_waiting(ctx, load, waited, reason)
+            blueprint.loads.stop_waiting(ctx, load, waited, reason)
             load.save(update_fields=["report", "status", "created_rows"])
 
 
@@ -219,9 +219,9 @@ def _load_what_waited(ctx: OperationContext, on: Iterable[str]) -> None:
     the next one does both, so nothing is lost or left half done. Oldest first: what is there already is left as it is."""
     on = set(on)
     for load in _waiting_loads():
-        waited = set(blueprint.waiting_apps(load)) & on
+        waited = set(blueprint.loads.waiting_apps(load)) & on
         if waited:
-            blueprint.finish_waiting(ctx, load, waited)
+            blueprint.loads.finish_waiting(ctx, load, waited)
             load.save(update_fields=["report", "status", "created_rows"])
             record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
 

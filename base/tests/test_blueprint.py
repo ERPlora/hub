@@ -19,7 +19,9 @@ import zipfile
 
 import pytest
 from django.contrib.auth import get_user_model
+from live import operations
 from live.context import OperationContext
+from live.errors import InvalidPayload
 from live.operations import get
 
 from base import blueprint, catalog
@@ -51,8 +53,8 @@ def call(ctx, operation, /, **data):
 
 def manifest(**fields):
     return {
-        "format": blueprint.FORMAT,
-        "format_version": blueprint.FORMAT_VERSION,
+        "format": blueprint.archive.FORMAT,
+        "format_version": blueprint.archive.FORMAT_VERSION,
         "name": "Bar Pepe",
         "language": "es",
         "country": "ES",
@@ -84,14 +86,14 @@ def a_file(data=None, **fields) -> bytes:
 
 
 def test_a_written_file_reads_back_as_the_same_blueprint():
-    bundle = blueprint.Bundle(
+    bundle = blueprint.archive.Bundle(
         manifest=manifest(), data={"inventory.category": [{"name": "Postres", "tax_category_key": "restaurant.food"}]}
     )
 
-    read = blueprint.read_zip(blueprint.write_zip(bundle))
+    read = blueprint.archive.read_zip(blueprint.archive.write_zip(bundle))
 
     assert read == bundle
-    with zipfile.ZipFile(io.BytesIO(blueprint.write_zip(bundle))) as archive:
+    with zipfile.ZipFile(io.BytesIO(blueprint.archive.write_zip(bundle))) as archive:
         assert sorted(archive.namelist()) == ["data/inventory.category.json", "manifest.json"]
 
 
@@ -102,7 +104,7 @@ def test_a_written_file_reads_back_as_the_same_blueprint():
         (zipped({"data/inventory.category.json": "[]"}), "no_manifest"),
         (zipped({"manifest.json": "{not json"}), "unreadable"),
         (zipped({"manifest.json": json.dumps(manifest(format="something.else"))}), "not_a_blueprint"),
-        (zipped({"manifest.json": json.dumps(manifest(format_version=blueprint.FORMAT_VERSION + 1))}), "too_new"),
+        (zipped({"manifest.json": json.dumps(manifest(format_version=blueprint.archive.FORMAT_VERSION + 1))}), "too_new"),
         (zipped({"manifest.json": json.dumps(manifest(purpose="everything"))}), "unreadable"),
         (zipped({"manifest.json": json.dumps(manifest(name=""))}), "unreadable"),
         (zipped({"manifest.json": json.dumps(manifest()), "data/inventory.category.json": '{"rows": 1}'}), "unreadable"),
@@ -127,26 +129,26 @@ def test_a_written_file_reads_back_as_the_same_blueprint():
     ],
 )
 def test_a_file_that_is_not_a_blueprint_is_refused_with_its_reason(content, reason):
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(content)
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(content)
 
     assert refused.value.reason == reason
     assert str(refused.value)  # a sentence for the person, never empty
 
 
 def test_a_file_too_big_is_refused_before_it_is_opened():
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(b"0" * (blueprint.MAX_FILE_BYTES + 1))
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(b"0" * (blueprint.archive.MAX_FILE_BYTES + 1))
 
     assert refused.value.reason == "too_big"
 
 
 def test_a_zip_that_inflates_beyond_the_limit_is_refused_without_inflating_it(monkeypatch):
-    monkeypatch.setattr(blueprint, "MAX_INFLATED_BYTES", 1000)
+    monkeypatch.setattr(blueprint.archive, "MAX_INFLATED_BYTES", 1000)
     content = a_file({"inventory.category": [{"name": "x" * 50, "tax_category_key": ""}] * 100})
 
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(content)
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(content)
 
     assert refused.value.reason == "too_big"
 
@@ -197,8 +199,8 @@ def test_a_file_whose_contents_were_damaged_is_refused_as_unreadable(member, how
             archive.writestr(PHOTO, webp, compress_type=zipfile.ZIP_STORED)
         archive.writestr("manifest.json", json.dumps(manifest()))
 
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(damaged(buffer.getvalue(), member, how))
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(damaged(buffer.getvalue(), member, how))
 
     assert refused.value.reason == "unreadable"
     assert str(refused.value) == "The file is damaged or was changed by hand, so it cannot be read."
@@ -215,7 +217,7 @@ def test_what_no_dataset_carries_is_left_out_of_the_blueprint():
         }
     )
 
-    read = blueprint.read_zip(content)
+    read = blueprint.archive.read_zip(content)
 
     assert list(read.data) == ["inventory.category"]
     assert read.dropped == ["base.membership", "verifactu.record"]
@@ -225,7 +227,7 @@ def test_what_no_dataset_carries_is_left_out_of_the_blueprint():
 
 
 def test_the_catalogue_has_a_seed_of_every_vertical_in_spanish_and_in_english():
-    templates = blueprint.catalog()
+    templates = blueprint.seeds.catalog()
 
     assert sorted((template.vertical, template.language) for template in templates) == sorted(
         (vertical, language) for vertical in catalog.known_verticals() for language in ("es", "en")
@@ -236,29 +238,29 @@ def test_the_catalogue_has_a_seed_of_every_vertical_in_spanish_and_in_english():
         assert template.country == "ES"
         # What a seed turns on is its vertical's: every app that lists it, closed by requires.
         assert template.bundle.manifest["apps"] == catalog.template_apps(template.vertical)
-        assert blueprint.template(template.key) == template
+        assert blueprint.seeds.template(template.key) == template
 
 
 def test_a_seed_brings_data_only_of_its_own_apps_and_never_personal_data():
-    for template in blueprint.catalog():
+    for template in blueprint.seeds.catalog():
         assert template.bundle.data, template.key
         for key, rows in template.bundle.data.items():
-            dataset = blueprint.dataset(key)
+            dataset = blueprint.datasets.dataset(key)
             assert dataset.app in template.bundle.manifest["apps"], (template.key, key)
             assert not dataset.personal, (template.key, key)
             assert rows, (template.key, key)
 
 
 def test_an_unknown_template_is_none():
-    assert blueprint.template("bakery.es") is None
+    assert blueprint.seeds.template("bakery.es") is None
 
 
 @pytest.mark.parametrize("key", ["restaurant.es", "restaurant.en", "hair_salon.es", "hair_salon.en"])
 def test_every_seed_loads_whole_into_an_empty_business(ctx, key):
     """The seeds are data the apps accept: every row is created, none fails (INVENTORY-F12 for the menu)."""
-    seed = blueprint.template(key)
+    seed = blueprint.seeds.template(key)
 
-    result = blueprint.apply(ctx, seed.bundle, apps=None)
+    result = blueprint.loading.apply(ctx, seed.bundle, apps=None)
 
     failures = [
         (app["id"], dataset["key"], dataset["problems"])
@@ -276,7 +278,7 @@ def test_every_seed_loads_whole_into_an_empty_business(ctx, key):
 
 
 def restaurant_bundle(**data):
-    return blueprint.Bundle(
+    return blueprint.archive.Bundle(
         manifest=manifest(),
         data={
             "inventory.category": [
@@ -298,7 +300,7 @@ def restaurant_bundle(**data):
 
 
 def test_a_blueprint_loads_each_app_through_its_operations_and_links_rows_by_name(ctx):
-    result = blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    result = blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
     products = {row.sku: row for row in call(ctx, "inventory.product.list", limit=100).rows}
     categories = {row.name: row for row in call(ctx, "inventory.category.list", limit=100).rows}
@@ -315,9 +317,9 @@ def test_a_blueprint_loads_each_app_through_its_operations_and_links_rows_by_nam
 
 
 def test_loading_again_duplicates_nothing_and_says_it_was_already_there(ctx):
-    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
-    again = blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    again = blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
     assert again.created == {}
     statuses = {dataset["key"]: dataset["status"] for app in again.report["apps"] for dataset in app["datasets"]}
@@ -326,20 +328,22 @@ def test_loading_again_duplicates_nothing_and_says_it_was_already_there(ctx):
     assert call(ctx, "table.table.list", limit=1).total == 2
 
 
-def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
-    bundle = restaurant_bundle(
-        **{
-            "inventory.product": [
-                {"name": "Croquetas", "sku": "ENT-01", "price": 850, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Entrantes"]},
-                {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []},
-            ]
-        }
-    )
+NAMELESS = {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []}
 
-    result = blueprint.apply(ctx, bundle, apps=None)
 
+def loaded_products(ctx, row):
+    """The restaurant loaded with ``row`` and a product without a name: its report, and what it says of inventory and
+    of its products."""
+    result = blueprint.loading.apply(ctx, restaurant_bundle(**{"inventory.product": [row, NAMELESS]}), apps=None)
     inventory = next(app for app in result.report["apps"] if app["id"] == "inventory")
-    products = next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
+    return result, inventory, next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
+
+
+def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
+    croquetas = {"name": "Croquetas", "sku": "ENT-01", "price": 850, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Entrantes"]}
+
+    result, inventory, products = loaded_products(ctx, croquetas)
+
     assert (products["status"], products["created"], products["failed"]) == ("partial", 1, 1)
     assert products["problems"] and "BAD-01" in products["problems"][0]
     assert inventory["status"] == "partial"
@@ -347,23 +351,44 @@ def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
     assert result.report["status"] == "partial"
 
 
+class Breaks:
+    """An app's create that breaks for a reason of its own (a bug, a lost connection), not a row it refuses."""
+
+    input = dict
+
+    def __call__(self, ctx, data):
+        raise RuntimeError("the tables broke")
+
+
+def test_a_part_that_breaks_fails_alone_is_told_and_is_logged_by_the_blueprints(ctx, monkeypatch, caplog):
+    monkeypatch.setitem(operations.registry, "table.table.create", Breaks())
+
+    result = blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
+
+    statuses = {dataset["key"]: dataset["status"] for app in result.report["apps"] for dataset in app["datasets"]}
+    assert statuses == {"inventory.category": "applied", "inventory.product": "applied", "table.zone": "applied", "table.table": "failed"}
+    tables = next(app for app in result.report["apps"] if app["id"] == "table")
+    assert (tables["status"], tables["datasets"][1]["failed"], len(tables["datasets"][1]["problems"])) == ("partial", 1, 1)
+    broke = [record.name for record in caplog.records if record.exc_info and str(record.exc_info[1]) == "the tables broke"]
+    assert broke == ["base.blueprint"]
+
+
 def test_a_refused_row_is_named_as_the_person_knows_it_by_its_name_and_by_its_code_only_without_one(ctx):
-    bundle = restaurant_bundle(
-        **{
-            "inventory.product": [
-                {"name": "Tarta mala", "sku": "BAD-02", "price": "abc", "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": []},
-                {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []},
-            ]
-        }
-    )
+    bad_price = {"name": "Tarta mala", "sku": "BAD-02", "price": "abc", "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": []}
 
-    result = blueprint.apply(ctx, bundle, apps=None)
+    _, _, products = loaded_products(ctx, bad_price)
 
-    inventory = next(app for app in result.report["apps"] if app["id"] == "inventory")
-    products = next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
     assert products["failed"] == 2
     assert products["problems"][0].startswith("«Tarta mala»:")
     assert products["problems"][1].startswith("«BAD-01»:")
+
+
+def test_a_refusal_says_what_its_app_said_about_the_field_once():
+    with_detail = InvalidPayload("The row could not be saved.", code="invalid_field", fields={"sku": "That code is taken."})
+    repeated = InvalidPayload("That code is taken.", code="invalid_field", fields={"sku": "That code is taken."})
+
+    assert blueprint.calls._reason(with_detail) == "The row could not be saved. That code is taken."
+    assert blueprint.calls._reason(repeated) == "That code is taken."
 
 
 def test_a_product_whose_category_is_not_there_is_created_and_the_missing_link_is_told(ctx):
@@ -375,7 +400,7 @@ def test_a_product_whose_category_is_not_there_is_created_and_the_missing_link_i
         }
     )
 
-    result = blueprint.apply(ctx, bundle, apps=None)
+    result = blueprint.loading.apply(ctx, bundle, apps=None)
 
     products = next(
         dataset for app in result.report["apps"] for dataset in app["datasets"] if dataset["key"] == "inventory.product"
@@ -385,7 +410,7 @@ def test_a_product_whose_category_is_not_there_is_created_and_the_missing_link_i
 
 
 def test_only_the_apps_chosen_load(ctx):
-    result = blueprint.apply(ctx, restaurant_bundle(), apps={"table"})
+    result = blueprint.loading.apply(ctx, restaurant_bundle(), apps={"table"})
 
     assert call(ctx, "inventory.product.list", limit=1).total == 0
     assert call(ctx, "table.table.list", limit=1).total == 2
@@ -397,15 +422,15 @@ def test_an_app_this_hub_does_not_know_is_told_and_skipped(ctx):
     bundle = restaurant_bundle()
     bundle.manifest["apps"] = ["inventory", "table", "bakery_oven"]
 
-    result = blueprint.apply(ctx, bundle, apps=None)
+    result = blueprint.loading.apply(ctx, bundle, apps=None)
 
     assert {app["id"]: app["status"] for app in result.report["apps"]}["bakery_oven"] == "unknown"
 
 
 def test_an_app_that_is_not_on_is_told_and_nothing_of_it_loads(ctx, monkeypatch):
-    monkeypatch.setattr(blueprint, "active_apps", lambda scope: frozenset({"table"}))
+    monkeypatch.setattr(blueprint.loading, "active_apps", lambda scope: frozenset({"table"}))
 
-    result = blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    result = blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
     assert {app["id"]: app["status"] for app in result.report["apps"]} == {"inventory": "inactive", "table": "applied"}
     assert result.report["status"] == "partial"
@@ -415,7 +440,7 @@ def test_a_template_never_brings_personal_data_even_if_its_file_says_so(ctx):
     bundle = restaurant_bundle(**{"customer.customer": [{"name": "Lucía Pérez", "email": "lucia@example.com", "phone": ""}]})
     bundle.manifest["apps"] = ["inventory", "table", "customer"]
 
-    result = blueprint.apply(ctx, bundle, apps=None)
+    result = blueprint.loading.apply(ctx, bundle, apps=None)
 
     customers = next(app for app in result.report["apps"] if app["id"] == "customer")["datasets"][0]
     assert customers["status"] == "discarded"
@@ -423,41 +448,50 @@ def test_a_template_never_brings_personal_data_even_if_its_file_says_so(ctx):
 
 
 def test_a_backup_brings_the_customers_back(ctx):
-    bundle = blueprint.Bundle(
+    bundle = blueprint.archive.Bundle(
         manifest=manifest(purpose="backup", apps=["customer"]),
         data={"customer.customer": [{"name": "Lucía Pérez", "email": "lucia@example.com", "phone": "+34600111222", "notes": "Alérgica"}]},
     )
 
-    result = blueprint.apply(ctx, bundle, apps=None)
+    result = blueprint.loading.apply(ctx, bundle, apps=None)
 
     [row] = call(ctx, "customer.customer.list", limit=10).rows
     assert (row.name, row.email) == ("Lucía Pérez", "lucia@example.com")
     assert result.created["customer.customer"] == [str(row.id)]
 
 
+def test_a_backup_keeps_a_customers_cell_that_starts_like_a_formula_as_it_was_typed(ctx):
+    """The customers' export quotes a cell a spreadsheet would run as a formula; the backup carries it unquoted."""
+    call(ctx, "customer.customer.create", name="Lucía Pérez", phone="+34600111222")
+
+    [row] = blueprint.export.export_data(ctx, {"customer": ["customer.customer"]}, purpose="backup")["customer.customer"]
+
+    assert row["phone"] == "+34600111222"
+
+
 # ── Exporting: the same datasets, read by each app's list ─────────────────────────────────────────────────────────
 
 
 def test_what_an_export_reads_loads_into_another_business_as_it_was(ctx):
-    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
     seed = restaurant_bundle()
 
-    exported = blueprint.export_data(ctx, blueprint.selection_of(seed.data), purpose="template")
+    exported = blueprint.export.export_data(ctx, blueprint.export.selection_of(seed.data), purpose="template")
 
     for key, rows in seed.data.items():
         assert sorted(exported[key], key=json.dumps) == sorted(rows, key=json.dumps), key
 
 
 def test_an_export_of_business_b_carries_its_rows_and_none_of_business_a_s(ctx, hub_b):
-    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
     patio = {"name": "Patio", "description": "", "color": "warning", "sort_order": 1}
     with use_hub(hub_b):
         user = get_user_model().objects.create_user(username="bea", password="pw")
         Membership.objects.create(user=user, host=B.key, role=Membership.Role.OWNER)
         theirs = OperationContext(scope=B, actor=user, permissions=permissions_for(user, B), language="es")
-        blueprint.apply(theirs, blueprint.Bundle(manifest=manifest(), data={"table.zone": [patio]}), apps=None)
+        blueprint.loading.apply(theirs, blueprint.archive.Bundle(manifest=manifest(), data={"table.zone": [patio]}), apps=None)
 
-        exported = blueprint.export_data(theirs, blueprint.selection_of(restaurant_bundle().data), purpose="backup")
+        exported = blueprint.export.export_data(theirs, blueprint.export.selection_of(restaurant_bundle().data), purpose="backup")
 
     assert exported == {"table.zone": [patio]}
 
@@ -465,17 +499,17 @@ def test_an_export_of_business_b_carries_its_rows_and_none_of_business_a_s(ctx, 
 def test_a_template_export_never_reads_personal_data(ctx):
     call(ctx, "customer.customer.create", name="Lucía Pérez", email="lucia@example.com")
 
-    template = blueprint.export_data(ctx, {"customer": ["customer.customer"]}, purpose="template")
-    backup = blueprint.export_data(ctx, {"customer": ["customer.customer"]}, purpose="backup")
+    template = blueprint.export.export_data(ctx, {"customer": ["customer.customer"]}, purpose="template")
+    backup = blueprint.export.export_data(ctx, {"customer": ["customer.customer"]}, purpose="backup")
 
     assert template == {}
     assert [row["name"] for row in backup["customer.customer"]] == ["Lucía Pérez"]
 
 
 def test_the_counts_of_every_dataset_of_the_apps_on(ctx):
-    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
-    counts = blueprint.counts(ctx)
+    counts = blueprint.export.counts(ctx)
 
     assert {key: counts[key] for key in ("inventory.category", "inventory.product", "table.zone", "table.table")} == {
         "inventory.category": 2,
@@ -490,10 +524,10 @@ def test_the_counts_of_every_dataset_of_the_apps_on(ctx):
 
 
 def test_undoing_removes_exactly_what_the_load_created_and_keeps_what_came_after(ctx):
-    result = blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    result = blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
     mine = call(ctx, "inventory.product.create", name="Mi plato", sku="MIO-01", price=900, tax_category_key="restaurant.food")
 
-    removed = blueprint.undo(ctx, result.created)
+    removed = blueprint.removal.undo(ctx, result.created)
 
     assert [row.sku for row in call(ctx, "inventory.product.list", limit=100).rows] == [mine.sku]
     assert call(ctx, "table.table.list", limit=1).total == 0
@@ -502,10 +536,10 @@ def test_undoing_removes_exactly_what_the_load_created_and_keeps_what_came_after
 
 
 def test_undoing_what_is_already_gone_counts_it_as_gone(ctx):
-    result = blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    result = blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
     call(ctx, "table.table.delete", id=result.created["table.table"][0])
 
-    removed = blueprint.undo(ctx, result.created)
+    removed = blueprint.removal.undo(ctx, result.created)
 
     table = next(app for app in removed["apps"] if app["id"] == "table")
     assert (table["removed"], table["failed"]) == (2, 0)
@@ -515,18 +549,18 @@ def test_undoing_what_is_already_gone_counts_it_as_gone(ctx):
 
 
 def test_the_reset_plan_says_how_many_rows_each_app_would_lose(ctx):
-    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
-    plan = {section["id"]: section for section in blueprint.reset_plan(ctx)}
+    plan = {section["id"]: section for section in blueprint.removal.reset_plan(ctx)}
 
     assert (plan["inventory"]["rows"], plan["table"]["rows"]) == (4, 3)
     assert plan["inventory"]["label"] == "Inventario"
 
 
 def test_resetting_a_section_removes_every_row_of_its_app_and_nothing_else(ctx):
-    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    blueprint.loading.apply(ctx, restaurant_bundle(), apps=None)
 
-    report = blueprint.reset(ctx, ["table"])
+    report = blueprint.removal.reset(ctx, ["table"])
 
     assert call(ctx, "table.table.list", limit=1).total == 0
     assert call(ctx, "table.zone.list", limit=1).total == 0
@@ -535,14 +569,14 @@ def test_resetting_a_section_removes_every_row_of_its_app_and_nothing_else(ctx):
 
 
 def test_an_export_names_its_file_after_the_business_and_its_language():
-    assert blueprint.file_name("Bar Pepe / Centro", "es") == "bar-pepe-centro_es.blueprint.zip"
-    assert blueprint.file_name("", "en") == "blueprint_en.blueprint.zip"
+    assert blueprint.archive.file_name("Bar Pepe / Centro", "es") == "bar-pepe-centro_es.blueprint.zip"
+    assert blueprint.archive.file_name("", "en") == "blueprint_en.blueprint.zip"
 
 
 def test_a_file_in_base64_is_read_as_its_bytes():
     content = a_file()
 
-    assert blueprint.read_base64(base64.b64encode(content).decode()) == blueprint.read_zip(content)
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_base64("@@not base64@@")
+    assert blueprint.archive.read_base64(base64.b64encode(content).decode()) == blueprint.archive.read_zip(content)
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_base64("@@not base64@@")
     assert refused.value.reason == "not_a_blueprint"

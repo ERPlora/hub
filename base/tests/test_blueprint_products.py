@@ -39,12 +39,12 @@ OLD_ROW = {
 
 
 def exported_products(ctx, purpose="backup"):
-    return blueprint.export_data(ctx, {"inventory": ["inventory.product"]}, purpose=purpose)["inventory.product"]
+    return blueprint.export.export_data(ctx, {"inventory": ["inventory.product"]}, purpose=purpose)["inventory.product"]
 
 
 def load(ctx, rows, purpose="backup"):
-    bundle = blueprint.Bundle(manifest=manifest(purpose=purpose), data={"inventory.product": rows})
-    return blueprint.apply(ctx, bundle, apps=None)
+    bundle = blueprint.archive.Bundle(manifest=manifest(purpose=purpose), data={"inventory.product": rows})
+    return blueprint.loading.apply(ctx, bundle, apps=None)
 
 
 def products_report(result):
