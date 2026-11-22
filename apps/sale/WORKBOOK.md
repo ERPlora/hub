@@ -1709,7 +1709,9 @@ es una línea.
   ajenas. **Inventario no es requisito** (PLAN §20.5): la línea guarda una copia del producto (id como
   UUID sin clave ajena, nombre, SKU, unidad, precio, coste y categoría fiscal) y el producto se lee con
   las operaciones de Inventario (`inventory.product.get`, `inventory.unit.list`) al añadir la línea,
-  con la sesión de quien vende, por la misma puerta `call_app`. Inventario apagado → `sale.catalog_unavailable`;
+  con la sesión de quien vende, por la misma puerta `call_app`. El coste se lee con `base.sensitive.recording_costs`,
+  porque quien vende puede no ver los costes y la línea lo guarda igual para valorar lo invitado; lo mismo con el
+  servicio de Servicios (`service.service.get`). Inventario apagado → `sale.catalog_unavailable`;
   el precio libre sigue.
   El equipo de Personal y la cita son UUID opacos (`staff_id`, `appointment_id`).
 - **Servicios no es requisito** (como Inventario): la línea de un servicio guarda una copia (id como

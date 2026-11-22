@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d50096ff863220da253e64e2dbd0af7ae552409951c72efbb39a14384a981ebf -->
+<!-- generated from WORKBOOK.md sha256:61824c084c109aa3001676b9881546d7c9d4d1d77e70b6dbcb30b99c5fd59e29 -->
 
 ## What it is for and who it is for
 
@@ -108,7 +108,7 @@ app also refuses it even if someone tries it through another door (the assistant
 ### Dashboard
 The stock's figures at a glance: "Tracked products" (those with stock control), "In stock", "Out of
 stock", "Low stock" and "Inventory value", at cost, which shows only to whoever sees the costs (the owner, the
-administrator and the manager; BASE-F119). Tap one of the first four to go to Products. Below,
+administrator and the manager). Tap one of the first four to go to Products. Below,
 the "Low stock products" table, from the one with the least to the one with the most, with each one's
 threshold. It updates on its own with every sale and every movement.
 
@@ -356,7 +356,7 @@ exists in the catalog"; a repeated EAN-13: "Another product of the catalog alrea
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
 API. Every refusal shows inside the panel and nothing is saved. Only whoever sees the costs writes the cost: a
 creation with a cost by someone who does not see them, through the assistant or the API, is refused as an
-operation they may not run and nothing is saved; without a cost, the product is created with cost 0 (BASE-F119).
+operation they may not run and nothing is saved; without a cost, the product is created with cost 0.
 Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (the ERPlora staff bring back from a separate copy
 the products the business no longer has at all, each by this same creation; a deleted one comes back the same,
 INVENTORY-F34)
@@ -384,7 +384,7 @@ If it fails: the same refusals as creating, inside the panel, and nothing is sav
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.". Changing the cost belongs to whoever sees the costs: it is refused to someone who does not see
-them as an operation they may not run, and the rest of a change without a cost is saved (BASE-F119).
+them as an operation they may not run, and the rest of a change without a cost is saved.
 Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119
 
 ### INVENTORY-F03 Turn a product on and off
@@ -544,8 +544,10 @@ longer than its column allows", "Another product of the catalog already has that
 category is missing" or "Tax category not recognized". If Taxes cannot save a learnt text or a created
 category, the report says so and its rows stay as failed with that reason. "Cancel" in the tax window
 imports nothing. "Stop" keeps what was already created and the report says "The import was stopped
-halfway. What had already been created is counted below; the rest of the file was left untouched.".
-Involved: TAX-F02, TAX-F14, TAX-F15
+halfway. What had already been created is counted below; the rest of the file was left untouched.". Only whoever
+sees the costs imports costs: a file with costs from someone who does not see them is refused whole as an operation
+they may not run and nothing is created.
+Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119
 
 ### INVENTORY-F10 Import categories from a CSV
 Status: done
@@ -580,7 +582,7 @@ In: the products or the categories that match the search and the filters.
 Out: the file, with the same headers the import recognises (Name, SKU, Price, Cost, Stock, Threshold,
 EAN-13, Description, Allergens, Unit, Tax category, Active) and the figures as they read on screen (€2.20, 3
 units), so it can be imported back without changing anything. Only the file of whoever sees the costs carries the
-"Cost" column; the file of whoever does not see them comes out without it (BASE-F119). It neither saves nor tells
+"Cost" column; the file of whoever does not see them comes out without it. It neither saves nor tells
 anything.
 If it fails: with no products, the file carries only the header. Without permission to export, the
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
@@ -647,8 +649,7 @@ inside the window. A service is not received: it has no button, and through the 
 is refused with "A service has no stock.". A goods receipt with a line without a product, with a product
 that does not exist or with a zero quantity is refused whole, saying which line fails: none goes in. Only
 whoever sees the costs writes the unit cost: a goods receipt with a cost by someone who does not see them is refused
-as an operation they may not run, and without a cost it is recorded and the product keeps the cost it had
-(BASE-F119).
+as an operation they may not run, and without a cost it is recorded and the product keeps the cost it had.
 Involved: BASE-F119
 
 ### INVENTORY-F14 Count a product's stock
@@ -730,7 +731,7 @@ Screen: Dashboard
 Steps:
 1. Open Inventory's **Dashboard** tab: "Tracked products", "In stock", "Out of stock" (balance 0 or less),
    "Low stock" (balance equal to or below its threshold) and "Inventory value" at cost, this one only for
-   whoever sees the costs (BASE-F119). Tapping one of the first four leads to **Products**.
+   whoever sees the costs. Tapping one of the first four leads to **Products**.
 2. Below, "Low stock products", from the one with least to the one with most, with its threshold.
 3. On **Home**, Inventory's panels: "Low-stock products" (the "Low stock" figure), "Stock value (at
    cost)" and "Lowest-stock products" (the five with the least, the first the one with the least) show

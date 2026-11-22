@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:33bf7a33acd00e586ca64bcae781d79efbcee9af6ee998edd0e6f3661e0d392e -->
+<!-- generated from WORKBOOK.md sha256:4eff42dcda7feb2dd1cfda68408b3ac5e14dc53f16a3f5087fce1c07b1c5b032 -->
 
 ## What it is for and who it is for
 
@@ -284,7 +284,7 @@ deleted."); a tax category that does not exist or is deactivated ("That tax cate
 Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same.
 The internal cost, given only through the assistant or the API, is written only by whoever sees the costs: a
 creation with a cost by someone who does not see them is refused as an operation they may not run and nothing is
-saved; without a cost, the service costs 0 (BASE-F119).
+saved; without a cost, the service costs 0.
 Involved: TAX-F01, BASE-F01, BASE-F119, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
 each by this same creation)
 
@@ -303,7 +303,7 @@ change.
 If it fails: the same reasons as when adding it, each under its field; a service that no longer exists,
 "That service does not exist in this business.". A service whose category was deleted shows "No category" and saves without trouble.
 Changing the internal cost belongs to whoever sees the costs: it is refused to someone who does not see them as an
-operation they may not run (BASE-F119).
+operation they may not run.
 Involved: SERVICE-F31, BASE-F119
 
 ### SERVICE-F03 Give a service an open price
@@ -1040,7 +1040,7 @@ belongs to Sales or Appointments: the sale by its number, its line and the check
 appointment as Appointments' cards say it and the refund or the void that gives sessions back by its sale ("Refund of
 sale 20261014-0007", "Void of sale 20261014-0007"). With Sales or Appointments off, or if whoever asks may not see it,
 that datum does not show, never its id. A service's internal cost reaches only whoever sees the costs (the owner,
-the administrator and the manager); the others get it empty (BASE-F119). The till keeps it all the same in the line
+the administrator and the manager); the others get it empty. The till keeps it all the same in the line
 it sells, even if whoever charges does not see it.
 
 ### What it offers: queries (they read and change nothing)

@@ -17,6 +17,7 @@ from live.operations import get as operation
 
 from apps.flow.tests.test_api import get
 from apps.inventory.models import Product
+from apps.inventory.schemas.imports import ProductImportIn
 from apps.inventory.schemas.products import ProductFiltersIn, ProductIn, ProductPatchIn
 from apps.inventory.schemas.stock import ReceiveIn
 from apps.inventory.tests.test_queries import read_csv
@@ -124,6 +125,15 @@ def test_a_receipt_with_a_unit_cost_is_refused_to_who_does_not_see_the_costs_and
     run("inventory.stock.receive", ReceiveIn(items=[{"product": "COF", "qty": "1"}]), mover)
     kept = Product.objects.get(sku="COF")
     assert (kept.stock, kept.cost) == (Decimal("6"), 160)
+
+
+def test_an_import_with_costs_is_refused_whole_to_who_does_not_see_them_and_one_without_goes_in(coffee):
+    importer = ctx_with("inventory.import_product", "inventory.add_product")
+    row = {"line": 2, "name": "Tea", "sku": "TEA", "price": "1.50", "tax_category_key": TAX}
+    with pytest.raises(PermissionDenied):
+        run("inventory.product.bulk_create", ProductImportIn(rows=[{**row, "cost": "0.90"}]), importer)
+    assert not Product.objects.filter(sku="TEA").exists()
+    assert run("inventory.product.bulk_create", ProductImportIn(rows=[row]), importer).created == 1
 
 
 # ── The export ─────────────────────────────────────────────────────────────────────────────────────────────────────
