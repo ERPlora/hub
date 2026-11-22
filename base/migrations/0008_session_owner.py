@@ -9,7 +9,7 @@ import uuid
 from django.db import migrations, models
 
 #: What the login wrote in the session (``base.services.sessions.SAAS_USER_ID_SESSION_KEY``,
-#: ``base.middleware.SESSION_HOST_KEY``).
+#: ``base.session_host.SESSION_HOST_KEY``).
 SAAS_USER_ID_KEY = "saas_user_id"
 HOST_KEY = "hub_host"
 
