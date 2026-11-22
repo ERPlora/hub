@@ -10,7 +10,8 @@ import customerEs from '../../../customer/frontend/locale/es.json';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
-const OTHERS = ['table.view_table', 'table.add_session', 'table.change_session', 'sale.add_sale', 'customer.view', 'customer.manage'];
+// `base.view_customer_contact`: the guests' phone and email, which the four roles see (base/apps.py).
+const OTHERS = ['table.view_table', 'table.add_session', 'table.change_session', 'sale.add_sale', 'customer.view', 'customer.manage', 'base.view_customer_contact'];
 
 /** Owner or admin: `reservation.*` (apps.py `role_permissions`), listed one by one. */
 export const OWNER: SessionMe = withMenu('reservation', {
@@ -56,6 +57,12 @@ export const EMPLOYEE: SessionMe = withMenu('reservation', {
     'reservation.view_settings',
     ...OTHERS,
   ],
+});
+
+/** The host at the door in a role the business made without the customers' contact details. */
+export const WITHOUT_CONTACT: SessionMe = withMenu('reservation', {
+  ...EMPLOYEE,
+  permissions: EMPLOYEE.permissions.filter((p) => p !== 'base.view_customer_contact'),
 });
 
 export async function mountReservation(component: Component, options: MountOptions = {}) {

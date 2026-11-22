@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f246ec4966b99741518d21feb4a645a1e176fd078337fcb07b791c0e620d4cd7 -->
+<!-- generated from WORKBOOK.md sha256:2e87f17cb5f6d7c1c8eae9ba6758e6a812705c190e6169b2c8e0c369ab8ba69a -->
 
 ## What it is for and who it is for
 
@@ -108,7 +108,8 @@ Here is the day's book: at the top, the date with its arrows and three figures (
 left in the next slot); below, the day's reservations by time, with their customer, their guests, their table and
 their status. With "New reservation" you note down one that comes by phone or at the door; on each row you confirm
 it, seat it when the party arrives, complete it when they leave or cancel it. The search finds a reservation in the
-whole book by name, phone or email.
+whole book by name, phone or email; by the phone and the email, only for whoever sees the customers' contact
+details.
 
 #### Detail
 Menu **Reservations → Reservations**. At the top, the **day bar**: "Previous day", the date, "Next day"
@@ -123,7 +124,9 @@ typed, or "Released: never confirmed"; a long one, shortened with "…"); search
 **whole** book, also by the digits of the phone without the prefix (results by day and time); filters by
 time, guests, table and status; table or cards view. Main action **"New reservation"** and, per row,
 according to its status: "Confirm", "Seat", "Complete", "Cancel", "No-show", "Edit" and "Delete" (the
-administrator only). Tapping a row opens it to edit it.
+administrator only). Tapping a row opens it to edit it. Whoever does not see the customers' contact details has
+the table without "Phone" and the search box "Search guest…", which only looks at the name. Nobody
+sorts the table by the phone: the order would tell the number to whoever does not see it.
 
 Empty: "No reservations this day", with an explanation and "New reservation". Searching without results:
 "No reservations match your search" and "Clear filters". Loading: "Loading…" and the figures in grey.
@@ -135,7 +138,9 @@ name or phone, with "+ New customer"), Guest (the name), Phone, Email, Date, Tim
 Table (the free ones at that time, with their capacity and their zone; the ones that do not fit the party,
 flagged), Booked through (Phone, In person), Guest notes and Internal notes. A reservation already seated,
 completed, cancelled or not shown only changes its notes, and says so on top; a cancelled one, also with its
-whole reason.
+whole reason. Whoever does not see the customers' contact details does not see the Phone nor the Email of the
+reservation they edit, and saving it keeps them; with a card chosen in "New reservation", neither: the reservation
+takes the card's.
 
 ### Waitlist
 Here you note down whoever wants a table and does not fit, in the order they arrive, with the day and the time they
@@ -144,8 +149,9 @@ reservation with their details, and "Remove" takes them off the list.
 
 #### Detail
 Menu **Reservations → Waitlist**. Table, in the order in which they were added (by day and preferred
-time): Date, Pref. time, Guest, Phone (as in Customers), Party, Contacted, Status (Waiting, Converted);
-search box and filters (date, contacted, converted). Main action **"Add guest"** (Customer, Guest, Phone,
+time): Date, Pref. time, Guest, Phone (as in Customers, only for whoever sees the customers' contact details),
+Party, Contacted, Status (Waiting, Converted); search box and filters (date, contacted, converted), as in
+Reservations. Main action **"Add guest"** (Customer, Guest, Phone,
 Date, Time, Party, Notes → "Add to waitlist"); per row "Contacted", "Convert" and "Remove". Empty:
 "Waitlist is empty.". Loading: "Loading…". Error: the table's message with "Retry".
 
@@ -324,7 +330,9 @@ Steps:
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
 one typed with the card already chosen; one written with another country's prefix keeps its own. It is
-the number with which WhatsApp finds the customer's conversation (RESERVATION-F19).
+the number with which WhatsApp finds the customer's conversation (RESERVATION-F19). Whoever does not see the
+customers' contact details (BASE-F119) searches the customer by their name only and, with the card chosen, does not
+see their phone nor their email: the reservation takes the card's, and the answer reaches them without them.
 Out: the reservation, linked to the customer's card (announces: `reservation.reservation.created`).
 If it fails: nothing is saved and what was typed stays; the first reason that applies, in this order: a
 phone that is not of its country (Customers' reason, "This is not a valid phone number of its country:
@@ -345,7 +353,7 @@ on the last place or on the same table and time: one goes in and the other gets 
 slot, the staff can then book anyway; on the table, never). In the window, the reason of a field (the
 Table included) shows under it and goes away as soon as that field is corrected, even if another one says
 the same.
-Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
+Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25, BASE-F119
 
 ### RESERVATION-F07 Confirm a reservation
 Status: done
@@ -378,13 +386,15 @@ Steps:
    says the reservation by its customer, its day and its time and the new table with its zone, as Tables
    names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
-same number written another way (with spaces or without the prefix) is not a change.
+same number written another way (with spaces or without the prefix) is not a change. Whoever does not see the
+customers' contact details (BASE-F119) does not see the phone nor the email and does not change them: saving keeps
+them.
 Out: the changed reservation (announces: `reservation.reservation.updated`).
 If it fails: the same reasons as when taking a reservation by hand, and the first one, a phone that is not of its country:
 "This is not a valid phone number of its country: check the digits or write it with its international
 prefix (+44…).", in the Phone field, and nothing changes; in another status: "This reservation can no
 longer change: only its notes.".
-Involved: TABLE-F26, RESERVATION-F06, RESERVATION-F18
+Involved: TABLE-F26, RESERVATION-F06, RESERVATION-F18, BASE-F119
 
 ### RESERVATION-F09 Cancel a reservation
 Status: done
@@ -671,9 +681,14 @@ separate reservation. If a reference matches several, it is refused saying which
 (`on_behalf_of`, their card; today, from WhatsApp): only their reservation, with their customer rules and
 without touching the table, the internal notes nor booking anyway (F18).
 
+The phone and the email of the customer of a reservation or of the waitlist only reach whoever sees the customers'
+contact details (BASE-F119): anyone else gets them empty, the search and a reference ("the reservation of 600 111
+222") only match the name for them, filtering by the phone is refused to them as an action without permission (403
+`permission_denied`) and sorting by it does not exist for anyone.
+
 Before changing anything, the assistant asks for confirmation with its card (BASE-F97), which names each
 record as the Reservations screens name it, never by its code: a reservation, by its customer, its day and
-its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone; with the customer's data
+its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone to whoever sees it; with the customer's data
 erased, by the day and the time); a waitlist entry, the same; a slot, by its weekday and its hours
 ("Thursday · 20:00–23:30"); a blocked date, by its day and, if it is not the whole day, its hours; the
 customer, by the name of their card, and the table, with its zone ("5 (Terrace)"), as Tables names it.
