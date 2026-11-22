@@ -65,6 +65,13 @@ class ProdDeployTest(DeployCase):
         self.assertEqual([new, new], self.images("erplora-prod-worker"))
         self.assertEqual([new], self.images("erplora-prod-hub-migrate"))
 
+    def test_an_image_that_names_the_hub_image_after_another_registry_keeps_its_own(self):
+        mirrored = "mirror.example/reg.example/erplora/hub:bootstrap"
+        self.edit("erplora-prod-hub.json",
+                  lambda found: found["taskDefinition"]["containerDefinitions"].append({"name": "m", "image": mirrored}))
+        self.assertEqual(0, self.deploy())
+        self.assertEqual(mirrored, self.images("erplora-prod-hub", "m")[0])
+
     def test_the_rest_of_the_definition_and_its_tags_are_kept_and_the_read_only_fields_go(self):
         self.deploy()
         hub = self.registered()["erplora-prod-hub"]

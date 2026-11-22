@@ -17,6 +17,15 @@ class MigrationTest(DeployCase):
         self.assertEqual(0, self.deploy(POLL_SECONDS="5", FAKE_TASK_STATUSES="RUNNING STOPPED"))
         self.assertEqual(["5"], self.pauses())
 
+    def test_seconds_with_leading_zeros_are_read_in_decimal(self):
+        # Bash's arithmetic read them in octal: 08 stopped the polling and the services moved without the migration.
+        self.assertEqual(0, self.deploy(POLL_SECONDS="08", FAKE_TASK_STATUSES="RUNNING RUNNING STOPPED"))
+        self.assertEqual(3, len(self.lines("describe-tasks .*lastStatus")))
+        self.assertEqual(["8", "8"], self.pauses())
+        self.assertLess(self.last_line_of("describe-tasks .*lastStatus"), self.line_of("update-service"))
+        self.assertEqual(1, self.deploy(POLL_SECONDS="010", MIGRATE_TIMEOUT_SECONDS="20", FAKE_TASK_STATUSES="RUNNING"))
+        self.assertEqual(["10", "10"], self.pauses())
+
     def test_empty_seconds_take_their_default(self):
         self.assertEqual(1, self.deploy(POLL_SECONDS="", MIGRATE_TIMEOUT_SECONDS="", ROLLOUT_TIMEOUT_SECONDS="",
                                         FAKE_TASK_STATUSES="RUNNING STOPPED", FAKE_ROLLOUT_STATES="IN_PROGRESS"))
