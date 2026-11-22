@@ -402,7 +402,7 @@ describe('AppointmentFormModal: Edit appointment', () => {
       },
     ]);
     // Only what happened, never «0 cancelled».
-    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because they are already charged']);
+    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because it is already charged']);
   });
 });
 
