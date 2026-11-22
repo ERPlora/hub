@@ -28,6 +28,7 @@ from base.models import HubUser, Membership
 from base.queries.people import hub_user_of
 from base.ordering import list_order_for
 from base.sensitive import VIEW_TEAM_CONTACT
+from .commissions import COMMISSION_LINES
 from apps.staff.schemas.accounts import AccountListIn, AccountPage
 from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
 from apps.staff.schemas.commissions import CommissionPage, CommissionReportIn, CommissionReportOut, CommissionSummaryIn
@@ -57,8 +58,6 @@ from apps.staff.schemas.time_off import (
     TimeOffPage,
     TodayIn,
 )
-
-from .commissions import COMMISSION_LINES
 
 MEMBER_NOT_FOUND = _("That staff member does not exist in this business.")
 AMBIGUOUS_MEMBER = _(
