@@ -1,12 +1,15 @@
 """The combo app declares its module metadata, its menu entry, its permissions, what each role gets and
 the assistant's contract of every operation (``ai`` and described input fields)."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.combo import queries, services  # noqa: F401  (importing them registers the operations)
 from base import assistant
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = ["combo.view", "combo.manage"]
 QUERIES = {
@@ -217,4 +220,21 @@ def test_the_reaction_and_the_recovery_are_run_only_by_the_platform():
 
 
 def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
-    assert combo_app().help == Help(videos={"es": "lD2ucK9wKq8", "en": "O7MO-x7zeZA"})
+    assert combo_app().help.videos == {"es": "lD2ucK9wKq8", "en": "O7MO-x7zeZA"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("COMBO-F02", "COMBO-F03", "COMBO-F04"), "yzOQ3_7BavE", "H3yU_v0zMOg"),
+    (("COMBO-F05",), "HJERGbDq7EM", "OvK6JKkYZUY"),
+    (("COMBO-F06",), "yWBBjnHESIU", "8L4Z85dEmDQ"),
+    (("COMBO-F12",), "ohXQusLVaaA", "GvBb0_DhBgw"),
+    (("COMBO-F14",), "WzjAZGjL4N4", "Lbm-ArC_AMU"),
+    (("COMBO-F06",), "pqsvhM41p9E", "E2zAyDUhJtU"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("combo", language) == help_videos.by_task(TASK_VIDEOS, language)
