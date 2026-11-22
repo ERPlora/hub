@@ -1,10 +1,10 @@
-// base's piece of the side menu's foot (`createShell({ chrome: { sidebarFooter } })`, BASE-F11): «Upgrade plan», then
-// right below it «Manage on erplora.com». Each decides for itself whether it shows (UpgradePlanLink.test.ts,
-// ManageLink.test.ts); here, their order and that one never takes the other with it.
+// base's piece of the side menu's foot (`createShell({ chrome: { sidebarFooter } })`, BASE-F11): «Upgrade plan», the
+// owner's alone, then right below it «Manage on erplora.com». Each decides for itself whether it shows (plan-link.test.ts,
+// UpgradePlanLink.test.ts, ManageLink.test.ts); here, their order and that one never takes the other with it.
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { flush, mountBase } from '../__tests__/mount-base';
+import { ADMIN, flush, mountBase } from '../__tests__/mount-base';
 import { forgetAppDistribution } from '../lib/management';
 import SidebarFooter from './SidebarFooter.vue';
 
@@ -44,7 +44,13 @@ describe('SidebarFooter', () => {
     expect(order(m.wrapper.element.parentElement!)).toEqual(['menu-manage']);
   });
 
-  it('without the way to the panel (an employee, a PIN session), «Upgrade plan» stays alone', async () => {
+  it('an administrator has only «Manage on erplora.com»: only the owner buys', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, manage_url: MANAGE_URL });
+    const m = await mountBase(SidebarFooter, { session: ADMIN });
+    expect(order(m.wrapper.element.parentElement!)).toEqual(['menu-manage']);
+  });
+
+  it('without the way to the panel (a PIN session), the owner keeps «Upgrade plan» alone', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, manage_url: '' });
     const m = await mountBase(SidebarFooter);
     expect(order(m.wrapper.element.parentElement!)).toEqual(['upgrade-plan']);

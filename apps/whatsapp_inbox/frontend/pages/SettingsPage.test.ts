@@ -104,6 +104,12 @@ describe('SettingsPage: the number and the month', () => {
     expect(spent.find('whatsapp-inbox-settings-upgrade').text()).toBe('Upgrade plan');
   });
 
+  it('an administrator configures the inbox but is not offered «Upgrade plan»: only the owner buys', async () => {
+    const spent = await setup({ session: ADMIN }, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
+    expect(spent.find('whatsapp-inbox-settings-month').text()).toContain('You have used all the messages of your plan this month.');
+    expect(spent.find('whatsapp-inbox-settings-upgrade').exists()).toBe(false);
+  });
+
   it('«Upgrade plan» goes with the pass: already signed in on erplora.com (BASE-F11, hub#723)', async () => {
     const s = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
     s.answer(200, { url: SIGNED });

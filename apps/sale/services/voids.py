@@ -12,7 +12,7 @@ from apps.sale import events
 from apps.sale.models import Sale, Settings
 from apps.sale.queries.business import actor
 from apps.sale.queries.other_apps import call_services
-from apps.sale.queries.sales import find_sale, sale_detail
+from apps.sale.queries.sales import sale_detail, visible_sale
 from apps.sale.schemas.sales import SaleOut, VoidIn
 from apps.sale.services.documents import _fiscal_document, _issue_waiting_document
 
@@ -50,7 +50,7 @@ REQUIRES_CREDIT_NOTE = _(
     ),
 )
 def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
-    sale = find_sale(data.sale_id, data.sale, lock=True)
+    sale = visible_sale(ctx, data.sale_id, data.sale, lock=True)
     if sale.status == Sale.Status.REFUNDED:
         raise Conflict(str(ALREADY_REFUNDED), code="sale.sale_already_refunded")
     if sale.status != Sale.Status.COMPLETED:

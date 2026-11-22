@@ -25,9 +25,10 @@ Para qué: comprobar que no queda nada abierto, cuadrar la caja con su descuadre
 10. SALE-F02, CASH_REGISTER-F17 — se cobra con tarjeta y sale como cobro fuera de turno.
 11. CASH_REGISTER-F16, PRINTING-F17 — el informe Z, en papel.
 12. CASH_REGISTER-F12 — la caja, en Inicio.
-13. SALE-F28 — las cifras de ventas del día.
-14. INVENTORY-F17 — lo que se ha quedado bajo de stock.
-15. VERIFACTU-F31 — que todo ha llegado a la AEAT.
-16. BASE-F09 — la actividad del día.
-17. ATTENDANCE-F01 — el responsable ficha la salida.
-18. BASE-F61 — cierra la sesión.
+13. SALE-F28, SALE-F29 — el empleado solo ve en Ventas los cobros que hizo él y reimprime uno.
+14. SALE-F28 — el responsable ve las ventas de todos y las cifras del día.
+15. INVENTORY-F17 — lo que se ha quedado bajo de stock.
+16. VERIFACTU-F31 — que todo ha llegado a la AEAT.
+17. BASE-F09 — la actividad del día.
+18. ATTENDANCE-F01 — el responsable ficha la salida.
+19. BASE-F61 — cierra la sesión.

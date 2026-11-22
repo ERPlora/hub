@@ -10,7 +10,7 @@ from live.operations import AI, operation
 
 from apps.sale.models import Refund, Sale
 from apps.sale.queries.payment_methods import method_display_name
-from apps.sale.queries.sales import find_sale, returned_by_line
+from apps.sale.queries.sales import returned_by_line, visible_sale
 from apps.sale.schemas.refunds import RefundByKeyIn, RefundByKeyOut, RefundListOut, RefundOptionsOut
 from apps.sale.schemas.sales import SaleRefIn
 from base.business import currency_decimals
@@ -71,7 +71,7 @@ def tender_options(sale: Sale) -> list[dict]:
     ),
 )
 def refund_options(ctx: OperationContext, params: SaleRefIn) -> dict:
-    sale = find_sale(params.sale_id, params.sale)
+    sale = visible_sale(ctx, params.sale_id, params.sale)
     returned = returned_by_line(sale)
     with translation.override(ctx.language):
         return {
@@ -141,7 +141,7 @@ def refund_row(refund: Refund) -> dict:
     ),
 )
 def list_refunds(ctx: OperationContext, params: SaleRefIn) -> dict:
-    sale = find_sale(params.sale_id, params.sale)
+    sale = visible_sale(ctx, params.sale_id, params.sale)
     return {
         "rows": [
             refund_row(refund) for refund in sale.refunds.order_by("-created_at", "-id")

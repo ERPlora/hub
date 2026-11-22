@@ -37,7 +37,9 @@ Quién lo usa:
 
 - El **propietario** y el **administrador** ven todo y son quienes pueden resolver los pasos de la
   plataforma («Tus apps», «Activa …» de cada app obligatoria en su país, «Tu equipo»), y en la campana ven los
-  avisos entre apps que no se entregaron.
+  avisos entre apps que no se entregaron. Solo el **propietario** compra para el negocio (mejorar el plan o contratar
+  una app de pago en erplora.com), restablece el negocio y descarga las copias de sus datos, como en erplora.com, donde el
+  plan, el cobro y la propiedad son solo suyos.
 - El **responsable** y el **empleado** ven sus apps, los pasos que les tocan, los paneles que pueden ver
   y la actividad. Un paso que solo puede resolver un administrador también lo ven, para saber por qué no se
   puede facturar, pero sin botón.
@@ -112,16 +114,16 @@ A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y 
 grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien tiene el
 permiso con el que se abre su pantalla, como en Square o Toast: «Sistema», a quien administra el negocio; «API», además,
 mientras la documentación de la API está mostrada (BASE-F91), y aparece o se va al cambiar el interruptor, sin
-recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan» y
-«Gestionar en erplora.com».
+recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan»
+(solo el propietario) y «Gestionar en erplora.com».
 
 ### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
-erplora.com, en una pestaña nueva y ya dentro con su cuenta, sin volver a escribir la contraseña. Solo en el navegador:
-en la app instalada no está.
+erplora.com, en una pestaña nueva y ya dentro con su cuenta, sin volver a escribir la contraseña. Solo lo ve el
+propietario, el único que cambia el plan en erplora.com, y solo en el navegador: en la app instalada no está.
 
 ### «Gestionar en erplora.com»
-Al pie del menú lateral, justo debajo de «Mejorar plan», con el icono de enlace externo; con el menú plegado a sus
+Al pie del menú lateral, justo debajo de «Mejorar plan» (si lo hay), con el icono de enlace externo; con el menú plegado a sus
 iconos (escritorio), queda solo el icono, que dice «Gestionar en erplora.com» al pasar por encima. Abre este negocio en
 el panel de erplora.com, ya dentro con su cuenta: en una pestaña nueva en el navegador y, en la app instalada, en el
 navegador del dispositivo.
@@ -157,7 +159,7 @@ Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué 
 
 ### La pantalla de una app que no se abre
 En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
-disponible en este negocio», con «Ir a Apps» (y «Mejorar plan» para quien administra, en el
+disponible en este negocio», con «Ir a Apps» (y «Mejorar plan» para el propietario, en el
 navegador).
 
 ### Ajustes · Negocio
@@ -186,7 +188,8 @@ con «Importar» (lo que se abre), «Exportar» y
 
 ### Sistema · Uso y plan
 Desde «Sistema» en el menú lateral. Cuatro pestañas abajo: «Uso y plan», «Actualizaciones», «Eventos caídos» y
-«Registros» (esta, solo para quien administra el negocio); se abre «Uso y plan»: su plan con «Mejorar plan», una línea
+«Registros» (esta, solo para quien administra el negocio); se abre «Uso y plan»: su plan con «Mejorar plan» (para el
+propietario), una línea
 que dice si le alcanza o tiene que ampliar y por qué, «Lo que incluye tu plan», de lo más lleno a lo menos, con su barra,
 y «Para tu información», con las cifras que ningún plan limita.
 
@@ -304,7 +307,7 @@ En el panel del asistente:
 | Cargando | Tres puntos que se mueven en la burbuja del asistente hasta que llega el primer texto («El asistente está escribiendo» para el lector de pantalla), y «Transcribiendo…» mientras se pasa a texto lo dictado. |
 | Vacío | Los destellos, «Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.» (abierto desde la puesta en marcha, «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.») y los atajos. Una respuesta que acaba sin decir nada: «(sin respuesta)». |
 | Error | En la burbuja, con su salida: «No se pudo contactar con el asistente. Comprueba la conexión y vuelve a intentarlo.», «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.» o «La respuesta se cortó.», con «Reintentar»; «Esta conversación es demasiado larga: empieza una nueva.» con «Nueva conversación»; «Tu sesión ha terminado. Vuelve a entrar para seguir hablando.» con «Volver a entrar». Sin Internet, en el pie, «Sin conexión: puedes escribir y enviar cuando vuelva.». |
-| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no administra ve «Pídele a quien administra el negocio que mejore el plan.» en lugar de «Mejorar plan». |
+| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no es el propietario ve «Pídele al propietario del negocio que mejore el plan.» en lugar de «Mejorar plan». |
 
 En la pantalla Ajustes · Datos y copias:
 
@@ -313,7 +316,7 @@ En la pantalla Ajustes · Datos y copias:
 | Cargando | «Cargando plantillas…»; en «Exportar» y «Restablecer», las filas en gris. |
 | Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
 | Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
-| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. |
+| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. Un administrador, en «Restablecer», deshace importaciones y, en lugar de «Restablecer el negocio» y «Copias de los datos», lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.». |
 
 En la pantalla Archivos:
 
@@ -698,18 +701,19 @@ Implicados: BASE-F40
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 Estado: hecho
-Actor: propietario, administrador, responsable, empleado
+Actor: propietario, administrador, responsable
 Pantalla: El menú lateral, «Mejorar plan», «Gestionar en erplora.com»
 Pasos:
-  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Lo ve cualquier
-     perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
-     sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
-     navegador: en la app instalada no está.
+  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Solo lo ve el
+     propietario: en erplora.com solo el propietario cambia el plan y paga. Con el menú plegado a sus iconos
+     (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el navegador: en la
+     app instalada no está.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com, ya dentro con su
      cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com. Igual
      desde cualquier otro «Mejorar plan» del Hub: Sistema, Empleados, Apps, el panel del asistente y la Bandeja de WhatsApp.
-  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, justo debajo de
-     «Mejorar plan», «Gestionar en erplora.com», con el icono de enlace externo (en el menú plegado, solo el icono).
+  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, al pie del menú (justo
+     debajo de «Mejorar plan», si lo tiene), «Gestionar en erplora.com», con el icono de enlace externo (en el menú
+     plegado, solo el icono).
      No vende: también está en la app instalada, salvo en la de Google Play.
   4. Lo pulsa: se abre este negocio en el panel de erplora.com, ya dentro con su cuenta, en una pestaña nueva; en la
      app instalada, en el navegador del dispositivo. El Hub se queda donde estaba.
@@ -722,7 +726,8 @@ pase no llega (el servidor da un error o no contesta en 8 segundos), se abre la 
 entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pestaña nueva, abre esa dirección el
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
 que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
-y la app de Google Play no tienen «Gestionar en erplora.com».
+y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
+ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran.
 Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -849,7 +854,7 @@ Pasos:
 Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en erplora.com.
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
-límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para quien administra en el
+límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para el propietario en el
 navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar» (BASE-F20). Una app que
 este negocio no puede usar tampoco: sale «No disponible» y, para quien administra, el motivo debajo («VeriFactu solo
 es para negocios de España.», VERIFACTU-F01). Cualquier otro fallo sale en un aviso con el nombre de la app y el
@@ -883,12 +888,12 @@ Pantalla: Apps
 Pasos:
   1. Una app de pago que el negocio no tiene contratada sale en «Añadir apps» y en «De pago» con «Necesita
      suscripción», y no está en «Mis apps» ni en el menú.
-  2. Quien administra el negocio, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de
-     erplora.com de este negocio en una pestaña nueva: allí ve el precio y la contrata.
+  2. El propietario, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de erplora.com de este
+     negocio en una pestaña nueva: allí ve el precio y la contrata.
   3. En cuanto erplora.com se lo dice al hub, la app pasa a «Activa» y aparece en «Mis apps» y en el menú, sin
      recargar.
-  4. Quien no administra el negocio, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
-     cuenta de ERPlora.» y ningún botón: el hub nunca vende.
+  4. Quien no es el propietario, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
+     cuenta de ERPlora.» y ningún botón: el hub nunca vende, y en erplora.com solo compra el propietario.
 Entra: lo que el negocio tiene contratado, tal y como erplora.com se lo pasa al hub.
 Sale: nada guardado ni cobrado en el hub.
 Si falla: hasta que erplora.com se lo dice al hub, la app sigue con «Necesita suscripción»; una pantalla suya
@@ -1040,7 +1045,7 @@ Pasos:
      ha contratado.
   2. Al abrir cualquier pantalla suya ve «Suscripción necesaria»: el nombre de la app y «está deshabilitada porque
      este negocio no tiene su suscripción. Tus datos están a salvo y vuelven en cuanto se contrate.», con «Ir a
-     Apps» y, para quien administra en el navegador, «Mejorar plan».
+     Apps» y, para el propietario en el navegador, «Mejorar plan».
   3. La app sale del menú y de «Mis apps», y el hub no hace nada de lo que se le pida a esa app, venga de esta
      pantalla, de otro dispositivo, del asistente o de una integración.
   4. Si se contrata con la pantalla abierta, cambia al nombre de la app con «ya está lista» — «Ya se puede
@@ -1216,8 +1221,10 @@ Entra: el nombre, el idioma, para qué es y lo marcado.
 Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
 ni datos fiscales. En el negocio no se guarda nada.
 Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
-exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.».
-Implicados: BASE-F112 (dentro de la app)
+exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
+exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
+restablecer (BASE-F37).
+Implicados: BASE-F112 (dentro de la app), BASE-F37
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho
@@ -1242,7 +1249,7 @@ Implicados: ninguno
 
 ### BASE-F37 Restablecer el negocio por secciones
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario
 Pantalla: Ajustes · Datos y copias › Restablecer
 Pasos:
   1. En «Restablecer», «Restablecer el negocio»: «Borra definitivamente los datos que marques. No se puede
@@ -1271,8 +1278,11 @@ coincide.». Si la copia no se puede hacer, no se vacía nada: «No se ha vaciad
 copia de los datos, así que no se ha vaciado nada.» y «Volver a intentarlo», con las mismas secciones. Si lo que falla
 es vaciar, la copia se guarda: «No se han podido vaciar las secciones, así que no se ha quitado nada. La copia de los
 datos de antes se guarda.». Quien no administra el negocio lee «Solo un administrador puede deshacer importaciones o
-restablecer el negocio.».
-Implicados: ninguno
+restablecer el negocio.». Un administrador deshace importaciones (BASE-F34), pero en lugar de «Restablecer el negocio»
+y «Copias de los datos» lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.»:
+restablecer, ver las copias y descargarlas es solo del propietario, también por la API y desde el asistente, que le
+responden que no tiene permiso.
+Implicados: BASE-F34, BASE-F35
 
 ### BASE-F38 Ver Inicio al día después de importar una plantilla
 Estado: hecho
@@ -1336,9 +1346,10 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
 Pasos:
-  1. Abre «Sistema»: se abre «Uso y plan». Mientras carga: «Consultando el sistema…». Arriba, su plan («Plan Starter») y
-     «Mejorar plan», que abre la página del plan de este negocio en erplora.com (BASE-F11); en la app instalada, o donde
-     ese enlace no sale, sin botón, «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.».
+  1. Abre «Sistema»: se abre «Uso y plan». Mientras carga: «Consultando el sistema…». Arriba, su plan («Plan Starter») y,
+     para el propietario, «Mejorar plan», que abre la página del plan de este negocio en erplora.com (BASE-F11); al
+     administrador, en la app instalada o donde ese enlace no sale, sin botón, «Los planes se gestionan desde tu cuenta
+     de ERPlora, en erplora.com.».
   2. Debajo, una línea le dice si tiene que ampliar. En verde, «Tu plan te alcanza». En ámbar, «Te conviene ampliar:
      {motivo}», con los archivos o los mensajes del mes desde el 80 %: «casi no te quedan archivos», «casi no te quedan
      mensajes del asistente este mes» o «casi no te quedan mensajes de WhatsApp este mes». En rojo, «Tienes que ampliar:
@@ -2118,7 +2129,7 @@ Pasos:
   1. En **Empleados › Personal**, encima de la tabla, cuántas plazas del plan están ocupadas: «{used} de {limit}
      plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
   2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
-     trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Mejorar plan».
+     trabaje aquí, o pasa a un plan con más plazas.»; en la web, y para el propietario, con «Mejorar plan».
   3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope
      (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: las personas del negocio y las plazas de su plan, como las manda erplora.com.
@@ -2755,12 +2766,12 @@ Pasos:
      renuevan el 1 de noviembre.», y no un fallo de conexión. El pie dice lo mismo, sin repetir «Mejorar plan»:
      «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
      el mes ya gastado.
-  5. Quien administra el negocio ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan
-     en erplora.com, ya dentro con su cuenta (BASE-F11); en la app instalada desde la tienda no sale. Quien no
-     administra ve «Pídele a quien administra el negocio que mejore el plan.». No hay paquetes de mensajes: se amplía
+  5. El propietario ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan en
+     erplora.com, ya dentro con su cuenta (BASE-F11); en la app instalada desde la tienda no sale. Quien no es el
+     propietario ve «Pídele al propietario del negocio que mejore el plan.». No hay paquetes de mensajes: se amplía
      mejorando de plan.
-  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para quien
-     administra; el panel se abre igual.
+  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para el
+     propietario; el panel se abre igual.
 Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
 Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
@@ -3764,7 +3775,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
   en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
-  «Mejorar plan» solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
+  «Mejorar plan» y la Tienda, solo con `useMayBuy` (`base/frontend/lib/plan-link.ts`). e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
 - Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio nace con todo
   apagado, también una demo, salvo las obligatorias de su país que la plataforma
@@ -3950,7 +3961,10 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   la saca por `openExternalLink`. Un error u 8 s sin respuesta (`SIGN_TIMEOUT_MS`: `client.api.call` no tiene tiempo
   límite) abren la dirección de siempre, que sigue en el `href`. Todo «Mejorar plan» con pase es una sola pieza,
   `base/frontend/components/PlanUpgradeLink.vue` (`plan`; hub#853): recibe la dirección (`url`), dice «Mejorar plan» o lo
-  que su sitio le pone dentro, y quien la coloca decide si sale (solo en la web) y su clase y `data-testid`. La colocan
+  que su sitio le pone dentro, y quien la coloca decide su clase y `data-testid`. Si sale lo decide una sola regla,
+  `useMayBuy` de `base/frontend/lib/plan-link.ts`: en la web y con `base.own_business`, porque en erplora.com solo el
+  propietario compra (`usePlanLink` la aplica a la dirección de `hub-home`; `canUpgrade` del asistente y los enlaces a
+  la Tienda de `AppsPage` y `AppBlockedPage`, también). La colocan
   `UpgradePlanLink` (pie del menú, con su icono), `SystemUsage`, `PeopleList`, `AppsPage` y la Bandeja de WhatsApp
   (`InboxPage`, `MessageComposer`, `ChannelSettings`, con su «Mejorar el plan»); su test prohíbe que un `.vue` vuelva a
   escribir a mano `openSaasPass('plan', …)`. Además usan `useSaasPass` `ManageLink` (`business`) y `openPlan` de
@@ -3963,7 +3977,11 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
   `base.open_management` (propietario y administrador por `base.*`; el encargado, a mano en `base/apps.py`: no tiene
-  `base.administer_hub`). Lo pinta `ManageLink.vue` (`menu-manage`, `ion:open-outline`) al pie del menú lateral,
+  `base.administer_hub`). Lo que es solo del propietario es `base.own_business` (`OWNER_ONLY` de `base/permissions.py`):
+  `permissions_of_role` da al propietario todo lo declarado y al administrador todo menos eso, y ninguna app lo da a
+  otro rol (`base/tests/test_permissions.py`). Lo exigen `base.hub.reset`, `base.hub.dumps` y `base.hub.dump_link`, y
+  en la pantalla, «Mejorar plan», la Tienda y «Restablecer el negocio» con «Copias de los datos»
+  (`components/data/ResetPanel.vue`). Lo pinta `ManageLink.vue` (`menu-manage`, `ion:open-outline`) al pie del menú lateral,
   justo debajo de «Mejorar plan» (`UpgradePlanLink.vue`): los dos van en `SidebarFooter.vue`, la pieza
   `sidebarFooter` de `createShell` en `frontend/main.ts`; la barra de arriba solo lleva los destellos y la campana. Es
   un enlace con `target=_blank rel=noopener` que al pulsarlo lleva el pase y en la app instalada sale por

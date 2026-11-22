@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bb1442f7f5e538cb55310e7793868c5df3d2297e2f331f6995904eccf9d60f4f -->
+<!-- generated from WORKBOOK.md sha256:da71fb417b9768d0daf2954b685edaa1479bef4a1212840303fd18ef70d21a41 -->
 
 ## What it is for and who it is for
 
@@ -22,9 +22,11 @@ businesses:
 ### Who uses it and what each one does
 
 - The **employee** (waiter, receptionist, cashier): builds the check, adds notes, comps a line, applies
-  discounts up to the business's maximum, parks and retrieves checks, charges and looks up the sales.
+  discounts up to the business's maximum, parks and retrieves checks, charges and looks up their sales:
+  the ones they charged and the ones attributed to them.
 - The **manager**: also sells at an open price, applies discounts above the maximum, voids an open check
-  or a line already sent to the kitchen, voids and refunds sales, sees the figures and prepares the quick
+  or a line already sent to the kitchen, voids and refunds sales, sees everyone's sales and the figures
+  and prepares the quick
   notes, the sections, the payment methods and the POS settings.
 - The **owner** and the **administrator**: everything.
 
@@ -190,7 +192,9 @@ is not an invoice. The fiscal receipt is issued on payment.", and the print and 
 ### Sales
 Here are the sales already charged, with the figures for today or for the period you choose. Look a sale
 up by its number or by the customer to see its ticket, reprint it, void it or refund it. If you are not
-allowed to void or refund, a manager approves it for you with their PIN.
+allowed to void or refund, a manager approves it for you with their PIN. An employee sees only their own
+sales, the ones they charged and the ones attributed to them; the manager, the owner and the
+administrator see everyone's.
 
 #### Details
 Title "Sales", period ("Today", "7 days", "30 days", "All"), six figures ("Tickets", "Revenue", "Avg.
@@ -1040,7 +1044,7 @@ Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F2
 ### SALE-F28 Look up the sales history and figures
 Status: done
 Vertical: common
-Actor: employee (history), manager (figures)
+Actor: employee (the history of their sales), manager (everyone's and the figures)
 Screen: Sales
 Steps:
 1. Open **Sales & POS → Sales**. At the top, the period ("Today" by default, "7 days", "30 days",
@@ -1057,12 +1061,15 @@ Steps:
    refund" if part was refunded) and Total. A sale charged with several methods shows them all under
    "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
    number or customer…", filter by status, payment, date or total, or sort; the payment filter finds a
-   sale by any of its methods.
+   sale by any of its methods. An employee only sees their own sales: the ones they charged and the ones
+   attributed to their Staff record (the "Served by" chip). The manager, the owner and the administrator
+   see everyone's.
 4. Tap a row to see its document. The table reloads by itself when a sale is charged, voided
    or refunded.
 5. Today's figures are also on **Home**, on the board: "Today's sales" and
    "Today's tickets" show from the start; "Sales, last 7 days" (one bar per day, from oldest to today) and
-   "Recent activity" (the last eight sales, the newest on top, with their number and their customer) are
+   "Recent activity" (the last eight sales the person sees, the newest on top, with their number and their
+   customer) are
    added with ⋮ ("Customize panel"). They update by themselves when a sale is charged, voided or refunded,
    without reloading. Whoever lacks the reports permission can only add "Recent activity".
 In: nothing from other apps.
@@ -1099,7 +1106,7 @@ Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVIC
 ### SALE-F29 See and reprint a sale's document
 Status: done
 Vertical: common
-Actor: employee, manager
+Actor: employee (of their sales), manager (of all of them)
 Screen: Sale document
 Steps:
 1. In **Sales**, tap the row or the "Document" action; it also opens by itself after charging, the whole
@@ -1145,7 +1152,9 @@ If it fails: "Loading document…" and "Error loading the document" (also if the
 the paper never comes out without it). If it does not print, "Could not print"; if the installed app does
 not open its print screen, with the reason after a colon, as when printing the bill for the table. A
 refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes nothing; with no reason,
-"The documents could not be issued. Try again.".
+"The documents could not be issued. Try again.". A sale the person does not see (someone else's, for an
+employee) is not opened, reprinted or issued: the window says "Error loading the document" and the API or
+the assistant, "That sale does not exist.".
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
@@ -1166,7 +1175,8 @@ With Invoicing, the corrective invoice of the whole ticket (R5, "RECT" series) i
 (INVOICE-F07); if the ticket had been left pending, it is issued first, in the same void. If Invoicing
 still cannot, the void goes ahead and both documents are left pending, in sight (SALE-F29, "Issue now").
 Inventory puts back the stock (INVENTORY-F23) and Customers takes off the purchase (CUSTOMER-F21).
-If it fails: without a reason, "A reason is required to void a sale"; if it was charged as a full
+If it fails: without a reason, "A reason is required to void a sale"; a sale the person does not see
+(someone else's, for an employee), "That sale does not exist."; if it was charged as a full
 invoice, "This sale carries a full invoice: issue a credit note instead of voiding it."; with refunds,
 "This sale already has refunds: refund what is left instead of voiding it."; voided from another device
 at the same time, "This sale is already voided.". A refusal is read inside the window, which stays open.
@@ -1203,7 +1213,8 @@ Out: the refund document with one row per payment method, the lines that go back
 reason and who made it (announces: sale refunded, with the refunded lines and whether it is left fully
 refunded) and, with Invoicing, its corrective invoice in the same refund (R5 for a ticket, R1 for an
 invoice; by differences, or what is left if it closes the sale: INVOICE-F09, F10).
-If it fails: "Card: €20.00 is more than the €12.00 still refundable.", "Card: choose where
+If it fails: a sale the person does not see (someone else's, for an employee), "That sale does not
+exist."; "Card: €20.00 is more than the €12.00 still refundable.", "Card: choose where
 this money goes back.", "A refund needs a reason.", "There is no money left to refund on this sale.". If
 another refund takes the last of a marked line at the same time: "One of the lines marked already came
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
@@ -1519,6 +1530,10 @@ sale by its id or its number; a section or a quick note by its id or its name; a
 id, its name or its type ("cash", "card"). If a name matches several, it is refused saying which ones
 (409 `*_ambiguous`).
 
+What reads or touches a charged sale (the list, the sale, its document and its paper, "Issue now", voiding
+and refunding) only reaches the sales the person sees: without "See all sales", the ones they charged and
+the ones attributed to them. One they do not see does not exist for them (404 `sale.sale_not_found`).
+
 ### What it offers: queries (they read and change nothing)
 
 | What it gives | Who can | Flows | Service |
@@ -1672,6 +1687,7 @@ the quick notes and what is refundable can be followed live.
 | Refund | yes | yes | yes | no | `sale.refund_sale` |
 | See the payment methods | yes | yes | yes | yes | `sale.view_paymentmethod` |
 | Create payment methods | yes | yes | yes | no | `sale.add_paymentmethod` |
+| See everyone's sales (without it, only their own: the ones they charged and the ones attributed to them) | yes | yes | yes | no | `sale.view_all_sales` |
 | See the figures | yes | yes | yes | no | `sale.view_reports` |
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
@@ -1682,8 +1698,8 @@ their PIN or their badge ("An approval is needed", BASE-F84), once and for that 
 refunding a sale, voiding a line sent to the kitchen, deleting a check with something ordered, selling at
 an open price and discounts above the maximum. The approved action does everything the manager's does
 (also what Invoicing and Services move: the corrective invoice and the voucher sessions that go back) and
-stays in **Employees › Approvals** (BASE-F85). Seeing the figures, the settings and creating payment
-methods are not approved.
+stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the figures, the settings and
+creating payment methods are not approved.
 
 What touches a voucher's session also asks for Services' permission, because it is Services that moves
 it with the session of whoever sells: paying a line with a voucher, undoing it, removing, voiding or

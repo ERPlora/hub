@@ -23,10 +23,17 @@ configureAssistant(HUB_ASSISTANT);
 
 export const OWNER: SessionMe = {
   user: { id: 'u1', label: 'Ana' },
-  permissions: ['base.view_home', 'base.administer_hub', 'demo.view', 'demo.manage'],
+  permissions: ['base.view_home', 'base.administer_hub', 'base.own_business', 'demo.view', 'demo.manage'],
   menu: [],
   apps: [],
   language: 'en',
+};
+
+/** Runs the business as the owner does, but does not own it: no buying, no reset, no copies (BASE-F11, BASE-F37). */
+export const ADMIN: SessionMe = {
+  ...OWNER,
+  user: { id: 'u3', label: 'Adam' },
+  permissions: OWNER.permissions.filter((permission) => permission !== 'base.own_business'),
 };
 
 export const EMPLOYEE: SessionMe = { ...OWNER, user: { id: 'u2', label: 'Leo' }, permissions: ['base.view_home', 'demo.view'] };

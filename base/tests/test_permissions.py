@@ -1,7 +1,8 @@
 """Permissions of a user on a host: the customer role of its Membership on that host (a superuser's ``*`` is the
 platform scope's alone: ERPlora's staff is no customer, tests/test_guardrails_permissions.py).
 
-Owner and admin get every permission of every app; manager and employee, what each app declares.
+The owner gets every permission of every app; an administrator, all but what is the owner's alone (``OWNER_ONLY``:
+owning the business); manager and employee, what each app declares.
 
 The businesses are ``hub_a`` and ``hub_b``, each on a database of its own; the memberships live in control.
 """
@@ -16,7 +17,7 @@ from live.meta import all_live_app_configs
 from base import permissions as permissions_module
 
 from base.models import Membership
-from base.permissions import permissions_for, reload_user
+from base.permissions import OWN_BUSINESS, OWNER_ONLY, permissions_for, permissions_of_role, reload_user
 from base.tests.test_auth_views import ON_HUB_A
 from base.tests.test_auth_views import A as SLUG_A
 from base.tests.test_auth_views import B as SLUG_B
@@ -88,9 +89,29 @@ def test_owner_and_admin_get_every_permission_of_every_app_even_unlisted(make_us
     granted = permissions_for(make_user(host=SLUG_A, role=role), A)
     everything = {"demo.view", "demo.manage", "shop.view", "shop.sell", "shop.refund"}
     assert of_apps(granted, "demo", "shop") == everything
-    # Every permission each installed app declares, and nothing else.
+
+
+def test_the_owner_gets_every_permission_declared(make_user, with_shop):
     declared = {permission for config in [*all_live_app_configs(), SHOP] for permission in config.permissions}
-    assert granted == declared
+
+    assert permissions_for(make_user(host=SLUG_A, role="hub_owner"), A) == declared
+
+
+def test_an_administrator_gets_every_permission_declared_but_owning_the_business(make_user, with_shop):
+    declared = {permission for config in [*all_live_app_configs(), SHOP] for permission in config.permissions}
+
+    assert permissions_for(make_user(host=SLUG_A, role="hub_admin"), A) == declared - {OWN_BUSINESS}
+
+
+def test_owning_the_business_is_declared_by_base_and_is_all_that_is_the_owners_alone():
+    assert OWNER_ONLY == {OWN_BUSINESS} == {"base.own_business"}
+    assert OWN_BUSINESS in apps.get_app_config("base").permissions
+
+
+@pytest.mark.parametrize("role", [role for role in Membership.Role.values if role != Membership.Role.OWNER])
+def test_no_role_but_the_owner_owns_the_business(role):
+    """Whatever an app grants a role (``base.*`` included), what is the owner's alone stays the owner's."""
+    assert not permissions_of_role(role) & OWNER_ONLY
 
 
 def test_manager_and_employee_get_what_each_app_declares(make_user, only_demo_and_shop):

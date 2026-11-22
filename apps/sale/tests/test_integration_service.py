@@ -679,16 +679,16 @@ def test_split_and_merge_carry_the_session_with_its_line(haircut, lucia):
 # ── Voiding and refunding (SALE-F32, SERVICE-F26, F27) ──────────────────────────────────────────
 
 
-def charged_with_voucher(haircut, lucia, product=None, key="svc-charge-0001"):
+def charged_with_voucher(haircut, lucia, product=None, key="svc-charge-0001", ctx=None):
     grant = voucher(lucia, haircut)
     lines = {"service_lines": [{"service_id": str(haircut.id)}]}
     if product is not None:
         lines["lines"] = [{"product": "SHA"}]
-    order = run("sale.order.open", lines)
+    order = run("sale.order.open", lines, ctx)
     cut = next(line for line in order.lines if line.service_id)
-    order = pay_with(order, cut.id, grant)
+    order = pay_with(order, cut.id, grant, ctx)
     payments = [{"method": "card"}] if product is not None else []
-    sale = charge(order, key=key, customer_id=str(lucia.id), payments=payments)
+    sale = charge(order, key=key, ctx=ctx, customer_id=str(lucia.id), payments=payments)
     return grant, sale, next(line for line in sale.lines if line.paid_by_voucher)
 
 

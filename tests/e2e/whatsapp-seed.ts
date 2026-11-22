@@ -1,5 +1,6 @@
 // What the WhatsApp e2e ask erplora.com's own test seed (`tests/e2e/panel/whatsapp_hub_seed.py` of its checkout, run by
-// `seedErplora` of whatsapp-helpers.ts) and what it leaves in `a`. No I/O here: whatsapp-helpers.ts runs the seed.
+// `seedErplora` of whatsapp-helpers.ts) and what it leaves in `a`, and the script that sets `a`'s plan there. No I/O
+// here: whatsapp-helpers.ts runs the seed and the spec runs the script.
 
 /** What the seed leaves besides the number: `used`, the WhatsApp messages `a` sent this month in erplora.com (0 when
  *  not given: no send of the e2e is stopped; the plan's allowance makes the send that reaches it refused). */
@@ -25,3 +26,22 @@ export const SEED_TEMPLATES = {
   rejected: 'e2e_seed_cambio_horario',
   manager: 'e2e_seed_bienvenida_foto',
 } as const;
+
+/** In erplora.com (`manage.py shell -c`): the WhatsApp messages a month of `a`'s plan become WA_LIMIT, and its photo
+ *  is pushed to this Hub. It prints what the plan had before and whether the Hub took the photo. */
+export const SET_PLAN = `
+import json, os
+from django.db import transaction
+from django.utils import timezone
+from hubs.models import Hub
+from hubs.queries.plan_catalog import effective_plan
+from hubs.services.hub_push import bump_state, sync_hub
+hub = Hub.objects.get(slug="a")
+plan = effective_plan(hub.id, timezone.now())
+before = plan.whatsapp_messages_per_month
+plan.whatsapp_messages_per_month = int(os.environ["WA_LIMIT"])
+plan.save(update_fields=["whatsapp_messages_per_month"])
+with transaction.atomic():
+    bump_state(hub.id)
+print(json.dumps({"before": before, "delivered": sync_hub(hub.id)}))
+`;

@@ -44,7 +44,22 @@ class PricingConfig(LiveAppConfig):
     navigation = [
         Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists", permission="pricing.manage"),
     ]
-    help = Help(videos={"es": "cL0GmPik7GY", "en": "8fbHffF_tRg"})
+    help = Help(
+        videos={"es": "cL0GmPik7GY", "en": "8fbHffF_tRg"},
+        flow_videos={
+            "PRICING-F02": {"es": ["PcXCOovdV4g"], "en": ["KSGMcNbYdU4"]},
+            "PRICING-F03": {"es": ["PcXCOovdV4g"], "en": ["KSGMcNbYdU4"]},
+            "PRICING-F04": {"es": ["-pxJmxIpO7c"], "en": ["0AuaTApG1TM"]},
+            "PRICING-F05": {"es": ["PcXCOovdV4g"], "en": ["KSGMcNbYdU4"]},
+            "PRICING-F06": {"es": ["hsA1bvxJvAw"], "en": ["Hf_-Vn1_dOk"]},
+            "PRICING-F07": {"es": ["hsA1bvxJvAw"], "en": ["Hf_-Vn1_dOk"]},
+            "PRICING-F08": {"es": ["hsA1bvxJvAw"], "en": ["Hf_-Vn1_dOk"]},
+            "PRICING-F09": {"es": ["R4voL1_MuGQ"], "en": ["pWjQIHi7V34"]},
+            "PRICING-F10": {"es": ["R4voL1_MuGQ"], "en": ["pWjQIHi7V34"]},
+            "PRICING-F11": {"es": ["R4voL1_MuGQ"], "en": ["pWjQIHi7V34"]},
+            "PRICING-F12": {"es": ["R4voL1_MuGQ"], "en": ["pWjQIHi7V34"]},
+        },
+    )
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each price
