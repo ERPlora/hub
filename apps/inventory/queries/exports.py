@@ -17,29 +17,30 @@ from apps.inventory.queries.categories import _categories, _filter_categories
 from apps.inventory.queries.products import _products, filter_products
 from apps.inventory.queries.settings import current_settings
 from apps.inventory.schemas.categories import CategoryFiltersIn
-from apps.inventory.schemas.exports import ExportOut
+from apps.inventory.schemas.exports import ExportOut, ProductRow
 from apps.inventory.schemas.products import ProductFiltersIn
 from base import allergens
 from base import operations as platform
 from base.business import money_text
+from base.exports import visible_columns
 
 PRODUCTS_FILENAME = _("inventory-products.csv")
 CATEGORIES_FILENAME = _("inventory-categories.csv")
-# The export's headers are the ones the import recognizes.
-PRODUCT_HEADERS = (
-    _("Name"),
-    _("SKU"),
-    _("Price"),
-    _("Cost"),
-    _("Stock"),
-    _("Threshold"),
-    _("EAN-13"),
-    _("Description"),
-    _("Allergens"),
-    _("Unit"),
-    _("Tax category"),
-    _("Active"),
-)
+# The export's headers, by the column of its row, are the ones the import recognizes.
+PRODUCT_HEADERS = {
+    "name": _("Name"),
+    "sku": _("SKU"),
+    "price": _("Price"),
+    "cost": _("Cost"),
+    "stock": _("Stock"),
+    "threshold": _("Threshold"),
+    "ean13": _("EAN-13"),
+    "description": _("Description"),
+    "allergens": _("Allergens"),
+    "unit": _("Unit"),
+    "tax_category": _("Tax category"),
+    "active": _("Active"),
+}
 CATEGORY_HEADERS = (_("Name"), _("Slug"), _("Products"))
 YES, NO = _("Yes"), _("No")
 CSV_CONTENT_TYPE = "text/csv"
@@ -74,24 +75,27 @@ FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
     products = filter_products(_products(current_settings()), params)
     currency = platform.business_currency(ctx.scope)
-    rows = [
-        [
-            _text_cell(product.name),
-            _text_cell(product.sku),
-            _money(product.price, currency),
-            _money(product.cost, currency),
-            quantity_text(product.stock),
-            quantity_text(product.low_stock_threshold),
-            _text_cell(product.ean13 or ""),
-            _text_cell(product.description),
-            allergens.names(product.allergens),
-            product.unit,
-            _text_cell(product.tax_category.key if product.tax_category else ""),
-            str(YES if product.is_active else NO),
-        ]
-        for product in products
-    ]
-    return _csv(PRODUCTS_FILENAME, PRODUCT_HEADERS, rows)
+    columns = visible_columns(ctx, ProductRow)
+    rows = [[cells[column] for column in columns] for cells in (_product_cells(product, currency) for product in products)]
+    return _csv(PRODUCTS_FILENAME, [PRODUCT_HEADERS[column] for column in columns], rows)
+
+
+def _product_cells(product, currency: str) -> dict[str, str]:
+    """Every cell of ``product``'s row, by its column (``ProductRow``)."""
+    return {
+        "name": _text_cell(product.name),
+        "sku": _text_cell(product.sku),
+        "price": _money(product.price, currency),
+        "cost": _money(product.cost, currency),
+        "stock": quantity_text(product.stock),
+        "threshold": quantity_text(product.low_stock_threshold),
+        "ean13": _text_cell(product.ean13 or ""),
+        "description": _text_cell(product.description),
+        "allergens": allergens.names(product.allergens),
+        "unit": product.unit,
+        "tax_category": _text_cell(product.tax_category.key if product.tax_category else ""),
+        "active": str(YES if product.is_active else NO),
+    }
 
 
 @operation(

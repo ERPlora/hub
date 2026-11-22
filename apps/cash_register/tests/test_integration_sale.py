@@ -390,7 +390,7 @@ def test_an_auto_close_keeps_the_lines_before_the_cut_off_and_leaves_the_rest_un
         "cash_register.settings.update",
         {"auto_close_enabled": True, "auto_close_time": "04:00"},
     )
-    from apps.cash_register.queries import last_cut_off
+    from apps.cash_register.queries.auto_close import last_cut_off
 
     cut = last_cut_off(now, dt.time(4, 0))
     Sale.objects.filter(pk=early.id).update(created_at=cut - dt.timedelta(hours=1))

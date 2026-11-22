@@ -2299,7 +2299,7 @@ Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
 publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
-Implicados: BASE-F89, BASE-F90
+Implicados: BASE-F89, BASE-F90, BASE-F119
 
 ### BASE-F87 Rotar una llave de API
 Estado: hecho
@@ -3412,11 +3412,13 @@ Pasos:
      va antes de la @.
   4. Un panel de Inicio cuya cifra es un dato que la persona no ve no le sale en el tablero ni entre los que puede
      añadir.
+  5. Una llave de API ve los datos que ve quien la crea: solo la crean el propietario y el administrador, que los ven
+     todos, así que una integración lee y escribe el coste de un producto como antes.
 Entra: el rol de la persona en este negocio.
 Sale: nada guardado.
 Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
-Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
+Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
 
 ## Para quien lo mantiene
 

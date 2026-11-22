@@ -288,7 +288,9 @@ Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que 
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
 tecleado se conserva. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
-Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
+El coste interno, que solo se da por el asistente o la API, lo escribe solo quien ve los costes: un alta con coste de
+quien no los ve se rechaza como una operación sin permiso y no se guarda nada; sin coste, el servicio cuesta 0.
+Implicados: TAX-F01, BASE-F01, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
 perdieron, cada uno por esta misma alta)
 
 ### SERVICE-F02 Editar un servicio
@@ -304,7 +306,8 @@ Sale: el servicio cambiado (`service.service.updated`); se cambia solo lo que se
 reservadas conservan el nombre, el precio y la duración que tenían; los bonos ya vendidos no cambian.
 Si falla: los mismos motivos que al darlo de alta, cada uno debajo de su campo; un servicio que ya no existe,
 «Ese servicio no existe en este negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se guarda sin problema.
-Implicados: SERVICE-F31
+Cambiar el coste interno es de quien ve los costes: a quien no los ve se le rechaza como una operación sin permiso.
+Implicados: SERVICE-F31, BASE-F119
 
 ### SERVICE-F03 Poner un servicio a precio abierto
 Estado: hecho
@@ -1027,7 +1030,9 @@ tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunc
 Ventas o de Citas: la venta por su número, su línea y la de la cuenta por lo que cobran, la cita como la dicen las
 tarjetas de Citas y la devolución o la anulación que devuelve sesiones por su venta («Devolución de la venta
 20261014-0007», «Anulación de la venta 20261014-0007»). Con Ventas o Citas apagadas, o si quien pregunta no puede
-verlo, ese dato no sale, nunca su id.
+verlo, ese dato no sale, nunca su id. El coste interno de un servicio llega solo a quien ve los costes (el
+propietario, el administrador y el encargado); a los demás les llega vacío. El TPV lo guarda igual en
+la línea que vende, aunque quien cobra no lo vea.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 

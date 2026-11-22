@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:de584fc2f012b0e9af4d227476ab38537a6090856df5dfc235fd91ea3d6eda6d -->
+<!-- generated from WORKBOOK.md sha256:c590635851edbee4e9258f039215ebb16551b6d7717d1836083e5669d8207bcb -->
 
 ## What it is for and who it is for
 
@@ -107,14 +107,16 @@ app also refuses it even if someone tries it through another door (the assistant
 
 ### Dashboard
 The stock's figures at a glance: "Tracked products" (those with stock control), "In stock", "Out of
-stock", "Low stock" and "Inventory value", at cost. Tap one of the first four to go to Products. Below,
+stock", "Low stock" and "Inventory value", at cost, which shows only to whoever sees the costs (the owner, the
+administrator and the manager). Tap one of the first four to go to Products. Below,
 the "Low stock products" table, from the one with the least to the one with the most, with each one's
 threshold. It updates on its own with every sale and every movement.
 
 #### Detail
 Figures at the top: "Tracked products", "In stock", "Out of stock", "Low stock" and "Inventory
 value" ("at cost"). The first four lead to Products. If there are items with stock control and no
-cost, the note "N product(s) without recorded cost: the value shown is partial". Below, the "Low
+cost, the note "N product(s) without recorded cost: the value shown is partial". Whoever does not see the costs
+has neither the value nor the note. Below, the "Low
 stock products" table (Name, SKU, Stock, Threshold), 5 per page. Empty: "No products in low
 stock.". Loading: "Loading…". Error: "Inventory metrics could not be loaded." and the table's notice
 with "Retry".
@@ -352,8 +354,10 @@ it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for 
 respect the step allowed for this unit". A SKU another live product already has: "That SKU already
 exists in the catalog"; a repeated EAN-13: "Another product of the catalog already has that EAN-13". A
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
-API. Every refusal shows inside the panel and nothing is saved.
-Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (the ERPlora staff bring back from a separate copy
+API. Every refusal shows inside the panel and nothing is saved. Only whoever sees the costs writes the cost: a
+creation with a cost by someone who does not see them, through the assistant or the API, is refused as an
+operation they may not run and nothing is saved; without a cost, the product is created with cost 0.
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (the ERPlora staff bring back from a separate copy
 the products the business no longer has at all, each by this same creation; a deleted one comes back the same,
 INVENTORY-F34)
 
@@ -379,8 +383,9 @@ bill keeps the price from when it was ordered (Sales decides it).
 If it fails: the same refusals as creating, inside the panel, and nothing is saved.
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
-it afterwards.".
-Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05
+it afterwards.". Changing the cost belongs to whoever sees the costs: it is refused to someone who does not see
+them as an operation they may not run, and the rest of a change without a cost is saved.
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119
 
 ### INVENTORY-F03 Turn a product on and off
 Status: done
@@ -539,8 +544,10 @@ longer than its column allows", "Another product of the catalog already has that
 category is missing" or "Tax category not recognized". If Taxes cannot save a learnt text or a created
 category, the report says so and its rows stay as failed with that reason. "Cancel" in the tax window
 imports nothing. "Stop" keeps what was already created and the report says "The import was stopped
-halfway. What had already been created is counted below; the rest of the file was left untouched.".
-Involved: TAX-F02, TAX-F14, TAX-F15
+halfway. What had already been created is counted below; the rest of the file was left untouched.". Only whoever
+sees the costs imports costs: a file with costs from someone who does not see them is refused whole as an operation
+they may not run and nothing is created.
+Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119
 
 ### INVENTORY-F10 Import categories from a CSV
 Status: done
@@ -574,12 +581,14 @@ Steps:
 In: the products or the categories that match the search and the filters.
 Out: the file, with the same headers the import recognises (Name, SKU, Price, Cost, Stock, Threshold,
 EAN-13, Description, Allergens, Unit, Tax category, Active) and the figures as they read on screen (€2.20, 3
-units), so it can be imported back without changing anything. It neither saves nor tells anything.
+units), so it can be imported back without changing anything. Only the file of whoever sees the costs carries the
+"Cost" column; the file of whoever does not see them comes out without it. It neither saves nor tells
+anything.
 If it fails: with no products, the file carries only the header. Without permission to export, the
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
 would run as a formula (it starts with =, +, -, @…) comes out with an apostrophe in front, which the
 import removes.
-Involved: BASE-F112 (inside the app)
+Involved: BASE-F112 (inside the app), BASE-F119
 
 ### INVENTORY-F12 Load the menu of a sector template
 Status: done
@@ -638,8 +647,10 @@ count and the write-off read no amounts: they do not wait for it. "The quantity 
 for this unit", an unreadable cost ("This is not an amount…") or the reason of any other refusal show
 inside the window. A service is not received: it has no button, and through the assistant or the API it
 is refused with "A service has no stock.". A goods receipt with a line without a product, with a product
-that does not exist or with a zero quantity is refused whole, saying which line fails: none goes in.
-Involved: none
+that does not exist or with a zero quantity is refused whole, saying which line fails: none goes in. Only
+whoever sees the costs writes the unit cost: a goods receipt with a cost by someone who does not see them is refused
+as an operation they may not run, and without a cost it is recorded and the product keeps the cost it had.
+Involved: BASE-F119
 
 ### INVENTORY-F14 Count a product's stock
 Status: done
@@ -719,8 +730,8 @@ Actor: administrator, manager, employee, cashier
 Screen: Dashboard
 Steps:
 1. Open Inventory's **Dashboard** tab: "Tracked products", "In stock", "Out of stock" (balance 0 or less),
-   "Low stock" (balance equal to or below its threshold) and "Inventory value" at cost. Tapping one of
-   the first four leads to **Products**.
+   "Low stock" (balance equal to or below its threshold) and "Inventory value" at cost, this one only for
+   whoever sees the costs. Tapping one of the first four leads to **Products**.
 2. Below, "Low stock products", from the one with least to the one with most, with its threshold.
 3. On **Home**, Inventory's panels: "Low-stock products" (the "Low stock" figure), "Stock value (at
    cost)" and "Lowest-stock products" (the five with the least, the first the one with the least) show
@@ -732,8 +743,10 @@ Out: nothing.
 If it fails: "Inventory metrics could not be loaded." and the table's notice with "Retry"; on Home, a
 panel that cannot be read says "Unavailable". The dashboard and Home's panels refresh on their own with
 any stock movement (sale, void, goods receipt, count, write-off), with any creation, change or deletion
-of a product and when the settings are saved. Home's panels are seen by whoever can view the products.
-Involved: none
+of a product and when the settings are saved. Home's panels are seen by whoever can view the products, and the
+value's only by whoever also sees the costs: the employee does not have it on the board nor among the ones they can
+add.
+Involved: BASE-F119
 
 ### INVENTORY-F18 Warn when an item crosses its minimum
 Status: done
@@ -1230,13 +1243,13 @@ or what no longer exists, is left out.
 |---|---|---|---|
 | The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29 | `inventory.product.list` |
 | A product's full card (by its id, its SKU or its name) | view products | F02, F25 | `inventory.product.get` |
-| The whole sales catalog: products on sale (active and not sold out) with price, cost, tax category, unit, allergens and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
+| The whole sales catalog: products on sale (active and not sold out) with price, cost (empty for whoever does not see the costs), tax category, unit, allergens and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |
 | One category by its id or its name: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view categories | F06, F07, F08 | `inventory.category.get` |
 | The ledger of movements: date, product, type, quantity, balance, reason, reference and who made it | view stock | F16 | `inventory.movement.list` |
-| The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
+| The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost (empty for whoever does not see the costs) and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
 | The units of measure with their step | view products | F26 | `inventory.unit.list` |
 | The inventory settings | manage settings | F19 | `inventory.config.get` |
 | Up to five library images for a product's photo, by its name and titled in the business's language; it sets none | view products | F30 | `inventory.product.suggest_image` |
