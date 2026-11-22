@@ -6,12 +6,23 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { ImportReport } from '../lib/useCustomerImport';
 
 const props = defineProps<{ report: ImportReport }>();
 const emit = defineEmits<{ close: [] }>();
+const { t } = useCustomerI18n();
 
 const SHOWN = 20;
+
+// One plural message per count: a single sentence cannot agree with three numbers at once.
+const summary = computed(() =>
+  t('customer.importCsv.summary', {
+    rows: t('customer.importCsv.rows', { n: props.report.total }),
+    created: t('customer.importCsv.created', { n: props.report.created }),
+    skipped: t('customer.importCsv.skipped', { n: props.report.skipped.length }),
+  }),
+);
 
 const tone = computed(() =>
   props.report.failed.length ? 'danger' : props.report.skipped.length || props.report.warnings.length ? 'warning' : 'success',
@@ -26,9 +37,7 @@ const warnings = computed(() => props.report.warnings.slice(0, SHOWN));
     data-testid="customer-import-report"
     :tone="tone"
   >
-    <strong data-testid="customer-import-summary">{{
-      $t('customer.importCsv.summary', { total: report.total, created: report.created, skipped: report.skipped.length })
-    }}</strong>
+    <strong data-testid="customer-import-summary">{{ summary }}</strong>
     <ul
       v-if="report.skipped.length"
       class="customer-import-report__list"
