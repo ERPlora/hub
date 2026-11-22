@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:900cac8e68370128dbe6c4e99750e20837664ec899da11b94895a413c42c4f5d -->
+<!-- generated from WORKBOOK.md sha256:dd99e54bf8d08b43ddeea0fe1fa3c398ac17c516dec84d9888db913b0feab015 -->
 
 ## What it is for and who it is for
 
@@ -69,9 +69,8 @@ Initial setup, step by step:
 
 ## Screens
 
-The **Cash register** menu has two tabs: **Cash register** and **Settings**. Only whoever
-has permission opens and changes the settings; the others, by its address, "No access" (BASE-F118). The buttons the profile cannot use do not
-show.
+The **Cash register** menu has two tabs: **Cash register** and **Settings**, this one only for whoever can change
+the settings; the others, by its address, see "No access" (BASE-F118). The buttons the profile cannot use do not show.
 
 ### Cash register
 Here you open and close the cash shifts and look back at the earlier ones. At the top you see the cash there should

@@ -3,12 +3,13 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import { type Component, defineComponent } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
 /** Owner, admin or manager: `kitchen.*` (apps.py `role_permissions`), listed one by one. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('kitchen', {
   user: { id: '1', label: 'Ana' },
   permissions: [
     'kitchen.view_ticket',
@@ -25,10 +26,10 @@ export const OWNER: SessionMe = {
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** The cook and the waiter: they move states; no cancel, no delete, no stations, no settings. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('kitchen', {
   ...OWNER,
   user: { id: '2', label: 'Luis' },
   permissions: [
@@ -39,14 +40,14 @@ export const EMPLOYEE: SessionMe = {
     'kitchen.view_log',
     'inventory.view_product',
   ],
-};
+});
 
 /** Who may only look at the board (no change, no serve). */
-export const VIEWER: SessionMe = {
+export const VIEWER: SessionMe = withMenu('kitchen', {
   ...OWNER,
   user: { id: '3', label: 'Eva' },
   permissions: ['kitchen.view_ticket'],
-};
+});
 
 /** Ionic's popover as a plain box that shows its content while open (Ionic's overlay does not present in happy-dom). */
 export const PopoverStub = defineComponent({

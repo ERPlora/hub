@@ -3,12 +3,13 @@ import type { SessionMe } from '@erplora/ui/shell';
 import { expect } from 'vitest';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { click, ionValue, mountInShell, type MountOptions, settle } from '../../../../base/frontend/__tests__/mount-in-shell';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
 /** Owner, admin or manager: `task.*` (apps.py `role_permissions`), listed one by one; they read Staff. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('task', {
   user: { id: '1', label: 'Marta' },
   permissions: [
     'task.view',
@@ -23,14 +24,14 @@ export const OWNER: SessionMe = {
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** An employee sees, creates and changes their own tasks; no deleting, no projects. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('task', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
   permissions: ['task.view', 'task.add', 'task.change', 'staff.view'],
-};
+});
 
 export async function mountTask(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, { path: '/task/tasks', session: OWNER, messages: { en, es } });

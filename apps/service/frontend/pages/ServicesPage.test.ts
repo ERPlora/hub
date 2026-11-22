@@ -9,7 +9,20 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { ServiceOut } from '../operations';
-import { business, EMPLOYEE, flush, JAPANESE, MANAGER, type MountOptions, mountService, OWNER, page, POLISH } from '../__tests__/mount-service';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  business,
+  EMPLOYEE,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  JAPANESE,
+  MANAGER,
+  type MountOptions,
+  mountService,
+  OWNER,
+  page,
+  POLISH,
+} from '../__tests__/mount-service';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import ServicesPage from './ServicesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -335,4 +348,8 @@ describe('ServicesPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('ServicesPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(MANAGER, 1) }), [['services', 'Services']]);
 });

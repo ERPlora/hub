@@ -2,12 +2,7 @@
   "inventory": {
     "title": "Inventory",
     "tabs": {
-      "label": "Inventory sections",
-      "dashboard": "Dashboard",
-      "products": "Products",
-      "movements": "Movements",
-      "categories": "Categories",
-      "settings": "Settings"
+      "label": "Inventory sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

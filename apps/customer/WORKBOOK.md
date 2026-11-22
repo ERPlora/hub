@@ -88,7 +88,8 @@ tiene su propia base de datos: sus fichas solo las ve ese negocio.
 ## Pantallas
 
 Clientes se abre desde el menú **Clientes** y tiene cuatro pestañas: **Clientes**, **Grupos**,
-**Etiquetas** y **Campos**. No tiene pestaña de ajustes. El buscador de cliente del TPV no es una pestaña de
+**Etiquetas** y **Campos**; las tres últimas, solo para quien puede configurar Clientes. No tiene pestaña de
+ajustes. El buscador de cliente del TPV no es una pestaña de
 Clientes: vive en **Ventas → Vender**, con el botón «Asignar cliente».
 
 ### Clientes

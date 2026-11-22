@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:20f1533b2120240e8c6824125d57701d86823825aa59e3ea9c014d6d03a34704 -->
+<!-- generated from WORKBOOK.md sha256:601cb67f34bd2695a85b600982bf068d9296381fb4648021737ee90f1af958e1 -->
 
 ## What it is for and who it is for
 
@@ -80,7 +80,8 @@ has its own database: its cards are seen by that business alone.
 ## Screens
 
 Customers opens from the **Customers** menu and has four tabs: **Customers**, **Groups**, **Tags** and
-**Fields**. It has no settings tab. The till's customer search is not a tab of Customers: it lives in
+**Fields**; the last three, only for whoever can configure Customers. It has no settings
+tab. The till's customer search is not a tab of Customers: it lives in
 **Sales & POS → Sell**, behind the "Assign customer" button.
 
 ### Customers

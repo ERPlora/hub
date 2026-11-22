@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
@@ -149,28 +148,3 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
         "message": "Esa venta no existe.",
     }
 
-
-# The menu entry's key in apps.py → its tab's key in the frontend catalogues (`sale.tabs.*`).
-TAB_KEYS = {
-    "pos": "pos",
-    "sales": "sales",
-    "quick_notes": "quickNotes",
-    "departments": "departments",
-    "settings": "settings",
-}
-
-
-@pytest.mark.parametrize("language", ["en", "es"])
-def test_the_menu_and_the_tabbar_name_each_section_alike(language):
-    # A menu entry and its footer tab say the same word: «Sections», since «Departments» is wider than a fifth of a
-    # phone's tabbar.
-    frontend = Path(apps.get_app_config("sale").path) / "frontend" / "locale"
-    catalogue = json.loads((frontend / f"{language}.json").read_text(encoding="utf-8"))
-    tabs = catalogue["sale"]["tabs"]
-    with translation.override(language):
-        menu = {
-            entry.id: str(entry.label)
-            for entry in apps.get_app_config("sale").navigation
-        }
-    assert menu == {entry: tabs[key] for entry, key in TAB_KEYS.items()}
-    assert menu["departments"] == {"en": "Sections", "es": "Secciones"}[language]

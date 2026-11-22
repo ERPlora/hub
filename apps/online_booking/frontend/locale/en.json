@@ -2,9 +2,7 @@
   "online_booking": {
     "title": "Online booking",
     "tabs": {
-      "label": "Online booking sections",
-      "bookings": "Bookings",
-      "settings": "Settings"
+      "label": "Online booking sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

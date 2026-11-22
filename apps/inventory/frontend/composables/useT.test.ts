@@ -22,12 +22,12 @@ async function probe(locale: 'en' | 'es') {
 describe('useT', () => {
   it('translates with the page language, plurals and placeholders included', async () => {
     const en = await probe('en');
-    expect(en.t('inventory.tabs.products')).toBe('Products');
+    expect(en.t('inventory.tabs.label')).toBe('Inventory sections');
     expect(en.t('inventory.dashboard.withoutCost', 2)).toBe('2 products without recorded cost: the value shown is partial');
     expect(en.t('inventory.form.editTitle', { name: 'Coffee' })).toBe('Editing product — Coffee');
     expect(en.locale.value).toBe('en');
     const es = await probe('es');
-    expect(es.t('inventory.tabs.products')).toBe('Productos');
+    expect(es.t('inventory.tabs.label')).toBe('Secciones del inventario');
     expect(es.locale.value).toBe('es');
   });
 

@@ -2,10 +2,7 @@
   "invoice": {
     "title": "Invoicing",
     "tabs": {
-      "label": "Invoicing sections",
-      "invoices": "Invoices",
-      "series": "Series",
-      "issuer": "Issuer"
+      "label": "Invoicing sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

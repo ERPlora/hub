@@ -48,7 +48,7 @@ class TaxConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon, and a keyword split over lines would look like one.
-    # The same icons as the tabbar (frontend/tabs.ts): the old menu's.
+    # The old menu's icons; each entry is also a tab of the app's pages.
     navigation = [
         Nav("categories", _("Categories"), "ion:pricetags-outline", "/tax/categories", permission="tax.manage"),
         Nav("rules", _("Rules"), "ion:receipt-outline", "/tax/rules", permission="tax.manage"),

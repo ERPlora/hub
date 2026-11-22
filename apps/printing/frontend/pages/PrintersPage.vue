@@ -20,7 +20,9 @@ import type { PrinterDraft } from '../lib/discovery';
 import { deviceError, printerAddress, printerPaper, printerState, STATE_TONE } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { PrinterOut } from '../operations';
-import { printingTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('printing');
 
 const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
@@ -140,7 +142,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
   <AppPage
     :title="$t('printing.title')"
     content-layout="fill"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
   >
     <div class="printing-printers page-fill">

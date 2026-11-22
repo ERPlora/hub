@@ -35,7 +35,9 @@ import { MEMBER_STATUSES, memberStatusTone } from '../lib/enums';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 import { accountSearch, roleSearch } from '../lib/pickers';
 import type { MemberListIn, MemberOut } from '../operations';
-import { staffTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('staff');
 
 const session = useSession();
 const t = useT();
@@ -51,7 +53,6 @@ const canPay = session.can('staff.view_compensation');
 /** The team's email and phone reach only whoever sees them: for anyone else they come empty, so no column. */
 const canContact = computed(() => session.can('base.view_team_contact'));
 const canLink = computed(() => canAdd.value || canChange.value);
-const canSettings = computed(() => session.can('staff.manage_settings'));
 
 // ── The list ───────────────────────────────────────────────────────────────────────────────────
 const table = useServerTable({ sort: 'name' });
@@ -206,7 +207,7 @@ async function deactivate(): Promise<void> {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings, commissions: canPay })"
+    :tabs="tabs"
     :tabs-label="$t('staff.tabs.label')"
   >
     <PageNotices

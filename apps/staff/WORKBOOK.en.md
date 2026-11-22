@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:257abd779bceede377497c44ddf15dd9915f2e1cc17702224e3721ab80787017 -->
+<!-- generated from WORKBOOK.md sha256:c46f2f31c9d1a16656e6b23e8562172a37c78f4cbae0aaf6a28656575c736c22 -->
 
 ## What it is for and who it is for
 
@@ -69,7 +69,8 @@ ticket). At the end of the day, **Commissions** gives what each professional has
 ## Screens
 
 Staff has five tabs: **Staff**, **Roles**, **Time Off**, **Schedules** and **Commissions** (this one,
-only for whoever sees the pay), plus **Settings** (for whoever can save them). What a person cannot do does not show, and the app refuses it even if they try through the API or
+only for whoever sees the pay), plus **Settings**; **Roles** and **Settings**, only for whoever can save the
+settings. What a person cannot do does not show, and the app refuses it even if they try through the API or
 the assistant.
 
 ### Staff

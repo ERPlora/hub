@@ -30,12 +30,8 @@ describe('kitchen catalogues (en source + es)', () => {
     for (const [domain, values] of domains) for (const value of values) expect(EN.has(`kitchen.${domain}.${value}`), `${domain}.${value}`).toBe(true);
   });
 
-  it('keep the old screens’ words: tabs, views, buttons, empty states and warnings', () => {
+  it('keep the old screens’ words: views, buttons, empty states and warnings', () => {
     expectWords(CATALOGUES, [
-      ['kitchen.tabs.display', 'Display', 'Pantalla'],
-      ['kitchen.tabs.tickets', 'Tickets', 'Comandas'],
-      ['kitchen.tabs.stations', 'Stations', 'Estaciones'],
-      ['kitchen.tabs.history', 'History', 'Historial'],
       ['kitchen.display.views.tickets', 'Tickets', 'Comandas'],
       ['kitchen.display.views.ready', 'Ready', 'Listas'],
       ['kitchen.display.views.allDay', 'All-Day', 'Resumen'],

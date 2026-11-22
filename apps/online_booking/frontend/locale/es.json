@@ -2,9 +2,7 @@
   "online_booking": {
     "title": "Reservas online",
     "tabs": {
-      "label": "Secciones de Reservas online",
-      "bookings": "Reservas",
-      "settings": "Ajustes"
+      "label": "Secciones de Reservas online"
     },
     "live": {
       "reconnecting": "Reconectando…",

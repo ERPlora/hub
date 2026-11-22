@@ -2,11 +2,7 @@
   "service": {
     "title": "Servicios",
     "tabs": {
-      "label": "Secciones de Servicios",
-      "services": "Servicios",
-      "categories": "Categorías",
-      "packages": "Bonos y paquetes",
-      "settings": "Ajustes"
+      "label": "Secciones de Servicios"
     },
     "live": {
       "reconnecting": "Reconectando…",

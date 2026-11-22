@@ -110,8 +110,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Seis pestañas en el pie de cada página de VeriFactu (las del menú, en este orden): Registros, Contingencia,
-Eventos, Recuperación, Configuración y Ajustes. Todas se ven con el permiso de consulta; los botones que
-la persona no puede usar no aparecen.
+Eventos, Recuperación, Configuración y Ajustes. Las cuatro primeras, para quien envía registros;
+Configuración y Ajustes, solo para quien configura VeriFactu. Los botones que la persona no puede usar no aparecen.
 
 ### Registros
 Cada factura y cada tique que emites tiene aquí su registro de VeriFactu, lo último arriba, con su estado ante la

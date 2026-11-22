@@ -25,12 +25,8 @@ describe('staff catalogues (en source + es)', () => {
     }
   });
 
-  it('keep the old screens’ words: tabs, columns, searches, empty states', () => {
+  it('keep the old screens’ words: columns, searches, empty states', () => {
     expectWords(CATALOGUES, [
-      ['staff.tabs.staff', 'Staff', 'Personal'],
-      ['staff.tabs.roles', 'Roles', 'Roles'],
-      ['staff.tabs.time_off', 'Time Off', 'Ausencias'],
-      ['staff.tabs.schedules', 'Schedules', 'Horarios'],
       ['staff.members.search', 'Search member…', 'Buscar miembro…'],
       ['staff.members.empty', 'No staff members.', 'Sin miembros del staff.'],
       ['staff.members.columns.hourlyRate', 'Rate/h', 'Tarifa/h'],

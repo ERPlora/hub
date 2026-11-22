@@ -20,10 +20,8 @@ describe('attendance catalogues (en source + es)', () => {
     }
   });
 
-  it('keep the old screens’ words: menu, buttons, columns, states and messages', () => {
+  it('keep the old screens’ words: buttons, columns, states and messages', () => {
     expectWords(CATALOGUES, [
-      ['attendance.tabs.clock', 'Clock in', 'Fichar'],
-      ['attendance.tabs.records', 'Records', 'Registros'],
       ['attendance.clock.greeting', 'Hello, {name}', 'Hola, {name}'],
       ['attendance.clock.now', 'It is {time}', 'Son las {time}'],
       ['attendance.clock.statusOut', 'You are clocked out', 'No has fichado la entrada'],

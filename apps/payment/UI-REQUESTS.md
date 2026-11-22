@@ -14,8 +14,8 @@ tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` d
 - `ion:arrow-forward-outline` — la acción de fila que avanza un pago (Aprobar, Marcar como enviado,
   Marcar como completado; el producto actual usaba `arrow-forward`). **Hoy:** `ion:chevron-forward-outline`.
 
-Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts` y sus tests
-(`tests/test_apps.py`, `frontend/tabs.test.ts`), correr `pnpm gen:app-icons`, y la acción de
+Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), y sus tests
+(`tests/test_apps.py`), correr `pnpm gen:app-icons`, y la acción de
 `frontend/pages/PaymentsPage.vue`.
 
 ## Piezas compartidas que viven copiadas en la app

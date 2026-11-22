@@ -8,7 +8,16 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, mountSale, taxSettings, type MountOptions } from '../__tests__/mount-sale';
+import {
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  type MountOptions,
+  mountSale,
+  taxSettings,
+} from '../__tests__/mount-sale';
 import DepartmentFormModal from '../components/backoffice/DepartmentFormModal.vue';
 import { plain } from '../lib/format';
 import type { DepartmentOut } from '../operations';
@@ -227,4 +236,8 @@ describe('DepartmentsPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('DepartmentsPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['pos', 'Sell'], ['sales', 'Sales']]);
 });

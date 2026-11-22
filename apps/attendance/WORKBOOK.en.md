@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:156b56c33b57f621db806da4db67577c12481c2cd86520a1aae2398cc28b2fc3 -->
+<!-- generated from WORKBOOK.md sha256:8f057bf46d6c057296ec8f6f55728fd78587c5b8f0bb55b9625786e2571d30d9 -->
 
 ## What it is for and who it is for
 
@@ -25,7 +25,7 @@ for four years and make it available to the worker, their representatives and th
 
 ### Who uses it and what each one does
 
-- The **employee** clocks in, clocks out and takes their breaks, sees their working days, their
+- The **employee** clocks in, clocks out and takes their breaks, sees their working days and their
   correction history, and exports their working days in CSV. They do not open the settings: by its address, "No access" (BASE-F118).
 - The **manager**, the **administrator** and the **owner** also see the working days of the whole team
   and who is in right now, correct working days with a reason, clock someone else in or out (through the
@@ -95,7 +95,7 @@ says above Records. Only whoever sees the working days of the whole team has it;
 ### Settings
 Here a manager decides whether whoever clocks in from their own phone is asked for their location, how far from the
 workplace they may clock in and where the workplace is. They also choose after how many hours a working day nobody
-closed becomes "Needs review". Everyone else sees the settings without being able to change them.
+closed becomes "Needs review". Only whoever can change them sees this tab.
 
 #### Detail
 The app's "Settings" tab. "Require location when clocking in from a personal device" (below it, where a

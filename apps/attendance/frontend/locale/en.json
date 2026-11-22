@@ -2,10 +2,7 @@
   "attendance": {
     "title": "Time clock",
     "tabs": {
-      "label": "Time clock sections",
-      "clock": "Clock in",
-      "records": "Records",
-      "settings": "Settings"
+      "label": "Time clock sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

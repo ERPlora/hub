@@ -57,7 +57,7 @@ class TaskConfig(LiveAppConfig):
         "hub_employee": ["task.view", "task.add", "task.change"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts).
+    # `icon =` as the module's own icon. Each entry is also a tab of the app's pages.
     navigation = [
         Nav("tasks", _("Tasks"), "ion:checkbox-outline", "/task/tasks", permission="task.view"),
         Nav("projects", _("Projects"), "ion:folder-outline", "/task/projects", permission="task.view"),

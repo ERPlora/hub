@@ -102,7 +102,7 @@ ahora» encima de Registros. Solo lo tiene quien ve las jornadas de todo el equi
 ### Ajustes
 Aquí un responsable decide si se pide la ubicación a quien ficha desde su propio móvil, a qué distancia del local se
 puede fichar y dónde está el local. También elige tras cuántas horas una jornada que nadie cerró pasa a «Por
-revisar». Los demás ven los ajustes sin poder cambiarlos.
+revisar». Solo quien puede cambiarlos ve esta pestaña.
 
 #### Detalle
 La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal» (debajo,
@@ -600,8 +600,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/routes.ts`: `/attendance/clock`, `/attendance/records` y `/attendance/settings`; la barra
-  de pestañas (`frontend/tabs.ts`) son las tres, «Ajustes» para todos (en solo lectura para quien no
-  puede guardar).
+  de pestañas son las entradas del menú que la persona puede abrir (`useAppTabs`, en
+  `base/frontend/lib/app-tabs.ts`): «Ajustes», solo para quien puede cambiarlos.
 - Fichar se suscribe a `attendance.record.current`, `attendance.settings.get` y `base.device.current`
   (el modo de este dispositivo, que decide si se lee la posición); el reloj, el tiempo
   desde la entrada y los totales de hoy corren con un temporizador de un segundo sobre el `as_of` del

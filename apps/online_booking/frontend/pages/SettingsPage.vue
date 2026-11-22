@@ -11,7 +11,9 @@ import { readAsBase64 } from '../../../../base/frontend/lib/upload';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { LogoUploadIn, SettingsOut } from '../operations';
-import { onlineBookingTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('online_booking');
 
 const TEXTS = ['page_title', 'primary_color'] as const;
 const LONG_TEXTS = ['welcome_message', 'confirmation_message', 'cancellation_policy'] as const;
@@ -96,7 +98,7 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
 <template>
   <AppPage
     :title="$t('online_booking.title')"
-    :tabs="onlineBookingTabs(t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('online_booking.tabs.label')"
     content-layout="detail"
   >

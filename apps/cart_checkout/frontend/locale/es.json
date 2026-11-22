@@ -2,9 +2,7 @@
   "cart_checkout": {
     "title": "Carrito y pago",
     "tabs": {
-      "label": "Secciones de Carrito y pago",
-      "carts": "Carritos",
-      "orders": "Pedidos"
+      "label": "Secciones de Carrito y pago"
     },
     "loading": "Cargando…",
     "noResults": "Sin resultados",

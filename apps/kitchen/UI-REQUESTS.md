@@ -28,8 +28,8 @@ sustituto en la misma PR del puntero.
   (`ion:restaurant-outline`; hoy `ion:list-outline`) y el botón de las demás acciones del pie
   (`ion:ellipsis-horizontal`; hoy `ion:ellipsis-vertical`, el mismo «⋮» de las tablas).
 
-Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts` y sus tests
-(`tests/test_apps.py`, `frontend/tabs.test.ts`) y correr `pnpm gen:app-icons`.
+Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), y sus tests
+(`tests/test_apps.py`) y correr `pnpm gen:app-icons`.
 
 ## Componentes y composables
 

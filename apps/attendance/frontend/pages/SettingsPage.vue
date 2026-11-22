@@ -19,7 +19,9 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import type { Radius, SettingsOut } from '../operations';
-import { attendanceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('attendance');
 
 const RADII: readonly Radius[] = [50, 100, 250, 500, 1000];
 /** Six decimals of a degree: about 11 cm, more than any phone reads. */
@@ -130,7 +132,7 @@ async function useMyLocation(): Promise<void> {
 <template>
   <AppPage
     :title="$t('attendance.title')"
-    :tabs="attendanceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('attendance.tabs.label')"
     content-layout="detail"
   >

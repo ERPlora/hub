@@ -7,7 +7,14 @@
 // BASE-F62), followed live as the other two.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, click, errorFrame, flush, mountAttendance } from '../__tests__/mount-attendance';
+import {
+  click,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  mountAttendance,
+} from '../__tests__/mount-attendance';
 import type { CurrentOut, RecordOut, SettingsOut } from '../operations';
 import ClockPage from './ClockPage.vue';
 
@@ -373,4 +380,8 @@ describe("ClockPage on the business's clock (hub#779)", () => {
     await flush();
     expect(out.text('attendance-clock-message')).toBe('Clocked in at 08:00.');
   });
+});
+
+describe('ClockPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup(), [['clock', 'Clock in'], ['records', 'Records']]);
 });

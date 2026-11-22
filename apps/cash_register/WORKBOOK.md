@@ -75,8 +75,8 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
-El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**. Los ajustes solo los abre y los cambia quien
-tiene permiso; los demás, por su dirección, «Sin acceso» (BASE-F118). Los botones que el perfil no puede usar no salen.
+El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**, esta solo para quien puede cambiar los ajustes; los
+demás, por su dirección, ven «Sin acceso» (BASE-F118). Los botones que el perfil no puede usar no salen.
 
 ### Caja
 Aquí abres y cierras los turnos de caja y repasas los anteriores. Arriba ves el efectivo que debería haber ahora en
