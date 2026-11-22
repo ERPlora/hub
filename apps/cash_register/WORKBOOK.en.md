@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8a3c81eefa2f455fd65ea64f50dda3c192170e601ab88b7f152e931caee6ff31 -->
+<!-- generated from WORKBOOK.md sha256:8ba79905339f47f379588733b47ca5c348d819505e2ace8590d1342f72e26a5d -->
 
 ## What it is for and who it is for
 
@@ -488,7 +488,7 @@ In: the chosen session; the number and the document of each sale, from Sales.
 Out: nothing; it is read-only.
 If it fails: "Could not load the session detail" or the error of each table with "Retry". Another employee's
 session does not exist for whoever does not see everyone's: by its link, its number or the assistant, "That cash
-session does not exist." (404 `cash_register.session_not_found`, like one that does not exist), and the same for its
+session does not exist.", like one that does not exist, and the same for its
 movements, its counts and its report.
 Involved: SALE-F28
 

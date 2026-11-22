@@ -494,7 +494,7 @@ Entra: la sesión elegida; el número y el documento de cada venta, de Ventas.
 Sale: nada; es de solo lectura.
 Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabla con «Reintentar». La sesión
 de otro empleado no existe para quien no ve las de todos: por su enlace, su número o el asistente, «Esa sesión
-de caja no existe.» (404 `cash_register.session_not_found`, como una que no existe), y lo mismo sus
+de caja no existe.», como una que no existe, y lo mismo sus
 movimientos, sus arqueos y su informe.
 Implicados: SALE-F28
 
