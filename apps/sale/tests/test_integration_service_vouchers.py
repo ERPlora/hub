@@ -31,6 +31,20 @@ def session_of(line_id) -> Redemption:
     )
 
 
+def shampoo_and_cut(haircut, lucia, product, **cut):
+    """Lucía's voucher of five haircuts and an open check of a shampoo and a haircut (``cut``: more of its line)."""
+    grant = voucher(lucia, haircut)
+    product("Shampoo", "SHA", 1200, "product.generic")
+    order = run(
+        "sale.order.open",
+        {
+            "lines": [{"product": "SHA"}],
+            "service_lines": [{"service_id": str(haircut.id), **cut}],
+        },
+    )
+    return grant, order
+
+
 # ── Paying a line with a voucher (SALE-F27, SERVICE-F22) ─────────────────────────────────────
 
 
@@ -160,15 +174,7 @@ def test_a_line_paid_with_a_voucher_keeps_its_quantity_comp_and_discount(
 def test_only_a_single_unit_service_line_that_is_no_comp_takes_a_voucher(
     haircut, lucia, product
 ):
-    grant = voucher(lucia, haircut)
-    product("Shampoo", "SHA", 1200, "product.generic")
-    order = run(
-        "sale.order.open",
-        {
-            "lines": [{"product": "SHA"}],
-            "service_lines": [{"service_id": str(haircut.id), "quantity": "2"}],
-        },
-    )
+    grant, order = shampoo_and_cut(haircut, lucia, product, quantity="2")
     shampoo, cuts = order.lines
     with pytest.raises(Conflict) as refusal:
         pay_with(order, shampoo.id, grant)
@@ -236,15 +242,7 @@ def test_a_voucher_that_cannot_pay_is_refused_with_its_409_and_the_line_stays(
 def test_charging_spends_the_session_and_the_sale_shows_the_line_at_zero(
     haircut, lucia, product
 ):
-    grant = voucher(lucia, haircut)
-    product("Shampoo", "SHA", 1200, "product.generic")
-    order = run(
-        "sale.order.open",
-        {
-            "lines": [{"product": "SHA"}],
-            "service_lines": [{"service_id": str(haircut.id)}],
-        },
-    )
+    grant, order = shampoo_and_cut(haircut, lucia, product)
     cut = order.lines[1]
     order = pay_with(order, cut.id, grant)
     sale = charge(
