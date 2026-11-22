@@ -21,7 +21,7 @@ Para qué: abrir la caja, llevar la agenda del día (citas que llegan, se mueven
 6. APPOINTMENT-F28 — el aviso de la cita nueva.
 7. APPOINTMENT-F03 — una cita pendiente, confirmada.
 8. APPOINTMENT-F04 — la cita del jueves pasa a las 11:00 con otro profesional.
-9. APPOINTMENT-F22 — una nota en la cita: «trae foto del color».
+9. APPOINTMENT-F22 — una nota en la cita: «trae foto del color»; después, el asistente le dice a Ana el teléfono de la clienta que tiene puesto la cita.
 10. APPOINTMENT-F16 — la hora de comer de Ana, bloqueada.
 11. APPOINTMENT-F07 — llega la clienta de las 10:00: empieza el servicio.
 12. APPOINTMENT-F08 — la cita, completada.

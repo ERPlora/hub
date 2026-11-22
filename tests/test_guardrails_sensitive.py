@@ -51,8 +51,6 @@ COMPENSATION = "staff.view_compensation"
 #: Every unmarked field of an answer whose name says it is sensitive: ``<module>.<Schema>.<field>`` → why. Closed on
 #: purpose: a new one gets its mark, or comes here with a reason a reviewer can weigh.
 UNMARKED: dict[str, str] = {
-    "apps.appointment.schemas.AppointmentOut.customer_email": NOT_MARKED_YET,
-    "apps.appointment.schemas.AppointmentOut.customer_phone": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.CartDetailOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.CartOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.OrderOut.customer_email": NOT_MARKED_YET,

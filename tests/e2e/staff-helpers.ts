@@ -1,8 +1,23 @@
-// What the e2e of Staff share: how a spec picks a member in a staff `Combo`, and how it takes away the people,
-// schedules, time off and roles it made.
-import { expect, type Page } from '@playwright/test';
+// What the e2e of Staff share: how a spec picks a member in a staff `Combo`, the staff record of an account, and how
+// it takes away the people, schedules, time off and roles it made.
+import { type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { psql } from './helpers';
+import { A, api, hubUserIdOf, psql } from './helpers';
+
+/**
+ * The staff record linked to the account `email`, made as `firstName` if it has none: one live record per account, so
+ * one left by another spec is reused. The account must exist: sign it in first.
+ */
+export async function recordOf(context: BrowserContext, email: string, firstName: string): Promise<{ id: string; full_name: string }> {
+  const user = hubUserIdOf(email);
+  expect(user, `${email} has signed in once`).not.toBe('');
+  const existing = await api<{ rows: { id: string; full_name: string }[] }>(context, A, 'GET', `/staff/members?user_id=${user}`);
+  expect(existing.status).toBe(200);
+  if (existing.data.rows[0]) return existing.data.rows[0];
+  const made = await api<{ id: string; full_name: string }>(context, A, 'POST', '/staff/members', { first_name: firstName, last_name: Date.now().toString(36), user_id: user });
+  expect(made.status, JSON.stringify(made.data)).toBe(201);
+  return made.data;
+}
 
 /** Picks, in a staff `Combo`, the option that names `name`, searching the server by `text`. */
 export async function pickMember(page: Page, field: string, text: string, name: string): Promise<void> {
