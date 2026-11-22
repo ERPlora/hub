@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f1627fc5a0053639edea55fd7eee403ddc6883d10fd6b34724872886b308efa1 -->
+<!-- generated from WORKBOOK.md sha256:0aa9ef4ea13f86ca07b50fd482a6ba83b11cd0118e5772c0b79691dd2de82a6c -->
 
 ## What it is for and who it is for
 
@@ -129,7 +129,8 @@ excluded"), **Validity** ("Always", "From Jul 1, 2026", "Until…" or both dates
 (how many it has) and **Status** (Active or Inactive). It sorts by Code, Name, Currency, Group and Tax
 (by default, by name) and filters, with the funnel of the bar, by Code, Name and Currency (by the
 text they contain), Customer group, Tax and Status (on opening, **Active** already chosen;
-**Inactive**, or **All** for both); 50 per page, as a list or as cards.
+**Inactive**, or **All** for both); 50 per page, as a list or as cards. On a card, each value carries its
+name before it ("Code QA-TERRAZA", "Currency EUR", "Prices 1").
 
 - **+** opens **New price list**: **Code** and **Name** (required), **Currency** (the business's),
   **Tax** (Business default by default), **Customer group** (search box; empty = none), **From** and
