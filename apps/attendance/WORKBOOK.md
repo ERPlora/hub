@@ -86,7 +86,8 @@ qué, y «Exportar CSV» descarga el mes.
 #### Detalle
 Se llega desde el menú de la app, «Registros». Una tabla de las jornadas del mes elegido: Fecha,
 Persona, Entrada, Salida, Pausas (min), Trabajado, Estado y Ubicación, con las acciones «Corregir» e
-«Historial» en cada fila; en el móvil, tarjetas. Un empleado ve solo las suyas (sin columna Persona,
+«Historial» en cada fila; en el móvil, tarjetas, con el nombre de cada dato delante («Entrada 21:01»,
+«Pausas (min) 0»). Un empleado ve solo las suyas (sin columna Persona,
 con «Historial»); el responsable ve las de todo el equipo con los filtros «Persona» (con buscador),
 «Mes» y «Estado», y encima de la tabla «Fichados ahora»: cuántas personas tienen la jornada abierta y
 quiénes, desde qué hora y si están en pausa. Arriba, «Exportar CSV». En una pantalla estrecha,

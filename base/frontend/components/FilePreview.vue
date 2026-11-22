@@ -11,6 +11,7 @@ import { computed, nextTick, ref, shallowRef, useTemplateRef, watch } from 'vue'
 
 import {
   cellText,
+  delimiterOf,
   extensionOf,
   formatSize,
   OFFICE_PREVIEW_MAX_BYTES,
@@ -134,7 +135,7 @@ async function draw(viewer: string, file: FileItem, blob: Blob, mine: number): P
   const content = await blob.text();
   if (mine !== loading) return;
   if (viewer === 'table') {
-    const separator = extensionOf(file.name) === 'tsv' ? '\t' : ',';
+    const separator = extensionOf(file.name) === 'tsv' ? '\t' : delimiterOf(content);
     sheets.value = [{ name: file.name, ...sheetRows(parseTable(content, separator, TABLE_PREVIEW_ROWS + 1)) }];
     return;
   }

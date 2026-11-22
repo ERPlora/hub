@@ -157,7 +157,10 @@ const text = (value: unknown): string => (value === null || value === undefined 
               class="task-project-sheet__swatch"
               :style="{ background: project.color }"
             />
-            <span data-testid="task-project-sheet-title">{{ project?.name ?? t('task.loading') }}</span>
+            <span
+              class="task-project-sheet__title"
+              data-testid="task-project-sheet-title"
+            >{{ project?.name ?? t('task.loading') }}</span>
           </span>
         </ion-title>
         <ion-buttons slot="end">
@@ -196,58 +199,59 @@ const text = (value: unknown): string => (value === null || value === undefined 
             data-testid="task-project-sheet-code"
           >{{ t('task.projects.sheet.code', { code: project.code }) }}</span>
         </div>
-        <div
-          v-if="canManage"
-          class="task-project-sheet__row"
-        >
-          <ion-input
-            data-testid="task-project-sheet-name"
-            :value="editName"
-            :label="t('task.projects.form.name')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            :maxlength="200"
-            @ion-input="editName = text($event.detail.value)"
-          />
-          <ion-input
-            data-testid="task-project-sheet-color"
-            :value="editColor"
-            :label="t('task.projects.form.color')"
-            :placeholder="t('task.projects.form.colorPlaceholder')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            :maxlength="7"
-            @ion-input="editColor = text($event.detail.value)"
-          />
-          <ion-button
-            data-testid="task-project-sheet-save"
-            size="small"
-            :disabled="busy || !editName.trim()"
-            @click="save"
-          >
-            {{ update.pending.value ? t('task.saving') : t('task.actions.save') }}
-          </ion-button>
-          <ion-button
-            data-testid="task-project-sheet-toggle"
-            size="small"
-            fill="outline"
-            :disabled="busy"
-            @click="toggleActive"
-          >
-            {{ project.is_active ? t('task.actions.deactivate') : t('task.actions.activate') }}
-          </ion-button>
-          <ion-button
-            data-testid="task-project-sheet-delete"
-            size="small"
-            fill="outline"
-            color="danger"
-            @click="(remove.error.value = null), (deleteOpen = true)"
-          >
-            {{ t('task.actions.delete') }}
-          </ion-button>
-        </div>
+        <template v-if="canManage">
+          <div class="task-project-sheet__fields">
+            <ion-input
+              data-testid="task-project-sheet-name"
+              :value="editName"
+              :label="t('task.projects.form.name')"
+              label-placement="floating"
+              fill="outline"
+              mode="md"
+              :maxlength="200"
+              @ion-input="editName = text($event.detail.value)"
+            />
+            <ion-input
+              data-testid="task-project-sheet-color"
+              :value="editColor"
+              :label="t('task.projects.form.color')"
+              :placeholder="t('task.projects.form.colorPlaceholder')"
+              label-placement="floating"
+              fill="outline"
+              mode="md"
+              :maxlength="7"
+              @ion-input="editColor = text($event.detail.value)"
+            />
+          </div>
+          <div class="task-project-sheet__row">
+            <ion-button
+              data-testid="task-project-sheet-save"
+              size="small"
+              :disabled="busy || !editName.trim()"
+              @click="save"
+            >
+              {{ update.pending.value ? t('task.saving') : t('task.actions.save') }}
+            </ion-button>
+            <ion-button
+              data-testid="task-project-sheet-toggle"
+              size="small"
+              fill="outline"
+              :disabled="busy"
+              @click="toggleActive"
+            >
+              {{ project.is_active ? t('task.actions.deactivate') : t('task.actions.activate') }}
+            </ion-button>
+            <ion-button
+              data-testid="task-project-sheet-delete"
+              size="small"
+              fill="outline"
+              color="danger"
+              @click="(remove.error.value = null), (deleteOpen = true)"
+            >
+              {{ t('task.actions.delete') }}
+            </ion-button>
+          </div>
+        </template>
         <InlineFeedback
           v-if="sheetError"
           tone="danger"
@@ -351,6 +355,12 @@ const text = (value: unknown): string => (value === null || value === undefined 
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+}
+.task-project-sheet__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .task-project-sheet__swatch {
   width: 0.9rem;
@@ -375,6 +385,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
   margin: 0;
   color: var(--ion-color-danger, #c5000f);
   font-weight: 600;
+}
+.task-project-sheet__fields {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
 }
 .task-project-sheet__row {
   display: flex;

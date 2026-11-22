@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fb32cda5fb67fec3555fac16f4cd929546f4e8fb7c1709ac807deb7ccef86683 -->
+<!-- generated from WORKBOOK.md sha256:0781798398e546a306d8e654adaf73550c11ef26d10759b7ab902e8ea872739c -->
 
 ## What it is for and who it is for
 
@@ -135,7 +135,8 @@ Missing tax category", whole while the row has room (also at 1280 px with the si
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
 "Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
 is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
-quantity…"), and does not filter; 50 per page; table or card view.
+quantity…"), and does not filter; 50 per page; table or card view. On a card, each value carries its name
+before it ("SKU QA-AGUA-01", "Price €1.50", "Stock 46").
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on

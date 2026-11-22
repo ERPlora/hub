@@ -147,6 +147,27 @@ describe('FilePreview', () => {
     expect(cells).toEqual(['producto', 'precio', 'Café, solo', '1.20']);
   });
 
+  it('shows a CSV separated by semicolons in its own columns, a decimal comma in one cell', async () => {
+    const csv = 'proveedor;concepto;importe\nQA Proveedor;Harina 25 kg;18,50\nQA Proveedor;Aceite 5 l;27,90\n';
+    vi.mocked(fetchFile).mockResolvedValue({ blob: new Blob([csv]), name: 'compras.csv' });
+    await show(item('compras.csv', 'table'));
+    await flush();
+    const cells = [...(inDoc('file-preview-table')?.querySelectorAll('th, td') ?? [])].map((cell) => cell.textContent);
+    expect(cells).toEqual([
+      'proveedor', 'concepto', 'importe',
+      'QA Proveedor', 'Harina 25 kg', '18,50',
+      'QA Proveedor', 'Aceite 5 l', '27,90',
+    ]);
+  });
+
+  it('splits a TSV by its tabs even when a cell holds a comma', async () => {
+    vi.mocked(fetchFile).mockResolvedValue({ blob: new Blob(['nombre\tnotas, varias\nAna\tsí, claro']), name: 'n.tsv' });
+    await show(item('notas.tsv', 'table'));
+    await flush();
+    const cells = [...(inDoc('file-preview-table')?.querySelectorAll('th, td') ?? [])].map((cell) => cell.textContent);
+    expect(cells).toEqual(['nombre', 'notas, varias', 'Ana', 'sí, claro']);
+  });
+
   // hub#578: a JSON folds by parts, a spreadsheet is a table per sheet and a Word document its formatted text.
   it('shows a JSON as a tree that folds; a broken one as it is, saying so', async () => {
     arrives('{"a":[1,2]}', 'datos.json');
