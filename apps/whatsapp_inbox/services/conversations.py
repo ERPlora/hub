@@ -13,7 +13,7 @@ from apps.customer.queries import find_customer
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.queries.agents import team
-from apps.whatsapp_inbox.queries.conversations import conversation_out, find_conversation
+from apps.whatsapp_inbox.queries.conversations import conversation_out, find_conversation, profile_name
 from apps.whatsapp_inbox.queries.reads import actor_id, person_name
 from apps.whatsapp_inbox.schemas.conversations import AssignIn, ConversationOut, FlaggedOut, LinkCustomerIn, SetStatusIn
 from apps.whatsapp_inbox.schemas.fields import ConversationRefIn
@@ -288,7 +288,8 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
             ctx,
             create.input.model_validate(
                 {
-                    "name": conversation.contact_name or conversation.phone,
+                    # Never the number as the card's name for whoever does not see it: the name is told to everyone.
+                    "name": profile_name(ctx, conversation),
                     "phone": conversation.phone,
                     "source": "whatsapp",
                 }

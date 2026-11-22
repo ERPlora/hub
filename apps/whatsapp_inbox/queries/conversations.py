@@ -133,12 +133,16 @@ def masked(phone: str) -> str:
     return f"{sign}{head}{'•' * hidden}{digits[-4:]}" if hidden > 0 else ""
 
 
+def profile_name(ctx: OperationContext, row: Conversation) -> str:
+    """Who writes, without a card: the WhatsApp name, else the number, masked to whoever does not see the customers'
+    contact details."""
+    return row.contact_name or (row.phone if sees_contact(ctx) else masked(row.phone))
+
+
 def display_name(ctx: OperationContext, row: Conversation) -> str:
-    """Who a conversation is with: the live customer card's name, else the WhatsApp name, else the number, masked to
-    whoever does not see the customers' contact details."""
+    """Who a conversation is with: the live customer card's name, else who writes (``profile_name``)."""
     card = row.customer if row.customer is not None and row.customer.deleted_at is None else None
-    named = (card.name if card else "") or row.contact_name
-    return named or (row.phone if sees_contact(ctx) else masked(row.phone))
+    return (card.name if card else "") or profile_name(ctx, row)
 
 
 def conversation_out(ctx: OperationContext, row: Conversation) -> dict:

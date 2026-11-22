@@ -1041,7 +1041,8 @@ Pasos:
 1. En el panel sin ficha, **Unir a una ficha** busca en Clientes por nombre, teléfono o email; elegir
    una la une.
 2. O **Crear ficha**: crea en Clientes una ficha con el nombre de WhatsApp (o el número) y el número,
-   con origen «WhatsApp», y la une.
+   con origen «WhatsApp», y la une. Si no hay nombre de WhatsApp y quien la crea no ve el contacto de los clientes
+   (BASE-F119), la ficha se llama por el número enmascarado («+346••••2333») y guarda el número en su teléfono.
 3. Con ficha, **Ver ficha** lleva a ella y **Desunir** la quita.
 Entra: la ficha elegida, o nada para crearla.
 Sale: aviso `whatsapp_inbox.conversation.customer_linked`.
@@ -1071,7 +1072,8 @@ El número del cliente solo sale a quien ve el contacto de los clientes (BASE-F1
 las conversaciones y en un mensaje, y donde se nombra a quien escribió sin nombre, enmascarado («+346••••2333»). La
 búsqueda y una referencia («la conversación del 600 111 222») solo le casan con los nombres; preguntar de quién es la
 conversación de un número (`whatsapp_inbox.conversation.by_phone`) se le rechaza como una acción sin permiso (403
-`permission_denied`), y ordenar por el teléfono no existe para nadie. Una automatización lleva los permisos de dato
+`permission_denied`), igual que escribir a un número tecleado (`to` de `message.send` y `message.notify`): la respuesta
+diría de quién es. Contesta eligiendo la conversación. Ordenar por el teléfono no existe para nadie. Una automatización lleva los permisos de dato
 (FLOW-F12), así que sus avisos y respuestas por WhatsApp siguen leyendo el número.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
@@ -1258,7 +1260,8 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 
 - **El número del cliente** (BASE-F119): `phone` de `ConversationOut` (el campo `PHONE` de
   `apps/customer/schemas/contact.py`), de `MessageGetOut`, de `ByPhoneOut` y de `ClaimErasureOut` lleva la marca
-  `CUSTOMER_CONTACT`, y también la entrada de `conversation.by_phone`. `display_name` (lista, ficha, mensaje, avisos y
+  `CUSTOMER_CONTACT`, y también la entrada de `conversation.by_phone`, `to` de `message.send` y `phone` de
+  `message.notify`. El nombre de la ficha creada desde la conversación sale de `profile_name`. `display_name` (lista, ficha, mensaje, avisos y
   la tarjeta del asistente) cae al número solo con `sees_contact` de Clientes; si no, a `masked` (tres primeras cifras
   y cuatro últimas, como Wati). La búsqueda (`_searched`, con `holds` de Clientes sobre la ficha unida), la referencia
   (`_matching_ids`) y el orden «Contacto» solo miran el número con el permiso; el orden por teléfono no existe. La

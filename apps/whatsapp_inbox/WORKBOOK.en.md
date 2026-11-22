@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d1a468eb46ba1d3e02e6775fd089d86565efaa63266c1ac4f8da9de5bede6305 -->
+<!-- generated from WORKBOOK.md sha256:b9cacfba46ad8b2ebd2a752431eab01fca0191251cf9ba024edbae6e3cb1a5c3 -->
 
 ## What it is for and who it is for
 
@@ -1018,7 +1018,8 @@ Screen: Inbox
 Steps:
 1. In the panel with no card, **Link to a card** searches Customers by name, phone or email; choosing one links it.
 2. Or **Create card**: it creates a card in Customers with the WhatsApp name (or the number) and the number, with
-   "WhatsApp" as its source, and links it.
+   "WhatsApp" as its source, and links it. With no WhatsApp name and made by whoever does not see the customers'
+   contact details (BASE-F119), the card is named by the masked number ("+346••••2333") and keeps the number in its phone.
 3. With a card, **View card** leads to it and **Unlink** removes it.
 In: the chosen card, or nothing to create it.
 Out: notice `whatsapp_inbox.conversation.customer_linked`.
@@ -1047,7 +1048,8 @@ The customer's number only reaches whoever sees the customers' contact details (
 in the conversations and in a message, and where whoever wrote without a name is named, masked ("+346••••2333"). The
 search and a reference ("the conversation of 600 111 222") only match the names for them; asking whose conversation a
 number is (`whatsapp_inbox.conversation.by_phone`) is refused to them as an action without permission (403
-`permission_denied`), and sorting by the phone does not exist for anyone. An automation carries the data permissions
+`permission_denied`), and so is writing to a typed number (`to` of `message.send`, and `message.notify`): the answer
+would tell whose it is. They answer by choosing the conversation. Sorting by the phone does not exist for anyone. An automation carries the data permissions
 (FLOW-F12), so its notices and answers by WhatsApp keep reading the number.
 
 ### What it offers: reads (they read, they change nothing)

@@ -203,6 +203,40 @@ def test_asking_whose_conversation_a_number_is_is_refused_without_it(chats, lack
     assert (found["phone"], found["conversation_id"]) == (ANA, str(chats[ANA].id))
 
 
+@respx.mock
+def test_writing_to_a_typed_number_is_refused_without_it(chats, lacking, as_role, client, django_capture_on_commit_callbacks):
+    # A number typed to write to would tell whose it is, as asking for its conversation does: the answer names it.
+    connect()
+    respx.post("http://saas.test/internal/whatsapp/send").mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
+    to_a_number = ("/whatsapp_inbox/messages/send", {"to": "600 111 222", "text": "Hola", "client_message_id": "0199e000-0000-7000-8000-0000000000c2"})
+    a_notice = ("/whatsapp_inbox/messages/notify", {"phone": ANA, "text": "Hola"})
+    as_role("hub_employee")
+    for path, payload in (to_a_number, a_notice):
+        refused = post(client, path, payload)
+        assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")
+    assert not Message.objects.filter(direction="outbound").exists()
+    as_role("hub_owner")
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
+        sent = post(client, *to_a_number)
+    assert (sent.status_code, sent.json()["conversation_id"]) == (201, str(chats[ANA].id))
+    assert post(client, *a_notice).json()["conversation_id"] == str(chats[ANA].id)
+
+
+def test_a_card_made_from_a_nameless_conversation_takes_the_number_as_its_name_only_from_whoever_sees_it(lacking, as_role, client):
+    receive("wamid.1", phone=NAMELESS[1:], contact_name="")
+    receive("wamid.2", phone="34699000000", contact_name="")
+    ids = {row.phone: str(row.id) for row in Conversation.objects.all()}
+    as_role("hub_employee")
+    made = post(client, "/whatsapp_inbox/conversations/link_customer", {"id": ids[NAMELESS], "create": True}).json()
+    assert (made["display_name"], made["customer_name"], made["phone"]) == (MASKED, MASKED, None)
+    as_role("hub_owner")
+    made = post(client, "/whatsapp_inbox/conversations/link_customer", {"id": ids["+34699000000"], "create": True}).json()
+    assert (made["display_name"], made["customer_name"], made["phone"]) == ("+34699000000",) * 3
+    # Both cards keep the number in their phone, which Customers gives only to whoever sees it.
+    told_by_customers = {row["name"]: row["phone"] for row in get(client, "/customer/customers").json()["rows"]}
+    assert told_by_customers == {MASKED: NAMELESS, "+34699000000": "+34699000000"}
+
+
 def test_nobody_sorts_the_inbox_by_the_number(chats, as_role, client):
     # The order would tell whose number comes first to whoever does not see the numbers.
     as_role("hub_owner")
