@@ -22,10 +22,9 @@
 923 apps/combo/services.py ERPlora/erplora-next#74
 542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
-1113 apps/customer/queries/__init__.py ERPlora/erplora-next#74
-1300 apps/customer/schemas/__init__.py ERPlora/erplora-next#74
-1100 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
-2666 apps/customer/tests/test_services.py ERPlora/erplora-next#74
+1087 apps/customer/queries/__init__.py ERPlora/erplora-next#74
+1082 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
+2641 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 474 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -68,9 +67,8 @@
 609 apps/schedule/services.py ERPlora/erplora-next#74
 686 apps/service/frontend/operations.d.ts ERPlora/erplora-next#74
 622 apps/service/models.py ERPlora/erplora-next#74
-1446 apps/service/schemas/__init__.py ERPlora/erplora-next#74
-1238 apps/service/tests/test_queries.py ERPlora/erplora-next#74
-1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
+1222 apps/service/tests/test_queries.py ERPlora/erplora-next#74
+1090 apps/service/tests/test_services.py ERPlora/erplora-next#74
 612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 1158 apps/staff/queries/__init__.py ERPlora/erplora-next#74

@@ -11,7 +11,7 @@ from apps.customer.queries import find_customer
 from apps.service.models import Grant, Redemption
 from apps.service.queries.catalog import find_service
 from apps.service.queries.grants import Balance, balance, grants, live_sessions
-from apps.service.schemas import TenderOptionPage, TenderOptionsIn
+from apps.service.schemas.tender import TenderOptionPage, TenderOptionsIn
 
 
 @operation(

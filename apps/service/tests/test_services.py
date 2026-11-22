@@ -23,16 +23,11 @@ from apps.service.models import (
     Service,
     ServiceSettings,
 )
-from apps.service.schemas import (
-    AdjustIn,
-    AssignmentPatchIn,
-    CategoryPatchIn,
-    MemberReleaseIn,
-    PackagePatchIn,
-    ReassignIn,
-    RedeemIn,
-    VoidIn,
-)
+from apps.service.schemas.assignments import AssignmentPatchIn, MemberReleaseIn
+from apps.service.schemas.categories import CategoryPatchIn
+from apps.service.schemas.customer_reactions import ReassignIn
+from apps.service.schemas.grants import AdjustIn, RedeemIn, VoidIn
+from apps.service.schemas.packages import PackagePatchIn
 
 from .conftest import (
     HUB_DB, ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption,

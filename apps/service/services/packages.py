@@ -12,7 +12,8 @@ from apps.service.models import Package, PackageItem, Service
 from apps.service.queries.catalog import find_service
 from apps.service.queries.packages import find_package, load_package
 from apps.service.queries.reads import held_rows
-from apps.service.schemas import SERVICE_REPEATED, DeletedOut, PackageIn, PackageOut, PackagePatchIn, PackageRefIn
+from apps.service.schemas.fields import DeletedOut, PackageRefIn
+from apps.service.schemas.packages import SERVICE_REPEATED, PackageIn, PackageOut, PackagePatchIn
 from apps.service.services.writes import _actor, _apply, _changes, _refuse, _save_unique, _tidy
 
 PACKAGE_NAME_TAKEN = _("There is already a package with that name. Pick another name.")

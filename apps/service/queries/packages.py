@@ -9,7 +9,8 @@ from live.operations import operation
 
 from apps.service.models import Package, PackageItem
 from apps.service.queries.reads import _page, _resolve
-from apps.service.schemas import PackageListIn, PackageOut, PackagePage, PackageRefIn
+from apps.service.schemas.fields import PackageRefIn
+from apps.service.schemas.packages import PackageListIn, PackageOut, PackagePage
 from base.ordering import list_order_for
 
 PACKAGE_NOT_FOUND = _("That package does not exist in this business.")

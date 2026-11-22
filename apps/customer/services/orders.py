@@ -8,7 +8,7 @@ from live.outbox import record_event
 from apps.customer import events
 from apps.customer.models import OrderLink
 from apps.customer.queries import find_customer
-from apps.customer.schemas import OrderCustomerOut, OrderLinkIn
+from apps.customer.schemas.orders import OrderCustomerOut, OrderLinkIn
 
 
 @operation(

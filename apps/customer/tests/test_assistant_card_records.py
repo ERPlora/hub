@@ -14,7 +14,7 @@ from live.operations import get, registry
 from pydantic import ValidationError
 
 from apps.customer.models import Activity, Customer, CustomerGroup, CustomerTag, CustomField
-from apps.customer.schemas import A_CUSTOMER_REFERENCE
+from apps.customer.schemas.fields import A_CUSTOMER_REFERENCE
 from base import assistant
 from base.schemas.assistant import names
 from base.tenancy.context import use_hub

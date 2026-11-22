@@ -8,7 +8,8 @@ from live.outbox import record_event
 from apps.customer import events
 from apps.customer.models import CustomerGroup
 from apps.customer.queries import find_group
-from apps.customer.schemas import DeletedOut, GroupIn, GroupPatchIn, GroupRefIn, GroupRow
+from apps.customer.schemas.fields import DeletedOut, GroupRefIn
+from apps.customer.schemas.groups import GroupIn, GroupPatchIn, GroupRow
 from apps.customer.services.writes import _patched, _save_named, _with_count
 
 GROUP_NAME_TAKEN = _("There is already a group with that name. Choose another name.")

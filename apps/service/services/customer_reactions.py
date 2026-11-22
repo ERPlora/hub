@@ -11,7 +11,7 @@ from apps.customer.models import Customer
 from apps.service import events
 from apps.service.models import Grant, GrantAdjustment, Redemption
 from apps.service.queries.reads import SYSTEM
-from apps.service.schemas import ForgetCustomerIn, ForgottenOut, ReassignedOut, ReassignIn
+from apps.service.schemas.customer_reactions import ForgetCustomerIn, ForgottenOut, ReassignedOut, ReassignIn
 
 CUSTOMER_UNAVAILABLE = _("That customer's card does not exist in this business.")
 

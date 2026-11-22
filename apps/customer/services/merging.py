@@ -26,7 +26,8 @@ from apps.customer.queries import (
     health_consent,
     load_detail,
 )
-from apps.customer.schemas import CustomerDetailOut, MergeIn
+from apps.customer.schemas.cards import CustomerDetailOut
+from apps.customer.schemas.merging import MergeIn
 from apps.customer.services.writes import _actor, lock_rows
 
 SAME_CUSTOMER = _("Pick another card: a card cannot be merged into itself.")
