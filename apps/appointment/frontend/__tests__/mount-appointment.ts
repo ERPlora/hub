@@ -26,7 +26,8 @@ const ALL = [
   'appointment.manage_schedule',
   'appointment.manage_settings',
 ];
-const READ_OTHERS = ['customer.view', 'customer.manage', 'service.view_service', 'staff.view', 'schedule.view'];
+// `base.view_customer_contact`: the customers' email and phone, which the four roles see (base/apps.py).
+const READ_OTHERS = ['customer.view', 'customer.manage', 'base.view_customer_contact', 'service.view_service', 'staff.view', 'schedule.view'];
 
 /** Owner or admin: `appointment.*` (apps.py `role_permissions`), listed one by one. */
 export const OWNER: SessionMe = withMenu('appointment', {
@@ -53,6 +54,7 @@ export const EMPLOYEE: SessionMe = withMenu('appointment', {
     'appointment.change_own_appointment',
     'appointment.view_schedule',
     'customer.view',
+    'base.view_customer_contact',
     'service.view_service',
     'staff.view',
     'schedule.view',
