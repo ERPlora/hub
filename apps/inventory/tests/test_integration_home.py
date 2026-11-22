@@ -129,9 +129,11 @@ def test_a_manager_is_offered_the_four_panels_followed_live(general):
 
 
 @HUB_DB
-def test_an_employee_reads_the_panels_as_the_inventory_panel(general):
-    # INVENTORY-F17's actors include the employee: the Home shows them what Inventory → Panel already shows them.
-    assert list(panels(ctx_for("hub_employee"))) == PANELS
+def test_an_employee_reads_the_panels_as_the_inventory_panel_but_the_stock_value(general):
+    # INVENTORY-F17's actors include the employee: the Home shows them what Inventory → Panel already shows them, and
+    # the stock's value is at cost, which they do not see (base.view_costs).
+    assert list(panels(ctx_for("hub_employee"))) == [key for key in PANELS if key != "inventory.value"]
+    assert "inventory.value" in panels(ctx_for("hub_manager"))
 
 
 @HUB_DB

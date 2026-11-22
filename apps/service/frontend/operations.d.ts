@@ -144,7 +144,7 @@ export interface ServiceOut {
   price: number;
   min_price: number | null;
   max_price: number | null;
-  cost: number;
+  cost: number | null;
   duration_minutes: number;
   buffer_before: number;
   buffer_after: number;

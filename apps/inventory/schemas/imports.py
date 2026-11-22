@@ -9,6 +9,7 @@ from pydantic import StringConstraints
 
 from apps.inventory.schemas.fields import FILE_ROWS, MAX_BATCH, _text
 from base.allergens import AllergensCellIn
+from base.sensitive import COSTS
 
 ImportStatus = Literal["ready", "created", "skipped", "failed"]
 
@@ -25,7 +26,7 @@ class ProductImportRowIn(AllergensCellIn):
     price: Cell = Field(
         "", description="Price cell, as written (2,20 · 1.234,56 · 2.20 €)."
     )
-    cost: Cell = Field("", description="Cost cell, as written.")
+    cost: Cell = Field("", description="Cost cell, as written; only whoever sees the costs sends one.", json_schema_extra=COSTS)
     stock: Cell = Field("", description="Stock cell, as written.")
     low_stock_threshold: Cell = Field(
         "",

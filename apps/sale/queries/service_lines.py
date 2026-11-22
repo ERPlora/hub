@@ -13,6 +13,7 @@ from apps.sale.queries.line_parts import GRID_FALLBACK, check_grid
 from apps.sale.queries.order_lines import OPEN_PRICE_PERMISSION, new_line
 from apps.sale.queries.other_apps import call_app, call_services
 from apps.sale.schemas.lines import ServiceLineFields
+from base.sensitive import recording_costs
 
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
@@ -156,8 +157,9 @@ def freeze_service_line(
     price: the one the appointment booked (``booked_price``, checked); else, of a fixed-price service,
     the professional's own or the service's; else the amount typed, within the service's range."""
     try:
+        # The line keeps the cost even when whoever sells does not see it (base.view_costs): it values the comps.
         service = call_services(
-            ctx, "service.service.get", {"id": data.service_id, "service": data.service}
+            recording_costs(ctx), "service.service.get", {"id": data.service_id, "service": data.service}
         )
     except NotFound:
         raise Conflict(

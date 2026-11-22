@@ -10,8 +10,8 @@ The door (:class:`KeyDoor`) asks ``base.services.api_keys.authenticate_api_key``
 the request's hub — the hub's own database: a key of another business does not exist there — and then this module's
 rules: what the key may do (read reaches the published queries of an app, write its published commands), its pace
 (requests a minute) and the brake on an address that tries tokens nobody issued (``AttemptLimit``, as the PIN's).
-A caller that passes gets the operation's own permission and nothing more (:class:`KeyCaller`); the operation then
-checks, as for anyone, the hub, the app's right and that permission.
+A caller that passes gets the operation's own permission and base's data permissions, the data whoever makes a key
+sees (:class:`KeyCaller`); the operation then checks, as for anyone, the hub, the app's right and that permission.
 """
 
 import hashlib
@@ -85,8 +85,8 @@ def over_pace(key_id: object, rate_per_minute: int, *, now: float | None = None)
 
 @dataclass(frozen=True)
 class KeyCaller:
-    """Who calls when a key does: the key, by its name. It holds the one permission of the operation it opened and
-    is no person (no ``get_username``): what an app writes as «who did it» is ``str(caller)``."""
+    """Who calls when a key does: the key, by its name. It holds the permission of the operation it opened and base's
+    data permissions, and is no person (no ``get_username``): what an app writes as «who did it» is ``str(caller)``."""
 
     key_id: str
     name: str
