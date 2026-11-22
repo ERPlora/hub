@@ -34,15 +34,15 @@ import re
 from pathlib import Path, PurePosixPath
 
 from django.conf import settings
-from orm_doors import is_door
+from orm_doors import is_door, is_schema_module
 
 HUB_DIR = Path(__file__).resolve().parent.parent
 SOURCE_ROOTS = ("base", "control", "apps")
 
 # ── (a) Who may touch the ORM ──────────────────────────────────────────────────────────────────
 
-#: Owners of the ORM that are no path to the data from the API: ``models.py`` declares the schema
-#: (managers, QuerySets, constraints with ``Q``); ``admin.py`` is Django's admin, the second write
+#: Owners of the ORM that are no path to the data from the API: ``models.py``, or a module of a ``models/`` package,
+#: declares the schema (managers, QuerySets, constraints with ``Q``); ``admin.py`` is Django's admin, the second write
 #: path the platform accepts, whose actions call ``services.py``; an ``admin_<part>.py`` beside it is a
 #: part of that admin, which its ``admin.py`` registers.
 ORM_OWNERS = frozenset({"models.py", "admin.py"})
@@ -207,6 +207,7 @@ def orm_rule_applies(path: PurePosixPath) -> bool:
     return not (
         is_door(path)
         or path.name in ORM_OWNERS
+        or is_schema_module(path)
         or ADMIN_PART.fullmatch(path.name)
         or is_migration(path)
         or str(path) in ORM_EXCEPTIONS
@@ -498,6 +499,9 @@ def test_orm_rule_skips_the_doors_the_owners_migrations_and_the_exceptions():
             "apps/demo/services.py",
             "apps/demo/queries.py",
             "apps/demo/models.py",
+            "base/models/access.py",
+            "apps/demo/models/__init__.py",
+            "apps/demo/models/kinds/tag.py",
             "apps/demo/admin.py",
             "control/admin_clusters.py",
             "apps/demo/migrations/0001_initial.py",
@@ -512,6 +516,7 @@ def test_orm_rule_skips_the_doors_the_owners_migrations_and_the_exceptions():
     }
 
     assert [path for path, scanned in applies.items() if scanned] == [
+        "apps/demo/models/kinds/tag.py",
         "apps/demo/api.py",
         "apps/demo/live.py",
         "apps/demo/schemas.py",
