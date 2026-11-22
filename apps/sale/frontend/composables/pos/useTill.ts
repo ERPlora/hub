@@ -1,6 +1,6 @@
 // `useTill()`: the check on screen and every write to it (SALE-F01, F09, F13–F18, F38; the product's «cart →
-// order» mapping, server first). The first line opens the check (`sale.order.open`, with the title typed
-// before and the line sealed with the chosen professional) and the device remembers it; the next lines
+// order» mapping, server first). The first line opens the check (`sale.order.open`, with the title typed before,
+// who serves it and the line sealed with the chosen professional) and the device remembers it; the next lines
 // go to it; a second tap on a product raises its pending line (same professional, no note, discount or
 // comp). Writes run ONE AT A TIME (five quick taps never open five checks) and each one reads the check
 // as the previous answer left it. The screen shows only what the operations answer — the check comes
@@ -34,6 +34,8 @@ export interface TillOptions {
   onOpened?: (orderId: string) => void;
   /** The check on screen was joined with another (SALE-F24): the till now shows that one; the page reads its customer. */
   onJoined?: (orderId: string) => void;
+  /** What else a new check opens with: who serves it (SALE-F16), chosen before it existed. */
+  opening?: () => { staff_id?: string };
 }
 
 export interface Till {
@@ -55,11 +57,9 @@ export interface Till {
   addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult>;
   /** A menu of Menus with the dishes picked (SALE-F12): always a line of its own; Menus prices it. */
   addComboLine(combo: { id: string }, staffId: string | null, choices: readonly ComboChoiceIn[]): Promise<WriteResult>;
-  /** Kitchen sends what is pending as a new round, normal or rush (SALE-F20, KITCHEN-F18); the check is read
-   *  back with its round. */
-  /** `printed` is false when the round was sent but its sheet did not reach the printer (KITCHEN-F08). */
-  /** `waiter`: who attends the check («Atiende»), named on the ticket; none: the kitchen names who sends it. */
-  sendToKitchen(rush: boolean, waiter?: string | null): Promise<WriteResult & { round?: number; printed?: boolean; code?: string }>;
+  /** Kitchen sends what is pending as a new round, normal or rush (SALE-F20, KITCHEN-F18), naming who serves the check;
+   *  the check is read back with its round. `printed` is false when its sheet did not reach the printer (KITCHEN-F08). */
+  sendToKitchen(rush: boolean): Promise<WriteResult & { round?: number; printed?: boolean; code?: string }>;
   setQuantity(line: OrderLineOut, quantity: string): Promise<void>;
   toggleGift(line: OrderLineOut): Promise<void>;
   setNote: ReturnType<typeof useLineNote>;
@@ -167,7 +167,7 @@ export function useTill(options: TillOptions): Till {
   }
 
   const staffOf = (staffId: string | null) => (staffId ? { staff_id: staffId } : {});
-  const labelOf = () => (pendingLabel.value ? { label: pendingLabel.value } : {});
+  const labelOf = () => ({ ...(pendingLabel.value ? { label: pendingLabel.value } : {}), ...options.opening?.() });
 
   async function opened(write: () => Promise<OrderOut>): Promise<void> {
     const created = await write();
@@ -265,12 +265,12 @@ export function useTill(options: TillOptions): Till {
     });
   }
 
-  function sendToKitchen(rush: boolean, waiter?: string | null): Promise<WriteResult & { round?: number; printed?: boolean; code?: string }> {
+  function sendToKitchen(rush: boolean): Promise<WriteResult & { round?: number; printed?: boolean; code?: string }> {
     return serial(async () => {
       const id = order.value?.id ?? check.id.value;
       if (!id) return { ok: false, message: t('sale.pos.kitchen.notSent') };
       try {
-        const ticket = await kitchenSend.run({ order_id: id, priority: rush ? 'rush' : 'normal', ...(waiter ? { waiter } : {}) });
+        const ticket = await kitchenSend.run({ order_id: id, priority: rush ? 'rush' : 'normal' });
         accept(await readCheck.run({ order_id: id }));
         return { ok: true, round: ticket.round_no, printed: !ticket.print_error };
       } catch (error) {

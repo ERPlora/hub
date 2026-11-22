@@ -100,6 +100,7 @@
       "lineChangeFailed": "That change to the line could not be saved. The line is back as it was.",
       "lineNotSaved": "Couldn't save that item — tap again",
       "lineStaffFailed": "The line could not be moved to another professional. It stays with the one it had.",
+      "staffSaveFailed": "Who serves the check could not be changed. It stays with whoever served it.",
       "discountTicket": "Ticket discount",
       "total": "Total",
       "printPrebill": "Print bill",
