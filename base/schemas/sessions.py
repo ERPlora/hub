@@ -50,6 +50,16 @@ class SessionDemo(Schema):
     expires_at: dt.datetime
 
 
+class SessionAccessIn(Schema):
+    pass
+
+
+class SessionAccessOut(Schema):
+    """A fingerprint of what the session may do: it changes exactly when its permissions do."""
+
+    key: str
+
+
 class SessionMeOut(Schema):
     user: SessionUser | None
     scope: SessionScope

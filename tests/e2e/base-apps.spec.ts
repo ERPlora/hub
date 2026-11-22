@@ -2,12 +2,10 @@
 // and AppBlockedPage and base/tests/test_entitlement.py cover it.
 // The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`, signed) and `a`'s photo is put
 // back after the run.
-import { createHmac } from 'node:crypto';
-
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, turnOn, untilStill } from './helpers';
-import { STACK } from './stack';
+import { keepPhotoOfA, type PhotoOfA } from './saas-photo';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -15,52 +13,20 @@ const VIEWPORTS = {
   1440: { width: 1440, height: 900 },
 } as const;
 
-/** The secret `/internal` is signed with; the local default of both projects. */
-const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
-/** The copy the run keeps of `a`'s photo. */
-const BACKUP = 'e2e_base_apps_photo_before';
-
-let hubId = '';
-/** Monotonic photo versions: an older one changes nothing. */
-let version = Math.floor(Date.now() / 1000);
+let photo: PhotoOfA | undefined;
 
 /** The SaaS's photo of hub `a`, with `plan` (its limits; 0 = none) or without one. */
 async function pushPhoto(plan?: { slug: string; max_users: number; max_devices: number }): Promise<void> {
-  version += 1;
-  const body = JSON.stringify({ hub_id: hubId, slug: 'a', version, ...(plan ? { plan } : {}) });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${hubId}/state`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
-  const answer = await response.text();
-  expect(response.status, answer).toBe(200);
-  expect(JSON.parse(answer)).toMatchObject({ applied: true, version });
+  if (!photo) throw new Error('No photo of a was kept before the run.');
+  await photo.send(plan ? { plan } : {});
 }
 
 test.beforeAll(() => {
-  hubId = psql("select id from base_hub where slug = 'a'");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(hubId)) {
-    throw new Error(`The registry of DB_NAME=${STACK.database} has no hub a (got ${JSON.stringify(hubId)}): run node tests/e2e/database.ts.`);
-  }
-  version = Math.max(version, Number(psql(`select state_version from base_hub where id = '${hubId}'`)));
-  psql(
-    [
-      `drop table if exists ${BACKUP}`,
-      `create table ${BACKUP} as select id, state, state_version from base_hub where id = '${hubId}'`,
-    ].join('; '),
-  );
+  photo = keepPhotoOfA('e2e_base_apps_photo_before');
 });
 
 test.afterAll(() => {
-  psql(
-    [
-      `update base_hub h set state = b.state, state_version = b.state_version from ${BACKUP} b where b.id = h.id`,
-      `drop table ${BACKUP}`,
-    ].join('; '),
-  );
+  photo?.putBack();
 });
 
 /** The capture of a flow, once the screen settled and nothing of it is still loading. */
