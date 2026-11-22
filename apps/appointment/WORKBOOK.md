@@ -125,14 +125,14 @@ profesional**, además, **Día · Semana**.
 - Botón **Añadir cita** → **Nueva cita**: Cliente (buscador «Buscar por nombre, teléfono, email…»; si no está,
   **+ Nuevo cliente** la crea con nombre y teléfono sin salir), Servicios (uno o varios, en orden),
   Profesional (solo los que hacen todos esos servicios), Día, Hora (con las **Horas libres** como
-  botones), Min. (la suma de las duraciones, cambiable), Notas para la clienta y Notas internas. Min.
-  y el **Total** salen con la duración y el precio propios del profesional elegido para cada servicio
-  (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva. Los
-  importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
+  botones), «Duración (min)» (la suma de las duraciones, cambiable), Notas para la clienta y Notas
+  internas. «Duración (min)» y el **Total** salen con la duración y el precio propios del profesional
+  elegido para cada servicio (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que
+  la cita reserva. Los importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
   Polonia; «—» mientras el negocio no contesta, nunca en euros ni con decimales supuestos) y salen agrupados desde cuatro
   cifras («1.234,56 €»; en inglés, «€1,234.56»).
   Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
-- **Editar** → **Editar la cita**: Día, Hora, Min., Servicios, Profesional, las notas y **Guardar
+- **Editar** → **Editar la cita**: Día, Hora, «Duración (min)», Servicios, Profesional, las notas y **Guardar
   cambios**; debajo, el historial. La clienta no se cambia.
 - Diálogos: **Cita solapada** (**Reservar igual** / **Elegir otra hora**), **Editar cita periódica**
   (**Solo esta cita** / **Esta y todas las siguientes**), **Cancelar la cita** (motivo opcional) y
@@ -143,7 +143,7 @@ Tercer segmento de la Agenda. Tabla: Cliente, Servicio, Profesional, Repetición
 semana · lunes · 11:00»), Empieza, Termina («Sin fin», «Tras {n} citas» o la fecha) y **Activa**
 (interruptor). Por fila: **Editar serie**, **Reservar citas** y **Borrar** (pide confirmación). El
 botón de añadir abre **Nueva cita periódica** (Cliente, Servicios, Profesional, Repetición, Día de la
-semana, Empieza el, Hora, Min., «Termina el (opcional)», «Número de citas (opcional)») con **Crear
+semana, Empieza el, Hora, «Duración (min)», «Termina el (opcional)», «Número de citas (opcional)») con **Crear
 cita periódica**; editar abre **Editar cita periódica** con «Desde» y **Guardar de esta cita en
 adelante**; el buscador es «Buscar cliente o servicio…». Tras reservar sale solo lo que ha pasado: «{n}
 citas reservadas» y, si alguna no cupo, «{n} no se han podido reservar» con cada fecha y su motivo (si ya
@@ -239,7 +239,7 @@ Pasos:
 2. Elige la clienta (se busca por nombre, teléfono o email, y por teléfono o email solo quien ve el contacto de
    los clientes; si no está, **+ Nuevo cliente** la crea con nombre y teléfono), uno o varios servicios y el profesional. Con servicios elegidos solo salen los
    profesionales **Activos y Reservables que los hacen todos**; si un servicio no tiene a nadie
-   asignado, para ese servicio vale todo el equipo reservable. «Min.» se rellena con la suma de las
+   asignado, para ese servicio vale todo el equipo reservable. «Duración (min)» se rellena con la suma de las
    duraciones (la propia del profesional si la tiene, si no la del catálogo).
 3. Escribe el día y toca una de las **Horas libres** (o escribe otra hora).
 4. Pulsa **Añadir cita**. Si el negocio permite solapes y esa hora choca con otra cita del
@@ -310,7 +310,7 @@ Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Editar** (o toca la cita en «Por profesional»): se abre «Editar la cita».
-2. Cambia Día, Hora, Min., Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
+2. Cambia Día, Hora, «Duración (min)», Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
    serie, elige **Solo esta cita** o **Esta y todas las siguientes**. Desde el
    mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió).
 3. Atajo: en «Por profesional» arrástrala a otra hora, otro día u otra fila. Arrastrando no se lleva a
