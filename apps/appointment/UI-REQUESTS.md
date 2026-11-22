@@ -17,6 +17,10 @@ F28) ya están hechos y salen de esta lista.
 Los dos están registrados en `packages/ui/src/shell/icons.ts` desde ui#27. Al usarlos, cambiar a la vez
 `frontend/components/AppointmentList.vue` (`ICONS`) y su test.
 
+- `DateField` y `TimeField` — el día y la hora de **Nueva cita periódica** (`frontend/components/SeriesFormModal.vue`),
+  en el idioma y los colores de la app. Hoy: `ion-input type="date"` y `type="time"`. La barra de la agenda y
+  «Nueva cita» / «Editar la cita» ya los usan; al cambiar este, conservar sus `data-testid`.
+
 ## Icono que falta (`appointment:ui-icons`; registrarlo en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
 - `ion:repeat-outline` — segmento **Periódicas**. Hoy: `ion:sync-outline`.
@@ -34,20 +38,6 @@ Al registrarlo, cambiar `frontend/components/AgendaToolbar.vue` (`VIEWS`) y su t
   movimiento con flechas (la duración se cambia en «Editar la cita»).
 - Al llegar: sustituir los dos componentes y sus tests por el `Scheduler`, conservando los `data-testid`
   que usan los e2e (`appointment-grid-*`, `appointment-week-*`).
-
-## `DateField` y `TimeField` en `@erplora/ui/components`, el día y la hora en el idioma del negocio (`appointment:ui-date-time-fields`)
-
-- **Qué**: el campo de fecha y el de hora del producto actual (appointments#205, #214, #223): un campo de
-  texto pintado en el idioma del negocio (`23/11/2026` en español, `11/23/2026` en inglés; `14:30` o
-  `02:30 PM`), con un botón de calendario que abre un selector compacto de un mes (la semana empieza
-  donde la empieza el idioma; flechas y Enter), en vez del `input` nativo, que pinta el idioma del
-  dispositivo y no el del negocio. Es la misma petición que `staff:ui-time-date-fields` y
-  `attendance:ui-datetime-field`.
-- **Hoy**: `ion-input type="date"` y `type="time"` (como Horarios, Personal, Ventas e Impuestos) en la
-  barra de la agenda (`appointment-toolbar-calendar`), «Nueva cita» / «Editar la cita» y «Nueva cita
-  periódica». El valor que viaja es el mismo (`AAAA-MM-DD`, `HH:MM`); solo cambia cómo se pinta si el
-  dispositivo está en otro idioma que el negocio.
-- Al llegar: cambiar esos campos conservando sus `data-testid`.
 
 ## De Personal: no dar de baja con citas futuras sin decidir qué pasa con ellas (`appointment:staff-block-termination`)
 

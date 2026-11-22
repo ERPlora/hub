@@ -246,7 +246,8 @@
         "less": "Una menos de {name}",
         "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo.",
         "chooseRange": "Elige de {n} a {max}",
-        "atLeast": "Elige al menos {n}"
+        "atLeast": "Elige al menos {n}",
+        "loading": "Cargando suplementos…"
       },
       "menu": {
         "badge": "Menú",

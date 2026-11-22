@@ -1,5 +1,6 @@
 // Fixtures of the till's tests: what the server answers (a product of Inventory, an open check with its
 // lines, a preview, the till settings, a page) and the browser's localStorage the test environment lacks.
+import type { SaleComboOut } from '../../../../../combo/frontend/operations';
 import type { CategoryOut, ProductOut } from '../../../../../inventory/frontend/operations';
 import { item as kitchenDish } from '../../../../../kitchen/frontend/__tests__/kitchen';
 import type { ItemOut, TicketOut } from '../../../../../kitchen/frontend/operations';
@@ -213,6 +214,20 @@ export function deferred<T = Response>() {
 
 /** The server's refusal envelope. */
 export const refused = (code: string, message: string, status = 409) => Response.json({ error: { code, message } }, { status });
+
+/** A dish of a menu of Menus on offer in the till (SALE-F12), its product `p-<id>`. */
+export const menuDish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
+
+/** «Menú del día», 13,50 € eaten in, with these courses, as the till's menu sheet gets it. */
+export const saleMenu = (groups: SaleComboOut['groups']): SaleComboOut => ({
+  id: 'm1',
+  name: 'Menú del día',
+  kitchen_name: 'MENU',
+  price: 1350,
+  supply_kind: 'service',
+  sort_order: 0,
+  groups,
+});
 
 /** A dish of a kitchen ticket, as `kitchen.ticket.by_order` answers it (KITCHEN-F19). */
 export const kitchenItem = (over: Partial<ItemOut> = {}): ItemOut => kitchenDish('i1', { product_id: 'p1', ...over });
