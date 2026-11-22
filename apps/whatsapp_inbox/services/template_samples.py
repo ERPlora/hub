@@ -16,7 +16,7 @@ from live.outbox import record_event
 from apps.whatsapp_inbox import events, samples
 from apps.whatsapp_inbox.models import TemplateSample
 from apps.whatsapp_inbox.queries.template_samples import sample_out
-from apps.whatsapp_inbox.schemas import TemplateSampleOut, TemplateSampleUploadIn
+from apps.whatsapp_inbox.schemas.template_samples import TemplateSampleOut, TemplateSampleUploadIn
 from base.files import STORE_ERRORS
 from base.operations import hub_id
 from base.queries.files import refuse_past_the_plans_space

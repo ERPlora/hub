@@ -7,7 +7,7 @@ from live.operations import operation
 
 from apps.whatsapp_inbox import clock, gateway
 from apps.whatsapp_inbox.models import Channel
-from apps.whatsapp_inbox.schemas import ChannelGetIn, ChannelOut
+from apps.whatsapp_inbox.schemas.channel import ChannelGetIn, ChannelOut
 from base.auth import SAAS_PANEL_PATH
 
 #: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (no packs).

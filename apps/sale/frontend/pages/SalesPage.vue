@@ -126,7 +126,16 @@ const columns = computed<DataTableColumn<SaleRow>[]>(() => [
   },
   { key: 'number', label: t('sale.sales.columns.number'), sortable: true, priority: 'high' },
   { key: 'customer_name', label: t('sale.sales.columns.customer'), sortable: true, format: dash },
-  { key: 'payment_method_name', label: t('sale.sales.columns.payment'), sortable: true, format: dash, filter: { type: 'lookup', load: findPaymentMethods } },
+  {
+    key: 'payment_method_name',
+    label: t('sale.sales.columns.payment'),
+    sortable: true,
+    format: dash,
+    // A sale paid with several methods says them all: «Efectivo + Tarjeta» whole, the row folding its actions first
+    // (measured at 820, 834 and 1024; narrower, the number is cut instead).
+    minWidth: '9.5rem',
+    filter: { type: 'lookup', load: findPaymentMethods },
+  },
   {
     key: 'status',
     label: t('sale.sales.columns.status'),

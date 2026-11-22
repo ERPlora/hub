@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5ac8527f52a0a9cb1cb1156278bc2852424f821b72bca0d71a0314bb47f6030a -->
+<!-- generated from WORKBOOK.md sha256:eb436b2bac086c5aa509a8fdd0a025d56418118cb35119941e058818399614b8 -->
 
 ## What it is for and who it is for
 
@@ -660,7 +660,8 @@ Steps:
      history: "Completed" in green, "Voided" in red, "Refunded" in amber and "Other" in grey for a status
      this screen does not know yet.
   3. They search with "Search activity…" (sale, customer or method), filter by method or status, sort,
-     switch to cards or pick columns; 15 per page.
+     switch to cards or pick columns; 15 per page. A sale charged with several methods shows them all
+     under "Method" ("Cash + Card"); the method filter offers each method once and finds it by any of them.
   4. A sale charged on another device shows up by itself, without reloading.
 In: the sales of the Sales app, if it is on, with the permissions of whoever is looking. Only sales: the
 business's other movements do not show here.

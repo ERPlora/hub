@@ -6,15 +6,9 @@
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, exposeMovingInPage, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { chargeByApi, cleanSales, stamp } from './sale-helpers';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
+import { A, capture, exposeMovingInPage, horizontalOverflow, login, shot, shown, THREE_SIZES, untilStill } from './helpers';
+import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
+import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let coffee: Product;
@@ -30,6 +24,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(() => {
   cleanSales();
   cleanInventory();
+  restoreDrawer();
 });
 
 /** What cuts `el`'s text: the boxes that clip it, up to its table cell (or card field). Empty = whole. */
@@ -194,7 +189,7 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
   await expect(row).toContainText(sale.number);
   await expect(row).toContainText(/1[.,]50/);
 
-  for (const vp of [VIEWPORTS[1], VIEWPORTS[0], VIEWPORTS[2]]) {
+  for (const vp of [THREE_SIZES[1], THREE_SIZES[0], THREE_SIZES[2]]) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/#actividad`);
     const seen = await rowOf(page, sale.id);
@@ -220,8 +215,41 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
   }
 });
 
+/** A desk, a tablet upright and a small phone (cards): where the method filter is checked. */
+const METHOD_VIEWPORTS = [
+  { label: '1440x900', width: 1440, height: 900 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '375x667', width: 375, height: 667 },
+];
+
+test('BASE-F09 — a sale paid in cash and by card is found under «Method» by either of them', async ({ page, context }) => {
+  await login(page, A, '/');
+  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
+  await drawerOff(context);
+  const split = await chargeByApi(context, {
+    lines: [{ product: coffee.sku }],
+    payments: [
+      { method: 'card', amount: 100 },
+      { method: 'cash', amount: 50, tendered: 50 },
+    ],
+  });
+  const cardOnly = await chargeByApi(context, { lines: [{ product: coffee.sku }], payments: [{ method: 'card' }] });
+  for (const vp of METHOD_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/#actividad`);
+    await expect(await rowOf(page, split.id)).toContainText(/Card \+ Cash|Tarjeta \+ Efectivo/);
+    await shown(page).locator('[data-testid=home-activity-filters-toggle]').click();
+    const panel = shown(page).locator('[data-testid=home-activity-filters-panel]');
+    await pick(page, panel.locator('[data-testid=home-activity-filter-payment_methods]'), /^(Cash|Efectivo)$/);
+    await panel.locator('[data-testid=home-activity-filters-apply]').click();
+    await expect(shown(page).locator(`[data-testid=home-activity-row][data-id="${cardOnly.id}"]`)).toHaveCount(0);
+    await (await rowOf(page, split.id)).scrollIntoViewIfNeeded();
+    await capture(page, `BASE-F09-split-sale-by-cash-${vp.label}`);
+  }
+});
+
 /** The fleet's tablet (820) beside the old hub's reference sizes. */
-const TOOLBAR_VIEWPORTS = [...VIEWPORTS, { label: '820', width: 820, height: 1180 }];
+const TOOLBAR_VIEWPORTS = [...THREE_SIZES, { label: '820', width: 820, height: 1180 }];
 
 test('BASE-F09 — the toolbar of «Activity» is one row from 820 to 1440, as in the old hub, and spills nowhere', async ({ page }) => {
   await login(page, A, '/');

@@ -18,6 +18,7 @@ function sale(id: string, fields: Record<string, unknown> = {}) {
     customer_id: null,
     customer_name: 'Ana',
     payment_method_name: 'Efectivo',
+    payment_methods: ['Efectivo'],
     staff_id: null,
     total: 1250,
     tax_total: 217,
@@ -93,7 +94,7 @@ describe('HomeActivity', () => {
     const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
     const call = await m.live();
     await m.result(call, 'sale.sale.list', {
-      rows: [sale('1'), sale('2', { payment_method_name: 'Tarjeta' }), sale('3')],
+      rows: [sale('1'), sale('2', { payment_method_name: 'Tarjeta', payment_methods: ['Tarjeta'] }), sale('3')],
       total: 3,
       limit: 100,
       offset: 0,
@@ -115,6 +116,33 @@ describe('HomeActivity', () => {
         ],
       ],
     ]);
+  });
+
+  it('finds a sale paid with several methods by any of them, and offers each method once', async () => {
+    const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
+    const call = await m.live();
+    const split = { payment_method_name: 'Efectivo + Tarjeta', payment_methods: ['Efectivo', 'Tarjeta'] };
+    await m.result(call, 'sale.sale.list', {
+      rows: [sale('1'), sale('2', { payment_method_name: 'Tarjeta', payment_methods: ['Tarjeta'] }), sale('3', split)],
+      total: 3,
+      limit: 100,
+      offset: 0,
+    });
+    const props = m.wrapper.getComponent(DataTable).props() as Record<string, unknown>;
+    const method = (props.columns as { key: string; filter?: { options?: { value: string }[] } }[]).find((c) => c.key === 'payment_method_name');
+    expect(method?.filter?.options?.map((option) => option.value)).toEqual(['Efectivo', 'Tarjeta']);
+    async function shownPaidWith(value: string): Promise<string[]> {
+      (document.querySelector('[data-testid="home-activity-filters-toggle"]') as HTMLElement).click();
+      await flush();
+      const select = document.querySelector('[data-testid="home-activity-filter-payment_methods"]') as HTMLElement;
+      select.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
+      await flush();
+      (document.querySelector('[data-testid="home-activity-filters-apply"]') as HTMLElement).click();
+      await flush();
+      return [...document.querySelectorAll('[data-testid="home-activity-row"]')].map((row) => row.getAttribute('data-id') ?? '');
+    }
+    expect(await shownPaidWith('Tarjeta')).toEqual(['2', '3']);
+    expect(await shownPaidWith('Efectivo')).toEqual(['1', '3']);
   });
 
   it('without Sales on, asks nothing and shows the empty table', async () => {
