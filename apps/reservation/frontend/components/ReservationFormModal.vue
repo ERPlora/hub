@@ -7,7 +7,8 @@
 // first («Book anyway», `overbook`, never for online bookings); a refusal goes on top, a bad field under
 // it, and what was typed stays. «Edit reservation» sends only what changed (`no_table` to leave it without
 // one); once seated, completed, cancelled or not shown, only its notes change, as the server says — and a
-// cancelled one says why on top (F09, F13).
+// cancelled one says why on top (F09, F13). A phone or an email that came without it (null: to whoever does not see the
+// customers' contact details) is neither shown nor sent, so saving keeps it; a card picked so books with the card's.
 import { Combo, type ComboOption, ConfirmDialog, DateField, FormModal, InlineFeedback, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
@@ -45,8 +46,8 @@ const OPEN_STATUSES = ['pending', 'confirmed'];
 
 const customer = ref<CustomerSnapshot | null>(null);
 const name = ref('');
-const phone = ref('');
-const email = ref('');
+const phone = ref<string | null>('');
+const email = ref<string | null>('');
 const date = ref('');
 const time = ref('');
 const party = ref('2');
@@ -80,8 +81,8 @@ function reset(): void {
   const booked = props.reservation;
   customer.value = null;
   name.value = booked?.guest_name ?? '';
-  phone.value = booked?.guest_phone ?? '';
-  email.value = booked?.guest_email ?? '';
+  phone.value = booked ? booked.guest_phone : '';
+  email.value = booked ? booked.guest_email : '';
   date.value = booked?.date ?? props.day;
   time.value = booked ? hhmm(booked.time) : '';
   party.value = String(booked?.party_size ?? 2);
@@ -104,13 +105,20 @@ watch(
 // A card picked from Customers fills the guest's name, phone and email (read whole: the pick brings only
 // its tax details).
 watch(customer, async (picked) => {
-  if (!picked) return;
+  if (!picked) {
+    // A new guest without a card again: her phone and email are asked for.
+    if (!editing.value) {
+      phone.value ??= '';
+      email.value ??= '';
+    }
+    return;
+  }
   name.value = picked.customer_name;
   try {
     const card = await client.api.call('customer.customer.detail', { id: picked.customer_id });
     if (customer.value?.customer_id !== picked.customer_id) return;
-    phone.value = card.phone ?? '';
-    email.value = card.email ?? '';
+    phone.value = card.phone;
+    email.value = card.email;
   } catch {
     // The server copies them from the card anyway.
   }
@@ -142,8 +150,8 @@ function newBooking(overbook: boolean): ReservationIn {
   return {
     ...(customer.value ? { customer_id: customer.value.customer_id } : {}),
     guest_name: name.value.trim(),
-    guest_phone: phone.value.trim(),
-    guest_email: email.value.trim(),
+    ...(phone.value !== null ? { guest_phone: phone.value.trim() } : {}),
+    ...(email.value !== null ? { guest_email: email.value.trim() } : {}),
     date: date.value,
     time: hhmm(time.value),
     party_size: partySize.value ?? 0,
@@ -156,6 +164,14 @@ function newBooking(overbook: boolean): ReservationIn {
   };
 }
 
+/** The phone and email the edit changes: never one that came without it (null). */
+function contactChanges(booked: ReservationOut): ReservationPatchIn {
+  const out: ReservationPatchIn = {};
+  if (phone.value !== null && phone.value.trim() !== booked.guest_phone) out.guest_phone = phone.value.trim();
+  if (email.value !== null && email.value.trim() !== booked.guest_email) out.guest_email = email.value.trim();
+  return out;
+}
+
 /** What the edit changes (only what differs from the reservation as it was opened). */
 function changes(booked: ReservationOut, overbook: boolean): ReservationPatchIn {
   const out: ReservationPatchIn = { id: booked.id, overbook };
@@ -163,8 +179,7 @@ function changes(booked: ReservationOut, overbook: boolean): ReservationPatchIn 
   if (internalNotes.value !== booked.internal_notes) out.internal_notes = internalNotes.value;
   if (notesOnly.value) return out;
   if (name.value.trim() !== booked.guest_name) out.guest_name = name.value.trim();
-  if (phone.value.trim() !== booked.guest_phone) out.guest_phone = phone.value.trim();
-  if (email.value.trim() !== booked.guest_email) out.guest_email = email.value.trim();
+  Object.assign(out, contactChanges(booked));
   if (date.value !== booked.date) out.date = date.value;
   if (hhmm(time.value) !== hhmm(booked.time)) out.time = hhmm(time.value);
   if (partySize.value && partySize.value !== booked.party_size) out.party_size = partySize.value;
@@ -248,6 +263,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             @ion-input="name = text($event.detail.value)"
           />
           <ion-input
+            v-if="phone !== null"
             data-testid="reservation-form-guest_phone"
             name="guest_phone"
             type="tel"
@@ -264,6 +280,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
         </div>
         <ion-input
+          v-if="email !== null"
           data-testid="reservation-form-guest_email"
           name="guest_email"
           type="email"
@@ -415,6 +432,10 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+}
+/* The guest's name alone, when the phone came without it: the whole row. */
+.reservation-form__pair > :only-child {
+  grid-column: 1 / -1;
 }
 .reservation-form__customer,
 .reservation-form__source {

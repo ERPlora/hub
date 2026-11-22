@@ -7,6 +7,7 @@ from uuid import UUID
 from ninja import Field, Schema
 
 from apps.whatsapp_inbox.schemas.fields import A_MESSAGE, MESSAGE, ConversationPageIn, Page
+from base.sensitive import CUSTOMER_CONTACT
 
 
 class MessageListIn(ConversationPageIn):
@@ -55,9 +56,14 @@ class MessageGetOut(MessageOut):
     """A message with what an automation needs to answer it: its conversation's exact number, her name and the options
     last offered to her."""
 
-    phone: str = Field(description="Its conversation's number, exactly in international format (+34600111222).")
+    phone: str | None = Field(
+        None,
+        description="Its conversation's number, exactly in international format (+34600111222).",
+        json_schema_extra=CUSTOMER_CONTACT,
+    )
     display_name: str = Field(
-        description="What to call the customer: her card's name, her WhatsApp profile's or, with neither, her number."
+        description="What to call the customer: her card's name, her WhatsApp profile's or, with neither, her number "
+        "(masked to whoever does not see the customers' contact details)."
     )
     can_send: bool = Field(
         description="Whether anything can be sent now (the number connected and the month's messages not spent)."

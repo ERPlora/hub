@@ -482,3 +482,9 @@ msgstr "%(section)s: se muestra"
 msgctxt "assistant card"
 msgid "No changes"
 msgstr "Sin cambios"
+
+msgid "View the website's status and share its address and QR code"
+msgstr "Ver el estado de la web y compartir su dirección y su QR"
+
+msgid "Change, preview, publish and disconnect the website"
+msgstr "Cambiar, previsualizar, publicar y desconectar la web"

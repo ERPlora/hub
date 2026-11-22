@@ -16,7 +16,7 @@ Para qué: que las clientas reserven solas desde el móvil y que el salón confi
 1. ONLINE_BOOKING-F07 — la página de reservas del salón.
 2. ONLINE_BOOKING-F01 — la clienta reserva un corte desde su móvil.
 3. ONLINE_BOOKING-F10 — la clienta vuelve a ver su reserva con su enlace.
-4. ONLINE_BOOKING-F08 — en el salón, la reserva nueva.
+4. ONLINE_BOOKING-F08 — en el salón, la reserva nueva, buscada por el móvil de la clienta: el responsable la ve con su teléfono.
 5. ONLINE_BOOKING-F02 — la reserva, confirmada.
 6. ONLINE_BOOKING-F11 — otra clienta cancela la suya con su enlace.
 7. ONLINE_BOOKING-F05 — el salón cancela una tercera.

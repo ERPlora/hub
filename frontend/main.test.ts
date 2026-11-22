@@ -19,8 +19,9 @@ vi.mock('@erplora/ui/shell', () => ({
   resetUserThemePreferences: vi.fn(),
 }));
 // base's side menu (base/frontend/lib/sidebar.test.ts declares and runs it): here, only that main hands it to the shell.
+// With no entry, the app gate, which reads it, leaves every platform screen open.
 vi.mock('../base/frontend/lib/sidebar', () => ({
-  SIDEBAR: 'SIDEBAR',
+  SIDEBAR: { groups: [], name: 'SIDEBAR' },
   shellSidebar: (sidebar: unknown) => ({ shellSidebarOf: sidebar }),
 }));
 vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
@@ -222,7 +223,7 @@ describe('main.ts', () => {
   it("paints base's side menu, as the shell takes it, and no module", async () => {
     fakeShell();
     await main.boot({});
-    expect(shellOptions().sidebar).toEqual({ shellSidebarOf: 'SIDEBAR' });
+    expect(shellOptions().sidebar).toEqual({ shellSidebarOf: { groups: [], name: 'SIDEBAR' } });
     expect(shellOptions()).not.toHaveProperty('nav');
   });
 

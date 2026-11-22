@@ -109,7 +109,7 @@ def test_reservation_is_in_the_store_and_in_the_restaurant_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert reservation().permissions == PERMISSIONS
+    assert list(reservation().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

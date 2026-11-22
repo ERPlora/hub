@@ -4,7 +4,8 @@
 // one sold «Today» with the refund taken off whoever sold it, their rate and their commission, the totals,
 // a new charge painted live, «Yesterday» and a custom range whose «To» before «From» is said under «To».
 // Seen at 390×844, 834×1112 and 1440×900. An
-// employee has no Commissions tab, the page tells them «You do not have permission» and the API refuses.
+// employee opens Commissions too and sees only her own row: the cut she did on a colleague's sale counts in it, the
+// same row the owner sees of her.
 // A session of a voucher (SALE-F27) charges nothing and still counts for who did it, at its value (hub#685);
 // whoever sold the voucher counts nothing for it (hub#769). One spent outside the checkout saying who did it counts
 // for her too, and the screen repaints by itself when another is spent (SERVICE-F21, hub#770).
@@ -14,7 +15,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { pickDay } from './date-time-fields';
-import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown, testid } from './helpers';
+import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, scrolledTo, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
@@ -202,20 +203,61 @@ test('STAFF-F21 (paso 3: la comisión del día): who sold a voucher counts nothi
   }
 });
 
-test('STAFF-F21 (paso 3: la comisión del día): an employee has no Commissions tab, the page refuses and so does the API', async ({ browser }) => {
-  const { context, page } = await signedIn(browser, '/staff/members', EMPLOYEE);
+test('STAFF-F21 (la fila propia): an employee opens Commissions and sees only her own row, with the cut she did on a colleague\'s sale', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const employee = await signedIn(browser, '/staff/members', EMPLOYEE);
+  const owner = await signedIn(browser, '/staff/members');
   try {
-    const view = shown(page);
-    await view.locator('[data-testid=staff-members-row], [data-testid=staff-members-empty]').first().waitFor({ state: 'visible' });
-    await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(3);
-    await expect(view.locator('ion-footer ion-segment-button', { hasText: 'Commissions' })).toHaveCount(0);
+    // Her account (the hub user her sign-in made) linked to a record of Staff; Bea, a colleague, beside her.
+    const accounts = await api<{ rows: Array<{ user_id: string; name: string }> }>(owner.context, A, 'GET', '/staff/accounts?search=employee');
+    const account = accounts.data.rows.find((row) => row.name.toLowerCase().includes('employee'));
+    expect(account, JSON.stringify(accounts.data)).toBeDefined();
+    const linked = await api<{ rows: Member[] }>(owner.context, A, 'GET', `/staff/members?user_id=${account!.user_id}`);
+    const eva =
+      linked.data.rows[0] ??
+      (
+        await api<Member>(owner.context, A, 'POST', '/staff/members', {
+          first_name: `${TAG} Eva`,
+          last_name: `Commission${stamp()}`,
+          commission_rate: '15',
+          user_id: account!.user_id,
+        })
+      ).data;
+    const bea = await member(owner.context, 'Bea', '10');
+    const sku = `${SKU}-OWN`;
+    await createProduct(owner.context, { name: 'E2E Own cut', sku, price: 1800, tax_category_key: 'product.generic' });
+    // The owner charges a sale attributed to Bea whose cut Eva did (a line's professional wins over the sale's): Eva
+    // cannot open it, and the cut is still hers. And one cut of Bea's own.
+    await chargeByApi(owner.context, { lines: [{ product: sku, staff_id: eva.id }], staff_id: bea.id, payments: CARD });
+    await chargeByApi(owner.context, { lines: [{ product: sku }], staff_id: bea.id, payments: CARD });
 
+    const hers = await api<{ rows: ReportRow[] }>(employee.context, A, 'GET', '/staff/commissions/report');
+    expect(hers.status).toBe(200);
+    expect(hers.data.rows.map((row) => row.member_id)).toEqual([eva.id]);
+    // Positive control: the owner sees Bea too, and of Eva the very row she sees.
+    expect(await reported(owner.context, bea.id)).toMatchObject({ sold: 1800, commission: 180 });
+    expect(await reported(owner.context, eva.id)).toEqual(hers.data.rows[0]);
+    expect(hers.data.rows[0].sold).toBeGreaterThanOrEqual(1800);
+
+    const page = employee.page;
     await page.goto(`${A}/staff/commissions`);
-    await expect(testid(page, 'no-access')).toBeVisible();
-    const refused = await api<{ error?: { code: string } }>(context, A, 'GET', '/staff/commissions/report');
-    expect([refused.status, refused.data.error?.code]).toEqual([403, 'permission_denied']);
+    const view = shown(page);
+    await expect(rowOf(page, eva.id)).toBeVisible();
+    await expect(view.locator('[data-testid=staff-commissions-row]')).toHaveCount(1);
+    await expect(rowOf(page, bea.id)).toHaveCount(0);
+    await expect(view.locator('ion-footer ion-segment-button', { hasText: 'Commissions' })).toHaveClass(/segment-button-checked/);
+    await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules', 'Commissions']);
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      // On a phone the row turns into a card: scrolledTo looks for it again while the list paints it again.
+      await scrolledTo(rowOf(page, eva.id));
+      await expect(rowOf(page, eva.id)).toBeInViewport();
+      await expect(view.locator('[data-testid=staff-commissions-row]')).toHaveCount(1);
+      await capture(page, `staff-commissions-employee-${viewport.label}`);
+    }
   } finally {
-    await context.close();
+    await employee.context.close();
+    await owner.context.close();
   }
 });
 

@@ -67,21 +67,21 @@ class InventoryConfig(LiveAppConfig):
         ("carta", "producto", "articulo", "product"),
         ("roto", "rota", "rotos", "rotas", "rotura", "broke", "broken"),
     )
-    permissions = [
-        "inventory.view_product",
-        "inventory.view_category",
-        "inventory.view_stock",
-        "inventory.add_product",
-        "inventory.change_product",
-        "inventory.delete_product",
-        "inventory.add_category",
-        "inventory.change_category",
-        "inventory.delete_category",
-        "inventory.import_product",
-        "inventory.export_product",
-        "inventory.adjust_stock",
-        "inventory.manage_settings",
-    ]
+    permissions = {
+        "inventory.view_product": _("View products"),
+        "inventory.view_category": _("View categories"),
+        "inventory.view_stock": _("View stock and its movements"),
+        "inventory.add_product": _("Add products"),
+        "inventory.change_product": _("Change products"),
+        "inventory.delete_product": _("Delete products"),
+        "inventory.add_category": _("Create categories"),
+        "inventory.change_category": _("Change categories"),
+        "inventory.delete_category": _("Delete categories"),
+        "inventory.import_product": _("Import products"),
+        "inventory.export_product": _("Export products"),
+        "inventory.adjust_stock": _("Move stock: receive, count and write off"),
+        "inventory.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old
     # ``cashier`` role is gone: it had exactly what the employee has.
     role_permissions = {

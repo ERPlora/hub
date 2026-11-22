@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d8407fb7934d75bd0a79b7219abad8a73f2d258799c20bddeade0b81352bfc6d -->
+<!-- generated from WORKBOOK.md sha256:82fd1c01d679ccb6deca825f540ad49d3c73ce69107df365306873db61469998 -->
 
 ## What it is for and who it is for
 
@@ -22,6 +22,10 @@ business's policy.
 - The **employee** sees in the inbox the online bookings of **their own diary**.
 - The **manager** sees every online booking and confirms, completes, marks as no-show or cancels them.
 - The **owner** and the **administrator**: besides, they delete them and set up the booking page.
+- The **customer's phone and email** on a booking are seen only by whoever holds the data permission "View
+  customer contact details" (BASE-F119), which the four roles hold today. Whoever lacks it sees the booking and the
+  customer's name, without her phone or email, on no screen, API, live inbox or assistant answer, and does not find
+  a booking by them. The customer's booking page does not change.
 - The **assistant** (by voice or by text, with the session of the person speaking) does the same: "confirm
   Ana's booking for tomorrow", "which online bookings are pending?", "cancel booking APT-20261016-0003".
   Before an action it asks to confirm with its card (BASE-F97), which names each record as the diary names
@@ -64,10 +68,11 @@ its row, confirm it, complete it, mark it as a no-show, cancel it or delete it. 
 the ones in your diary.
 
 #### Detail
-A table of 50 rows per page with a search box ("Search no., customer, phone, service…") and filters by
-column behind the filter button of the bar: No., Customer, Service,
+A table of 50 rows per page with a search box ("Search no., customer, phone, service…"; to whoever does not see
+the customers' contact details, "Search no., customer, service…", which does not look at the phone or the email)
+and filters by column behind the filter button of the bar: No., Customer, Service,
 Professional, Date (one day) and Status. Columns: **No.** (`APT-…`), **Customer** (with her
-phone), **Service**, **Professional**, **Date**, **Time**, **Status** and **Booked** (when she asked for it).
+phone, if whoever looks sees the customers' contact details), **Service**, **Professional**, **Date**, **Time**, **Status** and **Booked** (when she asked for it).
 Most recent first; sorted by column. List or cards.
 
 Per row: **Confirm**, **Complete**, **No-show**, **Cancel** and **Delete** (Delete only for whoever can
@@ -295,12 +300,14 @@ Screen: Bookings
 Steps:
 1. Open **Bookings**: the appointments with origin "Online booking", most recent first.
 2. Search by number, name, phone, email, service or professional; filter by column from the filter button
-   of the bar; sort. A long name ends in "…" inside its column.
-3. A specific booking is given by the assistant or the API by its number, or by the customer and the day.
+   of the bar; sort. A long name ends in "…" inside its column. Whoever does not see the customers' contact
+   details searches and filters without the phone or the email: they find nobody.
+3. A specific booking is given by the assistant or the API by its number, or by the customer and the day (by her
+   phone or her email, only to whoever sees the customers' contact details).
 In: the appointments of Appointments with origin "Online booking" that the person can see.
 Out: nothing is written. The row opens nothing by itself: what is done with a booking are its actions.
 If it fails: "The bookings could not be loaded" with **Retry**.
-Involved: APPOINTMENT-F27
+Involved: APPOINTMENT-F27, BASE-F119
 
 ### ONLINE_BOOKING-F09 Follow the customer when two cards are merged
 Status: done (Appointments does it; the inbox reflects it)
@@ -367,7 +374,8 @@ Involved: APPOINTMENT-F24, CUSTOMER-F16
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of the person speaking) and the
 API, with the same rules and permissions. A booking is named by its id, its number (`APT-…`) or **the way a
-person says it**: the customer (name, phone or email) and the day ("Ana's for tomorrow"); with no day, her next
+person says it**: the customer (name, phone or email; the phone and the email, only by whoever sees the
+customers' contact details) and the day ("Ana's for tomorrow"); with no day, her next
 online booking. If it fits several, they are listed and the number is asked for. By voice, the page's ones are
 asked for as "Olga's internet booking" or "what I have in the inbox".
 
@@ -376,7 +384,7 @@ asked for as "Olga's internet booking" or "what I have in the inbox".
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The online bookings, with search, filters and sorting, in pages (up to 100) | view bookings | F08 | `online_booking.booking.list` |
-| One booking | view bookings | F08 | `online_booking.booking.get` |
+| One booking (the customer's phone and email, only to whoever sees the customers' contact details) | view bookings | F08 | `online_booking.booking.get` |
 | The page's settings and the booking rules | view bookings | F07 | `online_booking.settings.get` |
 | Page, services, free times and booking by link (public) | `online_booking.public` | F01, F10 | `online_booking.public.page`, `.services`, `.slots`, `.booking` |
 
@@ -422,6 +430,7 @@ The rest of the facts (confirmed, cancelled, completed, no-show, deleted) are th
 | Delete bookings | yes | yes | no | no | `online_booking.delete_booking` |
 | Set up the page | yes | yes | no | no | `online_booking.manage_settings` |
 | Try the public page (preview) | yes | yes | no | no | `online_booking.public` |
+| See the customer's phone and email (data permission of the platform, BASE-F119) | yes | yes | yes | yes | `base.view_customer_contact` |
 
 The booking page asks for no session: whoever opens it holds `online_booking.public` and nothing else, also someone of
 the team with their session open.

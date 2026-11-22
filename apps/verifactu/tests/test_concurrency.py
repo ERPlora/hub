@@ -93,7 +93,7 @@ def test_the_same_invoice_twice_at_once_is_one_record(invoice_does_not_seal):
 def test_a_chain_held_too_long_leaves_the_document_pending_and_its_reaction_seals_it(monkeypatch):
     """A transient database error at the emission (another device holds the chain's lock past the lock timeout):
     Invoicing keeps the document «pending» and VeriFactu's reaction to its notice seals it once the lock is free."""
-    from apps.invoice import services as invoicing
+    from apps.invoice.services import issuing as invoicing
     from apps.invoice.models import Invoice
     from apps.verifactu.models import Chain
     from apps.verifactu.tests.conftest import deliver

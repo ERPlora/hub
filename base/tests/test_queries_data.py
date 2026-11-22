@@ -51,8 +51,8 @@ def call(ctx, operation, /, **data):
 
 
 def a_file(purpose="backup", apps=("table", "customer"), data=None):
-    bundle = blueprint.Bundle(
-        manifest=blueprint.manifest(
+    bundle = blueprint.archive.Bundle(
+        manifest=blueprint.archive.manifest(
             name="Copia del Bar Pepe",
             language="es",
             country="ES",
@@ -67,7 +67,7 @@ def a_file(purpose="backup", apps=("table", "customer"), data=None):
             "customer.customer": [{"name": "Lucía Pérez", "email": "lucia@example.com", "phone": ""}],
         },
     )
-    return base64.b64encode(blueprint.write_zip(bundle)).decode()
+    return base64.b64encode(blueprint.archive.write_zip(bundle)).decode()
 
 
 # ── The catalogue ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -82,9 +82,9 @@ def test_the_catalogue_puts_the_persons_language_first():
 
 
 def test_the_hubs_country_goes_before_the_language(owner, monkeypatch):
-    seeds = blueprint.catalog()
-    french = blueprint.Template(**{**seeds[0].__dict__, "key": "restaurant.fr", "language": "fr", "country": "FR"})
-    monkeypatch.setattr(blueprint, "catalog", lambda: [*seeds, french])
+    seeds = blueprint.seeds.catalog()
+    french = blueprint.seeds.Template(**{**seeds[0].__dict__, "key": "restaurant.fr", "language": "fr", "country": "FR"})
+    monkeypatch.setattr(blueprint.seeds, "catalog", lambda: [*seeds, french])
     Hub.objects.filter(slug=A.key).update(country="FR")
 
     listed = call(owner, "base.blueprint.list")
@@ -119,6 +119,13 @@ def test_an_empty_business_is_told_so_until_something_is_loaded(owner):
     call(owner, "base.blueprint.import", template="hair_salon.es")
 
     assert call(owner, "base.blueprint.list").empty is False
+
+
+def test_a_business_with_only_customers_is_still_offered_a_template(owner):
+    """A template never brings customers, so having some says nothing about what one would load."""
+    call(owner, "customer.customer.create", name="Lucía Pérez")
+
+    assert call(owner, "base.blueprint.list").empty is True
 
 
 def test_a_business_born_with_every_app_off_is_empty_for_the_homes_card(born):
@@ -284,7 +291,7 @@ def test_who_does_not_run_the_hub_cannot_export(manager):
 def test_the_loads_come_newest_first_and_the_last_unfinished_one_is_offered_again(owner, monkeypatch):
     whole = call(owner, "base.blueprint.import", template="hair_salon.es")
     with monkeypatch.context() as patch:
-        patch.setattr(blueprint, "active_apps", lambda scope: frozenset({"inventory"}))
+        patch.setattr(blueprint.loading, "active_apps", lambda scope: frozenset({"inventory"}))
         partial = call(owner, "base.blueprint.import", template="restaurant.es", apps=["inventory", "table"])
 
     loads = call(owner, "base.import.list")
@@ -311,7 +318,7 @@ def test_an_unfinished_load_from_a_file_says_why_it_is_not_retried(owner):
 
 def test_an_undone_load_is_no_longer_offered_nor_undoable(owner, monkeypatch):
     with monkeypatch.context() as patch:
-        patch.setattr(blueprint, "active_apps", lambda scope: frozenset({"inventory"}))
+        patch.setattr(blueprint.loading, "active_apps", lambda scope: frozenset({"inventory"}))
         partial = call(owner, "base.blueprint.import", template="restaurant.es", apps=["inventory", "table"])
     call(owner, "base.import.undo", id=partial.id)
 

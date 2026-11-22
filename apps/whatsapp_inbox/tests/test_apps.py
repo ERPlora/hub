@@ -54,7 +54,7 @@ def test_it_is_in_the_store_and_in_both_verticals():
 
 
 def test_permissions():
-    assert inbox().permissions == [
+    assert list(inbox().permissions) == [
         "whatsapp_inbox.view",
         "whatsapp_inbox.reply",
         "whatsapp_inbox.assign",

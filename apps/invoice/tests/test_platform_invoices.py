@@ -278,7 +278,7 @@ def test_an_invoice_without_its_record_yet_is_issuing_and_then_issued(
 ):
     from live.operations import UnknownOperation
 
-    from apps.invoice import services as invoicing
+    from apps.invoice.services import issuing as invoicing
 
     real = invoicing.get_operation
 

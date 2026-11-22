@@ -1,8 +1,8 @@
-// Staff for an employee (`hub_employee`: view the directory, roles, schedules and who is away; ask for
-// their own time off; WORKBOOK «Quién puede qué»): no «+» on Staff, Roles or Schedules, no row action,
-// no row to open, no «Rate/h», no Settings tab and Settings itself says «You do not have permission»;
-// the API refuses every write but asking for time off with 403 `permission_denied`. The owner is the
-// positive control: the same hooks are there for who may manage.
+// Staff for an employee (`hub_employee`: view the directory, schedules and who is away; ask for their own
+// time off; WORKBOOK «Quién puede qué»): three tabs (Staff, Time Off, Schedules), no «+» on Staff or
+// Schedules, no row action, no row to open, no «Rate/h»; Positions and Settings, opened by their address,
+// say «No access» (BASE-F118); the API refuses every write but asking for time off with 403
+// `permission_denied`. The owner is the positive control: the same hooks are there for who may manage.
 import { type Browser, expect, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, shot, shown, testid } from './helpers';
@@ -20,7 +20,7 @@ test.afterAll(cleanup);
 /** Someone (the owner unless `credentials`) on `next` at a desk's size, in English. */
 const signedIn = (browser: Browser, next: string, credentials?: Credentials) => signedInAt(browser, next, { width: 1280, height: 860 }, credentials);
 
-test('an employee reads Staff, Roles and Schedules without a single write button, and the API agrees', async ({ browser }) => {
+test('an employee reads Staff and Schedules without a write button, gets «No access» on Positions and Settings, and the API agrees', async ({ browser }) => {
   const owner = await signedIn(browser, '/staff/members');
   const employee = await signedIn(browser, '/staff/members', EMPLOYEE);
   try {
@@ -32,7 +32,7 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await ownerView.locator('[data-testid=staff-members-row]').first().waitFor({ state: 'visible' });
     await expect(ownerView.locator('[data-testid=staff-members-add]')).toBeVisible();
     await expect(ownerView.locator(`[data-testid^=staff-members-row-${member.data.id}-]`).first()).toBeAttached();
-    // Staff, Roles, Time Off, Schedules, Commissions and Settings (STAFF-F21: Commissions only with the pay).
+    // Staff, Roles, Time Off, Schedules, Commissions and Settings (STAFF-F21: an employee's Commissions is her own row).
     await expect(ownerView.locator('ion-footer ion-segment-button')).toHaveCount(6);
 
     // The employee: the list, nothing to write.
@@ -42,7 +42,7 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await expect(view.locator(`[data-testid^=staff-members-row-${member.data.id}-]`)).toHaveCount(0);
     await expect(view.locator('[role=columnheader]', { hasText: 'Rate/h' })).toHaveCount(0);
     await expect(ownerView.locator('[role=columnheader]', { hasText: 'Rate/h' })).toBeVisible();
-    await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules']);
+    await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules', 'Commissions']);
     await employee.page.screenshot({ path: shot('staff-employee-members') });
 
     await employee.page.goto(`${A}/staff/schedules`);

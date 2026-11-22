@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8984a8687233be6318549ff0bdd30a2228ef0ce7734a7b3b42845980a1f23ee9 -->
+<!-- generated from WORKBOOK.md sha256:732a2a6821069bd0fd73266c4747853862d9649c21194a7dac9fd6938f5814a8 -->
 
 ## What it is for and who it is for
 
@@ -679,12 +679,12 @@ Involved: PRINTING-F01, PRINTING-F14
 Status: partial — the card does not say yet whether the printer answers right now ("Printer ready", "Printer not
 connected" or "We couldn't check the printer"): Printing already has that read, the same one it gives the Home's
 health row, but the card does not use it yet (hub#573)
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
 1. With Printing on in the business, **System → Usage and plan** has, below what the business uses, the card
    **Your printer**: "Receipts, kitchen orders and labels are printed by the ERPlora app on the device next to the
-   printer.". Anyone who sees Printing sees it, also whoever cannot see what the business uses. With Printing off
+   printer.". Whoever opens System sees it, the owner and the administrator (BASE-F39). With Printing off
    there is no card: a business that does not print sees none of this.
 2. "Set up printing" opens **Printing → Printers** (PRINTING-F01).
 3. In a browser, below, "Download the ERPlora app" with "The ERPlora app is what talks to your printers, the cash

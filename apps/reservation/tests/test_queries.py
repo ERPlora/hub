@@ -127,6 +127,18 @@ def test_the_list_hides_the_deleted_and_filters_by_status_table_customer_party_a
     assert times(time="21") == ["21:00"]
 
 
+def test_the_list_filters_by_part_of_the_guests_name_and_by_days():
+    make_reservation(guest_name="Ana García")
+    make_reservation(date=TOMORROW + dt.timedelta(days=2), guest_name="Luis Pérez")
+
+    def guests(**filters):
+        return [row.guest_name for row in run("reservation.reservation.list", filters).rows]
+
+    assert guests(guest_name="garcía") == ["Ana García"]
+    assert guests(date_from=(TOMORROW + dt.timedelta(days=1)).isoformat()) == ["Luis Pérez"]
+    assert guests(date_to=TOMORROW.isoformat()) == ["Ana García"]
+
+
 def test_searching_looks_through_the_whole_book_by_name_phone_however_typed_or_email():
     make_reservation(guest_name="Ana García", guest_phone="+34600111222")
     make_reservation(

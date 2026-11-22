@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b34578fcec8af616c279098bb7190e34557aaeed3b584176fdb20d9f82590a2c -->
+<!-- generated from WORKBOOK.md sha256:0cdf3221ce38f336b7d75da1101f7268a2acbcebd8a9bdd5212543d09a87e534 -->
 
 ## What it is for and who it is for
 
@@ -22,6 +22,10 @@ everything that happens to it from the moment it is booked until it is attended,
   appointments.
 - The **manager** sees and manages the whole team's agenda, and blocks time.
 - The **owner** and the **administrator**: they also delete appointments and change the booking settings.
+- The **customer's phone and email** on an appointment are seen only by whoever holds the data permission "View
+  customer contact details" (BASE-F119), which the four roles hold today. Whoever lacks it sees the appointment and
+  the customer's name, without her phone or email, on no screen, API, live agenda or assistant answer, and does not
+  name a customer by her phone or email: those words only match a name for them.
 - The **customer** books, moves and cancels on their own when the business allows it (through WhatsApp or
   through online booking, via the API), always with the business's notice rules.
 - The **assistant** (by voice or by text, with the session of whoever is speaking) does all of the above:
@@ -231,8 +235,8 @@ Actor: employee (for themselves), manager, assistant
 Screen: Agenda
 Steps:
 1. Tap **Add appointment**, or in "By professional" tap a free slot (it fills in professional and time).
-2. Pick the customer (searched by name, phone or email; if they are not there, **+ New customer** creates
-   them with name and phone), one or more services and the professional. With services picked, only the
+2. Pick the customer (searched by name, phone or email, and by phone or email only by whoever sees the customers'
+   contact details; if they are not there, **+ New customer** creates them with name and phone), one or more services and the professional. With services picked, only the
    professionals who are **Active and Bookable and perform all of them** show; if a service has nobody
    assigned, for that service the whole bookable team counts. "Min." is filled in with the sum of the
    durations (the professional's own if they have one, otherwise the catalogue's).
@@ -255,8 +259,8 @@ customer is chosen, without saving again. From the front desk neither the minimu
 refuses (the past time only warns before saving); an automation does not have those exceptions. An employee
 only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.
-Involved: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
-(ERPlora's staff recovers from a separate copy the appointments the business no longer has, each by this same
+Involved: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F119,
+BASE-F114 (ERPlora's staff recovers from a separate copy the appointments the business no longer has, each by this same
 booking; a deleted one comes back the same, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 See which times are still free
@@ -635,10 +639,12 @@ Steps:
 1. Open the card in **Customers**.
 2. At the end, the **Visit history** block shows their last 10 appointments, the most recent first, with
    the day and the time, the services, the professional, the state and the notes (the internal one first).
-In: the customer's appointments that whoever is looking can see.
+In: the customer's appointments that whoever is looking can see. Through the API or the assistant the customer is
+named by her name, her phone or her email; by phone or email, only by whoever sees the customers' contact details
+(BASE-F119).
 Out: nothing (it only reads). An automation reads it without notes or reasons.
 If it fails: "The visit history could not be loaded." · empty: "No appointments yet for this customer."
-Involved: CUSTOMER-F24
+Involved: CUSTOMER-F24, BASE-F119
 
 ### APPOINTMENT-F21 Book several appointments at once (voucher or course)
 Status: done
@@ -663,12 +669,14 @@ Steps:
    through the assistant.
 2. Only what is sent changes. The phone is saved in international format, with the country prefix;
    one that is not a valid number is refused and nothing is saved.
+3. Whoever does not see the customers' contact details gets the appointment without the customer's phone or
+   email; changing the notes leaves them as they were.
 In: an appointment.
 Out: `appointment.appointment.updated` (without a history line if only notes or contact details change).
 If it fails: the invalid phone is refused without saving anything ("That phone is not a valid number for the
 business's country. Check it, or type it with its international prefix (for example +44…)."); an appointment that
 does not exist, "That appointment does not exist in this business.".
-Involved: CUSTOMER-F11
+Involved: CUSTOMER-F11, BASE-F119
 
 ### APPOINTMENT-F23 Merge the appointments when two customer cards are merged
 Status: done
@@ -773,16 +781,17 @@ Involved: none
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever is speaking) and the API, with the same rules and the same permissions. An appointment is named by
-its id or by its number (`APT-…`); a customer, by their id, their name, their phone or their email; a
-service and a professional, by their id or their name; a time, as the business's wall-clock date and time
-("2026-10-15 10:00"). If a name matches several, it says which ones and asks to choose.
+its id or by its number (`APT-…`); a customer, by their id, their name, their phone or their email (by phone or
+email, only by whoever sees the customers' contact details); a service and a professional, by their id or their
+name; a time, as the business's wall-clock date and time ("2026-10-15 10:00"). If a name matches several, it says
+which ones and asks to choose.
 
 ### What it offers: queries (they read, they change nothing)
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The appointments of a range of days, by professional, state, customer or search, in pages (up to 100) | see appointments (all or their own) | F01–F11, F27 | `appointment.appointment.list` |
-| A whole appointment | see appointments | F04, F10 | `appointment.appointment.get` |
+| A whole appointment (the customer's phone and email, only to whoever sees the customers' contact details) | see appointments | F04, F10, F22 | `appointment.appointment.get` |
 | The history of an appointment | see appointments | F10 | `appointment.appointment.history` |
 | A customer's last appointments, with notes | see appointments | F20 | `appointment.appointment.list_for_customer` |
 | How many upcoming appointments use a service | see appointments | F26 | `appointment.appointment.count_active_for_service` |
@@ -879,6 +888,7 @@ returns the open check of an appointment with `already = true`).
 | See availability and blocks | yes | yes | yes | yes | `appointment.view_schedule` |
 | Block time | yes | yes | yes | no | `appointment.manage_schedule` |
 | Settings | yes | yes | no | no | `appointment.manage_settings` |
+| See the customer's phone and email (data permission of the platform, BASE-F119) | yes | yes | yes | yes | `base.view_customer_contact` |
 
 "Their own" appointments are those of the Staff record linked to their account; an employee without a
 linked record sees the agenda empty with the notice "Your account is not linked to any Staff record: there

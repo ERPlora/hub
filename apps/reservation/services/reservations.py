@@ -168,7 +168,7 @@ CONTACT_FIELDS = ("guest_name", "guest_phone", "guest_email")
 )
 def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:  # noqa: C901
     settings = lock_book()
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     if data.on_behalf_of is not None and any(
         getattr(data, field) not in (None, False) for field in STAFF_ONLY_FIELDS
     ):
@@ -240,15 +240,15 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
     return _loaded(ctx, reservation)
 
 
-def _named(data: ReservationRefIn) -> Reservation:
+def _named(ctx: OperationContext, data: ReservationRefIn) -> Reservation:
     """The reservation the input names, locked. On the guest's behalf (``on_behalf_of``), only hers: any other —
     somebody else's, a walk-in without a card, a deleted or a missing one — is the same refusal, asked before its
     status, so a channel learns nothing about a booking that is not the guest's."""
     guest = getattr(data, "on_behalf_of", None)
     if guest is None:
-        return find_reservation(data.id, data.guest, data.day, lock=True)
+        return find_reservation(ctx, data.id, data.guest, data.day, lock=True)
     try:
-        reservation = find_reservation(data.id, data.guest, data.day, lock=True)
+        reservation = find_reservation(ctx, data.id, data.guest, data.day, lock=True)
     except NotFound:
         reservation = None
     if reservation is None or reservation.customer_id != guest:

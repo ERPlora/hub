@@ -9,7 +9,8 @@ import { expect, test } from '@playwright/test';
 import { clearPick, pickDay } from './date-time-fields';
 import { A, api, OWNER, shown } from './helpers';
 import { rowAction } from './service-helpers';
-import { choose, cleanUp, FLOW_VIEWPORTS, pick, post, recordOf, rowOf, signedIn, snap, TAG } from './task-helpers';
+import { recordOf } from './staff-helpers';
+import { choose, cleanUp, FLOW_VIEWPORTS, pick, post, rowOf, signedIn, snap, TAG } from './task-helpers';
 import { toastSaying } from './toast-helpers';
 
 test.beforeAll(cleanUp);
@@ -27,7 +28,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
     const label = (text: string): string => `${TAG} ${text} ${stamp}`;
     const { context, page } = await signedIn(browser, '/task/tasks', undefined, viewport);
     try {
-      const me = await recordOf(context, OWNER.email, 'Owner');
+      const me = await recordOf(context, OWNER.email, `${TAG} Owner`);
       const ana = await post<{ id: string }>(context, '/staff/members', { first_name: `${TAG} Ana`, last_name: `Lopez${stamp}` });
       await post(context, '/staff/members', { first_name: `${TAG} Bea`, last_name: `Ruiz${stamp}` });
       const find = async (title: string): Promise<Row> =>

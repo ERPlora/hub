@@ -3,8 +3,9 @@
 // `staff.commission.report`. The period is «Today» to begin with, then Yesterday, This week, This month or
 // a range of one's own (prefilled with the period on screen); the server counts it in business days and
 // judges the range (its 422 goes under «To»). Above the list, what the period sold and its commissions;
-// a professional who no longer works here but sold in the period is marked. Only whoever sees the pay
-// reads it; a business without Sales is told why there is nothing to show.
+// a professional who no longer works here but sold in the period is marked. Whoever reads the team follows it:
+// the server answers someone without the team's pay only their own line; a business without Sales is told why
+// there is nothing to show.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
@@ -195,8 +196,21 @@ describe('CommissionsPage', () => {
     expect(s.find('staff-commissions-total-sold').exists()).toBe(false);
   });
 
-  it('an employee does not see the pay: «You do not have permission», and nothing followed', async () => {
-    const s = await setup({ session: EMPLOYEE }, false);
+  it('an employee follows it too, and paints the one line the server gives her', async () => {
+    // flow: STAFF-F21 (la línea propia de quien no ve la paga del equipo)
+    const s = await setup({ session: EMPLOYEE });
+    await s.result(BUSINESS, business());
+    expect(s.report()).toEqual([{ period: 'today' }]);
+    await s.show({ ...REPORT, rows: [REPORT.rows[0]], total_sold: 2721, total_commission: 408 });
+    expect(s.find('staff-commissions-forbidden').exists()).toBe(false);
+    expect(s.rows()).toHaveLength(1);
+    expect(s.cells(0)).toEqual(['Ana López', 'Stylist', '€27.21', '15 %', '€4.08']);
+    expect(s.find('staff-commissions-total-commission').text()).toContain('€4.08');
+  });
+
+  it('without reading the team: «You do not have permission», and nothing followed', async () => {
+    const session = { ...EMPLOYEE, permissions: EMPLOYEE.permissions.filter((p) => p !== 'staff.view') };
+    const s = await setup({ session }, false);
     expect(s.find('staff-commissions-forbidden').text()).toContain('You do not have permission');
     expect(s.report()).toEqual([]);
     expect(s.table().exists()).toBe(false);

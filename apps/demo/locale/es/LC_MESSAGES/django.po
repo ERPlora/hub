@@ -170,3 +170,9 @@ msgstr "Un elemento abierto sigue en la lista hasta que se marca como hecho."
 #: apps.py
 msgid "See the items"
 msgstr "Ver los elementos"
+
+msgid "View items"
+msgstr "Ver elementos"
+
+msgid "Manage items and view their figures"
+msgstr "Gestionar elementos y ver sus cifras"

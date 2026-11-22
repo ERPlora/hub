@@ -719,9 +719,10 @@ Pasos:
    sigue en la cuenta con su comanda, y a cocina no le llega nada nuevo.
 Entra: nada de otras apps.
 Sale: la línea invitada: no suma dinero ni IVA, pero el aviso de venta la lleva para que Inventario
-baje el stock; la venta guarda el coste de lo invitado.
+baje el stock; la venta guarda el coste de lo invitado, que solo ve quien ve los costes: a los demás la
+venta, su cobro y la previsión del cobro se lo dan vacío (BASE-F119).
 Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.».
-Implicados: INVENTORY-F21
+Implicados: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
 Estado: hecho
@@ -750,7 +751,8 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía. En
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si su
+cuenta no tiene nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
 Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;
@@ -1074,9 +1076,10 @@ Pasos:
    una venta, sin recargar. Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el
    negocio o sus ventas.
 Entra: nada de otras apps.
-Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
-la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
-y, de las sesiones de bono gastadas fuera del cobro, las de su ficha. Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo pide el asistente para la comisión)
+cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas y, de las sesiones
+de bono gastadas fuera del cobro, las de su ficha. Personal lo pide como la plataforma, para que la fila de cada
+profesional cuente todo lo que hizo, y decide él qué filas ve cada persona (STAFF-F21). Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
@@ -1528,10 +1531,11 @@ MODIFIER-F07, MODIFIER-F08
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
 persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: un producto se
-nombra por su id, su SKU o su nombre; un cliente por su id, su nombre, su teléfono o su email; una
-venta por su id o su número; una sección o una nota rápida por su id o su nombre; un medio de
-pago por su id, su nombre o su tipo («efectivo», «tarjeta»). Si un nombre casa con varios, se rechaza
-diciendo cuáles (409 `*_ambiguous`).
+nombra por su id, su SKU o su nombre; un cliente por su id o su nombre y, quien ve el contacto de los
+clientes, también por su teléfono o su email (a quien no lo ve, esas palabras solo le casan con un
+nombre: 404 `customer.customer_unavailable`, BASE-F119); una venta por su id o su número; una sección
+o una nota rápida por su id o su nombre; un medio de pago por su id, su nombre o su tipo («efectivo»,
+«tarjeta»). Si un nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 
 Lo que lee o toca una venta ya cobrada (la lista, la venta, su documento y su papel, «Emitir ahora», anular y
 devolver) solo alcanza las ventas que la persona ve: sin «Ver todas las ventas», las que cobró y las que se le
@@ -1637,8 +1641,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 ### Lo que necesita de otras apps
 
 - **Impuestos** (requisito): la regla y el cálculo del IVA de cada línea al cobrar.
-- **Clientes** (requisito): la ficha del cliente de la venta y su búsqueda por nombre o teléfono; el
-  enlace de la cuenta con su cliente lo guarda Clientes (`customer.order.link`).
+- **Clientes** (requisito): la ficha del cliente de la venta y su búsqueda por nombre o, para quien ve el
+  contacto de los clientes, por teléfono o email; el enlace de la cuenta con su cliente lo guarda Clientes
+  (`customer.order.link`).
 - **Inventario** (opcional): el catálogo de venta, el precio, la unidad y la categoría fiscal de cada
   artículo, leídos con sus propias consultas al añadir la línea.
 - **Personal** (opcional): el equipo para el chip «Atiende», la ficha de quien tiene la sesión
@@ -1694,6 +1699,12 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+
+Dos permisos de dato de la plataforma (BASE-F119) recortan lo que se ve en Ventas: lo que costó lo invitado
+(SALE-F15) solo lo ve quien ve los costes (propietario, administrador y responsable), y nombrar al cliente de un
+cobro por su teléfono o su email solo lo puede quien ve el contacto de los clientes (también el empleado). Ventas no
+enseña el email ni el teléfono del cliente: guarda su nombre y, en una factura, su NIF y su domicilio, que son datos
+fiscales y los ve todo el que ve la venta.
 
 Lo que el empleado no puede hacer en el TPV lo pide en su propio dispositivo y lo aprueba un responsable
 con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para esa misma petición: anular
@@ -2078,6 +2089,15 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   sesiones de bono fuera del cobro con `VOUCHER_SESSIONS` (las de su ficha). `tests/test_guardrails_ownership.py`
   prohíbe `Sale.objects` y `VoucherSession.objects` en los paquetes `queries` fuera de su lista cerrada, cada entrada
   con su motivo.
+- **Permisos de dato** (BASE-F119, `live.sensitive`): `SaleOut.gift_total` y `PreviewOut.gift_total` llevan la marca
+  `COSTS` y admiten nulo. live los da vacíos a quien no ve los costes en todas las puertas que los responden (la venta y
+  su búsqueda por intento, el cobro, la anulación, «Emitir ahora» y la previsión del cobro), y el cobro los guarda igual
+  porque lee el coste de cada línea con `recording_costs`. El aviso `sale.sale.completed` sigue llevando `gift_total`
+  para las Automatizaciones, que solo abren el propietario y el administrador; Caja lee la venta y marca su propia
+  copia. El cliente de un cobro nombrado por una referencia lo busca `find_customer` de Clientes, que solo casa el
+  teléfono o el email con `base.view_customer_contact`; la lista de ventas busca en el número y en el nombre que guarda
+  la venta, nunca en el contacto. `tests/test_guardrails_sensitive.py` cuenta `gift_total` y `total_gifts` como nombres
+  de coste.
 - **Ids sin clave ajena hacia apps fuera de `requires`** (precedente PLAN §20.5, `product_id`): la venta
   guarda `invoice_id` de Facturación y la línea `service_id`, `voucher_session_id`, `staff_id` y la
   cuenta `appointment_id`, como UUID opacos; Ventas sigue sin requerir Facturación, Caja, Citas ni

@@ -51,13 +51,13 @@ class VerifactuConfig(LiveAppConfig):
     # A record is born from an issued invoice, read from its row (a foreign key).
     requires = ["invoice"]
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = [
-        "verifactu.view_record",
-        "verifactu.add_record",
-        "verifactu.transmit_record",
-        "verifactu.correct_record",
-        "verifactu.configure",
-    ]
+    permissions = {
+        "verifactu.view_record": _("View records, the queue, events and the chain, and verify the chain"),
+        "verifactu.add_record": _("Register an issued invoice"),
+        "verifactu.transmit_record": _("Send the queue to the AEAT, ask the AEAT and test the connection"),
+        "verifactu.correct_record": _("Fix and cancel records"),
+        "verifactu.configure": _("Upload the certificate, switch to production and recover the chain"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Receiving the account's
     # photo (``verifactu.sync_config``) is declared by no role: only the system holds it.
     role_permissions = {

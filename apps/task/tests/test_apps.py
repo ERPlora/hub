@@ -80,7 +80,7 @@ def test_task_has_the_store_metadata_and_belongs_to_both_verticals():
 
 
 def test_permissions():
-    assert task_app().permissions == PERMISSIONS
+    assert list(task_app().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

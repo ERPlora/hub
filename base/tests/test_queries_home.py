@@ -104,7 +104,7 @@ def module(label, *, setup=(), widgets=(), bell=(), notices=(), listed=True, per
         widgets=list(widgets),
         bell=list(bell),
         notices=list(notices),
-        permissions=list(permissions),
+        permissions=dict.fromkeys(permissions, "A phrase"),
         **more,
     )
 

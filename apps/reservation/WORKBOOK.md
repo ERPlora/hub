@@ -113,7 +113,7 @@ Aquí está el libro del día: arriba, la fecha con sus flechas y tres cifras (c
 próxima franja); debajo, las reservas del día por hora, con su cliente, sus comensales, su mesa y su estado. Con
 «Nueva reserva» apuntas una que llega por teléfono o en el local; en cada fila la confirmas, la sientas cuando llega
 el grupo, la completas cuando se va o la cancelas. El buscador encuentra una reserva en todo el libro por nombre,
-teléfono o correo.
+teléfono o correo; por el teléfono y el correo, solo a quien ve el contacto de los clientes.
 
 #### Detalle
 Menú **Reservas → Reservas**. Arriba, la **barra del día**: «Día anterior», la fecha, «Día siguiente» y
@@ -128,7 +128,9 @@ escribió, o «Liberada: nunca se confirmó»; uno largo, acortado con «…»);
 **todo** el libro, también por las cifras del teléfono sin prefijo (resultados por día y hora);
 filtros por hora, comensales, mesa y estado; vista tabla o tarjetas. Acción principal **«Nueva
 reserva»** y, por fila, según su estado: «Confirmar», «Sentar», «Completar», «Cancelar», «No
-presentado», «Editar» y «Borrar» (solo el administrador). Tocar una fila la abre para editarla.
+presentado», «Editar» y «Borrar» (solo el administrador). Tocar una fila la abre para editarla. Quien no ve el
+contacto de los clientes tiene la tabla sin «Teléfono» y el buscador «Buscar cliente…», que solo mira el
+nombre. Nadie ordena la tabla por el teléfono: el orden diría el número a quien no lo ve.
 
 Vacía: «No hay reservas este día», con explicación y «Nueva reserva». Buscando sin resultados:
 «Ninguna reserva coincide con la búsqueda» y «Limpiar filtros». Cargando: «Cargando…» y las cifras en
@@ -140,6 +142,8 @@ nombre o teléfono, con «+ Nuevo cliente»), Nombre, Teléfono, Correo, Fecha, 
 (minutos), Mesa (las libres a esa hora, con su aforo y su zona; las que no caben al grupo, avisadas),
 Origen (Teléfono, En el local), Notas del cliente y Notas internas. Una reserva ya sentada, completada,
 cancelada o no presentada solo cambia sus notas, y lo dice arriba; la cancelada, además, con su motivo entero.
+Quien no ve el contacto de los clientes no ve el Teléfono ni el Correo de la reserva que edita, y guardarla los
+conserva; con una ficha elegida en «Nueva reserva», tampoco: la reserva lleva los de la ficha.
 
 ### Lista de espera
 Aquí apuntas a quien quiere mesa y no cabe, en el orden en que llega, con el día y la hora que prefiere y sus
@@ -148,8 +152,8 @@ comensales. Cuando le llamas, lo marcas «Contactado»; si queda sitio, «Conver
 
 #### Detalle
 Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (por día y hora preferida):
-Fecha, Hora pref., Cliente, Teléfono (como en Clientes), Pax, Contactado, Estado (En espera, Convertida);
-buscador y filtros (fecha, contactado, convertida). Acción principal **«Añadir cliente»** (Cliente,
+Fecha, Hora pref., Cliente, Teléfono (como en Clientes, solo a quien ve el contacto de los clientes), Pax, Contactado,
+Estado (En espera, Convertida); buscador y filtros (fecha, contactado, convertida), como en Reservas. Acción principal **«Añadir cliente»** (Cliente,
 Nombre, Teléfono, Fecha, Hora, Pax, Notas → «Añadir a la lista de espera»); por fila «Contactado»,
 «Convertir» y «Quitar». Vacía: «Lista de espera vacía.». Cargando: «Cargando…». Error: el mensaje
 de la tabla con «Reintentar».
@@ -330,7 +334,8 @@ Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración,
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
 espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país
 conserva el suyo. Es el número con el que WhatsApp encuentra la conversación del cliente
-(RESERVATION-F19).
+(RESERVATION-F19). Quien no ve el contacto de los clientes (BASE-F119) busca al cliente solo por su nombre y, con la
+ficha elegida, no ve su teléfono ni su correo: la reserva lleva los de la ficha, y la respuesta le llega sin ellos.
 Sale: la reserva, ligada a la ficha del cliente (avisa: `reservation.reservation.created`).
 Si falla: no se guarda nada y lo escrito se queda; el primer motivo que aplica, en este orden: un
 teléfono que no es de su país (el motivo de Clientes, «No es un teléfono válido de su país: revisa las
@@ -350,7 +355,7 @@ Dos reservas a la vez sobre el último hueco o sobre la misma mesa y hora: entra
 motivo (en la franja llena, el personal puede después reservar igualmente; en la mesa, nunca). En la
 ventana, el motivo de un campo (la Mesa incluida) sale debajo de él y se quita en cuanto se corrige ese
 campo, aunque otro diga lo mismo.
-Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
+Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25, BASE-F119
 
 ### RESERVATION-F07 Confirmar una reserva
 Estado: hecho
@@ -383,13 +388,14 @@ Pasos:
    dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona, como la nombra Mesas
    («Cambiar en Reservas: Ana García · 15 oct 2026 · 21:00 · 7 (Terraza)»), nunca por un código.
 Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
-mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio.
+mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio. Quien no ve el contacto de los
+clientes (BASE-F119) no ve el teléfono ni el correo y no los cambia: guardar los conserva.
 Sale: la reserva cambiada (avisa: `reservation.reservation.updated`).
 Si falla: los mismos motivos que al tomar una reserva a mano, y el primero, un teléfono que no es de su país: «No es un
 teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…).», en el
 campo Teléfono, y no cambia nada; en otro estado: «Esta reserva ya no se puede cambiar: solo sus
 notas.».
-Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18
+Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18, BASE-F119
 
 ### RESERVATION-F09 Cancelar una reserva
 Estado: hecho
@@ -668,9 +674,14 @@ se rechaza diciendo cuáles (409 `*_ambiguous`). Cambiar y cancelar se pueden pe
 (`on_behalf_of`, su ficha; hoy, desde WhatsApp): solo su reserva, con sus reglas de cliente y sin tocar la
 mesa, las notas internas ni reservar igualmente (F18).
 
+El teléfono y el correo del cliente de una reserva o de la lista de espera solo salen a quien ve el contacto de los
+clientes (BASE-F119): a cualquier otro le llegan vacíos, la búsqueda y una referencia («la reserva del 600 111 222»)
+solo le casan con el nombre, filtrar por el teléfono se le rechaza como una acción sin permiso (403
+`permission_denied`) y ordenar por él no existe para nadie.
+
 Antes de cambiar nada, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro
 como lo nombran las pantallas de Reservas, nunca por su código: una reserva, por su cliente, su día y su
-hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono; con los datos del cliente borrados,
+hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono a quien lo ve; con los datos del cliente borrados,
 por el día y la hora); una entrada de la lista de espera, igual; una franja, por su día de la semana y sus
 horas («Jueves · 20:00–23:30»); una fecha bloqueada, por su día y, si no es entera, sus horas; el cliente,
 por el nombre de su ficha, y la mesa, con su zona («5 (Terraza)»), como la nombra Mesas.
@@ -820,6 +831,13 @@ la que solo se le autorizó reservar.
   declara `ai.in_person`: Automatizaciones no lo ofrece ni lo concede (`flow.high_risk`), porque abre la
   cuenta de la mesa con la sesión de quien sienta (`table.add_session` y `sale.add_sale`); el asistente, con
   una persona delante, sienta sin pedir confirmación (`risk: normal`).
+- **El contacto del invitado** (BASE-F119): `guest_phone` y `guest_email` de `ReservationOut` y `WaitlistOut` son los
+  campos `PHONE` y `EMAIL` de `apps/customer/schemas/contact.py`, con la marca `CUSTOMER_CONTACT`, y el filtro
+  `guest_phone` de las dos listas también la lleva. La búsqueda, `find_reservation`, `find_entry` (`_guest_matches`) y
+  la etiqueta de un invitado sin nombre (`_who`) miran el teléfono y el correo solo con `sees_contact` de Clientes. En
+  la interfaz, la columna «Teléfono» de las dos listas sale de `frontend/lib/guestContact.ts`, y el formulario de
+  reserva no enseña ni manda lo que llegó vacío. Un paso de una automatización lleva los permisos de dato de base
+  (FLOW-F12), así que las recetas de WhatsApp siguen leyendo y filtrando por el teléfono.
 - **Modelos**: `Settings` (una fila), `TimeSlot` (día de la semana, desde, hasta, máximo de reservas y
   de comensales; borrado lógico; sin solapes en el mismo día), `BlockedDate` (todo el día o
   desde–hasta; único por fecha y hora de inicio entre los vivos), `Reservation` (cliente, nombre,

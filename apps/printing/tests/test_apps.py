@@ -69,7 +69,7 @@ def test_it_is_in_the_store_and_in_both_verticals():
 
 
 def test_permissions():
-    assert config().permissions == PERMISSIONS
+    assert list(config().permissions) == PERMISSIONS
 
 
 def test_what_each_role_gets():

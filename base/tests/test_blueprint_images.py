@@ -9,7 +9,7 @@ longer has, or a photo missing from the file or past the plan's space, loads its
 says why; a ``media/`` entry that is no WebP of 2 MB at most makes the file unreadable.
 
 The ceilings: a photo is kept as a 512 × 512 WebP of 20–60 KB (``base.images``), already compressed, so a zip carries
-about what its photos weigh: 300 photos of 60 KB are 18 MB, under :data:`blueprint.MAX_FILE_BYTES` (20 MB), in 1 000
+about what its photos weigh: 300 photos of 60 KB are 18 MB, under :data:`blueprint.archive.MAX_FILE_BYTES` (20 MB), in 1 000
 entries at most; once inflated, 100 MB (the rows' JSON compresses ten to one, the photos not at all).
 
 Every test works in business A's own database, and business B in its own, as production does.
@@ -61,7 +61,7 @@ def library(settings, tmp_path):
     """The library with the test's images and every image the seeds name."""
     seen = {(image["folder"], image["name"]) for image in IMAGES}
     extra = []
-    for seed in blueprint.catalog():
+    for seed in blueprint.seeds.catalog():
         for key in ("inventory.product", "service.service"):
             for row in seed.bundle.data.get(key, []):
                 if not row.get("image"):
@@ -87,8 +87,8 @@ def product_row(name="Café con leche", sku="CAF-02", **fields):
 
 
 def bundle(rows, media=None, purpose="template"):
-    return blueprint.Bundle(
-        manifest=blueprint.manifest(
+    return blueprint.archive.Bundle(
+        manifest=blueprint.archive.manifest(
             name="Bar Pepe", language="es", country="ES", purpose=purpose, created_at="", vertical="restaurant",
             apps=["inventory"],
         ),
@@ -129,9 +129,9 @@ def problems(result) -> list[str]:
 
 @pytest.mark.parametrize("key", ["restaurant.es", "hair_salon.en"])
 def test_a_template_brings_each_product_and_service_with_its_image(ctx, library, key):
-    seed = blueprint.template(key)
+    seed = blueprint.seeds.template(key)
 
-    result = blueprint.apply(ctx, seed.bundle, apps=None)
+    result = blueprint.loading.apply(ctx, seed.bundle, apps=None)
 
     assert problems(result) == []
     shown = {row.sku: row.image for row in call(ctx, "inventory.product.list", limit=100).rows}
@@ -142,18 +142,18 @@ def test_a_template_brings_each_product_and_service_with_its_image(ctx, library,
 
 
 def test_loading_a_template_again_changes_no_image(ctx, library):
-    seed = blueprint.template("restaurant.es")
-    blueprint.apply(ctx, seed.bundle, apps=None)
+    seed = blueprint.seeds.template("restaurant.es")
+    blueprint.loading.apply(ctx, seed.bundle, apps=None)
     before = {sku: (product.image, product.updated_at) for sku, product in products(ctx).items()}
 
-    again = blueprint.apply(ctx, seed.bundle, apps=None)
+    again = blueprint.loading.apply(ctx, seed.bundle, apps=None)
 
     assert {sku: (product.image, product.updated_at) for sku, product in products(ctx).items()} == before
     assert again.created == {}
 
 
 def test_an_image_the_library_no_longer_has_loads_the_product_without_it_and_says_why(ctx, library):
-    result = blueprint.apply(ctx, bundle([product_row(image="catalog:hospitality/churros"), product_row("Agua", "BEB-01", image="")]), apps=None)
+    result = blueprint.loading.apply(ctx, bundle([product_row(image="catalog:hospitality/churros"), product_row("Agua", "BEB-01", image="")]), apps=None)
 
     assert {sku: product.image for sku, product in products(ctx).items()} == {"CAF-02": "", "BEB-01": ""}
     assert problems(result) == ["«Café con leche»: Esa imagen ya no está en la librería. Elige otra."]
@@ -184,9 +184,9 @@ def test_a_photo_that_is_gone_from_the_store_is_exported_without_it(ctx, library
     reference, _ = photo_of(ctx)
     hub_files.delete(f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}")
 
-    data = blueprint.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
+    data = blueprint.export.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
 
-    assert blueprint.export_media(ctx, data) == {}
+    assert blueprint.photos.export_media(ctx, data) == {}
     assert "image" not in data["inventory.product"][0]
 
 
@@ -195,13 +195,13 @@ def test_a_photo_that_is_gone_from_the_store_is_exported_without_it(ctx, library
 
 def test_loading_the_file_in_another_business_copies_each_photo_under_a_new_name(ctx, library, hub_files, hub_b):  # noqa: F811
     reference, kept = photo_of(ctx)
-    data = blueprint.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
-    media = blueprint.export_media(ctx, data)
-    content = blueprint.write_zip(bundle(data["inventory.product"], media))
+    data = blueprint.export.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
+    media = blueprint.photos.export_media(ctx, data)
+    content = blueprint.archive.write_zip(bundle(data["inventory.product"], media))
 
     with use_hub(hub_b):
         other = person(B)
-        result = blueprint.apply(other, blueprint.read_zip(content), apps=None)
+        result = blueprint.loading.apply(other, blueprint.archive.read_zip(content), apps=None)
         copy = products(other)["CAF-03"].image
 
     assert problems(result) == []
@@ -216,16 +216,16 @@ def test_loading_it_twice_copies_no_photo_twice(ctx, library, hub_files, hub_b):
     hub = hub_b.id
     with use_hub(hub_b):
         other = person(B)
-        blueprint.apply(other, loaded, apps=None)
+        blueprint.loading.apply(other, loaded, apps=None)
         before = hub_files.listdir(f"{hub_prefix(hub)}/{FOLDER}")[1]
 
-        blueprint.apply(other, loaded, apps=None)
+        blueprint.loading.apply(other, loaded, apps=None)
 
     assert hub_files.listdir(f"{hub_prefix(hub)}/{FOLDER}")[1] == before and len(before) == 1
 
 
 def test_a_photo_missing_from_the_file_loads_the_product_without_it_and_says_why(ctx, library, hub_files):  # noqa: F811
-    result = blueprint.apply(ctx, bundle([product_row(image=f"file:{FOLDER}{uuid.uuid7().hex}.webp")]), apps=None)
+    result = blueprint.loading.apply(ctx, bundle([product_row(image=f"file:{FOLDER}{uuid.uuid7().hex}.webp")]), apps=None)
 
     assert products(ctx)["CAF-02"].image == ""
     assert problems(result) == ["«Café con leche»: su foto no viene en el archivo, así que entra sin ella."]
@@ -235,7 +235,7 @@ def test_a_photo_past_the_plans_space_loads_the_product_without_it_and_says_why(
     name = f"{FOLDER}{uuid.uuid7().hex}.webp"
     Hub.objects.filter(slug=A.key).update(state={"plan": {"max_storage_bytes": 10}})
 
-    result = blueprint.apply(ctx, bundle([product_row(image=f"file:{name}")], {name: webp()}), apps=None)
+    result = blueprint.loading.apply(ctx, bundle([product_row(image=f"file:{name}")], {name: webp()}), apps=None)
 
     assert products(ctx)["CAF-02"].image == ""
     [problem] = problems(result)
@@ -244,11 +244,11 @@ def test_a_photo_past_the_plans_space_loads_the_product_without_it_and_says_why(
 
 def test_undoing_the_load_deletes_the_photos_it_copied(ctx, library, hub_files, django_capture_on_commit_callbacks):  # noqa: F811
     name = f"{FOLDER}{uuid.uuid7().hex}.webp"
-    result = blueprint.apply(ctx, bundle([product_row(image=f"file:{name}")], {name: webp()}), apps=None)
+    result = blueprint.loading.apply(ctx, bundle([product_row(image=f"file:{name}")], {name: webp()}), apps=None)
     copy = products(ctx)["CAF-02"].image
 
     with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-        blueprint.undo(ctx, result.created)
+        blueprint.removal.undo(ctx, result.created)
 
     assert copy.startswith("file:")
     assert not hub_files.exists(f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{copy.removeprefix('file:')}")
@@ -258,12 +258,12 @@ def test_a_service_travels_with_its_image(ctx, library, hub_b):
     made = call(ctx, "service.service.create", name="Corte de señora", tax_category_key="service.generic", price=2500)
     call(ctx, "service.service.set_image", id=made.id, image="catalog:beauty_hair/corte_senora")
 
-    data = blueprint.export_data(ctx, {"service": ["service.service"]}, purpose="template")
+    data = blueprint.export.export_data(ctx, {"service": ["service.service"]}, purpose="template")
     assert data["service.service"][0]["image"] == "catalog:beauty_hair/corte_senora"
 
     with use_hub(hub_b):
         other = person(B)
-        result = blueprint.apply(other, blueprint.Bundle(manifest=bundle([]).manifest, data=data), apps={"service"})
+        result = blueprint.loading.apply(other, blueprint.archive.Bundle(manifest=bundle([]).manifest, data=data), apps={"service"})
         images = {row.name: row.image for row in call(other, "service.service.list", limit=10).rows}
 
     assert problems(result) == [] and result.created["service.service"]
@@ -292,7 +292,7 @@ def test_a_written_file_reads_back_with_its_photos():
     name = f"{FOLDER}{uuid.uuid7().hex}.webp"
     written = bundle([product_row(image=f"file:{name}")], {name: webp()})
 
-    assert blueprint.read_zip(blueprint.write_zip(written)) == written
+    assert blueprint.archive.read_zip(blueprint.archive.write_zip(written)) == written
 
 
 @pytest.mark.parametrize(
@@ -309,36 +309,36 @@ def test_a_written_file_reads_back_with_its_photos():
 def test_a_media_entry_that_is_no_photo_of_ours_makes_the_file_unreadable(entry, content, reason):
     content = a_webp(2 * 1024 * 1024 + 1) if content is None else content
 
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(zip_with_media({entry: content}))
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(zip_with_media({entry: content}))
 
     assert refused.value.reason == reason
     assert str(refused.value)
 
 
 def test_the_ceilings_fit_three_hundred_photos():
-    assert (blueprint.MAX_FILE_BYTES, blueprint.MAX_INFLATED_BYTES, blueprint.MAX_ENTRIES) == (
+    assert (blueprint.archive.MAX_FILE_BYTES, blueprint.archive.MAX_INFLATED_BYTES, blueprint.archive.MAX_ENTRIES) == (
         20 * 1024 * 1024, 100 * 1024 * 1024, 1000,
     )
     photos = {f"media/{FOLDER}{uuid.uuid7().hex}.webp": a_webp(60 * 1024) for _ in range(300)}
 
     content = zip_with_media(photos)
 
-    assert len(content) <= blueprint.MAX_FILE_BYTES
-    assert len(blueprint.read_zip(content).media) == 300
+    assert len(content) <= blueprint.archive.MAX_FILE_BYTES
+    assert len(blueprint.archive.read_zip(content).media) == 300
 
 
 def test_past_a_thousand_entries_the_file_is_refused():
-    photos = {f"media/{FOLDER}{uuid.uuid7().hex}.webp": a_webp(20) for _ in range(blueprint.MAX_ENTRIES - 1)}
+    photos = {f"media/{FOLDER}{uuid.uuid7().hex}.webp": a_webp(20) for _ in range(blueprint.archive.MAX_ENTRIES - 1)}
 
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(zip_with_media(photos))
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(zip_with_media(photos))
 
     assert refused.value.reason == "unreadable"
 
 
 def test_a_file_past_20_mb_is_said_so():
-    with pytest.raises(blueprint.BlueprintInvalid) as refused:
-        blueprint.read_zip(b"0" * (blueprint.MAX_FILE_BYTES + 1))
+    with pytest.raises(blueprint.archive.BlueprintInvalid) as refused:
+        blueprint.archive.read_zip(b"0" * (blueprint.archive.MAX_FILE_BYTES + 1))
 
     assert "20 MB" in str(refused.value)

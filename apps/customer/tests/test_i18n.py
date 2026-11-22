@@ -87,16 +87,16 @@ def test_spanish_texts():
         assert (
             str(queries.CUSTOMER_UNAVAILABLE) == "Este cliente ya no está disponible."
         )
-        assert str(services.PHONE_INVALID) == (
+        assert str(services.writes.PHONE_INVALID) == (
             "No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo "
             "internacional (+44…)."
         )
         assert (
-            str(services.GROUP_NAME_TAKEN)
+            str(services.groups.GROUP_NAME_TAKEN)
             == "Ya hay un grupo con ese nombre. Elige otro nombre."
         )
         assert (
-            str(services.HEALTH_CONSENT_REQUIRED)
+            str(services.health.HEALTH_CONSENT_REQUIRED)
             == "Registra antes su permiso para guardar datos de salud."
         )
         assert str(models.HealthRecord.TestResult.NEGATIVE.label) == "Negativa"
@@ -163,7 +163,7 @@ def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field(
 
 @pytest.mark.parametrize(
     ("key", "message"),
-    [("invalidNumber", services.FIELD_INVALID_NUMBER)],
+    [("invalidNumber", services.field_values.FIELD_INVALID_NUMBER)],
 )
 def test_what_the_card_cannot_read_is_worded_as_the_server_refuses_it(key, message):
     """A number the browser cannot read is told by the form itself (it never reaches the server): in each

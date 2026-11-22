@@ -339,11 +339,11 @@ describe('MembersPage: who may do what', () => {
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['edit']);
   });
 
-  it('an employee only reads: no «+», no row to open, no action, no Roles, Commissions or Settings tab', async () => {
+  it('an employee only reads: no «+», no row to open, no action, no Roles or Settings tab; Commissions, her own row', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page(ROWS));
     expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);
-    expect(tabsOf(s.wrapper).map(([id]) => id)).toEqual(['members', 'time-off', 'schedules']);
+    expect(tabsOf(s.wrapper).map(([id]) => id)).toEqual(['members', 'time-off', 'schedules', 'commissions']);
   });
 });
 
@@ -463,6 +463,6 @@ describe('MembersPage: the list fills the page', () => {
 describe('MembersPage: its tab bar', () => {
   itPaintsTheTabsItsSessionOpens(
     () => setup({ session: EMPLOYEE }),
-    [['members', 'Staff'], ['time-off', 'Time Off'], ['schedules', 'Schedules']],
+    [['members', 'Staff'], ['time-off', 'Time Off'], ['schedules', 'Schedules'], ['commissions', 'Commissions']],
   );
 });

@@ -1041,3 +1041,27 @@ msgstr "Esa devolución no existe."
 
 msgid "Refund of sale %(number)s"
 msgstr "Devolución de la venta %(number)s"
+
+msgid "View sales and their figures, checks and the till settings"
+msgstr "Ver las ventas y sus cifras, las cuentas y los ajustes del TPV"
+
+msgid "Build a check: open, add, split, merge, send to the kitchen and discount up to the limit"
+msgstr "Montar la cuenta: abrir, añadir, dividir, juntar, enviar a cocina y descontar hasta el máximo"
+
+msgid "Take payments"
+msgstr "Cobrar"
+
+msgid "Give discounts over the limit"
+msgstr "Hacer descuentos por encima del máximo"
+
+msgid "View payment methods"
+msgstr "Ver los medios de pago"
+
+msgid "Create payment methods"
+msgstr "Crear medios de pago"
+
+msgid "View everyone's sales"
+msgstr "Ver las ventas de todos"
+
+msgid "Change the till settings, sections and quick notes"
+msgstr "Cambiar los ajustes del TPV, las secciones y las notas rápidas"

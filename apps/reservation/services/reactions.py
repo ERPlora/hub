@@ -6,7 +6,7 @@ from live.operations import operation
 from live.models import OutboxEvent
 from live.outbox import record_event
 
-from apps.customer.services import lock_customers
+from apps.customer.services.writes import lock_customers
 from apps.reservation import events
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.schemas import ChangedOut, CustomerEventIn, MergedIn

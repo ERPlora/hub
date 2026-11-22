@@ -15,6 +15,7 @@ from base.tenancy.tests.test_recovery import fresh, run, run_in
 from . import test_recovery as whole
 from .conftest import HUB_DB, make_category, make_service, make_tax
 from .test_recovery import recoveries  # noqa: F401 - the fixture of the two databases
+from .test_recovery_categories import a_recovery, links_of
 
 pytestmark = HUB_DB
 
@@ -22,9 +23,9 @@ pytestmark = HUB_DB
 def test_a_category_a_failed_recovery_brought_back_takes_back_what_it_had_inside_from_the_one_that_carries_it_on():
     tax = make_tax("test.service", "Service — test")
     gloss, toning = make_service("Gloss", tax=tax), make_category("Toning")
-    failed = whole.a_recovery()
-    [service], [subcategory] = whole.links_of(failed, services=[gloss], subcategories=[toning])
-    now = whole.a_recovery()
+    failed = a_recovery()
+    [service], [subcategory] = links_of(failed, services=[gloss], subcategories=[toning])
+    now = a_recovery()
 
     with giving_back(now, carrying_on=[failed]):
         whole.create(service, "service.service.return_to_category", now)

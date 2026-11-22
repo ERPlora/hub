@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4d2a53c538695cb0b0cc36018b340859ac9f7229421d28a92037afe338226093 -->
+<!-- generated from WORKBOOK.md sha256:7aeb7ef27c16129dbf89bad4589aa123ca8432a0d4a452d516438772c0466ec5 -->
 
 ## What it is for and who it is for
 
@@ -102,7 +102,8 @@ On the left (on a phone, from the bar's button): the person at the top and the p
 "Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever holds the
 permission its screen opens with, as in Square or Toast: "System", to whoever runs the business; "API", besides, while
 the API documentation is shown (BASE-F91), and it appears or goes when the switch changes, without reloading. An
-employee sees "Home", "Employees", "Files", "Apps" and "Settings". At the bottom, the QR code, "Upgrade plan" (the owner
+employee sees "Home", "Employees", "Files", "Apps" and "Settings". An entry the person does not have, opened by its
+address, says "No access" (BASE-F118). At the bottom, the QR code, "Upgrade plan" (the owner
 only) and "Manage on erplora.com".
 
 ### "Upgrade plan"
@@ -179,8 +180,8 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
   each section has, and "Copies of the data", with the copies kept and their "Download".
 
 ### System · Usage and plan
-From "System" in the side menu. Four tabs at the bottom: "Usage and plan", "Updates", "Failed events" and "Logs" (this
-one, only for whoever runs the business); "Usage and plan" opens: their plan with "Upgrade plan" (for the owner), a line that says whether
+From "System" in the side menu, which only whoever runs the business has. Four tabs at the bottom: "Usage and plan",
+"Updates", "Failed events" and "Logs"; "Usage and plan" opens: their plan with "Upgrade plan" (for the owner), a line that says whether
 it is enough or they have to upgrade and why, "What your plan includes", from the fullest down, with its bar, and "For
 your information", with the figures no plan limits.
 
@@ -281,7 +282,7 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 | Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
 | Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
-| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". A screen of an app their role does not open, opened by its address: "No access" (BASE-F118). |
+| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
 
@@ -344,7 +345,7 @@ On the Employees screens and the API documentation:
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | done |
 | BASE-F12 | Ask the assistant to go over the setup | done |
-| BASE-F13 | Lose access on a role change or on leaving the business | done |
+| BASE-F13 | A role change or leaving the business with the hub open | done |
 | BASE-F14 | See the business's apps | done |
 | BASE-F15 | Open an app from Apps | done |
 | BASE-F16 | Look for an app in the catalogue | done |
@@ -745,28 +746,32 @@ Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
 Involved: BASE-F103
 
-### BASE-F13 Lose access on a role change or on leaving the business
+### BASE-F13 A role change or leaving the business with the hub open
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: any screen of the hub
 Steps:
   1. At erplora.com, whoever manages the business changes a person's role, removes them from the business
      or hands the ownership over to them.
-  2. At that moment that person's session in this business ends, on all their devices: what they have open
-     stops updating and the next thing they do asks them to sign in again. Their sessions in other
-     businesses stay open.
-  3. If they are still in the business, they come back in from erplora.com and already work with their new
-     role: what the new role allows appears and what it does not, disappears.
-  4. If they were removed, on coming back erplora.com tells them "You don't have access to this hub" and
-     they do not get in.
+  2. If their role changed, their session stays open and what they have open, on all their devices, moves
+     at that moment to what the new role allows, without reloading or signing in again: the menu, "My apps"
+     and the tabs show only what they may open; the screen in front of them turns into "No access" if the
+     new role does not open it, and one that said "No access" opens if they now may.
+  3. If they were removed from the business, at that moment their session in this business ends, on all
+     their devices: what they have open stops updating and the next thing they do asks them to sign in
+     again; on coming back, erplora.com tells them "You don't have access to this hub" and they do not get
+     in. Their sessions in other businesses stay open.
+  4. A handover of the ownership ends the session of both people in this business (HUBS-F28): they come
+     back in from erplora.com and already work with their new role.
   5. If they change their password, sign out everywhere or delete their account at erplora.com, all their
      sessions of the hub end, in all their businesses.
 In: the change erplora.com made (who, in which business and with which role, or that they are no longer
 there).
-Out: that person's sessions ended; their role in the business, up to date.
-If it fails: if the hub does not answer at that moment, erplora.com tries again shortly; meanwhile, the
-next time erplora.com passes the business's state to the hub those sessions end too.
-Involved: HUBS-F26, HUBS-F27, HUBS-F28
+Out: their role in the business, up to date, and what they have open with what that role allows; the
+sessions of whoever is no longer in the business, ended.
+If it fails: if the hub does not answer at that moment, erplora.com passes it again shortly and the change
+arrives then. A device without a connection gets it when it reconnects.
+Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
 
 ### BASE-F14 See the business's apps
 Status: done
@@ -1319,7 +1324,7 @@ Involved: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Open System and move between its tabs
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
   1. They tap "System" in the side menu, or come from the bell's notice of the failed events.
@@ -1327,19 +1332,16 @@ Steps:
      plan" opens. The tab chosen stays in the address: a link or a reload opens the same one.
   3. A tab that does not exist opens "Usage and plan", and so do the old links to "Resources" and to "Plan and limits"; the
      old backups one leads to "Settings" › "Data and backups".
-  4. Whoever is neither the owner nor an administrator sees three: "Logs" does not exist for them and, if they ask for
-     it, "Usage and plan" opens. In "Usage and plan" they read "Only the owner or an administrator can see how much the
-     hub is using." and in "Failed events", "Only the owner or an administrator can see the failed events.", with
-     no "Retry".
-  5. At the end of "Usage and plan", anyone sees the cards the apps on in the business put there and that the person
-     may see, each with its own: Printing's is "Your printer" (PRINTING-F21). An app that is off puts none; turning it
+  4. Whoever does not run the business has no "System" in the side menu: its address, also that of any of its tabs,
+     tells them "No access" (BASE-F118).
+  5. At the end of "Usage and plan" come the cards the apps on in the business put there and that the person may
+     see, each with its own: Printing's is "Your printer" (PRINTING-F21). An app that is off puts none; turning it
      on or off makes its card appear or go without reloading.
-In: the person's role in the business; whoever does not run it is never asked for anything the hub would refuse. The
-cards, from the apps that are on.
+In: the cards of the apps that are on that the person may see.
 Out: nothing saved.
 If it fails: each tab says its own (BASE-F40 to BASE-F43). If which cards apply cannot be read, none shows and the rest
 of the tab goes on; a card that does not load is left out and the others show.
-Involved: BASE-F40, PRINTING-F21
+Involved: BASE-F40, BASE-F118, PRINTING-F21
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
 Status: done
@@ -1400,8 +1402,7 @@ been counted for less than their period, they say "Since {day}". The assistant i
 not answer, its row says "Not available right now", with no figure, and the screen goes on; the same if WhatsApp cannot be
 read. In a demo, instead of everything: "Use is not measured in a demo: its data is deleted when it ends.". While the hub
 does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends it." and, under
-"What you use", the figures with no limit, bar, pill or line at the top. Whoever does not run the business reads what
-BASE-F39 says.
+"What you use", the figures with no limit, bar, pill or line at the top.
 Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Know which version is running and when it was updated
@@ -1427,8 +1428,7 @@ Status: done
 Actor: owner, administrator
 Screen: System · Logs
 Steps:
-  1. They open the "Logs" tab: the title is "Event log". For whoever does not run the business the tab does not
-     exist (BASE-F39).
+  1. They open the "Logs" tab: the title is "Event log".
   2. They see the last 50 events between the business's apps, newest first, with "Time", "Level" ("Info",
      "Warning" or "Error", in a pill) and "Event": its name, the app that recorded it and what happened to it in
      their language (delivered, waiting, in "Failed events"…). Never what it carried.
@@ -1462,8 +1462,7 @@ Steps:
 In: the notices between apps of this business that ran out of retries, never another's.
 Out: nothing saved.
 If it fails: "We could not read the system" — "The queue of failed events could not be loaded. Check the
-connection and try again." with "Retry" in sight: a failure never shows as "All in order". Whoever does not run
-the business reads "Only the owner or an administrator can see the failed events.".
+connection and try again." with "Retry" in sight: a failure never shows as "All in order".
 Involved: none
 
 ### BASE-F44 Resend a failed event
@@ -2234,9 +2233,10 @@ Steps:
      "Members" of the business (in the installed app, in the device's browser; the Google Play copy does not have
      them).
   2. There they change the role.
-  3. Back here, the person shows with their new role and what they may do changes at once.
+  3. Back here, the person shows with their new role. If they have the hub open, what they see and what
+     they may do change at once, without ending their session (BASE-F13).
 In: the role chosen on erplora.com.
-Out: the person with their new role, as erplora.com sends it.
+Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
 
@@ -3340,19 +3340,19 @@ Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator; through the assistant, anyone of the business
 Screen: System · Updates
 Steps:
   1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
-     that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
-     about the business. While it loads: "Reading what's new…".
+     that the business notices, the most recent first. While it loads: "Reading what's new…".
   2. Each item says its day, whether it is something new, an improvement or a fix ("New", "Improved" or "Fixed"), a
      short title and one or two sentences on what can be done now, just as they were written. They are notes written
      for the business, never the list of changes to the code.
   3. The 20 most recent are shown, with no pages.
   4. With none, it says "Nothing new yet.".
   5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
-     in the person's language.
+     in the person's language. That is how whoever does not run the business, who has no System (BASE-F39), reads them
+     too: they say nothing about the business.
 In: what is new in the version running: it travels with it, so it is always its own.
 Out: nothing saved: what is new is only read.
 If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
@@ -3390,17 +3390,18 @@ Status: done
 Actor: manager, employee
 Screen: No access
 Steps:
-  1. They open by its address (a link, the history, a tab left open or typing it) a screen of an app their role does
-     not open: an entry that does not show in their menu, such as Taxes' "Rules" for an employee, or any screen that
-     hangs from it.
+  1. They open by its address (a link, the history, a tab left open or typing it) a screen their role does not open:
+     an entry of an app that does not show in their menu, such as Taxes' "Rules" for an employee, one of the platform
+     that does not show in their side menu, such as "System" for whoever does not run the business, or any screen
+     that hangs from them.
   2. Instead of the screen, in the same address, "No access" shows: "You do not have access to this screen" — "Your
      role in this business does not open it.". While it looks for whom to ask: "Looking for who can give you access…".
   3. Below, "Ask one of these people to give you access:" and the name of each one, with their avatar: whoever can
      change their role on erplora.com (HUBS-F26). An employee sees the owner and the administrators; a manager, only
      the owner. Only the name: neither the email nor the phone. Those invited who have not entered yet count too.
   4. "Go to Home" leads to the Home.
-In: the person's session, which says which screens of each app their role closes (the same ones that do not show in
-their menu); the people of the business with their role, from erplora.com's last photo.
+In: the person's session, which says which screens of each app their role closes and which permissions they hold,
+those that open each entry of the side menu (the same ones that do not show in their menus); the people of the business with their role, from erplora.com's last photo.
 Out: nothing.
 If it fails: if it cannot find out whom to ask, "We could not find out who can give you access" — "Ask whoever runs
 the business, or try again." with "Retry", and the screen still says they have no access. With nobody to name: "Ask

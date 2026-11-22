@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:885d68994dd3fe07fe800d30f397930dfa919f5edfd3c6d9ee58f8d159472f13 -->
+<!-- generated from WORKBOOK.md sha256:5d6bff888c6f0647b596b98ed8a8c63892fbe1382e4d7410a3ce708717d14372 -->
 
 ## What it is for and who it is for
 
@@ -715,9 +715,10 @@ Steps:
    check with its order, and the kitchen gets nothing new.
 In: nothing from other apps.
 Out: the comped line: it adds no money or VAT, but the sale notice carries it so that Inventory lowers
-the stock; the sale keeps the cost of what was comped.
+the stock; the sale keeps the cost of what was comped, which only whoever sees the costs sees: to anyone
+else the sale, its charge and the preview of the charge give it empty (BASE-F119).
 If it fails: "That change to the line could not be saved. The line is back as it was.".
-Involved: INVENTORY-F21
+Involved: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Attribute the check or a line to whoever serves
 Status: done
@@ -747,7 +748,8 @@ person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it. In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
+sends it or, if their account has no name, what goes before the @ of their e-mail, never the whole e-mail
+(BASE-F119). In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "Who serves the check could not be changed. It stays with whoever served it.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
@@ -1076,9 +1078,10 @@ Steps:
    without reloading. The panels count by the same rule as the screen's figures: the whole business or
    their own sales.
 In: nothing from other apps.
-Out: nothing saved. What each professional sold in the period (Staff and the assistant ask for it for the
-commission) counts by the same rule: whoever does not see the whole business gets only the lines of their
-own sales and, of the voucher sessions spent outside the till, those of their record. It already takes off
+Out: nothing saved. What each professional sold in the period (the assistant asks for it for the commission)
+counts by the same rule: whoever does not see the whole business gets only the lines of their own sales and, of
+the voucher sessions spent outside the till, those of their record. Staff asks for it as the platform, so that each
+professional's row counts everything they did, and Staff says which rows each person sees (STAFF-F21). It already takes off
 what was refunded: what goes back, to whoever sold it; the money that goes
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
@@ -1529,9 +1532,11 @@ MODIFIER-F07, MODIFIER-F08
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a product is
-named by its id, its SKU or its name; a customer by their id, their name, their phone or their email; a
-sale by its id or its number; a section or a quick note by its id or its name; a payment method by its
-id, its name or its type ("cash", "card"). If a name matches several, it is refused saying which ones
+named by its id, its SKU or its name; a customer by their id or their name and, for whoever sees the
+customers' contact details, also by their phone or their email (to whoever does not see them, those words
+only match a name: 404 `customer.customer_unavailable`, BASE-F119); a sale by its id or its number; a
+section or a quick note by its id or its name; a payment method by its id, its name or its type ("cash",
+"card"). If a name matches several, it is refused saying which ones
 (409 `*_ambiguous`).
 
 What reads or touches a charged sale (the list, the sale, its document and its paper, "Issue now", voiding
@@ -1638,8 +1643,9 @@ the quick notes and what is refundable can be followed live.
 ### What it needs from other apps
 
 - **Taxes** (required): the rule and the VAT calculation of each line when charging.
-- **Customers** (required): the sale's customer record and its search by name or phone; the link of the
-  check with its customer is kept by Customers (`customer.order.link`).
+- **Customers** (required): the sale's customer record and its search by name or, for whoever sees the
+  customers' contact details, by phone or email; the link of the check with its customer is kept by
+  Customers (`customer.order.link`).
 - **Inventory** (optional): the sale catalog, the price, the unit and the tax category of each article,
   read with its own queries when the line is added.
 - **Staff** (optional): the team for the "Served by" chip, the record of whoever is signed in
@@ -1695,6 +1701,12 @@ the quick notes and what is refundable can be followed live.
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+
+Two data permissions of the platform (BASE-F119) trim what is seen in Sales: what the comps cost (SALE-F15)
+is only seen by whoever sees the costs (owner, administrator and manager), and naming a charge's customer
+by their phone or their email is only for whoever sees the customers' contact details (the employee too).
+Sales does not show the customer's email or phone: it keeps their name and, on an invoice, their tax ID
+and their address, which are tax details that everyone who sees the sale sees.
 
 What the employee cannot do in the POS they ask for on their own device and a manager approves it with
 their PIN or their badge ("An approval is needed", BASE-F84), once and for that very request: voiding and

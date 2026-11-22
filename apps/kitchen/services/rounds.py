@@ -15,7 +15,7 @@ from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out, settle
 from apps.kitchen.services.writes import _ticket_event, locked_row, locked_settings
 from apps.sale.models import OrderLine
-from apps.sale.queries.people import person_label
+from base.queries.people import actor_name
 
 NOTHING_TO_COOK = _("Nothing on this check is cooked: services do not go to the kitchen.")
 
@@ -114,7 +114,7 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
         channel=data.channel,
         priority=data.priority,
         # Whoever the till names, else who serves the check (kept on it), else who sends it.
-        waiter=data.waiter or fired.order.staff_name or person_label(ctx.actor),
+        waiter=data.waiter or fired.order.staff_name or actor_name(ctx.actor),
     )
     return out(ticket, _print_round(ctx, ticket))
 

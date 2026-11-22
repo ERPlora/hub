@@ -79,8 +79,8 @@ WhatsApp Manager a crear las plantillas saca al dueño de la app para lo que hac
 
 ### Bandeja de entrada
 Aquí están las conversaciones con tus clientes, primero la de actividad más reciente, con su estado, a quién está
-asignada y cuántos mensajes quedan sin leer. Busca por contacto o teléfono, o filtra por estado, asignación o sin
-leer. Al abrir una, su hilo sale en un panel encima de la lista: desde ahí contestas, envías una plantilla, la
+asignada y cuántos mensajes quedan sin leer. Busca por contacto o teléfono (por teléfono, solo quien ve el contacto
+de los clientes), o filtra por estado, asignación o sin leer. Al abrir una, su hilo sale en un panel encima de la lista: desde ahí contestas, envías una plantilla, la
 asignas, cambias su estado o dejas una nota interna. Encima de la lista, los avisos del número y de los mensajes del
 plan.
 
@@ -92,7 +92,11 @@ de hoy, «Ayer», o la fecha, en el reloj del negocio); buscador «Filtrar conta
 **Estado**, **Asignada a** (A mí, Sin asignar) y **Sin leer** detrás de **Filtros**, junto al buscador (en
 el móvil se abren en una hoja sobre la lista) y con **Aplicar**; 50 por página; primero la actividad
 más reciente. Acción de fila **Abrir** (o tocar la fila): la conversación se abre en un panel encima
-de la lista, que se queda debajo.
+de la lista, que se queda debajo. Quien no ve el contacto de los clientes atiende la bandeja igual (lee, contesta,
+asigna y cambia el estado), pero sin el número: la tabla no tiene «Teléfono», el buscador dice «Filtrar contacto…» y
+solo mira los nombres, el panel no enseña el número y a quien escribió sin nombre lo ve por su número enmascarado, con
+las tres primeras cifras y las cuatro últimas («+346••••2333»), como lo enmascaran las bandejas compartidas. Nadie
+ordena la lista por el teléfono: el orden diría el número a quien no lo ve.
 
 El panel enseña: el contacto, su número y su estado; la ficha de Clientes unida (con enlace) o
 **Unir a una ficha** / **Crear ficha**; **Asignada a** con el selector del equipo y **Asignármela**;
@@ -321,11 +325,13 @@ Pasos:
    reacción (👍) aparece sobre el mensaje al que responde, sin sumar en **Sin leer**.
 4. Al abrirla, **Sin leer** vuelve a «—»; un mensaje que llega con el hilo abierto también queda leído.
 5. **Cerrar** vuelve a la lista.
-Entra: la búsqueda, los filtros y la conversación elegida.
+Entra: la búsqueda, los filtros y la conversación elegida. Quien no ve el contacto de los clientes (BASE-F119) busca y
+nombra la conversación solo por el nombre del contacto o de su ficha, y la lee y la contesta sin ver el número: a quien
+escribió sin nombre lo ve por su número enmascarado («+346••••2333»).
 Sale: **Sin leer** a cero en esa conversación; nada más cambia.
 Si falla: el motivo dentro del panel; la lista sigue disponible. Mientras la lista carga, la tabla lo
 dice (nunca «0 conversaciones»).
-Implicados: Clientes (el nombre de la ficha)
+Implicados: Clientes (el nombre de la ficha), BASE-F119
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
 Estado: hecho
@@ -392,13 +398,14 @@ Pasos:
    junto al nombre. Baja sola en cuanto alguien contesta (desde el Hub o desde el móvil), la deja pendiente o
    la cierra, y no sale cuando no espera nadie.
 3. En la app instalada, cada mensaje de un cliente que se queda sin contestar avisa con una notificación del
-   sistema, con su nombre y lo que escribió; al tocarla se abre esa conversación en la **Bandeja de entrada**.
+   sistema, con su nombre y lo que escribió (sin nombre, su número, enmascarado a quien no ve el contacto de los
+   clientes); al tocarla se abre esa conversación en la **Bandeja de entrada**.
 4. Al ordenar por cualquier columna, las filas sin ese dato van al final, en los dos sentidos.
 Entra: los filtros y el orden; los mensajes de los clientes.
 Sale: la lista filtrada y los recuentos (`whatsapp_inbox.conversation.summary`,
 `whatsapp_inbox.conversation.count_awaiting_reply`) y los avisos (`whatsapp_inbox.conversation.notices`); nada cambia.
 Si falla: el motivo con **Reintentar**.
-Implicados: la campana de la barra superior, los avisos de la app instalada
+Implicados: la campana de la barra superior, los avisos de la app instalada, BASE-F119
 
 ### WHATSAPP_INBOX-F10 Borrar los datos de un número sin ficha
 Estado: hecho
@@ -1034,12 +1041,13 @@ Pasos:
 1. En el panel sin ficha, **Unir a una ficha** busca en Clientes por nombre, teléfono o email; elegir
    una la une.
 2. O **Crear ficha**: crea en Clientes una ficha con el nombre de WhatsApp (o el número) y el número,
-   con origen «WhatsApp», y la une.
+   con origen «WhatsApp», y la une. Si no hay nombre de WhatsApp y quien la crea no ve el contacto de los clientes,
+   la ficha se llama por el número enmascarado («+346••••2333») y guarda el número en su teléfono.
 3. Con ficha, **Ver ficha** lleva a ella y **Desunir** la quita.
 Entra: la ficha elegida, o nada para crearla.
 Sale: aviso `whatsapp_inbox.conversation.customer_linked`.
 Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
-Implicados: Clientes
+Implicados: Clientes, BASE-F119
 
 ### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
 Estado: hecho
@@ -1059,6 +1067,14 @@ ninguno.
 Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 
 ## Servicios: lo que entra y lo que sale
+
+El número del cliente solo sale a quien ve el contacto de los clientes (BASE-F119): a cualquier otro le llega vacío en
+las conversaciones y en un mensaje, y donde se nombra a quien escribió sin nombre, enmascarado («+346••••2333»). La
+búsqueda y una referencia («la conversación del 600 111 222») solo le casan con los nombres; preguntar de quién es la
+conversación de un número (`whatsapp_inbox.conversation.by_phone`) se le rechaza como una acción sin permiso (403
+`permission_denied`), igual que escribir a un número tecleado (`to` de `message.send` y `message.notify`): la respuesta
+diría de quién es. Contesta eligiendo la conversación. Ordenar por el teléfono no existe para nadie. Una automatización lleva los permisos de dato
+(FLOW-F12), así que sus avisos y respuestas por WhatsApp siguen leyendo el número.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -1242,6 +1258,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 Mensajes recibidos y enviados: el admin los enseña en **solo lectura** (son lo que llevó WhatsApp; se
 corrigen borrando los datos de la conversación, nunca editando), con borrado para el staff.
 
+- **El número del cliente** (BASE-F119): `phone` de `ConversationOut` (el campo `PHONE` de
+  `apps/customer/schemas/contact.py`), de `MessageGetOut`, de `ByPhoneOut` y de `ClaimErasureOut` lleva la marca
+  `CUSTOMER_CONTACT`, y también la entrada de `conversation.by_phone`, `to` de `message.send` y `phone` de
+  `message.notify`. El nombre de la ficha creada desde la conversación sale de `profile_name`. `display_name` (lista, ficha, mensaje, avisos y
+  la tarjeta del asistente) cae al número solo con `sees_contact` de Clientes; si no, a `masked` (tres primeras cifras
+  y cuatro últimas, como Wati). La búsqueda (`_searched`, con `holds` de Clientes sobre la ficha unida), la referencia
+  (`_matching_ids`) y el orden «Contacto» solo miran el número con el permiso; el orden por teléfono no existe. La
+  columna «Teléfono» y el número del panel solo se pintan con el permiso (`InboxPage.vue`, `ConversationPanel.vue`).
 - **Columnas `host` que quedan en la BD**: los modelos no las tienen (migraciones `0011` y `0012`), pero las columnas,
   sus datos y las dos guardas únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
   `whatsapp_inbox_template_live_host_name_language_unique`) siguen en la BD; el código las deja vacías, así que siguen

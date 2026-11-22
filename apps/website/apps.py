@@ -35,7 +35,10 @@ class WebsiteConfig(LiveAppConfig):
     # Inventory's products and Services' services are read by their operation's name, only when installed.
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = ["website.view", "website.manage"]
+    permissions = {
+        "website.view": _("View the website's status and share its address and QR code"),
+        "website.manage": _("Change, preview, publish and disconnect the website"),
+    }
     # The published page's images, which any visitor sees (base.media serves them at /p/media/, cached for a year).
     public_media = ["website/img/"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The page speaks for the

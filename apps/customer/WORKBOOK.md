@@ -1119,7 +1119,7 @@ asistente.
 ## Para quien lo mantiene
 
 - Anatomía completa de una app, copiada de `apps/demo`: `apps.py`, `models.py`, `schemas.py`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `queries.py`, `services/` (un módulo por tema), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
 - **Orden de las listas** (`_ordered`, con `base.ordering.list_order`): fichas,

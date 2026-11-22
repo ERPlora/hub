@@ -22,6 +22,7 @@ from pydantic import (
     model_validator,
 )
 
+from apps.customer.schemas.contact import EMAIL, PHONE
 from base.schemas.assistant import names
 
 T = TypeVar("T")
@@ -55,9 +56,7 @@ SAY_WHICH_STAFF = _("Say which professional: their id, or their name.")
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
 SAY_WHICH_APPOINTMENT = _("Say which appointment: its id, or its number.")
 PICK_A_SERVICE = _("Pick at least one service.")
-SAY_WHAT_CHANGES = _(
-    "Say what changes: the time, the length, the professional or the services."
-)
+SAY_WHAT_CHANGES = _("Say what changes: the time, the length, the professional or the services.")
 SAY_WHAT_TO_EDIT = _("Say what to change.")
 SAY_THE_LENGTH = _("Say the services or how many minutes it lasts.")
 END_BEFORE_START = _("The end cannot be before the start.")
@@ -580,8 +579,8 @@ class AppointmentRow(Schema):
 
 
 class AppointmentOut(AppointmentRow):
-    customer_phone: str
-    customer_email: str
+    customer_phone: str | None = PHONE
+    customer_email: str | None = EMAIL
     notes: str
     internal_notes: str
     cancelled_at: dt.datetime | None

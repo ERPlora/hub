@@ -128,7 +128,7 @@ def _approvals_kept(data: ApprovalExportIn, currency: str | None):
 
 def _approval_cell(text: str) -> str:
     """A cell a spreadsheet must not run: an apostrophe in front of what it would read as a formula."""
-    return f"'{text}" if text.startswith(blueprint.FORMULA_STARTS) else text
+    return f"'{text}" if text.startswith(blueprint.datasets.FORMULA_STARTS) else text
 
 
 @operation(

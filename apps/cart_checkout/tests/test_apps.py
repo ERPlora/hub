@@ -112,7 +112,7 @@ def test_it_is_in_the_store_but_in_no_template():
 
 
 def test_permissions_are_the_old_module_ones():
-    assert cart_checkout().permissions == PERMISSIONS
+    assert list(cart_checkout().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

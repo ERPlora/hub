@@ -34,7 +34,7 @@ def _reset_state(hub: Hub) -> dict | None:
         return None
     return {
         "state": asked["state"],
-        "sections": [{"id": app, "label": blueprint.app_label(app)} for app in asked.get("apps") or []],
+        "sections": [{"id": app, "label": blueprint.datasets.app_label(app)} for app in asked.get("apps") or []],
         "requested_by": asked.get("requested_by") or "",
         "error": asked.get("error") or "",
         "removed": asked.get("removed") or [],

@@ -1,5 +1,6 @@
 """The SPA's own session (``base.session.me``): the user, its permissions, and the menu and apps it may see."""
 
+import hashlib
 from typing import Any
 
 from django.utils import translation
@@ -8,7 +9,8 @@ from live.operations import INTERNAL, operation
 
 from base import activation, entitlement, home
 from base.models import Hub, HubUser
-from base.schemas.sessions import SessionMeIn, SessionMeOut
+from base.permissions import VIEW_HOME
+from base.schemas.sessions import SessionAccessIn, SessionAccessOut, SessionMeIn, SessionMeOut
 
 from .apps import _can_see, _may_use, open_entries
 from .people import hub_user_of, person_label
@@ -73,6 +75,26 @@ def _locked(ctx: OperationContext, configs: list[Any]) -> dict[str, list[str]]:
         if closed := [nav.path for nav in config.navigation if nav.path not in opened]:
             locked[config.label] = closed
     return locked
+
+
+# Not an assistant tool: what a device follows to read its own session again.
+@operation(
+    "base.session.access",
+    kind="query",
+    permission=VIEW_HOME,
+    input=SessionAccessIn,
+    output=SessionAccessOut,
+    database=False,
+    ai=INTERNAL,
+)
+def session_access(ctx: OperationContext, data: SessionAccessIn) -> dict[str, str]:
+    """A fingerprint of the session's permissions on this scope, which every live re-run reads again from the person's
+    role: when erplora.com changes it, the device's open app sees the key change and reads ``base.session.me`` again,
+    so its menu and the screen in front follow the new role without signing in again. A hash, so the stream carries a
+    few bytes and only when it changes. The Home's permission, which every role of the business holds: a live query
+    needs one."""
+    digest = hashlib.sha256("\n".join(sorted(ctx.permissions)).encode()).hexdigest()
+    return {"key": digest}
 
 
 def _session_state(label: str, blocked: frozenset[str], creating: frozenset[str]) -> str:

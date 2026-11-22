@@ -29,7 +29,7 @@ por `/internal`.
   exportar y restablecer por secciones (en un negocio con su propia base de datos).
 - **La entrada** (F13, F52–F71): con la cuenta de erplora.com, con el salto desde su panel, con PIN o con la placa en
   una caja compartida, cambiar de usuario, Mi perfil, el PIN del negocio, los dispositivos y las sesiones que caducan
-  o se pierden al cambiar de rol.
+  o se cierran al salir del negocio (un cambio de rol se aplica sin cerrarlas).
 - **Archivos** (F72–F76): carpetas, subir, previsualizar (imágenes, PDF, texto, CSV, audio y vídeo), descargar,
   mover, renombrar y borrar.
 - **Empleados** (F77–F91): el personal y sus plazas, una persona, su PIN y su placa, los roles, las aprobaciones y su

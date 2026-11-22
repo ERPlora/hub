@@ -101,7 +101,7 @@ def create_entry(ctx: OperationContext, data: WaitlistIn) -> dict:
     },
 )
 def update_entry(ctx: OperationContext, data: WaitlistPatchIn) -> dict:
-    entry = find_entry(data.id, data.guest, data.day, lock=True)
+    entry = find_entry(ctx, data.id, data.guest, data.day, lock=True)
     if data.is_contacted is not None and data.is_contacted != entry.is_contacted:
         entry.is_contacted = data.is_contacted
         entry.contacted_at = timezone.now() if data.is_contacted else None
@@ -140,7 +140,7 @@ def update_entry(ctx: OperationContext, data: WaitlistPatchIn) -> dict:
 )
 def convert_entry(ctx: OperationContext, data: WaitlistConvertIn) -> dict:
     settings = lock_book()
-    entry = find_entry(data.id, data.guest, data.day, lock=True)
+    entry = find_entry(ctx, data.id, data.guest, data.day, lock=True)
     if entry.reservation_id is not None:
         raise Conflict(str(ENTRY_CONVERTED), code="reservation.waitlist_converted")
     request = engine.Request(
@@ -207,7 +207,7 @@ def convert_entry(ctx: OperationContext, data: WaitlistConvertIn) -> dict:
     },
 )
 def delete_entry(ctx: OperationContext, data: WaitlistRefIn) -> dict:
-    entry = find_entry(data.id, data.guest, data.day, lock=True)
+    entry = find_entry(ctx, data.id, data.guest, data.day, lock=True)
     entry.is_deleted, entry.deleted_at = True, timezone.now()
     _stamp(entry, ctx)
     entry.save()

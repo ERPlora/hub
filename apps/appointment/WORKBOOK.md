@@ -28,6 +28,10 @@ hasta que se atiende, se cobra o se anula.
   termina, las mueve, las anula y las cobra. Las citas de los compañeros no las ve.
 - El **responsable** ve y gestiona la agenda de todo el equipo, y bloquea tiempo.
 - El **propietario** y el **administrador**: además borran citas y cambian los ajustes de reserva.
+- El **teléfono y el email de la clienta** de una cita solo los ve quien tiene el permiso de dato «Ver el
+  contacto de los clientes» (BASE-F119), que hoy tienen los cuatro roles. Quien no lo tiene ve la cita y el
+  nombre de la clienta, sin su teléfono ni su email, en ninguna pantalla, API, agenda en vivo ni respuesta del
+  asistente, y no nombra a una clienta por su teléfono o su email: esas palabras solo le casan con un nombre.
 - La **clienta** reserva, mueve y cancela sola cuando el negocio lo permite (por WhatsApp o por la
   reserva online, a través de la API), siempre con las reglas de antelación del negocio.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace todo lo anterior:
@@ -232,8 +236,8 @@ Actor: empleado (para sí), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Añadir cita**, o en «Por profesional» toca un hueco libre (rellena profesional y hora).
-2. Elige la clienta (se busca por nombre, teléfono o email; si no está, **+ Nuevo cliente** la crea con
-   nombre y teléfono), uno o varios servicios y el profesional. Con servicios elegidos solo salen los
+2. Elige la clienta (se busca por nombre, teléfono o email, y por teléfono o email solo quien ve el contacto de
+   los clientes; si no está, **+ Nuevo cliente** la crea con nombre y teléfono), uno o varios servicios y el profesional. Con servicios elegidos solo salen los
    profesionales **Activos y Reservables que los hacen todos**; si un servicio no tiene a nadie
    asignado, para ese servicio vale todo el equipo reservable. «Min.» se rellena con la suma de las
    duraciones (la propia del profesional si la tiene, si no la del catálogo).
@@ -255,8 +259,8 @@ volver a guardar. Desde el mostrador ni la antelación mínima ni una hora ya pa
 hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
 solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
-Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
-(el personal de ERPlora recupera desde una copia aparte las citas que el negocio ya no tiene, cada una por esta misma
+Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F119,
+BASE-F114 (el personal de ERPlora recupera desde una copia aparte las citas que el negocio ya no tiene, cada una por esta misma
 reserva; una borrada vuelve la misma, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
@@ -625,10 +629,11 @@ Pasos:
 1. Abre la ficha en **Clientes**.
 2. Al final, el bloque **Historial de visitas** enseña sus 10 últimas citas, la más reciente primero,
    con el día y la hora, los servicios, el profesional, el estado y las notas (la interna primero).
-Entra: las citas de la clienta que quien mira puede ver.
+Entra: las citas de la clienta que quien mira puede ver. Por la API o el asistente la clienta se nombra por su
+nombre, su teléfono o su email; por teléfono o email, solo quien ve el contacto de los clientes (BASE-F119).
 Sale: nada (solo lee). Una automatización lo lee sin notas ni motivos.
 Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este cliente aún no tiene citas.»
-Implicados: CUSTOMER-F24
+Implicados: CUSTOMER-F24, BASE-F119
 
 ### APPOINTMENT-F21 Reservar varias citas de golpe (bono o curso)
 Estado: hecho
@@ -651,12 +656,14 @@ Pasos:
    está en una cita pendiente o confirmada sin cobrar; las notas de cualquier otra se cambian por el asistente.
 2. Solo cambia lo que se envía. El teléfono se guarda en formato internacional, con el prefijo del país;
    uno que no es un número válido se rechaza y no se guarda nada.
+3. Quien no ve el contacto de los clientes recibe la cita sin el teléfono ni el email de la clienta; cambiar las
+   notas los deja como estaban.
 Entra: una cita.
 Sale: `appointment.appointment.updated` (sin línea de historial si solo cambian notas o contacto).
 Si falla: el teléfono no válido se rechaza sin guardar nada («Ese teléfono no es un número válido del país del
 negocio. Revísalo o escríbelo con su prefijo internacional (por ejemplo +44…).»); una cita que no existe, «Esa cita
 no existe en este negocio.».
-Implicados: CUSTOMER-F11
+Implicados: CUSTOMER-F11, BASE-F119
 
 ### APPOINTMENT-F23 Unir las citas al fusionar dos fichas de clienta
 Estado: hecho
@@ -761,16 +768,17 @@ Implicados: ninguno
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
 habla) y la API, con las mismas reglas y los mismos permisos. Una cita se nombra por su id o por su
-número (`APT-…`); una clienta, por su id, su nombre, su teléfono o su email; un servicio y un
-profesional, por su id o su nombre; una hora, como fecha y hora de pared del negocio («2026-10-15
-10:00»). Si un nombre vale para varios, se dice cuáles y se pide que elija.
+número (`APT-…`); una clienta, por su id, su nombre, su teléfono o su email (por teléfono o email, solo
+quien ve el contacto de los clientes); un servicio y un profesional, por su id o su nombre; una hora, como fecha
+y hora de pared del negocio («2026-10-15 10:00»). Si un nombre vale para varios, se dice cuáles y se pide que
+elija.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las citas de un rango de días, por profesional, estado, clienta o búsqueda, en páginas (hasta 100) | ver citas (todas o las suyas) | F01–F11, F27 | `appointment.appointment.list` |
-| Una cita completa | ver citas | F04, F10 | `appointment.appointment.get` |
+| Una cita completa (el teléfono y el email de la clienta, solo a quien ve el contacto de los clientes) | ver citas | F04, F10, F22 | `appointment.appointment.get` |
 | El historial de una cita | ver citas | F10 | `appointment.appointment.history` |
 | Las últimas citas de una clienta, con notas | ver citas | F20 | `appointment.appointment.list_for_customer` |
 | Cuántas citas próximas usan un servicio | ver citas | F26 | `appointment.appointment.count_active_for_service` |
@@ -867,6 +875,7 @@ la devuelve sin abrir otra (Venta, por su parte, devuelve la cuenta abierta de u
 | Ver disponibilidad y bloqueos | sí | sí | sí | sí | `appointment.view_schedule` |
 | Bloquear tiempo | sí | sí | sí | no | `appointment.manage_schedule` |
 | Ajustes | sí | sí | no | no | `appointment.manage_settings` |
+| Ver el teléfono y el email de la clienta (permiso de dato de la plataforma, BASE-F119) | sí | sí | sí | sí | `base.view_customer_contact` |
 
 «Sus propias» citas son las de la ficha de Personal vinculada a su cuenta; un empleado sin ficha
 vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ninguna ficha de Personal: no hay
@@ -928,6 +937,13 @@ agenda tuya que enseñar.».
   `Appointment.objects` y `Recurring.objects` en los paquetes `queries` fuera de su lista cerrada, cada una con su
   motivo (lo que una orden acaba de escribir, las reglas de la agenda, las cuentas y la recuperación desde una copia).
   Tests: `tests/test_queries_ownership.py`, por la ruta real.
+- **El contacto de la clienta** (BASE-F119): `customer_phone` y `customer_email` de `AppointmentOut` son los
+  campos `PHONE` y `EMAIL` de `apps/customer/schemas/contact.py`, con la marca `CUSTOMER_CONTACT`: live los da nulos a
+  quien no tiene `base.view_customer_contact`, en todas las puertas y en toda orden que responde una cita (también las
+  de un lote). La cita los sigue guardando: editar las notas no los toca. Nombrar a la clienta por su teléfono o su
+  email lo resuelve `find_customer` de Clientes, que sin el permiso solo casa un nombre; la lista de citas no busca ni
+  ordena por ellos. Quien no es una persona los recibe vacíos aunque tenga el permiso (`for_caller`). Tests:
+  `tests/test_customer_contact.py`, por la ruta real y con una persona de verdad (la empleada, con su ficha).
 - **«Las suyas» de quien no es una persona**:
   `may_book_for` y `may_change` piden `add_appointment`/`change_appointment`, o `add_own_appointment`/
   `change_own_appointment` sobre una cita de la ficha propia (`is_own`, con la misma regla que las lecturas). Quien no

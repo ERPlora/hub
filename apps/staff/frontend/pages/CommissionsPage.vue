@@ -5,8 +5,9 @@
 // The period is «Today» to begin with, or Yesterday, This week, This month, all counted by the server in
 // the business's days, or «Custom»: «From» and «To», prefilled with the days on screen, whose 422 goes
 // under «To». Above the list, what the period sold and its commissions; a professional who sold in the
-// period and no longer works here (or was deactivated) is marked. Only whoever sees the pay reads it;
-// without Sales in the business there is nothing to work a commission out from, and the page says so.
+// period and no longer works here (or was deactivated) is marked. Whoever reads the team follows it, and the
+// server answers someone without the team's pay only their own line; without Sales in the business there is
+// nothing to work a commission out from, and the page says so.
 import { type DataTableColumn, DataTable, DateField, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type LiveStatus, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -28,7 +29,7 @@ const CHOICES: readonly Choice[] = ['today', 'yesterday', 'this_week', 'this_mon
 const session = useSession();
 const t = useT();
 const locale = useLocale();
-const canSeePay = computed(() => session.can('staff.view_compensation'));
+const canReadTeam = computed(() => session.can('staff.view'));
 
 // ── The period ─────────────────────────────────────────────────────────────────────────────────
 const choice = ref<Choice>('today');
@@ -40,8 +41,8 @@ const params = computed<CommissionReportIn>(() =>
   choice.value === 'custom' ? { date_from: from.value, date_to: to.value } : { period: choice.value },
 );
 
-// Whoever may not see the pay follows nothing: the page only says so.
-const report = canSeePay.value ? useLive('staff.commission.report', params) : null;
+// Whoever may not read the team follows nothing: the page only says so.
+const report = canReadTeam.value ? useLive('staff.commission.report', params) : null;
 const data = computed(() => report?.data.value);
 const status = computed<LiveStatus>(() => report?.status.value ?? 'live');
 const error = computed(() => report?.error.value ?? null);
@@ -133,7 +134,7 @@ const blocked = computed(() => blockingError(error.value));
     :tabs-label="$t('staff.tabs.label')"
   >
     <InlineFeedback
-      v-if="!canSeePay"
+      v-if="!canReadTeam"
       tone="warning"
       data-testid="staff-commissions-forbidden"
       :heading="$t('staff.noPermission')"
