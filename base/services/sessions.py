@@ -417,8 +417,8 @@ def _apply_members(hub: Hub, members: list) -> list[str]:
 
 def _wake_open_apps(slug: str) -> None:
     """The business of ``slug`` just stopped serving the app (suspended, cancelled), some of its sessions ended, or
-    somebody's role in it changed: every open live stream and print socket of its host re-runs now («*», everything may have changed), hears the host
-    gate and its session again (``base.operations.HubContextBuilder.refresh``) and ends if they no longer hold,
-    instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the SaaS, step 4: the devices with
-    the app open leave for the Hub's page)."""
+    somebody's role in it changed: every open live stream and print socket of its host re-runs now («*», everything
+    may have changed), hears the host gate and its session again (``base.operations.HubContextBuilder.refresh``) and
+    ends if they no longer hold, instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the
+    SaaS, step 4: the devices with the app open leave for the Hub's page)."""
     notify(Scope("host", slug), [ALL_EVENTS])
