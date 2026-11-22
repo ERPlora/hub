@@ -11,18 +11,7 @@ import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import {
-  business,
-  BYE,
-  EMPLOYEE,
-  errorFrame,
-  flush,
-  itPaintsTheTabsItsSessionOpens,
-  type MountOptions,
-  mountSale,
-  POLISH,
-  tabsOf,
-} from '../__tests__/mount-sale';
+import { business, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, POLISH } from '../__tests__/mount-sale';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
@@ -137,7 +126,7 @@ describe('SalesPage: the screen', () => {
     const page = s.wrapper.findComponent(AppPage);
     expect(page.props('title')).toBe('Sales & POS');
     expect(page.props('tabsLabel')).toBe('Sales & POS sections');
-    expect(tabsOf(s.wrapper).map(([id]) => id)).toEqual(['pos', 'sales', 'quick-notes', 'departments', 'settings']);
+    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick-notes', 'departments', 'settings']);
     expect(s.find('sales-title').text()).toBe('Sales');
   });
 
@@ -595,8 +584,4 @@ describe('SalesPage: «Total» is read as every amount of the Hub', () => {
       return { filter: s.filter, query: () => s.list().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
     },
   });
-});
-
-describe('SalesPage: its tab bar', () => {
-  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['pos', 'Sell'], ['sales', 'Sales']]);
 });

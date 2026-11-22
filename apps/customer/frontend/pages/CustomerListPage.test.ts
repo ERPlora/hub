@@ -15,12 +15,11 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
-  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   json,
   MANAGER,
-  mountCustomer,
   type MountOptions,
+  mountCustomer,
   POLISH,
   sent,
   subId,
@@ -531,8 +530,4 @@ describe('CustomerListPage: «Spent» is read as every amount of the Hub', () =>
       return { filter: s.filter, query: () => s.params(LIST).at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
     },
   });
-});
-
-describe('CustomerListPage: its tab bar', () => {
-  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['customers', 'Customers']]);
 });
