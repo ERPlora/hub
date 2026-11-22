@@ -59,7 +59,7 @@ const loadError = computed(() => {
 const fields = computed(() => {
   const doc = invoice.value;
   if (!doc) return [];
-  const issuer = doc.issuer_tax_id ? `${doc.issuer_name} (${doc.issuer_tax_id})` : doc.issuer_name;
+  const issuer = doc.issuer_vat_number ? `${doc.issuer_name} (${doc.issuer_vat_number})` : doc.issuer_name;
   const rows: { key: string; label: string; value: string }[] = [
     { key: 'type', label: t('invoice.detail.fields.type'), value: t(`invoice.typeNames.${doc.invoice_type}`) },
     { key: 'series', label: t('invoice.detail.fields.series'), value: doc.series_code },
