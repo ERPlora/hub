@@ -21,6 +21,7 @@ from apps.staff.schemas.fields import (
     _said_by,
 )
 from base.schemas.assistant import names
+from base.weekdays import Weekday
 
 BREAK_PAIR = _("The break needs a start and an end, or neither.")
 BREAK_INSIDE = _("The break must fall inside the working hours.")
@@ -35,9 +36,7 @@ SCHEDULE = gettext_noop("Schedule")
 class DayIn(Schema):
     """One weekday (Monday = 0): a stretch with an optional break inside it."""
 
-    weekday: int = Field(
-        ge=0, le=6, description="Day of the week: 0 Monday … 6 Sunday."
-    )
+    weekday: Weekday = Field(description="Day of the week: 0 Monday … 6 Sunday.")
     start_time: dt.time = Field(
         dt.time(9), description="Start of the working day (HH:MM)."
     )
