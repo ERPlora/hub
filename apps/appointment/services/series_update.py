@@ -1,4 +1,4 @@
-"""Changing a repeating appointment (APPOINTMENT-F14): from a date on, or the whole series."""
+"""Changing a repeating appointment from one of its dates on (APPOINTMENT-F14): this one and all that follow."""
 
 import datetime as dt
 
