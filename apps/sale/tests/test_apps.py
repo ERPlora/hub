@@ -307,6 +307,5 @@ def test_sales_has_no_setup_steps_nor_bell_counters():
     assert (sale().setup, sale().bell) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    # No video is recorded: the window opens with its text only.
-    assert sale().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert sale().help == Help(videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"})

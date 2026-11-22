@@ -1,10 +1,13 @@
-"""How the papers of the till name a person who acted: the waiter of a kitchen ticket and the cashier of a receipt.
-Kitchen requires Sales, so both read it here."""
+"""How the till names a person: who serves a check, and on its papers the waiter of a kitchen ticket and the cashier of
+a receipt. Kitchen requires Sales, so both read it here."""
 
 from collections.abc import Iterable
+from uuid import UUID
 
 from django.contrib.auth import get_user_model
+from live.context import OperationContext
 
+from apps.sale.queries.other_apps import call_app
 from base.queries.people import person_label as profile_name
 
 
@@ -38,3 +41,11 @@ def cashier_name(username: str) -> str:
         return ""
     name = profile_name(user)
     return "" if "@" in name or name == user.get_username() else name
+
+
+def member_name(ctx: OperationContext, staff_id: UUID | None) -> str:
+    """A member of Staff by their full name, asked to Staff as whoever acts (Sales does not require it): someone not on
+    the team is Staff's 404, Staff off or absent ``sale.staff_unavailable``. Empty for nobody («me»)."""
+    if staff_id is None:
+        return ""
+    return call_app(ctx, "staff.member.detail", {"id": staff_id}, "sale.staff_unavailable").full_name

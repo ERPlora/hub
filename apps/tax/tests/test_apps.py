@@ -225,5 +225,5 @@ def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
     assert f"'{step['icon'].removeprefix('ion:')}'" in registry
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert tax().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert tax().help == Help(videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"})

@@ -44,7 +44,7 @@ class PricingConfig(LiveAppConfig):
     navigation = [
         Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists", permission="pricing.manage"),
     ]
-    help = Help()
+    help = Help(videos={"es": "cL0GmPik7GY", "en": "8fbHffF_tRg"})
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each price
