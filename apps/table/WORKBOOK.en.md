@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d462d743960502264b330e87ab57313b6990472d785ace4e99c63458d0546453 -->
+<!-- generated from WORKBOOK.md sha256:d71b262bdfefe468a718f6274ed19724f9cc179de24a03d296c0db93daaeff0e -->
 
 ## What it is for and who it is for
 
@@ -469,7 +469,8 @@ Steps:
    writing, with an icon, shape, seats and colour: Available, Occupied, Reserved or Blocked.
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
-   its name and time. Who serves it is seen in its window.
+   its name and time. Who serves it is seen in its window: whoever serves its check in Sales (the till's
+   "Served by" chip) or, if nobody changed it, whoever seated it.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
    the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
@@ -477,7 +478,7 @@ Steps:
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".
-Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F19
+Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done

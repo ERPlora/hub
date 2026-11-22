@@ -728,7 +728,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   ausencias van por la columna elegida y desempatan por `id`, todo en la dirección de la lista y con los vacíos al final
   en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
-- Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
+- Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas/`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
   abajo), `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui` y `README.md` es la ficha de la app.
@@ -794,7 +794,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   su `check` antes de la tarjeta (hub#538) y el asistente dice cuáles hay; el «ask the person before creating
   it» que llevaba hacía que preguntara en el chat (hub#1175; lo guarda `tests/test_guardrails_assistant.py`).
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
-  marcas `refers` de `schemas.py` (`A_MEMBER`, `A_ROLE`, `A_SCHEDULE`, `A_TIME_OFF`), leídas como quien pregunta.
+  marcas `refers` de `schemas/` (`A_MEMBER`, `A_ROLE`, `A_SCHEDULE`, `A_TIME_OFF`), leídas como quien pregunta.
   `staff.role.detail` y `staff.time_off.get` son lecturas internas (`ai=INTERNAL`, sin API), porque el modelo encuentra
   esos registros en sus listas. La segunda existe porque `staff.time_off.detail` trae el motivo y pide un permiso que
   el rol de empleado no tiene, y un empleado también anula su propia solicitud (STAFF-F19). Lo que no se puede leer se

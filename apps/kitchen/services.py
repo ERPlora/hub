@@ -653,8 +653,8 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
         label=data.label or fired.order.label,
         channel=data.channel,
         priority=data.priority,
-        # Who attends the check («Atiende» of the till), else who sends it.
-        waiter=data.waiter or person_label(ctx.actor),
+        # Whoever the till names, else who serves the check (kept on it), else who sends it.
+        waiter=data.waiter or fired.order.staff_name or person_label(ctx.actor),
     )
     return out(ticket, _print_round(ctx, ticket))
 

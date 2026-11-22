@@ -46,33 +46,27 @@ from apps.staff.queries import (
     role_for,
     settings_out,
 )
-from apps.staff.schemas import (
-    SCHEDULE_RANGE,
+from apps.staff.schemas.fields import DeletedOut, MemberRefIn
+from apps.staff.schemas.members import (
     BulkCreatedOut,
     BulkCreateIn,
-    DeletedOut,
     MemberDetailOut,
     MemberIn,
     MemberPatchIn,
-    MemberRefIn,
-    RoleIn,
-    RoleOut,
-    RolePatchIn,
+    TerminatedOut,
+    TerminateIn,
+)
+from apps.staff.schemas.roles import RoleIn, RoleOut, RolePatchIn
+from apps.staff.schemas.schedules import (
+    SCHEDULE_RANGE,
     ScheduleIn,
     ScheduleOut,
     ScheduleRefIn,
     ScheduleUpdateIn,
     SetActiveIn,
-    SettingsIn,
-    SettingsOut,
-    TerminatedOut,
-    TerminateIn,
-    TimeOffDetailOut,
-    TimeOffFieldsIn,
-    TimeOffIn,
-    TimeOffRefIn,
-    TimeOffRequestIn,
 )
+from apps.staff.schemas.settings import SettingsIn, SettingsOut
+from apps.staff.schemas.time_off import TimeOffDetailOut, TimeOffFieldsIn, TimeOffIn, TimeOffRefIn, TimeOffRequestIn
 from base.models import HubUser, Membership
 from base.services.sessions import acting_hub_user
 
