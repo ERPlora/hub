@@ -179,8 +179,6 @@ ignore_imports = [
     "base.meter -> base.services",
     "base.operations -> base.services.devices",
     "base.permissions -> base.tenancy.context",
-    "base.services.devices -> base.middleware",
-    "base.services.sessions -> base.middleware",
     "base.tenancy.context -> base.tenancy.connections",
     "base.tenancy.cut -> base.services.photo",
     "base.tenancy.cut -> base.services.provisioning",

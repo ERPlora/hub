@@ -118,7 +118,7 @@ def test_the_people_of_the_hub_open_the_file_and_a_visitor_never_does(client):
     # show the photo; a visitor gets what a missing file gets.
     from django.contrib.auth import get_user_model
 
-    from base.middleware import SESSION_HOST_KEY
+    from base.session_host import SESSION_HOST_KEY
     from base.models import Membership
     from base.storage import hub_prefix, media_url
 
@@ -142,7 +142,7 @@ def sign_in(client, host: str = A.key) -> None:
     """A session of ``host``'s hub, as its people have after the jump from erplora.com."""
     from django.contrib.auth import get_user_model
 
-    from base.middleware import SESSION_HOST_KEY
+    from base.session_host import SESSION_HOST_KEY
     from base.models import Membership
 
     user = get_user_model().objects.create_user(username=f"saas:{host}-42", password="pw")
