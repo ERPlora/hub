@@ -1,6 +1,7 @@
 """The repeating appointments (APPOINTMENT-F12, F13): creating a series and booking its dates."""
 
 import datetime as dt
+from dataclasses import replace
 
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -135,14 +136,7 @@ def _book_window(
             occurrence=day,
             settings=settings,
         )
-        agenda = engine.Agenda(
-            agenda.zone,
-            agenda.rules,
-            agenda.business,
-            agenda.staff,
-            agenda.blocks,
-            [*agenda.busy, engine.Period(start, end, id=appointment.id)],
-        )
+        agenda = replace(agenda, busy=[*agenda.busy, engine.Period(start, end, id=appointment.id)])
         report["booked"] += 1
     return report
 

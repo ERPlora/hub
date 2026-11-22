@@ -1,5 +1,7 @@
 """Booking (APPOINTMENT-F01, F18, F21): one appointment, or several at once."""
 
+from dataclasses import replace
+
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict
@@ -145,16 +147,9 @@ def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
             notes=data.notes,
             settings=settings,
         )
-        agenda = engine.Agenda(
-            agenda.zone,
-            agenda.rules,
-            agenda.business,
-            agenda.staff,
-            agenda.blocks,
-            [
-                *agenda.busy,
-                engine.Period(start, end, id=appointment.id, label=appointment.number),
-            ],
+        agenda = replace(
+            agenda,
+            busy=[*agenda.busy, engine.Period(start, end, id=appointment.id, label=appointment.number)],
         )
         created.append(appointment.id)
     return {"rows": [load_detail(ctx, appointment_id) for appointment_id in created]}
