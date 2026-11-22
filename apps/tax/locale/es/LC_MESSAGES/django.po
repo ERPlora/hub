@@ -306,3 +306,9 @@ msgstr "Elige antes un hub (su enlace en el admin del SaaS): la región se guard
 # How the assistant's card names each datum of a write (the titles of the schemas, as the screens say them)
 msgid "Category"
 msgstr "Categoría"
+
+msgid "View tax categories, rules and the tax territory"
+msgstr "Ver las categorías fiscales, las reglas y el territorio fiscal"
+
+msgid "Create tax categories and rules, and change the tax territory"
+msgstr "Crear categorías fiscales y reglas, y cambiar el territorio fiscal"

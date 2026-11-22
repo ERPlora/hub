@@ -33,13 +33,13 @@ class ScheduleConfig(LiveAppConfig):
     # A hair salon books inside its opening hours; a restaurant shows and keeps its own.
     verticals = ["hair_salon", "restaurant"]
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = [
-        "schedule.view",
-        "schedule.add",
-        "schedule.change",
-        "schedule.delete",
-        "schedule.manage_settings",
-    ]
+    permissions = {
+        "schedule.view": _("View the week, special days, changes and whether it is open"),
+        "schedule.add": _("Add special days and temporary changes"),
+        "schedule.change": _("Set and confirm the week, and correct special days and changes"),
+        "schedule.delete": _("Delete special days and temporary changes"),
+        "schedule.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["schedule.*"],

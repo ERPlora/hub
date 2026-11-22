@@ -43,13 +43,13 @@ class WhatsappInboxConfig(LiveAppConfig):
     )
     # Not declared on purpose: ``whatsapp_inbox.receive``, which only the system context holds (the
     # doors erplora.com calls through /internal and the reactions to Customers).
-    permissions = [
-        "whatsapp_inbox.view",
-        "whatsapp_inbox.reply",
-        "whatsapp_inbox.assign",
-        "whatsapp_inbox.configure",
-        "whatsapp_inbox.erase",
-    ]
+    permissions = {
+        "whatsapp_inbox.view": _("Read conversations"),
+        "whatsapp_inbox.reply": _("Reply, add notes and take a free conversation"),
+        "whatsapp_inbox.assign": _("Assign conversations to others and take them from others"),
+        "whatsapp_inbox.configure": _("Connect the number and manage the templates and settings"),
+        "whatsapp_inbox.erase": _("Erase a number's data"),
+    }
     # The files of the templates' headers (samples.py), which the template's sheet shows to the hub's people only
     # (base.media serves them at /p/media/ to a session of this hub; a visitor gets a 404).
     members_media = ["whatsapp_inbox/samples/"]

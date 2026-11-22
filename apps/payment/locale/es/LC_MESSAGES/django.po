@@ -273,3 +273,12 @@ msgstr "Método"
 
 msgid "Payment"
 msgstr "Pago"
+
+msgid "View payments and payment methods"
+msgstr "Ver los pagos y los métodos de pago"
+
+msgid "Record payments, mark them sent or completed, and manage payment methods"
+msgstr "Registrar pagos, marcarlos como enviados o completados y gestionar los métodos de pago"
+
+msgid "Approve and cancel payments"
+msgstr "Aprobar y cancelar pagos"

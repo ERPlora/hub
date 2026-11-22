@@ -2458,3 +2458,36 @@ msgstr "Ese alérgeno no es uno de los catorce de declaración obligatoria."
 #, python-format
 msgid "Allergen not recognized: %(text)s"
 msgstr "Alérgeno no reconocido: %(text)s"
+
+msgid "View the Home and its panels"
+msgstr "Ver el Inicio y sus paneles"
+
+msgid "Run the business: apps, settings, people and devices"
+msgstr "Administrar el negocio: apps, ajustes, personas y dispositivos"
+
+msgid "View and open the files"
+msgstr "Ver y abrir los archivos"
+
+msgid "Upload and rename files"
+msgstr "Subir y renombrar archivos"
+
+msgid "Delete files"
+msgstr "Borrar archivos"
+
+msgid "Open this business on erplora.com"
+msgstr "Abrir este negocio en erplora.com"
+
+msgid "View costs"
+msgstr "Ver costes"
+
+msgid "View customer contact details"
+msgstr "Ver el contacto de los clientes"
+
+msgid "View team contact details"
+msgstr "Ver el contacto del equipo"
+
+msgid "View business totals"
+msgstr "Ver los totales del negocio"
+
+msgid "Reset the business, download its backups and upgrade the plan"
+msgstr "Restablecer el negocio, descargar sus copias y mejorar el plan"

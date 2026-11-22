@@ -60,17 +60,17 @@ class KitchenConfig(LiveAppConfig):
          "como hechas"),
         ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
     )
-    permissions = [
-        "kitchen.view_ticket",
-        "kitchen.add_ticket",
-        "kitchen.change_ticket",
-        "kitchen.complete_ticket",
-        "kitchen.cancel_ticket",
-        "kitchen.delete_ticket",
-        "kitchen.manage_station",
-        "kitchen.change_settings",
-        "kitchen.view_log",
-    ]
+    permissions = {
+        "kitchen.view_ticket": _("View kitchen tickets, stations, routing and settings"),
+        "kitchen.add_ticket": _("Send rounds and create tickets by hand"),
+        "kitchen.change_ticket": _("Change tickets: fire, ready, recall, rush and reprint"),
+        "kitchen.complete_ticket": _("Mark tickets served"),
+        "kitchen.cancel_ticket": _("Cancel tickets"),
+        "kitchen.delete_ticket": _("Delete tickets made by hand"),
+        "kitchen.manage_station": _("Manage stations and routing"),
+        "kitchen.change_settings": _("Change the settings"),
+        "kitchen.view_log": _("View the history"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier
     # and the cook are employees: they move states; the manager also cancels, deletes, runs the
     # stations and saves the settings.

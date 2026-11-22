@@ -46,19 +46,19 @@ class SaleConfig(LiveAppConfig):
         ("ticket", "tique", "recibo", "receipt", "sale"),
         ("quick", "para marcarlo rápido", "para marcarla rápido"),
     )
-    permissions = [
-        "sale.view_sale",
-        "sale.add_sale",
-        "sale.take_payment",
-        "sale.sell_open_price",
-        "sale.discount_over_limit",
-        "sale.void_sale",
-        "sale.refund_sale",
-        "sale.view_paymentmethod",
-        "sale.add_paymentmethod",
-        "sale.view_all_sales",
-        "sale.manage_settings",
-    ]
+    permissions = {
+        "sale.view_sale": _("View sales and their figures, checks and the till settings"),
+        "sale.add_sale": _("Build a check: open, add, split, merge, send to the kitchen and discount up to the limit"),
+        "sale.take_payment": _("Take payments"),
+        "sale.sell_open_price": _("Sell at an open price"),
+        "sale.discount_over_limit": _("Give discounts over the limit"),
+        "sale.void_sale": _("Void a sale"),
+        "sale.refund_sale": _("Refund a sale"),
+        "sale.view_paymentmethod": _("View payment methods"),
+        "sale.add_paymentmethod": _("Create payment methods"),
+        "sale.view_all_sales": _("View everyone's sales"),
+        "sale.manage_settings": _("Change the till settings, sections and quick notes"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier
     # (an employee who also charges) is the employee now.
     role_permissions = {

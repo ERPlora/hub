@@ -39,11 +39,11 @@ class PaymentConfig(LiveAppConfig):
             "bank account", "bank accounts",
         ),
     )
-    permissions = [
-        "payment.view_payment",
-        "payment.add_payment",
-        "payment.approve_payment",
-    ]
+    permissions = {
+        "payment.view_payment": _("View payments and payment methods"),
+        "payment.add_payment": _("Record payments, mark them sent or completed, and manage payment methods"),
+        "payment.approve_payment": _("Approve and cancel payments"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The manager has
     # all three; the employee only looks.
     role_permissions = {

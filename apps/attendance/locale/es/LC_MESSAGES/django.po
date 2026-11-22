@@ -291,3 +291,18 @@ msgstr "Esta jornada lleva abierta más de %(hours)s horas y está por revisar: 
 #: apps.py:74
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "Clock in and out, and see and export their own history"
+msgstr "Fichar, y ver y exportar su propio historial"
+
+msgid "View the whole team's shifts and who is in"
+msgstr "Ver las jornadas de todo el equipo y quién está dentro"
+
+msgid "Correct shifts"
+msgstr "Corregir jornadas"
+
+msgid "Clock other people in and out, and their breaks"
+msgstr "Fichar la entrada, la salida y las pausas de otra persona"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"

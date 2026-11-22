@@ -264,3 +264,21 @@ msgstr "Permitir que la clienta cancele su cita"
 
 msgid "Minimum notice to cancel (hours)"
 msgstr "Antelación mínima para cancelar (horas)"
+
+msgid "View online bookings"
+msgstr "Ver las reservas online"
+
+msgid "Change bookings: complete, no-show and cancel"
+msgstr "Cambiar reservas: completar, no-show y cancelar"
+
+msgid "Confirm bookings"
+msgstr "Confirmar reservas"
+
+msgid "Delete bookings"
+msgstr "Borrar reservas"
+
+msgid "Set up the booking page"
+msgstr "Configurar la página de reservas"
+
+msgid "Try out the public booking page"
+msgstr "Probar la página pública de reservas"
