@@ -312,21 +312,23 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
         </span>
       </template>
       <template #empty>
-        <div data-testid="flow-list-nomatch">
-          <EmptyState
-            icon="search-outline"
-            :heading="$t('flow.list.noMatch')"
-          />
-          <IonButton
-            size="small"
-            fill="outline"
-            mode="md"
-            data-testid="flow-list-clear"
-            @click="clearFilters"
-          >
-            {{ $t('flow.list.clear') }}
-          </IonButton>
-        </div>
+        <EmptyState
+          data-testid="flow-list-nomatch"
+          icon="search-outline"
+          :heading="$t('flow.list.noMatch')"
+        >
+          <template #action>
+            <IonButton
+              size="small"
+              fill="outline"
+              mode="md"
+              data-testid="flow-list-clear"
+              @click="clearFilters"
+            >
+              {{ $t('flow.list.clear') }}
+            </IonButton>
+          </template>
+        </EmptyState>
       </template>
     </DataTable>
   </section>

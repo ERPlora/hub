@@ -2,7 +2,7 @@
 // server-side DataTable — name and when it starts in words, its last run, Active/Paused with its switch
 // —, search, «Showing», «Starts with» and «Order»; several chosen are turned on or paused at once; each
 // row is copied or deleted (asked first); a row opens the editor.
-import { DataTable } from '@erplora/ui/components';
+import { DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
@@ -56,6 +56,16 @@ async function setup(rows: FlowOut[] = [flow('f1'), flow('f2', { enabled: false,
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const rowsShown = () => m.wrapper.findAll('[data-testid="flow-list-row"]');
   return { ...m, table, rowsShown };
+}
+
+/** The list after a search that finds nothing. */
+async function nothingFound() {
+  const s = await setup();
+  s.table().vm.$emit('update:search', 'zzz');
+  await flush();
+  await s.reopen();
+  await s.result(OP, page([], 0));
+  return s;
 }
 
 describe('FlowList', () => {
@@ -188,14 +198,17 @@ describe('FlowList', () => {
   });
 
   it('a search that finds nothing offers to show them all again', async () => {
-    const s = await setup();
-    s.table().vm.$emit('update:search', 'zzz');
-    await flush();
-    await s.reopen();
-    await s.result(OP, page([], 0));
+    const s = await nothingFound();
     expect(s.find('flow-list-nomatch').text()).toContain('Nothing here matches that.');
     await click(s.find('flow-list-clear').element);
     await s.reopen();
     expect(s.params(OP)).toEqual([{ sort: '-updated_at', limit: 50, offset: 0 }]);
+  });
+
+  it('the button to show them all again sits inside the notice, so it is centred under its text (FLOW-F02)', async () => {
+    const s = await nothingFound();
+    const notice = s.wrapper.findComponent(EmptyState as unknown as Component);
+    expect(notice.find('[data-testid="flow-list-clear"]').exists()).toBe(true);
+    expect(notice.attributes('data-testid')).toBe('flow-list-nomatch');
   });
 });
