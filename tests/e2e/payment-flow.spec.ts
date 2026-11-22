@@ -6,6 +6,7 @@
 // app's pytest and Vitest suites. Everything created here is named «E2E Pay …» and removed before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, capture, EMPLOYEE, horizontalOverflow, login, psql, shot, shown, testid } from './helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -86,8 +87,8 @@ async function filterDates(page: Page, from: string, to: string): Promise<void> 
     await expect(panel).toBeVisible();
   }
   const scope = folded ? panel : view;
-  await scope.locator('[data-testid=payment-payments-filter-payment_date_from] input').fill(from);
-  await scope.locator('[data-testid=payment-payments-filter-payment_date_to] input').fill(to);
+  await pickDay(page, scope.locator('[data-testid=payment-payments-filter-payment_date_from]'), from);
+  await pickDay(page, scope.locator('[data-testid=payment-payments-filter-payment_date_to]'), to);
   if (folded) {
     await panel.locator('[data-testid=payment-payments-filters-apply]').click();
     await expect(panel).toBeHidden();

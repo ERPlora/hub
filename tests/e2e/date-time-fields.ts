@@ -1,7 +1,7 @@
-// Picking a day or a time in the date and time fields of @erplora/ui (DateField, TimeField) as a person does: a tap
-// on the field opens Ionic's calendar or time wheel in a popover; the person moves to the month, taps the day (or
-// the hour, the minute and AM/PM) and presses Done, or Clear to empty a field that is not required. The field then
-// shows the value in the app's language.
+// Picking a day or a time in the date and time fields of @erplora/ui (DateField, TimeField, and the two of a
+// DateTimeField) as a person does: a tap on the field opens Ionic's calendar or time wheel in a popover; the person
+// moves to the month, taps the day (or the hour, the minute and AM/PM) and presses Done, or Clear to empty a field
+// that is not required. The field then shows the value in the app's language.
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Opens the picker of `field`: the ion-datetime of the popover it presents (Ionic hides the inline popovers that are
@@ -29,6 +29,12 @@ async function confirm(picker: Locator): Promise<void> {
 export function dayAsShown(day: string): string {
   const options = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' } as const;
   return new Intl.DateTimeFormat('en-US', options).format(Date.parse(`${day}T00:00:00Z`));
+}
+
+/** `time` (`HH:MM`, 24 hours) as a TimeField shows it to the specs' owner, in American English («09:30 AM»). */
+export function timeAsShown(time: string): string {
+  const options = { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' } as const;
+  return new Intl.DateTimeFormat('en-US', options).format(Date.parse(`1970-01-01T${time}:00Z`));
 }
 
 /** Picks `day` (`YYYY-MM-DD`) in the DateField `field`. */
@@ -78,4 +84,11 @@ export async function clearPick(page: Page, field: Locator, presentation: 'date'
   const picker = await openPicker(page, field, presentation);
   await picker.locator('#clear-button').click();
   await expect(picker).toBeHidden();
+}
+
+/** Picks `value` (`YYYY-MM-DDTHH:MM`) in the DateTimeField `pair` (its group): the day, then the time. */
+export async function pickDayTime(page: Page, pair: Locator, value: string): Promise<void> {
+  const [day, time] = value.split('T');
+  await pickDay(page, pair.locator('ion-input').first(), day);
+  await pickTime(page, pair.locator('ion-input').last(), time);
 }

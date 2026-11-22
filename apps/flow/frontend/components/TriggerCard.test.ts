@@ -5,6 +5,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { CatalogOut, FixedByAppOut, Trigger } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
@@ -86,7 +87,7 @@ describe('TriggerCard', () => {
     expect(s.emitted().at(-1)).toEqual({ kind: 'schedule', every: 'week', weekday: 0, time: '09:00' });
     await s.wrapper.setProps({ modelValue: { kind: 'schedule', every: 'week', weekday: 0, time: '09:00' } });
     await ionValue(s.find('flow-trigger-weekday').element, 4);
-    await ionValue(s.find('flow-trigger-time').element, '18:30', 'ionInput');
+    await pick(s.find('flow-trigger-time').element, '18:30');
     expect(s.emitted().slice(-2)).toEqual([
       { kind: 'schedule', every: 'week', weekday: 4, time: '09:00' },
       { kind: 'schedule', every: 'week', weekday: 0, time: '18:30' },
@@ -95,9 +96,11 @@ describe('TriggerCard', () => {
     expect(s.emitted().at(-1)).toEqual({ kind: 'schedule', every: 'month', day: 1, time: '09:00' });
   });
 
-  it('once at a date and time, sent with its offset', async () => {
+  it('once at a date and time, picked in the app’s calendar and sent with its offset', async () => {
     const s = await setup({ kind: 'at', at: '' });
-    await ionValue(s.find('flow-trigger-at').element, '2026-11-01T09:00', 'ionInput');
+    await pick(s.find('flow-trigger-at-date').element, '2026-11-01');
+    expect(s.emitted().at(-1), 'a day alone is no instant yet').toEqual({ kind: 'at', at: '' });
+    await pick(s.find('flow-trigger-at-time').element, '09:00');
     const sent = s.emitted().at(-1) as { kind: string; at: string };
     expect(sent.kind).toBe('at');
     expect(new Date(sent.at).getTime()).toBe(new Date('2026-11-01T09:00').getTime());
