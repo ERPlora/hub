@@ -1,7 +1,16 @@
 // Inventory's help plays its own video from YouTube, so unlike base-help.spec.ts this spec reaches the real player.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, settled, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
+import {
+  A,
+  capture,
+  horizontalOverflow,
+  saveSessionForTheSweep,
+  settled,
+  signedInSpanish,
+  turnOffTurnedOn,
+  turnOnMissing,
+} from './helpers';
 import { THREE_SIZES_TALL_TABLET } from './screen';
 
 const VIDEO = 'dIppfjMEKWo';
@@ -38,6 +47,7 @@ test.beforeAll(async ({ browser }) => {
     if (/youtube|ytimg|googlevideo/.test(host)) youtubeRequests.push(request.url());
   });
   await turnOnMissing(context, A, ['inventory'], turnedOn);
+  await saveSessionForTheSweep(context);
 });
 
 /** Opens «Dar de alta un producto» on a fresh page: what a player of an earlier test sent while unloading is not counted. */
