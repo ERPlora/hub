@@ -132,7 +132,7 @@ const quickErrors = computed(() => refusalFields(create.error.value));
 const quickFailure = computed(() => (create.error.value && !Object.keys(quickErrors.value).length ? create.error.value.message : ''));
 const creating = ref(false);
 /** Live cards that already have the phone typed: shown, and nothing happens until a choice. */
-const matches = ref<{ id: string; name: string; phone: string }[]>([]);
+const matches = ref<{ id: string; name: string; phone: string | null }[]>([]);
 
 function openQuickAdd(): void {
   const typed = term.value.trim();
@@ -159,9 +159,10 @@ async function createCard(): Promise<void> {
 async function quickCreate(): Promise<void> {
   const phone = quickPhone.value.trim();
   if (!quickName.value.trim()) return;
-  if (phone) {
+  // Who has a phone is only asked by whoever sees the customers' contact details; for anyone else the card is
+  // created, as when the check fails: it does not block the sale (and is merged later if it was her).
+  if (phone && session.can('base.view_customer_contact')) {
     creating.value = true;
-    // A failed check does not block the sale: the card is created (and merged later if it was her).
     const known = await client.api.call('customer.customer.by_phone', { phone }).catch(() => ({ rows: [] }));
     creating.value = false;
     if (known.rows.length) {

@@ -101,3 +101,17 @@ describe('CustomerFacts', () => {
     ]);
   });
 });
+
+describe('CustomerFacts: the contact details only for whoever sees them (BASE-F119)', () => {
+  it('a card that comes without its email and phone has no Email or Phone line, and keeps its address', async () => {
+    const s = await setup({ ...DETAIL, email: null, phone: null });
+    expect(s.wrapper.find('[data-fact="email"]').exists()).toBe(false);
+    expect(s.wrapper.find('[data-fact="phone"]').exists()).toBe(false);
+    expect(s.wrapper.find('[data-fact="address"] dd').text()).toBe('Calle Mayor 1, 28001, Madrid, Spain');
+  });
+
+  it('a card with no email or phone at all says so with a dash', async () => {
+    const s = await setup({ ...DETAIL, email: '', phone: '' });
+    expect([s.wrapper.find('[data-fact="email"] dd').text(), s.wrapper.find('[data-fact="phone"] dd').text()]).toEqual(['—', '—']);
+  });
+});
