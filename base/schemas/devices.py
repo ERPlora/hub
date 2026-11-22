@@ -1,7 +1,7 @@
 """Schemas of the business's devices (``base.device.*``) and the PIN (``base.pin.set``)."""
 
 import datetime as dt
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from django.utils.translation import gettext_noop
@@ -52,7 +52,7 @@ class DeviceOut(Schema):
     current: bool = Field(description="The one the person who asks is using.")
     in_use: bool = Field(description="It has a session open now.")
     session_until: dt.datetime | None = Field(description="When its open session ends, if it has one.")
-    last_entry_at: dt.datetime
+    last_entry_at: dt.datetime = Field(title=gettext_noop("Last used"))
     last_user: str = Field(description="The name of whoever entered on it last.")
     created_at: dt.datetime
     unused: bool = Field(description="Nobody entered on it in 30 days and it is not the one in hand.")
@@ -84,3 +84,9 @@ class DevicePruneIn(Schema):
 class DevicePruneOut(Schema):
     removed: int
 
+
+class DeviceUnusedOut(Schema):
+    count: int = Field(title=gettext_noop("Devices to remove"))
+    devices: list[Annotated[UUID, Field(json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))]] = Field(
+        title=gettext_noop("Which"), description="The last entered first."
+    )

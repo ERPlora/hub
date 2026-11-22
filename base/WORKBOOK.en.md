@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:854d7e4ba638086715deaa456cbcabf2893b46596a233356cf1d0f34c0ab7ab4 -->
+<!-- generated from WORKBOOK.md sha256:4cbdd3e4db8cec4e408e1df4d1f06944e4ebf9375ec0483c77b925198e54a698 -->
 
 ## What it is for and who it is for
 
@@ -1975,12 +1975,15 @@ Steps:
      using: removing it will close your session and you will have to enter again.".
   3. They confirm with "Remove this device" (or "Leave it"). The row disappears and its session closes at once.
      If it was theirs, they leave the business.
+  4. From the assistant ("remove the phone I lost this afternoon"), the card asks to type CONFIRM (BASE-F98) and,
+     under "What will happen", says when it was last used ("Last used: Nov 22, 2026, 4:18 PM"): two devices
+     without a name are called the same ("Chrome · Linux") and only their last use tells them apart.
 In: the device.
 Out: the device forgotten and its sessions ended: the device is cut off, not the person, who can enter on it
 again with their account.
 If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
 registered here. Refresh the list."; what was refused never stays as done.
-Involved: BASE-F58, BASE-F68
+Involved: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Remove at once the devices nobody uses
 Status: done
@@ -1993,10 +1996,15 @@ Steps:
      30 days?") with "They stop showing here and, to use one again, someone will have to enter on it with their
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
+  4. From the assistant ("clear out the old devices nobody uses any more"), the card asks to type CONFIRM
+     (BASE-F98) and, under "What will happen", says how many it will remove and which, by their name, the last used
+     first ("Devices to remove: 2" and "Which: Chrome · Linux, Bar"); the one in use is never among them. If none
+     has gone 30 days without being used, no card shows and the assistant says so: "No device has gone 30 days
+     without being used, so there is nothing to remove.".
 In: which devices nobody has used for 30 days.
 Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
-Involved: BASE-F70
+Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
 Status: done
