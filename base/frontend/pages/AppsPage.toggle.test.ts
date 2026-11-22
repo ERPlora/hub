@@ -22,7 +22,7 @@ import {
   switchState,
 } from '../__tests__/apps-page';
 import { confirmSpy } from '../__tests__/apps-page-spies';
-import { EMPLOYEE, flush, followPass, passRefused, placedUpgrade, SIGNED } from '../__tests__/mount-base';
+import { ADMIN, EMPLOYEE, flush, followPass, passRefused, placedUpgrade, SIGNED } from '../__tests__/mount-base';
 import type { AppList } from '../operations/apps';
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
@@ -213,6 +213,15 @@ describe('the plan’s limit', () => {
     expect(sessionChanged).not.toHaveBeenCalled();
     expect(refused(m).exists()).toBe(false);
     expect(switchState(m, 'flow').checked).toBe(false);
+  });
+
+  it('to an administrator, says so without «Upgrade plan»: only the owner buys', async () => {
+    const m = await open('/apps#all', { onApi: LIMIT, session: ADMIN });
+    await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
+    await flip(m, 'flow', true);
+    const notice = m.wrapper.find('[data-testid="apps-limit"]');
+    expect(notice.text()).toContain('You have reached the 20-app limit of your plan.');
+    expect(notice.find('[data-testid="apps-limit-upgrade"]').exists()).toBe(false);
   });
 
   /** The Apps store at the plan's limit, its notice out, with `pass` as what signing the pass answers. */

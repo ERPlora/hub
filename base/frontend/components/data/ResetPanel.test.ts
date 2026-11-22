@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@erplora/ui/components';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { load } from '../../__tests__/data-fixtures';
-import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
+import { ADMIN, EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { HubDumps, ResetProgress } from '../../operations/dumps';
 import type { HubReset } from '../../operations/reset';
 import ResetPanel from './ResetPanel.vue';
@@ -77,6 +77,31 @@ describe('ResetPanel', () => {
     expect(m.net.api).toEqual([]);
     expect(m.client.stream.subscriptions('base.import.list')).toEqual([]);
     expect(m.client.stream.subscriptions('base.hub.dumps')).toEqual([]);
+  });
+
+  it('to an administrator, undoes imports but says only the owner resets or downloads the copies, and asks neither', async () => {
+    const sent: Sent[] = [];
+    const m = await mountBase(ResetPanel, {
+      session: ADMIN,
+      locale: 'es',
+      onApi: ({ url, init }) => {
+        sent.push({ url, body: JSON.parse(String(init.body ?? '{}')) as Record<string, unknown> });
+        return Response.json({ id: load().id, apps: [] });
+      },
+    });
+    await m.result(await m.live(), 'base.import.list', { imports: [load()], unfinished: null });
+    await settle();
+    expect(m.wrapper.get('[data-testid="reset-owner-only"]').text()).toBe(
+      'Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.',
+    );
+    expect(['reset-section', 'reset-submit', 'dumps-card'].filter((id) => m.wrapper.find(`[data-testid="${id}"]`).exists())).toEqual([]);
+    expect(m.client.stream.subscriptions('base.hub.dumps')).toEqual([]);
+    // Undoing an import is still theirs, and what each section has is never asked for them.
+    await m.wrapper.get(`[data-testid="undo-${load().id}"]`).trigger('click');
+    await settle();
+    dialog(m as Awaited<ReturnType<typeof panel>>, 'undo-confirm').vm.$emit('confirm');
+    await settle();
+    expect(sent.map((call) => call.url)).toEqual(['/api/settings/data/imports/undo']);
   });
 
   it('lists the imports that can be undone and undoes one, saying what went per app', async () => {

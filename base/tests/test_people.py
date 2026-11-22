@@ -371,7 +371,8 @@ class TestTheRoles:
         assert {key: role["members"] for key, role in roles.items()} == {
             "hub_owner": 1, "hub_admin": 1, "hub_manager": 0, "hub_employee": 1,
         }
-        assert roles["hub_owner"]["permissions"] == roles["hub_admin"]["permissions"]
+        # The administrator holds all the owner does but owning the business.
+        assert roles["hub_owner"]["permissions"] == roles["hub_admin"]["permissions"] + 1
         assert roles["hub_admin"]["permissions"] > roles["hub_manager"]["permissions"] > roles["hub_employee"]["permissions"] > 0
         assert all(role["origin"] == "basic" for role in roles.values())
         assert roles["hub_manager"]["label"] == "Manager"

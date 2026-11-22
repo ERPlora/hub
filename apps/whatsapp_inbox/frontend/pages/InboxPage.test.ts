@@ -9,7 +9,7 @@ import { AppPage, applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { click, EMPLOYEE, errorFrame, flush, followUpgrade, type MountOptions, mountInbox, SIGNED } from '../__tests__/mount-inbox';
+import { ADMIN, click, EMPLOYEE, errorFrame, flush, followUpgrade, type MountOptions, mountInbox, SIGNED } from '../__tests__/mount-inbox';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
 import InboxPage from './InboxPage.vue';
@@ -253,7 +253,7 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     }
   });
 
-  it('from 80 % of the month\'s messages the inbox says how many are left, «Upgrade plan» for whoever configures (as the assistant, BASE-F104)', async () => {
+  it('from 80 % of the month\'s messages the inbox says how many are left, «Upgrade plan» for the owner (as the assistant, BASE-F104)', async () => {
     const near = await setup({}, { ...CONNECTED, monthly_usage: 120 });
     expect(near.find('whatsapp-inbox-near-cap').text()).toContain('You have 30 of 150 WhatsApp messages of your plan left this month.');
     expect(near.find('whatsapp-inbox-near-cap').attributes('data-tone')).toBe('warning');
@@ -268,6 +268,10 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     const employee = await setup({ session: EMPLOYEE }, { ...CONNECTED, monthly_usage: 120 });
     expect(employee.find('whatsapp-inbox-near-cap').text()).toContain('You have 30 of 150 WhatsApp messages of your plan left this month.');
     expect(employee.find('whatsapp-inbox-upgrade').exists()).toBe(false);
+    // An administrator configures the inbox but does not buy: only the owner does, on erplora.com.
+    const admin = await setup({ session: ADMIN }, { ...CONNECTED, monthly_usage: 120 });
+    expect(admin.find('whatsapp-inbox-near-cap').exists()).toBe(true);
+    expect(admin.find('whatsapp-inbox-upgrade').exists()).toBe(false);
     // Below 80 %, nothing; once spent, the cap says it instead.
     expect((await setup({}, { ...CONNECTED, monthly_usage: 119 })).find('whatsapp-inbox-near-cap').exists()).toBe(false);
     const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });

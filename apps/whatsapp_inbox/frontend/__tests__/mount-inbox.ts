@@ -10,7 +10,8 @@ import customerEs from '../../../customer/frontend/locale/es.json';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
-/** Owner or admin: every permission of the inbox (apps.py `role_permissions`), and Customers'. */
+/** An administrator: every permission of the inbox (apps.py `role_permissions`), and Customers'; not the owner, so it
+ *  does not buy (no «Upgrade plan»). */
 export const ADMIN: SessionMe = {
   user: { id: '1', label: 'Ana' },
   permissions: [
@@ -26,6 +27,9 @@ export const ADMIN: SessionMe = {
   apps: [],
   language: 'en',
 };
+
+/** The owner: all the administrator has, and the business is theirs, so it is the only one offered «Upgrade plan». */
+export const OWNER: SessionMe = { ...ADMIN, permissions: [...ADMIN.permissions, 'base.own_business'] };
 
 /** A manager: reads, answers and assigns anybody; no settings, no erasing. */
 export const MANAGER: SessionMe = {
@@ -54,7 +58,7 @@ export interface MountOptions {
 export async function mountInbox(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, {
     path: '/whatsapp_inbox/inbox',
-    session: ADMIN,
+    session: OWNER,
     messages: { en: { ...customerEn, ...en }, es: { ...customerEs, ...es } },
     inDocFrom: 'component',
   });
