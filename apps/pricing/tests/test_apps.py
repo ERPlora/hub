@@ -180,5 +180,5 @@ def test_the_reactions_are_run_only_by_the_platform():
     assert "pricing.system" not in pricing_app().permissions
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert pricing_app().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert pricing_app().help == Help(videos={"es": "cL0GmPik7GY", "en": "8fbHffF_tRg"})

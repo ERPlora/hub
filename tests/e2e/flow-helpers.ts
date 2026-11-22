@@ -41,6 +41,12 @@ export async function confirmDialog(page: Page, title: string, beforeConfirm?: (
 
 export const idFromUrl = (page: Page): string => new URL(page.url()).pathname.split('/').at(-1)!;
 
+/** Deletes the automations of hub `a` whose name starts with `tag`, with their runs. */
+export function deleteFlowsNamed(tag: string): void {
+  const flows = `select id from flow_flow where name like '${tag}%'`;
+  psql([`delete from flow_flowrun where flow_id in (${flows})`, `delete from flow_flow where id in (${flows})`].join('; '));
+}
+
 /** An automation that starts by hand, made through the API with `steps` and `grants`, switched on. */
 export async function manualFlow(context: BrowserContext, name: string, steps: unknown[], grants: string[]): Promise<string> {
   const created = await api<{ id: string }>(context, A, 'POST', '/flow/flows', { name, trigger: { kind: 'manual' }, steps });

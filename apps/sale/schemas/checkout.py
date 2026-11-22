@@ -163,7 +163,7 @@ class CompleteIn(ChargeLinesIn):
         description="Invoice abroad: 02 EU VAT, 03 passport, 04 foreign tax id, 05 residence certificate, 06 other, 07 not registered.",
     )
     staff_id: UUID | None = Field(
-        None, description="Who served the sale (a member of Staff).", json_schema_extra=A_MEMBER
+        None, description="Who served the sale (a member of Staff); empty = who serves the check.", json_schema_extra=A_MEMBER
     )
     appointment_id: UUID | None = Field(
         None, description="Counter sale: the appointment it charges.", json_schema_extra=A_BOOKING
