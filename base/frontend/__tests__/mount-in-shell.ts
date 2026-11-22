@@ -4,15 +4,17 @@
 // person and its words once; the tools that drive the stream, answer the API and find what the screen painted, and the
 // gestures and fixtures those tests share, live here.
 import {
+  AppPage,
   createShellI18n,
   provideSession,
   provideShellConfig,
   type SessionMe,
   type SessionStatus,
   type ShellConfig,
+  type ShellTab,
 } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName, stableJson } from '@erplora/ui/sdk';
-import { mount } from '@vue/test-utils';
+import { mount, type VueWrapper } from '@vue/test-utils';
 import { type Component, createApp, isRef, type Ref, ref } from 'vue';
 import { createMemoryHistory, createRouter, type RouteMeta, type Router } from 'vue-router';
 
@@ -292,4 +294,9 @@ export function words(el: Element): string {
     if (text) out.push(text);
   }
   return out.join(' ');
+}
+
+/** The tab bar a page gives its `AppPage`: each tab's id and label, in order. */
+export function tabsOf(wrapper: VueWrapper): [string, string][] {
+  return (wrapper.findComponent(AppPage).props('tabs') as ShellTab[]).map((tab) => [tab.id, tab.label]);
 }
