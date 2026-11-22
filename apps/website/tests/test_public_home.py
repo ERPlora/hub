@@ -24,6 +24,7 @@ from apps.website import reviews
 from apps.website.tests.conftest import (
     HOST,
     HUB_DB,
+    NAMELESS,
     PLACE_ID,
     WEBSITE_JS,
     A,
@@ -31,6 +32,7 @@ from apps.website.tests.conftest import (
     ctx_for,
     full_content,
     google_reviews,
+    page_names,
 )
 from base.models import Hub
 from base.tenancy.context import current_alias, use_hub
@@ -161,6 +163,28 @@ def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_
     page = visit(client).content.decode()
     assert "PLN\xa015.00" in page and "€" not in page
     assert cache.get(page_cache_key(A.key, 1, "en", local_day(""), "PLN")) is not None
+
+
+def test_a_page_that_names_nobody_goes_by_the_business_s_name_and_follows_a_change_of_it(client):
+    # flow: WEBSITE-F10 — with «Business name» empty the page is the business's as erplora.com registered it (Settings ›
+    # Business), never the slug of its address (hub#2084); a new name there is never hidden behind the kept page.
+    Hub.objects.filter(slug=A.key).update(name="Salón Aurora")
+    publish(**NAMELESS)
+    assert page_names(visit(client).content.decode()) == ["Salón Aurora"] * 4
+    Hub.objects.filter(slug=A.key).update(name="Salón Boreal")
+    assert page_names(visit(client).content.decode()) == ["Salón Boreal"] * 4
+
+
+def test_a_business_without_a_name_goes_by_its_address(client):
+    # A demo has no business on erplora.com, hence no name: its page goes by the slug of its address, never by nothing.
+    publish(**NAMELESS)
+    assert page_names(visit(client).content.decode()) == [A.key] * 4
+
+
+def test_the_name_written_in_the_bar_is_the_one_the_page_goes_by(client):
+    Hub.objects.filter(slug=A.key).update(name="Salón Aurora")
+    publish(topbar={"name": "Aurora Peluqueros", "logo": None}, hero={"title": "", "tagline": ""})
+    assert page_names(visit(client).content.decode()) == ["Aurora Peluqueros"] * 4
 
 
 def test_a_visit_served_from_the_cache_opens_no_transaction_of_its_own(client):

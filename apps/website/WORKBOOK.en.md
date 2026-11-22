@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d66376cd4ad28bd0b3a3c90570d7cc6ed7cfea5363758dee9109de207f683a52 -->
+<!-- generated from WORKBOOK.md sha256:a19fa841c007927a9f9fda74108dce188688df2350b8ac8898833edd27425fe1 -->
 
 ## What it is for and who it is for
 
@@ -81,8 +81,9 @@ switches between the two.
 - **Page background**: **Light**, **Dark** or **Auto** (the default): auto follows each visitor's device, dark when it
   is in dark mode and light otherwise; a note under it says so.
 - **Sections**, in this order, each one folding:
-  - **Top bar** (always on the page): business name (up to 80) and logo; **Log in** always.
-  - **Header** (always): title (up to 80), tagline (up to 160) and cover photo.
+  - **Top bar** (always on the page): business name (up to 80; empty = the one in **Settings › Business**, as it says
+    under the field) and logo; **Log in** always.
+  - **Header** (always): title (up to 80; empty = the business name), tagline (up to 160) and cover photo.
   - **About us**: **Show** switch, heading (empty = «About us»), text (up to 4000, with **bold**, lists and links in
     Markdown; no HTML) and a photo.
   - **Catalog**: **Show**, heading (empty = «Our products» or «Our services»), **What to show** (Nothing, Products or
@@ -339,7 +340,9 @@ Steps:
    app as always.
 In: the business's address.
 Out: the published page, with its own security policy (no user scripts: only the page's bundle), without cookies and
-kept a minute by the browser; the tab shows the logo or the name's initial. The page tells search engines which is its
+kept a minute by the browser; the tab shows the logo or the name's initial. The name in the bar, in the header without
+a title, in the footer and in the tab is the one the owner wrote or, if empty, the business's in **Settings ›
+Business**, and a change of that name on erplora.com shows on the next visit. The page tells search engines which is its
 main address: the business's own domain if it opens there (BASE-F110), also from this address, which does not redirect
 because it is still the team's way in; without an own domain, this one.
 If it fails: not published, taken offline or with the app off, the address leads to the team's sign-in; whoever
