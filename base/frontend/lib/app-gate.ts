@@ -82,7 +82,7 @@ function longestCovering(entries: readonly string[], path: string): string | und
 /** The router guard: `true`, or the gate page in the same address. */
 export function createAppGate(me: Readonly<Ref<SessionMe | undefined>>) {
   return (to: RouteLocationNormalized): true | RouteLocationRaw => {
-    if (gateVerdict(me.value, to) === 'open') return true;
+    if (to.name === APP_BLOCKED_ROUTE.name || gateVerdict(me.value, to) === 'open') return true;
     return {
       name: APP_BLOCKED_ROUTE.name,
       params: { pathMatch: to.path.slice(1).split('/') },

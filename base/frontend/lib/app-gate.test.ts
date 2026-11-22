@@ -139,6 +139,10 @@ describe('the platform’s screens, which belong to no app', () => {
     expect(gateVerdict({ ...EMPLOYEE, permissions: ['*'] }, to('/system'))).toBe('open');
   });
 
+  it('let the gate’s own page through in the address it stopped, or the guard would send there again for ever', () => {
+    expect(gate(to('/system', undefined, { name: APP_BLOCKED_ROUTE.name }))).toBe(true);
+  });
+
   it('leave open an address no side-menu entry covers, segment by segment', () => {
     const nobody: SessionMe = { ...EMPLOYEE, permissions: [] };
     expect(gateVerdict(nobody, to('/'))).toBe('open');
