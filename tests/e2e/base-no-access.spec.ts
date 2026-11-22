@@ -3,7 +3,7 @@
 // owner, the positive control, opens the same screen. A screen of the employee's own work still opens.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, saveSessionForTheSweep, shot, shown, testid, THREE_SIZES } from './helpers';
+import { A, api, capture, EMPLOYEE, hostPage, saveSessionForTheSweep, shown, testid, THREE_SIZES } from './helpers';
 
 type People = { people: { name: string; role: string; me: boolean }[] };
 
@@ -32,7 +32,7 @@ test('BASE-F118: an employee opening by its address a screen its role does not o
       if (employeeName) await expect(grantors.filter({ hasText: employeeName })).toHaveCount(0);
       await expect(grantors.filter({ hasText: '@' })).toHaveCount(0);
       await expect(shown(page).locator('[data-testid=tax-rules-add]')).toHaveCount(0);
-      await page.screenshot({ path: shot(`base-no-access-${size.label}`) });
+      await capture(page, `base-no-access-${size.label}`);
     }
 
     await testid(page, 'no-access-home').click();
