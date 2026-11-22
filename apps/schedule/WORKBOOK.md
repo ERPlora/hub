@@ -32,7 +32,7 @@ Es el horario **del negocio**. No es el turno de cada profesional ni sus ausenci
 
 - El **propietario**, el **administrador** y el **responsable** fijan la semana, añaden, corrigen y borran
   días especiales y cambios temporales, y cambian los ajustes.
-- El **empleado** solo lo ve.
+- El **empleado** no abre Horarios (por su dirección, «Sin acceso» (BASE-F118)); las citas y las reservas siguen su horario.
 
 Citas lo lee para ofrecer horas libres y rechazar una cita con el negocio cerrado (también las que llegan por
 Reservas online); Reservas, para no dar mesa con el negocio cerrado; el asistente contesta con él «¿estáis
@@ -121,7 +121,7 @@ de fila **Editar** (o tocar la fila) abre «Editar horario — {día}» con: **D
 de medianoche (22:00–02:00).» y **Guardar día**. Mientras nadie haya guardado ni confirmado la semana,
 encima de la tabla sale el aviso amarillo «Este es un horario por defecto que hemos puesto por ti.
 Comprueba que coincide con el de tu negocio: las citas fuera de él se rechazan.» con el botón **Sí,
-este es mi horario** (el botón, solo para quien puede cambiar el horario; el empleado ve el aviso). En
+este es mi horario** (el botón, solo para quien puede cambiar el horario). En
 móvil la tabla se pinta como tarjetas.
 
 ### Días especiales

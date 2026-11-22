@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:becf7f63b3ac82cbb358902aea4f8abf0afe215e95498b99ede7900d8266deea -->
+<!-- generated from WORKBOOK.md sha256:9d35c4c8664574f70c416b22e88c51f3c3d4f6368168295f1a2d3889eb7d5c3e -->
 
 ## What it is for and who it is for
 
@@ -28,7 +28,7 @@ Who uses it:
 
 - The **owner**, the **administrator** and the **manager** create categories, rules and aliases, set an end
   date on a rule and deactivate or restore it.
-- The **employee** only looks and calculates.
+- The **employee** does not open its screens (by its address, "No access" (BASE-F118)); the till and the assistant calculate with its rules.
 - The **assistant** (by voice or by text, with the session of whoever speaks) does the same: "deactivate the beer
   rule in Germany", "end the reduced rate on 31 December". Before an action it asks for confirmation with its card
   (BASE-F97), which names each rule as the Rules list tells it apart, never by its identifier: by its category, a

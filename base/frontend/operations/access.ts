@@ -33,8 +33,14 @@ export interface AccessSettings {
   can_change: boolean;
 }
 
+/** `base.GrantorsOut`: who can give the person a screen it may not open, by name only («No access»). */
+export interface Grantors {
+  grantors: { name: string }[];
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
+    'base.access.grantors': { input: NoInput; output: Grantors };
     'base.access.door': { input: NoInput; output: AccessDoor };
     'base.access.faces': { input: NoInput; output: AccessDoor };
     'base.access.settings': { input: NoInput; output: AccessSettings };

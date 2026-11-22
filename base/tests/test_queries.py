@@ -40,6 +40,7 @@ def test_anonymous():
         "permissions": [],
         "menu": [],
         "apps": [],
+        "locked": {},
         "language": "es",
         "demo": None,
     }

@@ -35,7 +35,7 @@ Quién la usa:
 
 - El **propietario**, el **administrador** y el **responsable** crean, cambian y borran grupos y
   opciones, y los enganchan o sueltan.
-- El **empleado** (camarero, cajero) consulta los grupos; quien lo vive cada día es él, en el TPV.
+- El **empleado** (camarero, cajero) no abre los grupos (por su dirección, «Sin acceso» (BASE-F118)): los vive cada día en el TPV.
 
 No es una variante de producto (una opción no lleva stock ni coste y no descuenta existencias) ni un
 menú a precio cerrado (eso es Menús).
@@ -162,7 +162,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 
 ### MODIFIER-F01 Consultar y buscar los grupos
 Estado: hecho
-Actor: propietario, administrador, responsable, empleado
+Actor: propietario, administrador, responsable (un empleado no abre Suplementos: por su dirección, «Sin acceso» (BASE-F118))
 Pantalla: Suplementos
 Pasos:
 1. Abre **Suplementos**.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:96ccf7d7bdd732390b817a6511fa70dbc86088cbfe7d004a2cec65e4bd2b678d -->
+<!-- generated from WORKBOOK.md sha256:ec8a3410919204d9ef8133fb7ea892e74ecb588ebef6aeb43387a685bfea542d -->
 
 ## What it is for and who it is for
 
@@ -22,7 +22,7 @@ marked by a person once the bank has done it.
 
 Who uses it:
 
-- The **employee**: only looks at the list of payments and the list of methods.
+- The **employee** does not open Payments (by its address, "No access" (BASE-F118)).
 - The **manager**, the **administrator** and the **owner**: also record payments, mark them as sent and
   as completed, approve and cancel them, and manage the payment methods.
 - The **assistant** (by voice or by text, with the session of whoever speaks) does the same. Before an
@@ -255,7 +255,7 @@ Involved: FLOW-F21
 
 ### PAYMENT-F06 Search and review the payments
 Status: done
-Actor: employee, manager, administrator, owner, assistant
+Actor: manager, administrator, owner, assistant (an employee does not open Payments: by its address, "No access" (BASE-F118))
 Screen: Payments
 Steps:
 1. Open **Payments**.

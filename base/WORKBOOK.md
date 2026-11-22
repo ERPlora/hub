@@ -161,6 +161,11 @@ En la misma dirección de la pantalla de la app, el motivo: «Suscripción neces
 disponible en este negocio», con «Ir a Apps» (y «Mejorar plan» para el propietario, en el
 navegador).
 
+### Sin acceso
+En la misma dirección de una pantalla que el rol de la persona no abre, un candado con «No tienes acceso a esta
+pantalla» — «Tu rol en este negocio no la abre.», los nombres de quien puede darle acceso, cada uno con su avatar, y
+«Ir al Inicio».
+
 ### Ajustes · Negocio
 La segunda pestaña de las de abajo de «Ajustes» («General», «Negocio», «Impresión» y «Datos y copias»). La
 tarjeta «Tu negocio» enseña, sin campos que rellenar, «Nombre del negocio», «País», «Zona
@@ -288,7 +293,7 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 | Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
-| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». |
+| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla de una app que su rol no abre, abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
 
@@ -446,6 +451,7 @@ En la pantalla Archivos:
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
 | BASE-F116 | Leer las novedades de ERPlora | hecho |
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
+| BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
@@ -1031,9 +1037,9 @@ Entra: lo que el negocio tiene de cada app.
 Sale: nada.
 Si falla: «No se ha podido comprobar por qué no se abre esta app» — «Comprueba la conexión y vuelve a
 intentarlo.» con «Reintentar»: nunca un motivo inventado. Una dirección que no existe en el hub dice que no
-existe, como cualquier otra. Una app que la persona no puede ver se abre igual y cada pantalla dice que no tiene
-permiso.
-Implicados: ninguno
+existe, como cualquier otra. Una pantalla que el rol de la persona no abre dice «Sin acceso» (BASE-F118); si la app
+entera no se abre en el negocio, manda este motivo, que vale para todos.
+Implicados: BASE-F118
 
 ### BASE-F27 Ver una app de pago bloqueada
 Estado: hecho
@@ -3377,6 +3383,30 @@ erplora.com: si no se paga pronto, el negocio se suspende. No se borra nada.». 
 campana se queda con lo último que supo, como en BASE-F10.
 Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
+### BASE-F118 Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo
+Estado: hecho
+Actor: responsable, empleado
+Pantalla: Sin acceso
+Pasos:
+  1. Abre por su dirección (un enlace, el historial, una pestaña que se quedó abierta o escribiéndola) una pantalla de
+     una app que su rol no abre: una entrada que no sale en su menú, como «Reglas» de Impuestos para un empleado, o
+     cualquier pantalla que cuelgue de ella.
+  2. En lugar de la pantalla, en la misma dirección, sale «Sin acceso»: «No tienes acceso a esta pantalla» — «Tu rol en
+     este negocio no la abre.». Mientras busca a quién pedirlo: «Buscando quién puede darte acceso…».
+  3. Debajo, «Pide acceso a una de estas personas:» y el nombre de cada una, con su avatar: quien le puede cambiar el
+     rol en erplora.com (HUBS-F26). Un empleado ve al propietario y a los administradores; un responsable, solo al
+     propietario. Solo el nombre: ni el email ni el teléfono. Cuentan también los invitados que aún no han entrado.
+  4. «Ir al Inicio» lleva al Inicio.
+Entra: la sesión de la persona, que dice qué pantallas de cada app tiene cerradas por su rol (las mismas que no salen
+en su menú); las personas del negocio con su rol, de la última foto de erplora.com.
+Sale: nada.
+Si falla: si no se puede saber a quién pedirlo, «No hemos podido saber quién puede darte acceso» — «Pregunta a quien
+lleva el negocio o vuelve a intentarlo.» con «Reintentar», y la pantalla sigue diciendo que no tiene acceso. Sin nadie
+a quien nombrar: «Pide acceso a quien lleva el negocio.». Si la app entera no se abre en el negocio (apagada o sin su
+suscripción), sale su motivo (BASE-F26). El Hub rechaza igual lo que esa pantalla pediría: «Sin acceso» solo ahorra
+una pantalla de errores.
+Implicados: BASE-F26, HUBS-F26 (erplora.com)
+
 ### BASE-F119 Lo que se ve según los permisos de dato
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado
@@ -3768,9 +3798,14 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
   `base/tenancy/tests/test_limits.py`.
 - Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`;
-  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
-  de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
-  en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
+  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppGatePage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
+  de `apps/<id>/frontend/routes.ts` lleva `meta.app`; la página va por nombre en la misma dirección, como `NotInAppPage`
+  del shell, y se comprueba también la primera dirección antes de montar). Pinta `AppBlockedPage.vue` cuando la app no
+  está `on` en `base.session.me` y `NoAccessPage.vue` («Sin acceso», BASE-F118) cuando la entrada de menú más larga de
+  la app que cubre la dirección está en `locked` de la sesión (las rutas de las entradas `Nav` que la persona no
+  abre); la decide `gateVerdict`, nunca la lista `apps`, que lleva toda app de la que la persona tiene algún permiso.
+  Los nombres salen de `base.access.grantors` (`base/queries/access_rights.py`): quien puede subirle el rol en
+  erplora.com, solo el nombre.
   «Mejorar plan» y la Tienda, solo con `useMayBuy` (`base/frontend/lib/plan-link.ts`). e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
 - Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio nace con todo

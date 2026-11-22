@@ -4,7 +4,7 @@
 // are put back and the drawer deleted after it.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shown, testid } from './helpers';
 import { rowAction } from './service-helpers';
 import { dialog, fill } from './inventory-helpers';
 import { shots, stamp } from './sale-helpers';
@@ -57,10 +57,9 @@ test('CASH_REGISTER-F02: the owner adds a drawer and deactivates it', async ({ p
   await expect(row).toContainText(/No/);
 });
 
-test('CASH_REGISTER-F01: the employee reads the settings blocked', async ({ page }) => {
+test('CASH_REGISTER-F01: the employee does not open the settings: «No access» by their address', async ({ page }) => {
   await login(page, A, '/cash_register/settings', EMPLOYEE);
-  await settingsReady(page);
-  await expect(shown(page).locator('[data-testid=cash-register-settings-read-only]')).toBeVisible();
+  // Not in an employee's menu (BASE-F118).
+  await expect(testid(page, 'no-access')).toBeVisible();
   await expect(shown(page).locator('[data-testid=cash-register-settings-save]')).toHaveCount(0);
-  await expect(shown(page).locator('[data-testid=cash-register-setting-require_blind_count]')).toBeDisabled();
 });
