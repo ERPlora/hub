@@ -47,6 +47,20 @@ describe('ReservationFormModal: the guest’s contact details it was not given',
     expect(s.bodies('/api/reservation/reservations/update')).toEqual([{ id: 'r1', party_size: 6, overbook: false }]);
   });
 
+  it('the same panel, after a new booking with a card, edits one that came without them the same way', async () => {
+    const s = await setup({});
+    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', LUCIA);
+    await settle();
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ reservation: reservationRow({ status: 'confirmed', guest_phone: null, guest_email: null }), open: true });
+    await settle();
+    expect(s.shown()).toEqual([]);
+    await ionValue(s.field('party_size'), '6', 'ionInput');
+    s.answer(200, reservationRow());
+    await click(s.inDoc('reservation-form-submit')!);
+    expect(s.bodies('/api/reservation/reservations/update')).toEqual([{ id: 'r1', party_size: 6, overbook: false }]);
+  });
+
   it('a card picked without them books with the card’s, and leaving the card asks for them again', async () => {
     const s = await setup({});
     const pick = async (card: typeof LUCIA | null) => {

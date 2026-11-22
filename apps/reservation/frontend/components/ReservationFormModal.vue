@@ -167,8 +167,8 @@ function newBooking(overbook: boolean): ReservationIn {
 /** The phone and email the edit changes: never one that came without it (null). */
 function contactChanges(booked: ReservationOut): ReservationPatchIn {
   const out: ReservationPatchIn = {};
-  if (booked.guest_phone !== null && phone.value !== null && phone.value.trim() !== booked.guest_phone) out.guest_phone = phone.value.trim();
-  if (booked.guest_email !== null && email.value !== null && email.value.trim() !== booked.guest_email) out.guest_email = email.value.trim();
+  if (phone.value !== null && phone.value.trim() !== booked.guest_phone) out.guest_phone = phone.value.trim();
+  if (email.value !== null && email.value.trim() !== booked.guest_email) out.guest_email = email.value.trim();
   return out;
 }
 
