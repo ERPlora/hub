@@ -36,7 +36,7 @@ from base.tenancy import ops
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import HUB_DB
-from base.tenancy.tests.hubs import make_cluster, make_hub  # noqa: F401 (fixtures)
+from base.tenancy.tests.hubs import make_cluster, make_database, make_hub  # noqa: F401 (fixtures)
 from base.tests.test_internal import signed
 from base.tests.test_session_revoke import ANA, OLGA, login
 from control.models import Hub, HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
@@ -156,6 +156,18 @@ def test_measuring_again_a_day_replaces_its_figures(hub_a, catalog_read):
 
     again = HubUsageDaily.objects.get(hub=hub_a, day=DAY)
     assert (again.db_bytes, again.measured_at) == (catalog_read[hub_a.db_name], NIGHT)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_each_hub_gets_its_own_databases_size(hub_a, make_hub, make_database):
+    # hub_a's database holds every app's tables and the new one none: their sizes stay far apart whatever Postgres
+    # changes on its own, so a size read from the wrong database cannot pass.
+    empty = make_hub(make_database())
+
+    usage.measure(DAY, now=NIGHT)
+
+    sizes = dict(HubUsageDaily.objects.filter(day=DAY).values_list("hub_id", "db_bytes"))
+    assert sizes[hub_a.id] > sizes[empty.id] > 0
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
