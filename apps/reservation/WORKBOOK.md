@@ -327,9 +327,10 @@ Pasos:
    duración, el origen y las notas. «Reservar».
 3. La reserva nace Pendiente (o Confirmada, si se confirman solas: entonces retiene su mesa).
 4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5». Antes de apuntarla, la
-   tarjeta del asistente dice para quién, por el nombre de su ficha, el día y la hora («Crear en Reservas:
-   Ana García · 15 oct 2026 · 21:00»), y lleva la mesa con su zona, como la nombra Mesas («5 (Terraza)»: el
-   número se repite entre zonas), nunca por un código.
+   tarjeta del asistente dice primero para quién, por el nombre de su ficha (también si se la nombró por su
+   teléfono) o, sin ficha, por el nombre que se dijo, y una sola vez; después, el día y la hora, antes que el
+   teléfono («Crear en Reservas: Ana García · 15 oct 2026 · 21:00»). Lleva la mesa con su zona, como la nombra
+   Mesas («5 (Terraza)»: el número se repite entre zonas), nunca por un código.
 Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
 espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país

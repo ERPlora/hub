@@ -14,7 +14,7 @@ from apps.reservation.models import Reservation
 from apps.reservation.queries import find_reservation, reservation_out
 from apps.reservation.schemas import ReservationIn, ReservationOut, ReservationPatchIn, ReservationRefIn
 from apps.reservation.services.gate import choose_table, judge, lock_book
-from apps.reservation.services.guests import CARD_SOURCES, _guest_contact, card_for_phone, typed_phone
+from apps.reservation.services.guests import CARD_SOURCES, _folded, _guest_contact, card_for_phone, typed_phone
 from apps.reservation.services.other_apps import drop_hold, status_changed, sync_hold
 from apps.reservation.services.writes import S, _stamp
 
@@ -31,6 +31,8 @@ STAFF_ONLY = _(
 #: What only the restaurant sets on a booking, never a channel acting for the guest, booking a full slot anyway
 #: included.
 STAFF_ONLY_FIELDS = ("table_id", "table", "zone", "no_table", "internal_notes", "overbook")
+#: The data that say for whom a booking is: the customer card, by its id or as said, else the guest's name.
+FOR_WHOM = ("customer_id", "customer", "guest_name")
 
 
 def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
@@ -38,6 +40,21 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
     return reservation_out(
         ctx, Reservation.objects.select_related("table__zone").get(pk=reservation.pk)
     )
+
+
+def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """For whom, the day and the time first, as the book lists a reservation: the card's line says only its first
+    three data. The guest's name is left out when it says the same as the card."""
+    whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
+    if whom is None:
+        return fields
+    rest = [
+        field
+        for field in fields
+        if field is not whom
+        and not (field["name"] in FOR_WHOM and _folded(str(field["value"])) == _folded(str(whom["value"])))
+    ]
+    return [whom, *sorted(rest, key=lambda field: field["name"] not in ("date", "time"))]
 
 
 @operation(
@@ -66,6 +83,7 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
         "when the book confirms by itself, which holds its table. Somebody already on the waitlist is booked with "
         "reservation.waitlist.convert, which marks their entry converted.",
         "risk": "normal",
+        "summary": _booking_summary,
     },
 )
 def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
