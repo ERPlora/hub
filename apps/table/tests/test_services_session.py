@@ -11,6 +11,7 @@ the order, split and merge keep the check, guests visible and correctable) and w
 check no longer open refuses the write; closing by hand must name the bill the check carries).
 """
 
+import logging
 import uuid
 
 import pytest
@@ -772,6 +773,13 @@ def test_a_customer_that_cannot_be_put_on_the_check_does_not_stop_the_seating(
     session = seat(table, customer=said)
     assert (session.status, session.customer_id) == ("open", None)
     assert status(table) == "occupied"
+
+
+def test_a_seating_without_its_customer_is_logged_under_the_table_writes(room, caplog):
+    with caplog.at_level(logging.INFO):
+        seat(make_table("4", zone=room), customer="Nobody At All")
+    said = [r.name for r in caplog.records if r.getMessage().startswith("table: seated without the customer")]
+    assert said == ["apps.table.services"]
 
 
 def test_a_split_sales_refuses_leaves_the_table_as_it_was(room, product):
