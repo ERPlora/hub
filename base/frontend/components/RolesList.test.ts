@@ -19,7 +19,7 @@ function embed(block: object | null) {
 }
 
 async function open(options: Parameters<typeof mountBase>[1] = {}) {
-  const m = await mountBase(RolesList, { path: '/employees#roles', routes: ['/employees'], ...options });
+  const m = await mountBase(RolesList, { path: '/employees#roles', routes: ['/employees', '/employees/roles/:role'], ...options });
   const call = await m.live();
   return { ...m, call };
 }
@@ -80,6 +80,14 @@ describe('RolesList', () => {
     await play.result(play.call, 'base.role.list', { roles: ROLES });
     await flush();
     expect(play.wrapper.find('[data-testid="roles-change"]').exists()).toBe(false);
+  });
+
+  it('anyone opens what a role allows from its row', async () => {
+    const m = await open({ session: EMPLOYEE });
+    await m.result(m.call, 'base.role.list', { roles: ROLES });
+    await m.wrapper.findAll('[data-testid="roles-row"]')[3].trigger('click');
+    await flush();
+    expect(m.router.currentRoute.value.path).toBe('/employees/roles/hub_employee');
   });
 
   it('a catalogue that cannot be read says so', async () => {

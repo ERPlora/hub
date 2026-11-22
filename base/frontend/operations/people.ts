@@ -51,6 +51,30 @@ export interface HubRoleRow {
   permissions: number;
 }
 
+/** `base.RolePermissionOut`: a permission in business words, and what the role does with it. */
+export interface RolePermission {
+  permission: string;
+  phrase: string;
+  /** yes: the role holds it; approval: a manager approves it there and then with their PIN; no: not at all. */
+  state: 'yes' | 'approval' | 'no';
+}
+
+/** `base.RoleAppOut`: one panel of «What it allows»: the business, an app that is on, or the sensitive data. */
+export interface RoleApp {
+  app: string;
+  name: string;
+  permissions: RolePermission[];
+}
+
+/** `base.RoleDetailOut`: «What it allows» of a basic role. */
+export interface RoleDetail {
+  key: HubRole;
+  label: string;
+  origin: 'basic';
+  members: number;
+  apps: RoleApp[];
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.person.list': { input: NoInput; output: { people: Person[]; seats: Seats } };
@@ -59,5 +83,6 @@ declare module '@erplora/ui/sdk' {
     'base.person.badge_set': { input: { person: string; badge: string }; output: PersonDetail };
     'base.person.badge_remove': { input: { person: string }; output: PersonDetail };
     'base.role.list': { input: NoInput; output: { roles: HubRoleRow[] } };
+    'base.role.detail': { input: { role: string }; output: RoleDetail };
   }
 }
