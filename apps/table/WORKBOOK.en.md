@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:de37a9b59e113cf3f2cc196b95528eccb009616ab742319dbe4a04127825106d -->
+<!-- generated from WORKBOOK.md sha256:d44623787d60055a94dc7b185f37fdc50f9b1c8a5a744a8b1c4135021a9b4a61 -->
 
 ## What it is for and who it is for
 
@@ -177,7 +177,7 @@ charges, moves or edits a table. It has two modes:
   Blocked), Zone, Active; footer with "Delete" and "Save");
   the "+" opens **Add** (Zone field and "Add zone"; "Table number" field, which if left empty is
   "Auto-numbered", and "Add table"); the pencil opens **Edit zone** (Name, Description (optional);
-  "Delete zone" and "Save"). Below, the help "Drag to position · click a table to edit or delete it.
+  "Delete zone" and "Save"). Below, the help "Drag to position · tap a table to edit or delete it.
   Changes are saved instantly.". In "Edit plan" the deactivated tables and zones are also seen, in grey.
 
 The windows cover the whole screen on the phone and are centred on tablet and computer.

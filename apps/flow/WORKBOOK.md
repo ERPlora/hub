@@ -237,7 +237,7 @@ Pasos:
    en puntos suspensivos, nunca partido a media palabra: se lee entero al dejar el puntero encima, en la
    tarjeta del teléfono y al abrirla.
 2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o filtra por
-   **Ver** y **Arranca con**; ordena por **Tocadas al final** o **Nombre**.
+   **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**.
 3. Sin resultados: «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas**.
 4. Toca una fila para abrirla en el editor.
 Entra: las automatizaciones del negocio, en páginas de hasta 100.
@@ -1352,7 +1352,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Para quien lo mantiene
 
-- **Orden de la lista** (`base.ordering.list_order_for`): «Tocadas al final» o
+- **Orden de la lista** (`base.ordering.list_order_for`): «Últimas tocadas primero» o
   «Nombre», y el `id` para desempatar, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
   empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de

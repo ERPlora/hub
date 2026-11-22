@@ -150,6 +150,13 @@ describe('ProjectSheet', () => {
     expect(s.inDoc('task-project-sheet-add-task')).not.toBeNull();
   });
 
+  it('Name and Color are a group of their own, and Save, Deactivate and Delete sit together on their own row', async () => {
+    const s = await setup();
+    const siblings = (id: string) => [...(s.el(id).parentElement?.children ?? [])].map((child) => child.getAttribute('data-testid'));
+    expect(siblings('task-project-sheet-name')).toEqual(['task-project-sheet-name', 'task-project-sheet-color']);
+    expect(siblings('task-project-sheet-save')).toEqual(['task-project-sheet-save', 'task-project-sheet-toggle', 'task-project-sheet-delete']);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     expect(s.text('task-project-sheet-tasks-heading')).toBe('Tareas de este proyecto (2)');

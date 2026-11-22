@@ -94,7 +94,7 @@ max-statements = 50
 "apps/modifier/tests/test_concurrency.py" = ["E731"]
 "apps/payment/tests/test_queries.py" = ["E731"]
 "apps/pricing/admin.py" = ["DJ007"]
-"apps/pricing/queries.py" = ["B035"]
+"apps/pricing/queries/other_apps.py" = ["B035"]
 "apps/pricing/schemas.py" = ["F402"]
 "apps/pricing/tests/test_relay.py" = ["F841"]
 "apps/sale/tests/conftest.py" = ["F401"]
@@ -179,8 +179,6 @@ ignore_imports = [
     "base.meter -> base.services",
     "base.operations -> base.services.devices",
     "base.permissions -> base.tenancy.context",
-    "base.services.devices -> base.middleware",
-    "base.services.sessions -> base.middleware",
     "base.tenancy.context -> base.tenancy.connections",
     "base.tenancy.cut -> base.services.photo",
     "base.tenancy.cut -> base.services.provisioning",

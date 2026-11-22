@@ -94,12 +94,12 @@ export function localDate(iso: string, timeZone: Zone): string {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
-/** Business `YYYY-MM-DD HH:MM` of an instant (the history's and the CSV's form). */
-export function localDateTime(iso: string | null | undefined, timeZone: Zone): string {
+/** The business day and time of an instant («sáb, 21 nov · 21:00»); `—` when missing. */
+export function formatDayTime(iso: string | null | undefined, locale: string, timeZone: Zone): string {
   const ms = readable(iso);
   if (ms === null) return DASH;
   const p = partsOf(ms, timeZone);
-  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+  return `${formatDay(`${p.year}-${p.month}-${p.day}`, locale)} · ${p.hour}:${p.minute}`;
 }
 
 /** `HH:MM`, with the day when it is not the day of the clock-in (a night shift); `—` when missing. */

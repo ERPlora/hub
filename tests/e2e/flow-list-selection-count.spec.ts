@@ -6,8 +6,8 @@
 // The two automations it makes are named «E2E FlowSelected …» and go before and after.
 import { expect, test } from '@playwright/test';
 
-import { manualFlow } from './flow-helpers';
-import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { deleteFlowsNamed, manualFlow } from './flow-helpers';
+import { capture, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { noHorizontalScroll } from './schedule-helpers';
 
 const KEY = 'ui-122-selection-count';
@@ -18,13 +18,8 @@ const VIEWPORTS = [
   { label: '375x667', width: 375, height: 667 },
 ];
 
-function cleanUp(): void {
-  const flows = `select id from flow_flow where name like '${TAG}%'`;
-  psql([`delete from flow_flowrun where flow_id in (${flows})`, `delete from flow_flow where id in (${flows})`].join('; '));
-}
-
-test.beforeAll(cleanUp);
-test.afterAll(cleanUp);
+test.beforeAll(() => deleteFlowsNamed(TAG));
+test.afterAll(() => deleteFlowsNamed(TAG));
 
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F03 says «1 seleccionado» with one automation marked and «2 seleccionados» with two, at ${viewport.label}`, async ({ browser }) => {

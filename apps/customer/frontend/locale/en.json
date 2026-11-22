@@ -129,7 +129,10 @@
     "importCsv": {
       "button": "Import CSV",
       "importing": "Importing…",
-      "summary": "Import: {total} rows — {created} created, {skipped} skipped.",
+      "summary": "Import: {rows} — {created}, {skipped}.",
+      "rows": "{n} row | {n} rows",
+      "created": "{n} created | {n} created",
+      "skipped": "{n} skipped | {n} skipped",
       "noRows": "The file has no customers: its first line must name the columns (name, email, phone…).",
       "unreadable": "The file could not be read.",
       "row": "Row {line}",

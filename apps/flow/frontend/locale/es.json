@@ -34,7 +34,7 @@
       "triggerAt": "Una fecha",
       "triggerManual": "Tú, a mano",
       "sortLabel": "Orden",
-      "sortUpdated": "Tocadas al final",
+      "sortUpdated": "Últimas tocadas primero",
       "sortName": "Nombre",
       "columns": {
         "name": "Nombre",
