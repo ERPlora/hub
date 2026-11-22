@@ -72,8 +72,8 @@ según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo,
 - **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
   tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
   plantillas» y «Ahora no».
-- **«Mis apps»**: una baldosa por app, con su icono y su nombre; las que más se abren en este navegador,
-  primero. En el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
+- **«Mis apps»**: una baldosa por app que la persona puede abrir, con su icono y su nombre; las que más se abren
+  en este navegador, primero. En el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
 - **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
   cada uno con su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
   «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». Plegada: cinco pasos (dos en el
@@ -543,9 +543,16 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen · la barra de arriba de cualquier pantalla
 Pasos:
   1. En «Mis apps», una baldosa por app que esta persona puede abrir, con su icono y su nombre (si no
-     cabe, el nombre entero sale al pasar por encima).
+     cabe, el nombre entero sale al pasar por encima). Una app sale si su rol le deja abrir al menos una de sus
+     pantallas. Un empleado tiene las de su trabajo diario: Ventas / TPV, Caja, Mesas, Cocina, Reservas, Reservas
+     online, Citas, Clientes, Inventario, Facturación, Servicios, Personal, Control horario, Tareas, Carrito y pago y
+     la Bandeja de WhatsApp, y Automatizaciones para contestar lo que le pregunta una automatización. Las que
+     configuran el negocio (Impuestos, Tarifas, Suplementos, Menús y combos, Pagos, Horarios, VeriFactu, Impresión y
+     Página web) son de quien las gestiona: el empleado no las tiene, aunque el TPV y el asistente sigan usando lo que
+     leen de ellas.
   2. Las más abiertas en este navegador van primero.
-  3. Toca una baldosa: se abre la app. Una app que se está encendiendo dice «Activando…» y no abre nada.
+  3. Toca una baldosa: se abre la primera pantalla de la app que la persona puede abrir. Una app que se está
+     encendiendo dice «Activando…» y no abre nada.
   4. En el móvil, con seis apps o más, se ven las cuatro primeras y «Ver todas las apps», que enseña el
      resto. «Añadir apps», la última, lleva a Apps.
   5. Para salir de una app, toca «Mis apps» en la barra: la pantalla principal de una app no tiene
@@ -780,7 +787,7 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Apps
 Pasos:
   1. En la fila de una app de «Mis apps», pulsa «Abrir».
-  2. Se abre la primera pantalla de esa app que la persona puede ver.
+  2. Se abre la primera pantalla de esa app que el rol de la persona le deja abrir.
 Entra: el menú de la app y lo que la persona puede ver.
 Sale: nada guardado.
 Si falla: una app que la persona no puede abrir, o que no está en marcha, no lleva «Abrir» (no sale apagado: no
@@ -3544,6 +3551,34 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
 - `demo` (módulo no listado) sale en el menú, en «Mis apps» y con su ejemplo en el Inicio solo con
   `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
   Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.
+- Cada entrada del menú de un módulo (`Nav` de su `apps.py`) declara el permiso que la abre (`permission`, uno de los
+  del propio módulo; `live.E025` lo exige). `base.session.me` lleva en `menu` solo las entradas abiertas a la persona y
+  solo los módulos con alguna (`_can_see` de `base/queries/apps.py`), y «Mis apps» (`useMyApps` de `@erplora/ui`) sale
+  de ese menú; la primera entrada abierta es la que abre una baldosa y el «Abrir» de Apps. `apps` sigue listando todo
+  módulo del que la persona tiene algún permiso (`_may_use`): otras pantallas leen de ahí si una app está encendida,
+  como el TPV con Suplementos y Menús, que un empleado usa sin abrir esas apps. Toda ruta con sesión de
+  `apps/<id>/frontend/routes.ts` cuelga de una entrada de su app (el prefijo de `path` más largo), salvo las de fondo
+  (`meta.background`) y las de solo desarrollo; lo comprueba `tests/test_guardrails_navigation.py`, y por eso los
+  ajustes de cada app son una entrada más (`settings`, con el permiso que los guarda).
+- Qué abre cada rol (skill `market-decision`, 2026-11-21): una entrada de trabajo diario se abre con el permiso que
+  usa quien atiende (vender, cobrar, la caja, las mesas, la cocina, las reservas, la agenda, los clientes, fichar);
+  una de configurar (ajustes, catálogos de estaciones, zonas, mesas, grupos, etiquetas y campos, series y emisor,
+  franjas de reservas) y las apps de configurar el negocio (Impuestos, Tarifas, Suplementos, Menús y combos, Pagos,
+  Horarios, VeriFactu, Impresión y Página web) se abren con el permiso que las cambia, no con el de leer que necesita
+  el TPV. Automatizaciones se abre con `flow.answer`: ahí contesta cada persona lo que le pregunta una automatización
+  (FLOW-F29).
+
+  | Producto | Qué abre el rol más bajo | Fuente |
+  |---|---|---|
+  | Square | El nivel «Standard» es para cobrar en el TPV (cajeros, baristas, sala); el resto se da permiso a permiso | https://square.com/help/us/en/article/6455-setting-up-your-employees-with-square-for-retail |
+  | Toast | El puesto de camarero lleva solo «POS Access»; el de cajero, además, el cajón; la trastienda es aparte | https://doc.toasttab.com/doc/platformguide/adminExampleConfigurationForEnterprises.html |
+  | Lightspeed | Roles por zona (TPV y trastienda); solo el administrador crea y cambia roles | https://o-series-support.lightspeedhq.com/hc/en-us/sections/30076369973787-User-and-staff-management |
+  | Odoo | El usuario del TPV cobra y lleva la caja, sin informes ni configuración; una app sin derecho no sale en su menú | https://www.odoo.com/blog/business-hacks-1/point-of-sale-user-access-rights-1808 |
+  | Fresha | La agenda: solo la suya o la de todo el equipo, según su rol | https://www.fresha.com/help-center/knowledge-base/team/100687-create-permission-roles |
+  | Shopify POS | Rol por defecto «Associate», ajustable; la configuración del canal es de quien gestiona | https://help.shopify.com/en/manual/sell-in-person/shopify-pos/staff-management/pos-roles |
+  | Clover | El empleado ficha, vende y cobra; lo demás lo activa el propietario | https://www.stitchflow.com/user-management/clover/manual |
+  | Business Central | El menú de cada persona sale de su perfil y de sus permisos | https://learn.microsoft.com/en-us/training/modules/users-security-dynamics-365-business-central/5-understand |
+  | Booksy | El profesional básico ve y reserva solo en su agenda | https://support.booksy.com/hc/en-ie/articles/16535688940946-How-do-I-manage-staff-permissions |
 - `base/spa.py` incrusta `hub-home` (`name` del registro y `plan_url` =
   `SAAS_URL/dashboard/store/plans?business=<id del hub>`) y `widget-list`, `base.widget.list` tal como su consulta viva se lo
   contesta a la persona (sin el permiso del Inicio no va): `WidgetBoard.vue` monta sus paneles con él, así que los

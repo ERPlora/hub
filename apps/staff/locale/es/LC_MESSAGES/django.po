@@ -405,3 +405,7 @@ msgstr "Ausencia"
 
 msgid "Staff members"
 msgstr "Miembros del personal"
+
+#: apps.py:117
+msgid "Settings"
+msgstr "Ajustes"

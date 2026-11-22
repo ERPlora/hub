@@ -27,6 +27,7 @@ from pydantic import (
 )
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
+from apps.combo.schemas.dish_options import MAX_DISH_OPTIONS, DishOptionIn, DishOptionOut
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn
 from base.schemas import assistant, catalog_images
@@ -530,11 +531,12 @@ class ChoiceIn(In):
     group: Reference | None = Field(
         None, description="The course it is picked in, when the product is in several."
     )
-    quantity: int = Field(
-        1,
-        ge=1,
-        le=MAX_PICKS,
-        description="How many times it is picked (two coffees: 2).",
+    quantity: int = Field(1, ge=1, le=MAX_PICKS, description="How many times it is picked (two coffees: 2).")
+    options: list[DishOptionIn] = Field(
+        default_factory=list,
+        max_length=MAX_DISH_OPTIONS,
+        description="The options of Modifiers chosen for the dish, as modifier.selection.resolve valued them: each "
+        "pick of the dish carries them all, and their price adds to the menu's amount.",
     )
 
     @model_validator(mode="after")
@@ -705,19 +707,14 @@ class ComponentOut(Schema):
     product_id: UUID
     product_name: str
     sku: str
-    category_id: UUID | None = Field(
-        description="The product's first category, for the kitchen's routing."
-    )
+    category_id: UUID | None = Field(description="The product's first category, for the kitchen's routing.")
     is_service: bool = Field(description="A service product never moves stock.")
     quantity: int = Field(description="Picks of it in one menu.")
     price_delta: int = Field(description="Supplement of one pick, in cents.")
-    catalog_price: int = Field(
-        description="The product's catalogue price, in cents: the weight of the split."
-    )
+    catalog_price: int = Field(description="The product's catalogue price, in cents: the weight of the split.")
     tax_category_key: str | None
-    amount: int | None = Field(
-        description="Its part of the menu's amount, in cents, when the menu is split."
-    )
+    amount: int | None = Field(description="Its part of the menu's amount, in cents, when the menu is split.")
+    options: list[DishOptionOut] = Field(description="The options of Modifiers chosen for it, in the order chosen.")
 
 
 class ResolvedOut(Schema):
@@ -728,7 +725,7 @@ class ResolvedOut(Schema):
     price: int = Field(description="Today's closed price, in cents.", json_schema_extra={"money": True})
     supplements: int = Field(description="The supplements of the picks, in cents.", json_schema_extra={"money": True})
     amount: int = Field(
-        description="What the menu charges: the amount ordered, or price plus supplements.",
+        description="What the menu charges: the amount ordered, or price plus supplements plus the dishes' options.",
         json_schema_extra={"money": True},
     )
     split: bool = Field(

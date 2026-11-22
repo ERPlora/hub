@@ -124,6 +124,13 @@ def test_open_leads_to_the_first_screen_of_the_app_for_who_may_see_it():
     assert (with_permission["path"], without["path"]) == ("/demo/items", None)
 
 
+def test_open_leads_to_the_first_screen_the_person_may_open_not_the_first_of_the_menu():
+    """Whoever may only ask for time off opens Staff on «Time off»; whoever only reads the taxes for the till has no
+    screen of Taxes to open."""
+    document = by_id(app_list("staff.view_time_off", "staff.request_time_off", "tax.view"))
+    assert (document["staff"]["path"], document["tax"]["path"]) == ("/staff/time-off", None)
+
+
 def test_what_an_app_needs_and_what_needs_it():
     """What comes along with an app (its ``requires``, transitively) and what an app is needed by."""
     document = by_id(app_list())

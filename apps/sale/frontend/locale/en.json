@@ -246,7 +246,8 @@
         "less": "One less {name}",
         "loadFailed": "The options of this product could not be read. Try again.",
         "chooseRange": "Choose {n} to {max}",
-        "atLeast": "Choose at least {n}"
+        "atLeast": "Choose at least {n}",
+        "loading": "Loading options…"
       },
       "menu": {
         "badge": "Menu",

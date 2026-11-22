@@ -65,8 +65,11 @@ class CartCheckoutConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only (UI-REQUESTS.md).
     navigation = [
-        Nav("carts", _("Carts"), "lucide:shopping-bag", "/cart_checkout/carts"),
-        Nav("orders", _("Orders"), "ion:receipt-outline", "/cart_checkout/orders"),
+        Nav("carts", _("Carts"), "lucide:shopping-bag", "/cart_checkout/carts", permission="cart_checkout.view_cart"),
+        Nav(
+            "orders", _("Orders"), "ion:receipt-outline", "/cart_checkout/orders",
+            permission="cart_checkout.view_cart",
+        ),
     ]
     help = Help()
 

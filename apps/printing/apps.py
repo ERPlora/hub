@@ -132,9 +132,12 @@ class PrintingConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/set-icons.ts).
     navigation = [
-        Nav("printers", _("Printers"), "lucide:receipt", "/printing/printers"),
-        Nav("devices", _("Devices"), "lucide:smartphone", "/printing/devices"),
-        Nav("jobs", _("Queue"), "ion:list-outline", "/printing/jobs"),
-        Nav("settings", _("Settings"), "ion:settings-outline", "/printing/settings"),
+        Nav("printers", _("Printers"), "lucide:receipt", "/printing/printers", permission="printing.manage_settings"),
+        Nav("devices", _("Devices"), "lucide:smartphone", "/printing/devices", permission="printing.manage_settings"),
+        Nav("jobs", _("Queue"), "ion:list-outline", "/printing/jobs", permission="printing.manage_settings"),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/printing/settings",
+            permission="printing.manage_settings",
+        ),
     ]
     help = Help()

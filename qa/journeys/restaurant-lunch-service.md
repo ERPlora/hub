@@ -23,7 +23,7 @@ Para qué: un servicio de mediodía normal, desde que se abre la caja hasta que 
 6. TABLE-F10, SALE-F19 — un grupo sin reserva: mesa 4, tres comensales.
 7. TABLE-F10, SALE-F19 — dos clientes más: mesa 6, solo bebidas.
 8. SALE-F11, MODIFIER-F06 — en la mesa 4, un entrecot al punto.
-9. SALE-F12, COMBO-F07 — dos menús del día.
+9. SALE-F12, COMBO-F07, SALE-F42 — dos menús del día, uno con el entrecot al punto.
 10. CUSTOMER-F17 — la mesa 4 es de una clienta que ya tiene ficha.
 11. SALE-F40, MODIFIER-F12 — los alérgenos de la tarta con «Extra de queso».
 12. SALE-F41 — la clienta es alérgica al gluten: se marca en su plato.

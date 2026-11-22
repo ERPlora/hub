@@ -108,9 +108,11 @@ class CashRegisterConfig(LiveAppConfig):
             _("Cash register"),
             "ion:cash-outline",
             "/cash_register/sessions",
+            permission="cash_register.view_session",
         ),
         Nav(
-            "settings", _("Settings"), "ion:settings-outline", "/cash_register/settings"
+            "settings", _("Settings"), "ion:settings-outline", "/cash_register/settings",
+            permission="cash_register.manage_settings",
         ),
     ]
     help = Help()

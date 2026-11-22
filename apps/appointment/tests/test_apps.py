@@ -89,13 +89,12 @@ def test_what_each_role_gets():
     }
 
 
-def test_navigation_is_a_single_entry_with_a_registered_icon():
+def test_navigation_is_the_agenda_and_its_settings_with_registered_icons():
     entries = appointment().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [
-        (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
-    ] == [
-        ("appointments", "Agenda", "ion:calendar-outline", "/appointment/agenda"),
+    assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [
+        ("appointments", "Agenda", "ion:calendar-outline", "/appointment/agenda", "appointment.view_own_appointment"),
+        ("settings", "Settings", "ion:settings-outline", "/appointment/settings", "appointment.manage_settings"),
     ]
 
 

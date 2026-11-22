@@ -74,17 +74,21 @@ class VerifactuConfig(LiveAppConfig):
     # module's own icon. Registered icons only (packages/ui/src/shell/icons.ts): the old document-text-outline
     # waits in UI-REQUESTS.md.
     navigation = [
-        Nav("records", _("Records"), "ion:list-outline", "/verifactu/records"),
+        Nav("records", _("Records"), "ion:list-outline", "/verifactu/records", permission="verifactu.transmit_record"),
         Nav(
             "contingency",
             _("Contingency"),
             "ion:warning-outline",
             "/verifactu/contingency",
+            permission="verifactu.transmit_record",
         ),
-        Nav("events", _("Events"), "ion:time-outline", "/verifactu/events"),
-        Nav("recovery", _("Recovery"), "ion:shield-checkmark-outline", "/verifactu/recovery"),
-        Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config"),
-        Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings"),
+        Nav("events", _("Events"), "ion:time-outline", "/verifactu/events", permission="verifactu.transmit_record"),
+        Nav(
+            "recovery", _("Recovery"), "ion:shield-checkmark-outline", "/verifactu/recovery",
+            permission="verifactu.transmit_record",
+        ),
+        Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config", permission="verifactu.configure"),
+        Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings", permission="verifactu.configure"),
     ]
     help = Help()
     # The Home's step is done once the chosen way could carry the records to the AEAT's production environment

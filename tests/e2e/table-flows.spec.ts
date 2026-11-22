@@ -15,7 +15,8 @@ import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, openTillCart, stamp } from './sale-helpers';
 import { ownerPage, post, rowAction, settled } from './service-helpers';
-import { bookingDays, bookingTimes, type BookingTimes, RESERVED_LEAD_MINUTES, untilMidnight } from './table-clock';
+import { reservationTimes } from './table-booking';
+import { bookingDays, RESERVED_LEAD_MINUTES } from './table-clock';
 
 const RUN = stamp();
 const TAG = `E2E Tbf ${RUN}`;
@@ -76,20 +77,6 @@ async function flowShots(page: Page, flows: string[], ready: () => Promise<void>
     for (const flow of flows) await page.screenshot({ path: shot(`APP-TABLE-${flow}-${size.label}`) });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-}
-
-/** The times of a test's reservations (table-clock.ts). In the last minutes of the day none of today is left: the
- *  test waits for midnight first (less than ten minutes), its timeout stretched by exactly that wait. */
-async function reservationTimes(): Promise<BookingTimes> {
-  const now = new Date();
-  const times = bookingTimes(now);
-  if (times) return times;
-  const wait = untilMidnight(now) + 1_000;
-  test.setTimeout(test.info().timeout + wait);
-  await new Promise((done) => setTimeout(done, wait));
-  const after = bookingTimes(new Date());
-  expect(after, 'a time of the new day after midnight').not.toBeNull();
-  return after!;
 }
 
 /** A wall-clock time («20:00») as the plan paints it (`clock` of `apps/table/frontend/lib/format.ts`): the

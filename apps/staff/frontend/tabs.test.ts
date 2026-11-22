@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { ION_ICONS } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -68,13 +69,10 @@ describe('the staff tabbar', () => {
   });
 
   it('wears the same icons and paths as the menu entries of apps.py (one icon per section everywhere)', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.matchAll(/Nav\(\s*id="([a-z_]+)",\s*label=_\("[^"]+"\),\s*icon="([^"]+)",\s*path="([^"]+)",?\s*\)/g)].map((m) => [
-      m[1],
-      m[2],
-      m[3],
-    ]);
-    // Settings is the help's own last tab (base.queries.app_help), not a menu entry.
-    expect(menu).toEqual(STAFF_TABS.filter((tab) => tab.id !== 'settings').map((tab) => [tab.id, tab.icon, tab.to]));
+    const menu = appMenu('staff');
+    expect(menu.map((entry) => [entry.id, entry.icon, entry.path])).toEqual(STAFF_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
+    // «Commissions» and «Settings» open with the permissions their pages show the tabs with.
+    const permissionOf = (id: string) => menu.find((entry) => entry.id === id)?.permission;
+    expect([permissionOf('commissions'), permissionOf('settings')]).toEqual(['staff.view_compensation', 'staff.manage_settings']);
   });
 });

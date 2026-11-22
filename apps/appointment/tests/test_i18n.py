@@ -114,7 +114,7 @@ def test_spanish_texts_of_the_workbook():
     with translation.override("es"):
         config = apps.get_app_config("appointment")
         assert str(config.verbose_name) == "Citas"
-        assert [str(nav.label) for nav in config.navigation] == ["Agenda"]
+        assert [str(nav.label) for nav in config.navigation] == ["Agenda", "Ajustes"]
         assert [str(label) for label in Appointment.Status.labels] == [
             "Pendiente",
             "Confirmada",

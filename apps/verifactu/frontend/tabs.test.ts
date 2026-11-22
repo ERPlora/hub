@@ -1,13 +1,11 @@
 // The six sections of VeriFactu (the old manifest's `navigation`): Records, Contingency, Events, Recovery,
 // Configuration and Settings, as the footer tabbar of every VeriFactu page. Each tab follows its route, has
 // its icon (a registered one: an unregistered icon paints nothing) and its label in the reader's language.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { resolveIcon } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -43,8 +41,7 @@ describe('the VeriFactu tabbar', () => {
   });
 
   it('wears the same icons and paths as the menu entries of apps.py', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.matchAll(/Nav\(\s*"([a-z]+)",\s*_\("[^"]+"\),\s*"([^"]+)",\s*"([^"]+)",?\s*\)/g)].map((m) => [m[1], m[2], m[3]]);
+    const menu = appMenu('verifactu').map((entry) => [entry.id, entry.icon, entry.path]);
     expect(menu).toEqual(VERIFACTU_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

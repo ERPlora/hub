@@ -40,7 +40,12 @@ def dish_allergens(dish: dict) -> list[str]:
 
 def _combo_row(line: OrderLine) -> dict:
     components = [
-        {**dish, "allergens": dish_allergens(dish), "allergy_in_dish": found_in(line.allergy, dish_allergens(dish))}
+        {
+            **dish,
+            "allergens": dish_allergens(dish),
+            "allergy_in_dish": found_in(line.allergy, dish_allergens(dish)),
+            "modifiers": [option["name"] for option in dish.get("options", [])],
+        }
         for dish in line.combo["components"]
     ]
     return {"combo_id": line.combo_id, **line.combo, "components": components}

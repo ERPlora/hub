@@ -83,14 +83,17 @@ class FakeApp:
 
 @pytest.fixture
 def two_apps(monkeypatch, every_app_on):
-    """Two modules with a menu, one without, and a platform app (which never shows)."""
+    """Two modules with a menu, one without, one whose only entry sets it up, and a platform app (which never shows)."""
     apps = [
-        FakeApp("demo", "Demo", ["demo.view", "demo.manage"], [Nav("demo", "Demo", "ion:flask-outline", "/demo/items")]),
+        FakeApp("demo", "Demo", ["demo.view", "demo.manage"],
+                [Nav("demo", "Demo", "ion:flask-outline", "/demo/items", permission="demo.view")]),
         FakeApp("stock", gettext_lazy("January"), ["stock.view", "stock.count"], [
-            Nav("stock", gettext_lazy("January"), "mdi:package-variant", "/stock"),
-            Nav("stock-count", "Count", "mdi:counter", "/stock/count"),
+            Nav("stock", gettext_lazy("January"), "mdi:package-variant", "/stock", permission="stock.view"),
+            Nav("stock-count", "Count", "mdi:counter", "/stock/count", permission="stock.count"),
         ]),
         FakeApp("reports", "Reports", ["reports.view"]),
+        FakeApp("extras", "Extras", ["extras.view", "extras.manage"],
+                [Nav("extras", "Extras", "ion:add-circle-outline", "/extras", permission="extras.manage")]),
         FakeApp("platform", "Platform", ["platform.view"], [Nav("platform", "Platform", "ion:home", "/platform")],
                 kind="platform"),
     ]
@@ -108,9 +111,27 @@ def test_menu_lists_only_permitted_apps(make_user, two_apps):
     assert me["apps"] == [{"label": "demo", "state": "on"}]
 
 
-def test_any_permission_of_an_app_makes_it_visible(make_user, two_apps):
+def test_the_menu_of_an_app_has_only_the_entries_the_person_may_open(make_user, two_apps):
     me = session_me(make_user(), {"stock.count"})
     assert [group["id"] for group in me["menu"]] == ["stock"]
+    assert [item["path"] for item in me["menu"][0]["items"]] == ["/stock/count"]
+    every = session_me(make_user("marta"), {"stock.view", "stock.count"})
+    assert [item["path"] for item in every["menu"][0]["items"]] == ["/stock", "/stock/count"]
+
+
+def test_an_app_with_no_entry_open_to_the_person_has_no_menu_but_stays_among_its_apps(make_user, two_apps):
+    """Other screens read from ``apps`` whether an app is on, as the till does with modifiers its cashier sells."""
+    me = session_me(make_user(), {"extras.view"})
+    assert me["menu"] == []
+    assert me["apps"] == [{"label": "extras", "state": "on"}]
+    manager = session_me(make_user("marta"), {"extras.view", "extras.manage"})
+    assert [group["id"] for group in manager["menu"]] == ["extras"]
+
+
+def test_an_entry_that_names_no_permission_opens_to_nobody(make_user, two_apps, monkeypatch):
+    bare = Nav("stock-bare", "Bare", "mdi:counter", "/stock/bare")
+    monkeypatch.setattr(two_apps[1], "navigation", [*two_apps[1].navigation, bare])
+    me = session_me(make_user(), {"stock.view", "stock.count"})
     assert [item["path"] for item in me["menu"][0]["items"]] == ["/stock", "/stock/count"]
 
 
@@ -141,7 +162,7 @@ def test_superuser_does_not_see_base_among_its_apps(superuser):
 def test_system_actor(two_apps):
     me = session_me("system", {"*"})
     assert me["user"] == {"id": "system", "label": "system"}
-    assert [app["label"] for app in me["apps"]] == ["demo", "stock", "reports"]
+    assert [app["label"] for app in me["apps"]] == ["demo", "stock", "reports", "extras"]
 
 
 def a_demo(hub):

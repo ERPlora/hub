@@ -22,8 +22,12 @@ sign-in to send a visitor to.
 
 On both addresses the page tells search engines which one is its main address (``rel="canonical"``, hub#818): the
 business's own domain while the door opens its website there, else its address on erplora.com. There is no redirect:
-the erplora.com address is still the team's way in. A page is kept with the main address it names, and one kept before
-the domain changed is painted again, so it never names the address of before.
+the erplora.com address is still the team's way in.
+
+A page whose bar names nobody goes by the business's name, as erplora.com registered it (Settings › Business: the
+registry row the host loaded), or by its address's slug when it has none, as a demo (hub#2084). A page is kept with
+the main address and the name it shows, and one kept before either changed is painted again, so it never shows those
+of before.
 """
 
 from django.core.cache import cache
@@ -63,8 +67,8 @@ def respond(request: HttpRequest) -> HttpResponse:
     language, today = visitor_language(request), local_day(request.hub.timezone)
     currency = currency_of(request.hub.country)
     version = queries.live_version(scope)
-    main = main_address(request.hub)
-    html = _kept(queries.page_cache_key(slug, version, language, today, currency, own_domain=own_domain), main)
+    marks = {"main": main_address(request.hub), "name": request.hub.name or slug}
+    html = _kept(queries.page_cache_key(slug, version, language, today, currency, own_domain=own_domain), marks)
     if html is None:
         page = queries.published_page(scope)
         if page is None:
@@ -78,17 +82,17 @@ def respond(request: HttpRequest) -> HttpResponse:
             page["theme"],
             page["content"],
             language,
-            hub=slug,
+            name=marks["name"],
             currency=currency,
             catalog=queries.live_catalog(scope, page["content"]) if own_domain else page.get("catalog"),
             today=today,
             reviews=queries.shown_reviews(slug, page["content"], page.get("reviews_snapshot")),
             hub_address=public_url(slug) if own_domain else "",
-            canonical=main,
+            canonical=marks["main"],
         )
         cache.set(
             queries.page_cache_key(slug, page["version"], language, today, currency, own_domain=own_domain),
-            {"main": main, "html": html},
+            {"marks": marks, "html": html},
             queries.CATALOG_TTL if own_domain else queries.PAGE_TTL,
         )
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
@@ -105,10 +109,11 @@ def main_address(hub) -> str:
     return f"https://{domain}/" if domain else public_url(hub.slug)
 
 
-def _kept(key: str, main: str) -> str | None:
-    """The page kept under ``key`` if it names ``main`` as its main address: never one kept before a domain change."""
+def _kept(key: str, marks: dict[str, str]) -> str | None:
+    """The page kept under ``key`` if it was painted with ``marks``, its main address and its name: never one kept
+    before a domain or the business's name changed."""
     kept = cache.get(key)
-    return kept["html"] if kept is not None and kept["main"] == main else None
+    return kept["html"] if kept is not None and kept.get("marks") == marks else None
 
 
 def visitor_language(request: HttpRequest) -> str:

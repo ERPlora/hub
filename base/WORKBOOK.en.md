@@ -58,8 +58,8 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
 
 - **"Start with a business like yours"**, only for who administers the business and while the business has
   nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
-- **"My apps"**: one tile per app, with its icon and its name; the ones opened most in this browser,
-  first. On a phone, with six apps or more, the first four and "View all apps".
+- **"My apps"**: one tile per app the person can open, with its icon and its name; the ones opened most in this
+  browser, first. On a phone, with six apps or more, the first four and "View all apps".
 - **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
   icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
   available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
@@ -541,9 +541,16 @@ Actor: owner, administrator, manager, employee
 Screen: Home · Summary · the top bar of any screen
 Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
-     fit, the whole name shows on hover).
+     fit, the whole name shows on hover). An app shows if their role lets them open at least one of its screens. An
+     employee has the ones of their daily work: Sales & POS, Cash register, Tables, Kitchen, Reservations, Online
+     booking, Appointments, Customers, Inventory, Invoicing, Services, Staff, Time clock, Tasks, Cart & Checkout and
+     the WhatsApp inbox, and Automations to answer what an automation asks them. The ones that set up the business
+     (Taxes, Price Lists, Modifiers, Menus and combos, Payments, Schedules, VeriFactu, Printing and Website) belong to
+     whoever manages them: the employee does not have them, even though the till and the assistant keep using what
+     they read from them.
   2. The ones opened most in this browser go first.
-  3. They tap a tile: the app opens. An app that is being turned on says "Activating…" and opens nothing.
+  3. They tap a tile: the first screen of the app the person can open opens. An app that is being turned on says
+     "Activating…" and opens nothing.
   4. On a phone, with six apps or more, the first four show and "View all apps", which shows the rest.
      "Add apps", the last one, leads to Apps.
   5. To leave an app, tap "My apps" in the bar: the main screen of an app has no "Back". The sheet starts
@@ -778,7 +785,7 @@ Actor: owner, administrator, manager, employee
 Screen: Apps
 Steps:
   1. On the row of an app in "My apps", they tap "Open".
-  2. The first screen of that app the person can see opens.
+  2. The first screen of that app the person's role lets them open opens.
 In: the app's menu and what the person can see.
 Out: nothing saved.
 If it fails: an app the person cannot open, or that is not running, has no "Open" (it does not show greyed

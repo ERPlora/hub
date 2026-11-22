@@ -481,3 +481,7 @@ msgstr "imagen"
 #: schemas/product_images.py
 msgid "Image"
 msgstr "Imagen"
+
+#: apps.py:112
+msgid "Settings"
+msgstr "Ajustes"

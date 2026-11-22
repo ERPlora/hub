@@ -311,7 +311,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 | SALE-F40 | See a dish's allergens when ordering it | common | done |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | done |
-| SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | not done |
+| SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | done |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -1453,26 +1453,26 @@ the confirmation card, which says the check, the dish and the allergens by their
 Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
 ### SALE-F42 Choose the modifiers of a dish in a menu
-Status: not done — the menu sheet does not ask yet for the modifiers of each dish, Menus does not add them to the
-amount and the kitchen order does not carry them (hub#2019)
+Status: done
 Vertical: restaurant
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. With Menus and combos and Modifiers active, open a menu in the POS (SALE-F12) and choose a dish that has modifier
+1. With Menus and combos and Modifiers active, open a menu in the POS and choose a dish that has modifier
    groups, its own or its category's, the same ones it asks for when sold on its own (the entrecôte with "Meat
    doneness"): its groups open right there, under the dish, with the rules, the extra charges with their sign, the
-   allergens and the default options of the sheet of an article on its own (SALE-F11). A dish without groups is
-   chosen as always.
+   allergens and the default options of the sheet of an article on its own. A dish without groups is chosen as
+   always.
 2. Choose the options. Removing the dish, or changing it for another in a single-choice course, removes its
    options. A choice that is repeated (two coffees) carries the same options each time.
 3. While a required group of a chosen dish is not complete, the button says what is missing ("Choose 1 in «Meat
-   doneness»") and tapping it points to that group. With everything complete, "Add · <total>" adds to the set price
+   doneness»") and tapping it points to that group. With everything complete, "Add · €16.50" adds to the set price
    the menu's extra charges and those of the chosen options.
-4. Press it: the menu goes into the check with each dish and, under it, its options.
-5. Send to the kitchen: each dish carries its options under it, on the screen and on paper, like a dish on its own
-   (COMBO-F11, MODIFIER-F08). Charge as always: the ticket names the options under their dish and the menu charges
-   what it was worth when ordered, options included, even if they change or are deleted later.
+4. Press it: the menu goes into the check with its dishes under it and, beside each dish, its options ("Entrecôte
+   (Rare, Cheese)").
+5. Send to the kitchen: each dish carries its options under it, on the screen and on paper, like a dish on its own.
+   Charge as always: the ticket names the options beside their dish, under the menu, and
+   the menu charges what it was worth when ordered, options included, even if they change or are deleted later.
 In: the groups and options of the product of each chosen dish, from Modifiers (MODIFIER-F06). Modifiers checks and
 prices the options of each dish (MODIFIER-F07) and Menus adds them to the menu's amount when the line is added and
 again when charging, with the amount ordered (COMBO-F08).

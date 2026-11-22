@@ -798,15 +798,11 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
 def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     now = timezone.now()
     table = _seatable_table(data.table_id, data.table, data.zone, now)
-    guests = data.guests_count
-    if guests is None:
-        hold = (
-            _seating_holds(table, now, data.reservation_id)
-            .filter(party_size__gt=0)
-            .order_by("held_from", "id")
-            .first()
-        )
-        guests = hold.party_size if hold else table.capacity
+    hold = _seating_holds(table, now, data.reservation_id).filter(party_size__gt=0).order_by("held_from", "id").first()
+    guests = data.guests_count or (hold.party_size if hold else table.capacity)
+    # Only a new check takes the reservation's customer: linking one to a brought check would replace its own.
+    reserved_for = hold.customer_id if hold and data.order_id is None and not data.customer else None
+    customer_id = data.customer_id or reserved_for
     if data.order_id is not None:
         _bring_order(ctx, data.order_id, table)
         order_id = data.order_id
@@ -824,8 +820,8 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     _stamp(session, ctx, created=True)
     session.save()
     _seat_at(session, table, SessionMove.Reason.OPENED, now, data.reservation_id)
-    if data.customer_id or data.customer:
-        _put_customer(ctx, order_id, data.customer_id, data.customer)
+    if customer_id or data.customer:
+        _put_customer(ctx, order_id, customer_id, data.customer)
     _event(
         ctx, events.SESSION_OPENED, session, order_id=str(order_id), guests_count=guests
     )

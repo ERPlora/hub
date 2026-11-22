@@ -63,7 +63,8 @@ def _item(line, decimals: int) -> dict:
     item = {"name": f"+ {name}" if child else name, "quantity": float(line.quantity), "total": units(line.line_total, decimals)}
     if line.modifiers:
         item["modifiers"] = list(line.modifiers)
-    if line.components:
+    # A dish of a split menu is a line of its own (it has its product), its options already under it.
+    if line.components and getattr(line, "product_id", None) is None:
         item["components"] = [_dish(dish) for dish in line.components]
     notes = [(line.notes or "").strip()] if hasattr(line, "notes") else []
     if line.paid_by_voucher:
@@ -74,9 +75,12 @@ def _item(line, decimals: int) -> dict:
 
 
 def _dish(dish) -> str:
+    """A dish of a menu charged in one line, as the receipt prints it under the menu: «2× Coffee», with the options
+    charged inside it («Steak (Rare, Cheese)»); the bill's preview already names it so."""
     if isinstance(dish, str):
         return dish
-    return f"{dish.quantity}× {dish.product_name}" if dish.quantity > 1 else dish.product_name
+    name = f"{dish.quantity}× {dish.product_name}" if dish.quantity > 1 else dish.product_name
+    return f"{name} ({', '.join(dish.modifiers)})" if dish.modifiers else name
 
 
 def receipt(

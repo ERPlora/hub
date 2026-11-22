@@ -101,6 +101,11 @@ class AppointmentConfig(LiveAppConfig):
             _("Agenda"),
             "ion:calendar-outline",
             "/appointment/agenda",
+            permission="appointment.view_own_appointment",
+        ),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/appointment/settings",
+            permission="appointment.manage_settings",
         ),
     ]
     help = Help()

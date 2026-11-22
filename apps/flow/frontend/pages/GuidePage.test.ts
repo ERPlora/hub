@@ -6,7 +6,7 @@ import { click, mountFlow, settle } from '../__tests__/mount-flow';
 import GuidePage from './GuidePage.vue';
 
 async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountFlow(GuidePage, { path: '/flow/guide', locale });
+  const m = await mountFlow(GuidePage, { path: '/flow/automations/guide', locale });
   await settle();
   return m;
 }

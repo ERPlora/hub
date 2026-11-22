@@ -96,6 +96,7 @@
     },
     "fields": {
       "name": "Business name",
+      "nameHelp": "Leave it empty to use the one in Settings › Business.",
       "logo": "Logo",
       "title": "Title",
       "tagline": "Tagline",
