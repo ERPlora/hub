@@ -168,7 +168,7 @@ def invoice_does_not_seal(monkeypatch):
     its record, which only a direct call or the reaction to its notice seals. The rest of Invoicing is real."""
     from live.operations import UnknownOperation
 
-    from apps.invoice import services as invoicing
+    from apps.invoice.services import issuing as invoicing
 
     real = invoicing.get_operation
 
@@ -185,7 +185,7 @@ def at_emission(monkeypatch):
     """``at_emission(change)``: when Invoicing's emission asks VeriFactu for the record, the invoice's row is first
     changed behind Invoicing's back with ``change(row)`` (in the emission's transaction, outside VeriFactu's
     savepoint), so VeriFactu's real operation sees a document it must refuse right at the emission."""
-    from apps.invoice import services as invoicing
+    from apps.invoice.services import issuing as invoicing
     from apps.invoice.models import Invoice
 
     real = invoicing.get_operation

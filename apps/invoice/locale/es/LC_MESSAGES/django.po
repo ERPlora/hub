@@ -491,7 +491,7 @@ msgstr "líneas de factura"
 msgid "Invoice not found."
 msgstr "Factura no encontrada."
 
-#: queries.py:52 services.py:88
+#: queries.py:52 services/numbering.py:15
 msgid "This numbering series does not exist."
 msgstr "Esa serie de numeración no existe."
 
@@ -607,11 +607,11 @@ msgstr "Di qué venta: su id o su número."
 msgid "Say which series: its id, or its code."
 msgstr "Di qué serie: su id o su código."
 
-#: schemas.py:69 services.py:84
+#: schemas.py:69 services/recipient.py:16
 msgid "This field is required."
 msgstr "Este campo es obligatorio."
 
-#: services.py:78
+#: services/issuer.py:17
 msgid ""
 "Set up the issuer (the business's legal name, tax ID and address) in "
 "Invoicing → Issuer before issuing documents."
@@ -619,12 +619,12 @@ msgstr ""
 "Configura el emisor (la razón social, el NIF y el domicilio del negocio) en "
 "Facturación → Emisor antes de emitir documentos."
 
-#: services.py:82
+#: services/recipient.py:13
 msgid "A full invoice needs the customer's name, tax ID and address."
 msgstr ""
 "Una factura completa necesita el nombre, el NIF y la dirección del cliente."
 
-#: services.py:86
+#: services/recipient.py:19
 #, python-format
 msgid ""
 "VeriFactu's record holds at most %(max)s characters here: shorten it (on the"
@@ -633,20 +633,20 @@ msgstr ""
 "El registro de VeriFactu admite como mucho %(max)s caracteres aquí: acórtalo"
 " (en la ficha del cliente)."
 
-#: services.py:89
+#: services/manual.py:27
 msgid "This series is not active: activate it or choose another one."
 msgstr "Esta serie no está activa: actívala o elige otra."
 
-#: services.py:91
+#: services/manual.py:30
 msgid "A manual invoice is numbered in an invoice (F1) or ticket (F2) series."
 msgstr ""
 "Una factura manual se numera en una serie de facturas (F1) o de tiques (F2)."
 
-#: services.py:93
+#: services/series.py:19
 msgid "There is already a series with that code that year."
 msgstr "Ya hay una serie con ese código ese año."
 
-#: services.py:95
+#: services/series.py:22
 msgid ""
 "This series has already issued invoices, so its prefix, its format and its "
 "next number can no longer change: the number is part of the VeriFactu chain."
@@ -656,7 +656,7 @@ msgstr ""
 "siguiente número ya no se pueden cambiar: el número forma parte de la cadena"
 " de VeriFactu. Crea una serie nueva si necesitas otros."
 
-#: services.py:99
+#: services/series.py:28
 msgid ""
 "The numbers of this series would not fit in 60 characters (VeriFactu's "
 "limit): shorten the prefix or the format."
@@ -664,7 +664,7 @@ msgstr ""
 "Los números de esta serie no cabrían en 60 caracteres (el límite de "
 "VeriFactu): acorta el prefijo o el formato."
 
-#: services.py:103
+#: services/manual.py:35
 msgid ""
 "That series numbers another year: a manual invoice is numbered in a series "
 "of this year."
@@ -672,7 +672,7 @@ msgstr ""
 "Esa serie numera otro año: una factura manual se numera en una serie de este"
 " año."
 
-#: services.py:106
+#: services/manual.py:40
 #, python-format
 msgid ""
 "Above %(limit)s a ticket cannot be issued: issue an invoice (F1) with the "
@@ -681,12 +681,12 @@ msgstr ""
 "Por encima de %(limit)s no se puede emitir un tique: emite una factura (F1) "
 "con los datos del cliente."
 
-#: services.py:109
+#: services/from_sale.py:32
 #, python-format
 msgid "Sale %(number)s"
 msgstr "Venta %(number)s"
 
-#: services.py:111
+#: services/numbering.py:18
 #, python-format
 msgid ""
 "The number %(number)s already exists in series %(code)s: give the series a "
@@ -695,7 +695,7 @@ msgstr ""
 "El número %(number)s ya existe en la serie %(code)s: da a la serie un "
 "formato con el año."
 
-#: services.py:114
+#: services/paying.py:16
 msgid ""
 "This invoice cannot be marked as paid: only an issued invoice that is not "
 "paid yet can be. Nothing was changed."
@@ -733,20 +733,20 @@ msgstr ""
 msgid "Nothing is left to rectify on this invoice."
 msgstr "No queda nada por rectificar en esta factura."
 
-#: services.py:128
+#: services/substitution.py:20
 msgid "Only a ticket (simplified invoice) can be replaced by a full invoice."
 msgstr ""
 "Solo un tique (factura simplificada) se puede sustituir por una factura "
 "completa."
 
-#: services.py:131
+#: services/substitution.py:25
 msgid ""
 "This ticket is cancelled: it can no longer be replaced by a full invoice."
 msgstr ""
 "Este tique está cancelado: ya no se puede sustituir por una factura "
 "completa."
 
-#: services.py:134
+#: services/substitution.py:30
 msgid ""
 "This ticket already has rectifying invoices: it can no longer be replaced by"
 " a full invoice."
@@ -754,7 +754,7 @@ msgstr ""
 "Este tique ya tiene rectificativas: ya no se puede sustituir por una factura"
 " completa."
 
-#: services.py:137
+#: services/rectifying.py:40
 #, python-format
 msgid ""
 "The sale %(number)s has no invoice yet: its rectification waits for it."
@@ -762,7 +762,7 @@ msgstr ""
 "La venta %(number)s aún no tiene factura: su rectificativa espera a que la "
 "tenga."
 
-#: services.py:139
+#: services/rectifying.py:45
 #, python-format
 msgid "The sale %(number)s is not voided."
 msgstr "La venta %(number)s no está anulada."
@@ -771,12 +771,12 @@ msgstr "La venta %(number)s no está anulada."
 msgid "That refund does not exist."
 msgstr "Esa devolución no existe."
 
-#: services.py:141
+#: services/manual.py:45
 #, python-format
 msgid "There is no tax category «%(category)s»."
 msgstr "No hay ninguna categoría fiscal «%(category)s»."
 
-#: services.py:142
+#: services/manual.py:48
 #, python-format
 msgid ""
 "No tax rule applies today to the tax category «%(category)s». Create its "
@@ -785,7 +785,7 @@ msgstr ""
 "Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s». "
 "Crea su regla en Impuestos › Reglas."
 
-#: services.py:144
+#: services/manual.py:53
 #, python-format
 msgid ""
 "Line %(line)s: %(quantity)s at that price comes to 0.00, so no invoice was "
@@ -794,7 +794,7 @@ msgstr ""
 "Línea %(line)s: %(quantity)s a ese precio sale a 0,00, así que no se ha "
 "emitido ninguna factura."
 
-#: services.py:149
+#: services/issuing.py:24
 msgid ""
 "The tax quota does not match its base and rate, so no invoice was issued. "
 "Charging one amount and declaring another breaks the tax agency's cross-"
@@ -804,14 +804,14 @@ msgstr ""
 "ha emitido ninguna factura. Cobrar una cosa y declarar otra rompe el cruce "
 "que hace Hacienda."
 
-#: services.py:153
+#: services/issuing.py:28
 msgid ""
 "The invoice's total does not add up to its own lines, so nothing was issued."
 msgstr ""
 "El total de la factura no cuadra con sus propias líneas, así que no se ha "
 "emitido nada."
 
-#: services.py:156
+#: services/issuing.py:31
 msgid ""
 "An exempt, not subject or reverse-charge line carries a tax quota, so no "
 "invoice was issued: only a subject operation may declare a quota."
@@ -820,7 +820,7 @@ msgstr ""
 " impuesto, así que no se ha emitido ninguna factura: solo una operación "
 "sujeta puede declarar cuota."
 
-#: services.py:160
+#: services/issuing.py:35
 msgid ""
 "An ordinary invoice cannot add up below zero. To give an amount back, issue "
 "a rectifying invoice."
@@ -910,7 +910,7 @@ msgstr "Factura de ERPlora"
 msgid "document language"
 msgstr "idioma del documento"
 
-#: services.py
+#: services/platform_invoices.py:19
 #, python-format
 msgid ""
 "The invoice this credit note rectifies (%(number)s) was never issued here: "
