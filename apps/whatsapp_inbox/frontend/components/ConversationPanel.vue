@@ -14,7 +14,6 @@ import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
-import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import { useLiveList } from '../composables/useLiveList';
 import { useT } from '../composables/useT';
 import type { ChannelOut, ConversationStatus, NoteOut } from '../operations';
@@ -167,7 +166,7 @@ async function removeNote(note: NoteOut): Promise<void> {
         v-if="conversation?.phone"
         class="wa-detail__phone"
         data-testid="whatsapp-inbox-detail-phone"
-      >{{ formatPhone(conversation.phone) }}</span>
+      >{{ conversation.phone }}</span>
       <StatusPill
         v-if="conversation"
         size="sm"

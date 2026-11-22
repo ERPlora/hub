@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Reservations → Waitlist (WORKBOOK «Pantallas · Lista de espera»; RESERVATION-F14 to F16): the live
 // `reservation.waitlist.list` in the order people were written down (day, preferred time, arrival) — Date,
-// Pref. time, Guest, Phone (Customers' customerContact), Party, Contacted and Status (Waiting, Converted) —, «Search guest,
+// Pref. time, Guest, Phone (lib/guestContact), Party, Contacted and Status (Waiting, Converted) —, «Search guest,
 // phone or email…» (or «Search guest…» to whoever does not see them), filters by day, guest, phone, contacted and
 // status, 50 a page. «Add guest» opens the form; per
 // row «Contacted» (until called), «Convert» (until converted: it books the entry's own data; a full slot
@@ -20,13 +20,13 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 
-import { CUSTOMER_CONTACT, phoneColumns } from '../../../customer/frontend/lib/customerContact';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
+import { CUSTOMER_CONTACT, phoneColumns } from '../lib/guestContact';
 import type { WaitlistOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
@@ -83,7 +83,7 @@ const columns = computed<DataTableColumn<WaitlistOut>[]>(() => [
     format: (_, row) => formatTime(row.preferred_time, locale.value),
   },
   { key: 'guest_name', label: t('reservation.waitlist.columns.guest'), sortable: true, priority: 'high', cell: 'guest', filter: { type: 'text' } },
-  ...phoneColumns<'guest_phone', WaitlistOut>(seesContact.value, { key: 'guest_phone', label: t('reservation.waitlist.columns.phone'), filtered: true }),
+  ...phoneColumns<WaitlistOut>(seesContact.value, t('reservation.waitlist.columns.phone')),
   { key: 'party_size', label: t('reservation.waitlist.columns.party'), sortable: true, align: 'right', format: (_, row) => String(row.party_size) },
   {
     key: 'is_contacted',

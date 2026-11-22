@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6b8c7482f6df9eeedbd24f5520caf0540d9a186aaeca262c07ce6b60f56f9ae1 -->
+<!-- generated from WORKBOOK.md sha256:d1a468eb46ba1d3e02e6775fd089d86565efaa63266c1ac4f8da9de5bede6305 -->
 
 ## What it is for and who it is for
 
@@ -90,7 +90,7 @@ says "Filter contact…" and only looks at the names, the panel does not show th
 name is seen by their masked number, with the first three digits and the last four ("+346••••2333"), as shared
 inboxes mask it. Nobody sorts the list by the phone: the order would tell the number to whoever does not see it.
 
-The panel shows: the contact, their number (as in Customers: "+34 600 111 222") and their status; the linked card in Customers (with a link) or **Link
+The panel shows: the contact, their number and their status; the linked card in Customers (with a link) or **Link
 to a card** / **Create card**; **Assigned to** with the team picker and **Assign to me**; the status buttons
 **Open / Pending / Closed**; the thread, from the oldest message to the newest (the customer's on the left, the
 business's on the right with their status —Sending…, Sent, Delivered, Read, Not delivered, or Not sent with

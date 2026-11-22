@@ -98,7 +98,7 @@ solo mira los nombres, el panel no enseña el número y a quien escribió sin no
 las tres primeras cifras y las cuatro últimas («+346••••2333»), como lo enmascaran las bandejas compartidas. Nadie
 ordena la lista por el teléfono: el orden diría el número a quien no lo ve.
 
-El panel enseña: el contacto, su número (como en Clientes: «+34 600 111 222») y su estado; la ficha de Clientes unida (con enlace) o
+El panel enseña: el contacto, su número y su estado; la ficha de Clientes unida (con enlace) o
 **Unir a una ficha** / **Crear ficha**; **Asignada a** con el selector del equipo y **Asignármela**;
 los botones de estado **Abierta / Pendiente / Cerrada**; el hilo, del mensaje más antiguo al más
 reciente (los del cliente a la izquierda, los del negocio a la derecha con su estado —Enviando…,
@@ -1262,7 +1262,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   la tarjeta del asistente) cae al número solo con `sees_contact` de Clientes; si no, a `masked` (tres primeras cifras
   y cuatro últimas, como Wati). La búsqueda (`_searched`, con `holds` de Clientes sobre la ficha unida), la referencia
   (`_matching_ids`) y el orden «Contacto» solo miran el número con el permiso; el orden por teléfono no existe. La
-  columna «Teléfono» sale de `phoneColumns` de Clientes (`customerContact.ts`), la misma de Reservas.
+  columna «Teléfono» y el número del panel solo se pintan con el permiso (`InboxPage.vue`, `ConversationPanel.vue`).
 - **Columnas `host` que quedan en la BD**: los modelos no las tienen (migraciones `0011` y `0012`), pero las columnas,
   sus datos y las dos guardas únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
   `whatsapp_inbox_template_live_host_name_language_unique`) siguen en la BD; el código las deja vacías, así que siguen

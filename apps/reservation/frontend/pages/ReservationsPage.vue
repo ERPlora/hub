@@ -4,7 +4,7 @@
 // and its figures (`reservation.availability.day`, live); the list follows the live
 // `reservation.reservation.list` of that day by time — or, searching a guest's name (and phone or email, for
 // whoever sees them), the whole book in calendar order (the old module's rule). Columns Date, Time, Guest, Phone
-// (Customers' customerContact), Party, Table and Status (a cancelled one says why next to it, F09 and F13), filters by time,
+// (lib/guestContact), Party, Table and Status (a cancelled one says why next to it, F09 and F13), filters by time,
 // guest, phone, party and status, list or cards, 50 a page. «New reservation» and a
 // row open the booking panel; per row Confirm, Seat (it seats the table and opens its check), Complete,
 // Cancel and No-show (asking first), Edit and Delete (the owner and the admin), as its status allows.
@@ -22,7 +22,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonNote } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 
-import { CUSTOMER_CONTACT, phoneColumns } from '../../../customer/frontend/lib/customerContact';
 import DayBar from '../components/DayBar.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
@@ -31,6 +30,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
+import { CUSTOMER_CONTACT, phoneColumns } from '../lib/guestContact';
 import { allows, cancellationNote, type RowAction, shortNote, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
@@ -127,7 +127,7 @@ const columns = computed<DataTableColumn<ReservationOut>[]>(() => [
     filter: { type: 'text' },
   },
   { key: 'guest_name', label: t('reservation.list.columns.guest'), sortable: true, priority: 'high', cell: 'guest', filter: { type: 'text' } },
-  ...phoneColumns<'guest_phone', ReservationOut>(seesContact.value, { key: 'guest_phone', label: t('reservation.list.columns.phone'), filtered: true }),
+  ...phoneColumns<ReservationOut>(seesContact.value, t('reservation.list.columns.phone')),
   {
     key: 'party_size',
     label: t('reservation.list.columns.party'),

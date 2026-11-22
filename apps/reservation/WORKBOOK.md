@@ -835,7 +835,7 @@ la que solo se le autorizó reservar.
   campos `PHONE` y `EMAIL` de `apps/customer/schemas/contact.py`, con la marca `CUSTOMER_CONTACT`, y el filtro
   `guest_phone` de las dos listas también la lleva. La búsqueda, `find_reservation`, `find_entry` (`_guest_matches`) y
   la etiqueta de un invitado sin nombre (`_who`) miran el teléfono y el correo solo con `sees_contact` de Clientes. En
-  la interfaz, la columna «Teléfono» de las dos listas sale de `phoneColumns` de Clientes (`customerContact.ts`), y el formulario de
+  la interfaz, la columna «Teléfono» de las dos listas sale de `frontend/lib/guestContact.ts`, y el formulario de
   reserva no enseña ni manda lo que llegó vacío. Un paso de una automatización lleva los permisos de dato de base
   (FLOW-F12), así que las recetas de WhatsApp siguen leyendo y filtrando por el teléfono.
 - **Modelos**: `Settings` (una fila), `TimeSlot` (día de la semana, desde, hasta, máximo de reservas y

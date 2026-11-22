@@ -23,7 +23,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { CUSTOMER_CONTACT, phoneColumns } from '../../../customer/frontend/lib/customerContact';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
@@ -43,7 +42,7 @@ const tabs = useAppTabs('whatsapp_inbox');
 const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
 const session = useSession();
-const seesContact = computed(() => session.can(CUSTOMER_CONTACT));
+const seesContact = computed(() => session.can('base.view_customer_contact'));
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 /** Where the number is connected, reconnected or disconnected (WHATSAPP_INBOX-F01, F02). */
 const SETTINGS = '/whatsapp_inbox/settings';
@@ -128,7 +127,8 @@ const actions = computed<DataTableAction<ConversationOut>[]>(() => [
 
 const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
   { key: 'contact', label: t('whatsapp_inbox.inbox.columns.contact'), sortable: true, priority: 'high', cell: 'contact', format: (_, row) => row.display_name },
-  ...phoneColumns<'phone', ConversationOut>(seesContact.value, { key: 'phone', label: t('whatsapp_inbox.inbox.columns.phone') }),
+  // The number only for whoever sees the customers' contact details, and never sorted: the order would tell it.
+  ...(seesContact.value ? [{ key: 'phone', label: t('whatsapp_inbox.inbox.columns.phone') }] : []),
   {
     key: 'status',
     label: t('whatsapp_inbox.inbox.columns.status'),

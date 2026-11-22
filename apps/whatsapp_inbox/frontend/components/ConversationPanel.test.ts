@@ -108,7 +108,7 @@ describe('ConversationPanel: what it shows', () => {
     expect(s.params(MESSAGES)).toEqual([{ id: 'c1', limit: 50, offset: 0 }]);
     expect(s.params(NOTES)).toEqual([{ id: 'c1', limit: 100 }]);
     expect(s.find('whatsapp-inbox-detail-name').text()).toBe('Ana');
-    expect(s.find('whatsapp-inbox-detail-phone').text()).toBe('+34 600 111 222');
+    expect(s.find('whatsapp-inbox-detail-phone').text()).toBe('+34600111222');
     expect(s.find('whatsapp-inbox-detail-status').text()).toContain('Open');
     const thread = s.wrapper.findComponent(ThreadView);
     expect(thread.props('messages')).toHaveLength(1);
