@@ -25,16 +25,11 @@ from base.business import babel_locale, business_zone
 from base.models import HubUser, Membership
 from base.queries.people import hub_user_of
 from base.ordering import list_order_for
-from apps.staff.schemas import (
-    AccountListIn,
-    AccountPage,
-    AvailabilityIn,
-    AvailabilityOut,
-    ByIdIn,
-    CommissionPage,
-    CommissionReportIn,
-    CommissionReportOut,
-    CommissionSummaryIn,
+from apps.staff.schemas.accounts import AccountListIn, AccountPage
+from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
+from apps.staff.schemas.commissions import CommissionPage, CommissionReportIn, CommissionReportOut, CommissionSummaryIn
+from apps.staff.schemas.fields import ByIdIn, MemberRefIn, PageIn
+from apps.staff.schemas.members import (
     CompensationListIn,
     CompensationPage,
     CurrentMemberIn,
@@ -42,23 +37,16 @@ from apps.staff.schemas import (
     MemberDetailOut,
     MemberListIn,
     MemberPage,
-    MemberRefIn,
     MemberStatsIn,
     MemberStatsOut,
     MineIn,
     MineOut,
+)
+from apps.staff.schemas.roles import RoleListIn, RoleOut, RolePage, RoleResolveIn, RoleResolveOut
+from apps.staff.schemas.schedules import ScheduleListIn, ScheduleDetailOut, SchedulePage
+from apps.staff.schemas.settings import SettingsGetIn, SettingsOut
+from apps.staff.schemas.time_off import (
     MyTimeOffIn,
-    PageIn,
-    RoleListIn,
-    RoleOut,
-    RolePage,
-    RoleResolveIn,
-    RoleResolveOut,
-    ScheduleListIn,
-    ScheduleDetailOut,
-    SchedulePage,
-    SettingsGetIn,
-    SettingsOut,
     TimeOffDetailOut,
     TimeOffNamedOut,
     TimeOffDetailPage,
@@ -642,7 +630,7 @@ def list_roles(ctx: OperationContext, params: RoleListIn) -> dict:
     return _page(roles.order_by(*list_order_for(params.sort, columns=ROLE_ORDER, nulls_last=True)), params)
 
 
-# Not an assistant tool: what names a role on the card of a write (``schemas.A_ROLE``), retired too, since a retired
+# Not an assistant tool: what names a role on the card of a write (``schemas.fields.A_ROLE``), retired too, since a retired
 # one can be brought back; the model finds them in ``staff.role.list``.
 @operation(
     "staff.role.detail",
@@ -971,7 +959,7 @@ def time_off_detail(ctx: OperationContext, data: ByIdIn) -> TimeOff:
     return time_off
 
 
-# Not an assistant tool: what names a request on the card of a write (``schemas.A_TIME_OFF``). The detail holds its
+# Not an assistant tool: what names a request on the card of a write (``schemas.time_off.A_TIME_OFF``). The detail holds its
 # reason and needs a right an employee withdrawing their own does not have; this says what their list already shows.
 @operation(
     "staff.time_off.get",
