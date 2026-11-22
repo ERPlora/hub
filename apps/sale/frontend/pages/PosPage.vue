@@ -44,6 +44,7 @@ import { shortTime } from '../components/pos/till';
 import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useCheckStaff } from '../composables/pos/useCheckStaff';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
+import { useStaffNames } from '../composables/pos/useStaffNames';
 import { useSystemBack } from '../composables/pos/useSystemBack';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
 import { useLocale, useT } from '../composables/useT';
@@ -73,7 +74,6 @@ const loadError = computed(() => {
 // ── The check ────────────────────────────────────────────────────────────────────────────────────
 const customer = shallowRef<CustomerSnapshot | null>(null);
 const choosingCustomer = shallowRef(false);
-const staffNames = shallowRef<Record<string, string>>({});
 const marks = shallowRef<string[]>([]);
 const preview = shallowRef<PreviewOut | undefined>();
 const previewError = shallowRef<string | null>(null);
@@ -92,6 +92,7 @@ const till = useTill({
 const { staff, ...serving } = useCheckStaff(till);
 const order = computed(() => till.order.value);
 const lines = computed(() => order.value?.lines ?? []);
+const { names: staffNames, remember: rememberName } = useStaffNames(() => lines.value);
 
 const openChecksLive = useLive('sale.order.list', { status: 'open' as const, limit: 1, offset: 0 });
 const openChecks = computed(() => Math.max(0, (openChecksLive.data.value?.total ?? 0) - (till.orderId.value ? 1 : 0)));
@@ -127,10 +128,6 @@ watch(charging, (now) => {
   heldWhileCharging = null;
   till.follow(held);
 });
-
-function rememberName(id: string | null, name: string | null): void {
-  if (id && name) staffNames.value = { ...staffNames.value, [id]: name };
-}
 
 /** The screen starts afresh: no check, no customer, «me» serving, nothing marked. */
 function clearScreen(): void {
