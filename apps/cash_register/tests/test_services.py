@@ -498,7 +498,8 @@ def test_the_last_cut_off_is_today_at_its_hour_or_yesterday_before_it():
 
 
 def test_who_opened_and_closed_is_written_as_a_person_reads_it(make_user):
-    # The session's user is a Django user: its name (or e-mail), never its internal username.
+    # The session's user is a Django user: its name (else what goes before the «@» of its e-mail), never its internal
+    # username nor a colleague's address (BASE-F119).
     from live.context import OperationContext
 
     from apps.cash_register.tests.conftest import A
@@ -507,7 +508,7 @@ def test_who_opened_and_closed_is_written_as_a_person_reads_it(make_user):
     user.first_name, user.email = "", "ana@example.com"
     user.save()
     ctx = OperationContext(scope=A, actor=user, permissions=ctx_for().permissions)
-    assert run("cash_register.session.open", {"opening_balance": 100}, ctx).opened_by == "ana@example.com"
+    assert run("cash_register.session.open", {"opening_balance": 100}, ctx).opened_by == "ana"
     user.first_name, user.last_name = "Ana", "López"
     user.save()
     closed = run("cash_register.session.close", {"closing_balance": 100}, ctx)

@@ -12,7 +12,7 @@
 711 apps/attendance/services.py ERPlora/erplora-next#74
 560 apps/cart_checkout/queries.py ERPlora/erplora-next#74
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
-769 apps/cart_checkout/services.py ERPlora/erplora-next#74
+763 apps/cart_checkout/services.py ERPlora/erplora-next#74
 306 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
 626 apps/cash_register/schemas.py ERPlora/erplora-next#74
 744 apps/cash_register/services.py ERPlora/erplora-next#74
@@ -43,7 +43,7 @@
 732 apps/online_booking/queries.py ERPlora/erplora-next#74
 515 apps/online_booking/schemas.py ERPlora/erplora-next#74
 565 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
-621 apps/payment/services.py ERPlora/erplora-next#74
+615 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
 699 apps/pricing/schemas.py ERPlora/erplora-next#74
 1015 apps/pricing/services.py ERPlora/erplora-next#74

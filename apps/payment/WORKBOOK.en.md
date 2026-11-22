@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ec8a3410919204d9ef8133fb7ea892e74ecb588ebef6aeb43387a685bfea542d -->
+<!-- generated from WORKBOOK.md sha256:3c202f103fe4d7fa0a6525234a0bc8f2a2d372561e96d7b2c02ae0d0a49d4c35 -->
 
 ## What it is for and who it is for
 
@@ -268,10 +268,11 @@ Steps:
 In: what the person types.
 Out: nothing; read only. The list updates on its own when another person records or changes a payment.
 Through the assistant, "the payment PAY-20261014-0003" is read whole, with its method, concept, IBAN and
-invoice.
+invoice. Whoever recorded, changed, approved or cancelled a payment shows by their name or, if their account has
+none, by what goes before the @ of their email, never the whole email, also in earlier payments.
 If it fails: if the list does not load, the table says so ("The payments could not be loaded.") with
 "Retry", never "No payments.". A filter amount that is not a figure does not filter (never "from 0").
-Involved: FLOW-F11
+Involved: FLOW-F11, BASE-F119
 
 ### PAYMENT-F07 Announce a completed payment
 Status: done

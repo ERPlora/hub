@@ -275,9 +275,11 @@ Pasos:
 Entra: lo que teclea la persona.
 Sale: nada; solo lectura. La lista se pone al día sola cuando otra persona registra o cambia un pago.
 Por el asistente, «el pago PAY-20261014-0003» se lee entero, con su método, concepto, IBAN y factura.
+Quien registró, cambió, aprobó o canceló un pago sale por su nombre o, si su cuenta no tiene, por lo que va
+antes de la @ de su correo, nunca el correo entero, también en los pagos de antes.
 Si falla: si la lista no carga, la tabla lo dice («No se han podido cargar los pagos.») con
 «Reintentar», nunca «Sin pagos.». Un importe del filtro que no es una cifra no filtra (nunca «desde 0»).
-Implicados: FLOW-F11
+Implicados: FLOW-F11, BASE-F119
 
 ### PAYMENT-F07 Avisar de un pago completado
 Estado: hecho
@@ -420,6 +422,11 @@ pago» y ata Pagos a Ventas sin motivo.
   moneda ISO 4217, beneficiario, IBAN, concepto, estado, factura del proveedor, motivo de cancelación,
   quién lo creó y quién lo cambió por última vez) y `PaymentCounter` (último número por día). UUIDv7,
   sin `hub_id`.
+- **Quién actúa** (`created_by`, `updated_by`, `approved_by` y `cancelled_by`) se guarda como lo lee un compañero:
+  `_actor` (`services.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
+  el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega
+  a quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
+  `0005_actors_without_address`, en la base de datos de cada negocio.
 - **Referencia** `PAY-AAAAMMDD-NNNN`: el día es el del negocio, en su zona (`base.business.business_zone`, hub#771), al
   registrarlo; un cambio de zona sigue la cuenta de ese día, nunca repite número; el contador sube con `UPDATE … RETURNING` en la transacción del alta (nunca una
   secuencia), así que dos altas a la vez no repiten número y un alta rechazada no gasta ninguno. Por

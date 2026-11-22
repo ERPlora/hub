@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:914c0562992de81c25dd09227c3977aa4fce7dcea175e1dfea99defb07611748 -->
+<!-- generated from WORKBOOK.md sha256:8a71f45ffd8e03945c3ec716c5ba0bcb0908320fba6b2c5f062b0424419bef9e -->
 
 ## What it is for and who it is for
 
@@ -350,11 +350,13 @@ Steps:
    by its number.
 In: the "view carts" permission (the employee has it).
 Out: lists of 50 rows (up to 100 per request). Quantities with their decimals, amounts in the minor
-unit of the row's currency (cents; the yen has none) with the currency and its decimals.
+unit of the row's currency (cents; the yen has none) with the currency and its decimals. Whoever created or
+last changed a cart or an order shows by their name or, if their account has none, by what goes before the @ of
+their email, never the whole email, also in earlier ones.
 If it fails: a loading error with "Retry"; without permission, "You do not have permission"; a Total amount that
 cannot be read, what the amount field would say ("This is not an amount. Type a figure, for example 12.50.", or
 the two readings of "1,250") under its box, without filtering.
-Involved: none
+Involved: BASE-F119
 
 ### CART_CHECKOUT-F13 Tell other apps what happens
 Status: done
