@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2f0d3f81fab33e5504b94cecb3bc0e9a47a514add07ca66e5d04a3df8fc91007 -->
+<!-- generated from WORKBOOK.md sha256:2fa84eb792b884a57df6344888707e4803f9a5dfc519fb50cc3fb33e0cd37ea6 -->
 
 ## What it is for and who it is for
 
@@ -2593,7 +2593,9 @@ Steps:
      say what they do: emptying a cart says "Clear in Cart & Checkout", removing one of its lines "Remove in Cart &
      Checkout" and taking a product's route away in the kitchen "Clear in Kitchen"; a cash count says "Register count
      in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
-     never "Add".
+     never "Add"; and VeriFactu's live test, as its buttons do, "Test the connection in VeriFactu" and "Create test
+     invoice in VeriFactu", never "Run" or "Create". An action that carries no datum to show says only its action and
+     its app, ending in a full stop and with no empty colon after it: "Test the connection in VeriFactu.".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
