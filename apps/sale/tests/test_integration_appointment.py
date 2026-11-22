@@ -17,6 +17,7 @@ from live.context import system_context
 from live.errors import Conflict, PermissionDenied
 from live.operations import registry
 
+from apps.appointment.tests.conftest import TESTER
 from apps.sale.models import Order
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
@@ -109,10 +110,11 @@ def test_the_booked_price_stays_whatever_the_catalog_says_today(salon):
 
 
 def test_an_appointment_the_seller_cannot_see_has_no_booked_price_for_her(salon):
-    # An employee sees her own appointments only (APPOINTMENT «view own»): another's is not hers to charge.
+    # An employee sees her own appointments only (APPOINTMENT «view own»): another's is not hers to charge. She is a
+    # person of the team: what is not one (an automation) reads all its permission opens.
     haircut, _ana, _lucia = salon
     appointment = book(salon)
-    refusal = mismatch(appointment, haircut, ctx_for(EMPLOYEE), booked_price=9000)
+    refusal = mismatch(appointment, haircut, ctx_for(EMPLOYEE, actor=TESTER), booked_price=9000)
     # Said as it is: she cannot see it (not «cancelled, another customer's…», which she cannot know).
     assert refusal.message == (
         "You cannot see that appointment: it is another professional's or it no longer exists. Charge it "
