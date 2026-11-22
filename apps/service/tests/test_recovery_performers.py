@@ -10,7 +10,7 @@ from live.models import OutboxEvent
 
 from apps.service import queries
 from apps.service.models import Assignment
-from apps.service.schemas import ServiceRecoverIn
+from apps.service.schemas.recovery import ServiceRecoverIn
 from apps.service.services.service_recovery import MEMBER_TERMINATED_LEFT
 from apps.staff.models import Member
 from base.tenancy.context import current_alias

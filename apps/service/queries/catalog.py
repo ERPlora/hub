@@ -10,18 +10,16 @@ from live.operations import operation
 
 from apps.service.models import Service
 from apps.service.queries.reads import _bounds, _page, _resolve
-from apps.service.schemas import (
+from apps.service.schemas.catalog import (
     CatalogStatusOut,
-    NoIn,
     ServiceForSaleIn,
-    ServiceImageSuggestIn,
-    ServiceImageSuggestOut,
     ServiceListIn,
     ServiceOut,
     ServicePage,
-    ServiceRefIn,
     ServiceSalePage,
 )
+from apps.service.schemas.fields import NoIn, ServiceRefIn
+from apps.service.schemas.service_images import ServiceImageSuggestIn, ServiceImageSuggestOut
 from base import images
 from base.queries.catalog_images import business_language, image_library
 from base.ordering import list_order_for
