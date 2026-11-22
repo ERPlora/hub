@@ -42,7 +42,7 @@ describe('table catalogues (en source + es)', () => {
       ['table.tabs.zones', 'Zones', 'Zonas'],
       ['table.tabs.tables', 'Tables', 'Mesas'],
       ['table.tabs.sessions', 'Sessions', 'Sesiones'],
-      ['table.floor.hint', 'Drag to position · click a table to edit or delete it. Changes are saved instantly.', 'Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.'],
+      ['table.floor.hint', 'Drag to position · tap a table to edit or delete it. Changes are saved instantly.', 'Arrastra para colocar · toca una mesa para editarla o borrarla. Los cambios se guardan al momento.'],
       ['table.floor.emptyZones', 'Create a zone to start placing tables.', 'Crea una zona para empezar a colocar mesas.'],
       ['table.floor.emptyTables', 'No tables in this zone. Tap “Add table”.', 'Sin mesas en esta zona. Pulsa «Añadir mesa».'],
       ['table.floor.taken', 'Another device has just taken that table. The floor plan has been refreshed.', 'Otro dispositivo acaba de ocupar esa mesa. Se ha actualizado el plano.'],

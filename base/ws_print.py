@@ -137,7 +137,7 @@ from live.executor import BYE_FRAME, Stream, Subscription, executor
 from live.meta import all_live_app_configs
 from live.operations import UnknownOperation, get
 
-from base.middleware import HubHostRequiredMiddleware, opened_elsewhere
+from base import middleware, session_host
 from base.operations import HostClosed
 from base.tenancy.context import use_hub
 from base.throttle import AttemptLimit, RateLimited, client_key
@@ -271,7 +271,7 @@ class PrintSocket:
         self.language = translation.get_language_from_request(request)
         with translation.override(self.language):
             try:
-                answer = HubHostRequiredMiddleware(_no_view).process_request(request)
+                answer = middleware.HubHostRequiredMiddleware(_no_view).process_request(request)
             except Http404:
                 return Refusal("not_found", gettext("Not found"), status=404)
             if getattr(request, "platform_host", False):
@@ -555,7 +555,7 @@ class PrintSocket:
             raise Refusal("unauthenticated", gettext("Sign in to this hub to print: this connection has no session."), status=401)
         self.request.session = import_module(settings.SESSION_ENGINE).SessionStore(key)
         # A session opened on another host is no session here: the HTTP doors' rule.
-        user = AnonymousUser() if opened_elsewhere(self.request) else auth.get_user(self.request)
+        user = AnonymousUser() if session_host.opened_elsewhere(self.request) else auth.get_user(self.request)
         held = self.device.ctx.actor if self.device is not None else None
         if not user.is_authenticated or (held is not None and user.pk != held.pk):
             self._count_refused_session()

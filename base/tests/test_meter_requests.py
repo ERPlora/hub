@@ -316,7 +316,7 @@ def test_an_api_key_is_no_person(client, hub_a):
 
 @HUB_DB
 def test_a_session_opened_on_another_hub_is_nobody_here(client, hub_a, hub_b):
-    from base.middleware import SESSION_HOST_KEY
+    from base.session_host import SESSION_HOST_KEY
 
     client.force_login(member(hub_a.slug))
     session = client.session

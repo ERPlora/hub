@@ -10,7 +10,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
-import { formatDay, localDateTime } from '../lib/time';
+import { formatDay, formatDayTime, timeOfDay } from '../lib/time';
 import type { CorrectionOut, RecordOut, RecordStatus } from '../operations';
 
 const props = defineProps<{
@@ -52,8 +52,10 @@ watch(
 
 const heading = computed(() => (props.record ? `${props.record.member_name} · ${formatDay(props.record.work_date, locale.value)}` : ''));
 
+/** A clock-in → clock-out as the records table writes it: the time, and the day only when it is not the working day's. */
 function span(start: string | null, end: string | null, status: RecordStatus): string {
-  return `${localDateTime(start, zone.value)} → ${localDateTime(end, zone.value)} (${t(`attendance.status.${status}`)})`;
+  const at = (iso: string | null) => timeOfDay(iso, props.record?.work_date ?? '', locale.value, zone.value);
+  return `${at(start)} → ${at(end)} (${t(`attendance.status.${status}`)})`;
 }
 </script>
 
@@ -100,7 +102,7 @@ function span(start: string | null, end: string | null, status: RecordStatus): s
         data-testid="attendance-history-item"
       >
         <h3>
-          {{ item.is_system ? $t('attendance.history.system') : item.created_by_name }} · {{ localDateTime(item.created_at, zone) }}
+          {{ item.is_system ? $t('attendance.history.system') : item.created_by_name }} · {{ formatDayTime(item.created_at, locale, zone) }}
         </h3>
         <p>{{ $t('attendance.history.before') }}: {{ span(item.old_clock_in_at, item.old_clock_out_at, item.old_status) }}</p>
         <p>{{ $t('attendance.history.after') }}: {{ span(item.new_clock_in_at, item.new_clock_out_at, item.new_status) }}</p>
