@@ -3,8 +3,8 @@ transaction: the page's settings, the inbox over the diary's online appointments
 the public context and the visitor's fingerprint.
 
 - **A booking is an appointment** of Citas with ``source = "online"``: the inbox reads the diary's table (Citas
-  is a requirement) and who sees what is the diary's rule (``appointment.queries.visible``: the employee sees
-  her own agenda).
+  is a requirement) and who sees what is the diary's rule (``appointment.queries.ownership.APPOINTMENTS``: the
+  employee sees her own agenda).
 - **The public reads** (``online_booking.public``) answer only while the page is on, and ask the other apps
   with ``delegated(ctx)``: the same context with exactly what they need of Citas, Clientes, Servicios,
   Horarios and Personal (as ``appointment.queries.reader`` does), never a role's.
@@ -29,11 +29,11 @@ from apps.appointment.queries import (
     check_member,
     day_bounds,
     now,
-    visible,
     zone_name,
 )
 from apps.appointment.queries import business_zone
 from apps.appointment.queries import current_settings as current_rules
+from apps.appointment.queries.ownership import APPOINTMENTS
 from apps.appointment.schemas import SlotsIn
 from apps.customer.phones import candidates
 from apps.customer.queries import business_country
@@ -190,8 +190,8 @@ def visitor_key(ctx: OperationContext) -> str:
 
 def online(ctx: OperationContext) -> QuerySet[Appointment]:
     """The live online appointments the caller may see (the diary's rule), with their lines."""
-    rows = Appointment.objects.filter(deleted_at__isnull=True, source=ONLINE)
-    return visible(ctx, rows).prefetch_related("lines")
+    rows = APPOINTMENTS.visible(ctx).filter(deleted_at__isnull=True, source=ONLINE)
+    return rows.prefetch_related("lines")
 
 
 def _with_page(rows: QuerySet[Appointment]) -> QuerySet[Appointment]:
