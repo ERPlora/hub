@@ -75,7 +75,7 @@
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
 612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
-1162 apps/staff/queries/__init__.py ERPlora/erplora-next#74
+1158 apps/staff/queries/__init__.py ERPlora/erplora-next#74
 1065 apps/staff/services.py ERPlora/erplora-next#74
 1299 apps/staff/tests/test_queries.py ERPlora/erplora-next#74
 1489 apps/staff/tests/test_services.py ERPlora/erplora-next#74
