@@ -390,7 +390,7 @@ Si falla: «No se pudieron guardar los ajustes.» con el motivo; si nombra la im
 función. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
 una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
 se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si la lectura falla, la
-pantalla no enseña valores y ofrece «Reintentar». Sin permiso, «Sin acceso» (BASE-F118).
+pantalla no enseña valores y ofrece «Reintentar». Sin permiso, «Sin acceso».
 Implicados: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Imprimir el tique al cobrar

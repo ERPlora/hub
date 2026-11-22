@@ -228,7 +228,7 @@ el primer guardado sin cambios). Sin guardar nunca, valen los de fábrica y «Tu
 abrir una sesión no lo cuenta como hecho.
 Si falla: «No se pudieron guardar los ajustes.» con el motivo, y los ajustes quedan como estaban. Si
 la lectura falla, la pantalla no enseña valores (nunca los de fábrica como si fueran los del negocio)
-y ofrece «Reintentar». Sin el permiso de ajustes, la pantalla dice «Sin acceso» (BASE-F118) y el
+y ofrece «Reintentar». Sin el permiso de ajustes, la pantalla dice «Sin acceso» y el
 Inicio no le enseña el paso «Tu caja».
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 

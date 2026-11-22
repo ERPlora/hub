@@ -760,7 +760,7 @@ Pasos:
    conservan) y sigue en la lista con el filtro de inactivos, desde donde se vuelve a activar.
 3. Para quitarlo, **Eliminar**: «¿Eliminar Socios? Las fichas que lo tienen lo pierden.» → «Grupo
    Socios eliminado».
-4. Un empleado no abre Grupos: por su dirección, «Sin acceso» (BASE-F118), y se lo pide a quien lleva el negocio.
+4. Un empleado no abre Grupos: por su dirección, «Sin acceso», y se lo pide a quien lleva el negocio.
 Entra: los datos del grupo.
 Sale: el grupo, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.group.created`, `.updated`, `.deleted`). Eliminar un grupo lo quita de todas sus fichas
@@ -784,7 +784,7 @@ Pasos:
    actualizada».
 3. **Eliminar**: «¿Eliminar Habitual? Las fichas que la tienen la pierden.» → «Etiqueta Habitual
    eliminada».
-4. Como en los grupos, un empleado no abre Etiquetas: por su dirección, «Sin acceso» (BASE-F118).
+4. Como en los grupos, un empleado no abre Etiquetas: por su dirección, «Sin acceso».
 Entra: nombre y color.
 Sale: la etiqueta, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.tag.created`, `.updated`, `.deleted`). Eliminarla la quita de todas sus fichas.
@@ -806,7 +806,7 @@ Pasos:
    exige, y sus valores se quedan. Se cambia todo menos el tipo, si ya hay fichas con un valor.
    **Eliminar** → «¿Eliminar Talla? Se borran también los valores guardados en las fichas.» →
    «Campo Talla eliminado».
-4. Como en los grupos, un empleado no abre Campos: por su dirección, «Sin acceso» (BASE-F118).
+4. Como en los grupos, un empleado no abre Campos: por su dirección, «Sin acceso».
 Entra: la definición del campo.
 Sale: el campo y su aviso (`customer.field.created`, `.updated`, `.deleted`). «Obligatorio» solo se
 exige al guardar la ficha completa (CUSTOMER-F04), nunca al darla de alta (Clientes, TPV,

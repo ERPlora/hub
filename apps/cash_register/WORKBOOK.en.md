@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:575b5b76cbcdc334f49b99f8075ebc86b1c64ccaf725e17cbf8cc01e78a037be -->
+<!-- generated from WORKBOOK.md sha256:900cac8e68370128dbe6c4e99750e20837664ec899da11b94895a413c42c4f5d -->
 
 ## What it is for and who it is for
 
@@ -221,7 +221,7 @@ the first save with no changes). Never saved, the default ones apply and "Your c
 opening a session does not count it as done.
 If it fails: "Could not save the settings." with the reason, and the settings stay as they were. If the
 reading fails, the screen shows no values (never the default ones as if they were the business's) and
-offers "Retry". Without the settings permission, the screen says "No access" (BASE-F118) and the
+offers "Retry". Without the settings permission, the screen says "No access" and the
 Home does not show the step "Your cash drawer".
 Involved: CASH_REGISTER-F03, F05, F07, F09, F10
 

@@ -546,7 +546,7 @@ Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de ca
 (ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
 sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
-Si falla: sin permiso de compensación, su dirección dice «Sin acceso» (BASE-F118); sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
+Si falla: sin permiso de compensación, su dirección dice «Sin acceso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».

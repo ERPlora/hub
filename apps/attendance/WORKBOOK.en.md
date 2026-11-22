@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9027e9a99b4b75d85bd0da948f774a1cc9118019393f710e32b2bedf81fd99de -->
+<!-- generated from WORKBOOK.md sha256:156b56c33b57f621db806da4db67577c12481c2cd86520a1aae2398cc28b2fc3 -->
 
 ## What it is for and who it is for
 
@@ -242,7 +242,7 @@ with the location denied, "Use my current location" keeps what was typed and war
 "Location access is denied. Allow location in this browser to read the workplace position, or type the
 coordinates." (in the installed app, which has no browser, "Location access is denied. Allow location in
 your device settings to read the workplace position, or type the coordinates."); an employee does
-not open them (by its address, "No access" (BASE-F118)). As in the form windows, the notice goes as soon as something is changed
+not open them: by its address, "No access". As in the form windows, the notice goes as soon as something is changed
 and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
 takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
 until the next try. Tapping "Save" with nothing to send is a try too: it says "Settings saved." and takes away the

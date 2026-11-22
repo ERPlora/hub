@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5bf67ea2ee4c5c46fb3bd556e46335c1a2ca95bd1566733b1c104f79297a959b -->
+<!-- generated from WORKBOOK.md sha256:20f1533b2120240e8c6824125d57701d86823825aa59e3ea9c014d6d03a34704 -->
 
 ## What it is for and who it is for
 
@@ -753,7 +753,7 @@ Steps:
    in the list with the inactive filter, from where it is activated again.
 3. To remove it, **Delete**: "Delete Members? The customers who have it lose it." → "Group Members
    deleted".
-4. An employee does not open Groups: by its address, "No access" (BASE-F118), and asks whoever runs the business.
+4. An employee does not open Groups: by its address, "No access", and asks whoever runs the business.
 In: the group's details.
 Out: the group, which is assigned from each card (CUSTOMER-F06), and its notice
 (`customer.group.created`, `.updated`, `.deleted`). Deleting a group really removes it from all its
@@ -774,7 +774,7 @@ Steps:
 1. In **Tags** tap **Add** ("New tag"): "Name" and "Color". **Save** → "Tag created".
 2. When editing ("Edit · Regular") "Active" appears, as in the groups. **Save** → "Tag updated".
 3. **Delete**: "Delete Regular? The customers who have it lose it." → "Tag Regular deleted".
-4. As with the groups, an employee does not open Tags: by its address, "No access" (BASE-F118).
+4. As with the groups, an employee does not open Tags: by its address, "No access".
 In: name and color.
 Out: the tag, which is assigned from each card (CUSTOMER-F06), and its notice (`customer.tag.created`,
 `.updated`, `.deleted`). Deleting it removes it from all its cards.
@@ -795,7 +795,7 @@ Steps:
    not demanded, and its values stay. Everything can be changed except the type, if there are already
    cards with a value. **Delete** → "Delete Size? The values saved on the cards are deleted too." →
    "Field Size deleted".
-4. As with the groups, an employee does not open Fields: by its address, "No access" (BASE-F118).
+4. As with the groups, an employee does not open Fields: by its address, "No access".
 In: the field's definition.
 Out: the field and its notice (`customer.field.created`, `.updated`, `.deleted`). "Required" is only
 demanded when saving the full card (CUSTOMER-F04), never when adding it (Customers, till, import or

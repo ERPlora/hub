@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3db612b0f7d181fb812e1798f399957fab00e853ab633bb9642ad6e800252638 -->
+<!-- generated from WORKBOOK.md sha256:8984a8687233be6318549ff0bdd30a2228ef0ce7734a7b3b42845980a1f23ee9 -->
 
 ## What it is for and who it is for
 
@@ -378,7 +378,7 @@ deleted or moved to another role while it was being chosen), the reason also sho
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not
-show values and offers "Retry". Without permission, "No access" (BASE-F118).
+show values and offers "Retry". Without permission, "No access".
 Involved: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Print the receipt when charging
