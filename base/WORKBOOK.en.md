@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eb545d046e3efe0d2dada70fdef23e4226378239c12ad39d8f6c5b7e7f15c4a6 -->
+<!-- generated from WORKBOOK.md sha256:0f0b55038d0d2d644c0fa038cf7f035c5f2334f7718bc7368a216ec89820365f -->
 
 ## What it is for and who it is for
 
@@ -3366,7 +3366,8 @@ Steps:
   2. Whoever lacks a data permission does not receive that data by any way: not on the screen, not through the API,
      not in what the assistant answers. Where it would go, the data comes empty and the screen does not show it.
   3. In **Employees › Staff**, the "Email" column only shows to whoever sees the team's contact details. An employee
-     sees nobody's email, not even their own.
+     sees nobody's email, not even their own, nor inside a name: an erplora.com account without a name shows with
+     what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
 In: the person's role in this business.

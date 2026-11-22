@@ -3376,7 +3376,8 @@ Pasos:
   2. Quien no tiene un permiso de dato no recibe ese dato por ningún camino: ni en la pantalla, ni por la API, ni en
      lo que contesta el asistente. Donde iría, el dato llega vacío y la pantalla no lo enseña.
   3. En **Empleados › Personal**, la columna «Email» solo sale a quien ve el contacto del equipo. Un empleado no ve
-     el email de nadie, tampoco el suyo.
+     el email de nadie, tampoco el suyo, ni dentro de un nombre: una cuenta de erplora.com sin nombre sale con lo que
+     va antes de la @.
   4. Un panel de Inicio cuya cifra es un dato que la persona no ve no le sale en el tablero ni entre los que puede
      añadir.
 Entra: el rol de la persona en este negocio.
@@ -3387,6 +3388,15 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
 
 ## Para quien lo mantiene
 
+- **Permisos de dato** (BASE-F119; `base/sensitive.py`, `base/visibility.py`, `live.sensitive`): un campo de un
+  esquema se marca con `Field(json_schema_extra=COSTS)` (o `CUSTOMER_CONTACT`, `TEAM_CONTACT`, `BUSINESS_TOTALS`) y, en
+  una respuesta, admite nulo (`live.E026`). live lo pone a nulo a quien no tiene el permiso en `Operation.__call__`,
+  también cuando una operación corre dentro de otra: un cálculo con costes los lee por su propia puerta, nunca llamando
+  a otra operación con el contexto de la persona. Una entrada que rellena un campo marcado (un filtro, el orden) se
+  rechaza con 403 `permission_denied`. Un panel de Inicio no sale a quien no tiene el permiso de un campo marcado que
+  lee su `map` (`visibility.widget_open`). `tests/test_guardrails_sensitive.py` exige la marca en todo campo de
+  respuesta con nombre de coste, contacto o sueldo, o su entrada en `UNMARKED` con su motivo (la lista solo encoge), y
+  la misma marca en el filtro o el orden de una lectura que lo nombra.
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
   `base.middleware.CustomDomainMiddleware`): `ALLOWED_HOSTS` no cambia. El SaaS nombra el dominio en la foto
   (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
