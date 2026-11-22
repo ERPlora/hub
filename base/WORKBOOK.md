@@ -1000,6 +1000,9 @@ Pasos:
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
      estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
+  5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
+     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
+     España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
@@ -3823,9 +3826,11 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
   `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
-  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide) y `state` como lo
+  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide), `state` como lo
   dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
-  del hub recibe sus tablas). Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
+  del hub recibe sus tablas), y `mandatory`, como `base.app.list`: el país del negocio la exige y, una vez activada,
+  no se desactiva. La tarjeta de `base.app.enable` de una así añade el dato `mandatory` con el motivo de Apps
+  (`activation.mandatory_off`, el mismo `MANDATORY_OFF`). Tests: `base/tests/test_assistant_mandatory_apps.py`. Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
   es una app); si vale para varias («reserva»), 409 `base.app_ambiguous` nombrándolas en el idioma de quien pide.
   `base.app.enable`, `base.app.disable` y `base.app.retry` resuelven `AppChangeIn.app` con la misma `find_app` y declaran
   `"check": "base.app.get"` en su `ai=` (hub#542): el asistente la lee antes de la tarjeta, y un nombre de varias apps o

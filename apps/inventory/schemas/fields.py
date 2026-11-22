@@ -50,7 +50,15 @@ Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": Tru
 Quantity = Annotated[Decimal, Field(max_digits=15, decimal_places=3)]
 #: How a person names a product (its SKU or name) or a category (its name or slug).
 Said = _text(200, 1)
-ProductSearch = Annotated[str | None, Field(max_length=200, description="Part of the name or the SKU.")]
+#: A product has one name, in the language it was written in: the model looks it up with what the person said.
+IN_THEIR_WORDS = "in the person's own words, never translated"
+PRODUCT_SAID = (
+    f"The product's SKU or name, when its id is not known (e.g. said aloud), {IN_THEIR_WORDS}: a product has one "
+    "name, in the language it was written in; if none matches, ask."
+)
+ProductSearch = Annotated[
+    str | None, Field(max_length=200, description=f"Part of the name or the SKU, {IN_THEIR_WORDS}.")
+]
 
 # The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
@@ -82,10 +90,7 @@ class Page(Schema, Generic[T]):
 
 class ProductRefIn(Schema):
     id: UUID | None = Field(None, title=T_PRODUCT, description="The product's id.", json_schema_extra=A_PRODUCT)
-    product: Said | None = Field(
-        None,
-        description="The product's SKU or name, when its id is not known (e.g. said aloud).",
-    )
+    product: Said | None = Field(None, description=PRODUCT_SAID)
 
     @model_validator(mode="after")
     def _named(self):
@@ -111,10 +116,7 @@ class _ProductLineRef(Schema):
     """A product named by ``product_id`` or by its SKU or name (``product``)."""
 
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
-    product: Said | None = Field(
-        None,
-        description="The product's SKU or name, when its id is not known (e.g. said aloud).",
-    )
+    product: Said | None = Field(None, description=PRODUCT_SAID)
 
     @model_validator(mode="after")
     def _named(self):

@@ -2500,3 +2500,7 @@ msgstr "Datos sensibles"
 
 msgid "This role does not exist in this business."
 msgstr "Este rol no existe en este negocio."
+
+msgctxt "base"
+msgid "Once on"
+msgstr "Una vez activada"

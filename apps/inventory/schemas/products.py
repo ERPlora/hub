@@ -17,6 +17,7 @@ from apps.inventory.schemas.fields import (
     T_PRODUCT,
     Cents,
     Description,
+    IN_THEIR_WORDS,
     Page,
     PageIn,
     ProductRefIn,
@@ -78,7 +79,7 @@ class ProductFiltersIn(Schema):
     """The product list's search, filters and order; the export takes the same."""
 
     search: ProductSearch = None
-    name: str | None = Field(None, max_length=200, description="Part of the name.")
+    name: str | None = Field(None, max_length=200, description=f"Part of the name, {IN_THEIR_WORDS}.")
     sku: str | None = Field(None, max_length=64, description="Part of the SKU.")
     price_min: Cents | None = Field(None, description="Lowest price, in cents.")
     price_max: Cents | None = Field(None, description="Highest price, in cents.")

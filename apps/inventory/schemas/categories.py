@@ -62,7 +62,10 @@ class CategoryListIn(PageIn, CategoryFiltersIn):
 
 
 class CategoryIn(Schema):
-    name: CategoryName = Field(description="The category's name.")
+    name: CategoryName = Field(
+        description="The category's name. Before creating one, look at the ones there are (inventory.category.list): "
+        "they may be written in another language («Desserts» for «postres»); if one is the same, ask."
+    )
     slug: Slug = Field(
         "", description="Lowercase with dashes; empty = made from the name."
     )
