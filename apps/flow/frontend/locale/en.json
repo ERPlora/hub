@@ -1368,6 +1368,7 @@
       "verifactu__stats__records_by_status": "Count the tax records by status",
       "whatsapp_inbox__agent__list": "Look for who answers WhatsApp",
       "whatsapp_inbox__channel__get": "Read the WhatsApp channel",
+      "whatsapp_inbox__channel__health": "Check whether the WhatsApp number is connected",
       "whatsapp_inbox__channel__prepare": "Check whether the WhatsApp number can be connected",
       "whatsapp_inbox__conversation__assign": "Assign a WhatsApp conversation",
       "whatsapp_inbox__conversation__by_phone": "Find a WhatsApp conversation by phone",
