@@ -13,7 +13,7 @@ export { business, IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/
 /** The platform's query of the business (its currency). */
 export const BUSINESS = 'base.business.get';
 
-/** Owner or admin: `staff.*` (apps.py `role_permissions`), listed one by one. */
+/** Owner or admin: `staff.*` (apps.py `role_permissions`), listed one by one, and the team's contact details. */
 export const OWNER: SessionMe = {
   user: { id: '1', label: 'Ana' },
   permissions: [
@@ -27,6 +27,7 @@ export const OWNER: SessionMe = {
     'staff.manage_time_off',
     'staff.manage_settings',
     'staff.request_time_off',
+    'base.view_team_contact',
   ],
   menu: [],
   apps: [],
