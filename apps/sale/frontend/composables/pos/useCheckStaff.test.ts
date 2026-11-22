@@ -76,10 +76,21 @@ describe('useCheckStaff', () => {
     s.orderId.value = 'o1';
     s.current.value = SERVED_BY_LUCIA;
     await settle();
+    expect(s.saves()).toEqual([]);
     s.orderId.value = null;
     s.current.value = null;
     await settle();
     expect(s.served.staff.value).toEqual(ME);
+    expect(s.served.opening()).toEqual({});
+  });
+
+  it('a check opened elsewhere for this screen (Tables, seating it) knows nobody: who was waiting is saved on it', async () => {
+    const s = await setup();
+    await s.served.choose(LUCIA);
+    s.orderId.value = 'o1';
+    await settle();
+    expect(s.saves()).toEqual([{ order_id: 'o1', staff_id: 's9' }]);
+    expect(s.follow).toHaveBeenCalledWith(SERVED_BY_LUCIA);
     expect(s.served.opening()).toEqual({});
   });
 

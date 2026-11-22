@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e42cf9a0b9ed4cf7b057e4bdc5d4825e7d303930e55bb0bc7ebcfec1e67d4d77 -->
+<!-- generated from WORKBOOK.md sha256:657e290011b4c3e552323ffdac959e3dd23f027f9f93c9f0d601aef666485605 -->
 
 ## What it is for and who it is for
 
@@ -726,7 +726,8 @@ Steps:
 2. In "Who is serving this check", choose the person from the Staff team or "Me (whoever is signed in)".
    If your account has no record in Staff, the sheet warns about it: "Your account has no record in
    Staff: left on «Me», this sale counts for nobody." With the check open it is saved on it at once;
-   with no check yet, the check is opened with that person when the first item goes in.
+   with no check yet, the check is opened with that person when the first item goes in, and the one
+   Tables opens when a table is picked for it is theirs too.
 3. The lines added from then on are stamped with that person. To correct a line already in, tap the
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
    A line that arrives with its professional (an appointment's, one of a check built on another device or

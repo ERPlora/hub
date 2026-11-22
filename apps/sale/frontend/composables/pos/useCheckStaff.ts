@@ -38,7 +38,12 @@ export function useCheckStaff(till: CheckOnScreen) {
   });
 
   watch(till.orderId, (id) => {
-    if (id) waiting.value = ME;
+    if (!id) return;
+    const chosen = waiting.value;
+    waiting.value = ME;
+    // A check the till did not open itself (Tables opens it when a table is picked first) knows nothing of who was
+    // chosen before it existed: it is saved on it.
+    if (chosen.id && till.order.value?.staff_id !== chosen.id) void choose(chosen);
   });
 
   async function choose(next: Server): Promise<void> {

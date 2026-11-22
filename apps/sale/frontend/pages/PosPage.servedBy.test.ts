@@ -9,6 +9,7 @@ import CartHeading from '../components/pos/CartHeading.vue';
 import PosCart from '../components/pos/PosCart.vue';
 import PosCatalog from '../components/pos/PosCatalog.vue';
 import StaffPicker from '../components/pos/StaffPicker.vue';
+import TablePicker from '../components/pos/TablePicker.vue';
 import { line, memoryStorage, order, product, settings } from '../components/pos/__tests__/fixtures';
 import { CURRENT_CHECK_KEY } from '../composables/pos/useCurrentCheck';
 import PosPage from './PosPage.vue';
@@ -19,6 +20,8 @@ afterEach(() => vi.unstubAllGlobals());
 const LUCIA = { id: 's9', name: 'Lucia Garcia' };
 const COFFEE = line({ id: 'l1', product_id: 'p1', name: 'White coffee', staff_id: 's9' });
 const SERVED_BY_LUCIA = order({ id: 'o6', version: 3, label: 'Table 6', staff_id: 's9', staff_name: 'Lucia Garcia', lines: [COFFEE] });
+const TABLE_PERMISSIONS = ['table.view_table', 'table.add_session', 'table.view_session', 'table.change_session'];
+const WITH_TABLES = { ...MANAGER, permissions: [...MANAGER.permissions, ...TABLE_PERMISSIONS], apps: [{ label: 'table', state: 'on' as const }] };
 const WITH_KITCHEN = { ...MANAGER, permissions: [...MANAGER.permissions, 'kitchen.add_ticket'], apps: [{ label: 'kitchen', state: 'on' as const }] };
 
 /** The chip «Served by …» of the check's heading. */
@@ -29,6 +32,15 @@ async function pick(s: Awaited<ReturnType<typeof mountSale>>, who: { id: string 
   await settle();
   s.wrapper.findComponent(StaffPicker).vm.$emit('choose', who);
   await settle();
+}
+
+/** Sell with no check yet and Lucia chosen to serve the next one. */
+async function withLuciaWaiting(session = MANAGER) {
+  const s = await mountSale(PosPage, { session });
+  await s.live();
+  await s.result('sale.pos_settings.get', settings());
+  await pick(s, LUCIA);
+  return s;
 }
 
 describe('PosPage: who serves the check is the check’s', () => {
@@ -57,10 +69,7 @@ describe('PosPage: who serves the check is the check’s', () => {
   });
 
   it('someone chosen before there is a check opens it with them', async () => {
-    const s = await mountSale(PosPage);
-    await s.live();
-    await s.result('sale.pos_settings.get', settings());
-    await pick(s, LUCIA);
+    const s = await withLuciaWaiting();
     s.net.onApi(() => Response.json(SERVED_BY_LUCIA));
     s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
     await settle();
@@ -68,6 +77,31 @@ describe('PosPage: who serves the check is the check’s', () => {
       path: '/api/sale/orders',
       body: { staff_id: 's9', lines: [{ product_id: 'p1', staff_id: 's9' }] },
     });
+  });
+
+  it('someone chosen before the table is picked serves the check Tables opens for it', async () => {
+    const s = await withLuciaWaiting(WITH_TABLES);
+    await click(s.find('pos-table-trigger').element);
+    s.net.onApi(() => Response.json(order({ id: 'o9', version: 2, label: 'Table 4', staff_id: 's9', staff_name: 'Lucia Garcia' })));
+    s.wrapper.findComponent(TablePicker).vm.$emit('seated', { order_id: 'o9' });
+    await settle();
+    const writes = s.sent().filter((call) => call.method === 'POST');
+    expect(writes.map((call) => [call.path, call.body])).toEqual([['/api/sale/orders/set_staff', { order_id: 'o9', staff_id: 's9' }]]);
+    expect(chip(s)).toMatchObject({ staffId: 's9', staffName: 'Lucia Garcia' });
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p2' }));
+    await settle();
+    expect(s.sent().at(-1)).toMatchObject({ path: '/api/sale/orders/add_line', body: { order_id: 'o9', product_id: 'p2', staff_id: 's9' } });
+  });
+
+  it('another check put on screen keeps who serves it: whoever was waiting for a new one is not saved on it', async () => {
+    const s = await withLuciaWaiting();
+    s.net.onApi(() => Response.json(order({ id: 'o7', version: 4, label: 'Table 7' })));
+    await s.router.push('/sale/pos?order=o7');
+    await settle();
+    await settle();
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o7');
+    expect(s.sent().filter((call) => call.path === '/api/sale/orders/set_staff')).toEqual([]);
+    expect(chip(s)).toMatchObject({ staffId: null });
   });
 
   it('a round sent names nobody: the kitchen ticket names who serves the check, as the Hub keeps it', async () => {

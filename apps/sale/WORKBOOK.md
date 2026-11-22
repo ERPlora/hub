@@ -732,7 +732,8 @@ Pasos:
 2. En «Quién atiende esta cuenta», elige a la persona del equipo de Personal o «Yo (quien tenga la
    sesión)». Si tu cuenta no tiene ficha en Personal, la hoja lo avisa: «Tu cuenta no tiene ficha en
    Personal: si lo dejas en «Yo», esta venta no contará para nadie.» Con la cuenta abierta queda guardado
-   en ella al momento; sin cuenta todavía, la cuenta nace con esa persona al añadir lo primero.
+   en ella al momento; sin cuenta todavía, la cuenta nace con esa persona al añadir lo primero, y la que
+   abre Mesas al elegirle una mesa queda también con ella.
 3. Las líneas que se añadan a partir de ahí quedan selladas con esa persona. Para corregir una línea
    ya puesta, toca el nombre que sale debajo de ella («De quién es esta línea») y elige otra persona o
    «El profesional de la cuenta». Una línea que llega con su profesional (la de una cita, la de una cuenta
