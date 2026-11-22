@@ -16,6 +16,7 @@ from live.operations import get
 
 from apps.demo.models import Item
 from base import assistant
+from base.models.activation import AppActivation
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.test_plan_usage_figures import STARTER, chose_only
@@ -102,6 +103,32 @@ def test_the_plan_is_told_only_to_who_runs_the_business(in_business_a):
     registered(in_business_a)
     assert "- Plan: starter." in facts(in_business_a, RUNS_IT)
     assert "Plan:" not in facts(in_business_a, STAFF)
+
+
+def came_with_another(hub, label: str) -> None:
+    """App ``label`` on in ``hub`` without the business choosing it, as one that came with another app."""
+    with use_hub(hub):
+        AppActivation.objects.filter(host=hub.slug, app=label).update(state=AppActivation.State.ON, chosen=False)
+
+
+def test_the_plan_says_how_many_apps_it_counts_and_which_ones(in_business_a):
+    """Apps says «21 apps on · 14 of 40 of your plan»: told only the apps on, the assistant could not explain why
+    the two figures differ."""
+    registered(in_business_a, plan={**STARTER, "max_apps": 40})
+    chose_only(in_business_a, "demo", "customer")
+    came_with_another(in_business_a, "inventory")
+    text = facts(in_business_a)
+    assert "- Apps on: Customers, Demo, Inventory." in text
+    assert (
+        "- Plan: starter. Apps it counts: 2 of 40 (only those the business chose, not one that came with another app "
+        "or was on from the start)."
+    ) in text
+
+
+def test_a_plan_with_no_limit_of_apps_says_so(in_business_a):
+    registered(in_business_a, plan={**STARTER, "max_apps": 0})
+    chose_only(in_business_a, "demo")
+    assert "- Plan: starter. Apps it counts: 1, with no limit (only those the business chose" in facts(in_business_a)
 
 
 def test_what_erplora_com_did_not_register_is_not_told(in_business_a):

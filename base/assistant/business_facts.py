@@ -1,5 +1,5 @@
 """What the Hub's assistant knows of the business from the start of every conversation (``block``): its country, its
-clock and the moment it is there, its sector, its apps on and, for who runs it, its plan.
+clock and the moment it is there, its sector, its apps on and, for who runs it, its plan with the apps it counts.
 
 Each is one short line, read from what the platform already keeps: ``base.business.get``, the registry's row of the
 business at work and the SaaS's last photo on it, and the apps on. Nothing is asked of erplora.com, and what it did not
@@ -14,7 +14,7 @@ from django.utils import timezone, translation
 from live.context import OperationContext
 from live.meta import LiveAppConfig
 
-from base import home
+from base import activation, home
 from base.business import business_zone, zone_name
 from base.permissions import ADMINISTER_HUB
 from base.tenancy.context import current_hub
@@ -40,7 +40,7 @@ def block(ctx: OperationContext, business: Mapping, apps: Mapping[str, LiveAppCo
         lines.append(f"- Apps on: {', '.join(names)}.")
     plan = _plan(hub) if ctx.has(ADMINISTER_HUB) else ""
     if plan:
-        lines.append(f"- Plan: {plan}.")
+        lines.append(f"- Plan: {plan}. {_apps_counted(ctx, hub)}")
     return "\n".join(lines)
 
 
@@ -48,6 +48,19 @@ def _names_on(ctx: OperationContext, apps: Mapping[str, LiveAppConfig], *, demo:
     """The apps of the store on in the business, by the names its menu gives them in the chat's language."""
     with translation.override(ctx.language):
         return sorted((str(config.verbose_name) for config in home.home_modules(apps, demo_hub=demo)), key=str.casefold)
+
+
+def _apps_counted(ctx: OperationContext, hub) -> str:
+    """How many apps the plan counts against its limit, as Apps says it («14 of 40 of your plan»): the ones the
+    business chose, never one that came with another app or was on from the start."""
+    shown = {config.label for config in home.shown_modules(demo_hub=hub.is_demo)}
+    used = activation.chosen_on(activation.states_of(ctx.scope), among=shown)
+    limit = activation.plan_limit(hub.state)
+    counted = f"{used} of {limit}" if limit else f"{used}, with no limit"
+    return (
+        f"Apps it counts: {counted} (only those the business chose, not one that came with another app or was on "
+        "from the start)."
+    )
 
 
 def _plan(hub) -> str:

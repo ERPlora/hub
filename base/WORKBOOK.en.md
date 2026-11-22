@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:785b04c18d9fdd7931be89b7b0fd6fee7949dc73a9fd6b151f707b6df60673e1 -->
+<!-- generated from WORKBOOK.md sha256:dcfb6a3e0777d2d0a6e311a97010f5aedbc7461e824c7428fe42e43388c0a477 -->
 
 ## What it is for and who it is for
 
@@ -2464,8 +2464,9 @@ Steps:
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
      it say on which screen it is done.
   10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
-     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan; it does
-     not have to look them up for each question. Every date and time it says is in the business's time, the one the
+     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
+     many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
+     question. Every date and time it says is in the business's time, the one the
      screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
