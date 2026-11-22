@@ -36,6 +36,7 @@ for (const [index, viewport] of FLOW_VIEWPORTS.entries()) {
   test(`the employee's own appointment keeps the customer's phone and email at ${viewport.label}px`, async ({ browser }) => {
     const owner = await signedIn(browser, '/appointment/agenda', viewport);
     const employee = await signedIn(browser, '/appointment/agenda', viewport, EMPLOYEE);
+    if (process.env.E2E_SAVE_STORAGE_STATE) await employee.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     try {
       const bea = await employeesRecord(owner.context, `${TAG} Bea`);
       const run = `${viewport.label}${Date.now().toString(36)}`;
