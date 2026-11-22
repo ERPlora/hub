@@ -16,6 +16,7 @@ from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provi
 from apps.sale.queries.other_apps import call_app
 from apps.sale.schemas.lines import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
 from base.allergens import in_order
+from base.sensitive import recording_costs
 
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
@@ -216,7 +217,8 @@ def freeze_product_line(
     """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
     new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
     try:
-        product = _product(ctx, {"id": data.product_id, "product": data.product})
+        # The line keeps the cost even when whoever sells does not see it (base.view_costs): it values the comps.
+        product = _product(recording_costs(ctx), {"id": data.product_id, "product": data.product})
     except NotFound:
         raise Conflict(
             str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available"

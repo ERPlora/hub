@@ -410,7 +410,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
     product("Untaxed")
     product("Cut", product_type="service", tax=general)
 
-    page = run("inventory.product.list_for_sale", ForSaleListIn(), role="hub_employee")
+    page = run("inventory.product.list_for_sale", ForSaleListIn(), role="hub_manager")
 
     assert [row.name for row in page.rows] == ["Coffee", "Cut", "Untaxed"]
     assert page.rows[0].model_dump() == {
@@ -616,7 +616,7 @@ def test_the_ledger_most_recent_first_with_the_product_it_moved():
         coffee, "reception", 5, 15, reference="ALB-7", unit_cost=180, actor="ana"
     )
 
-    page = run("inventory.movement.list", MovementListIn(), role="hub_employee")
+    page = run("inventory.movement.list", MovementListIn(), role="hub_manager")
 
     assert [row.id for row in page.rows] == [second.id, first.id]
     assert page.rows[0].model_dump(exclude={"created_at"}) == {
@@ -742,7 +742,7 @@ def test_the_panel_counts_tracked_articles_and_values_them_at_cost():
     product("U", cost=999, stock=Decimal("50"), track_stock=False)
     product("I", cost=999, stock=Decimal("50"), is_active=False)
 
-    summary = run("inventory.stock.get_summary", SummaryIn(), role="hub_employee")
+    summary = run("inventory.stock.get_summary", SummaryIn(), role="hub_manager")
 
     assert summary.model_dump() == {
         "products_tracked": 5,
