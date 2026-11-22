@@ -59,6 +59,7 @@ class BaseConfig(LiveAppConfig):
     # erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
     # The four data permissions (base.sensitive) say which sensitive data a role sees: a manager sees them all, an
     # employee only the customers' contact details, which serving them needs.
+    # Owning the business is the owner's alone (base.permissions.OWNER_ONLY): no role but the owner gets it.
     permissions = [
         "base.view_home",
         "base.administer_hub",
@@ -70,6 +71,7 @@ class BaseConfig(LiveAppConfig):
         "base.view_customer_contact",
         "base.view_team_contact",
         "base.view_business_totals",
+        "base.own_business",
     ]
     role_permissions = {
         "hub_owner": ["base.*"],

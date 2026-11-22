@@ -6,7 +6,7 @@
 // 50 a page, the latest activity first. «Open» (or the row) opens the conversation in a panel above the
 // list, kept in the address (`?conversation=`). Above it: «Reconnecting…», the number not connected or to
 // reconnect («Go to Settings», where it is connected, for whoever configures), the month's messages spent or a plan
-// that includes none (with «Upgrade plan», erplora.com's plans, for whoever configures), a number erased. A
+// that includes none (with «Upgrade plan», erplora.com's plans, for the owner), a number erased. A
 // conversation an automatic answer could not answer says «Needs attention» by its name (F20).
 import {
   type DataTableAction,
@@ -18,13 +18,14 @@ import {
   StatusPill,
 } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
+import { useMayBuy } from '../../../../base/frontend/lib/plan-link';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
@@ -76,10 +77,9 @@ table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 
 const { data: channel } = useLive('whatsapp_inbox.channel.get', {});
-/** «Upgrade plan» at the cap: for whoever configures, only with erplora.com to send them to, and only on the web (it
- *  sells: surface.ts). */
-const { isWeb } = useSurface();
-const upgradeUrl = computed(() => (isWeb.value && canConfigure.value && channel.value?.plans_url) || '');
+/** «Upgrade plan» at the cap: for the owner, who alone buys, only with erplora.com to send them to, and only on the web. */
+const mayBuy = useMayBuy();
+const upgradeUrl = computed(() => (mayBuy.value && channel.value?.plans_url) || '');
 // From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
 const left = computed(() => nearCap(channel.value));
 
