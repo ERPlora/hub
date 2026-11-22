@@ -6,7 +6,7 @@ person keeps their name, and a beneficiary is not a colleague. Back, nothing cha
 import datetime as dt
 
 from apps.whatsapp_inbox.tests.test_migrations import database, migrate
-from base.tests.team_contact import ADDRESS, SHOWN
+from base.tests.colleagues import ADDRESS, SHOWN
 
 #: The fixture taken from the inbox's migration tests: a business's database cloned from the template.
 __all__ = ["database"]

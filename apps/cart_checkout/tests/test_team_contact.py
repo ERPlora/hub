@@ -10,17 +10,17 @@ import pytest
 
 from apps.cart_checkout.models import Cart, CartItem, Order
 from apps.flow.tests.test_api import get, post
-from base.tests.team_contact import NAMELESS, NAMELESS_IDS, SHOWN, signed_in
+from base.tests.colleagues import NAMELESS, SHOWN, signed_in
 
 from .conftest import HUB_DB
 
 pytestmark = HUB_DB
 
 
-@pytest.fixture(params=NAMELESS, ids=NAMELESS_IDS)
+@pytest.fixture(params=list(NAMELESS.values()), ids=list(NAMELESS))
 def zoe(request):
     """Zoe, a manager whose account has no name of its own: her device."""
-    return signed_in("zoe", "hub_manager", **request.param)[1]
+    return signed_in("zoe", "hub_manager", **request.param)
 
 
 def ordered(client) -> dict:
@@ -38,7 +38,7 @@ def ordered(client) -> dict:
 @pytest.mark.parametrize("role", ["hub_employee", "hub_manager"])
 def test_who_opens_a_cart_and_orders_it_is_named_without_their_address(zoe, role):
     ordered(zoe)
-    _, reader = signed_in("reader", role)
+    reader = signed_in("reader", role)
     carts = [(row["created_by"], row["updated_by"]) for row in get(reader, "/cart_checkout/carts").json()["rows"]]
     orders = [(row["created_by"], row["updated_by"]) for row in get(reader, "/cart_checkout/orders").json()["rows"]]
     assert (carts, orders) == ([(SHOWN, SHOWN)], [(SHOWN, SHOWN)])
@@ -52,5 +52,5 @@ def test_who_opens_a_cart_and_orders_it_is_named_without_their_address(zoe, role
 
 
 def test_a_named_colleague_keeps_their_name(db):
-    _, luis = signed_in("luis", "hub_manager", first_name="Luis", last_name="García", email="luis@example.com")
+    luis = signed_in("luis", "hub_manager", first_name="Luis", last_name="García", email="luis@example.com")
     assert ordered(luis)["created_by"] == "Luis García"

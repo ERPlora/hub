@@ -11,7 +11,7 @@ from live.operations import get as operation
 
 from apps.flow.tests.test_api import get, post
 from apps.payment.models import Payment
-from base.tests.team_contact import NAMELESS, NAMELESS_IDS, SHOWN, signed_in
+from base.tests.colleagues import NAMELESS, SHOWN, signed_in
 
 from .conftest import HUB_DB, A
 
@@ -20,12 +20,12 @@ pytestmark = HUB_DB
 ACTORS = ("created_by", "updated_by", "approved_by", "cancelled_by")
 
 
-@pytest.fixture(params=NAMELESS, ids=NAMELESS_IDS)
+@pytest.fixture(params=list(NAMELESS.values()), ids=list(NAMELESS))
 def zoe(request):
     """Zoe, a manager whose account has no name of its own, with a method to pay by: her device."""
     op = operation("payment.method.create")
     op(system_context(A), op.input.model_validate({"name": "Bank", "method_type": "transfer"}))
-    return signed_in("zoe", "hub_manager", **request.param)[1]
+    return signed_in("zoe", "hub_manager", **request.param)
 
 
 def recorded(client, beneficiary: str) -> str:
@@ -43,7 +43,7 @@ def test_who_records_approves_or_cancels_a_payment_is_named_without_their_addres
     approved = post(zoe, "/payment/payments/approve", {"id": recorded(zoe, "Bakery")})
     cancelled = post(zoe, "/payment/payments/cancel", {"id": recorded(zoe, "Florist"), "reason": "Twice"})
     assert (approved.status_code, cancelled.status_code) == (200, 200), (approved.content, cancelled.content)
-    _, reader = signed_in("reader", role)
+    reader = signed_in("reader", role)
     rows = {row["beneficiary_name"]: row for row in get(reader, "/payment/payments").json()["rows"]}
     shown = {name: {field: row[field] for field in ACTORS if row[field]} for name, row in rows.items()}
     assert shown == {
@@ -55,6 +55,6 @@ def test_who_records_approves_or_cancels_a_payment_is_named_without_their_addres
 
 
 def test_a_named_colleague_keeps_their_name(zoe):
-    _, luis = signed_in("luis", "hub_manager", first_name="Luis", last_name="García", email="luis@example.com")
+    luis = signed_in("luis", "hub_manager", first_name="Luis", last_name="García", email="luis@example.com")
     payment = get(luis, "/payment/payments/detail", id=recorded(luis, "Bakery")).json()
     assert payment["created_by"] == "Luis García"
