@@ -406,7 +406,9 @@ def test_a_load_that_breaks_turns_its_app_on_all_the_same_and_says_so_and_can_be
     assert by_app(broken)["service"]["status"] == blueprint.FAILED
     assert by_app(broken)["service"]["reason"]
     assert (broken["status"], broken["retry"], broken["retry_blocked"]) == ("failed", True, "")
-    assert "the load broke" in caplog.text
+    assert [record.name for record in caplog.records if record.exc_info and str(record.exc_info[1]) == "the load broke"] == [
+        "base.blueprint"
+    ]
 
     again = call(hub, "base.blueprint.import", retry_of=load["id"])
 

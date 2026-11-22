@@ -19,6 +19,7 @@ import zipfile
 
 import pytest
 from django.contrib.auth import get_user_model
+from live import operations
 from live.context import OperationContext
 from live.operations import get
 
@@ -345,6 +346,28 @@ def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
     assert inventory["status"] == "partial"
     assert next(app for app in result.report["apps"] if app["id"] == "table")["status"] == "applied"
     assert result.report["status"] == "partial"
+
+
+class Breaks:
+    """An app's create that breaks for a reason of its own (a bug, a lost connection), not a row it refuses."""
+
+    input = dict
+
+    def __call__(self, ctx, data):
+        raise RuntimeError("the tables broke")
+
+
+def test_a_part_that_breaks_fails_alone_is_told_and_is_logged_by_the_blueprints(ctx, monkeypatch, caplog):
+    monkeypatch.setitem(operations.registry, "table.table.create", Breaks())
+
+    result = blueprint.apply(ctx, restaurant_bundle(), apps=None)
+
+    statuses = {dataset["key"]: dataset["status"] for app in result.report["apps"] for dataset in app["datasets"]}
+    assert statuses == {"inventory.category": "applied", "inventory.product": "applied", "table.zone": "applied", "table.table": "failed"}
+    tables = next(app for app in result.report["apps"] if app["id"] == "table")
+    assert (tables["status"], tables["datasets"][1]["failed"], len(tables["datasets"][1]["problems"])) == ("partial", 1, 1)
+    broke = [record.name for record in caplog.records if record.exc_info and str(record.exc_info[1]) == "the tables broke"]
+    assert broke == ["base.blueprint"]
 
 
 def test_a_refused_row_is_named_as_the_person_knows_it_by_its_name_and_by_its_code_only_without_one(ctx):
