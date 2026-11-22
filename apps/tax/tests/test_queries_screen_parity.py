@@ -10,7 +10,7 @@ from apps.tax.schemas import AliasListIn, CategoryGetIn, CategoryListIn, RuleLis
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import HUB_DB, TODAY, aliases, calculate, category, resolved, rule, rules, run
+from .conftest import HUB_DB, TODAY, aliases, calculate, category, food_and_book_aliases, resolved, rule, rules, run
 
 pytestmark = HUB_DB
 
@@ -116,10 +116,7 @@ def test_rules_sort_by_any_column_of_the_screen(no_seed):
 
 
 def test_aliases_filter_sort_and_only_active(no_seed):
-    food, books = category("restaurant.food"), category("product.books")
-    TaxAlias.objects.create(alias="meal", category=food, source="shipped")
-    TaxAlias.objects.create(alias="comida casera", category=food)
-    TaxAlias.objects.create(alias="libros", category=books)
+    books = food_and_book_aliases()
     TaxAlias.objects.create(alias="old", category=books, is_active=False)
     names = lambda **where: [row.alias for row in aliases(**where).rows]  # noqa: E731
     assert names(alias="casera") == ["comida casera"]

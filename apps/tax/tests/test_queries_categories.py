@@ -13,7 +13,7 @@ from live.errors import NotFound
 from apps.tax.models import TaxAlias, TaxCategory
 from apps.tax.schemas import CategoryGetIn
 
-from .conftest import HUB_DB, aliases, categories, category, resolved, rule, run
+from .conftest import HUB_DB, aliases, categories, category, food_and_book_aliases, resolved, rule, run
 
 pytestmark = HUB_DB
 
@@ -176,10 +176,7 @@ def test_the_seeded_aliases():
 
 
 def test_alias_search_and_filters(no_seed):
-    food, books = category("restaurant.food"), category("product.books")
-    TaxAlias.objects.create(alias="meal", category=food, source="shipped")
-    TaxAlias.objects.create(alias="comida casera", category=food)
-    TaxAlias.objects.create(alias="libros", category=books)
+    food_and_book_aliases()
     names = lambda **where: [row.alias for row in aliases(**where).rows]  # noqa: E731
     assert names(search="COMIDA") == ["comida casera"]
     assert names(search="books") == ["libros"]  # the category key

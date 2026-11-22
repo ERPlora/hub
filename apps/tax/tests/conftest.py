@@ -157,3 +157,15 @@ def aliases(**params):
 def resolved(text, language="en"):
     out = run("tax.alias.resolve", AliasResolveIn(text=text), language=language)
     return (out.text, out.tax_category_key, out.matched_by)
+
+
+def food_and_book_aliases():
+    """A shipped and a learned alias of restaurant.food and a learned one of product.books.
+
+    Returns the books category, for a test that adds one more alias of its own.
+    """
+    food, books = category("restaurant.food"), category("product.books")
+    TaxAlias.objects.create(alias="meal", category=food, source="shipped")
+    TaxAlias.objects.create(alias="comida casera", category=food)
+    TaxAlias.objects.create(alias="libros", category=books)
+    return books
