@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:37077c2d121c4e1fe7786bab3091685870101653417ee9eacad10d1735092819 -->
+<!-- generated from WORKBOOK.md sha256:ce9921de5a736927d101110df176e5957c4461599d722542ddf91250ebcb43aa -->
 
 ## What it is for and who it is for
 
@@ -471,7 +471,7 @@ Steps:
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
    its name and time. Who serves it is seen in its window: whoever serves its check in Sales (the till's
    "Served by" chip) or, if nobody changed it, whoever seated it, by their name or, if their account has
-   none, by what goes before the @ of their e-mail, never the whole e-mail (BASE-F119).
+   none, by what goes before the @ of their e-mail, never the whole e-mail.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
    the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
@@ -495,7 +495,7 @@ Steps:
    pick none, the check carries the booking's customer.
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
    checks** of the till sees it). Whoever seats is the server of the check: their name or, if their account
-   has none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119).
+   has none, what goes before the @ of their e-mail, never the whole e-mail.
 5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
 In: the table and the guests; on a Reserved one, the booking's guests and customer.
 Out: the table check opened with its guests, the time and the server (announces:
@@ -507,7 +507,7 @@ plan has been refreshed." and the table is not seated. **Two servers who seat th
 same time leave a single check**: the second one gets that same warning. A blocked, deactivated or
 deleted table is not seated. Seating is done on the floor, with the party in front: an automation
 cannot do it.
-Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
+Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12, BASE-F119
 
 ### TABLE-F11 Go back to an occupied table to order more or charge it
 Status: done
@@ -720,7 +720,7 @@ Steps:
    "Closed"; "All", also the transferred, merged and parked ones.
 3. Filter by zone, server or status, or search by table number. The server shows by their name or, if their
    account has none, by what goes before the @ of their e-mail, also on earlier checks, and is never searched
-   by their e-mail (BASE-F119).
+   by their e-mail.
 4. "Details" shows zone, server, status, guests, opening, closing, time, charged and notes.
 In: the table checks and what was charged in Sales.
 Out: nothing.

@@ -472,7 +472,7 @@ Pasos:
    pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
    el nombre y la hora. Quién la atiende se ve en su ventana: quien atiende su cuenta en Ventas (el chip
    «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó, por su nombre o, si su cuenta no tiene,
-   por lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119).
+   por lo que va antes de la @ de su correo, nunca el correo entero.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
    volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
    que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su
@@ -496,7 +496,7 @@ Pasos:
    eliges ninguna, la cuenta lleva el cliente de la reserva.
 4. La mesa pasa a Ocupada y en Ventas nace su cuenta abierta con el título «Mesa N» (la ve **Cuentas
    abiertas** del TPV). Quien sienta es el camarero de la cuenta: su nombre o, si su cuenta no tiene, lo que
-   va antes de la @ de su correo, nunca el correo entero (BASE-F119).
+   va antes de la @ de su correo, nunca el correo entero.
 5. Con el asistente: «sienta a tres en la mesa 4» (con su zona si el número se repite).
 Entra: la mesa y los comensales; en una Reservada, los comensales y el cliente de la reserva.
 Sale: la cuenta de mesa abierta con sus comensales, la hora y el camarero (avisa:
@@ -507,7 +507,7 @@ Si falla: si otro dispositivo la acaba de ocupar, «Otro dispositivo acaba de oc
 actualizado el plano.» y la mesa no se sienta. **Dos camareros que sientan la misma mesa a la vez
 dejan una sola cuenta**: el segundo recibe ese mismo aviso. Una mesa bloqueada, desactivada o borrada
 no se sienta. Sentar se hace en la sala, con el grupo delante: una automatización no puede hacerlo.
-Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
+Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12, BASE-F119
 
 ### TABLE-F11 Volver a una mesa ocupada para pedir más o cobrarla
 Estado: hecho
@@ -719,7 +719,7 @@ Pasos:
    «Cierre»; «Todas», también las trasladadas, fusionadas y aparcadas.
 3. Filtra por zona, camarero o estado, o busca por número de mesa. El camarero sale por su nombre o, si su
    cuenta no tiene, por lo que va antes de la @ de su correo, también en las cuentas de antes, y no se le
-   busca por su correo (BASE-F119).
+   busca por su correo.
 4. «Detalle» enseña zona, camarero, estado, comensales, apertura, cierre, tiempo, cobrado y notas.
 Entra: las cuentas de mesa y lo cobrado en Ventas.
 Sale: nada.
