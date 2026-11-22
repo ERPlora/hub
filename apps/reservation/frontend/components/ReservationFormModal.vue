@@ -443,6 +443,10 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
+/* The guest's name alone, when the phone came without it: the whole row. */
+.reservation-form__pair > :only-child {
+  grid-column: 1 / -1;
+}
 .reservation-form__customer,
 .reservation-form__source {
   display: grid;
