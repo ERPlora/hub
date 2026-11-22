@@ -74,4 +74,17 @@ class TaxConfig(LiveAppConfig):
             refresh_on=RULE_IN_FORCE_EVENTS,
         )
     ]
-    help = Help(videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"})
+    help = Help(
+        videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"},
+        flow_videos={
+            "TAX-F02": {"es": ["A9nFeyCvAbQ"], "en": ["nTVArJ9MhsA"]},
+            "TAX-F03": {"es": ["8_UzQyd7JiQ"], "en": ["-2AM34vDWm4"]},
+            "TAX-F04": {"es": ["8_UzQyd7JiQ"], "en": ["-2AM34vDWm4"]},
+            "TAX-F05": {"es": ["cs3OCfJvPjg"], "en": ["ZjucdTFQ8tM"]},
+            "TAX-F06": {"es": ["2uZNBribMXQ"], "en": ["ocI95rmmhvA"]},
+            "TAX-F07": {"es": ["Xifu7kVbOe0"], "en": ["zXiDlwQ1sTs"]},
+            "TAX-F08": {"es": ["zQgLuHvgn04"], "en": ["Ly_I_Une8YI"]},
+            "TAX-F13": {"es": ["E5-4AOlKnyM"], "en": ["obkc8TRqkf4"]},
+            "TAX-F14": {"es": ["E5-4AOlKnyM"], "en": ["obkc8TRqkf4"]},
+        },
+    )

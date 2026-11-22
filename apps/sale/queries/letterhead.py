@@ -8,7 +8,7 @@ from live.errors import OperationError
 from live.operations import AI, UnknownOperation, get, operation
 
 from apps.sale import paper
-from apps.sale.queries.sales import find_sale
+from apps.sale.queries.sales import visible_sale
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.sales import LetterheadIn, LetterheadOut
 
@@ -73,6 +73,6 @@ def business_letterhead(ctx: OperationContext, invoice_id: UUID | None = None) -
     ),
 )
 def get_letterhead(ctx: OperationContext, params: LetterheadIn) -> dict:
-    invoice_id = None if params.sale_id is None else find_sale(params.sale_id, None).invoice_id
+    invoice_id = None if params.sale_id is None else visible_sale(ctx, params.sale_id, None).invoice_id
     with translation.override(ctx.language):
         return {"sale_id": params.sale_id, **business_letterhead(ctx, invoice_id)}

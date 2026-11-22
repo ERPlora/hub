@@ -18,6 +18,7 @@ from . import (
     health as health,
     home as home,
     hubs as hubs,
+    ownership as ownership,
     people as people,
     profile as profile,
     release_notes as release_notes,

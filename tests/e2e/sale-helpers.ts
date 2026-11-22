@@ -7,7 +7,7 @@
 // notes, check titles); its sales are found by their lines.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
 import { toastSaying } from './toast-helpers';
@@ -55,6 +55,15 @@ export async function chargeByApi(context: BrowserContext, body: Record<string, 
   const res = await api<SaleOut>(context, A, 'POST', '/sale/sales', { idempotency_key: `e2e-${stamp()}`, ...body });
   expect(res.status, `charge ${JSON.stringify(body)}`).toBe(201);
   return res.data;
+}
+
+/** The cashier (`EMPLOYEE`) signed in at Sales on a device of their own: the till where the sales they then void
+ *  or refund are charged, since an employee sees only the sales they charged (SALE-F28). */
+export async function cashiersTill(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/sale/sales', EMPLOYEE);
+  return { context, page };
 }
 
 /** The sale charged with `key`, read back (server-side evidence). */

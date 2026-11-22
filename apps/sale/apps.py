@@ -56,6 +56,7 @@ class SaleConfig(LiveAppConfig):
         "sale.refund_sale",
         "sale.view_paymentmethod",
         "sale.add_paymentmethod",
+        "sale.view_all_sales",
         "sale.view_reports",
         "sale.manage_settings",
     ]
@@ -120,7 +121,20 @@ class SaleConfig(LiveAppConfig):
         Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments", permission="sale.manage_settings"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings", permission="sale.manage_settings"),
     ]
-    help = Help(videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"})
+    help = Help(
+        videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"},
+        flow_videos={
+            "SALE-F01": {"es": ["0j9NMnpgXWM"], "en": ["TALKAH4xCLM"]},
+            "SALE-F02": {"es": ["6IaIDRuKHzk"], "en": ["glc7T7Xpyw0"]},
+            "SALE-F03": {"es": ["4iMjcVUNlGQ"], "en": ["FjqB1ra8qPQ"]},
+            "SALE-F04": {"es": ["QZIskHcvbx4"], "en": ["WBdK2Z-XHOQ"]},
+            "SALE-F05": {"es": ["QZIskHcvbx4"], "en": ["WBdK2Z-XHOQ"]},
+            "SALE-F11": {"es": ["gtsNNFvYHIw"], "en": ["yViCguWhBP8"]},
+            "SALE-F13": {"es": ["VkHmRSouS8U"], "en": ["yQGyb_bvMi8"]},
+            "SALE-F14": {"es": ["kG1MT9VEMjo"], "en": ["B_-hW7QysXU"]},
+            "SALE-F15": {"es": ["ADneSwlsnlg"], "en": ["8vLwV_6ILUQ"]},
+        },
+    )
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query
     # on; each figure in the colour of data of its measure, the same on every screen (sales 1, tickets 2). Registered
     # icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps of «Finish

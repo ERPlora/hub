@@ -3,7 +3,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Count, Exists, OuterRef, Q, StringAgg, Subquery, Sum, TextField, Value
+from django.db.models import Count, Exists, OuterRef, Q, QuerySet, StringAgg, Subquery, Sum, TextField, Value
 from django.db.models.functions import Coalesce
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
@@ -12,6 +12,7 @@ from live.errors import NotFound
 from live.operations import AI, operation
 
 from apps.sale.models import FiscalStatus, Refund, RefundLine, Sale, SaleLine, SalePayment
+from apps.sale.queries.ownership import SALES
 from apps.sale.queries.payment_methods import method_display_name
 from apps.sale.queries.receipt_codes import paper_code
 from apps.sale.schemas.sales import SaleByKeyIn, SaleByKeyOut, SaleListIn, SaleOut, SalePage, SaleRefIn
@@ -21,8 +22,13 @@ from base.ordering import list_order
 SALE_NOT_FOUND = _("That sale does not exist.")
 
 
-def find_sale(sale_id: UUID | None, number: str | None, *, lock: bool = False) -> Sale:
-    sales = Sale.objects.select_for_update() if lock else Sale.objects.all()
+def find_sale(
+    sale_id: UUID | None, number: str | None, *, lock: bool = False, among: QuerySet[Sale] | None = None
+) -> Sale:
+    """The sale of that id or number among ``among`` (every sale by default); one outside it does not exist."""
+    sales = Sale.objects.all() if among is None else among
+    if lock:
+        sales = sales.select_for_update()
     sale = (
         sales.filter(pk=sale_id).first()
         if sale_id is not None
@@ -31,6 +37,12 @@ def find_sale(sale_id: UUID | None, number: str | None, *, lock: bool = False) -
     if sale is None:
         raise NotFound(str(SALE_NOT_FOUND), code="sale.sale_not_found")
     return sale
+
+
+def visible_sale(ctx: OperationContext, sale_id: UUID | None, number: str | None, *, lock: bool = False) -> Sale:
+    """``find_sale`` among the sales the caller sees (``SALES``): someone else's, for a person who sees only theirs,
+    is the same 404 as one that does not exist."""
+    return find_sale(sale_id, number, lock=lock, among=SALES.visible(ctx))
 
 
 def returned_by_line(sale: Sale) -> dict[UUID, Decimal]:
@@ -208,7 +220,7 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
 )
 def get_sale(ctx: OperationContext, params: SaleRefIn) -> dict:
     with translation.override(ctx.language):
-        return sale_detail(find_sale(params.sale_id, params.sale))
+        return sale_detail(visible_sale(ctx, params.sale_id, params.sale))
 
 
 @operation(
@@ -233,7 +245,7 @@ def get_sale(ctx: OperationContext, params: SaleRefIn) -> dict:
     ),
 )
 def sale_by_key(ctx: OperationContext, params: SaleByKeyIn) -> dict:
-    sale = Sale.objects.filter(idempotency_key=params.idempotency_key).first()
+    sale = SALES.visible(ctx).filter(idempotency_key=params.idempotency_key).first()
     with translation.override(ctx.language):
         return {"found": sale is not None, "sale": sale_detail(sale) if sale else None}
 
@@ -312,7 +324,7 @@ def sale_row(sale: Sale) -> dict:
     ),
 )
 def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
-    sales = Sale.objects.annotate(
+    sales = SALES.visible(ctx).annotate(
         voucher_lines_left=Count(
             "lines",
             filter=Q(
