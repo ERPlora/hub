@@ -1,5 +1,6 @@
 """The reads of the sale app (SALE-F06, F17, F21, F22, F28, F29, F31, F34–F36), each ``READ ONLY``."""
 
+import dataclasses
 import datetime as dt
 from decimal import Decimal
 from pathlib import Path
@@ -149,12 +150,13 @@ def test_a_row_says_whether_the_sale_has_refunds_also_one_of_no_money(catalog):
     assert rows[session_only.id].refunded_total == 0
 
 
-def test_an_employee_reads_the_sales_but_not_the_figures(catalog):
+def test_an_employee_reads_the_sales_and_their_figures_and_nobody_else_does(catalog):
     charge("list-key-0001")
     employee = ctx_for(EMPLOYEE)
     assert run("sale.sale.list", {}, employee).total == 1
+    assert run("sale.sale.stats", {}, employee).count == 1
     with pytest.raises(PermissionDenied):
-        run("sale.sale.stats", {}, employee)
+        run("sale.sale.stats", {}, dataclasses.replace(employee, permissions=frozenset({"base.view_business_totals"})))
 
 
 # ── One sale ────────────────────────────────────────────────────────────────────────────────────

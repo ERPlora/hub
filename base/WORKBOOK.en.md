@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bd9a6eece84c2feed54491d8f42202a30895d3eab3d6216bda421bd36c51686b -->
+<!-- generated from WORKBOOK.md sha256:4d2a53c538695cb0b0cc36018b340859ac9f7229421d28a92037afe338226093 -->
 
 ## What it is for and who it is for
 
@@ -3412,7 +3412,7 @@ Involved: BASE-F26, HUBS-F26 (erplora.com)
 ### BASE-F119 What each person sees by their data permissions
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
-Screen: Employees · Staff, Home · Summary
+Screen: Employees · Staff, Home · Summary, Sales · Sales, Customers
 Steps:
   1. Besides what it may do, each role says which sensitive data it sees, with four data permissions: view costs,
      view customer contact details, view team contact details and view business totals. The owner, the
@@ -3427,9 +3427,12 @@ Steps:
      among the ones they may add.
   5. An API key sees the data whoever makes it sees: only the owner and the administrator make one, and they see all
      of it, so an integration reads and writes a product's cost as before.
+  6. The business totals are the figures of the whole business, beyond what each one does: with everyone's sales,
+     the figures of **Sales** and its Home panels are the whole business's; without them, those of the person's own
+     sales. In **Customers**, "Revenue" only shows to whoever sees them.
 In: the person's role in this business.
 Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
-Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:58d28df3fb74f6aabf08a6978d9d6850389dcde79edf84227e9dc9431c7a7056 -->
+<!-- generated from WORKBOOK.md sha256:3b55c34ad79ead9c0f5abc6f9f41ae744dce374d390eeb8f486329b36c459322 -->
 
 ## What it is for and who it is for
 
@@ -97,7 +97,7 @@ already had and with **Export CSV** you take them to a spreadsheet. Tap a row to
 your notes, their advertising permission, their allergies and their purchases.
 
 #### Detail
-At the top, four figures: "Customers", "Active", "VIP" and "Revenue" (what the live cards have spent).
+At the top, four figures: "Customers", "Active", "VIP" and "Revenue" (what the live cards have spent, only to whoever sees the business totals).
 Below, the table: "Name", "Email", "Phone", "Stage" and "Spent"; search "Search name, phone or email…"
 (it also searches tax ID and company); filters by stage, source, active and spent ("From / To", in the
 business's currency); sort by any column but "Email" and "Phone"; 50 per page. Whoever does not see the
@@ -854,7 +854,8 @@ Actor: everyone
 Screen: Customers
 Steps:
 1. Open **Customers**: at the top, above the table, four figures show: "Customers", "Active", "VIP" and
-   "Revenue".
+   "Revenue". "Revenue" is a figure of the whole business: it only shows to whoever sees the business totals
+   (the owner, the administrator and the manager). The employee sees the other three.
 2. "Customers" counts the cards still in the list; "Active", those with the "Active" checkbox ticked;
    "VIP", those of the "VIP" stage, and "Revenue" adds up what all of them have spent, in the business's
    currency, grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
@@ -867,7 +868,7 @@ If it fails: "The figures could not be loaded" in their place, and the table kee
 arrive, each figure shows "…". On the phone they go two by two, so the table can still be seen below; a
 figure never breaks across two lines: one that does not fit ("1.234.567,89 €") drops with its card to a
 row of its own.
-Involved: none
+Involved: BASE-F119
 
 ### CUSTOMER-F32 Note allergies or the sensitivity test with their permission
 Status: done

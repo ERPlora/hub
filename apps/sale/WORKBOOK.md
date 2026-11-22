@@ -32,10 +32,10 @@ negocios:
 
 - El **empleado** (camarero, recepcionista, cajero): monta la cuenta, pone notas, invita una línea,
   aplica descuentos hasta el máximo del negocio, aparca y recupera cuentas, cobra y consulta sus
-  ventas: las que cobró y las que se le atribuyeron.
+  ventas y sus cifras: las que cobró y las que se le atribuyeron.
 - El **responsable**: además vende a precio libre, aplica descuentos por encima del máximo, anula una
   cuenta abierta o una línea ya enviada a cocina, anula y devuelve ventas, ve las ventas de todos y las
-  cifras y prepara las
+  cifras de todo el negocio y prepara las
   notas rápidas, las secciones, los medios de pago y los ajustes del TPV.
 - El **propietario** y el **administrador**: todo.
 
@@ -1043,7 +1043,7 @@ Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-
 ### SALE-F28 Consultar el historial y las cifras de ventas
 Estado: hecho
 Vertical: común
-Actor: empleado (el historial de sus ventas), responsable (el de todas y las cifras)
+Actor: empleado (el historial y las cifras de sus ventas), responsable (los de todas)
 Pantalla: Ventas
 Pasos:
 1. Abre **Ventas / TPV → Ventas**. Arriba, el periodo («Hoy» por defecto, «7 días», «30 días»,
@@ -1056,8 +1056,8 @@ Pasos:
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
    Son las cifras de todo el negocio para el responsable, el propietario y el administrador, que ven las
-   ventas de todos y los totales del negocio; quien ve las cifras sin esos dos permisos ve las de sus
-   ventas, las mismas que le da la tabla.
+   ventas de todos y los totales del negocio; quien no tiene esos dos permisos, como el empleado, ve las de
+   sus ventas, las mismas que le da la tabla.
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
    5,00 €» si se devolvió una parte) y Total. Una venta cobrada con varios medios dice en «Pago»
    todos, una vez cada uno y en el orden en que se cobraron: «Efectivo + Tarjeta». Busca con
@@ -1071,8 +1071,8 @@ Pasos:
    hoy» y «Tiques hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
    hoy) y «Actividad reciente» (las ocho últimas ventas que la persona ve, la más nueva arriba, con su
    número y su cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
-   una venta, sin recargar. Quien no tiene permiso de informes solo puede poner «Actividad reciente».
-   Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el negocio o sus ventas.
+   una venta, sin recargar. Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el
+   negocio o sus ventas.
 Entra: nada de otras apps.
 Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
 la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
@@ -1096,15 +1096,14 @@ producción de quien lo vendió, sin pasar nunca de lo que a esa línea le queda
 Las ventas cobradas antes siguen como estaban: su línea cuenta para quien la vendió y las sesiones de esos
 bonos no cuentan para nadie, así que nada cuenta dos veces.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
-«No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
-no tiene permiso de informes ve la tabla, sin las cifras. El filtro de total se escribe como cualquier
+«No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». El filtro de total se escribe como cualquier
 importe del Hub («1.000,50», «1,000.50», «2 500» y «12,50 €» filtran); uno que no se puede leer lo dice
 bajo su campo con las palabras del campo de importe («Esto no es un
 importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000» en
 euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial, «La fecha
 final no puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
-Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 Estado: hecho
@@ -1546,10 +1545,10 @@ atribuyeron. Una que no ve no existe para ella (404 `sale.sale_not_found`).
 | Una venta entera: cabecera, cliente con su NIF y domicilio (en una factura), líneas, cobros, desglose de IVA y lo devuelto | ver ventas | F29 | `sale.sale.get` |
 | El negocio tal como lo nombra el papel: nombre, NIF y líneas (domicilio y cabecera del recibo); de una venta, los de su documento fiscal | ver ventas | F21, F29 | `sale.letterhead.get` |
 | La venta grabada con una clave de intento de cobro | ver ventas | F06 | `sale.sale.by_idempotency_key` |
-| Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
-| Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
-| Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
+| Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | ver ventas | F28 | `sale.sale.stats` |
+| Lo vendido hoy y los tiques de hoy | ver ventas | F28 | `sale.sale.today` |
+| Lo vendido cada uno de los últimos 7 días | ver ventas | F28 | `sale.sale.last_7_days` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | ver ventas | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
@@ -1682,7 +1681,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas | sí | sí | sí | sí | `sale.view_sale` |
+| Ver ventas y sus cifras, cuentas, ajustes del TPV, secciones y notas rápidas | sí | sí | sí | sí | `sale.view_sale` |
 | Montar la cuenta (abrir, añadir, cambiar, quitar, dividir, juntar, enviar a cocina, descuento hasta el máximo) | sí | sí | sí | sí | `sale.add_sale` |
 | Cobrar | sí | sí | sí | sí | `sale.take_payment` |
 | Vender a precio libre | sí | sí | sí | no | `sale.sell_open_price` |
@@ -1691,8 +1690,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Devolver | sí | sí | sí | no | `sale.refund_sale` |
 | Ver los medios de pago | sí | sí | sí | sí | `sale.view_paymentmethod` |
 | Crear medios de pago | sí | sí | sí | no | `sale.add_paymentmethod` |
-| Ver las ventas de todos (sin él, solo las suyas: las que cobró y las que se le atribuyeron) | sí | sí | sí | no | `sale.view_all_sales` |
-| Ver las cifras (las de todo el negocio, con las ventas de todos y los totales del negocio, `base.view_business_totals`; sin ellos, las de sus ventas) | sí | sí | sí | no | `sale.view_reports` |
+| Ver las ventas de todos (sin él, solo las suyas: las que cobró y las que se le atribuyeron) y, con los totales del negocio (`base.view_business_totals`), las cifras de todo el negocio (sin los dos, las de sus ventas) | sí | sí | sí | no | `sale.view_all_sales` |
 | Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
@@ -1702,8 +1700,8 @@ con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para
 y devolver una venta, anular una línea enviada a cocina, eliminar una cuenta con algo pedido, vender a
 precio libre y los descuentos por encima del máximo. La acción aprobada hace todo lo que hace la del
 responsable (también lo que mueven Facturación y Servicios: la rectificativa y las sesiones de bono que
-vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras, los
-ajustes y crear medios de pago no se aprueban.
+vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras de todo
+el negocio, los ajustes y crear medios de pago no se aprueban.
 
 La gestoría (`hub_accountant`) solo lee: «Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas», «Ver
 los medios de pago» y «Ver las ventas de todos». No monta cuentas, no cobra, no anula ni devuelve, nadie le aprueba

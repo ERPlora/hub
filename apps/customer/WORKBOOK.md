@@ -105,7 +105,7 @@ te los llevas a una hoja de cálculo. Toca una fila para abrir su ficha: sus dat
 publicidad, sus alergias y sus compras.
 
 #### Detalle
-Arriba, cuatro cifras: «Clientes», «Activos», «VIP» e «Ingresos» (lo gastado por las fichas vivas).
+Arriba, cuatro cifras: «Clientes», «Activos», «VIP» e «Ingresos» (lo gastado por las fichas vivas, solo a quien ve los totales del negocio).
 Debajo, la tabla: «Nombre», «Email», «Teléfono», «Etapa» y «Gastado»; buscador «Buscar nombre,
 teléfono o email…» (busca también NIF y empresa); filtros por etapa, origen, activo y gastado
 («Desde / Hasta», en la moneda del negocio); orden por cualquier columna menos «Email» y «Teléfono»; 50 por página.
@@ -860,7 +860,8 @@ Actor: todos
 Pantalla: Clientes
 Pasos:
 1. Abre **Clientes**: arriba, encima de la tabla, salen cuatro cifras: «Clientes», «Activos», «VIP» e
-   «Ingresos».
+   «Ingresos». «Ingresos» es una cifra de todo el negocio: solo sale a quien ve los totales del negocio (el
+   propietario, el administrador y el responsable). El empleado ve las otras tres.
 2. «Clientes» cuenta las fichas que siguen en la lista; «Activos», las que tienen marcada la casilla
    «Activo»; «VIP», las de la etapa «VIP», e «Ingresos» suma lo que han gastado todas ellas, en la moneda
    del negocio, agrupada desde cuatro cifras («1.234,56 €»; en inglés, «€1,234.56»).
@@ -872,7 +873,7 @@ Sale: nada; solo lectura.
 Si falla: «No se pudieron cargar las cifras» en su sitio, y la tabla sigue funcionando. Mientras
 llegan, cada cifra enseña «…». En el móvil van de dos en dos, para que la tabla se siga viendo debajo; una
 cifra nunca se parte en dos líneas: la que no cabe («1.234.567,89 €») baja con su tarjeta a una fila propia.
-Implicados: ninguno
+Implicados: BASE-F119
 
 ### CUSTOMER-F32 Apuntar alergias o la prueba de sensibilidad con su permiso
 Estado: hecho
