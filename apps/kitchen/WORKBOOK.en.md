@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:44cc60501841943a463ca76f16148b71602f984bf00328de08b2307e892b5d4e -->
+<!-- generated from WORKBOOK.md sha256:e80a81f32fbcdb19b87972f089416ebef2eae1296ddb9132df52da17ca5eac85 -->
 
 ## What it is for and who it is for
 
@@ -178,9 +178,9 @@ Search by the ticket's number or by words of its notes, and filter by action ("R
 #### Detail
 Menu **Kitchen → History**, title "Kitchen history". Table of what happened in the kitchen, latest first,
 50 per page (another size is chosen at the bottom): Action, Ticket (the number), Dish, Who (the person's
-name or, if they have none, their e-mail, or the API key's; "System" if no person did it: Kitchen by
-itself or an automation), Notes and When (date and
-time of the business). Search box "Search ticket or notes…" (a piece of the number or words of the notes);
+name or, if they have none, what goes before the @ of their e-mail, never the whole e-mail, or the API key's;
+"System" if no person did it: Kitchen by itself or an automation), Notes and When (date and time of the
+business). Search box "Search ticket or notes…" (a piece of the number or words of the notes);
 action filter with the same words as the column ("Received", "Created", "Fired", "Ready", "Dish ready",
 "Dish recalled", "Dish voided", "Served", "Recalled", "Cancelled", "Rush", "Rush removed", "Reprinted",
 "Deleted"). Empty: "No recent kitchen activity.". Loading: the skeleton. Error: the table's, with retry.
@@ -334,7 +334,9 @@ Steps:
 1. The waiter sends the round (KITCHEN-F18) or Sales sends it by itself (through the assistant or the
    API); the one Sales sends by itself reaches Kitchen a moment later, without anyone doing anything.
 2. Kitchen opens a ticket with the day's number (`YYYYMMDD-NNNN`, the business day, in its time zone), the
-   check's round, the check's label ("Table 4"), the type, the priority and the waiter.
+   check's round, the check's label ("Table 4"), the type, the priority and the waiter: their name or, if
+   their account has none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119); a
+   ticket saved before with the e-mail reads the same way.
 3. Each line that is not a service is a dish, in the order of the check, sent to its station
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.
 4. The ticket appears on the display as "To prepare", rings (KITCHEN-F16), comes out on paper
@@ -347,7 +349,7 @@ Out: the ticket "To prepare" with its dishes and "Received" in the History, at t
 If it fails: a round of services only does not open a ticket. What was sent before Kitchen existed in the
 business does not appear. The same round never opens two tickets, even if it arrives twice. No failure
 here blocks the waiter.
-Involved: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18
+Involved: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119
 
 ### KITCHEN-F06 A menu of the day on the ticket
 Status: done
@@ -704,8 +706,8 @@ Actor: employee, manager, administrator
 Screen: History
 Steps:
 1. Open **Kitchen → History**: what happened, on which ticket and with which dish, who (their name or, if
-   they have none, their e-mail; "System" if it was no person: Kitchen by itself or an automation), their
-   notes and when, latest first.
+   they have none, what goes before the @ of their e-mail, never the whole e-mail; "System" if it was no
+   person: Kitchen by itself or an automation), their notes and when, latest first.
 2. In "Search ticket or notes…", write a piece of the ticket's number or a few words of the notes; filter
    by action ("Received", "Cancelled"…).
 3. At the bottom, change page or choose how many entries to see (25, 50…).
@@ -715,7 +717,7 @@ deleted.
 Out: nothing; it only shows.
 If it fails: if it cannot be loaded, "Could not load the history" with "Retry". Whoever has no permission to
 see the history reads "You do not have permission to see this.".
-Involved: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29
+Involved: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29, BASE-F119
 
 ### KITCHEN-F26 Adjust the kitchen display
 Status: done

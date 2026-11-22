@@ -186,8 +186,9 @@ Busca por el número de la comanda o por palabras de sus notas, y filtra por acc
 #### Detalle
 Menú **Cocina → Historial**, título «Historial de cocina». Tabla de lo que pasó en cocina, lo último
 primero, 50 por página (otro tamaño se elige al pie): Acción, Comanda (el número), Plato, Quién (el
-nombre de la persona o, si no tiene, su correo, o el de la API key; «Sistema» si no lo hizo una persona:
-Cocina sola o una automatización), Notas y Cuándo (fecha y hora del negocio). Buscador «Buscar comanda o
+nombre de la persona o, si no tiene, lo que va antes de la @ de su correo, nunca el correo entero, o el de
+la API key; «Sistema» si no lo hizo una persona: Cocina sola o una automatización), Notas y Cuándo (fecha y
+hora del negocio). Buscador «Buscar comanda o
 notas…» (un trozo del número o palabras de las notas); filtro de acción con las mismas palabras de la columna («Recibida», «Creada», «Lanzada»,
 «Lista», «Plato listo», «Plato recuperado», «Plato anulado», «Servida», «Recuperada», «Cancelada»,
 «Urgente», «Urgencia quitada», «Reimpresa», «Borrada»). Vacía: «Sin actividad reciente en cocina.». Cargando: el esqueleto. Error:
@@ -341,7 +342,8 @@ Pasos:
    que envía Ventas sola llega a Cocina un momento después, sin que nadie haga nada.
 2. Cocina abre una comanda con el número del día (`AAAAMMDD-NNNN`, el día del negocio, en su
    zona horaria), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
-   camarero.
+   camarero: su nombre o, si su cuenta no tiene, lo que va antes de la @ de su correo, nunca el correo
+   entero (BASE-F119); una comanda guardada antes con el correo también se lee así.
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
    (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
    cocinan.
@@ -355,7 +357,7 @@ Sale: la comanda «Por preparar» con sus platos y «Recibida» en el Historial,
 Si falla: una ronda de solo servicios no abre comanda. Lo que se envió antes de que existiera Cocina en
 el negocio no aparece. Una misma ronda nunca abre dos comandas, aunque llegue dos veces. Ningún fallo de
 aquí bloquea al camarero.
-Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18
+Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119
 
 ### KITCHEN-F06 Un menú del día en la comanda
 Estado: hecho
@@ -710,8 +712,8 @@ Actor: empleado, responsable, administrador
 Pantalla: Historial
 Pasos:
 1. Abre **Cocina → Historial**: qué pasó, en qué comanda y con qué plato, quién (su nombre o, si no
-   tiene, su correo; «Sistema» si no fue una persona: Cocina sola o una automatización), sus notas y
-   cuándo, lo último primero.
+   tiene, lo que va antes de la @ de su correo, nunca el correo entero; «Sistema» si no fue una persona:
+   Cocina sola o una automatización), sus notas y cuándo, lo último primero.
 2. En «Buscar comanda o notas…», escribe un trozo del número de la comanda o unas palabras de las
    notas; filtra por acción («Recibida», «Cancelada»…).
 3. Al pie, pasa de página o elige cuántas entradas ver (25, 50…).
@@ -721,7 +723,7 @@ quitada, reimpresa y borrada.
 Sale: nada; solo enseña.
 Si falla: si no se puede cargar, «No se pudo cargar el historial» con «Reintentar». Quien no tiene
 permiso de ver el historial lee «No tienes permiso para ver esto.».
-Implicados: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29
+Implicados: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29, BASE-F119
 
 ### KITCHEN-F26 Ajustar la pantalla de cocina
 Estado: hecho
@@ -1026,6 +1028,13 @@ que no tiene ningún papel: solo el sistema (`*`).
   (`queries.state.effective`): F29 (plato anulado), F28 (cuenta anulada) y F27 (cerrada: la Lista desde
   antes del cierre pasa a Servida; la de papel o con la cocina en papel desde antes del cierre, a
   Servida con sus platos).
+- **Quién envió y quién hizo cada cosa** (BASE-F119): la comanda guarda el camarero como texto y el Historial el
+  usuario de quien actúa, que se nombra al leer; los dos salen de `person_label` de Ventas
+  (`apps/sale/queries/people.py`), que da el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo
+  (`without_address` de `base.queries.people`): el correo de un compañero solo llega a quien ve el contacto del
+  equipo, y la comanda en papel la lee cualquiera. Una comanda guardada antes con un correo se lee sin él en la vista
+  de la comanda (`queries/views.py`: tablero, detalle, por cuenta, avisos, vivo y asistente) y en su papel
+  (`services/paper.py`, la reimpresión), para todos: el nombre de quien la envió no es un dato de contacto.
 - **Número del día** por `DayCounter` con `select_for_update` en la transacción; una comanda por
   recibir enseña el que tendrá (el siguiente del contador por orden de envío).
 - **Desde cuándo recibe**: `KitchenSettings.receiving_since` (la hora a la que se crearon sus tablas):
