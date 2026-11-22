@@ -291,6 +291,9 @@ msgstr "motivo de la invitación"
 msgid "served by"
 msgstr "atendido por"
 
+msgid "server's name"
+msgstr "nombre de quien atiende"
+
 msgid "line total"
 msgstr "total de la línea"
 

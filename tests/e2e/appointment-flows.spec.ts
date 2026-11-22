@@ -387,10 +387,13 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await form.locator('[data-testid=series-form-submit]').click();
       await expect(form).toBeHidden();
       const outcome = view.locator('[data-testid=appointment-series-outcome]');
-      await expect(outcome).toContainText('appointments booked');
+      await expect(outcome).toContainText(/\d+ appointments? booked/);
       const series = psql(`select id from appointment_recurring where customer_id = '${who.customer.id}'`);
       const booked = () => Number(psql(`select count(*) from appointment_appointment where recurring_id = '${series}' and status <> 'cancelled' and deleted_at is null`));
       expect(booked()).toBeGreaterThan(0);
+      // The count and its noun agree: «1 appointment booked», «3 appointments booked».
+      const appointments = (count: number) => `${count} appointment${count === 1 ? '' : 's'}`;
+      await expect(outcome).toContainText(`${appointments(booked())} booked`);
       // «Ends» is a column of low priority: a tablet hides it (the «Columns» menu brings it back).
       await expect(view.locator('[data-testid=appointment-series-row]', { hasText: who.customer.name })).toBeVisible();
       expect(psql(`select max_occurrences from appointment_recurring where id = '${series}'`)).toBe('3');
@@ -409,14 +412,14 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(form.locator('ion-title')).toHaveText('Edit repeating appointment');
       await form.locator('[data-testid=series-form-from_date] input').fill(SERIES_DAY);
       await form.locator('[data-testid=series-form-time] input').fill('17:00');
-      await expect(form.locator('[data-testid=series-form-scope]')).toContainText('booked appointments');
+      await expect(form.locator('[data-testid=series-form-scope]')).toContainText(`reaches ${booked()} booked appointment${booked() === 1 ? '' : 's'}.`);
       // Only what happens; nothing is charged here, so no «0 already charged».
       await expect(form.locator('[data-testid=series-form-scope]')).not.toContainText('already charged');
       expect(await cutLabels(form), `labels cut in the series form at ${vp.label}`).toEqual([]);
       await capture(page, 'APPOINTMENT-F14');
       await form.locator('[data-testid=series-form-submit]').click();
       await expect(form).toBeHidden();
-      await expect(outcome).toContainText('appointments moved');
+      await expect(outcome).toContainText(`${appointments(before)} moved`);
       await expect(outcome).not.toContainText('0 cancelled');
       await expect
         .poll(() => psql(`select string_agg(distinct to_char(start at time zone 'Europe/Madrid', 'HH24:MI'), ',') from appointment_appointment where recurring_id = '${series}' and deleted_at is null and status <> 'cancelled'`))

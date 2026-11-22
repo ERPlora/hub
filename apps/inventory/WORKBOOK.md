@@ -145,7 +145,8 @@ producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, prec
 desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
 de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
 puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;
-vista de tabla o de tarjetas.
+vista de tabla o de tarjetas. En la tarjeta, cada dato lleva su nombre delante («SKU QA-AGUA-01», «Precio 1,50 €»,
+«Stock 46»).
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
