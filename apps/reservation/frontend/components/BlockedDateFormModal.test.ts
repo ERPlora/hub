@@ -4,17 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import { click, ionChecked, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
+import { click, type Control, ionChecked, ionValue, mountOpenForm, settle } from '../__tests__/mount-reservation';
 import { blockedRow } from '../__tests__/rows';
 import BlockedDateFormModal from './BlockedDateFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; readonly?: boolean; required?: boolean };
-
 async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountReservation(BlockedDateFormModal, { props: { open: false, day: '2026-10-15' }, locale });
-  await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
-  await settle();
+  const m = await mountOpenForm(BlockedDateFormModal, { props: { day: '2026-10-15' }, locale });
   const field = (name: string) => m.inDoc(`reservation-blocked-form-${name}`) as Control | null;
   return { ...m, field, submit: () => m.inDoc('reservation-blocked-form-submit') as Control };
 }

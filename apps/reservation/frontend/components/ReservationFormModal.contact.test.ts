@@ -4,12 +4,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { pick as pickIn } from '../../../../base/frontend/__tests__/date-time-fields';
-import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { openBookingPanel } from '../__tests__/booking-panel';
-import { click, ionValue, settle, WITHOUT_CONTACT } from '../__tests__/mount-reservation';
+import { click, ionValue, LUCIA, pickCard, settle, WITHOUT_CONTACT } from '../__tests__/mount-reservation';
 import { reservationRow } from '../__tests__/rows';
-
-const LUCIA = { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' };
 
 async function setup(props: Record<string, unknown>) {
   const card = { id: 'c1', name: 'Lucía Pérez', phone: null, email: null };
@@ -44,8 +41,7 @@ describe('ReservationFormModal: the guest’s contact details it was not given',
 
   it('the same panel, after a new booking with a card, edits one that came without them the same way', async () => {
     const s = await setup({});
-    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', LUCIA);
-    await settle();
+    await pickCard(s.wrapper, LUCIA);
     await s.wrapper.setProps({ open: false });
     await s.wrapper.setProps({ reservation: reservationRow({ status: 'confirmed', guest_phone: null, guest_email: null }), open: true });
     await settle();
@@ -55,8 +51,7 @@ describe('ReservationFormModal: the guest’s contact details it was not given',
   it('a card picked without them books with the card’s, and leaving the card asks for them again', async () => {
     const s = await setup({});
     const pick = async (card: typeof LUCIA | null) => {
-      s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', card);
-      await settle();
+      await pickCard(s.wrapper, card);
       return s.shown();
     };
     expect(s.shown()).toEqual(['guest_phone', 'guest_email']);

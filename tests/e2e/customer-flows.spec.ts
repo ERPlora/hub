@@ -58,12 +58,17 @@ async function createNamed(context: BrowserContext, kind: 'groups' | 'tags', nam
   return res.data.id;
 }
 
-// flow: CUSTOMER-F01 — a refused save is told under its field and in sight, also on a phone
-test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is told under its field at every width', async ({ page }) => {
+/** The customers' list, with «Add»'s dialog open. */
+async function openNewCard(page: Page): Promise<Locator> {
   await login(page, A, '/customer/customers');
   await customersReady(page);
   await shown(page).locator('[data-testid=customer-list-add]').click();
-  const dialog = page.locator('ion-modal[data-testid=customer-create]');
+  return page.locator('ion-modal[data-testid=customer-create]');
+}
+
+// flow: CUSTOMER-F01 — a refused save is told under its field and in sight, also on a phone
+test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is told under its field at every width', async ({ page }) => {
+  const dialog = await openNewCard(page);
   await expect(dialog.locator('[data-testid=customer-create-submit]')).toHaveJSProperty('disabled', true);
   const name = e2eName('F01 Ana');
   await inputOf(dialog, 'customer-form-name').fill(name);
@@ -81,10 +86,7 @@ test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is tol
 
 // flow: CUSTOMER-F01 — the birthday is picked in the app's calendar, never typed, and the card keeps that day
 test('CUSTOMER-F01: a birthday picked in the app’s calendar is the one the new card keeps', async ({ page }) => {
-  await login(page, A, '/customer/customers');
-  await customersReady(page);
-  await shown(page).locator('[data-testid=customer-list-add]').click();
-  const dialog = page.locator('ion-modal[data-testid=customer-create]');
+  const dialog = await openNewCard(page);
   const name = e2eName('F01 Birthday');
   await inputOf(dialog, 'customer-form-name').fill(name);
   await dialog.locator('[data-testid=customer-form-more] summary').click();

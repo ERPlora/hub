@@ -11,11 +11,9 @@ import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fiel
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { openBookingPanel } from '../__tests__/booking-panel';
-import { click, ionValue, settle } from '../__tests__/mount-reservation';
+import { click, type Control, ionValue, LUCIA, pickCard, settle } from '../__tests__/mount-reservation';
 import { freeTable, reservationRow } from '../__tests__/rows';
 import en from '../locale/en.json';
-
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean; required?: boolean };
 
 const TABLES = {
   rows: [
@@ -123,14 +121,7 @@ describe('ReservationFormModal: New reservation', () => {
 
   it('a customer picked from Customers fills the guest and books with her card', async () => {
     const s = await setup();
-    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
-      customer_id: 'c1',
-      customer_name: 'Lucía Pérez',
-      customer_tax_id: '',
-      customer_address: '',
-      customer_country: '',
-    });
-    await settle();
+    await pickCard(s.wrapper, LUCIA);
     expect([s.field('guest_name').value, s.field('guest_phone').value, s.field('guest_email').value]).toEqual([
       'Lucía Pérez',
       '+34600999888',

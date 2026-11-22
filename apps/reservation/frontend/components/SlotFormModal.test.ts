@@ -4,17 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
+import { click, type Control, ionValue, mountOpenForm, settle } from '../__tests__/mount-reservation';
 import { slotRow } from '../__tests__/rows';
 import SlotFormModal from './SlotFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; readonly?: boolean; required?: boolean };
-
 async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountReservation(SlotFormModal, { props: { open: false, weekday: 3 }, locale });
-  await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
-  await settle();
+  const m = await mountOpenForm(SlotFormModal, { props: { weekday: 3 }, locale });
   const field = (name: string) => m.inDoc(`reservation-slot-form-${name}`) as Control;
   return { ...m, field, submit: () => m.inDoc('reservation-slot-form-submit') as Control };
 }

@@ -6,17 +6,12 @@ import { describe, expect, it } from 'vitest';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
+import { click, type Control, ionValue, LUCIA, mountOpenForm, pickCard, settle } from '../__tests__/mount-reservation';
 import { entryRow } from '../__tests__/rows';
 import WaitlistFormModal from './WaitlistFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean; required?: boolean };
-
 async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountReservation(WaitlistFormModal, { props: { open: false, day: '2026-10-15' }, locale });
-  await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
-  await settle();
+  const m = await mountOpenForm(WaitlistFormModal, { props: { day: '2026-10-15' }, locale });
   const field = (name: string) => m.inDoc(`reservation-waitlist-form-${name}`) as Control;
   const submit = () => m.inDoc('reservation-waitlist-form-submit') as Control;
   return { ...m, field, submit };
@@ -63,14 +58,7 @@ describe('WaitlistFormModal', () => {
 
   it('a customer picked from Customers is the guest', async () => {
     const s = await setup();
-    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
-      customer_id: 'c1',
-      customer_name: 'Lucía Pérez',
-      customer_tax_id: '',
-      customer_address: '',
-      customer_country: '',
-    });
-    await settle();
+    await pickCard(s.wrapper, LUCIA);
     await pick(s.field('preferred_time'), '21:00');
     s.answer(201, entryRow());
     await click(s.submit());
