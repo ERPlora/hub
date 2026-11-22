@@ -1181,6 +1181,7 @@
       "sale__order__set_label": "Name a check",
       "sale__order__set_line_allergy": "Mark the customer's allergy on a line of a check",
       "sale__order__set_line_staff": "Choose who did a line of a check",
+      "sale__order__set_staff": "Choose who serves a check",
       "sale__order__split": "Split a check",
       "sale__order__split_line": "Split a line of a check",
       "sale__order__update_line": "Change a line of a check",
