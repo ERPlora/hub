@@ -328,20 +328,22 @@ def test_loading_again_duplicates_nothing_and_says_it_was_already_there(ctx):
     assert call(ctx, "table.table.list", limit=1).total == 2
 
 
-def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
-    bundle = restaurant_bundle(
-        **{
-            "inventory.product": [
-                {"name": "Croquetas", "sku": "ENT-01", "price": 850, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Entrantes"]},
-                {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []},
-            ]
-        }
-    )
+NAMELESS = {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []}
 
-    result = blueprint.loading.apply(ctx, bundle, apps=None)
 
+def loaded_products(ctx, row):
+    """The restaurant loaded with ``row`` and a product without a name: its report, and what it says of inventory and
+    of its products."""
+    result = blueprint.loading.apply(ctx, restaurant_bundle(**{"inventory.product": [row, NAMELESS]}), apps=None)
     inventory = next(app for app in result.report["apps"] if app["id"] == "inventory")
-    products = next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
+    return result, inventory, next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
+
+
+def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
+    croquetas = {"name": "Croquetas", "sku": "ENT-01", "price": 850, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Entrantes"]}
+
+    result, inventory, products = loaded_products(ctx, croquetas)
+
     assert (products["status"], products["created"], products["failed"]) == ("partial", 1, 1)
     assert products["problems"] and "BAD-01" in products["problems"][0]
     assert inventory["status"] == "partial"
@@ -372,19 +374,10 @@ def test_a_part_that_breaks_fails_alone_is_told_and_is_logged_by_the_blueprints(
 
 
 def test_a_refused_row_is_named_as_the_person_knows_it_by_its_name_and_by_its_code_only_without_one(ctx):
-    bundle = restaurant_bundle(
-        **{
-            "inventory.product": [
-                {"name": "Tarta mala", "sku": "BAD-02", "price": "abc", "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": []},
-                {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []},
-            ]
-        }
-    )
+    bad_price = {"name": "Tarta mala", "sku": "BAD-02", "price": "abc", "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": []}
 
-    result = blueprint.loading.apply(ctx, bundle, apps=None)
+    _, _, products = loaded_products(ctx, bad_price)
 
-    inventory = next(app for app in result.report["apps"] if app["id"] == "inventory")
-    products = next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
     assert products["failed"] == 2
     assert products["problems"][0].startswith("«Tarta mala»:")
     assert products["problems"][1].startswith("«BAD-01»:")
