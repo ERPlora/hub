@@ -48,7 +48,18 @@ class ComboConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry, no tabbar.
     navigation = [Nav("menus", _("Menus"), "ion:layers-outline", "/combo/menus", permission="combo.manage")]
-    help = Help(videos={"es": "lD2ucK9wKq8", "en": "O7MO-x7zeZA"})
+    help = Help(
+        videos={"es": "lD2ucK9wKq8", "en": "O7MO-x7zeZA"},
+        flow_videos={
+            "COMBO-F02": {"es": ["yzOQ3_7BavE"], "en": ["H3yU_v0zMOg"]},
+            "COMBO-F03": {"es": ["yzOQ3_7BavE"], "en": ["H3yU_v0zMOg"]},
+            "COMBO-F04": {"es": ["yzOQ3_7BavE"], "en": ["H3yU_v0zMOg"]},
+            "COMBO-F05": {"es": ["HJERGbDq7EM"], "en": ["OvK6JKkYZUY"]},
+            "COMBO-F06": {"es": ["yWBBjnHESIU", "pqsvhM41p9E"], "en": ["8L4Z85dEmDQ", "E2zAyDUhJtU"]},
+            "COMBO-F12": {"es": ["ohXQusLVaaA"], "en": ["GvBb0_DhBgw"]},
+            "COMBO-F14": {"es": ["WzjAZGjL4N4"], "en": ["Lbm-ArC_AMU"]},
+        },
+    )
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114, COMBO-F15):
