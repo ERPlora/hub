@@ -6,7 +6,7 @@
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1634 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
-1127 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
+1126 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 880 apps/attendance/queries.py ERPlora/erplora-next#74
 711 apps/attendance/services.py ERPlora/erplora-next#74
@@ -75,7 +75,7 @@
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
 612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
-1162 apps/staff/queries/__init__.py ERPlora/erplora-next#74
+1158 apps/staff/queries/__init__.py ERPlora/erplora-next#74
 1065 apps/staff/services.py ERPlora/erplora-next#74
 1299 apps/staff/tests/test_queries.py ERPlora/erplora-next#74
 1489 apps/staff/tests/test_services.py ERPlora/erplora-next#74

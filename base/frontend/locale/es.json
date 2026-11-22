@@ -513,7 +513,6 @@
         },
         "loading": "Cargando los eventos caídos…",
         "errorBody": "No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.",
-        "denied": "Solo el dueño o un administrador puede ver los eventos caídos.",
         "retried": "Evento reenviado.",
         "retriedAll": "Eventos reenviados: {count}.",
         "nothingToRetry": "No había nada que reenviar.",
@@ -557,7 +556,6 @@
       },
       "usage": {
         "loading": "Consultando el sistema…",
-        "denied": "Solo el dueño o un administrador puede ver cuánto está usando el hub.",
         "plan": "Plan {name}",
         "planNames": {
           "free": "Gratis",

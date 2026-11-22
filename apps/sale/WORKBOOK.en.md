@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5bf75d1b4280c1baf6afad3bba22c64d9e40c6cda3e61156e859d874a6ca0e92 -->
+<!-- generated from WORKBOOK.md sha256:5d6bff888c6f0647b596b98ed8a8c63892fbe1382e4d7410a3ce708717d14372 -->
 
 ## What it is for and who it is for
 
@@ -1078,9 +1078,10 @@ Steps:
    without reloading. The panels count by the same rule as the screen's figures: the whole business or
    their own sales.
 In: nothing from other apps.
-Out: nothing saved. What each professional sold in the period (Staff and the assistant ask for it for the
-commission) counts by the same rule: whoever does not see the whole business gets only the lines of their
-own sales and, of the voucher sessions spent outside the till, those of their record. It already takes off
+Out: nothing saved. What each professional sold in the period (the assistant asks for it for the commission)
+counts by the same rule: whoever does not see the whole business gets only the lines of their own sales and, of
+the voucher sessions spent outside the till, those of their record. Staff asks for it as the platform, so that each
+professional's row counts everything they did, and Staff says which rows each person sees (STAFF-F21). It already takes off
 what was refunded: what goes back, to whoever sold it; the money that goes
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
