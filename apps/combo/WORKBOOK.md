@@ -853,10 +853,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`inventory.product.list`, activos), de categoría fiscal con `Combo` (`tax.category.list`).
 - Reordenar: `ion-reorder-group` (asa) y los botones subir/bajar, que acaban en la misma operación
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
-- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+- **Millares**: los importes agrupan los millares también con cuatro cifras (`1.234,56 €`; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#654).
 - Los importes se escriben en el `MoneyInput` de `@erplora/ui/components` (el suplemento, con `signed` y su botón
-  ±) y se leen con su `parseMoney` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
+  ±) y se leen con su `parseMoney` (coma o punto, el `1.250` ambiguo se pregunta, el suplemento admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
   `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es
   ruido al leer, el de otra moneda no. Mientras el negocio no contesta, un importe es «—» (nunca un
   euro ni decimales supuestos), el campo dice solo «Precio cerrado» o «Suplemento» y salir de él no lo reformatea. Si contesta (o
@@ -867,10 +867,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   final de `MenuFormModal.vue` (tras guardar el menú, `combo.combo.set_image` o `combo.combo.upload_image`; un
   fallo se queda en la ventana con «Reintentar», que solo manda la foto, y «Guardar» apagado), la columna `photo`
   (`ItemImage` de 40 px) en `MenusPage.vue` y la baldosa del TPV en `apps/sale/frontend/components/pos/ComboTiles.vue`.
-  Tests: `frontend/components/MenuFormModal.test.ts` («MenuFormModal: photo»), `frontend/pages/MenusPage.test.ts`,
+  Tests: `frontend/components/MenuFormModal.test.ts` (`MenuFormModal: photo`), `frontend/pages/MenusPage.test.ts`,
   `apps/sale/frontend/components/pos/ComboTiles.test.ts` y en Chrome `tests/e2e/combo-photo.spec.ts`. Las cuatro
   imágenes `menu_*` de la librería son hoy el mismo archivo (una bandeja de desayuno) y su manifiesto las titula
-  así: buscar «menú del día» no las encuentra.
+  así: buscar `menú del día` no las encuentra.
 - Iconos registrados en la shell; `restaurant-outline` y `arrow-up-outline` esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
   `ion-reorder` con su icono propio.
 
