@@ -70,12 +70,11 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
     ),
     ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
-        "The tenders charged, voided and refunded while a register session was open, whoever charged them: what the "
-        "drawer took, which its expected cash adds up; the session itself is read through SESSIONS.",
+        "The tenders of the sales charged and voided while a register session was open: the session's takings.",
     ),
     ("apps/cash_register/queries/unassigned.py", "unassigned_totals"): (
-        NO_ROW_READ,
-        "How many sale tenders and comps of a time window no register session copied, and their cash: counted in SQL.",
+        PART_OF_THE_WORK,
+        "How many sale tenders and comps of a time window no register session copied, counted for the drawer.",
     ),
     ("apps/cash_register/queries/unassigned.py", "unassigned_window"): (
         PART_OF_THE_WORK,
