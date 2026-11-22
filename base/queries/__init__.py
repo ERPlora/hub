@@ -2,6 +2,7 @@
 
 from . import (
     access as access,
+    access_rights as access_rights,
     api_keys as api_keys,
     app_help as app_help,
     approvals as approvals,
