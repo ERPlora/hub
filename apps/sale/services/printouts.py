@@ -20,7 +20,7 @@ from apps.sale.queries.letterhead import business_letterhead
 from apps.sale.queries.orders import find_order
 from apps.sale.queries.people import cashier_name
 from apps.sale.queries.receipt_codes import receipt_url
-from apps.sale.queries.sales import find_sale, sale_detail
+from apps.sale.queries.sales import sale_detail, visible_sale
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.checkout import PreviewIn
 from apps.sale.schemas.orders import OrderRefIn
@@ -156,7 +156,7 @@ def _note_bill_requested(ctx: OperationContext, order: Order) -> None:
     ),
 )
 def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
-    sale = find_sale(data.sale_id, data.sale)
+    sale = visible_sale(ctx, data.sale_id, data.sale)
     with translation.override(ctx.language):
         detail = SaleOut.model_validate(sale_detail(sale))
     return _print_sale(ctx, detail, duplicate=data.duplicate, key=f"sale-{sale.id}-print-{uuid.uuid7()}")

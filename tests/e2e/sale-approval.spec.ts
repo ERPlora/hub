@@ -27,7 +27,7 @@ import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -82,14 +82,13 @@ test.beforeAll(async ({ browser }) => {
   ownerName = await usernameOf(context);
   await drawerOff(context);
   article = await createProduct(context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
-  toVoid = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
-  toRefund = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
-  toKeep = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   // The cashier enters while nobody of the business has a PIN: the way in is erplora.com's, as every spec's.
-  const till = await browser.newContext({ baseURL: A });
-  cashier = { context: till, page: await till.newPage() };
-  await login(cashier.page, A, '/sale/sales', EMPLOYEE);
+  cashier = await cashiersTill(browser);
+  const till = cashier.context;
   cashierName = await usernameOf(till);
+  toVoid = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
+  toRefund = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
+  toKeep = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   // Only now the owner chooses a PIN («My profile»): who may approve, on the cashier's device.
   const pin = await api<{ set: boolean }>(context, A, 'POST', '/me/pin', { pin: OWNER_PIN });
   expect(pin.status, JSON.stringify(pin.data)).toBe(200);
@@ -155,21 +154,22 @@ async function askToVoid(page: Page, sale: SaleOut, reason: string) {
   return { modal, dialog: approval(page) };
 }
 
-/** Lucía's sale: a haircut paid with a session of her voucher and the shampoo by card, charged with its ticket. */
-async function paidWithAVoucher(context: BrowserContext): Promise<SaleOut> {
+/** Lucía's sale: a haircut paid with a session of her voucher and the shampoo by card, charged with its ticket at
+ *  `till` (the voucher and the catalogue set up by `context`). */
+async function paidWithAVoucher(context: BrowserContext, till: BrowserContext): Promise<SaleOut> {
   await ensureIssuer(context);
   const haircut = await post<{ id: string }>(context, '/service/services', { name: named('Corte aprobado'), price: 2500, tax_category_key: 'service.generic' });
   const lucia = await createCard(context, { name: e2eName('Lucía') });
   const voucher = await post<{ id: string }>(context, '/service/packages', { name: named('Bono aprobado'), max_uses: 2, items: [{ service_id: haircut.id }] });
   const grant = await post<{ id: string }>(context, '/service/grants', { package_id: voucher.id, customer_id: lucia.id, amount: 9000 });
-  const opened = await post<{ id: string; lines: { id: string; service_id: string | null }[] }>(context, '/sale/orders', {
+  const opened = await post<{ id: string; lines: { id: string; service_id: string | null }[] }>(till, '/sale/orders', {
     lines: [{ product: SKU }],
     service_lines: [{ service_id: haircut.id }],
   });
   const cut = opened.lines.find((line) => line.service_id === haircut.id);
   expect(cut, 'the haircut on the check').toBeDefined();
-  await post(context, '/sale/orders/apply_voucher', { order_id: opened.id, line_id: cut?.id, grant_id: grant.id }, 200);
-  return chargeByApi(context, { order_id: opened.id, customer_id: lucia.id, payments: [{ method: 'card' }] });
+  await post(till, '/sale/orders/apply_voucher', { order_id: opened.id, line_id: cut?.id, grant_id: grant.id }, 200);
+  return chargeByApi(till, { order_id: opened.id, customer_id: lucia.id, payments: [{ method: 'card' }] });
 }
 
 /** The status of the voucher session that paid a line of `sale`, in Services. */
@@ -250,7 +250,7 @@ test('SALE-F30: «Cancel» on the approval leaves its refusal inside the window,
 });
 
 test('SALE-F30, SALE-F32: an approved void of a sale paid with a voucher gives the session back and issues its rectifying invoice', async () => {
-  const sale = await paidWithAVoucher(owner.context);
+  const sale = await paidWithAVoucher(owner.context, cashier.context);
   expect(sessionOf(sale)).toBe('consumed');
   const { page } = cashier;
   const { modal, dialog } = await askToVoid(page, sale, 'e2e wrong customer');

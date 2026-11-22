@@ -19,6 +19,7 @@ from . import (
     order_lines as order_lines,
     orders as orders,
     other_apps as other_apps,
+    ownership as ownership,
     payment_methods as payment_methods,
     people as people,
     receipt_codes as receipt_codes,

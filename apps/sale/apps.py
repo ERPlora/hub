@@ -56,6 +56,7 @@ class SaleConfig(LiveAppConfig):
         "sale.refund_sale",
         "sale.view_paymentmethod",
         "sale.add_paymentmethod",
+        "sale.view_all_sales",
         "sale.view_reports",
         "sale.manage_settings",
     ]
