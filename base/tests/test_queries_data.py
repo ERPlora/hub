@@ -121,6 +121,13 @@ def test_an_empty_business_is_told_so_until_something_is_loaded(owner):
     assert call(owner, "base.blueprint.list").empty is False
 
 
+def test_a_business_with_only_customers_is_still_offered_a_template(owner):
+    """A template never brings customers, so having some says nothing about what one would load."""
+    call(owner, "customer.customer.create", name="Lucía Pérez")
+
+    assert call(owner, "base.blueprint.list").empty is True
+
+
 def test_a_business_born_with_every_app_off_is_empty_for_the_homes_card(born):
     """Nothing on, nothing to count: the Home offers a template to a business just born."""
     listed = call(born, "base.blueprint.list")
