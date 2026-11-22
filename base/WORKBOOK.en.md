@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f75fd4bf26df1a57c396c64efada87abc989f5546aab865dc6dfe8080b11e20f -->
+<!-- generated from WORKBOOK.md sha256:c5bf1c704ba55e5ba24472a895d6073fc547534c883ad3ce4207329d9d94cd4f -->
 
 ## What it is for and who it is for
 
@@ -24,7 +24,9 @@ Who uses it:
 
 - The **owner** and the **administrator** see everything and are the ones who can complete the
   platform's steps ("Your apps", "Turn on …" for each app mandatory in their country, "Your team"), and in the bell
-  they see the notices between apps that were not delivered.
+  they see the notices between apps that were not delivered. Only the **owner** buys for the business (upgrading the
+  plan or subscribing to a paid app on erplora.com), resets the business and downloads the copies of its data, as on
+  erplora.com, where the plan, the billing and the ownership are theirs alone.
 - The **manager** and the **employee** see their apps, the steps that are theirs, the panels they may
   see and the activity. A step that only an administrator can complete is shown to them too, so they know
   why invoicing is not possible, but without a button.
@@ -100,15 +102,16 @@ On the left (on a phone, from the bar's button): the person at the top and the p
 "Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever may open its screen:
 "System", to whoever runs the business; "API", while the API documentation is shown (BASE-F91), and it appears or goes
 when the switch changes, without reloading. An employee sees "Home", "Employees", "Files", "Apps" and "Settings". At
-the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
+the bottom, the QR code, "Upgrade plan" (the owner only) and "Manage on erplora.com".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
-erplora.com, in a new tab and already signed in with their account, without typing the password again. Only in the
-browser: the installed app does not have it.
+erplora.com, in a new tab and already signed in with their account, without typing the password again. Only the
+owner sees it, the only one who changes the plan on erplora.com, and only in the browser: the installed app does not
+have it.
 
 ### "Manage on erplora.com"
-At the foot of the side menu, right below "Upgrade plan", with the external link icon; with the menu folded to its
+At the foot of the side menu, right below "Upgrade plan" (if there is one), with the external link icon; with the menu folded to its
 icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
 erplora.com's panel, already signed in with their account: in a new tab in the browser and, in the installed app, in
 the device's browser. Only the owner,
@@ -143,7 +146,7 @@ when it applies, the notice of the plan's limit or the one saying why an app was
 
 ### The screen of an app that does not open
 In the same address as the app's screen, the reason: "Subscription needed" or "This app is not available in
-this business", with "Go to Apps" (and "Upgrade plan" for whoever runs the business, in the
+this business", with "Go to Apps" (and "Upgrade plan" for the owner, in the
 browser).
 
 ### No access
@@ -176,7 +179,7 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
 
 ### System · Usage and plan
 From "System" in the side menu. Four tabs at the bottom: "Usage and plan", "Updates", "Failed events" and "Logs" (this
-one, only for whoever runs the business); "Usage and plan" opens: their plan with "Upgrade plan", a line that says whether
+one, only for whoever runs the business); "Usage and plan" opens: their plan with "Upgrade plan" (for the owner), a line that says whether
 it is enough or they have to upgrade and why, "What your plan includes", from the fullest down, with its bar, and "For
 your information", with the figures no plan limits.
 
@@ -295,7 +298,7 @@ In the assistant's panel:
 | Loading | Three dots that move in the assistant's bubble until the first text arrives ("The assistant is writing" for the screen reader), and "Transcribing…" while what was dictated is turned into text. |
 | Empty | The sparkles, "Ask me about your sales, your stock or anything about your business." (opened from the setup, "Review your business's setup. Choose an option or write your question.") and the shortcuts. An answer that ends without saying anything: "(no answer)". |
 | Error | In the bubble, with its way out: "The assistant could not be reached. Check the connection and try again.", "The assistant is not available right now. Try again in a few minutes." or "The answer was cut off.", with "Try again"; "This conversation is too long: start a new one." with "New conversation"; "Your session has ended. Sign in again to keep talking." with "Sign in again". Without Internet, in the foot, "No connection: you can write, and send when it is back.". |
-| No permission | What the person cannot do with their buttons, the assistant cannot either: it is not offered and, if it tries, the receipt reads "Not done, not allowed: …". With the month's messages spent, whoever does not run the business sees "Ask whoever runs the business to upgrade the plan." instead of "Upgrade plan". |
+| No permission | What the person cannot do with their buttons, the assistant cannot either: it is not offered and, if it tries, the receipt reads "Not done, not allowed: …". With the month's messages spent, whoever is not the owner sees "Ask the business's owner to upgrade the plan." instead of "Upgrade plan". |
 
 On the Settings · Data and backups screen:
 
@@ -304,7 +307,7 @@ On the Settings · Data and backups screen:
 | Loading | "Loading templates…"; in "Export" and "Reset", the rows in grey. |
 | Empty | "There are no templates for your business yet.", "No template matches your search.", "This business has no app on to export." and "There is nothing to reset: no section has data.". |
 | Error | "The templates could not be loaded right now. You can still import a file." with "Retry"; "The apps of this business could not be loaded." and "What each section has could not be worked out.", with "Retry". |
-| No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. |
+| No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. An administrator, in "Reset", undoes imports and, instead of "Reset the business" and "Copies of the data", reads "Only the business's owner can reset it or download the copies of its data.". |
 
 On the Files screen:
 
@@ -699,18 +702,19 @@ Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
 Steps:
-  1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Any profile
-     sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
-     menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
-     browser: the installed app does not have it.
+  1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Only the owner
+     sees it: on erplora.com only the owner changes the plan and pays. With the menu folded to its icons
+     (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the browser: the installed app
+     does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
      account: they do not type the password again even if that browser did not have the erplora.com session open. The
      same from any other "Upgrade plan" of the Hub: System, Employees, Apps, the assistant's panel and the WhatsApp Inbox.
-  3. The owner, the administrator or the manager who came in with their account also has, right below
-     "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
+  3. The owner, the administrator or the manager who came in with their account also has, at the foot of the menu
+     (right below "Upgrade plan", if they have it), "Manage on erplora.com", with the external link icon (on the folded
+     menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
   4. They tap it: this business opens on erplora.com's panel, already signed in with their account, in a new tab; in
      the installed app, in the device's browser. The Hub stays where it was.
@@ -723,7 +727,8 @@ pass does not come (the server gives an error or does not answer in 8 seconds), 
 asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
 that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
 account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
-a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
+a PIN or with the badge and the Google Play app do not have "Manage on erplora.com". Whoever is not the owner has no
+"Upgrade plan" anywhere in the Hub, nor erplora.com's Store: the administrator, the manager and the employee do not buy.
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -853,8 +858,8 @@ Steps:
 In: the chosen app, the ones it needs and what the business has subscribed to on erplora.com.
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
-reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for whoever runs
-the business in the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
+reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in
+the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
 (BASE-F20). Neither does an app this business cannot use: it shows "Not available" and, for whoever runs the
 business, the reason below it ("VeriFactu is only for businesses in Spain.", VERIFACTU-F01). Any other failure shows
 in a notice with the app's name and the reason, which stays until it is closed.
@@ -887,12 +892,12 @@ Screen: Apps
 Steps:
   1. A paid app the business has not subscribed to shows in "Add apps" and in "Paid" with "Needs a
      subscription", and is neither in "My apps" nor in the menu.
-  2. Whoever runs the business, in the browser, sees "Upgrade plan" next to it, which opens this
-     business's Store on erplora.com in a new tab: there they see the price and subscribe.
+  2. The owner, in the browser, sees "Upgrade plan" next to it, which opens this business's Store on
+     erplora.com in a new tab: there they see the price and subscribe.
   3. As soon as erplora.com tells the hub, the app becomes "Active" and shows in "My apps" and in the menu,
      without reloading.
-  4. Whoever does not run the business, and anyone in the installed app, sees "Subscribed to on erplora.com,
-     from your ERPlora account." and no button: the hub never sells.
+  4. Whoever is not the owner, and anyone in the installed app, sees "Subscribed to on erplora.com,
+     from your ERPlora account." and no button: the hub never sells, and on erplora.com only the owner buys.
 In: what the business has subscribed to, as erplora.com passes it to the hub.
 Out: nothing saved or charged in the hub.
 If it fails: until erplora.com tells the hub, the app keeps "Needs a subscription"; a screen of it that is
@@ -1046,7 +1051,7 @@ Steps:
      not subscribed to.
   2. On opening any of its screens they see "Subscription needed": the app's name and "is disabled because this
      business does not have its subscription. Your data is safe and comes back as soon as it is subscribed
-     to.", with "Go to Apps" and, for whoever runs the business in the browser, "Upgrade plan".
+     to.", with "Go to Apps" and, for the owner in the browser, "Upgrade plan".
   3. The app leaves the menu and "My apps", and the hub does nothing asked of that app, whether it comes from
      this screen, from another device, from the assistant or from an integration.
   4. If it is subscribed to with the screen open, it changes to the app's name with "is ready" — "It can be
@@ -1220,8 +1225,10 @@ In: the name, the language, what it is for and what is ticked.
 Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows; never people,
 PINs nor fiscal data. Nothing is kept in the business.
 If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
-exported. Who does not administer the business reads "Only an administrator can export the business.".
-Involved: BASE-F112 (inside the app)
+exported. Who does not administer the business reads "Only an administrator can export the business.". The
+administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset
+(BASE-F37).
+Involved: BASE-F112 (inside the app), BASE-F37
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
 Status: done
@@ -1244,7 +1251,7 @@ Involved: none
 
 ### BASE-F37 Reset the business by sections
 Status: done
-Actor: owner, administrator
+Actor: owner
 Screen: Settings · Data and backups › Reset
 Steps:
   1. In "Reset", "Reset the business": "Removes for good the data you mark. It cannot be undone: if in
@@ -1271,7 +1278,10 @@ name does not match.". If the copy cannot be made, nothing is emptied: "Nothing 
 data could not be made, so nothing was emptied." and "Try again", with the same sections. If emptying is what fails,
 the copy is kept: "The sections could not be emptied, so nothing was removed. The copy of the data from before is
 kept.". Who does not administer the business reads "Only an administrator can undo imports or reset the business.".
-Involved: none
+An administrator undoes imports (BASE-F34), but instead of "Reset the business" and "Copies of the data" reads "Only the
+business's owner can reset it or download the copies of its data.": resetting, seeing the copies and downloading them
+is the owner's alone, also through the API and from the assistant, which answer that they are not allowed.
+Involved: BASE-F34, BASE-F35
 
 ### BASE-F38 See the Home up to date after importing a template
 Status: done
@@ -1336,8 +1346,9 @@ Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
   1. They open "System": "Usage and plan" opens. While it loads: "Reading the system…". At the top, their plan ("Starter
-     plan") and "Upgrade plan", which opens this business's plan page on erplora.com (BASE-F11); in the installed app, or
-     where that link does not appear, with no button, "Plans are managed from your ERPlora account, on erplora.com.".
+     plan") and, for the owner, "Upgrade plan", which opens this business's plan page on erplora.com (BASE-F11); to the
+     administrator, in the installed app or where that link does not appear, with no button, "Plans are managed from your
+     ERPlora account, on erplora.com.".
   2. Below, a line tells them whether to upgrade. In green, "Your plan is enough". In amber, "You should upgrade: {motive}",
      with the files or the month's messages from 80 %: "you are almost out of space for files", "the assistant's messages
      are almost spent this month" or "WhatsApp messages are almost spent this month". In red, "You have to upgrade:
@@ -2111,7 +2122,7 @@ Steps:
   1. In **Employees › Staff**, above the table, how many of the plan's places are taken: "{used} of {limit} places
      taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people".
   2. With every place taken, "Every place of your plan is taken" shows with "Remove on erplora.com someone who no
-     longer works here, or move to a plan with more places."; on the web, with "Upgrade plan".
+     longer works here, or move to a plan with more places."; on the web, and for the owner, with "Upgrade plan".
   3. To invite somebody else, "Invite on erplora.com" leads to "Members" of the business, where the limit applies
      (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the people of the business and its plan's places, as erplora.com sends them.
@@ -2746,12 +2757,12 @@ Steps:
      renew on November 1.", and not a connection failure. The foot says the same, without repeating "Upgrade plan":
      "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
      with the month already spent.
-  5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
-     another tab, already signed in with their account (BASE-F11); in the app installed from the store it does not
-     show. Whoever does not run it sees "Ask whoever runs the business to upgrade the plan.". There are no message packs:
-     it is extended by upgrading the plan.
+  5. The owner sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in another tab,
+     already signed in with their account (BASE-F11); in the app installed from the store it does not show. Whoever is
+     not the owner sees "Ask the business's owner to upgrade the plan.". There are no message packs: it is extended by
+     upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
-     plan" for whoever runs the business; the panel opens anyway.
+     plan" for the owner; the panel opens anyway.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when

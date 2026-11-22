@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// This hub's plan page on erplora.com (`hub-home`, embedded by `base/spa.py`), shown for every profile because the
-// owner often comes in through the till's session; erplora.com decides what each profile may do there. Its click goes
-// with the pass so the person arrives signed in, and the link keeps the plain address for when the browser blocks the
-// new tab. It sells, so it shows only on the web (`useSurface`).
+// This hub's plan page on erplora.com (`hub-home`, embedded by `base/spa.py`), for the owner alone and only on the web
+// (`usePlanLink`): on erplora.com only the owner buys. Its click goes with the pass so the person arrives signed in, and
+// the link keeps the plain address for when the browser blocks the new tab.
 import { HubIcon } from '@erplora/ui/shell';
 
 import { usePlanLink } from '../lib/plan-link';

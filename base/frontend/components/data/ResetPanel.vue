@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Only for whoever administers the hub. Undoing an import is confirmed without typing, because it can be imported
-// again. Resetting the business asks for its name; the worker copies the business's data first and only then empties
-// the chosen sections, and `base.hub.dumps` tells each step live. While one reset runs, no second one is offered.
+// Undoing an import is for whoever administers the hub, confirmed without typing, because it can be imported again.
+// Resetting the business and its copies are its owner's alone (BASE-F37): it asks for the business's name; the worker
+// copies the business's data first and only then empties the chosen sections, and `base.hub.dumps` tells each step
+// live. While one reset runs, no second one is offered.
 import { ConfirmDialog, EmptyState, type FormModalError, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -21,9 +22,10 @@ const session = useSession();
 const route = useRoute();
 const router = useRouter();
 const admin = session.can('base.administer_hub');
+const owner = session.can('base.own_business');
 const client = useLiveClient();
 const imports = admin ? useLive('base.import.list', {}) : undefined;
-const copies = admin ? useLive('base.hub.dumps', {}) : undefined;
+const copies = owner ? useLive('base.hub.dumps', {}) : undefined;
 const copiesFailed = computed(() => copies?.status.value === 'error' && copies.data.value === undefined);
 
 const undoable = computed(() => (imports?.data.value?.imports ?? []).filter((row) => row.undoable));
@@ -69,7 +71,7 @@ async function undo(): Promise<void> {
     undone.value = removalLines(answer.apps);
     undoOpen.value = false;
     // What each section has changed.
-    void readPlan();
+    if (owner) void readPlan();
   } catch (error) {
     undoError.value = asError(error);
   } finally {
@@ -119,7 +121,7 @@ async function readPlan(): Promise<void> {
 }
 
 onMounted(() => {
-  if (admin) void readPlan();
+  if (owner) void readPlan();
 });
 
 function tick(section: string, on: boolean): void {
@@ -169,17 +171,7 @@ function exportFirst(): void {
 </script>
 
 <template>
-  <EmptyState
-    v-if="!admin"
-    icon="ion:file-tray-outline"
-    :message="t('base.data.reset.adminOnly')"
-    data-testid="reset-admin-only"
-  />
-
-  <div
-    v-else
-    class="data-stack"
-  >
+  <div class="data-stack">
     <section
       v-if="undoable.length || undone.length"
       class="data-card"
@@ -245,7 +237,16 @@ function exportFirst(): void {
       </InlineFeedback>
     </section>
 
-    <section class="data-card">
+    <EmptyState
+      v-if="!owner"
+      icon="ion:file-tray-outline"
+      :message="t(admin ? 'base.data.reset.ownerOnly' : 'base.data.reset.adminOnly')"
+      :data-testid="admin ? 'reset-owner-only' : 'reset-admin-only'"
+    />
+    <section
+      v-else
+      class="data-card"
+    >
       <div class="data-head">
         <div>
           <h3 class="data-title">
@@ -422,6 +423,7 @@ function exportFirst(): void {
     </section>
 
     <DumpsCard
+      v-if="owner"
       :dumps="copies?.data.value"
       :failed="copiesFailed"
       @retry="copies?.refresh()"

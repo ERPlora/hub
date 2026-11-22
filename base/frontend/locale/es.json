@@ -97,7 +97,8 @@
     },
     "plan": {
       "upgrade": "Mejorar plan",
-      "manage": "Gestionar en erplora.com"
+      "manage": "Gestionar en erplora.com",
+      "askOwner": "Pídele al propietario del negocio que mejore el plan."
     },
     "userMenu": {
       "account": "Mi cuenta",
@@ -386,6 +387,7 @@
       },
       "reset": {
         "adminOnly": "Solo un administrador puede deshacer importaciones o restablecer el negocio.",
+        "ownerOnly": "Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.",
         "undoTitle": "Deshacer una importación",
         "undoHint": "Quita solo lo que trajo esa importación. Lo que hayas creado después se conserva.",
         "undo": "Deshacer",
