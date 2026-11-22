@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ebb885196720dbd35c0d741b92d6e76ef982961ce6d9563908f448b292c009b0 -->
+<!-- generated from WORKBOOK.md sha256:5ac8527f52a0a9cb1cb1156278bc2852424f821b72bca0d71a0314bb47f6030a -->
 
 ## What it is for and who it is for
 
@@ -3287,8 +3287,10 @@ Steps:
      screen · <tab>", marked "You are here", with the summary of what the tab the person is on shows: short and whole,
      with no "See more".
   5. "How to" brings each finished task of the module, grouped by tab, those of the tab the person is on first. Each
-     task is a folded row that opens with its steps and its "If something goes wrong", one at a time. With more than
-     eight tasks, "Search tasks…" appears on top, filtering by the title and the steps regardless of accents and
+     task is a folded row that opens with its steps and its "If something goes wrong", one at a time. A task with a
+     short video shows it when it opens, before its steps, in the same player as the module's and in the person's
+     language or, if there is none, in Spanish; with several, one below the other. Opening the help or a task asks
+     nothing of YouTube until the video is tapped. With more than eight tasks, "Search tasks…" appears on top, filtering by the title and the steps regardless of accents and
      capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
   6. "Other screens of this module" brings the other tabs, folded, each with its short summary. A link of the help to a
      screen of the Hub goes there and closes the help.
@@ -3300,8 +3302,9 @@ Out: nothing: the help is only read. It is the part of the module's user manual 
 language.
 If it fails: while it is read, the window shows its skeleton; if it cannot be read, it says "Could not load the help."
 and "Retry" asks for it again. The help already read stays stored until the page is reloaded: offline it opens again,
-also from another tab of the module, and the video says "Offline: the video is not available". If the manual is not
-translated into the person's language, or its translation fell behind, the help comes in Spanish.
+also from another tab of the module, and each video says "Offline: the video is not available", with the text in
+view. If the manual is not translated into the person's language, or its translation fell behind, the help comes in
+Spanish.
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora

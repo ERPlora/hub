@@ -3296,8 +3296,10 @@ Pasos:
      pantalla · <pestaña>», marcado «Estás aquí», con el resumen de lo que enseña la pestaña en la que se está: corto
      y entero, sin «Ver más».
   5. «Cómo se hace» trae cada tarea terminada del módulo, agrupada por pestaña, primero las de la pestaña en la que se
-     está. Cada tarea es una fila plegada que se abre con sus pasos y su «Si algo falla», una a la vez. Con más de
-     ocho tareas, arriba sale «Buscar tareas…», que filtra por el título y los pasos sin mirar acentos ni mayúsculas;
+     está. Cada tarea es una fila plegada que se abre con sus pasos y su «Si algo falla», una a la vez. Una tarea con
+     vídeo corto lo enseña al abrirse, antes de sus pasos, con el mismo reproductor que el del módulo y en el idioma de
+     la persona o, si no lo hay, en español; con varios, uno debajo de otro. Abrir la ayuda o una tarea no pide nada a
+     YouTube hasta que se pulsa el vídeo. Con más de ocho tareas, arriba sale «Buscar tareas…», que filtra por el título y los pasos sin mirar acentos ni mayúsculas;
      si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas.
   6. «Otras pantallas del módulo» trae las demás pestañas, plegadas, cada una con su resumen corto. Un enlace de la
      ayuda a una pantalla del Hub lleva a ella y cierra la ayuda.
@@ -3309,9 +3311,9 @@ Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo que 
 persona.
 Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, dice «No se ha podido cargar la
 ayuda.» y «Reintentar» la vuelve a pedir. La ayuda ya leída se queda guardada hasta que se recarga la página: sin
-conexión se vuelve a abrir, también desde otra pestaña del módulo, y el vídeo dice «Sin conexión: el vídeo no está
-disponible». Si el manual no está traducido al idioma de la persona, o su traducción se quedó atrás, la ayuda sale en
-español.
+conexión se vuelve a abrir, también desde otra pestaña del módulo, y cada vídeo dice «Sin conexión: el vídeo no está
+disponible», con el texto a la vista. Si el manual no está traducido al idioma de la persona, o su traducción se
+quedó atrás, la ayuda sale en español.
 Implicados: BASE-F92, BASE-F93
 
 ### BASE-F116 Leer las novedades de ERPlora
