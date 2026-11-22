@@ -301,7 +301,7 @@
       "monthDay": "Day of the month",
       "monthDayHint": "A month without that day is skipped.",
       "time": "Time",
-      "at": "Date and time",
+      "at": "Date",
       "weekdays": [
         "Monday",
         "Tuesday",

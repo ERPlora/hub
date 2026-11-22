@@ -98,6 +98,8 @@ describe('TriggerCard', () => {
 
   it('once at a date and time, picked in the app’s calendar and sent with its offset', async () => {
     const s = await setup({ kind: 'at', at: '' });
+    const label = (testid: string) => (s.find(testid).element as HTMLElement & { label?: string }).label;
+    expect([label('flow-trigger-at-date'), label('flow-trigger-at-time')]).toEqual(['Date', 'Time']);
     await pick(s.find('flow-trigger-at-date').element, '2026-11-01');
     expect(s.emitted().at(-1), 'a day alone is no instant yet').toEqual({ kind: 'at', at: '' });
     await pick(s.find('flow-trigger-at-time').element, '09:00');

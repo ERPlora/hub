@@ -138,6 +138,7 @@ const canDismiss = useUnsavedFormOnOpen(
       </p>
       <DateTimeField
         v-model="clockIn"
+        class="attendance-correct__when"
         testid="attendance-correct-clock_in"
         :label="$t('attendance.correct.clockIn')"
         name="clock_in_at"
@@ -145,6 +146,7 @@ const canDismiss = useUnsavedFormOnOpen(
       />
       <DateTimeField
         v-model="clockOut"
+        class="attendance-correct__when"
         testid="attendance-correct-clock_out"
         :label="$t('attendance.correct.clockOut')"
         name="clock_out_at"
@@ -175,7 +177,7 @@ const canDismiss = useUnsavedFormOnOpen(
   margin: 0 0 16px;
   font-weight: 600;
 }
-ion-input,
+.attendance-correct__when,
 ion-textarea {
   margin-bottom: 14px;
 }
