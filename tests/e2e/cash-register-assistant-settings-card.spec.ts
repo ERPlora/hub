@@ -17,6 +17,8 @@ interface Settings {
   require_closing_balance: boolean;
 }
 
+const OFF: Settings = { require_opening_balance: false, require_closing_balance: false };
+
 const EXPECTED = {
   es: {
     line: 'Cambiar en Caja: Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí',
@@ -34,31 +36,38 @@ for (const language of ['es', 'en'] as const) {
     await openPanelAtTheDesk(page);
     const before = await api<Settings>(context, A, 'GET', '/cash_register/settings');
     expect(before.status).toBe(200);
+    try {
+      // Both off before asking (the count to close is on by default): a cancelled card that ran anyway would show.
+      const off = await api<Settings>(context, A, 'POST', '/cash_register/settings', OFF);
+      expect(off.status, JSON.stringify(off.data)).toBe(200);
 
-    const fields = await fieldsOf(page, 'cash_register__settings__update', {
-      require_opening_balance: true,
-      require_closing_balance: true,
-    });
-    expect(fields.map(({ name, label, kind, value }) => ({ name, label, kind, value }))).toEqual([
-      { name: 'require_opening_balance', label: EXPECTED[language].labels[0], kind: 'bool', value: true },
-      { name: 'require_closing_balance', label: EXPECTED[language].labels[1], kind: 'bool', value: true },
-    ]);
+      const fields = await fieldsOf(page, 'cash_register__settings__update', {
+        require_opening_balance: true,
+        require_closing_balance: true,
+      });
+      expect(fields.map(({ name, label, kind, value }) => ({ name, label, kind, value }))).toEqual([
+        { name: 'require_opening_balance', label: EXPECTED[language].labels[0], kind: 'bool', value: true },
+        { name: 'require_closing_balance', label: EXPECTED[language].labels[1], kind: 'bool', value: true },
+      ]);
 
-    for (const vp of VIEWPORTS) {
-      await page.setViewportSize({ width: vp.width, height: vp.height });
-      await expect(card(page)).toContainText(EXPECTED[language].line);
-      await untilStill(page);
-      await capture(page, `hub-2176-cash-register-settings-${language}-${vp.label}`);
+      for (const vp of VIEWPORTS) {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await expect(card(page)).toContainText(EXPECTED[language].line);
+        await untilStill(page);
+        await capture(page, `hub-2176-cash-register-settings-${language}-${vp.label}`);
+      }
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await cancel(page);
+
+      const after = await api<Settings>(context, A, 'GET', '/cash_register/settings');
+      expect(after.status).toBe(200);
+      expect([after.data.require_opening_balance, after.data.require_closing_balance]).toEqual([false, false]);
+    } finally {
+      await api<Settings>(context, A, 'POST', '/cash_register/settings', {
+        require_opening_balance: before.data.require_opening_balance,
+        require_closing_balance: before.data.require_closing_balance,
+      });
     }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await cancel(page);
-
-    const after = await api<Settings>(context, A, 'GET', '/cash_register/settings');
-    expect(after.status).toBe(200);
-    expect([after.data.require_opening_balance, after.data.require_closing_balance]).toEqual([
-      before.data.require_opening_balance,
-      before.data.require_closing_balance,
-    ]);
     await context.close();
   });
 }

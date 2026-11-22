@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4db444b1e31610f628708326f38aaad5a686db41fa9d0d7ac1ab26d1342974d0 -->
+<!-- generated from WORKBOOK.md sha256:de7ed648408b3bf2022fc11afc556252c9130910429a2ad22aa060c43511a8c1 -->
 
 ## What it is for and who it is for
 
@@ -220,7 +220,7 @@ Steps:
    shows done without reloading.
 5. Through the assistant ("I want it to ask me for the float when opening and to make me count the cash when
    closing"), the card says each setting it changes by its name and its value, as in **Cash register → Settings**:
-   "Change in Cash register: Require an opening float: Yes · Require a count to close: Yes" (BASE-F97).
+   "Change in Cash register: Require an opening float: Yes · Require a count to close: Yes".
 In: the administrator's decisions.
 Out: the business's cash register settings, a single row (announces: `cash_register.settings.updated`, also
 the first save with no changes). Never saved, the default ones apply and "Your cash drawer" stays pending;

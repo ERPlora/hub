@@ -228,7 +228,7 @@ Pasos:
    sin recargar.
 5. Por el asistente («quiero que al abrir me pida el fondo y que al cerrar tenga que contar el dinero»), la
    tarjeta dice cada ajuste que cambia por su nombre y su valor, como en **Caja → Ajustes**: «Cambiar en Caja:
-   Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí» (BASE-F97).
+   Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí».
 Entra: las decisiones del administrador.
 Sale: los ajustes de caja del negocio, una sola fila (avisa: `cash_register.settings.updated`, también
 el primer guardado sin cambios). Sin guardar nunca, valen los de fábrica y «Tu caja» sigue pendiente;
