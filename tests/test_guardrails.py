@@ -43,8 +43,10 @@ SOURCE_ROOTS = ("base", "control", "apps")
 
 #: Owners of the ORM that are no path to the data from the API: ``models.py`` declares the schema
 #: (managers, QuerySets, constraints with ``Q``); ``admin.py`` is Django's admin, the second write
-#: path the platform accepts, whose actions call ``services.py``.
+#: path the platform accepts, whose actions call ``services.py``; an ``admin_<part>.py`` beside it is a
+#: part of that admin, which its ``admin.py`` registers.
 ORM_OWNERS = frozenset({"models.py", "admin.py"})
+ADMIN_PART = re.compile(r"admin_\w+\.py")
 #: Files outside the doors that may touch the ORM, each with its reason. Not here on purpose:
 #: ``live.py`` (it only names events), ``api.py`` (one operation per route), ``auth.py`` (reads
 #: ``Membership.Role``, an enum), ``auth_views.py`` (opens the session through ``services``),
@@ -205,6 +207,7 @@ def orm_rule_applies(path: PurePosixPath) -> bool:
     return not (
         is_door(path)
         or path.name in ORM_OWNERS
+        or ADMIN_PART.fullmatch(path.name)
         or is_migration(path)
         or str(path) in ORM_EXCEPTIONS
     )
@@ -496,11 +499,13 @@ def test_orm_rule_skips_the_doors_the_owners_migrations_and_the_exceptions():
             "apps/demo/queries.py",
             "apps/demo/models.py",
             "apps/demo/admin.py",
+            "control/admin_clusters.py",
             "apps/demo/migrations/0001_initial.py",
             "base/permissions.py",
             "apps/demo/api.py",
             "apps/demo/live.py",
             "apps/demo/schemas.py",
+            "apps/demo/administration.py",
             "base/middleware.py",
             "base/management/commands/seed.py",
         ]
@@ -510,6 +515,7 @@ def test_orm_rule_skips_the_doors_the_owners_migrations_and_the_exceptions():
         "apps/demo/api.py",
         "apps/demo/live.py",
         "apps/demo/schemas.py",
+        "apps/demo/administration.py",
         "base/middleware.py",
         "base/management/commands/seed.py",
     ]

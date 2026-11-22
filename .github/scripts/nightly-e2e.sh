@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The Hub's nightly browser run: every spec of tests/e2e, once a night, on the newest origin/main, on the Mac.
-# Never a check: a red night stops no PR and no deploy. It keeps ONE open issue instead (e2e-report.sh): a red
+# Never a check: a red night stops no PR and no deploy. It keeps ONE open issue instead (scripts/e2e_report.py): a red
 # night opens it or comments on it, and the first green night closes it.
 #
 #   nightly-e2e.sh [--no-publish] [--spec tests/e2e/<name>.spec.ts]...   one night: every spec, or the ones named
@@ -373,7 +373,7 @@ clean_up
 status=0
 [ "$result" = success ] || status=1
 RESULT="$result" REPORT="$run/test-results/results.json" STEP="$failed_step" SHA="$sha" RUN_DIR="$run" \
-  PUBLISH="$publish" bash "$here/e2e-report.sh" || {
+  PUBLISH="$publish" python3 "$here/../../scripts/e2e_report.py" || {
   say "the report failed: the night's result did not reach GitHub"
   status=1
 }

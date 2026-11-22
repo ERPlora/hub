@@ -251,7 +251,7 @@ la pila, la escribe `global-setup.ts` si la ejecución arranca sin las cuentas.
 ## La pasada nocturna (`.github/scripts/nightly-e2e.sh`)
 
 Cada noche, en el Mac, corre todas las specs sobre el `origin/main` recién traído y mantiene **una sola issue**
-(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `e2e-report.sh`): una noche en rojo la abre o la
+(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `scripts/e2e_report.py`): una noche en rojo la abre o la
 comenta, y la primera noche en verde la cierra. No es un check: una noche roja no para ninguna PR ni ningún despliegue. Va
 en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los planes, solo `aws` usa Actions; el SaaS hace lo
 mismo con su pasada.

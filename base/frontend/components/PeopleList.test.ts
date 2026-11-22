@@ -225,11 +225,25 @@ describe('PeopleList', () => {
   it('anyone else sees the list, without opening a person nor inviting', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     const m = await open({ session: EMPLOYEE });
-    await m.result(m.call, 'base.person.list', { people: PEOPLE.map((p) => ({ ...p, email: '' })), seats: SEATS });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE.map((p) => ({ ...p, email: null })), seats: SEATS });
     await m.wrapper.findAll('[data-testid="people-row"]')[1].trigger('click');
     await flush();
     expect(m.router.currentRoute.value.path).toBe('/employees');
     expect(m.wrapper.find('[data-testid="people-invite"]').exists()).toBe(false);
+  });
+
+  it('the «Email» column is for whoever sees the team’s contact details, even without running the business', async () => {
+    const manager = { ...EMPLOYEE, permissions: ['base.view_home', 'base.view_team_contact'] };
+    const m = await open({ session: manager });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: SEATS });
+    expect(m.wrapper.text()).toContain('Email');
+    expect(m.wrapper.findAll('[data-testid="people-row"]')[1].text()).toContain('eva@example.com');
+  });
+
+  it('without it there is no «Email» column, not even for who runs the business', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.person.list', { people: PEOPLE.map((p) => ({ ...p, email: null })), seats: SEATS });
+    expect(m.wrapper.text()).not.toContain('Email');
   });
 
   it('a list that cannot be read says so with «Retry», never «nobody»', async () => {

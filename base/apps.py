@@ -57,6 +57,8 @@ class BaseConfig(LiveAppConfig):
     # Everyone sees and opens the files; whoever runs the hub uploads, renames and deletes them.
     # «Manage on erplora.com» at the menu's foot: the owner, an administrator and a manager open this business on
     # erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
+    # The four data permissions (base.sensitive) say which sensitive data a role sees: a manager sees them all, an
+    # employee only the customers' contact details, which serving them needs.
     # Owning the business is the owner's alone (base.permissions.OWNER_ONLY): no role but the owner gets it.
     permissions = [
         "base.view_home",
@@ -65,13 +67,25 @@ class BaseConfig(LiveAppConfig):
         "base.upload_files",
         "base.delete_files",
         "base.open_management",
+        "base.view_costs",
+        "base.view_customer_contact",
+        "base.view_team_contact",
+        "base.view_business_totals",
         "base.own_business",
     ]
     role_permissions = {
         "hub_owner": ["base.*"],
         "hub_admin": ["base.*"],
-        "hub_manager": ["base.view_home", "base.view_files", "base.open_management"],
-        "hub_employee": ["base.view_home", "base.view_files"],
+        "hub_manager": [
+            "base.view_home",
+            "base.view_files",
+            "base.open_management",
+            "base.view_costs",
+            "base.view_customer_contact",
+            "base.view_team_contact",
+            "base.view_business_totals",
+        ],
+        "hub_employee": ["base.view_home", "base.view_files", "base.view_customer_contact"],
     }
 
     @cached_property

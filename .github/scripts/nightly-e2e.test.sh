@@ -29,14 +29,8 @@ g() { git -c user.name=nightly -c user.email=nightly@example.com -c init.default
 for repo in hub saas; do
   g init -q "$root/remote/$repo"
   mkdir -p "$root/remote/$repo/.github/scripts"
-  for script in nightly-e2e.sh e2e-report.sh; do
-    if [ -f "$here/$script" ]; then
-      cp "$here/$script" "$root/remote/$repo/.github/scripts/$script"
-    else
-      echo '#!/usr/bin/env bash' > "$root/remote/$repo/.github/scripts/$script"
-    fi
-    chmod +x "$root/remote/$repo/.github/scripts/$script"
-  done
+  cp "$here/nightly-e2e.sh" "$root/remote/$repo/.github/scripts/nightly-e2e.sh"
+  chmod +x "$root/remote/$repo/.github/scripts/nightly-e2e.sh"
   g -C "$root/remote/$repo" add -A
   g -C "$root/remote/$repo" commit -q -m "first"
   g clone -q "$root/remote/$repo" "$root/erplora/$repo"

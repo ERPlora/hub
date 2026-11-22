@@ -24,6 +24,7 @@ from django.utils import timezone
 from base import admin as base_admin
 from base.tenancy import credentials
 from control import admin as control_admin
+from control import admin_clusters, admin_shared
 from control.models import Cluster, Hub
 from control.tests.conftest import events
 
@@ -139,7 +140,7 @@ def read_only_values(html: str, field: str) -> list[str]:
 
 class TestClusters:
     def test_is_registered(self):
-        assert isinstance(admin.site._registry[Cluster], control_admin.ClusterAdmin)
+        assert isinstance(admin.site._registry[Cluster], admin_clusters.ClusterAdmin)
 
     def test_lists_each_with_its_doors_limit_hubs_secret_and_total_size(self, client, root, hub_databases):
         cluster = local_cluster(pooler_host="pooler-1.example", max_hubs=100)
@@ -285,14 +286,14 @@ class TestClusters:
         from live.errors import Conflict
 
         first, second = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
-        real = control_admin.cluster_delete
+        real = admin_clusters.cluster_delete
 
         def refuses_the_second(ctx, data):
             if data.id == second.pk:
                 raise Conflict("A hub was just placed on cluster-2.", code="control.cluster_holds_hubs")
             return real(ctx, data)
 
-        monkeypatch.setattr(control_admin, "cluster_delete", refuses_the_second)
+        monkeypatch.setattr(admin_clusters, "cluster_delete", refuses_the_second)
 
         response = client.post(
             CLUSTERS,
@@ -315,7 +316,7 @@ class TestClusters:
         def refused(ctx, data):
             raise Conflict("A hub was just placed on cluster-1.", code="control.cluster_holds_hubs")
 
-        monkeypatch.setattr(control_admin, "cluster_delete", refused)
+        monkeypatch.setattr(admin_clusters, "cluster_delete", refused)
 
         response = client.post(f"{CLUSTERS}{cluster.pk}/delete/", {"post": "yes"}, HTTP_HOST=PLATFORM, follow=True)
 
@@ -360,13 +361,13 @@ class TestHubs:
 
     def test_measures_once_per_cluster_on_the_page(self, client, root, hub_databases, monkeypatch):
         calls: list[object] = []
-        real = control_admin.cluster_sizes
+        real = admin_shared.cluster_sizes
 
         def counted(ctx, data):
             calls.append(data.cluster)
             return real(ctx, data)
 
-        monkeypatch.setattr(control_admin, "cluster_sizes", counted)
+        monkeypatch.setattr(admin_shared, "cluster_sizes", counted)
         cluster = local_cluster()
         for slug, db_name in (("acme", hub_databases.a), ("bistro", hub_databases.b)):
             Hub.objects.create(slug=slug, status=Hub.Status.READY, cluster=cluster, db_name=db_name)
@@ -487,5 +488,5 @@ def test_its_words_are_translated():
     from django.utils import translation
 
     with translation.override("es"):
-        assert str(control_admin.ClusterAdmin.close_to_new_hubs.short_description) == "Cerrar a hubs nuevos"
-        assert control_admin.no_limit() == "sin límite"
+        assert str(admin_clusters.ClusterAdmin.close_to_new_hubs.short_description) == "Cerrar a hubs nuevos"
+        assert admin_clusters.no_limit() == "sin límite"

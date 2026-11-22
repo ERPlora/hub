@@ -54,7 +54,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
         credential = credentials.get(username)
         profile = profiles.get(username)
         own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-        name = own or person["name"] or person["email"].split("@", 1)[0] or username
+        name = own or without_address(person["name"]) or without_address(person["email"]) or username
         people.append(
             {
                 **person,
@@ -97,17 +97,17 @@ def seats_of(slug: str, used: int) -> dict[str, Any]:
 
 
 def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
-    """A person as Employees shows them to who asks: the address only to who runs the business, and their own."""
-    me = signed_in_username(ctx) == person["id"]
+    """A person as Employees shows them; their address only reaches whoever sees the team's contact details (the
+    mark of ``PersonOut.email``)."""
     return {
         "id": person["id"],
         "name": person["name"],
         "initials": person["initials"],
-        "email": person["email"] if (me or ctx.has(ADMINISTER_HUB)) else "",
+        "email": person["email"],
         "role": person["role"],
         "ways": person["ways"],
         "entered": person["entered"],
-        "me": me,
+        "me": signed_in_username(ctx) == person["id"],
     }
 
 
@@ -262,7 +262,11 @@ def person_label(user) -> str:
 
 
 def face_name(user) -> str:
-    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email (the
-    SaaS names an account without a name by its address: then the part before the «@»)."""
-    label = person_label(user)
-    return label.split("@", 1)[0] if "@" in label else label
+    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email."""
+    return without_address(person_label(user))
+
+
+def without_address(name: str) -> str:
+    """``name`` without an email address in it: erplora.com names an account without a name by its address, and a
+    colleague's address only reaches whoever sees the team's contact details. Then the part before the «@»."""
+    return name.split("@", 1)[0]
