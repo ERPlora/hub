@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:97f0fddb626766c509181cfb6af4777f553c5b128086451a6ca0bf531e318358 -->
+<!-- generated from WORKBOOK.md sha256:484773e0f21374d8f0b903f47d5c2b6f6b4644d1afdcebb715fdc3e1471b7bbe -->
 
 ## What it is for and who it is for
 
@@ -107,7 +107,8 @@ Initial setup, step by step:
 ## Screens
 
 Sales & POS opens from the **Sales & POS** menu and has five entries: **Sell**, **Sales**,
-**Quick notes**, **Sections** and **Settings**. "Sections" are the till's departments: the short
+**Quick notes**, **Sections** and **Settings**; the last three, only for whoever can change the Sales
+settings. "Sections" are the till's departments: the short
 word fits in a phone's tab bar with all five in sight.
 
 ### Sell

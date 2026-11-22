@@ -43,7 +43,7 @@ caja ni de stock. Para cobrar está Ventas.
 | Verticales | ninguna (`verticals = []`): no entra en ninguna plantilla, se enciende desde la Tienda |
 | `requires` | ninguno (`[]`): sin FK a Inventario ni a Clientes; nadie la requiere |
 | Usa de otras apps | nada: no lee ni llama a ninguna |
-| Pantallas | `/cart_checkout/carts`, `/cart_checkout/orders` (pestañas de `frontend/tabs.ts`) |
+| Pantallas | `/cart_checkout/carts`, `/cart_checkout/orders` (pestañas: las entradas del menú que la persona puede abrir) |
 | Operaciones | 6 consultas (`queries.py`) y 13 acciones (`services.py`), todas con `ai=` (`risk = "high"` en borrar un carrito, marcar pagado, fallar y borrar los datos de un cliente); 19 rutas en `/api/cart_checkout/…`, una por operación |
 | Eventos | 13, `cart_checkout.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Consultas vivas | las 6 consultas, re-ejecutadas tras el COMMIT de sus eventos (`live.py`) |

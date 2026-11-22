@@ -23,9 +23,8 @@ tienen su sustituto en uso. Cada una lleva la clave con la que pasa a `## 6` de 
 - `ion:call-outline` — acción «Contactado» de la lista de espera (la del módulo viejo). Hoy:
   `ion:chatbubbles-outline`.
 
-Al registrarlos, cambiar a la vez `apps.py` (`icon`), `frontend/tabs.ts`, las acciones de
-`frontend/pages/ReservationsPage.vue` y `WaitlistPage.vue` y sus tests (`tests/test_apps.py`,
-`frontend/tabs.test.ts`) y correr `pnpm gen:app-icons`.
+Al registrarlos, cambiar a la vez `apps.py` (`icon`), las acciones de
+`frontend/pages/ReservationsPage.vue` y `WaitlistPage.vue` y sus tests (`tests/test_apps.py`) y correr `pnpm gen:app-icons`.
 
 ## De Mesas
 

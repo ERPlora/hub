@@ -79,7 +79,8 @@ de cocina). Al cerrar el día, **Comisiones** da lo que ha vendido y ganado cada
 ## Pantallas
 
 Personal tiene cinco pestañas: **Personal**, **Roles**, **Ausencias**, **Horarios** y **Comisiones**
-(esta, solo para quien ve la compensación), más **Ajustes** (para quien puede guardarlos). Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
+(esta, solo para quien ve la compensación), más **Ajustes**; **Roles** y **Ajustes**, solo para quien puede
+guardar los ajustes. Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
 intente por la API o por el asistente.
 
 ### Personal
@@ -840,8 +841,8 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`,
   `/staff/commissions` y `/staff/settings`. El menú de `apps.py` lleva las seis, cada una con el permiso que la abre:
   Personal y Horarios, `staff.view`; Ausencias, `staff.view_time_off`; Comisiones, `staff.view_compensation`; Roles y
-  Ajustes, `staff.manage_settings`. La barra de pestañas (`frontend/tabs.ts`) añade «Comisiones» solo a quien ve la
-  compensación y «Ajustes» solo a quien puede guardarlos.
+  Ajustes, `staff.manage_settings`. La barra de pestañas son las entradas que la persona puede abrir
+  (`useAppTabs`).
 - Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo
   resuelve el servidor en días del negocio, y «Personalizado» envía `date_from` y `date_to`. Su 422 sale
   bajo «Hasta». Hasta 575 px el periodo es un `ion-select` (popover, `mode="md"`) con las mismas opciones

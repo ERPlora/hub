@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d462d743960502264b330e87ab57313b6990472d785ace4e99c63458d0546453 -->
+<!-- generated from WORKBOOK.md sha256:ea21cef50568d13356e84a2a59fa246135d1c93cfebb44334f606a8a1270bc3d -->
 
 ## What it is for and who it is for
 
@@ -100,8 +100,8 @@ Initial setup, step by step:
 ## Screens
 
 The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sessions** and
-**Settings** (this one only for whoever can change them). No other one is hidden by permission; the
-buttons the profile cannot use do not show.
+**Settings**. **Zones** and **Tables** show only to whoever can change them, and **Settings**, to whoever
+can change it; the buttons the profile cannot use do not show.
 
 ### Floor plan
 Here you see at a glance how the room is doing: each table in its place, with its colour and, when it is

@@ -111,7 +111,7 @@ class TableConfig(LiveAppConfig):
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: `map-outline` waits in UI-REQUESTS.md.
-    # The same icons as the tabbar (frontend/tabs.ts). Each entry opens with its permission: Zones, Tables and Settings,
+    # Each entry is also a tab of the app's pages and opens with its permission: Zones, Tables and Settings,
     # to whoever may change them.
     navigation = [
         Nav("floor_plan", _("Floor plan"), "ion:apps-outline", "/table/floor-plan", permission="table.view_table"),
