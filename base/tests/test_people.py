@@ -153,6 +153,17 @@ class TestWhoIsInTheBusiness:
         client.force_login(eva)
         assert [entry["email"] for entry in people(client)["people"]] == [None, None, None]
 
+    def test_an_account_without_a_name_is_named_by_what_comes_before_its_at_never_by_its_address(
+        self, client, eva, make_user
+    ):
+        # erplora.com names an account without a name by its address: the name must not carry it to an employee.
+        make_user("saas:6", host=A.key, role=Membership.Role.EMPLOYEE, first_name="nora@example.com", email="nora@example.com")
+        photo(members=[{"user_id": "7", "role": "hub_employee", "email": "pau@example.com", "name": "pau@example.com"}])
+        client.force_login(eva)
+        answer = people(client)
+        assert (row(answer, "saas:6")["name"], row(answer, "saas:7")["name"]) == ("nora", "pau")
+        assert "@" not in json.dumps(answer)
+
     def test_the_name_is_the_one_of_my_profile_in_this_business(self, client, olga, eva):
         from base.models import Profile
 
