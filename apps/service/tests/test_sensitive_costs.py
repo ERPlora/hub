@@ -11,7 +11,7 @@ from live.operations import get as operation
 
 from apps.flow.tests.test_api import get
 from apps.service.models import Service
-from apps.service.schemas import ServiceIn, ServicePatchIn
+from apps.service.schemas.catalog import ServiceIn, ServicePatchIn
 from base.sensitive import VIEW_COSTS
 
 from .conftest import A, HUB_DB, ctx_for, make_service, make_tax

@@ -28,7 +28,7 @@ from live.operations import get
 
 from apps.service import queries
 from apps.service.models import Assignment, Category, Service
-from apps.service.schemas import ServiceRecoverIn
+from apps.service.schemas.recovery import ServiceRecoverIn
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in

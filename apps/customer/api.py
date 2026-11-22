@@ -9,47 +9,21 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.customer import queries, services
-from apps.customer.schemas import (
-    ActivityIn,
-    ActivityListIn,
-    ByPhoneIn,
-    ConsentGrantIn,
-    ConsentHistoryIn,
-    ConsentStateIn,
-    ConsentWithdrawIn,
-    CustomerExportIn,
-    CustomerIn,
-    CustomerListIn,
-    CustomerPatchIn,
-    CustomerRefIn,
-    DivergencesIn,
-    EraseIn,
-    FieldIn,
-    FieldListIn,
-    FieldPatchIn,
-    FieldRefIn,
-    GroupIn,
-    GroupListIn,
-    GroupPatchIn,
-    GroupRefIn,
-    HealthDetailIn,
-    HealthGrantIn,
-    HealthIn,
-    HealthWithdrawIn,
-    ImportIn,
-    MergeIn,
-    NoteIn,
-    OrderIn,
-    OrderLinkIn,
-    OrderListIn,
-    PurchaseListIn,
-    SetGroupsIn,
-    SetTagsIn,
-    TagIn,
-    TagListIn,
-    TagPatchIn,
-    TagRefIn,
-)
+from apps.customer.schemas.activity import ActivityIn, ActivityListIn, NoteIn
+from apps.customer.schemas.cards import ByPhoneIn, CustomerIn, CustomerListIn, CustomerPatchIn
+from apps.customer.schemas.consent import ConsentGrantIn, ConsentHistoryIn, ConsentStateIn, ConsentWithdrawIn
+from apps.customer.schemas.custom_fields import FieldIn, FieldListIn, FieldPatchIn
+from apps.customer.schemas.erasing import EraseIn
+from apps.customer.schemas.exports import CustomerExportIn
+from apps.customer.schemas.fields import CustomerRefIn, FieldRefIn, GroupRefIn, TagRefIn
+from apps.customer.schemas.groups import GroupIn, GroupListIn, GroupPatchIn
+from apps.customer.schemas.health import HealthDetailIn, HealthGrantIn, HealthIn, HealthWithdrawIn
+from apps.customer.schemas.importing import ImportIn
+from apps.customer.schemas.memberships import SetGroupsIn, SetTagsIn
+from apps.customer.schemas.merging import MergeIn
+from apps.customer.schemas.orders import OrderIn, OrderLinkIn, OrderListIn
+from apps.customer.schemas.purchases import DivergencesIn, PurchaseListIn
+from apps.customer.schemas.tags import TagIn, TagListIn, TagPatchIn
 
 router = Router(tags=["customer"])
 

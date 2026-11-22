@@ -7,7 +7,7 @@ from live.outbox import record_event
 from apps.customer import events
 from apps.customer.models import Customer
 from apps.customer.queries import find_customer, load_detail
-from apps.customer.schemas import CustomerDetailOut, CustomerIn, CustomerPatchIn
+from apps.customer.schemas.cards import CustomerDetailOut, CustomerIn, CustomerPatchIn
 from apps.customer.services.field_values import _apply_field_values, _validated_field_values
 from apps.customer.services.writes import _changes, _e164
 

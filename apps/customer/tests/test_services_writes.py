@@ -9,7 +9,8 @@ from django.utils import timezone
 from live.errors import InvalidPayload
 
 from apps.customer.models import Consent, Customer
-from apps.customer.schemas import ConsentGrantIn, HealthGrantIn
+from apps.customer.schemas.consent import ConsentGrantIn
+from apps.customer.schemas.health import HealthGrantIn
 
 from .conftest import HUB_DB, run
 

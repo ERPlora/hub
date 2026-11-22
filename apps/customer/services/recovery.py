@@ -17,13 +17,12 @@ from apps.customer.queries import (
     lost_since_copy,
     named,
 )
-from apps.customer.schemas import (
-    CustomerIn,
+from apps.customer.schemas.cards import CustomerIn, FieldValueIn
+from apps.customer.schemas.custom_fields import FieldIn
+from apps.customer.schemas.recovery import (
     CustomerRecoveredOut,
     CustomerRecoverIn,
     CustomerRestoreIn,
-    FieldIn,
-    FieldValueIn,
     FieldValueOfCopyIn,
     GroupOfCopyIn,
     TagOfCopyIn,

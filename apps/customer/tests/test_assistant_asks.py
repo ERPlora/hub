@@ -13,7 +13,7 @@ from live.errors import Conflict
 from live.operations import AI, registry
 
 from apps.customer.models import Customer
-from apps.customer.schemas import MergeIn
+from apps.customer.schemas.merging import MergeIn
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_asks_bring, offered_to

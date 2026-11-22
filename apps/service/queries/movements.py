@@ -11,7 +11,7 @@ from live.operations import operation
 from apps.service.models import Grant, GrantAdjustment, Redemption
 from apps.service.queries.packages import find_package
 from apps.service.queries.reads import CUSTOMER_VIEW
-from apps.service.schemas import MovementListIn, MovementPage
+from apps.service.schemas.movements import MovementListIn, MovementPage
 
 
 @operation(

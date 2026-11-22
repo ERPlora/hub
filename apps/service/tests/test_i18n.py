@@ -122,7 +122,7 @@ def test_spanish_texts_of_the_workbook():
         assert (
             str(queries.catalog.SERVICE_NOT_FOUND) == "Ese servicio no existe en este negocio."
         )
-        assert str(schemas.SAY_WHICH_CUSTOMER) == (
+        assert str(schemas.grants.SAY_WHICH_CUSTOMER) == (
             "Elige el cliente al que pertenece el bono: un bono sin dueño no lo puede canjear nadie."
         )
         assert [str(label) for label in Service.PricingType.labels] == [
@@ -164,7 +164,7 @@ def test_spanish_says_services_own_words_not_an_earlier_apps():
         "Grant.voided_by": Grant._meta.get_field("voided_by").verbose_name,
         "Redemption": Redemption._meta.verbose_name,
         "Redemption plural": Redemption._meta.verbose_name_plural,
-        "SAY_WHICH_CATEGORY": schemas.SAY_WHICH_CATEGORY,
+        "SAY_WHICH_CATEGORY": schemas.fields.SAY_WHICH_CATEGORY,
         "CATEGORY_AMBIGUOUS": queries.categories.CATEGORY_AMBIGUOUS,
     }
     with translation.override("es"):
