@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b9cacfba46ad8b2ebd2a752431eab01fca0191251cf9ba024edbae6e3cb1a5c3 -->
+<!-- generated from WORKBOOK.md sha256:28afb5da49c7c69ca1944bea49dd1d8c5902c2f7d00a9e9f4fe24b083f91a3d7 -->
 
 ## What it is for and who it is for
 
@@ -1019,12 +1019,12 @@ Steps:
 1. In the panel with no card, **Link to a card** searches Customers by name, phone or email; choosing one links it.
 2. Or **Create card**: it creates a card in Customers with the WhatsApp name (or the number) and the number, with
    "WhatsApp" as its source, and links it. With no WhatsApp name and made by whoever does not see the customers'
-   contact details (BASE-F119), the card is named by the masked number ("+346••••2333") and keeps the number in its phone.
+   contact details, the card is named by the masked number ("+346••••2333") and keeps the number in its phone.
 3. With a card, **View card** leads to it and **Unlink** removes it.
 In: the chosen card, or nothing to create it.
 Out: notice `whatsapp_inbox.conversation.customer_linked`.
 If it fails: Customers' reasons (for example, a number that is not valid).
-Involved: Customers
+Involved: Customers, BASE-F119
 
 ### WHATSAPP_INBOX-F38 Know which question what the customer taps answers
 Status: done

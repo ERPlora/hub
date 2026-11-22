@@ -1041,13 +1041,13 @@ Pasos:
 1. En el panel sin ficha, **Unir a una ficha** busca en Clientes por nombre, teléfono o email; elegir
    una la une.
 2. O **Crear ficha**: crea en Clientes una ficha con el nombre de WhatsApp (o el número) y el número,
-   con origen «WhatsApp», y la une. Si no hay nombre de WhatsApp y quien la crea no ve el contacto de los clientes
-   (BASE-F119), la ficha se llama por el número enmascarado («+346••••2333») y guarda el número en su teléfono.
+   con origen «WhatsApp», y la une. Si no hay nombre de WhatsApp y quien la crea no ve el contacto de los clientes,
+   la ficha se llama por el número enmascarado («+346••••2333») y guarda el número en su teléfono.
 3. Con ficha, **Ver ficha** lleva a ella y **Desunir** la quita.
 Entra: la ficha elegida, o nada para crearla.
 Sale: aviso `whatsapp_inbox.conversation.customer_linked`.
 Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
-Implicados: Clientes
+Implicados: Clientes, BASE-F119
 
 ### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
 Estado: hecho
