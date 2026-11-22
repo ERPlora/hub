@@ -1054,7 +1054,7 @@ Lo que Reservas manda al llamar (los mismos nombres que sus avisos `status_chang
 
 | App | Para qué | Servicio |
 |---|---|---|
-| Ventas | «Elegir mesa» del TPV (SALE-F19): las mesas y su estado, sentar o volver a sentar la cuenta de pantalla, quitarle la mesa y seguir la mesa de una cuenta | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
+| Ventas | «Elegir mesa» del TPV (SALE-F19): las mesas y su estado, sentar o volver a sentar la cuenta de pantalla, quitarle la mesa y seguir la mesa de una cuenta; la tarjeta del asistente dice la cuenta de una mesa por su mesa | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
 | Reservas | Retener, mover y soltar la mesa de una reserva y sentarla, dentro de su operación | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
 | Plataforma (Inicio) | El paso «Tus mesas» de «Termina de configurar tu negocio» (TABLE-F02) | `table.floor.status` |
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ce9921de5a736927d101110df176e5957c4461599d722542ddf91250ebcb43aa -->
+<!-- generated from WORKBOOK.md sha256:3199ef5356927e2c07bbbb7ebd06414135962e1490a8f4a05b2b728e7998779a -->
 
 ## What it is for and who it is for
 
@@ -1061,7 +1061,7 @@ What Reservations sends when it calls (the same names as its notices `status_cha
 
 | App | What for | Service |
 |---|---|---|
-| Sales & POS | "Choose table" of the till (SALE-F19): the tables and their status, seating or seating again the check on screen, taking its table away and following the table of a check | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
+| Sales & POS | "Choose table" of the till (SALE-F19): the tables and their status, seating or seating again the check on screen, taking its table away and following the table of a check; the assistant's card says a table's check by its table | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
 | Reservations | Holding, moving and releasing the table of a booking and seating it, inside its operation | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
 | Platform (Home) | The "Your tables" step of "Finish setting up your business" (TABLE-F02) | `table.floor.status` |
 
