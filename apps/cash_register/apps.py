@@ -189,4 +189,4 @@ class CashRegisterConfig(LiveAppConfig):
         (``fiscal_archive_models``)."""
         from apps.cash_register import queries  # the models are not loaded yet when this module is
 
-        return queries.keeps_fiscal_documents()
+        return queries.movements.keeps_fiscal_documents()
