@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3a99a903f47ae8836f0e5f6efe8ae7eba2a125bebd38ebb8c17bf7ac7849ef94 -->
+<!-- generated from WORKBOOK.md sha256:28afb5da49c7c69ca1944bea49dd1d8c5902c2f7d00a9e9f4fe24b083f91a3d7 -->
 
 ## What it is for and who it is for
 
@@ -71,7 +71,8 @@ create the templates takes them out of the app for something they do every day.
 
 ### Inbox
 Here are the conversations with your customers, the most recent activity first, with their status, who they are
-assigned to and how many messages are unread. Search by contact or phone, or filter by status, assignment or unread.
+assigned to and how many messages are unread. Search by contact or phone (by phone, only whoever sees the customers'
+contact details), or filter by status, assignment or unread.
 When you open one, its thread shows in a panel on top of the list: from there you answer, send a template, assign
 it, change its status or leave an internal note. Above the list, the warnings about the number and the plan's
 messages.
@@ -83,7 +84,11 @@ name, or the WhatsApp one, or the number), **Phone**, **Status** (Open, Pending,
 search box "Filter contact or phone…"; filters **Status**, **Assigned to** (Me, Unassigned) and **Unread** behind
 **Filters**, next to the search box (on the phone they open in a sheet over the list) and with **Apply**; 50 per
 page; the most recent activity first. Row action **Open** (or tap the row): the conversation opens in a panel on top
-of the list, which stays underneath.
+of the list, which stays underneath. Whoever does not see the customers' contact details works the inbox the same
+(reads, answers, assigns and changes the status), but without the number: the table has no "Phone", the search box
+says "Filter contact…" and only looks at the names, the panel does not show the number, and whoever wrote without a
+name is seen by their masked number, with the first three digits and the last four ("+346••••2333"), as shared
+inboxes mask it. Nobody sorts the list by the phone: the order would tell the number to whoever does not see it.
 
 The panel shows: the contact, their number and their status; the linked card in Customers (with a link) or **Link
 to a card** / **Create card**; **Assigned to** with the team picker and **Assign to me**; the status buttons
@@ -305,11 +310,13 @@ Steps:
    answers, without counting in **Unread**.
 4. On opening it, **Unread** goes back to "—"; a message that arrives with the thread open is left read too.
 5. **Close** goes back to the list.
-In: the search, the filters and the chosen conversation.
+In: the search, the filters and the chosen conversation. Whoever does not see the customers' contact details
+(BASE-F119) searches and names the conversation only by the name of the contact or of their card, and reads and
+answers it without seeing the number: whoever wrote without a name is seen by their masked number ("+346••••2333").
 Out: **Unread** at zero in that conversation; nothing else changes.
 If it fails: the reason inside the panel; the list stays available. While the list loads, the table says so (never
 "0 conversations").
-Involved: Customers (the card's name)
+Involved: Customers (the card's name), BASE-F119
 
 ### WHATSAPP_INBOX-F06 See a photo, a voice note or a document
 Status: done
@@ -376,14 +383,15 @@ Steps:
    by itself as soon as someone answers (from the Hub or from the phone), leaves it pending or closes it, and it does
    not show when nobody is waiting.
 3. In the installed app, each message from a customer that is left unanswered alerts with a system notification,
-   with their name and what they wrote; tapping it opens that conversation in the **Inbox**.
+   with their name and what they wrote (without a name, their number, masked to whoever does not see the customers'
+   contact details); tapping it opens that conversation in the **Inbox**.
 4. When sorting by any column, the rows without that datum go last, in both directions.
 In: the filters and the order; the customers' messages.
 Out: the filtered list and the counts (`whatsapp_inbox.conversation.summary`,
 `whatsapp_inbox.conversation.count_awaiting_reply`) and the notices (`whatsapp_inbox.conversation.notices`); nothing
 changes.
 If it fails: the reason with **Retry**.
-Involved: the bell in the top bar, the installed app's notifications
+Involved: the bell in the top bar, the installed app's notifications, BASE-F119
 
 ### WHATSAPP_INBOX-F10 Erase the data of a number with no card
 Status: done
@@ -1010,12 +1018,13 @@ Screen: Inbox
 Steps:
 1. In the panel with no card, **Link to a card** searches Customers by name, phone or email; choosing one links it.
 2. Or **Create card**: it creates a card in Customers with the WhatsApp name (or the number) and the number, with
-   "WhatsApp" as its source, and links it.
+   "WhatsApp" as its source, and links it. With no WhatsApp name and made by whoever does not see the customers'
+   contact details, the card is named by the masked number ("+346••••2333") and keeps the number in its phone.
 3. With a card, **View card** leads to it and **Unlink** removes it.
 In: the chosen card, or nothing to create it.
 Out: notice `whatsapp_inbox.conversation.customer_linked`.
 If it fails: Customers' reasons (for example, a number that is not valid).
-Involved: Customers
+Involved: Customers, BASE-F119
 
 ### WHATSAPP_INBOX-F38 Know which question what the customer taps answers
 Status: done
@@ -1034,6 +1043,14 @@ If it fails: if it answers a message this Hub did not send (or quotes one of its
 Involved: erplora.com; Appointments and Reservations, when they notify by WhatsApp
 
 ## Services: what goes in and what comes out
+
+The customer's number only reaches whoever sees the customers' contact details (BASE-F119): anyone else gets it empty
+in the conversations and in a message, and where whoever wrote without a name is named, masked ("+346••••2333"). The
+search and a reference ("the conversation of 600 111 222") only match the names for them; asking whose conversation a
+number is (`whatsapp_inbox.conversation.by_phone`) is refused to them as an action without permission (403
+`permission_denied`), and so is writing to a typed number (`to` of `message.send`, and `message.notify`): the answer
+would tell whose it is. They answer by choosing the conversation. Sorting by the phone does not exist for anyone. An automation carries the data permissions
+(FLOW-F12), so its notices and answers by WhatsApp keep reading the number.
 
 ### What it offers: reads (they read, they change nothing)
 

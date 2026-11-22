@@ -21,6 +21,7 @@ from live.operations import get
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.services.sending import NO_PLAN_MESSAGES
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, A, connect, ctx_for, receive, run, system, template
+from base.sensitive import DATA_PERMISSIONS
 from base.tenancy.context import current_alias
 
 pytestmark = HUB_DB
@@ -32,12 +33,12 @@ ANA = "+34600111222"
 
 
 def automation(scope=A, language: str = "en") -> OperationContext:
-    """What a step of an automation runs with: its run as the actor, the permission of this one action and the
-    app's reads (``apps.flow``'s ``_step_context``)."""
+    """What a step of an automation runs with: its run as the actor, the permission of this one action, the app's
+    reads and every data permission (``apps.flow``'s ``_step_context``)."""
     return OperationContext(
         scope=scope,
         actor=f"flow_run:{uuid.uuid7()}",
-        permissions=frozenset({get(NOTIFY).permission, "whatsapp_inbox.view"}),
+        permissions=frozenset({get(NOTIFY).permission, "whatsapp_inbox.view"}) | DATA_PERMISSIONS,
         language=language,
     )
 

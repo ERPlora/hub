@@ -14,6 +14,7 @@ from live.operations import operation
 
 from apps.customer.phones import InvalidPhone, candidates, to_e164
 from apps.customer.queries import business_country
+from apps.customer.queries.contact import holds, sees_contact
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Conversation, Message, name_key
@@ -58,11 +59,13 @@ AWAITING_REPLY = Q(status=Conversation.Status.OPEN) & (
 def _matching_ids(ctx: OperationContext, reference: str) -> list[UUID]:
     """The live conversations ``reference`` names (at most two: one is enough to answer).
 
-    A number (any format) is compared as a number. A name is compared as people say it (``name_key``:
-    no case, accents, emoji or extra spaces), to the WhatsApp name and to the live card's name.
+    A number (any format) is compared as a number, for whoever sees the customers' contact details. A name is
+    compared as people say it (``name_key``: no case, accents, emoji or extra spaces), to the WhatsApp name and to the
+    live card's name.
     """
     text = reference.strip()
-    numbers = candidates(text, business_country(ctx)) if _PHONE_TEXT.match(text) else set()
+    by_number = sees_contact(ctx) and _PHONE_TEXT.match(text)
+    numbers = candidates(text, business_country(ctx)) if by_number else set()
     rows = live_conversations()
     if numbers:
         return list(rows.filter(phone__in=numbers).values_list("id", flat=True)[:2])
@@ -121,13 +124,28 @@ def find_conversation(
     return found
 
 
-def display_name(row: Conversation) -> str:
-    """Who a conversation is with: the live customer card's name, else the WhatsApp name, else the number."""
+def masked(phone: str) -> str:
+    """``phone`` as whoever does not see the customers' contact details reads it, as the shared inboxes mask it: its
+    first three and last four digits, the rest dots («+34611222333» → «+346••••2333»); a short one, only the last four."""
+    sign, digits = ("+", phone[1:]) if phone.startswith("+") else ("", phone)
+    head = digits[:3] if len(digits) > 7 else ""
+    hidden = len(digits) - len(head) - 4
+    return f"{sign}{head}{'•' * hidden}{digits[-4:]}" if hidden > 0 else ""
+
+
+def profile_name(ctx: OperationContext, row: Conversation) -> str:
+    """Who writes, without a card: the WhatsApp name, else the number, masked to whoever does not see the customers'
+    contact details."""
+    return row.contact_name or (row.phone if sees_contact(ctx) else masked(row.phone))
+
+
+def display_name(ctx: OperationContext, row: Conversation) -> str:
+    """Who a conversation is with: the live customer card's name, else who writes (``profile_name``)."""
     card = row.customer if row.customer is not None and row.customer.deleted_at is None else None
-    return (card.name if card else "") or row.contact_name or row.phone
+    return (card.name if card else "") or profile_name(ctx, row)
 
 
-def conversation_out(row: Conversation) -> dict:
+def conversation_out(ctx: OperationContext, row: Conversation) -> dict:
     """A conversation as every read and write returns it."""
     card = (
         row.customer
@@ -139,7 +157,7 @@ def conversation_out(row: Conversation) -> dict:
         "id": row.id,
         "phone": row.phone,
         "contact_name": row.contact_name,
-        "display_name": display_name(row),
+        "display_name": display_name(ctx, row),
         "customer_id": card.id if card else None,
         "customer_name": customer_name,
         "assigned_to_id": row.assigned_to_id,
@@ -159,7 +177,7 @@ def conversation_out(row: Conversation) -> dict:
 def conversation_detail(ctx: OperationContext, row: Conversation) -> dict:
     blocked = send_blocked(channel(ctx.scope))
     return {
-        **conversation_out(row),
+        **conversation_out(ctx, row),
         "window_open": row.window_open(clock.now()),
         "window_expires_at": row.window_expires_at(),
         "can_send": blocked is None,
@@ -175,10 +193,23 @@ def _phone_digits(search: str) -> str:
     return digits[1:] if digits.startswith("0") else digits
 
 
+def _searched(ctx: OperationContext, rows, search: str):
+    """The conversations whose contact's or card's name holds ``search`` or, for whoever sees the customers' contact
+    details, whose number holds the digits typed (or whose card's email or phone holds it)."""
+    if not search:
+        return rows
+    if sees_contact(ctx) and _PHONE_TEXT.match(search) and len(re.sub(r"\D", "", search)) >= 3:
+        return rows.filter(phone__contains=_phone_digits(search))
+    return rows.filter(
+        Q(contact_name__icontains=search)
+        | Q(customer__name__icontains=search, customer__deleted_at__isnull=True)
+        | (holds(ctx, normalize(search), through="customer__") & Q(customer__deleted_at__isnull=True))
+    )
+
+
 _SORTS = {
     "last_message_at": "last_message_at",
     "contact": "sort_name",
-    "phone": "phone",
     "status": "status",
     "unread_count": "unread_count",
     "assigned_to": "assigned_to__username",
@@ -211,20 +242,7 @@ _SORTS = {
     },
 )
 def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dict:
-    rows = live_conversations().select_related("customer", "assigned_to")
-    search = (params.search or "").strip()
-    if search:
-        if _PHONE_TEXT.match(search) and len(re.sub(r"\D", "", search)) >= 3:
-            rows = rows.filter(phone__contains=_phone_digits(search))
-        else:
-            rows = rows.filter(
-                Q(contact_name__icontains=search)
-                | Q(customer__name__icontains=search, customer__deleted_at__isnull=True)
-                | Q(
-                    customer__search_text__contains=normalize(search),
-                    customer__deleted_at__isnull=True,
-                )
-            )
+    rows = _searched(ctx, live_conversations().select_related("customer", "assigned_to"), (params.search or "").strip())
     if params.status:
         rows = rows.filter(status=params.status)
     if params.assigned == "me":
@@ -239,17 +257,19 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
         rows = rows.filter(unread_count=0)
     if params.customer_id:
         rows = rows.filter(customer_id=params.customer_id)
+    # A conversation without a name sorts by its number only for whoever sees it: the order would tell it.
+    number = "phone" if sees_contact(ctx) else Value("")
     rows = rows.annotate(
         sort_name=Lower(
             Coalesce(
                 NullIf("customer__name", Value("")),
                 NullIf("contact_name", Value("")),
-                "phone",
+                number,
             )
         )
     )
     order = rows.order_by(*list_order(_SORTS[params.sort], descending=params.dir == "desc", nulls_last=True))
-    return page(order, params, conversation_out)
+    return page(order, params, lambda row: conversation_out(ctx, row))
 
 
 @operation(
@@ -427,7 +447,7 @@ def notices(ctx: OperationContext, data: NoticesIn) -> dict:
             {
                 "id": row.id,
                 "at": row.last_inbound_at,
-                "display_name": display_name(row),
+                "display_name": display_name(ctx, row),
                 "last_message_preview": row.last_message_preview,
             }
             for row in rows

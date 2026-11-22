@@ -39,13 +39,13 @@ export interface ConversationListIn extends PageIn {
   assigned?: string;
   unread?: boolean;
   customer_id?: string;
-  sort?: 'last_message_at' | 'contact' | 'phone' | 'status' | 'unread_count' | 'assigned_to';
+  sort?: 'last_message_at' | 'contact' | 'status' | 'unread_count' | 'assigned_to';
   dir?: SortDir;
 }
 
 export interface ConversationOut {
   id: string;
-  phone: string;
+  phone: string | null;
   contact_name: string;
   display_name: string;
   customer_id: string | null;
@@ -78,7 +78,7 @@ export interface ByPhoneIn {
 
 export interface ByPhoneOut {
   phone_is_international: boolean;
-  phone: string;
+  phone: string | null;
   conversation_id: string | null;
 }
 

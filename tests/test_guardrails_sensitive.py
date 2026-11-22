@@ -78,12 +78,7 @@ UNMARKED: dict[str, str] = {
     "apps.website.schemas.ContactSection.phone": BUSINESS_OWN,
     "apps.whatsapp_inbox.schemas.channel.ChannelConnectOut.phone_number": BUSINESS_OWN,
     "apps.whatsapp_inbox.schemas.channel.ChannelOut.phone_number": BUSINESS_OWN,
-    "apps.whatsapp_inbox.schemas.conversations.ByPhoneOut.phone": NOT_MARKED_YET,
     "apps.whatsapp_inbox.schemas.conversations.ByPhoneOut.phone_is_international": ABOUT_THE_DATA,
-    "apps.whatsapp_inbox.schemas.conversations.ConversationDetailOut.phone": NOT_MARKED_YET,
-    "apps.whatsapp_inbox.schemas.conversations.ConversationOut.phone": NOT_MARKED_YET,
-    "apps.whatsapp_inbox.schemas.erasing.ClaimErasureOut.phone": NOT_MARKED_YET,
-    "apps.whatsapp_inbox.schemas.messages.MessageGetOut.phone": NOT_MARKED_YET,
     "apps.whatsapp_inbox.schemas.templates.TemplateButtonOut.phone_number": BUSINESS_OWN,
     "base.schemas.profile.ProfileOut.contact_email": CALLERS_OWN,
 }

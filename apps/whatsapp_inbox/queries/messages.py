@@ -114,7 +114,7 @@ def get_message(ctx: OperationContext, data: MessageRefIn) -> dict:
     return {
         **message_out(row),
         "phone": row.conversation.phone,
-        "display_name": display_name(row.conversation),
+        "display_name": display_name(ctx, row.conversation),
         "can_send": send_blocked(channel(ctx.scope)) is None,
         "options": last_offered(row),
     }
