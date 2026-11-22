@@ -13,7 +13,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
-import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
+import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown, testid } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
@@ -205,11 +205,11 @@ test('STAFF-F21 (paso 3: la comisión del día): an employee has no Commissions 
   try {
     const view = shown(page);
     await view.locator('[data-testid=staff-members-row], [data-testid=staff-members-empty]').first().waitFor({ state: 'visible' });
-    await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(4);
+    await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(3);
     await expect(view.locator('ion-footer ion-segment-button', { hasText: 'Commissions' })).toHaveCount(0);
 
     await page.goto(`${A}/staff/commissions`);
-    await expect(shown(page).locator('[data-testid=staff-commissions-forbidden]')).toContainText('You do not have permission');
+    await expect(testid(page, 'no-access')).toBeVisible();
     const refused = await api<{ error?: { code: string } }>(context, A, 'GET', '/staff/commissions/report');
     expect([refused.status, refused.data.error?.code]).toEqual([403, 'permission_denied']);
   } finally {

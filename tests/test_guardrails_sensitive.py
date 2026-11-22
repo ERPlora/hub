@@ -8,9 +8,12 @@ that may open its operation. Here:
   carries a mark or is in :data:`UNMARKED`, closed and with its reason; what the list names must still exist and still
   be unmarked, so it never rots, and each reason is held to what it promises;
 - a read whose answer marks a field cannot be filtered or sorted by it without the same mark on the input, which live
-  then refuses to whoever lacks it: sorting by cost would tell the order of the costs.
+  then refuses to whoever lacks it: sorting by cost would tell the order of the costs;
+- every amount a figures read answers (a period's totals, a summary, the close by person) carries a mark, or the read
+  is in :data:`UNMARKED_FIGURES`, closed and with its reason, each held to what it promises.
 """
 
+import inspect
 from collections.abc import Iterable, Iterator
 from typing import Any, Literal, get_args, get_origin
 
@@ -20,7 +23,7 @@ from live.sensitive import marked_fields, required_permission
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
-from base.sensitive import COSTS
+from base.sensitive import COSTS, CUSTOMER_CONTACT
 
 #: The words of a field's name that say it carries a cost or someone's contact details or pay. A name matches when one
 #: of them is a whole part of it between underscores: ``unit_cost`` and ``customer_email`` do, ``costume`` does not.
@@ -49,19 +52,7 @@ UNMARKED: dict[str, str] = {
     "apps.cart_checkout.schemas.CartDetailOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.CartOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.OrderOut.customer_email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerDetailOut.email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerDetailOut.phone": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRecoveredOut.email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRecoveredOut.phone": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRow.email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRow.phone": NOT_MARKED_YET,
-    "apps.customer.schemas.PhoneMatch.email": NOT_MARKED_YET,
-    "apps.customer.schemas.PhoneMatch.phone": NOT_MARKED_YET,
-    "apps.inventory.schemas.movements.MovementOut.unit_cost": NOT_MARKED_YET,
-    "apps.inventory.schemas.products.ProductOut.cost": NOT_MARKED_YET,
-    "apps.inventory.schemas.products.SaleProductOut.cost": NOT_MARKED_YET,
     "apps.inventory.schemas.stock.SummaryOut.products_without_cost": ABOUT_THE_DATA,
-    "apps.inventory.schemas.stock.SummaryOut.stock_value": NOT_MARKED_YET,
     "apps.online_booking.schemas.BookingOut.customer_email": NOT_MARKED_YET,
     "apps.online_booking.schemas.BookingOut.customer_phone": NOT_MARKED_YET,
     "apps.online_booking.schemas.BookingRow.customer_email": NOT_MARKED_YET,
@@ -78,22 +69,16 @@ UNMARKED: dict[str, str] = {
     "apps.reservation.schemas.WaitlistDetailOut.guest_phone": NOT_MARKED_YET,
     "apps.reservation.schemas.WaitlistOut.guest_email": NOT_MARKED_YET,
     "apps.reservation.schemas.WaitlistOut.guest_phone": NOT_MARKED_YET,
-    "apps.service.schemas.ServiceOut.cost": NOT_MARKED_YET,
-    "apps.service.schemas.ServiceRecoveredOut.cost": NOT_MARKED_YET,
-    "apps.staff.schemas.CommissionOut.commission_rate": COMPENSATION_ONLY,
-    "apps.staff.schemas.CommissionReportOut.total_commission": COMPENSATION_ONLY,
-    "apps.staff.schemas.CommissionReportRow.commission": COMPENSATION_ONLY,
-    "apps.staff.schemas.CommissionReportRow.commission_rate": COMPENSATION_ONLY,
-    "apps.staff.schemas.CompensationOut.commission_rate": COMPENSATION_ONLY,
-    "apps.staff.schemas.CompensationOut.hourly_rate": COMPENSATION_ONLY,
-    "apps.staff.schemas.MemberDetailOut.email": NOT_MARKED_YET,
-    "apps.staff.schemas.MemberDetailOut.phone": NOT_MARKED_YET,
-    "apps.staff.schemas.MemberMineOut.commission_rate": CALLERS_OWN,
-    "apps.staff.schemas.MemberMineOut.email": CALLERS_OWN,
-    "apps.staff.schemas.MemberMineOut.hourly_rate": CALLERS_OWN,
-    "apps.staff.schemas.MemberMineOut.phone": CALLERS_OWN,
-    "apps.staff.schemas.MemberOut.email": NOT_MARKED_YET,
-    "apps.staff.schemas.MemberOut.phone": NOT_MARKED_YET,
+    "apps.staff.schemas.commissions.CommissionOut.commission_rate": COMPENSATION_ONLY,
+    "apps.staff.schemas.commissions.CommissionReportOut.total_commission": COMPENSATION_ONLY,
+    "apps.staff.schemas.commissions.CommissionReportRow.commission": COMPENSATION_ONLY,
+    "apps.staff.schemas.commissions.CommissionReportRow.commission_rate": COMPENSATION_ONLY,
+    "apps.staff.schemas.members.CompensationOut.commission_rate": COMPENSATION_ONLY,
+    "apps.staff.schemas.members.CompensationOut.hourly_rate": COMPENSATION_ONLY,
+    "apps.staff.schemas.members.MemberMineOut.commission_rate": CALLERS_OWN,
+    "apps.staff.schemas.members.MemberMineOut.email": CALLERS_OWN,
+    "apps.staff.schemas.members.MemberMineOut.hourly_rate": CALLERS_OWN,
+    "apps.staff.schemas.members.MemberMineOut.phone": CALLERS_OWN,
     "apps.website.schemas.ContactSection.email": BUSINESS_OWN,
     "apps.website.schemas.ContactSection.phone": BUSINESS_OWN,
     "apps.whatsapp_inbox.schemas.channel.ChannelConnectOut.phone_number": BUSINESS_OWN,
@@ -176,11 +161,14 @@ def unguarded_filters(operation: Operation) -> list[str]:
     if operation.kind != "query":
         return []
     marked = {mark.name for mark in marked_fields(operation.output)}
+    answered = {name for _, name, _ in fields_of(operation.output)} if marked else set()
     found = []
     for schema, name, field in fields_of(operation.input):
         if not marked or required_permission(field) is not None:
             continue
-        sorted_by = {value.lstrip("-") for value in literal_values(field.annotation)}
+        # The choices of a filter called as a field of the answer are that field's values («came by phone» is a
+        # source); the choices of any other input are the keys of an order.
+        sorted_by = set() if name in answered else {value.lstrip("-") for value in literal_values(field.annotation)}
         if any(names_a(term, name) for term in marked) or sorted_by & marked:
             found.append(f"{operation.name}: {key(schema, name)}")
     return found
@@ -220,6 +208,108 @@ def test_a_callers_own_field_is_answered_only_by_an_operation_of_their_own_recor
 
 def test_no_read_filters_or_sorts_by_a_marked_field_without_its_mark():
     assert [found for operation in registry.values() for found in unguarded_filters(operation)] == []
+
+
+# ── The figures ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+#: The words of a read's action that say it answers figures, as whole parts between underscores; a read in a
+#: ``figures`` or ``stats`` module answers figures too (Sales' «today» and «last 7 days»).
+FIGURE_WORDS = ("stats", "summary", "figures", "report", "by_staff", "totals")
+
+#: Adds up only the rows the caller counts (``Owned.counted``): the whole business's with its «see all» permission and
+#: ``base.view_business_totals``, else the caller's own.
+COUNTED = "counted by whose it is"
+#: The money of one register session, which whoever closes it counts: never a figure of the whole business.
+ONE_SESSION = "one session's"
+
+#: Every figures read that answers an amount without a mark → why. Closed on purpose: a new one marks its amounts
+#: (``BUSINESS_TOTALS`` for the whole business's), or comes here with a reason a reviewer can weigh.
+UNMARKED_FIGURES: dict[str, str] = {
+    "cash_register.session.closing_summary": ONE_SESSION,
+    "sale.sale.by_staff": COUNTED,
+    "sale.sale.last_7_days": COUNTED,
+    "sale.sale.stats": COUNTED,
+    "sale.sale.today": COUNTED,
+    "staff.commission.report": COMPENSATION_ONLY,
+}
+
+
+def answers_figures(operation: Operation) -> bool:
+    action = f"_{operation.name.rsplit('.', 1)[-1]}_"
+    module = operation.fn.__module__.rsplit(".", 1)[-1]
+    return operation.kind == "query" and (module in ("figures", "stats") or any(f"_{w}_" in action for w in FIGURE_WORDS))
+
+
+def unmarked_amounts(operations: Iterable[Operation]) -> dict[str, list[str]]:
+    """Each figures read → the amounts of its answer, at any depth, that carry no mark."""
+    found = {}
+    for operation in filter(answers_figures, operations):
+        amounts = [
+            key(schema, name)
+            for schema, name, field in fields_of(operation.output)
+            if isinstance(field.json_schema_extra, dict)
+            and field.json_schema_extra.get("money")
+            and required_permission(field) is None
+        ]
+        if amounts:
+            found[operation.name] = sorted(amounts)
+    return found
+
+
+def test_every_amount_of_a_figures_read_is_marked_or_its_read_is_listed_with_its_reason():
+    unlisted = {name: amounts for name, amounts in unmarked_amounts(registry.values()).items() if name not in UNMARKED_FIGURES}
+    assert unlisted == {}, "Mark these amounts (base.sensitive: BUSINESS_TOTALS…), or list the read in UNMARKED_FIGURES"
+
+
+def test_what_the_figures_list_names_still_answers_an_unmarked_amount():
+    assert sorted(set(UNMARKED_FIGURES) - set(unmarked_amounts(registry.values()))) == []
+
+
+def test_every_figures_reason_is_one_of_the_known_ones():
+    known = {COUNTED, ONE_SESSION, COMPENSATION_ONLY}
+    assert {name: reason for name, reason in UNMARKED_FIGURES.items() if reason not in known} == {}
+
+
+def test_a_read_listed_as_counted_adds_up_what_the_caller_counts():
+    listed = [name for name, reason in UNMARKED_FIGURES.items() if reason == COUNTED]
+    assert [name for name in listed if ".counted(" not in inspect.getsource(registry[name].fn)] == []
+
+
+def test_a_read_listed_as_one_session_is_asked_for_one():
+    listed = [name for name, reason in UNMARKED_FIGURES.items() if reason == ONE_SESSION]
+    assert [name for name in listed if "session_id" not in registry[name].input.model_fields] == []
+
+
+def test_a_figures_read_listed_as_compensation_only_requires_it():
+    listed = [name for name, reason in UNMARKED_FIGURES.items() if reason == COMPENSATION_ONLY]
+    assert {name: registry[name].permission for name in listed if registry[name].permission != COMPENSATION} == {}
+
+
+class PeriodTotalsOut(BaseModel):
+    count: int = 0
+    revenue: int = Field(0, json_schema_extra={"money": True})
+
+
+class DaysOut(BaseModel):
+    rows: list[PeriodTotalsOut] = []
+
+
+class MarkedTotalsOut(BaseModel):
+    count: int = 0
+    stock_value: int | None = Field(None, json_schema_extra={"money": True, **COSTS})
+
+
+def test_an_unmarked_amount_of_a_figures_read_is_caught_at_any_depth():
+    assert unmarked_amounts([operation("shop.sale.stats", PeriodTotalsOut), operation("shop.sale.by_staff", DaysOut)]) == {
+        "shop.sale.stats": [key(PeriodTotalsOut, "revenue")],
+        "shop.sale.by_staff": [key(PeriodTotalsOut, "revenue")],
+    }
+
+
+def test_a_marked_amount_or_a_read_that_is_not_of_figures_is_not():
+    assert unmarked_amounts([operation("shop.sale.stats", MarkedTotalsOut)]) == {}
+    assert unmarked_amounts([operation("shop.sale.list", PeriodTotalsOut)]) == {}
+    assert unmarked_amounts([operation("shop.sale.stats", PeriodTotalsOut, kind="command")]) == {}
 
 
 # ── The checks catch what they guard ───────────────────────────────────────────────────────────────────────────────
@@ -285,6 +375,31 @@ def test_filtering_or_sorting_by_a_marked_field_without_its_mark_is_caught():
     assert unguarded_filters(operation("stock.line.list", MarkedLinesOut)) == [
         f"stock.line.list: {key(LineListIn, 'unit_cost_min')}",
         f"stock.line.list: {key(LineListIn, 'sort')}",
+    ]
+
+
+class MarkedContactOut(BaseModel):
+    phone: str | None = Field(None, json_schema_extra=CUSTOMER_CONTACT)
+    source: Literal["walk_in", "phone"] = "walk_in"
+
+
+class OrderedContactListIn(BaseModel):
+    order: Literal["name", "phone"] = "name"
+
+
+class SourceListIn(BaseModel):
+    source: Literal["walk_in", "phone"] | None = None
+
+
+def test_a_filter_whose_choices_name_a_marked_field_is_not_an_order():
+    # «Came by phone» is a source, not the customer's phone: the filter chooses among the values of the answer's
+    # ``source``.
+    assert unguarded_filters(operation("shop.contact.list", MarkedContactOut, SourceListIn)) == []
+
+
+def test_an_order_by_a_marked_field_is_caught_whatever_its_field_is_called():
+    assert unguarded_filters(operation("shop.contact.list", MarkedContactOut, OrderedContactListIn)) == [
+        f"shop.contact.list: {__name__}.OrderedContactListIn.order"
     ]
 
 

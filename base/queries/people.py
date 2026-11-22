@@ -7,12 +7,11 @@ from django.utils import translation
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import AI, INTERNAL, operation
 
 from base import access, people as people_rules
 from base.models import Credential, Hub, HubUser, Membership, Profile
-from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_of_role
 from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
@@ -71,7 +70,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
     return sorted(people, key=lambda person: (people_rules.role_rank(person["role"]), person["name"].casefold()))
 
 
-#: The roles the photo's ``members`` may carry: erplora.com's four.
+#: The roles the photo's ``members`` may carry: erplora.com's.
 PHOTO_ROLES = frozenset(people_rules.ROLE_ORDER)
 
 
@@ -194,7 +193,8 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
 def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
     """Employees › Personal: every person once, owner first, with the plan's places."""
     found = people_of(ctx.scope.key)
-    return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, len(found))}
+    taking_a_place = sum(1 for person in found if person["role"] not in people_rules.FREE_ROLES)
+    return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, taking_a_place)}
 
 
 @operation(
@@ -237,10 +237,8 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     ),
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
-    """Employees › Roles: erplora.com's four, from the top, with their people and permissions."""
+    """Employees › Roles: erplora.com's, from the top, with their people and permissions."""
     found = people_of(ctx.scope.key)
-    configs = all_live_app_configs()
-    everything = {permission for config in configs for permission in config.permissions}
     with translation.override(ctx.language):
         return {
             "roles": [
@@ -249,9 +247,7 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
                     "label": str(role.label),
                     "origin": "basic",
                     "members": sum(1 for person in found if person["role"] == role),
-                    "permissions": len(
-                        everything if role in FULL_ACCESS_ROLES else permissions_for_role(configs, role.value)
-                    ),
+                    "permissions": len(permissions_of_role(role.value)),
                 }
                 for role in people_rules.ROLE_ORDER
             ]

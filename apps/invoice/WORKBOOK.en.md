@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e9d5432543507d86dc90f51fa18933a1bf275f4a12c6f4fbe18fb71ed861720a -->
+<!-- generated from WORKBOOK.md sha256:aa102b64ce37080c510bb2a1bd639b67a976f4d5813fa9c9a323df0f9c851120 -->
 
 ## What it is for and who it is for
 
@@ -19,9 +19,10 @@ restaurant and the hair salon alike: nothing in it belongs to one vertical.
 
 ### Who uses it and what each one does
 
-- The **employee** looks at the invoices, prints them, issues an invoice by hand, turns a ticket into a
-  full invoice and marks an invoice as paid.
-- The **manager**, besides, rectifies and keeps the numbering series.
+- The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them,
+  issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
+  paid.
+- The **manager**, besides, sees everyone's invoices, rectifies and keeps the numbering series.
 - The **owner** and the **administrator**, besides, set up the **issuer** (the business's tax identity
   that appears on every invoice).
 - The **system**, with nobody in front, invoices every charge and rectifies every refund and every void.
@@ -93,7 +94,9 @@ Initial setup, step by step:
 All the business's invoices: the tickets of every charge, the full invoices and the rectifying ones, the latest
 issued on top. Search them by number, customer or tax ID, filter them by status, type, series, date or total, and
 open them to view, print or save them as a PDF. From each one you mark it paid, rectify it or turn a ticket into a
-full invoice; **+** issues an invoice by hand.
+full invoice; **+** issues an invoice by hand. An employee sees only theirs: the ones they issued, the ones of their
+sales (the ones they charged and the ones attributed to them) and what rectifies or replaces one of them; the manager,
+the owner and the administrator see everyone's.
 
 #### Detail
 Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card view; on the phone, cards
@@ -192,8 +195,8 @@ Error: "Could not load the series" with "Retry".
 
 ### Issuer
 Your business's fiscal details that appear on every invoice: legal name, tax ID and full address. Without them no
-ticket or invoice is issued. Only the owner and the administrator change them; the others see them without being
-able to edit them.
+ticket or invoice is issued. Only the owner and the administrator see this tab and change
+them.
 
 #### Detail
 Menu **Invoicing → Issuer**. "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and
@@ -399,7 +402,9 @@ anything is changed (and the field's message, as soon as that field is corrected
 card fills it; the tax ID's, also when the country or the document type changes) and comes back if the
 next try is refused too; a document that is not a ticket, "Only a ticket (simplified invoice) can be
 replaced by a full invoice.". If the ticket already has its F3, it answers with it without issuing
-another or using a number.
+another or using a number. An employee only finds their own tickets (the ones of their sales): someone else's
+does not show up in **Invoices** and the API or the assistant say "Invoice not found."; the manager turns it,
+or the customer themselves with the code of their ticket.
 Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
@@ -653,15 +658,19 @@ Involved: none
 
 ### INVOICE-F16 Find an invoice
 Status: done
-Actor: employee, manager, administrator
+Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoices
 Steps:
 1. Open **Invoicing → Invoices**.
 2. Type in "Search invoices…" a number, a customer's name or a tax ID; or filter (status, type, series,
    source, date, total); or tap a column to sort.
-3. The table shows the matching ones, 50 at a time; the latest issued, on top.
+3. The table shows the matching ones, 50 at a time; the latest issued, on top. An employee only sees theirs:
+   the ones they issued and the ones of their sales (the ones they charged and the ones attributed to their
+   Staff record), and what follows one of them: the full invoice that replaced a ticket of theirs and the
+   rectifying invoice of any of them, even when the manager issues it. The manager, the owner and the
+   administrator see everyone's.
 4. Tap "View", or the row, to open it.
-In: the hub's invoices.
+In: the hub's invoices the person sees.
 Out: nothing; it only reads.
 If it fails: without results, "No results"; with an error, the message and "Retry". The total is read as in
 any amount field of the Hub and as in the other lists ("1.000,50", "1,000.50", "2 500" and
@@ -673,7 +682,7 @@ Involved: none
 
 ### INVOICE-F17 View an invoice
 Status: done
-Actor: employee, manager, administrator
+Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
 Steps:
 1. In **Invoices**, open the invoice.
@@ -689,12 +698,14 @@ Out: nothing; it only reads. The detail updates by itself if meanwhile it is pai
 answers.
 If it fails: "Invoice not found" or the reason of the failure. Without VeriFactu, without a record yet or
 without permission to see it, the detail shows without the receipt card. In the installed app, if it cannot open the
-AEAT's page, "Could not open that page. Try again.".
+AEAT's page, "Could not open that page. Try again.". An invoice the person does not see (someone else's, for an
+employee) does not open, not even by its number: "Invoice not found", as one that does not exist. What rectifies
+or replaces one of theirs is theirs, so its links open.
 Involved: VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
 Status: done
-Actor: employee, manager, administrator
+Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
 Steps:
 1. On the detail, tap "Print / PDF".
@@ -714,12 +725,13 @@ Out: the paper; the invoice does not change. Each tap, one paper.
 If it fails: "Could not print the invoice", also if the VeriFactu record of an invoice that has one cannot
 be read (it is not printed without its QR). If the installed app does not open its print screen, the notice
 says why after a colon ("…: this version of the ERPlora app cannot print; update it", "…: the device's print
-service did not open"…).
+service did not open"…). Someone else's, for an employee, is neither printed nor downloaded: the API and the
+assistant say "Invoice not found.".
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF)
 
 ### INVOICE-F19 Mark an invoice as paid
 Status: done
-Actor: employee, manager, administrator, assistant
+Actor: employee (their invoices), manager and administrator (everyone's), assistant
 Screen: Invoices, Invoice detail
 Steps:
 1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice; or ask the assistant
@@ -733,7 +745,8 @@ In: the chosen invoice.
 Out: the status "Paid" and the payment date (announces `invoice.invoice.paid`). No amount changes and the
 till is not touched.
 If it fails: if meanwhile someone paid it or rectified it, "This invoice cannot be marked as paid: only an
-issued invoice that is not paid yet can be. Nothing was changed.". The invoices born from a sale are
+issued invoice that is not paid yet can be. Nothing was changed.". Someone else's, for an employee, "Invoice not
+found.", without changing anything. The invoices born from a sale are
 already born paid and a rectifying invoice is not paid: they do not offer the action.
 Involved: none
 
@@ -747,7 +760,8 @@ Steps:
    series, date, issuer, customer, total and status.
 In: the sale (its id or its number).
 Out: the invoice's data; it only reads.
-If it fails: if the invoice does not exist yet, it answers that there is none.
+If it fails: if the invoice does not exist yet, it answers that there is none. With a person's session, it only
+answers about a sale they see: someone else's, for an employee, "That sale does not exist.".
 Involved: SALE-F29
 
 ### INVOICE-F21 Set up the issuer
@@ -812,6 +826,14 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 session) and the API, with the same rules and the same permissions. Designed for voice: an invoice is named
 by its number (`FACT-2026-000012`), a sale by its number of the day (`20261014-0003`), a customer by their
 name, their phone or their email (as in Customers) and a series by its code.
+
+What reads or touches an issued invoice (the list, the invoice, its document and its paper, turning it into a full
+invoice, marking it paid and rectifying it) and the invoice of a sale only reach the ones the person sees: without
+"See all invoices", the ones they issued, the ones of their sales and what rectifies or replaces one of them. One
+they do not see does not exist for them
+(404 `invoice.not_found`; someone else's sale, 404 `sale.sale_not_found`). An API key or an automation, which are
+not a person, reach all the ones their permission opens. The numbering (its gaps and the book of numbers) is the
+whole series'.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -935,6 +957,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | View invoices, series, numbering and issuer; print | yes | yes | yes | yes | `invoice.view_invoice` |
+| View everyone's invoices (without it, only theirs: the ones they issued, the ones of their sales and what rectifies or replaces them) | yes | yes | yes | no | `invoice.view_all_invoices` |
 | Issue by hand, invoice a sale, replace a ticket, mark as paid | yes | yes | yes | yes | `invoice.add_invoice` |
 | Rectify (by hand, by refund and by void) | yes | yes | yes | no | `invoice.rectify_invoice` |
 | Create and change series | yes | yes | yes | no | `invoice.manage_series` |
@@ -945,3 +968,7 @@ The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_man
 Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: only to the system. Whoever opens
 the ticket's public page holds `invoice.public`, without a session and without any other permission; no automation
 issues from it alone (high risk, as replacing a ticket at the counter).
+
+The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print" and "View
+everyone's invoices": it opens, prints and downloads everyone's invoices issued, without issuing, rectifying or setting
+up anything.

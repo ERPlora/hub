@@ -31,7 +31,6 @@ import ImportTaxModal from '../components/ImportTaxModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
 import ProductFormModal from '../components/ProductFormModal.vue';
 import StockModal, { type StockAction } from '../components/StockModal.vue';
-import { useInventoryTabs } from '../composables/useInventoryTabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useProductImport } from '../composables/useProductImport';
 import { useServerTable } from '../composables/useServerTable';
@@ -40,6 +39,7 @@ import { useUnits } from '../composables/useUnits';
 import { saveTextFile } from '../lib/download';
 import { amountFilterErrors, formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
 import { filterParams, filtersInUse, PRICE_ENDS, PRODUCT_STATUSES, type ProductStatus, unreadableQuantities } from '../lib/productFilters';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
 /** `?status=` of a link (the till's «N articles cannot be sold» opens «unconfigured»). */
@@ -47,7 +47,7 @@ const STATUS_FROM_QUERY: Record<string, ProductStatus> = { unconfigured: 'needs_
 
 const { t, locale } = useT();
 const business = useBusinessMoney();
-const tabs = useInventoryTabs();
+const tabs = useAppTabs('inventory');
 const session = useSession();
 const client = useLiveClient();
 const route = useRoute();

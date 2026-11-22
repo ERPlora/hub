@@ -258,9 +258,9 @@ def test_the_sales_figures_alone_do_not_open_the_pay():
     make_member("Ana", commission_rate=Decimal("15"))
     op = get("staff.commission.report")
     with pytest.raises(PermissionDenied):
-        op(ctx_for(permissions={"staff.view", "sale.view_reports"}), op.input.model_validate({}))
+        op(ctx_for(permissions={"staff.view", "sale.view_sale"}), op.input.model_validate({}))
     # Positive control: the same figures with the pay permission read it.
-    page = op(ctx_for(permissions={"staff.view_compensation", "sale.view_reports"}), op.input.model_validate({}))
+    page = op(ctx_for(permissions={"staff.view_compensation", "sale.view_sale"}), op.input.model_validate({}))
     assert [row.full_name for row in page.rows] == ["Ana López"]
 
 

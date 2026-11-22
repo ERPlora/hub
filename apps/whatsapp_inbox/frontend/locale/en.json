@@ -3,9 +3,7 @@
     "title": "WhatsApp inbox",
     "settingsTitle": "Channel settings",
     "tabs": {
-      "label": "WhatsApp inbox sections",
-      "inbox": "Inbox",
-      "settings": "Settings"
+      "label": "WhatsApp inbox sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

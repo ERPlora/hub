@@ -35,29 +35,23 @@ from apps.cash_register.models import (
     Settings,
     session_number,
 )
-from apps.cash_register.queries import (
-    actor,
-    business_currency,
-    count_row,
-    count_total,
-    currency_decimals,
-    current_settings,
-    expected_now,
-    find_register,
+from apps.cash_register.queries.auto_close import last_cut_off
+from apps.cash_register.queries.counts import count_row
+from apps.cash_register.queries.currency import count_total, currency_decimals, normalized_count
+from apps.cash_register.queries.figures import expected_now
+from apps.cash_register.queries.lines import sale_lines, stored_line
+from apps.cash_register.queries.movements import line_row
+from apps.cash_register.queries.people import actor
+from apps.cash_register.queries.registers import find_register, register_row
+from apps.cash_register.queries.sessions import (
     find_session,
     hides_expected,
-    last_cut_off,
-    line_row,
-    normalized_count,
-    register_row,
     require_count,
-    sale_lines,
     session_detail,
     session_row,
     session_to_close,
-    settings_row,
-    stored_line,
 )
+from apps.cash_register.queries.settings import current_settings, settings_row
 from apps.cash_register.schemas import (
     AutoCloseOut,
     CountAddIn,
@@ -76,7 +70,9 @@ from apps.cash_register.schemas import (
     SettingsOut,
     SettingsPatchIn,
 )
+from apps.sale.queries.business import business_currency
 from base.business import business_zone, paper_date
+from base.queries.people import signed_in_username
 
 SESSION_ALREADY_OPEN = _(
     "There is already an open cash session. Close it before opening another one."
@@ -296,7 +292,8 @@ def _close(  # noqa: PLR0913
     auto: bool,
 ) -> Session:
     """Close ``session`` (locked) at ``end``: copy its sale lines of ``[opened_at, end)``, freeze the expected
-    cash, the counted one and their difference, and say so."""
+    cash, the counted one and their difference, and say so. Closed by itself, it is closed by no one, whoever's
+    opening closes it."""
     copies = [
         Movement(
             session=session,
@@ -320,7 +317,7 @@ def _close(  # noqa: PLR0913
     expected = session.opening_balance + sum(line.cash for line in lines)
     session.status = Session.Status.CLOSED
     session.closed_at = end
-    session.closed_by = by
+    session.closed_by, session.closed_by_username = by, "" if auto else signed_in_username(ctx)
     session.closing_balance = counted
     session.expected_balance = expected
     session.difference = None if counted is None else counted - expected
@@ -330,7 +327,7 @@ def _close(  # noqa: PLR0913
         update_fields=[
             "status",
             "closed_at",
-            "closed_by",
+            "closed_by", "closed_by_username",
             "closing_balance",
             "expected_balance",
             "difference",
@@ -429,7 +426,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
                 sequence=sequence,
                 register=register,
                 opened_at=now,
-                opened_by=actor(ctx),
+                opened_by=actor(ctx), opened_by_username=signed_in_username(ctx),
                 opening_balance=data.opening_balance or 0,
                 opening_notes=data.opening_notes,
             )
@@ -447,11 +444,6 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
         },
     )
     return session_row(ctx, session, settings, now, [])
-
-
-def _open_for_writing(session_id, number) -> Session:
-    """The session named (or the open one), locked, still open and not past its daily cut-off."""
-    return session_to_close(session_id, number, lock=True)
 
 
 @operation(
@@ -489,7 +481,7 @@ def _open_for_writing(session_id, number) -> Session:
     },
 )
 def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
-    session = _open_for_writing(data.session_id, data.session)
+    session = session_to_close(ctx, data.session_id, data.session, lock=True)
     settings = current_settings()
     require_count(data.closing_balance, settings)
     now = timezone.now()
@@ -567,7 +559,7 @@ def auto_close(ctx: OperationContext, data: EmptyIn) -> dict:
     },
 )
 def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
-    session = _open_for_writing(data.session_id, data.session)
+    session = session_to_close(ctx, data.session_id, data.session, lock=True)
     settings = current_settings()
     if (
         data.type == Movement.Type.OUT
@@ -627,7 +619,7 @@ def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
     },
 )
 def add_count(ctx: OperationContext, data: CountAddIn) -> dict:
-    session = _open_for_writing(data.session_id, data.session)
+    session = session_to_close(ctx, data.session_id, data.session, lock=True)
     currency = business_currency(ctx)
     sent = data.denominations.model_dump() if data.denominations is not None else {}
     denominations = normalized_count(sent, currency) if sent else {}
@@ -720,7 +712,7 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
     },
 )
 def print_session(ctx: OperationContext, data: SessionGetIn) -> dict:
-    session = find_session(data.session_id, data.session)
+    session = find_session(ctx, data.session_id, data.session)
     if hides_expected(ctx, session, current_settings()):
         raise Conflict(str(REPORT_HIDDEN), code="cash_register.report_hidden")
     report = "x" if session.is_open else "z"

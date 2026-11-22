@@ -18,7 +18,11 @@ ROLE_ORDER = (
     Membership.Role.ADMIN,
     Membership.Role.MANAGER,
     Membership.Role.EMPLOYEE,
+    Membership.Role.ACCOUNTANT,
 )
+
+#: The roles that take no place of the plan: the accountancy firm only reads (erplora.com does not count it either).
+FREE_ROLES = frozenset({Membership.Role.ACCOUNTANT})
 
 #: The local copy of an erplora.com account is named ``saas:<id>`` (``base.services.sessions.username_for``): a person
 #: the SaaS's photo names is known by it before entering.
@@ -37,7 +41,7 @@ OWN_BADGE_MESSAGE = _("Nobody registers their own badge: ask another administrat
 
 
 def role_rank(role: str) -> int:
-    """0 for the owner, 3 for an employee; a role erplora.com did not send (none) goes last."""
+    """0 for the owner, 4 for the accountancy firm; a role erplora.com did not send (none) goes last."""
     try:
         return ROLE_ORDER.index(role)
     except ValueError:

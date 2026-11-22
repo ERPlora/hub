@@ -81,6 +81,32 @@ def test_the_owner_and_the_admin_open_every_screen_of_every_app(make_user):
     assert every.keys() == {config.label for config in module_configs() if config.navigation}
 
 
+def test_the_screens_an_employee_may_not_open_are_locked_under_their_app(make_user):
+    locked = session_me(make_user(), "hub_employee")["locked"]
+    assert locked["tax"] == ["/tax/categories", "/tax/rules", "/tax/aliases", "/tax/settings"]
+    assert locked["verifactu"] == [nav.path for nav in _navigation_of("verifactu")]
+    assert "/sale/pos" not in locked.get("sale", [])
+
+
+def test_every_screen_of_an_app_is_either_open_in_the_menu_or_locked(make_user):
+    for username, role in (("eva", "hub_employee"), ("mario", "hub_manager")):
+        me = session_me(make_user(username), role)
+        menu = {group["id"]: [item["path"] for item in group["items"]] for group in me["menu"]}
+        for config in home.shown_modules(demo_hub=False):
+            opened, closed = menu.get(config.label, []), me["locked"].get(config.label, [])
+            assert sorted(opened + closed) == sorted(nav.path for nav in config.navigation), (role, config.label)
+            assert role != "hub_employee" or config.label not in SETUP_APPS or not opened, config.label
+
+
+def test_nothing_is_locked_to_the_owner_or_the_admin(make_user):
+    assert session_me(make_user("olga"), "hub_owner")["locked"] == {}
+    assert session_me(make_user("adrian"), "hub_admin")["locked"] == {}
+
+
+def _navigation_of(label: str) -> list:
+    return next(config.navigation for config in module_configs() if config.label == label)
+
+
 # ── base.session.access: what a device follows to read its session again ──────────────────────────────────────────
 
 

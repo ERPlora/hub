@@ -28,7 +28,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { allowed, type InboxAction, inboxActions } from '../lib/actions';
 import type { BookingListIn, BookingRow, BookingSort, BookingStatus } from '../operations';
-import { onlineBookingTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('online_booking');
 
 const STATUSES: readonly BookingStatus[] = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
 const ICONS: Record<InboxAction, string> = {
@@ -186,7 +188,7 @@ async function confirmDelete(): Promise<void> {
   <AppPage
     :title="$t('online_booking.title')"
     content-layout="fill"
-    :tabs="onlineBookingTabs(t, { settings: session.can('online_booking.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('online_booking.tabs.label')"
   >
     <PageNotices

@@ -2,7 +2,7 @@
 // Apps: the business's apps over the live `base.app.list`, which the SaaS's photo re-runs (a paid app bought on
 // erplora.com turns up without reloading). Three tabs in the address: «My apps» (`/apps`), «Add apps» (`#all`, the whole
 // catalogue) and «Paid» (`#paid`, only while some app is sold apart). A paid app without its right says it needs a
-// subscription and, for whoever runs the business and only on the web, «Upgrade plan» opens erplora.com's Store (the
+// subscription and, for the owner and only on the web (`useMayBuy`), «Upgrade plan» opens erplora.com's Store (the
 // stores refuse an app that sells inside the Hub). Whoever runs the business turns an app on or off with its switch: on
 // asks first when it brings others it needs; off always asks, naming what goes with it, and one another app on needs says
 // which to turn off first; the switch goes back to the real state when nothing changed. A refusal is a notice that stays
@@ -22,7 +22,7 @@ import {
   useConfirm,
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, openExternalLink, type ShellTab, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, type ShellTab, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -47,6 +47,7 @@ import {
 import { appActions, appSwitch } from '../lib/apps-table';
 import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { useBaseI18n } from '../lib/i18n';
+import { useMayBuy } from '../lib/plan-link';
 import type { AppRow } from '../operations/apps';
 
 const { t, locale } = useBaseI18n();
@@ -54,7 +55,7 @@ const { confirm } = useConfirm();
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
-const { isWeb } = useSurface();
+const buyer = useMayBuy();
 
 const { data, status, refresh } = useLive('base.app.list', {});
 const enable = useCommand('base.app.enable');
@@ -65,12 +66,11 @@ const apps = computed<AppRow[]>(() => data.value?.apps ?? []);
 const storeUrl = computed(() => data.value?.store_url ?? '');
 const failed = computed(() => status.value === 'error');
 const loading = computed(() => data.value === undefined && !failed.value);
-/** Who runs the business buys: erplora.com decides the rest by profile. */
-const mayBuy = computed(() => isWeb.value && session.can('base.administer_hub') && storeUrl.value !== '');
+/** The owner buys, on the web: on erplora.com only the owner does. */
+const mayBuy = computed(() => buyer.value && storeUrl.value !== '');
 /** Who runs the business turns apps on and off. */
 const mayManage = computed(() => session.can('base.administer_hub'));
-/** The plan's page on erplora.com, only on the web (the Hub never sells inside the installed app). */
-const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.plan_url ?? '') : ''));
+const planUrl = computed(() => (buyer.value ? (data.value?.plan_url ?? '') : ''));
 /** The app being turned on or off: only its button waits, and no other starts meanwhile. */
 const pending = ref<string | null>(null);
 /** The plan's limit the last «Turn on» hit; cleared by the next change. */

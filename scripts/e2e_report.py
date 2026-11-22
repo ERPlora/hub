@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The report of the Hub's nightly e2e run (.github/scripts/nightly-e2e.sh): lists what came out red, from Playwright's
+"""The report of the Hub's nightly e2e run (scripts/nightly_e2e.py): lists what came out red, from Playwright's
 JSON report, in its output, and keeps ONE open issue about it: a red night opens it (or comments on it when it is
 already open) and the first green night closes it.
 
@@ -58,14 +58,14 @@ ISSUE_OPENING = (
     "- Pasada del {day} sobre `main` (commit `{commit}`), en el Mac. El registro de la noche (`night.log`) y las trazas"
     " y capturas de cada fallo (`test-results/`), en `{folder}`.\n"
     "- Una spec se repite en una pila propia (`tests/e2e/README.md`, «Varias ejecuciones a la vez») con `CI=1 pnpm e2e"
-    " tests/e2e/<spec>`, o con la misma pila de la noche: `bash .github/scripts/nightly-e2e.sh --no-publish --spec"
+    " tests/e2e/<spec>`, o con la misma pila de la noche: `python3 scripts/nightly_e2e.py --no-publish --spec"
     " tests/e2e/<spec>`.\n"
     "\n"
 )
 ISSUE_CLOSING = (
     "\n"
     "## Origen\n"
-    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`.github/scripts/nightly-e2e.sh`, que"
+    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`scripts/nightly_e2e.py`, que"
     " lanza launchd en el Mac).\n"
     "- Sale de #877\n"
     "- La introdujo una PR: no comprobado — la pasada no sabe qué cambio la rompió; se busca entre los commits desde la"

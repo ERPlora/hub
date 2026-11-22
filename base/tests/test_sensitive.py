@@ -23,6 +23,7 @@ DATA_PERMISSIONS = {
 
 def test_base_declares_the_four_data_permissions():
     assert DATA_PERMISSIONS <= set(apps.get_app_config("base").permissions)
+    assert sensitive.DATA_PERMISSIONS == DATA_PERMISSIONS
 
 
 @pytest.mark.parametrize(

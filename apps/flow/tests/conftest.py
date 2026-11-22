@@ -17,11 +17,11 @@ from django.contrib.auth import get_user_model
 from django.db import connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
-from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
+from base.permissions import permissions_of_role
 from base.tenancy.context import current_alias
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
@@ -44,17 +44,12 @@ def ctx_for(
     permissions: set[str] | None = None,
     language: str = "en",
 ) -> OperationContext:
-    """The context a caller with ``role`` on ``scope`` gets (permissions from the apps' AppConfig).
+    """The context a caller with ``role`` on ``scope`` gets, as ``base.permissions`` computes it.
 
-    Owner and admin get every permission (``base.permissions.FULL_ACCESS_ROLES``); the others what each
-    app's ``role_permissions`` gives them. ``permissions`` replaces them for a combination no role has.
+    ``permissions`` replaces the role's for a combination no role has.
     """
     if permissions is None:
-        configs = all_live_app_configs()
-        if role in ("hub_owner", "hub_admin"):
-            permissions = {p for config in configs for p in config.permissions}
-        else:
-            permissions = permissions_for_role(configs, role)
+        permissions = permissions_of_role(role)
     return OperationContext(
         scope=scope, actor=actor, permissions=permissions, language=language
     )

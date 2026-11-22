@@ -83,7 +83,7 @@ check("build caches its layers in GitHub's cache",
           for step in steps(build) if "build-push-action" in str(step.get("uses", ""))))
 check("build tests the image before it pushes it", before(build, "docker/image.test.sh", "docker push"))
 check("the deploy never moves the environment back to an older commit",
-      before(deploy_job, "deploy-order.sh", "ecs-deploy.sh"))
+      before(deploy_job, "deploy-order.sh", "scripts/ecs_deploy.py"))
 check("the workflow only reads", deploy.get("permissions") == {"contents": "read"})
 
 # --- deploy.yml: the settings of deploy/app-env.json and the confirmation of a protected one ------
@@ -93,10 +93,10 @@ confirm_input = (dispatch.get("inputs") or {}).get("confirm_protected") or {}
 check("a manual deploy takes the confirmation of a protected setting, empty by default",
       confirm_input.get("type") == "string" and confirm_input.get("default") == ""
       and confirm_input.get("required") is False)
-ecs_step = next((step for step in steps(deploy_job) if "ecs-deploy.sh" in str(step.get("run", ""))), {})
-check("the deploy hands the confirmation to ecs-deploy.sh in its environment, never inline in the script",
+ecs_step = next((step for step in steps(deploy_job) if "scripts/ecs_deploy.py" in str(step.get("run", ""))), {})
+check("the deploy runs python3 scripts/ecs_deploy.py with the confirmation in its environment, never inline",
       (ecs_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
-      and "inputs.confirm_protected" not in str(ecs_step.get("run", "")))
+      and str(ecs_step.get("run", "")).split() == ["python3", "scripts/ecs_deploy.py"])
 checkout = next((step for step in steps(deploy_job) if "actions/checkout" in str(step.get("uses", ""))), {})
 check("the deploy checks out the whole history: it reads deploy/app-env.json of the commit it deploys",
       (checkout.get("with") or {}).get("fetch-depth") == 0)
@@ -108,10 +108,10 @@ check("a rollback takes the confirmation of a protected setting, empty by defaul
       rollback_confirm.get("type") == "string" and rollback_confirm.get("default") == ""
       and rollback_confirm.get("required") is False)
 rollback_job = (rollback.get("jobs") or {}).get("rollback", {})
-rollback_step = next((step for step in steps(rollback_job) if "ecs-rollback.sh" in str(step.get("run", ""))), {})
-check("the rollback hands the confirmation to ecs-rollback.sh in its environment, never inline in the script",
+rollback_step = next((step for step in steps(rollback_job) if "ecs_rollback.py" in str(step.get("run", ""))), {})
+check("the rollback runs python3 scripts/ecs_rollback.py with the confirmation in its environment, never inline",
       (rollback_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
-      and "inputs.confirm_protected" not in str(rollback_step.get("run", "")))
+      and str(rollback_step.get("run", "")).split() == ["python3", "scripts/ecs_rollback.py"])
 check("only build and deploy get an OIDC token",
       sorted(name for name, job in jobs.items() if (job.get("permissions") or {}).get("id-token") == "write")
       == ["build", "deploy"])
@@ -251,7 +251,7 @@ check("setup-uv caches by uv.lock",
 
 # --- test.yml: the browser smoke stops the merge ----------------------------------------------------
 # A change that breaks a critical walk in the browser turns "test / test" red: the job smoke runs smoke-e2e.sh (the
-# tests tagged @smoke, narrowed with --spec while the groups enter one at a time) on the stack nightly-e2e.sh builds,
+# tests tagged @smoke, narrowed with --spec while the groups enter one at a time) on the stack nightly_e2e.py builds,
 # with the SaaS beside the Hub because every login goes through erplora.com.
 smoke_job = tjobs.get("smoke", {})
 smoke_runs = runs(smoke_job)
@@ -259,7 +259,7 @@ smoke_step = next((step for step in steps(smoke_job) if "smoke-e2e.sh" in str(st
 smoke_words = str(smoke_step.get("run", "")).split()
 check("smoke runs the browser smoke with smoke-e2e.sh", smoke_words[:2] == ["bash", ".github/scripts/smoke-e2e.sh"])
 check("smoke runs Playwright only through smoke-e2e.sh",
-      not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly-e2e.sh")))
+      not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly_e2e.py")))
 smoke_specs = [smoke_words[index + 1] for index, word in enumerate(smoke_words[:-1]) if word == "--spec"]
 check("smoke's step is that command and its --spec, with nothing after them that could hide a red (as `|| true`)",
       smoke_words[2:] == [word for spec in smoke_specs for word in ("--spec", spec)])
@@ -290,7 +290,7 @@ check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if u
       not unsmoked)
 check("smoke has a timeout of its own, in whole minutes",
       isinstance(smoke_job.get("timeout-minutes"), int) and smoke_job.get("timeout-minutes") > 0)
-# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly-e2e.sh takes
+# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly_e2e.py takes
 # the SaaS from ../saas, as in the erplora-next tree.
 check("smoke starts Postgres with docker compose before the smoke", before(smoke_job, "docker compose", "smoke-e2e.sh"))
 check("smoke clones ERPlora/saas into ../saas before the smoke",

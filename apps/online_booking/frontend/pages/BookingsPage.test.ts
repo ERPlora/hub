@@ -10,7 +10,18 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { BookingRow } from '../operations';
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountOnlineBooking, page, settle } from '../__tests__/mount-online-booking';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  EMPLOYEE,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  mountOnlineBooking,
+  type MountOptions,
+  OWNER,
+  page,
+  settle,
+} from '../__tests__/mount-online-booking';
 import CancelDialog from '../components/CancelDialog.vue';
 import BookingsPage from './BookingsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -225,4 +236,8 @@ describe('BookingsPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('BookingsPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(OWNER, 1) }), [['bookings', 'Bookings']]);
 });

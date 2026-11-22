@@ -94,10 +94,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     // The side menu: whoever runs the business sees every entry with a screen; «API» only with the docs shown.
     await expect.poll(() => menuIds(page)).toEqual(OWNER_MENU);
     await snapMenu(page, 'FIX-SIDEBAR-owner', width);
-    // «Roles»: the four of erplora.com.
+    // «Roles»: the five of erplora.com.
     await tab(page, 'roles');
     await expect(page).toHaveURL(/\/employees#roles$/);
-    await expect(shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]')).toHaveCount(4);
+    await expect(shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]')).toHaveCount(5);
     await expect(testid(page, 'roles-change')).toHaveAttribute('href', /\/members$/);
     await snap(page, 'BASE-G143', width);
     await noProblems(problems);

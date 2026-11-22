@@ -9,7 +9,18 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  mountInventory,
+  type MountOptions,
+  page,
+  subId,
+} from '../__tests__/mount-inventory';
 import KpiTile from '../components/KpiTile.vue';
 import { formatMoney } from '../lib/format';
 import DashboardPage from './DashboardPage.vue';
@@ -109,6 +120,13 @@ describe('DashboardPage', () => {
     expect(s.testid('inventory-dashboard-without-cost').text()).toBe('1 product without recorded cost: the value shown is partial');
   });
 
+  it('whoever does not see the costs gets the value empty: no value tile and no note about it (BASE-F119)', async () => {
+    const s = await setup();
+    await s.summary({ ...SUMMARY, stock_value: null, products_without_cost: 2 });
+    expect(s.kpis().map(([label]) => label)).toEqual(['Tracked products', 'In stock', 'Out of stock', 'Low stock']);
+    expect(s.testid('inventory-dashboard-without-cost').exists()).toBe(false);
+  });
+
   it('a new result replaces the figures without reloading (a sale elsewhere)', async () => {
     const s = await setup();
     await s.summary(SUMMARY);
@@ -201,4 +219,8 @@ describe('DashboardPage', () => {
     await s.lowStock(page([], 0, 5));
     expect(s.prop('emptyMessage')).toBe('Sin productos en stock bajo.');
   });
+});
+
+describe('DashboardPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(EMPLOYEE, 1) }), [['dashboard', 'Dashboard']]);
 });

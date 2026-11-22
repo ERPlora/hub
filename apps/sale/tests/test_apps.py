@@ -2,6 +2,7 @@
 of the Home."""
 
 
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
@@ -9,13 +10,14 @@ from live.live_registry import live_registry
 from base.tests.shell_icons import shell_icon_registry
 from live.meta import (
     Category,
-    Help,
     LiveAppConfig,
     Nav,
     Widget,
     module_configs,
     permissions_for_role,
 )
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "sale.view_sale",
@@ -27,7 +29,7 @@ PERMISSIONS = [
     "sale.refund_sale",
     "sale.view_paymentmethod",
     "sale.add_paymentmethod",
-    "sale.view_reports",
+    "sale.view_all_sales",
     "sale.manage_settings",
 ]
 
@@ -69,16 +71,27 @@ def test_sale_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # The product's fifteen, but for the four no operation asks for (delete_sale, change_sale,
-    # change_paymentmethod, delete_paymentmethod) and with `discount.over_limit` as one action.
+    # change_paymentmethod, delete_paymentmethod) and with `discount.over_limit` as one action. Seeing the whole
+    # business's figures is base's «View business totals», not a permission of Sales.
     assert sale().permissions == PERMISSIONS
 
 
-def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
+def test_the_figures_open_to_whoever_reads_the_sales():
+    # What they add up is the caller's own sales or the whole business's (``SALES.counted``), never more than the
+    # sales list opens, so reading the sales is all they ask.
+    from live.operations import registry
+
+    figures = ("sale.sale.stats", "sale.sale.today", "sale.sale.last_7_days", "sale.sale.by_staff")
+    assert {name: registry[name].permission for name in figures} == dict.fromkeys(figures, "sale.view_sale")
+
+
+def test_roles_are_the_customer_roles_with_the_hub_prefix():
     assert set(sale().role_permissions) == {
         "hub_owner",
         "hub_admin",
         "hub_manager",
         "hub_employee",
+        "hub_accountant",
     }
 
 
@@ -87,11 +100,18 @@ def test_roles():
     for role in ("hub_owner", "hub_admin", "hub_manager"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
     # The old cashier (the employee who also charges) is the employee now: it builds the check,
-    # charges it and reads the sales; voiding, refunding, figures and settings are the manager's.
+    # charges it and reads its own sales and their figures; everyone's, voiding, refunding and settings are the
+    # manager's.
     assert permissions_for_role([config], "hub_employee") == {
         "sale.view_sale",
         "sale.add_sale",
         "sale.take_payment",
+        "sale.view_paymentmethod",
+    }
+    # The accountancy firm reads everyone's sales and how they were paid; it never builds a check nor charges.
+    assert permissions_for_role([config], "hub_accountant") == {
+        "sale.view_sale",
+        "sale.view_all_sales",
         "sale.view_paymentmethod",
     }
 
@@ -196,7 +216,7 @@ def test_the_homes_panels_are_the_old_sales_dashboards_four():
             "sale.sale.today",
             "sm",
             True,
-            "sale.view_reports",
+            "sale.view_sale",
             {},
             {"value": "total"},
             {"format": "currency", "tone": 1},
@@ -207,7 +227,7 @@ def test_the_homes_panels_are_the_old_sales_dashboards_four():
             "sale.sale.today",
             "sm",
             True,
-            "sale.view_reports",
+            "sale.view_sale",
             {},
             {"value": "tickets"},
             {"format": "number", "tone": 2},
@@ -218,7 +238,7 @@ def test_the_homes_panels_are_the_old_sales_dashboards_four():
             "sale.sale.last_7_days",
             "lg",
             False,
-            "sale.view_reports",
+            "sale.view_sale",
             {},
             {"label": "day", "value": "total"},
             {"format": "currency"},
@@ -308,4 +328,23 @@ def test_sales_has_no_setup_steps_nor_bell_counters():
 
 
 def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
-    assert sale().help == Help(videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"})
+    assert sale().help.videos == {"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("SALE-F01",), "0j9NMnpgXWM", "TALKAH4xCLM"),
+    (("SALE-F02",), "6IaIDRuKHzk", "glc7T7Xpyw0"),
+    (("SALE-F03",), "4iMjcVUNlGQ", "FjqB1ra8qPQ"),
+    (("SALE-F04", "SALE-F05"), "QZIskHcvbx4", "WBdK2Z-XHOQ"),
+    (("SALE-F11",), "gtsNNFvYHIw", "yViCguWhBP8"),
+    (("SALE-F13",), "VkHmRSouS8U", "yQGyb_bvMi8"),
+    (("SALE-F14",), "kG1MT9VEMjo", "B_-hW7QysXU"),
+    (("SALE-F15",), "ADneSwlsnlg", "8vLwV_6ILUQ"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("sale", language) == help_videos.by_task(TASK_VIDEOS, language)

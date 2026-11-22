@@ -12,11 +12,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { CartOut, CartStatus } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   business,
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   mountCartCheckout,
   type MountOptions,
   page,
@@ -374,4 +376,8 @@ describe('CartsPage: the business’s currency (cart-checkout-business-currency)
 
 describe('CartsPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
   itReadsAmountFiltersAsTheHub(totalFilter(setup, page(ROWS)));
+});
+
+describe('CartsPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(EMPLOYEE, 1) }), [['carts', 'Carts']]);
 });

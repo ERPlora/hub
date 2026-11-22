@@ -14,7 +14,7 @@ describe('SpecialDaysPage', () => {
     await m.live();
     const page = m.wrapper.findComponent(AppPage);
     expect(page.props('title')).toBe('Schedules');
-    expect((page.props('tabs') as Array<{ id: string }>).map((t) => t.id)).toEqual(['hours', 'special_days', 'settings']);
+    expect((page.props('tabs') as Array<{ id: string }>).map((t) => t.id)).toEqual(['hours', 'special-days', 'settings']);
     expect(m.wrapper.findComponent(SpecialDaysList).exists()).toBe(true);
     expect(m.wrapper.findComponent(OverridesList).exists()).toBe(true);
     const headings = m.wrapper.findAll('h3').map((h) => h.text());

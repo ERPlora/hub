@@ -1,6 +1,6 @@
-"""``manage.py export_assistant_catalog --role <owner|admin|manager|employee> --language <en|es> [--apps a,b]``: the
-assistant's tools a role holds, as JSON (``live.assistant_qa.export_catalog``), for the assistant's QA with the
-real model: the QA reads it to write its own phrases
+"""``manage.py export_assistant_catalog --role <owner|admin|manager|employee|accountant> --language <en|es>
+[--apps a,b]``: the assistant's tools a role holds, as JSON (``live.assistant_qa.export_catalog``), for the assistant's
+QA with the real model: the QA reads it to write its own phrases
 and to check which tool the model calls, which card a write shows and what the role is refused.
 
 It names no business: the catalogue is a member's of a business with every app on (the e2e business ``a``), as a
@@ -24,6 +24,7 @@ ROLES = {
     "admin": Membership.Role.ADMIN,
     "manager": Membership.Role.MANAGER,
     "employee": Membership.Role.EMPLOYEE,
+    "accountant": Membership.Role.ACCOUNTANT,
 }
 #: No business's: the catalogue is given its apps (``--apps`` or every one), so its scope is never read.
 EXPORT_SCOPE = Scope("host", "export")

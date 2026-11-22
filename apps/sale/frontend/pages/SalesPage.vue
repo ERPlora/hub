@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Sales & POS → Sales (SALE-F28–F31; the old `erp-sales-list`): «Sales», the period (Today to begin
-// with, 7 days, 30 days, All) counted from the hub's business day, the six figures of the period (only
-// for whoever may see the reports) and the live `sale.sale.list` in a server-side DataTable — Date,
+// with, 7 days, 30 days, All) counted from the hub's business day, the six figures of the period (the
+// whole business's or one's own sales') and the live `sale.sale.list` in a server-side DataTable — Date,
 // Number, Customer, Payment, Status («<amount> left to refund» under a sale partly refunded), Total —,
 // with search, the filters behind the table's funnel (date, payment, status, total on their columns; a
 // date range replaces the period; an amount it cannot read, or a «to» day before its «from», is said
@@ -40,7 +40,9 @@ import { amountFilterErrors, formatMoney, type Money, moneyOf, useBusinessMoney 
 import { refusal } from '../lib/refusal';
 import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES, TOTAL_ENDS } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
-import { saleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('sale');
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'sale.sales.period.today',
@@ -50,7 +52,6 @@ const PERIOD_LABELS: Record<Period, string> = {
 };
 
 const session = useSession();
-const canReports = computed(() => session.can('sale.view_reports'));
 const canIssue = computed(() => session.can('sale.take_payment'));
 const t = useT();
 const locale = useLocale();
@@ -233,7 +234,7 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
   <AppPage
     :title="$t('sale.title')"
     content-layout="fill"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <h2
@@ -267,10 +268,10 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
       {{ $t('sale.sales.businessDayError') }}
     </InlineFeedback>
     <SalesKpis
-      v-if="canReports && !blocked"
+      v-if="!blocked"
       :bounds="bounds"
     />
-    <SalesWeek v-if="canReports && !blocked && segmentValue === 'week'" />
+    <SalesWeek v-if="!blocked && segmentValue === 'week'" />
     <InlineFeedback
       v-if="status === 'reconnecting'"
       class="sales-page__notice"

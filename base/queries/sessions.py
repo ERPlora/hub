@@ -23,11 +23,13 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
 
     The menu lists the entries of each module the person may open (``Nav.permission``), and only the modules with one;
     ``apps`` lists every module the person holds a permission of, since other screens read from it whether a module
-    is on (the till sells the modifiers and menus a cashier never opens). Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
-    or a demo's hub): a platform app such as ``base`` is always on and never shows. A module its business has no
-    right to (``base.entitlement``) or turned off (``base.activation``) is ``off`` and has no menu: the shell's gate
-    tells why its screens do not open. ``demo`` says when the demo ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
-    tells the SPA to send it to the login.
+    is on (the till sells the modifiers and menus a cashier never opens). ``locked`` names, per module, the entries
+    the person may not open: the shell's gate answers them with «No access». Menu and apps list modules only
+    (``home.shown_modules``: the reference app only in development, the tests or a demo's hub): a platform app such
+    as ``base`` is always on and never shows. A module its business has no right to (``base.entitlement``) or turned
+    off (``base.activation``) is ``off`` and has no menu: the shell's gate tells why its screens do not open. ``demo``
+    says when the demo ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing
+    else, which tells the SPA to send it to the login.
     """
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
@@ -37,7 +39,8 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
     creating = activation.creating_apps(ctx.scope) if blocked else frozenset()
     with translation.override(ctx.language):
-        usable = [config for config in home.shown_modules(demo_hub=demo is not None) if _may_use(ctx, config)]
+        shown = home.shown_modules(demo_hub=demo is not None)
+        usable = [config for config in shown if _may_use(ctx, config)]
         return {
             "user": _user(ctx.actor, hub_user_of(ctx)),
             "scope": {"kind": ctx.scope.kind, "key": ctx.scope.key},
@@ -55,9 +58,23 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
                 if _can_see(ctx, config) and config.label not in blocked
             ],
             "apps": [{"label": config.label, "state": _session_state(config.label, blocked, creating)} for config in usable],
+            "locked": _locked(ctx, shown),
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
+
+
+def _locked(ctx: OperationContext, configs: list[Any]) -> dict[str, list[str]]:
+    """Per module, the paths of its menu entries the person may not open; a module it opens entirely is absent, and
+    nothing is locked to an anonymous visitor, who is sent to the login."""
+    if ctx.actor is None:
+        return {}
+    locked = {}
+    for config in configs:
+        opened = {nav.path for nav in open_entries(ctx, config)}
+        if closed := [nav.path for nav in config.navigation if nav.path not in opened]:
+            locked[config.label] = closed
+    return locked
 
 
 # Not an assistant tool: what a device follows to read its own session again.

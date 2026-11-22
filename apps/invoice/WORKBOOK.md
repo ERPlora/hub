@@ -27,9 +27,9 @@ peluquería: no hay nada propio de un vertical.
 
 ### Quién la usa y qué hace cada uno
 
-- El **empleado** consulta las facturas, las imprime, emite una factura a mano, pasa un tique a
-  factura completa y marca pagada una factura.
-- El **responsable**, además, rectifica y lleva las series de numeración.
+- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, emite una
+  factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
+- El **responsable**, además, ve las facturas de todos, rectifica y lleva las series de numeración.
 - El **propietario** y el **administrador**, además, configuran el **emisor** (la identidad fiscal del
   negocio que sale en cada factura).
 - El **sistema**, sin nadie delante, factura cada cobro y rectifica cada devolución y cada anulación.
@@ -99,7 +99,9 @@ Configuración inicial, paso a paso:
 Todas las facturas del negocio: los tiques de cada cobro, las facturas completas y las rectificativas, lo último
 emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado, tipo, serie, fecha o total, y ábrelas para
 verlas, imprimirlas o guardarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
-completa; con **+** emites una factura a mano.
+completa; con **+** emites una factura a mano. Un empleado ve solo las suyas: las que emitió, las de sus ventas
+(las que cobró y las que se le atribuyeron) y lo que rectifica o sustituye a una de ellas; el responsable, el
+propietario y el administrador ven las de todos.
 
 #### Detalle
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
@@ -198,8 +200,8 @@ Error: «No se pudieron cargar las series» con «Reintentar».
 
 ### Emisor
 Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo. Sin ellos no se
-emite ningún tique ni factura. Solo los cambian el propietario y el administrador; los demás los ven sin poder
-editarlos.
+emite ningún tique ni factura. Solo el propietario y el administrador ven esta pestaña y
+los cambian.
 
 #### Detalle
 Menú **Facturación → Emisor**. «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad»,
@@ -403,7 +405,9 @@ bajo el campo y arriba «Revisa los datos marcados.», que se va en cuanto se ca
 campo, en cuanto se corrige ese campo, también si lo rellena la tarjeta de un cliente; el del NIF,
 también si cambia el país o el tipo de documento) y vuelve si el siguiente intento también se rechaza; un
 documento que no es un tique, «Solo un tique (factura simplificada) se puede sustituir por una factura
-completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número.
+completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número. Un empleado solo
+encuentra sus tiques (los de sus ventas): el de otro no le sale en **Facturas** y la API o el asistente dicen
+«Factura no encontrada.»; lo pasa el responsable o el propio cliente con el código de su tique.
 Implicados: ninguno
 
 ### INVOICE-F06 Una venta cobrada que no se ha podido facturar
@@ -654,15 +658,19 @@ Implicados: ninguno
 
 ### INVOICE-F16 Buscar una factura
 Estado: hecho
-Actor: empleado, responsable, administrador
+Actor: empleado (sus facturas), responsable y administrador (las de todos)
 Pantalla: Facturas
 Pasos:
 1. Abre **Facturación → Facturas**.
 2. Escribe en «Buscar facturas…» un número, un nombre de cliente o un NIF; o filtra (estado, tipo,
    serie, origen, fecha, total); o pulsa una columna para ordenar.
-3. La tabla enseña las que casan, de 50 en 50; lo último emitido, arriba.
+3. La tabla enseña las que casan, de 50 en 50; lo último emitido, arriba. Un empleado solo ve las suyas:
+   las que emitió él y las de sus ventas (las que cobró y las que se atribuyeron a su ficha de Personal), y
+   lo que sigue a una de ellas: la factura completa que sustituyó a un tique suyo y la rectificativa de
+   cualquiera de ellas, aunque la emita el responsable. El responsable, el propietario y el administrador ven
+   las de todos.
 4. Pulsa «Ver», o la fila, para abrirla.
-Entra: las facturas del hub.
+Entra: las facturas del hub que la persona ve.
 Sale: nada; solo se lee.
 Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar». El total se lee como
 en cualquier campo de importe del Hub y como en las demás listas («1.000,50», «1,000.50», «2 500» y
@@ -674,7 +682,7 @@ Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura
 Estado: hecho
-Actor: empleado, responsable, administrador
+Actor: empleado (sus facturas), responsable y administrador (las de todos)
 Pantalla: Ficha de factura
 Pasos:
 1. En **Facturas**, abre la factura.
@@ -690,12 +698,14 @@ Sale: nada; solo se lee. La ficha se pone al día sola si mientras tanto se paga
 contesta.
 Si falla: «Factura no encontrada» o el motivo del fallo. Sin VeriFactu, sin registro todavía o sin permiso
 para verlo, la ficha sale sin la tarjeta del justificante. En la app instalada, si no puede abrir la página de la
-AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.».
+AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.». Una factura que la persona no ve (la de otro,
+para un empleado) no se abre, tampoco por su número: «Factura no encontrada», como una que no existe. Lo que
+rectifica o sustituye a una suya es suyo, así que sus enlaces se abren.
 Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
 Estado: hecho
-Actor: empleado, responsable, administrador
+Actor: empleado (sus facturas), responsable y administrador (las de todos)
 Pantalla: Ficha de factura
 Pasos:
 1. En la ficha, pulsa «Imprimir / PDF».
@@ -717,12 +727,13 @@ Sale: el papel; la factura no cambia. Cada pulsación, un papel.
 Si falla: «No se pudo imprimir la factura», también si no se puede leer el registro de VeriFactu de una
 factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
 aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
-«…: el servicio de impresión del dispositivo no se abrió»…).
+«…: el servicio de impresión del dispositivo no se abrió»…). La de otro, para un empleado, ni se imprime ni
+se descarga: la API y el asistente dicen «Factura no encontrada.».
 Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF)
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
-Actor: empleado, responsable, administrador, asistente
+Actor: empleado (sus facturas), responsable y administrador (las de todos), asistente
 Pantalla: Facturas, Ficha de factura
 Pasos:
 1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida»; o pídeselo al
@@ -737,7 +748,8 @@ Entra: la factura elegida.
 Sale: el estado «Pagada» y la fecha de pago (avisa `invoice.invoice.paid`). Ningún importe cambia y la
 caja no se toca.
 Si falla: si mientras tanto alguien la pagó o la rectificó, «Esta factura no se puede marcar como
-pagada: solo se puede con una factura emitida que aún no esté pagada. No se ha cambiado nada.». Las
+pagada: solo se puede con una factura emitida que aún no esté pagada. No se ha cambiado nada.». La de
+otro, para un empleado, «Factura no encontrada.», sin cambiar nada. Las
 facturas que nacen de una venta ya nacen pagadas y una rectificativa no se paga: no ofrecen la acción.
 Implicados: ninguno
 
@@ -751,7 +763,8 @@ Pasos:
    tipo, serie, fecha, emisor, cliente, total y estado.
 Entra: la venta (su id o su número).
 Sale: los datos de la factura; solo se lee.
-Si falla: si la factura aún no existe, contesta que no hay.
+Si falla: si la factura aún no existe, contesta que no hay. Con la sesión de una persona, solo contesta de una
+venta que ve: la de otro, para un empleado, «Esa venta no existe.».
 Implicados: SALE-F29
 
 ### INVOICE-F21 Configurar el emisor
@@ -815,6 +828,14 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: una factura se
 nombra por su número (`FACT-2026-000012`), una venta por su número del día (`20261014-0003`), un
 cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie por su código.
+
+Lo que lee o toca una factura ya emitida (la lista, la factura, su documento y su papel, pasarla a completa,
+marcarla pagada y rectificarla) y la factura de una venta solo alcanzan las que la persona ve: sin «Ver todas
+las facturas», las que emitió, las de sus ventas y lo que rectifica o sustituye a una de ellas. Una que no ve no
+existe para ella (404 `invoice.not_found`;
+la venta de otro, 404 `sale.sale_not_found`). Una llave de API o una automatización, que no son una persona,
+alcanzan todas las que abre su permiso. La numeración (sus huecos y el libro de números) es la de la serie
+entera.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -936,6 +957,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver facturas, series, numeración y emisor; imprimir | sí | sí | sí | sí | `invoice.view_invoice` |
+| Ver las facturas de todos (sin él, solo las suyas: las que emitió, las de sus ventas y lo que las rectifica o sustituye) | sí | sí | sí | no | `invoice.view_all_invoices` |
 | Emitir a mano, facturar una venta, sustituir un tique, marcar pagada | sí | sí | sí | sí | `invoice.add_invoice` |
 | Rectificar (a mano, por devolución y por anulación) | sí | sí | sí | no | `invoice.rectify_invoice` |
 | Crear y cambiar series | sí | sí | sí | no | `invoice.manage_series` |
@@ -946,6 +968,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo del sistema. `invoice.public` lo tiene
 quien abre la página pública del tique, sin sesión y sin ningún otro permiso; ninguna automatización emite desde ella
 sola (riesgo alto, como sustituir un tique en el mostrador).
+
+La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir» y «Ver las facturas de
+todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, rectificar ni configurar nada.
 
 ## Para quien lo mantiene
 
@@ -1337,6 +1362,15 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     | Lightspeed | el QR del tique es para pagar; la factura desde un tique la hace el personal | https://k-series-support.lightspeedhq.com/hc/en-us/articles/1260804607150 |
     | Toast | el enlace del recibo digital, sin autofactura | https://support.toasttab.com/en/article/Reprint-and-Resend-Receipt-from-Payment-Terminal |
     | RD 1619/2012 | art. 7.2 y 7.3 (el cliente la exige), 15.3 (cuatro años) y 15.6 (la sustitutiva no es rectificativa) | https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696 |
+
+23. **Cada empleado ve sus facturas; el responsable, las de todos** (Odoo «Facturación: solo mis documentos»,
+    Square y Toast «ver las ventas propias / ver todas», como Ventas): las suyas son las que emitió y las de sus
+    ventas (el tique, la F3 y las rectificativas de una devolución o una anulación de una venta suya), y un
+    documento sigue a su original: la F3 que sustituye a un tique suyo y la rectificativa de una factura suya
+    también son suyas, las emita quien las emita, como en Odoo, donde la rectificativa hereda el comercial de la
+    original. Una que no ve es el mismo 404 que una que no existe, también al pasarla a completa, marcarla pagada
+    o rectificarla. La numeración no se filtra: un hueco o el libro de números son de la serie entera y solo dan
+    números, no clientes ni importes.
 
 ### Lo que NO hace, a propósito
 

@@ -9,8 +9,8 @@
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
-import { offersRowAction, rowAction } from './service-helpers';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, testid, untilStill } from './helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -171,33 +171,24 @@ test('MODIFIER-F01: the groups are found by name and say their rule, their optio
   await expect(shown(page).locator('[data-testid=modifier-groups-empty]')).toContainText('No results');
 });
 
-test('MODIFIER-F01: the employee reads the groups and their sheet, with nothing that changes them', async ({ browser }) => {
+test('MODIFIER-F01: the employee does not open the groups («No access»), and the API refuses its writes', async ({ browser }) => {
   // Made by the owner, through the API (setup, never the check).
   const owner = await hostPage(browser, A, { next: '/modifier/groups' });
   const made = await makeGroup(owner.context, { name: named('Cooking'), min_choices: 1, max_choices: 1 }, [{ name: 'Rare' }]);
   const employee = await hostPage(browser, A, { next: '/modifier/groups', credentials: EMPLOYEE });
   const { page } = employee;
   try {
-    // Positive control: the owner has what the employee must not.
+    // Positive control: the owner opens the groups, with what the employee must not have.
     await tableReady(owner.page);
     await expect(shown(owner.page).locator('[data-testid=modifier-groups-add]')).toBeVisible();
 
-    await tableReady(page);
-    await shown(page).locator('[data-testid=modifier-groups-search] input').fill(STAMP);
-    await expect(groupRow(page, made.id)).toBeVisible();
+    // The groups set the till up: not in an employee's menu, and by their address «No access» (BASE-F118).
+    await expect(testid(page, 'no-access')).toBeVisible();
+    await expect(groupRow(page, made.id)).toHaveCount(0);
     await expect(shown(page).locator('[data-testid=modifier-groups-add]')).toHaveCount(0);
-    expect(await offersRowAction(page, 'modifier-groups', made.id, 'delete')).toBe(false);
-    await groupRow(page, made.id).locator('[role=cell]').first().click();
-    await expect(sheet(page)).toBeVisible();
-    await expect(sheet(page).locator('[data-testid^=modifier-sheet-options-row-]')).toContainText('Rare');
-    for (const hook of ['modifier-sheet-options-add', 'modifier-sheet-links-add']) {
-      await expect(sheet(page).locator(`[data-testid=${hook}]`), hook).toHaveCount(0);
-    }
-    await expect(sheet(page).locator('[data-testid^=modifier-sheet-options-delete-]')).toHaveCount(0);
     // The API refuses the write too.
     const refused = await api<{ error: { code: string } }>(employee.context, A, 'POST', '/modifier/groups', { name: named('Nope') });
     expect([refused.status, refused.data.error.code]).toEqual([403, 'permission_denied']);
-    await shoot(page, 'MODIFIER-F01-employee', () => expect(sheet(page).locator('[data-testid=modifier-sheet-title]')).toBeVisible());
   } finally {
     await employee.context.close();
     await owner.context.close();

@@ -2,9 +2,7 @@
   "appointment": {
     "title": "Appointments",
     "tabs": {
-      "label": "Appointment sections",
-      "agenda": "Agenda",
-      "settings": "Settings"
+      "label": "Appointment sections"
     },
     "loading": "Loading…",
     "retry": "Retry",

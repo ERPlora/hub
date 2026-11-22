@@ -2,10 +2,7 @@
   "invoice": {
     "title": "Facturación",
     "tabs": {
-      "label": "Secciones de Facturación",
-      "invoices": "Facturas",
-      "series": "Series",
-      "issuer": "Emisor"
+      "label": "Secciones de Facturación"
     },
     "live": {
       "reconnecting": "Reconectando…",

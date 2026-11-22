@@ -79,23 +79,26 @@ de cocina). Al cerrar el día, **Comisiones** da lo que ha vendido y ganado cada
 ## Pantallas
 
 Personal tiene cinco pestañas: **Personal**, **Roles**, **Ausencias**, **Horarios** y **Comisiones**
-(esta, solo para quien ve la compensación), más **Ajustes** (para quien puede guardarlos). Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
+(esta, solo para quien ve la compensación), más **Ajustes**; **Roles** y **Ajustes**, solo para quien puede
+guardar los ajustes. Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
 intente por la API o por el asistente.
 
 ### Personal
-Aquí está tu equipo: una fila por persona con su nombre, su rol, su email y su estado (**Activo**, **Inactivo** o **De
-baja**) y, para quien ve la compensación, su tarifa por hora. Encima, tres cifras: **Plantilla activa**, **Ausentes
+Aquí está tu equipo: una fila por persona con su nombre, su rol, su email (para quien ve el contacto del equipo) y su
+estado (**Activo**, **Inactivo** o **De baja**) y, para quien ve la compensación, su tarifa por hora. Encima, tres cifras: **Plantilla activa**, **Ausentes
 hoy** y **Ausencias pendientes**. **+** da de alta a una persona y una fila abre su ficha para editarla; el propietario
 y el administrador también la desactivan o la dan de baja desde la fila. Quien tiene su cuenta vinculada a una ficha la
 ve en **Mi ficha**.
 
 #### Detalle
 Encima de la tabla, tres cifras: **Plantilla activa**, **Ausentes hoy** y **Ausencias pendientes**
-(STAFF-F23). Debajo, la tabla con buscador «Buscar miembro…» (nombre, apellidos, email, teléfono, nº de empleado o rol),
-columnas **Nombre, Rol, Email, Estado** y, solo para quien puede ver la compensación, **Tarifa/h**;
-**Teléfono** existe pero sale oculto. Se ordena por cualquier columna y se filtra por Nombre,
-Apellidos, Email, Teléfono, Rol, Estado (**Activo**, **De baja**, **Inactivo**), Reservable, fecha de
-alta, color y usuario; 50 por página. Las fichas dadas de baja no salen.
+(STAFF-F23). Debajo, la tabla con buscador «Buscar miembro…» (nombre, apellidos, nº de empleado o rol, y email y
+teléfono para quien ve el contacto del equipo), columnas **Nombre, Rol, Email, Estado** y, solo para quien puede ver
+la compensación, **Tarifa/h**; **Teléfono** existe pero sale oculto. **Email** y **Teléfono** solo salen a quien ve el
+contacto del equipo (el propietario, el administrador y el responsable; BASE-F119): un empleado ve la tabla sin esas dos
+columnas, sin huecos. Se ordena por cualquier columna salvo Email, Teléfono y Tarifa/h, y se filtra por Nombre,
+Apellidos, Email y Teléfono (quien ve el contacto del equipo), Rol, Estado (**Activo**, **De baja**, **Inactivo**),
+Reservable, fecha de alta, color y usuario; 50 por página. Las fichas dadas de baja no salen.
 
 El botón **+** abre **Nuevo**; una fila abre **Editar · {nombre}**. Formulario: **Nombre, Apellidos,
 Email, Teléfono, Nº de empleado, Rol** («Sin rol»), **Usuario del Hub** («Sin acceso al Hub»),
@@ -220,7 +223,8 @@ Pasos:
    Nº de empleado, Rol, Usuario del Hub, Fecha de alta, Color (#RRGGBB),
    Especialidades, Bio, Margen entre citas y, con permiso de compensación, Tarifa por hora y
    Comisión (%). **Reservable** viene encendido.
-3. Pulsa Guardar: la persona sale en la tabla como **Activa**.
+3. Pulsa Guardar: la persona sale en la tabla como **Activa**, con su email y su teléfono para quien ve el contacto
+   del equipo.
 Entra: el formulario; los roles activos (STAFF-F04), por id o por su nombre. La tarifa se escribe en la
 moneda del negocio y se guarda en su unidad más pequeña (céntimos en euros; en yenes, yenes enteros); la
 comisión es un porcentaje de 0 a 100 con dos decimales. Por la API o el
@@ -237,7 +241,7 @@ ese rol no está disponible y cuáles hay, y no se crea nada. Guardar (también 
 mientras el negocio no haya dicho todavía su moneda, porque la tarifa por hora se lee en ella (sin ella,
 «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar se enciende.
-Implicados: BASE-F97
+Implicados: BASE-F97, BASE-F119
 
 ### STAFF-F02 Editar la ficha de un profesional
 Estado: hecho (servidor y pantalla)
@@ -251,14 +255,14 @@ Pasos:
    De baja (la baja definitiva se da con **Dar de baja**, en la fila). «Sin rol» quita el rol, «Sin acceso al Hub» desvincula la
    cuenta, y la Fecha de alta se puede **borrar**.
 3. Guarda: solo cambia lo enviado.
-Entra: la ficha (y, con permiso, su tarifa, comisión y notas).
+Entra: la ficha (su email y su teléfono, a quien ve el contacto del equipo; con permiso, su tarifa, comisión y notas).
 Sale: la ficha cambiada (`staff.member.updated`). Guardar sin cambiar nada no avisa. Poner Inactivo
 aquí no apaga Reservable; volver a Activo tampoco lo enciende.
 Si falla: los mismos rechazos que al dar de alta; «Ese miembro del personal no existe en este
 negocio.» si ya no está (también si se dio de baja); poner **Inactivo** con ausencias pendientes o
 aprobadas sin terminar: «Ese miembro tiene ausencias pendientes o aprobadas que aún no han terminado.
 Resuélvelas primero.».
-Implicados: ninguno
+Implicados: BASE-F119
 
 ### STAFF-F03 Vincular la ficha con una cuenta del negocio
 Estado: hecho (servidor y pantalla)
@@ -356,8 +360,8 @@ Actor: empleado (y cualquier persona con ficha vinculada), asistente
 Pantalla: Personal (vista propia), Ausencias
 Pasos:
 1. Una persona con su cuenta vinculada a su ficha pulsa **Mi ficha** en **Personal**, o abre **Ausencias**.
-2. Ve su ficha con **su propia** tarifa y comisión (sin las notas de RRHH), y sus ausencias con su
-   motivo y sus notas.
+2. Ve su ficha con **su propia** tarifa y comisión (sin las notas de RRHH) y su propio email y teléfono, aunque no
+   vea el contacto del resto del equipo, y sus ausencias con su motivo y sus notas.
 3. La ficha es solo de lectura: un único botón, **Cerrar**.
 Entra: la cuenta con la que entra (no se puede falsear).
 Sale: nada cambia. Sin ficha vinculada, la respuesta viene vacía.
@@ -371,8 +375,8 @@ Pantalla: ninguna
 Pasos:
 1. Una app que necesita nombrar al equipo (el TPV en «Quién atiende esta cuenta», y con él la comanda
    de cocina; Citas, Servicios, Tareas) pide el directorio, con su permiso de ver el equipo.
-2. Recibe, por persona: nombre, email, teléfono, nº de empleado, rol, cuenta, estado, reservable,
-   fecha de alta y color; **nunca** la tarifa ni la comisión. Hasta 100 por página; se filtra, entre
+2. Recibe, por persona: nombre, email y teléfono (vacíos si quien pide no ve el contacto del equipo), nº de empleado,
+   rol, cuenta, estado, reservable, fecha de alta y color; **nunca** la tarifa ni la comisión. Hasta 100 por página; se filtra, entre
    otros, por usuario (para pasar de una cuenta a su ficha).
 Entra: nada; es una lectura.
 Sale: el directorio de fichas que no están dadas de baja (también las Inactivas y De baja).
@@ -546,7 +550,7 @@ Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de ca
 (ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
 sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
-Si falla: sin permiso de compensación, «No tienes permiso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
+Si falla: sin permiso de compensación, su dirección dice «Sin acceso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».
@@ -629,13 +633,13 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| El directorio, con búsqueda, filtros y orden por cualquier columna, en páginas (hasta 100) | ver | F09 | `staff.member.list` |
-| La ficha de una persona (sin compensación) | ver | F02 | `staff.member.detail` |
-| Mi ficha, con mi tarifa y mi comisión | ver | F08 | `staff.member.mine` |
+| El directorio, con búsqueda, filtros y orden por cualquier columna salvo el email y el teléfono, en páginas (hasta 100); el email y el teléfono, vacíos para quien no ve el contacto del equipo, que tampoco busca ni filtra por ellos | ver | F01, F02, F09 | `staff.member.list` |
+| La ficha de una persona (sin compensación; el email y el teléfono, vacíos para quien no ve el contacto del equipo) | ver | F02 | `staff.member.detail` |
+| Mi ficha, con mi tarifa, mi comisión, mi email y mi teléfono | ver | F08 | `staff.member.mine` |
 | La ficha de quien tiene la sesión, solo su id y su nombre: a ella atribuye Ventas «Yo» | cualquiera con sesión | SALE-F16 | `staff.member.current` |
 | Tarifa, comisión y notas de RRHH, con los filtros, el orden y las páginas del directorio (la columna Tarifa/h lee las mismas filas) | ver la compensación | F21 | `staff.member.compensation` |
 | La hoja de comisiones: quien puede cobrar comisión, con su ficha, su cuenta y su comisión | ver la compensación | F21 | `staff.commission.summary` |
-| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las cifras de Ventas) | F21 | `staff.commission.report` |
+| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las ventas) | F21 | `staff.commission.report` |
 | Las cifras: fichas, activos, de baja, inactivos, ausentes hoy y solicitudes pendientes | ver | F23 | `staff.member.stats` |
 | Los roles con sus miembros activos, con filtros y orden | ver | F04, F23 | `staff.role.list` |
 | Un rol por su id, también retirado: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F01, F02, F04, F07 | `staff.role.detail` |
@@ -694,7 +698,7 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 ### A qué reacciona y lo que necesita de otras apps
 No reacciona a ningún aviso y no requiere ninguna app. Para **Comisiones** pide a **Ventas**, si el
 negocio la tiene, lo vendido por cada profesional en el periodo, con lo devuelto ya restado
-(`sale.sale.by_staff`, con el permiso de cifras de Ventas de quien mira), y se pone al día con sus avisos
+(`sale.sale.by_staff`, con el permiso de ver las ventas de quien mira), y se pone al día con sus avisos
 de venta cobrada, anulada o devuelta (`sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded`).
 Sin Ventas, Comisiones lo dice y no lista a nadie. De la plataforma usa las cuentas del negocio (para
 vincular una ficha) y la zona horaria del negocio (para el «hoy»).
@@ -712,6 +716,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver el equipo, roles, horarios, disponibilidad, cifras y ajustes | sí | sí | sí | sí | `staff.view` |
+| Ver el email y el teléfono del equipo (permiso de dato de la plataforma) | sí | sí | sí | no | `base.view_team_contact` |
 | Ver tarifa, comisión y notas de RRHH | sí | sí | sí | no | `staff.view_compensation` |
 | Dar de alta fichas | sí | sí | sí | no | `staff.add_member` |
 | Editar fichas | sí | sí | sí | no | `staff.change_member` |
@@ -840,8 +845,8 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`,
   `/staff/commissions` y `/staff/settings`. El menú de `apps.py` lleva las seis, cada una con el permiso que la abre:
   Personal y Horarios, `staff.view`; Ausencias, `staff.view_time_off`; Comisiones, `staff.view_compensation`; Roles y
-  Ajustes, `staff.manage_settings`. La barra de pestañas (`frontend/tabs.ts`) añade «Comisiones» solo a quien ve la
-  compensación y «Ajustes» solo a quien puede guardarlos.
+  Ajustes, `staff.manage_settings`. La barra de pestañas son las entradas que la persona puede abrir
+  (`useAppTabs`).
 - Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo
   resuelve el servidor en días del negocio, y «Personalizado» envía `date_from` y `date_to`. Su 422 sale
   bajo «Hasta». Hasta 575 px el periodo es un `ion-select` (popover, `mode="md"`) con las mismas opciones
@@ -865,7 +870,8 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   al Hub» van primero mientras no se teclea, con `asCombo`).
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
   hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) dan dentro de la app lo mismo que los
-  paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y «Fichados ahora» de Control horario;
+  paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y el panel de quién está fichado de
+  Control horario (ATTENDANCE-F11);
   sus tarjetas rehacen el `ok-kpi` hasta que `@erplora/ui` tenga una (`UI-REQUESTS.md`).
 - Los paneles del Inicio son los `widgets` de `apps.py` (`base` los sirve en `base.widget.list`): `headcount` (`kpi`), `on_leave_today` (`stat`) y `pending_time_off` (`kpi`) sobre
   `staff.member.stats`, `time_off_today` (`timeline`) sobre `staff.time_off.today` y `by_role` (`bar-list`)

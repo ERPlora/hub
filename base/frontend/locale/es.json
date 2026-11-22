@@ -97,7 +97,8 @@
     },
     "plan": {
       "upgrade": "Mejorar plan",
-      "manage": "Gestionar en erplora.com"
+      "manage": "Gestionar en erplora.com",
+      "askOwner": "Pídele al propietario del negocio que mejore el plan."
     },
     "userMenu": {
       "account": "Mi cuenta",
@@ -233,6 +234,19 @@
         "body": "Comprueba la conexión y vuelve a intentarlo."
       },
       "toApps": "Ir a Apps"
+    },
+    "noAccess": {
+      "title": "Sin acceso",
+      "heading": "No tienes acceso a esta pantalla",
+      "body": "Tu rol en este negocio no la abre.",
+      "checking": "Buscando quién puede darte acceso…",
+      "ask": "Pide acceso a una de estas personas:",
+      "nobody": "Pide acceso a quien lleva el negocio.",
+      "error": {
+        "heading": "No hemos podido saber quién puede darte acceso",
+        "body": "Pregunta a quien lleva el negocio o vuelve a intentarlo."
+      },
+      "home": "Ir al Inicio"
     },
     "systemPlan": {
       "title": "Sistema",
@@ -373,6 +387,7 @@
       },
       "reset": {
         "adminOnly": "Solo un administrador puede deshacer importaciones o restablecer el negocio.",
+        "ownerOnly": "Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.",
         "undoTitle": "Deshacer una importación",
         "undoHint": "Quita solo lo que trajo esa importación. Lo que hayas creado después se conserva.",
         "undo": "Deshacer",
@@ -768,7 +783,8 @@
         "hub_owner": "Propietario",
         "hub_admin": "Administrador",
         "hub_manager": "Encargado",
-        "hub_employee": "Empleado"
+        "hub_employee": "Empleado",
+        "hub_accountant": "Gestoría"
       }
     },
     "device": {
@@ -864,7 +880,8 @@
         "hub_owner": "Propietario",
         "hub_admin": "Administrador",
         "hub_manager": "Encargado",
-        "hub_employee": "Empleado"
+        "hub_employee": "Empleado",
+        "hub_accountant": "Gestoría"
       },
       "status": {
         "active": "Activo",

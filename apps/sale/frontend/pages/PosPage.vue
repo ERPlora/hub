@@ -55,7 +55,9 @@ import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
 import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
 import { refusal } from '../lib/refusal';
-import { saleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('sale');
 
 const t = useT();
 const locale = useLocale();
@@ -588,7 +590,7 @@ onBeforeUnmount(() => {
 <template>
   <AppPage
     :title="$t('sale.title')"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <InlineFeedback

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:76718ae758c98740cb38a37187a62d9095b6e8ef8e2b5c44cb47616fd408733a -->
+<!-- generated from WORKBOOK.md sha256:ba3814de3ea3137051a399231c4c62fb1cad53f12d37e2ada1cb09dc5534de34 -->
 
 ## What it is for and who it is for
 
@@ -282,7 +282,10 @@ business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
 Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same.
-Involved: TAX-F01, BASE-F01, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
+The internal cost, given only through the assistant or the API, is written only by whoever sees the costs: a
+creation with a cost by someone who does not see them is refused as an operation they may not run and nothing is
+saved; without a cost, the service costs 0.
+Involved: TAX-F01, BASE-F01, BASE-F119, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
 each by this same creation)
 
 ### SERVICE-F02 Edit a service
@@ -299,7 +302,9 @@ already booked keep the name, the price and the duration they had; the vouchers 
 change.
 If it fails: the same reasons as when adding it, each under its field; a service that no longer exists,
 "That service does not exist in this business.". A service whose category was deleted shows "No category" and saves without trouble.
-Involved: SERVICE-F31
+Changing the internal cost belongs to whoever sees the costs: it is refused to someone who does not see them as an
+operation they may not run.
+Involved: SERVICE-F31, BASE-F119
 
 ### SERVICE-F03 Give a service an open price
 Status: done
@@ -1034,7 +1039,9 @@ confirmation with its card (BASE-F97), which names each record as the screens na
 belongs to Sales or Appointments: the sale by its number, its line and the check's line by what they charge, the
 appointment as Appointments' cards say it and the refund or the void that gives sessions back by its sale ("Refund of
 sale 20261014-0007", "Void of sale 20261014-0007"). With Sales or Appointments off, or if whoever asks may not see it,
-that datum does not show, never its id.
+that datum does not show, never its id. A service's internal cost reaches only whoever sees the costs (the owner,
+the administrator and the manager); the others get it empty. The till keeps it all the same in the line
+it sells, even if whoever charges does not see it.
 
 ### What it offers: queries (they read and change nothing)
 
@@ -1165,7 +1172,7 @@ with the session of whoever sells, as it does with Inventory.
   without Sales it refuses (409 `service.sales_unavailable`), as there is no sale to say.
 - **The session spent outside the checkout with its professional (F21)**: the other one. `service.grant.redeem` with
   `member_id` or `member` calls `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) with the session of
-  whoever spends it (its Sales permission, "Build the check", is held by all four roles) and in the same transaction.
+  whoever spends it (its Sales permission, "Build the check", is held by every role but the accountancy firm) and in the same transaction.
   `value` is the session's or, on an unlimited voucher, that professional's price for the service. Sales keeps it
   apart, because there is no line, and adds it to the production (SALE-F28): a session of the checkout never comes
   this way, so none counts twice. Without Sales in the business it is not called.

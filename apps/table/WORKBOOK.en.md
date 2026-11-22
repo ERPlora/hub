@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d71b262bdfefe468a718f6274ed19724f9cc179de24a03d296c0db93daaeff0e -->
+<!-- generated from WORKBOOK.md sha256:25d3baab83db604eb2e1008da0a98b526e835de9387eb2063c577638b7825c81 -->
 
 ## What it is for and who it is for
 
@@ -100,8 +100,8 @@ Initial setup, step by step:
 ## Screens
 
 The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sessions** and
-**Settings** (this one only for whoever can change them). No other one is hidden by permission; the
-buttons the profile cannot use do not show.
+**Settings**. **Zones** and **Tables** show only to whoever can change them, and **Settings**, to whoever
+can change it; the buttons the profile cannot use do not show.
 
 ### Floor plan
 Here you see at a glance how the room is doing: each table in its place, with its colour and, when it is
@@ -1088,4 +1088,4 @@ hears every notice of Tables, like those of any app.
 
 The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Seating, splitting and joining also ask for "Build the
-check" of Sales (`sale.add_sale`), which the four roles have.
+check" of Sales (`sale.add_sale`), which every role but the accountancy firm has.

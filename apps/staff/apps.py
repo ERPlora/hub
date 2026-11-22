@@ -79,7 +79,7 @@ class StaffConfig(LiveAppConfig):
         ],
         "hub_employee": ["staff.view", "staff.view_time_off", "staff.request_time_off"],
     }
-    # The sections of its tab bar (frontend/tabs.ts), each opening with its permission: Commissions to whoever sees the
+    # The sections of its tab bar, each opening with its permission: Commissions to whoever sees the
     # pay, Roles and Settings to whoever may save the settings.
     navigation = [
         Nav(
@@ -188,3 +188,11 @@ class StaffConfig(LiveAppConfig):
             options={"valueFormat": "number"},
         ),
     ]
+
+    def own_records(self, ctx) -> frozenset:
+        """The caller's live staff record, what other apps count as theirs: the sales attributed to them
+        (``base.queries.ownership.me``); none without one."""
+        from apps.staff.queries import own_member  # the models are not loaded yet when this module is
+
+        member = own_member(ctx)
+        return frozenset() if member is None else frozenset({member.pk})

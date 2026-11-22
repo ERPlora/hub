@@ -20,6 +20,7 @@ import type { SetupStatus } from '../operations/home';
 import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
 import { type HubHome, readJsonBlock } from './home';
+import { OWN_BUSINESS } from './plan-link';
 import { useSaasPass } from './saas-pass';
 
 /** The verb of each action a card or a receipt names, base's catalogue; another one is «Do this». */
@@ -133,7 +134,8 @@ export const HUB_ASSISTANT: AssistantConfig = {
   transcribe: (client, clip) => client.api.call('base.assistant.transcribe', clip),
   report: (client, report) => client.api.call('base.assistant.report', report),
   canUse: (session) => session.can('base.view_home'),
-  canUpgrade: (session) => session.can('base.administer_hub'),
+  canUpgrade: (session) => session.can(OWN_BUSINESS),
+  spentNoteKey: 'base.plan.askOwner',
   planUrl,
   openPlan: (client, event) => useSaasPass(client).openSaasPass('plan', planUrl(), event),
   verbKey: actionKey,

@@ -103,7 +103,9 @@ const sections = computed(() =>
         { id: 'essentials', more: false, fields: ESSENTIAL_FIELDS as TextField[] },
         { id: 'more', more: true, fields: MORE_FIELDS as TextField[] },
       ]
-    : [{ id: 'all', more: false, fields: [...ESSENTIAL_FIELDS, ...MORE_FIELDS] as TextField[] }],
+    : // A detail the card came without (null: the customers' contact details, to whoever does not see them) is not
+      // edited: it stays as it is.
+      [{ id: 'all', more: false, fields: ([...ESSENTIAL_FIELDS, ...MORE_FIELDS] as TextField[]).filter((field) => form.value[field] !== null) }],
 );
 
 /** What the browser could not read at the last «Save», by the key the server would refuse it under. */

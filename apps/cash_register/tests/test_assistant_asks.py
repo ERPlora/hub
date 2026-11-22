@@ -18,6 +18,7 @@ from apps.cash_register.tests.conftest import HUB_DB
 from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
+from base.tests.roles import WORKING_ROLES
 from base.tests.test_assistant_asks import (
     assert_its_words_name,
     TOP,
@@ -215,7 +216,7 @@ SEVERAL_MOVEMENTS_SAID = [
 
 
 @HUB_DB
-@pytest.mark.parametrize("role", tuple(Membership.Role))
+@pytest.mark.parametrize("role", WORKING_ROLES)
 @pytest.mark.parametrize(("language", "phrase"), SEVERAL_MOVEMENTS_SAID)
 def test_several_movements_said_by_their_count_bring_the_movement_among_the_first_ten(
     catalog_of, role, language, phrase

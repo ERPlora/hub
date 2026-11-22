@@ -23,7 +23,7 @@ Para qué: ver qué apps tiene el negocio, activar y desactivar las que se neces
 9. BASE-F23 — «Reservas», desactivada.
 10. BASE-F25 — VeriFactu se niega a desactivarse.
 11. BASE-F24 — «Reservas», activada otra vez, con sus datos.
-12. BASE-F20 — una app que necesita suscripción.
+12. BASE-F20 — una app que necesita suscripción; la Tienda solo le sale al propietario.
 13. BASE-F27 — una app de pago, bloqueada.
 14. BASE-F26 — por qué una app no se abre.
-15. BASE-F11 — a erplora.com a mejorar el plan.
+15. BASE-F11 — a erplora.com a mejorar el plan; lo hace el propietario.

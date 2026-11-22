@@ -105,7 +105,7 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 El menú **Reservas** tiene tres entradas: **Reservas**, **Lista de espera** y **Disponibilidad**. Abajo,
-las pestañas de las tres más **Ajustes** (esta, solo a quien puede cambiarlos). Los botones que el
+las pestañas de las tres más **Ajustes**; **Disponibilidad** y **Ajustes**, solo para quien puede cambiarlas. Los botones que el
 perfil no puede usar no salen.
 
 ### Reservas
@@ -796,7 +796,7 @@ la que solo se le autorizó reservar.
   descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
   por lista.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `engine.py` (la puerta del
-  alta sin base de datos), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  alta sin base de datos), `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_table.py`, `tests/test_integration_customer.py`,
   `tests/test_integration_schedule.py` (las apps reales, sin dobles) y `tests/test_concurrency.py`
@@ -813,7 +813,8 @@ la que solo se le autorizó reservar.
   cliente, a `customer.Customer` (`PROTECT`, como Citas); el horario se lee con la operación
   `schedule.hours.for_range`, con `schedule.view` añadido al contexto solo para esa lectura (como
   Citas); la ficha por teléfono (`card_for_phone`, al reservar y en la lista de espera) se busca y se
-  crea con `customer.view` y `customer.manage` añadidos solo para esas dos llamadas (`card_keeper`): un
+  crea con `customer.view`, `customer.manage` y `base.view_customer_contact` (el teléfono que da el invitado se busca
+  entre el contacto de los clientes) añadidos solo para esas dos llamadas (`card_keeper`): un
   paso de una automatización, que solo lleva el permiso de su operación y las lecturas de Reservas
   (FLOW-F12), reserva por teléfono sin recibir permisos de Clientes. Sentar (`reservation.reservation.seat`)
   declara `ai.in_person`: Automatizaciones no lo ofrece ni lo concede (`flow.high_risk`), porque abre la

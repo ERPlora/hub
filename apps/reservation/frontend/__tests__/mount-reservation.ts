@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import customerEn from '../../../customer/frontend/locale/en.json';
 import customerEs from '../../../customer/frontend/locale/es.json';
@@ -12,7 +13,7 @@ import es from '../locale/es.json';
 const OTHERS = ['table.view_table', 'table.add_session', 'table.change_session', 'sale.add_sale', 'customer.view', 'customer.manage'];
 
 /** Owner or admin: `reservation.*` (apps.py `role_permissions`), listed one by one. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('reservation', {
   user: { id: '1', label: 'Ana' },
   permissions: [
     'reservation.view_reservation',
@@ -32,16 +33,16 @@ export const OWNER: SessionMe = {
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** A manager runs the book and its rules; deleting a reservation is the owner's and the admin's. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('reservation', {
   ...OWNER,
   permissions: OWNER.permissions.filter((p) => p !== 'reservation.delete_reservation'),
-};
+});
 
 /** The host at the door: takes, confirms, seats, edits and cancels, keeps the waitlist; no rules. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('reservation', {
   ...OWNER,
   user: { id: '2', label: 'Luis' },
   permissions: [
@@ -55,7 +56,7 @@ export const EMPLOYEE: SessionMe = {
     'reservation.view_settings',
     ...OTHERS,
   ],
-};
+});
 
 export async function mountReservation(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, {

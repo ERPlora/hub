@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import appointmentEn from '../../../appointment/frontend/locale/en.json';
 import appointmentEs from '../../../appointment/frontend/locale/es.json';
@@ -22,26 +23,26 @@ const ALL = [
 ];
 
 /** Owner or admin: `online_booking.*` (apps.py `role_permissions`), and the services' rights. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('online_booking', {
   user: { id: '1', label: 'Ana' },
   permissions: [...ALL, 'service.view_service', 'service.change_service', 'appointment.manage_settings'],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** A manager: the inbox, without deleting, the settings nor the preview. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('online_booking', {
   ...OWNER,
   permissions: ['online_booking.view_booking', 'online_booking.change_booking', 'online_booking.confirm_booking'],
-};
+});
 
 /** An employee only looks. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('online_booking', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
   permissions: ['online_booking.view_booking'],
-};
+});
 
 export async function mountOnlineBooking(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, {

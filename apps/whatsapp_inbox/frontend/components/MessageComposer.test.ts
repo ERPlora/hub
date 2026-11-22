@@ -7,7 +7,7 @@ import { formatDateTime } from '@erplora/ui/components';
 import { applySurface } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import { click, EMPLOYEE, flush, followUpgrade, ionValue, mountInbox, settle, SIGNED } from '../__tests__/mount-inbox';
+import { ADMIN, click, EMPLOYEE, flush, followUpgrade, ionValue, mountInbox, settle, SIGNED } from '../__tests__/mount-inbox';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
@@ -204,7 +204,7 @@ describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
   };
   const BLOCKED = { can_send: false, send_blocked: 'cap_reached' as const };
 
-  it('a plan without WhatsApp messages: «Send» says so instead of sending, «Upgrade plan» for whoever configures', async () => {
+  it('a plan without WhatsApp messages: «Send» says so instead of sending, «Upgrade plan» for the owner', async () => {
     const s = await setup(BLOCKED, 'en', { channel: CHANNEL });
     const blocked = s.find('whatsapp-inbox-composer-blocked');
     expect(blocked.attributes('data-code')).toBe('cap_reached');
@@ -220,6 +220,9 @@ describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
     const employee = await setup(BLOCKED, 'en', { channel: CHANNEL, session: EMPLOYEE });
     expect(employee.find('whatsapp-inbox-composer-blocked').text()).toContain('Your plan does not include WhatsApp messages');
     expect(employee.find('whatsapp-inbox-composer-upgrade').exists()).toBe(false);
+    const admin = await setup(BLOCKED, 'en', { channel: CHANNEL, session: ADMIN });
+    expect(admin.find('whatsapp-inbox-composer-blocked').exists()).toBe(true);
+    expect(admin.find('whatsapp-inbox-composer-upgrade').exists()).toBe(false);
   });
 
   // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened

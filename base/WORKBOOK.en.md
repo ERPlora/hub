@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ec973b5973d4b06ae00142a123c2c2387ab0ec60917261be0450abefd7ac0c2d -->
+<!-- generated from WORKBOOK.md sha256:b0341fa635066c24acef7aaff2ed2dcf659c7aa2f094f1358327cac26adf604a -->
 
 ## What it is for and who it is for
 
@@ -24,7 +24,9 @@ Who uses it:
 
 - The **owner** and the **administrator** see everything and are the ones who can complete the
   platform's steps ("Your apps", "Turn on …" for each app mandatory in their country, "Your team"), and in the bell
-  they see the notices between apps that were not delivered.
+  they see the notices between apps that were not delivered. Only the **owner** buys for the business (upgrading the
+  plan or subscribing to a paid app on erplora.com), resets the business and downloads the copies of its data, as on
+  erplora.com, where the plan, the billing and the ownership are theirs alone.
 - The **manager** and the **employee** see their apps, the steps that are theirs, the panels they may
   see and the activity. A step that only an administrator can complete is shown to them too, so they know
   why invoicing is not possible, but without a button.
@@ -97,18 +99,20 @@ print… No notice is dismissed: it goes by itself once it is solved.
 
 ### The side menu
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
-"Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever may open its screen:
-"System", to whoever runs the business; "API", while the API documentation is shown (BASE-F91), and it appears or goes
-when the switch changes, without reloading. An employee sees "Home", "Employees", "Files", "Apps" and "Settings". At
-the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
+"Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever holds the
+permission its screen opens with, as in Square or Toast: "System", to whoever runs the business; "API", besides, while
+the API documentation is shown (BASE-F91), and it appears or goes when the switch changes, without reloading. An
+employee sees "Home", "Employees", "Files", "Apps" and "Settings". At the bottom, the QR code, "Upgrade plan" (the owner
+only) and "Manage on erplora.com".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
-erplora.com, in a new tab and already signed in with their account, without typing the password again. Only in the
-browser: the installed app does not have it.
+erplora.com, in a new tab and already signed in with their account, without typing the password again. Only the
+owner sees it, the only one who changes the plan on erplora.com, and only in the browser: the installed app does not
+have it.
 
 ### "Manage on erplora.com"
-At the foot of the side menu, right below "Upgrade plan", with the external link icon; with the menu folded to its
+At the foot of the side menu, right below "Upgrade plan" (if there is one), with the external link icon; with the menu folded to its
 icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
 erplora.com's panel, already signed in with their account: in a new tab in the browser and, in the installed app, in
 the device's browser. Only the owner,
@@ -143,8 +147,13 @@ when it applies, the notice of the plan's limit or the one saying why an app was
 
 ### The screen of an app that does not open
 In the same address as the app's screen, the reason: "Subscription needed" or "This app is not available in
-this business", with "Go to Apps" (and "Upgrade plan" for whoever runs the business, in the
+this business", with "Go to Apps" (and "Upgrade plan" for the owner, in the
 browser).
+
+### No access
+In the same address as a screen the person's role does not open, a padlock with "You do not have access to this
+screen" — "Your role in this business does not open it.", the names of who can give them access, each with their
+avatar, and "Go to Home".
 
 ### Settings · Business
 The second of the tabs at the bottom of "Settings" ("General", "Business", "Printing" and "Data and backups").
@@ -171,7 +180,7 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
 
 ### System · Usage and plan
 From "System" in the side menu. Four tabs at the bottom: "Usage and plan", "Updates", "Failed events" and "Logs" (this
-one, only for whoever runs the business); "Usage and plan" opens: their plan with "Upgrade plan", a line that says whether
+one, only for whoever runs the business); "Usage and plan" opens: their plan with "Upgrade plan" (for the owner), a line that says whether
 it is enough or they have to upgrade and why, "What your plan includes", from the fullest down, with its bar, and "For
 your information", with the figures no plan limits.
 
@@ -230,7 +239,7 @@ only for whoever runs the business, "API keys" and "Approvals"; each one in the 
 Employees.
 
 ### Employees · Roles
-The four roles of erplora.com, with where they come from, how many people have them and how many permissions they
+The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
 give.
 
 ### Employees · API keys
@@ -272,7 +281,7 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 | Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
 | Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
-| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". |
+| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". A screen of an app their role does not open, opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
 
@@ -290,7 +299,7 @@ In the assistant's panel:
 | Loading | Three dots that move in the assistant's bubble until the first text arrives ("The assistant is writing" for the screen reader), and "Transcribing…" while what was dictated is turned into text. |
 | Empty | The sparkles, "Ask me about your sales, your stock or anything about your business." (opened from the setup, "Review your business's setup. Choose an option or write your question.") and the shortcuts. An answer that ends without saying anything: "(no answer)". |
 | Error | In the bubble, with its way out: "The assistant could not be reached. Check the connection and try again.", "The assistant is not available right now. Try again in a few minutes." or "The answer was cut off.", with "Try again"; "This conversation is too long: start a new one." with "New conversation"; "Your session has ended. Sign in again to keep talking." with "Sign in again". Without Internet, in the foot, "No connection: you can write, and send when it is back.". |
-| No permission | What the person cannot do with their buttons, the assistant cannot either: it is not offered and, if it tries, the receipt reads "Not done, not allowed: …". With the month's messages spent, whoever does not run the business sees "Ask whoever runs the business to upgrade the plan." instead of "Upgrade plan". |
+| No permission | What the person cannot do with their buttons, the assistant cannot either: it is not offered and, if it tries, the receipt reads "Not done, not allowed: …". With the month's messages spent, whoever is not the owner sees "Ask the business's owner to upgrade the plan." instead of "Upgrade plan". |
 
 On the Settings · Data and backups screen:
 
@@ -299,7 +308,7 @@ On the Settings · Data and backups screen:
 | Loading | "Loading templates…"; in "Export" and "Reset", the rows in grey. |
 | Empty | "There are no templates for your business yet.", "No template matches your search.", "This business has no app on to export." and "There is nothing to reset: no section has data.". |
 | Error | "The templates could not be loaded right now. You can still import a file." with "Retry"; "The apps of this business could not be loaded." and "What each section has could not be worked out.", with "Retry". |
-| No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. |
+| No permission | Whoever does not run the business has no "Data and backups" tab: its address opens "General" for them (BASE-F48), and the Home's templates card does not show. An administrator, in "Reset", undoes imports and, instead of "Reset the business" and "Copies of the data", reads "Only the business's owner can reset it or download the copies of its data.". |
 
 On the Files screen:
 
@@ -439,6 +448,7 @@ On the Employees screens and the API documentation:
 | BASE-F115 | See the help of a module's screen | done |
 | BASE-F116 | Read what is new in ERPlora | done |
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
+| BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 
 ### BASE-F01 See what the business still has to set up
@@ -693,18 +703,19 @@ Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
 Steps:
-  1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Any profile
-     sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
-     menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
-     browser: the installed app does not have it.
+  1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Only the owner
+     sees it: on erplora.com only the owner changes the plan and pays. With the menu folded to its icons
+     (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the browser: the installed app
+     does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
      account: they do not type the password again even if that browser did not have the erplora.com session open. The
      same from any other "Upgrade plan" of the Hub: System, Employees, Apps, the assistant's panel and the WhatsApp Inbox.
-  3. The owner, the administrator or the manager who came in with their account also has, right below
-     "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
+  3. The owner, the administrator or the manager who came in with their account also has, at the foot of the menu
+     (right below "Upgrade plan", if they have it), "Manage on erplora.com", with the external link icon (on the folded
+     menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
   4. They tap it: this business opens on erplora.com's panel, already signed in with their account, in a new tab; in
      the installed app, in the device's browser. The Hub stays where it was.
@@ -717,7 +728,8 @@ pass does not come (the server gives an error or does not answer in 8 seconds), 
 asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
 that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
 account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
-a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
+a PIN or with the badge and the Google Play app do not have "Manage on erplora.com". Whoever is not the owner has no
+"Upgrade plan" anywhere in the Hub, nor erplora.com's Store: the administrator, the manager and the employee do not buy.
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -851,8 +863,8 @@ Steps:
 In: the chosen app, the ones it needs and what the business has subscribed to on erplora.com.
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
-reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for whoever runs
-the business in the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
+reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in
+the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
 (BASE-F20). Neither does an app this business cannot use: it shows "Not available" and, for whoever runs the
 business, the reason below it ("VeriFactu is only for businesses in Spain.", VERIFACTU-F01). Any other failure shows
 in a notice with the app's name and the reason, which stays until it is closed.
@@ -885,12 +897,12 @@ Screen: Apps
 Steps:
   1. A paid app the business has not subscribed to shows in "Add apps" and in "Paid" with "Needs a
      subscription", and is neither in "My apps" nor in the menu.
-  2. Whoever runs the business, in the browser, sees "Upgrade plan" next to it, which opens this
-     business's Store on erplora.com in a new tab: there they see the price and subscribe.
+  2. The owner, in the browser, sees "Upgrade plan" next to it, which opens this business's Store on
+     erplora.com in a new tab: there they see the price and subscribe.
   3. As soon as erplora.com tells the hub, the app becomes "Active" and shows in "My apps" and in the menu,
      without reloading.
-  4. Whoever does not run the business, and anyone in the installed app, sees "Subscribed to on erplora.com,
-     from your ERPlora account." and no button: the hub never sells.
+  4. Whoever is not the owner, and anyone in the installed app, sees "Subscribed to on erplora.com,
+     from your ERPlora account." and no button: the hub never sells, and on erplora.com only the owner buys.
 In: what the business has subscribed to, as erplora.com passes it to the hub.
 Out: nothing saved or charged in the hub.
 If it fails: until erplora.com tells the hub, the app keeps "Needs a subscription"; a screen of it that is
@@ -1031,8 +1043,9 @@ In: what the business has of each app.
 Out: nothing.
 If it fails: "We could not check why this app does not open" — "Check the connection and try again." with
 "Retry": never a made-up reason. An address that does not exist in the hub says it does not exist, like any
-other. An app the person cannot see opens anyway and each screen says they have no permission.
-Involved: none
+other. A screen the person's role does not open says "No access" (BASE-F118); if the whole app does not open in the
+business, this reason rules, since it holds for everyone.
+Involved: BASE-F118
 
 ### BASE-F27 See a paid app blocked
 Status: done
@@ -1043,7 +1056,7 @@ Steps:
      not subscribed to.
   2. On opening any of its screens they see "Subscription needed": the app's name and "is disabled because this
      business does not have its subscription. Your data is safe and comes back as soon as it is subscribed
-     to.", with "Go to Apps" and, for whoever runs the business in the browser, "Upgrade plan".
+     to.", with "Go to Apps" and, for the owner in the browser, "Upgrade plan".
   3. The app leaves the menu and "My apps", and the hub does nothing asked of that app, whether it comes from
      this screen, from another device, from the assistant or from an integration.
   4. If it is subscribed to with the screen open, it changes to the app's name with "is ready" — "It can be
@@ -1217,8 +1230,10 @@ In: the name, the language, what it is for and what is ticked.
 Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows; never people,
 PINs nor fiscal data. Nothing is kept in the business.
 If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
-exported. Who does not administer the business reads "Only an administrator can export the business.".
-Involved: BASE-F112 (inside the app)
+exported. Who does not administer the business reads "Only an administrator can export the business.". The
+administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset
+(BASE-F37).
+Involved: BASE-F112 (inside the app), BASE-F37
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
 Status: done
@@ -1241,7 +1256,7 @@ Involved: none
 
 ### BASE-F37 Reset the business by sections
 Status: done
-Actor: owner, administrator
+Actor: owner
 Screen: Settings · Data and backups › Reset
 Steps:
   1. In "Reset", "Reset the business": "Removes for good the data you mark. It cannot be undone: if in
@@ -1268,7 +1283,10 @@ name does not match.". If the copy cannot be made, nothing is emptied: "Nothing 
 data could not be made, so nothing was emptied." and "Try again", with the same sections. If emptying is what fails,
 the copy is kept: "The sections could not be emptied, so nothing was removed. The copy of the data from before is
 kept.". Who does not administer the business reads "Only an administrator can undo imports or reset the business.".
-Involved: none
+An administrator undoes imports (BASE-F34), but instead of "Reset the business" and "Copies of the data" reads "Only the
+business's owner can reset it or download the copies of its data.": resetting, seeing the copies and downloading them
+is the owner's alone, also through the API and from the assistant, which answer that they are not allowed.
+Involved: BASE-F34, BASE-F35
 
 ### BASE-F38 See the Home up to date after importing a template
 Status: done
@@ -1333,8 +1351,9 @@ Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
   1. They open "System": "Usage and plan" opens. While it loads: "Reading the system…". At the top, their plan ("Starter
-     plan") and "Upgrade plan", which opens this business's plan page on erplora.com (BASE-F11); in the installed app, or
-     where that link does not appear, with no button, "Plans are managed from your ERPlora account, on erplora.com.".
+     plan") and, for the owner, "Upgrade plan", which opens this business's plan page on erplora.com (BASE-F11); to the
+     administrator, in the installed app or where that link does not appear, with no button, "Plans are managed from your
+     ERPlora account, on erplora.com.".
   2. Below, a line tells them whether to upgrade. In green, "Your plan is enough". In amber, "You should upgrade: {motive}",
      with the files or the month's messages from 80 %: "you are almost out of space for files", "the assistant's messages
      are almost spent this month" or "WhatsApp messages are almost spent this month". In red, "You have to upgrade:
@@ -1529,11 +1548,14 @@ Actor: owner, administrator, manager, employee
 Screen: Settings, Settings · Printing
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
-  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups";
-     "General" opens (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back
-     leaves Settings instead of walking its tabs. On the phone the four fit, whole.
+  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can
+     use what it holds: "Printing", for whoever sets up the Printing app (owner, administrator and manager), and "Data
+     and backups", for whoever runs the business. An employee has "General" and "Business". "General" opens
+     (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back leaves Settings instead
+     of walking its tabs. On the phone the four fit, whole.
   3. Old links still take you to their place: the one of the old "General" opens "General", the one of the old
-     taxes tab opens "Business", and the one of a tab that no longer exists opens the first.
+     taxes tab opens "Business", and the one of a tab that no longer exists, or that the person does not have, opens
+     the first.
   4. In "Printing", "Printers and ticket" ("Add your printer and set up the printed and digital ticket") opens
      the Printing app; when it is not there, it says "Install the Printing app to add your printer and set up the
      ticket" and takes you to "Apps".
@@ -2106,9 +2128,10 @@ Actor: owner, administrator
 Screen: Employees · Staff
 Steps:
   1. In **Employees › Staff**, above the table, how many of the plan's places are taken: "{used} of {limit} places
-     taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people".
+     taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people". The accountancy
+     firm takes no place: it is on the list, but it does not count here nor in "Usage and plan" of System.
   2. With every place taken, "Every place of your plan is taken" shows with "Remove on erplora.com someone who no
-     longer works here, or move to a plan with more places."; on the web, with "Upgrade plan".
+     longer works here, or move to a plan with more places."; on the web, and for the owner, with "Upgrade plan".
   3. To invite somebody else, "Invite on erplora.com" leads to "Members" of the business, where the limit applies
      (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the people of the business and its plan's places, as erplora.com sends them.
@@ -2170,12 +2193,13 @@ Involved: BASE-F77, BASE-F81
 
 ### BASE-F81 Understand how each person gets in
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff
 Steps:
   1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own; in a row, a
      name that does not fit is cut and shows whole on hovering over it), "Email" (only for whoever sees the team's
-     contact details: owner, administrator and manager; BASE-F119), "Role", "Access" and "Status".
+     contact details: owner, administrator and manager; BASE-F119), "Role" (the accountancy firm, the last one),
+     "Access" and "Status".
   2. "Access" says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
      "Account + PIN + Badge").
   3. "Status" says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
@@ -2187,15 +2211,19 @@ Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles
 Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
-  2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
-     many people have it and how many permissions it gives. It is always these four, erplora.com's: no app adds
-     roles of its own; each app says what each of them can do in it.
-  3. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
+  2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
+     available", how many people have it and how many permissions it gives. It is always these five, erplora.com's:
+     no app adds roles of its own; each app says what each of them can do in it.
+  3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
+     the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
+     its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
+     change any setting, and it takes no place of the plan (BASE-F77).
+  4. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles and the people of the business.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry".
@@ -2290,7 +2318,7 @@ In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
 app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
-Involved: BASE-F89, BASE-F90
+Involved: BASE-F89, BASE-F90, BASE-F119
 
 ### BASE-F87 Rotate an API key
 Status: done
@@ -2744,12 +2772,12 @@ Steps:
      renew on November 1.", and not a connection failure. The foot says the same, without repeating "Upgrade plan":
      "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
      with the month already spent.
-  5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
-     another tab, already signed in with their account (BASE-F11); in the app installed from the store it does not
-     show. Whoever does not run it sees "Ask whoever runs the business to upgrade the plan.". There are no message packs:
-     it is extended by upgrading the plan.
+  5. The owner sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in another tab,
+     already signed in with their account (BASE-F11); in the app installed from the store it does not show. Whoever is
+     not the owner sees "Ask the business's owner to upgrade the plan.". There are no message packs: it is extended by
+     upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
-     plan" for whoever runs the business; the panel opens anyway.
+     plan" for the owner; the panel opens anyway.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
@@ -3362,15 +3390,39 @@ comes without a date: "Pay it on erplora.com: if it is not paid soon, the busine
 If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
+### BASE-F118 Open a screen without permission: "No access" and whom to ask
+Status: done
+Actor: manager, employee
+Screen: No access
+Steps:
+  1. They open by its address (a link, the history, a tab left open or typing it) a screen of an app their role does
+     not open: an entry that does not show in their menu, such as Taxes' "Rules" for an employee, or any screen that
+     hangs from it.
+  2. Instead of the screen, in the same address, "No access" shows: "You do not have access to this screen" — "Your
+     role in this business does not open it.". While it looks for whom to ask: "Looking for who can give you access…".
+  3. Below, "Ask one of these people to give you access:" and the name of each one, with their avatar: whoever can
+     change their role on erplora.com (HUBS-F26). An employee sees the owner and the administrators; a manager, only
+     the owner. Only the name: neither the email nor the phone. Those invited who have not entered yet count too.
+  4. "Go to Home" leads to the Home.
+In: the person's session, which says which screens of each app their role closes (the same ones that do not show in
+their menu); the people of the business with their role, from erplora.com's last photo.
+Out: nothing.
+If it fails: if it cannot find out whom to ask, "We could not find out who can give you access" — "Ask whoever runs
+the business, or try again." with "Retry", and the screen still says they have no access. With nobody to name: "Ask
+whoever runs the business to give you access.". If the whole app does not open in the business (turned off or without
+its subscription), its reason shows (BASE-F26). The Hub refuses what that screen would ask all the same: "No access"
+only spares a screen of errors.
+Involved: BASE-F26, HUBS-F26 (erplora.com)
+
 ### BASE-F119 What each person sees by their data permissions
 Status: done
-Actor: owner, administrator, manager, employee
-Screen: Employees · Staff, Home · Summary
+Actor: owner, administrator, manager, employee, accountancy firm
+Screen: Employees · Staff, Home · Summary, Sales · Sales, Customers
 Steps:
   1. Besides what it may do, each role says which sensitive data it sees, with four data permissions: view costs,
      view customer contact details, view team contact details and view business totals. The owner, the
      administrator and the manager have all four; the employee, only the customers' contact details, which they need
-     to serve them.
+     to serve them; the accountancy firm, only the business totals.
   2. Whoever lacks a data permission does not receive that data by any way: not on the screen, not through the API,
      not in what the assistant answers. Where it would go, the data comes empty and the screen does not show it.
   3. In **Employees › Staff**, the "Email" column only shows to whoever sees the team's contact details. An employee
@@ -3378,9 +3430,14 @@ Steps:
      what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
+  5. An API key sees the data whoever makes it sees: only the owner and the administrator make one, and they see all
+     of it, so an integration reads and writes a product's cost as before.
+  6. The business totals are the figures of the whole business, beyond what each one does: with everyone's sales,
+     the figures of **Sales** and its Home panels are the whole business's; without them, those of the person's own
+     sales. In **Customers**, "Revenue" only shows to whoever sees them.
 In: the person's role in this business.
 Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
-Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31

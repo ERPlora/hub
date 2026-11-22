@@ -14,6 +14,7 @@ from live.errors import OperationError
 from live.operations import AI, INTERNAL, operation
 
 from base import activation, files, home, meter
+from base.people import FREE_ROLES
 from base.apps_on import active_apps
 from base.models import Hub, Membership, SessionOwner
 from base.permissions import ADMINISTER_HUB
@@ -67,8 +68,9 @@ BUSY_WINDOW_DAYS = 7
 )
 def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     """What «Usage and plan» of System says: the limits of the plan the SaaS's last photo carries (``plan``:
-    ``max_users``, ``max_devices``, ``max_apps``; 0 = no limit) against the people of the business (its active members, the
-    ones the SaaS counts), the devices in use (those with a session open on this hub: the ones the cap on devices keeps)
+    ``max_users``, ``max_devices``, ``max_apps``; 0 = no limit) against the people of the business (its active members
+    but the accountancy firm: the ones the SaaS counts), the devices in use (those with a session open on this hub: the
+    ones the cap on devices keeps)
     and the apps it chose; what the last night measured (``database``, ``files``, the 30 days of ``activity``);
     what is counted during the day (``base.meter``: ``connections``, ``requests``, who is active now), as control has it
     plus what this process has not written yet; and what its apps say their plan includes (``meters``). The assistant's
@@ -76,7 +78,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     to a business. For who runs the business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state, plan, known = _plan_of(hub)
-    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).count()
+    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).exclude(role__in=FREE_ROLES).count()
     devices = (
         SessionOwner.objects.filter(host=ctx.scope.key, session__expire_date__gt=timezone.now())
         .exclude(device_id=None)

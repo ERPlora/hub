@@ -21,6 +21,7 @@ from live.errors import InvalidPayload, PermissionDenied
 from apps.appointment.models import Appointment
 from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixture
     MONDAY,
+    TESTER,
     anytime,
     at,
     make_appointment,
@@ -365,14 +366,15 @@ def test_after_the_yes_the_customers_cancellation_policy_still_judges_it(gateway
 
 
 def test_the_card_of_the_yes_says_which_appointment_it_cancels(gateway, worker, beas, salon):
-    # Saying yes blind to what cannot be undone is no yes: the card names the appointment, for whoever may read it.
+    # Saying yes blind to what cannot be undone is no yes: the card names the appointment, for whoever may read it. A
+    # person of the team with only their own agenda (and no staff record) does not read Bea's.
     assistant_cancels(worker, gateway, beas)
     [row] = run("flow.question.list", {}, ctx_for(permissions=MAY_CANCEL)).rows
     assert row.action == "Cancel an appointment"
     said_values = [field.value for field in row.fields]
     assert any(salon.lucia.name in str(value) and "10:00" in str(value) and "Bea" in str(value) for value in said_values), said_values
     assert not any(str(beas.id) in str(value) for value in said_values)
-    [hidden] = run("flow.question.list", {}, ctx_for(permissions=ONLY_THEIR_OWN)).rows
+    [hidden] = run("flow.question.list", {}, ctx_for(permissions=ONLY_THEIR_OWN, actor=TESTER)).rows
     assert not any(salon.lucia.name in str(field.value) for field in hidden.fields)
     [spanish] = run("flow.question.list", {}, ctx_for(permissions=MAY_CANCEL, language="es")).rows
     assert spanish.action == "Anular una cita"

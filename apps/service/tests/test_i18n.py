@@ -108,17 +108,17 @@ def test_spanish_texts_of_the_workbook():
             "Ajustes",
         ]
         assert (
-            str(services.CATEGORY_NAME_TAKEN)
+            str(services.categories.CATEGORY_NAME_TAKEN)
             == "Ya hay una categoría con ese nombre. Elige otro nombre."
         )
         assert (
-            str(services.TAX_REQUIRED)
+            str(services.catalog.TAX_REQUIRED)
             == "Elige una categoría fiscal: sin ella el servicio no se puede cobrar."
         )
         assert (
-            str(services.GRANT_IN_USE) == "Ese bono ya se ha usado: no se puede anular."
+            str(services.grants.GRANT_IN_USE) == "Ese bono ya se ha usado: no se puede anular."
         )
-        assert str(services.REDEEM_REFUSALS["expired"][1]) == "Este bono ha caducado."
+        assert str(services.grants.REDEEM_REFUSALS["expired"][1]) == "Este bono ha caducado."
         assert (
             str(queries.catalog.SERVICE_NOT_FOUND) == "Ese servicio no existe en este negocio."
         )
@@ -140,14 +140,14 @@ def test_spanish_texts_of_the_workbook():
             "Caducada",
             "Devuelta",
         ]
-        assert str(services.SESSION_SETTLED) == (
+        assert str(services.sessions.SESSION_SETTLED) == (
             "Esa sesión del bono ya no se puede soltar: la venta está cobrada. Devolverla es una devolución."
         )
         assert (
             str(queries.grants.SESSION_NOT_FOUND)
             == "Esa sesión del bono no existe en este negocio."
         )
-        assert str(services.HOLD_LOST) % {"name": "Bono 5"} == (
+        assert str(services.sessions.HOLD_LOST) % {"name": "Bono 5"} == (
             "La sesión reservada de «Bono 5» ya no está reservada (pasó su día o se soltó). Quita el bono "
             "de la línea y vuelve a aplicarlo."
         )

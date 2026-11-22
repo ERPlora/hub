@@ -924,7 +924,7 @@ avisos de Ventas (`sale.order.*`).
   suplementos, `allergens`, y en un menú los de cada plato, `combo.components[].allergens`, y la alergia del
   cliente, `allergy`), leídas con sus modelos; el envío,
   por su operación `sale.order.fire`. Un plato de un menú guarda la línea del menú y su número dentro de
-  él (`menu_dish`); su id sale del de la línea (`queries.dish_id`), así que la comanda por recibir y la
+  él (`menu_dish`); su id sale del de la línea (`queries.rounds.dish_id`), así que la comanda por recibir y la
   guardada comparten los ids de sus platos.
 - **Inventario** (requisito): los productos y las categorías del enrutado (claves ajenas) y sus
   listas para elegirlos (`inventory.product.list`, `inventory.category.list`).
@@ -982,8 +982,8 @@ que no tiene ningún papel: solo el sistema (`*`).
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
   alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
-  `schemas.py`, `queries.py`,
-  `services.py`, `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
+  `schemas.py`, `queries/` (un módulo por tema),
+  `services/` (un módulo por tema), `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
   `test_integration_modifier.py` y `test_concurrency.py` con las apps reales.
@@ -1023,7 +1023,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   `kitchen.category_not_found`, `kitchen.station_not_found`), y nunca hay un 500, un interbloqueo ni una ruta
   creada a algo ya borrado. Quitar una ruta solo la bloquea (no nombra nada). Probado con hilos en
   `test_concurrency.py`. Las mismas reglas las aplica la lectura sin escribir
-  (`queries.effective`): F29 (plato anulado), F28 (cuenta anulada) y F27 (cerrada: la Lista desde
+  (`queries.state.effective`): F29 (plato anulado), F28 (cuenta anulada) y F27 (cerrada: la Lista desde
   antes del cierre pasa a Servida; la de papel o con la cocina en papel desde antes del cierre, a
   Servida con sus platos).
 - **Número del día** por `DayCounter` con `select_for_update` en la transacción; una comanda por

@@ -35,12 +35,13 @@ def test_every_phrase_of_sale_is_one_of_at_least_200():
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     """The till's settings are the manager's (``sale.manage_settings``), and no manager approves them on the spot:
-    the employee's turn never offers them, whatever they ask; the figures of the business are not theirs either."""
+    the employee's turn never offers them, whatever they ask. The figures are theirs too: those of their own sales."""
     employee = assistant.tools.catalog(ctx_for("hub_employee", language="es"))
     manager = assistant.tools.catalog(ctx_for("hub_manager", language="es"))
-    for name in ("sale.settings.update", "sale.payment_method.create", "sale.sale.today"):
+    for name in ("sale.settings.update", "sale.payment_method.create"):
         assert name in manager  # positive control: the manager holds it
         assert name not in employee
+    assert "sale.sale.today" in employee
     # A write the employee lacks but a manager approves with their PIN stays theirs, as its button does (BASE-F84).
     assert "sale.sale.void" in employee
 

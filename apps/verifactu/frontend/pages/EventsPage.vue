@@ -15,7 +15,9 @@ import { useLocale, useT } from '../composables/useT';
 import { backwardsDays, filterParams, filtersInUse } from '../lib/filters';
 import { EVENT_KINDS, SEVERITIES, severityTone } from '../lib/record';
 import type { EventListIn, EventOut } from '../operations';
-import { verifactuTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('verifactu');
 
 const router = useRouter();
 const t = useT();
@@ -77,7 +79,7 @@ function open(row: EventOut): void {
   <AppPage
     :title="$t('verifactu.events.title')"
     content-layout="fill"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
   >
     <PageNotices

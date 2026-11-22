@@ -288,7 +288,9 @@ Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que 
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
 tecleado se conserva. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
-Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
+El coste interno, que solo se da por el asistente o la API, lo escribe solo quien ve los costes: un alta con coste de
+quien no los ve se rechaza como una operación sin permiso y no se guarda nada; sin coste, el servicio cuesta 0.
+Implicados: TAX-F01, BASE-F01, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
 perdieron, cada uno por esta misma alta)
 
 ### SERVICE-F02 Editar un servicio
@@ -304,7 +306,8 @@ Sale: el servicio cambiado (`service.service.updated`); se cambia solo lo que se
 reservadas conservan el nombre, el precio y la duración que tenían; los bonos ya vendidos no cambian.
 Si falla: los mismos motivos que al darlo de alta, cada uno debajo de su campo; un servicio que ya no existe,
 «Ese servicio no existe en este negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se guarda sin problema.
-Implicados: SERVICE-F31
+Cambiar el coste interno es de quien ve los costes: a quien no los ve se le rechaza como una operación sin permiso.
+Implicados: SERVICE-F31, BASE-F119
 
 ### SERVICE-F03 Poner un servicio a precio abierto
 Estado: hecho
@@ -1027,7 +1030,9 @@ tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunc
 Ventas o de Citas: la venta por su número, su línea y la de la cuenta por lo que cobran, la cita como la dicen las
 tarjetas de Citas y la devolución o la anulación que devuelve sesiones por su venta («Devolución de la venta
 20261014-0007», «Anulación de la venta 20261014-0007»). Con Ventas o Citas apagadas, o si quien pregunta no puede
-verlo, ese dato no sale, nunca su id.
+verlo, ese dato no sale, nunca su id. El coste interno de un servicio llega solo a quien ve los costes (el
+propietario, el administrador y el encargado); a los demás les llega vacío. El TPV lo guarda igual en
+la línea que vende, aunque quien cobra no lo vea.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -1158,7 +1163,7 @@ con la sesión de quien vende, como hace con Inventario.
   (409 `service.sales_unavailable`), porque no hay venta que decir.
 - **La sesión gastada fuera del cobro con su profesional (F21)**: la otra. `service.grant.redeem` con `member_id` o
   `member` llama a `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) con la sesión de quien la gasta
-  (su permiso de Ventas, «Montar la cuenta», lo tienen los cuatro papeles) y en la misma transacción. `value` es el de
+  (su permiso de Ventas, «Montar la cuenta», lo tienen todos los papeles menos la gestoría) y en la misma transacción. `value` es el de
   la sesión o, en un bono sin límite, el precio de esa profesional para el servicio. Ventas lo guarda aparte, porque
   no hay línea, y lo suma en la producción (SALE-F28): una sesión del cobro nunca pasa por aquí, así que ninguna cuenta
   dos veces. Sin Ventas en el negocio no se llama.
@@ -1406,8 +1411,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `image` en cada servicio; las fotos propias viajan en el blueprint como las de Inventario.
 
 - `frontend/routes.ts`: `/service/services`, `/service/categories`, `/service/packages` y
-  `/service/settings`; la barra de pestañas (`frontend/tabs.ts`) añade «Ajustes» solo a quien puede
-  guardarlos.
+  `/service/settings`; la barra de pestañas son las entradas del menú que la persona puede abrir
+  (`useAppTabs`): «Ajustes», solo para quien puede guardarlos.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas) y `useServerTable`; filtros por columna del
   `DataTable`; escrituras con `useCommand`; los selectores de listas largas (categoría, categoría
   fiscal, servicio, profesional) son `Combo` que buscan en el servidor.

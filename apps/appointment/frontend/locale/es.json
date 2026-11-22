@@ -2,9 +2,7 @@
   "appointment": {
     "title": "Citas",
     "tabs": {
-      "label": "Secciones de Citas",
-      "agenda": "Agenda",
-      "settings": "Ajustes"
+      "label": "Secciones de Citas"
     },
     "loading": "Cargando…",
     "retry": "Reintentar",

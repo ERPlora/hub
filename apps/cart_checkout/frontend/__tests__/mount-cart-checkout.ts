@@ -4,6 +4,7 @@ import type { SessionMe } from '@erplora/ui/shell';
 import type { OpName } from '@erplora/ui/sdk';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { flush, mountInShell, type MountOptions, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import type { AmountFilterList } from '../../../../base/frontend/__tests__/amount-filter';
 import { business } from '../../../../base/frontend/__tests__/business';
@@ -11,27 +12,27 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 
 /** Owner, admin or manager: `cart_checkout.*` (apps.py `role_permissions`), listed one by one. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('cart_checkout', {
   user: { id: '1', label: 'Ana' },
   permissions: ['cart_checkout.view_cart', 'cart_checkout.manage_cart', 'cart_checkout.checkout'],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** Manages carts but does not take orders through checkout (no role has it: a custom grant). */
-export const CART_KEEPER: SessionMe = {
+export const CART_KEEPER: SessionMe = withMenu('cart_checkout', {
   ...OWNER,
   user: { id: '3', label: 'Carla' },
   permissions: ['cart_checkout.view_cart', 'cart_checkout.manage_cart'],
-};
+});
 
 /** An employee only looks. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('cart_checkout', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
   permissions: ['cart_checkout.view_cart'],
-};
+});
 
 export async function mountCartCheckout(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, { path: '/cart_checkout/carts', session: OWNER, messages: overBase(en, es) });

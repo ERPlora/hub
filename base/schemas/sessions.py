@@ -66,10 +66,25 @@ class SessionMeOut(Schema):
     permissions: list[str]
     menu: list[MenuGroup]
     apps: list[AppState]
+    #: Per app, the paths of the menu entries this person may not open: the router's gate says «No access» on them.
+    locked: dict[str, list[str]]
     language: str
     #: Always there; ``None`` on a business's hub.
     demo: SessionDemo | None
 
+
+class GrantorsIn(Schema):
+    pass
+
+
+class Grantor(Schema):
+    name: str
+
+
+class GrantorsOut(Schema):
+    """Who can give this person a screen it may not open: by name only, never how to reach them."""
+
+    grantors: list[Grantor]
 
 
 class HubUserGetIn(Schema):

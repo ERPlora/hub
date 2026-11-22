@@ -16,6 +16,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
 from base.schemas.assistant import names
+from base.sensitive import COSTS
 
 T = TypeVar("T")
 
@@ -333,9 +334,8 @@ class SessionSummary(Schema):
         json_schema_extra={"money": True},
     )
     total_gifts: int | None = Field(
-        description="Comps of the shift at cost, in cents, not cash (empty when hidden).",
-        json_schema_extra={"money": True},
-    )
+        description="Comps of the shift at cost, in cents, not cash (empty when hidden or without the costs).",
+        json_schema_extra={"money": True, **COSTS})
     expected_cash: int | None = Field(
         description="Expected cash, in cents (empty when hidden).", json_schema_extra={"money": True}
     )
@@ -526,7 +526,7 @@ class MovementRow(Schema):
     sale_id: UUID | None = Field(description="The sale of a sale, void or refund line.")
     sale_number: str = Field(description="That sale's number.")
     document_type: str = Field(description="That sale's document: ticket or invoice.")
-    gift_total: int = Field(description="Comps of that sale at cost, in cents.", json_schema_extra={"money": True})
+    gift_total: int | None = Field(description="Comps of that sale at cost, in cents (empty without the costs).", json_schema_extra={"money": True, **COSTS})
     created_at: datetime = Field(description="When.")
     created_by: str = Field(description="Who.")
 

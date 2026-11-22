@@ -17,7 +17,9 @@ import { computed } from 'vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
-import { reservationTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('reservation');
 
 const STAFF_NUMBERS = ['default_duration_minutes', 'no_show_window_minutes'] as const;
 const GUEST_NUMBERS = ['min_party_size', 'max_party_size', 'min_advance_hours', 'max_advance_days'] as const;
@@ -68,7 +70,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('reservation.title')"
-    :tabs="reservationTabs($t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
     content-layout="detail"
   >

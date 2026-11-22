@@ -106,8 +106,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 El menú **Mesas** tiene cinco pestañas: **Plano de sala**, **Zonas**, **Mesas**, **Sesiones** y
-**Ajustes** (esta solo a quien puede cambiarlos). Ninguna otra se esconde por permiso; los botones
-que el perfil no puede usar no salen.
+**Ajustes**. **Zonas** y **Mesas** solo salen a quien puede cambiarlas, y **Ajustes**, a quien puede
+cambiarlos; los botones que el perfil no puede usar no salen.
 
 ### Plano de sala
 Aquí ves de un vistazo cómo está la sala: cada mesa en su sitio, con su color y, si está ocupada, el
@@ -1081,12 +1081,12 @@ como los de cualquier app.
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Sentar, dividir y juntar piden además «Montar la cuenta» de
-Ventas (`sale.add_sale`), que tienen los cuatro papeles.
+Ventas (`sale.add_sale`), que tienen todos los papeles menos la gestoría.
 
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales),
   `tests/test_integration_relay.py` (Reservas, Clientes y Ventas reales, por el bucle del worker con el
   relay del outbox) y `tests/test_concurrency.py` (dos camareros a la vez, con hilos). Reservas → Mesas, sin

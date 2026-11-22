@@ -21,7 +21,9 @@ import { useT } from '../composables/useT';
 import { arrivals, rememberedStation, rememberStation } from '../lib/board';
 import { Chime } from '../lib/chime';
 import type { AllDayOut, Priority, SettingsOut, TicketOut } from '../operations';
-import { kitchenTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('kitchen');
 
 const FACTORY: SettingsOut = {
   show_timer: true,
@@ -172,7 +174,7 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
 <template>
   <AppPage
     :title="$t('kitchen.title')"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <div

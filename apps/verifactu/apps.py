@@ -69,6 +69,7 @@ class VerifactuConfig(LiveAppConfig):
             "verifactu.transmit_record",
         ],
         "hub_employee": ["verifactu.view_record", "verifactu.add_record"],
+        "hub_accountant": ["verifactu.view_record"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
     # module's own icon. Registered icons only (packages/ui/src/shell/icons.ts): the old document-text-outline

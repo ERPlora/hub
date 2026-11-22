@@ -1,4 +1,6 @@
-"""The sales figures: a period's totals, today, the last seven days and by staff member."""
+"""The sales figures: a period's totals, today, the last seven days and by staff member, for whoever reads the sales.
+Each adds up the sales the caller counts (``SALES.counted``): the whole business's only with «See all sales» and the
+business totals, else their own (SALE-F28)."""
 
 import datetime as dt
 from fractions import Fraction
@@ -13,7 +15,8 @@ from live.context import OperationContext
 from live.operations import AI, operation
 
 from apps.sale import pricing
-from apps.sale.models import Refund, RefundLine, Sale, SaleLine, VoucherSession
+from apps.sale.models import Refund, RefundLine, Sale, SaleLine
+from apps.sale.queries.ownership import SALES, VOUCHER_SESSIONS
 from apps.sale.schemas.fields import EmptyIn
 from apps.sale.schemas.figures import ByStaffOut, LastDaysOut, PeriodIn, StatsOut, TodayOut
 from apps.tax.queries import business_tax_kind, business_today
@@ -55,7 +58,7 @@ def declared_tax_kind(sales) -> str | None:
 @operation(
     "sale.sale.stats",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=PeriodIn,
     output=StatsOut,
     ai=AI(
@@ -78,7 +81,7 @@ def declared_tax_kind(sales) -> str | None:
     ),
 )
 def stats(ctx: OperationContext, params: PeriodIn) -> dict:
-    sales = _period(Sale.objects.all(), params)
+    sales = _period(SALES.counted(ctx), params)
     zero = 0
     charged = sales.filter(status__in=COUNTED)
     counted = charged.aggregate(
@@ -104,11 +107,9 @@ def stats(ctx: OperationContext, params: PeriodIn) -> dict:
     }
 
 
-def _revenue_by_day(first: dt.date, last: dt.date) -> dict[dt.date, int]:
+def _revenue_by_day(sales, first: dt.date, last: dt.date) -> dict[dt.date, int]:
     rows = (
-        Sale.objects.filter(
-            status__in=COUNTED, business_day__gte=first, business_day__lte=last
-        )
+        sales.filter(status__in=COUNTED, business_day__gte=first, business_day__lte=last)
         .values("business_day")
         .annotate(total=Sum(F("total") - F("refunded_total")))
     )
@@ -118,7 +119,7 @@ def _revenue_by_day(first: dt.date, last: dt.date) -> dict[dt.date, int]:
 @operation(
     "sale.sale.today",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=EmptyIn,
     output=TodayOut,
     ai=AI(
@@ -140,18 +141,18 @@ def _revenue_by_day(first: dt.date, last: dt.date) -> dict[dt.date, int]:
 )
 def today(ctx: OperationContext, params: EmptyIn) -> dict:
     day = business_today()
-    sales = Sale.objects.filter(status__in=COUNTED, business_day=day)
+    sales = SALES.counted(ctx)
     return {
         "day": day,
-        "total": _revenue_by_day(day, day).get(day, 0),
-        "tickets": sales.count(),
+        "total": _revenue_by_day(sales, day, day).get(day, 0),
+        "tickets": sales.filter(status__in=COUNTED, business_day=day).count(),
     }
 
 
 @operation(
     "sale.sale.last_7_days",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=EmptyIn,
     output=LastDaysOut,
     ai=AI(
@@ -171,7 +172,7 @@ def today(ctx: OperationContext, params: EmptyIn) -> dict:
 def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     last = business_today()
     first = last - dt.timedelta(days=6)
-    totals = _revenue_by_day(first, last)
+    totals = _revenue_by_day(SALES.counted(ctx), first, last)
     days = [first + dt.timedelta(days=offset) for offset in range(7)]
     return {"rows": [{"day": day, "total": totals.get(day, 0)} for day in days]}
 
@@ -179,7 +180,7 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
 @operation(
     "sale.sale.by_staff",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=PeriodIn,
     output=ByStaffOut,
     expose_api=True,
@@ -204,11 +205,8 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     ),
 )
 def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
-    lines = SaleLine.objects.filter(sale__status__in=COUNTED)
-    if params.date_from:
-        lines = lines.filter(sale__business_day__gte=params.date_from)
-    if params.date_to:
-        lines = lines.filter(sale__business_day__lte=params.date_to)
+    sales = _period(SALES.counted(ctx).filter(status__in=COUNTED), params)
+    lines = SaleLine.objects.filter(sale__in=sales)
     rows = (
         lines.annotate(served_by=Coalesce("staff_id", "sale__staff_id"))
         .filter(served_by__isnull=False)
@@ -226,10 +224,10 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
             ),
         )
     )
-    refunded, voucher_sold_back = _refunded_by_staff(params)
+    refunded, voucher_sold_back = _refunded_by_staff(sales)
     # The sessions spent outside the till (SERVICE-F21) are on no line: they count apart, each once.
     off_till = dict(
-        _period(VoucherSession.objects.order_by(), params)
+        _period(VOUCHER_SESSIONS.counted(ctx).order_by(), params)
         .values("staff_id")
         .annotate(worth=Sum("value"))
         .values_list("staff_id", "worth")
@@ -272,8 +270,8 @@ NO_MONEY = {
 }
 
 
-def _refunded_by_staff(params: PeriodIn) -> tuple[dict[UUID, int], dict[UUID, int]]:
-    """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents, and how much
+def _refunded_by_staff(sales) -> tuple[dict[UUID, int], dict[UUID, int]]:
+    """What the refunds of ``sales`` (the period's the caller counts) gave back on each professional's lines (SALE-F31), in cents, and how much
     of what those lines paid for vouchers went with it: a line never pays for more than it has left.
 
     The refunds of a sale are taken in the order they were made, against what each line has left to give
@@ -284,7 +282,6 @@ def _refunded_by_staff(params: PeriodIn) -> tuple[dict[UUID, int], dict[UUID, in
     Each refund is shared out whole, to the cent (``pricing.allocate``): with the lines no professional
     served, the rows square with the period's revenue, which takes refunds off on the day of their sale
     too (``sale.sale.stats``)."""
-    sales = _period(Sale.objects.filter(status__in=COUNTED), params)
     refunds = (
         Refund.objects.filter(total__gt=0, sale__in=sales)
         .select_related("sale")

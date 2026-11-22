@@ -128,11 +128,12 @@ def test_what_each_role_gets():
         "hub_admin": everything,
         "hub_manager": everything - ADMIN_ONLY,
         "hub_employee": EMPLOYEE,
+        "hub_accountant": set(),
     }
 
 
 def test_navigation_is_the_three_sections_of_the_old_module_and_the_settings_with_its_icons():
-    # Settings opens only to whoever may save them, as its tab of the pages (frontend/tabs.ts).
+    # Settings opens only to whoever may save them, and so does its tab of the pages.
     entries = reservation().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [

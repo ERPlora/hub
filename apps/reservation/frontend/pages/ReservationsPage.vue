@@ -33,7 +33,9 @@ import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
 import { allows, cancellationNote, type RowAction, shortNote, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
-import { reservationTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('reservation');
 
 /** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';
@@ -225,7 +227,7 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
   <AppPage
     :title="$t('reservation.title')"
     content-layout="fill"
-    :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
   >
     <DayBar

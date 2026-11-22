@@ -37,7 +37,9 @@ Quién lo usa:
 
 - El **propietario** y el **administrador** ven todo y son quienes pueden resolver los pasos de la
   plataforma («Tus apps», «Activa …» de cada app obligatoria en su país, «Tu equipo»), y en la campana ven los
-  avisos entre apps que no se entregaron.
+  avisos entre apps que no se entregaron. Solo el **propietario** compra para el negocio (mejorar el plan o contratar
+  una app de pago en erplora.com), restablece el negocio y descarga las copias de sus datos, como en erplora.com, donde el
+  plan, el cobro y la propiedad son solo suyos.
 - El **responsable** y el **empleado** ven sus apps, los pasos que les tocan, los paneles que pueden ver
   y la actividad. Un paso que solo puede resolver un administrador también lo ven, para saber por qué no se
   puede facturar, pero sin botón.
@@ -109,18 +111,19 @@ impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resu
 
 ### El menú lateral
 A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y las entradas de la plataforma en dos
-grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien puede abrir
-su pantalla: «Sistema», a quien administra el negocio; «API», mientras la documentación de la API está mostrada
-(BASE-F91), y aparece o se va al cambiar el interruptor, sin recargar. Un empleado ve «Inicio», «Empleados»,
-«Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan» y «Gestionar en erplora.com».
+grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien tiene el
+permiso con el que se abre su pantalla, como en Square o Toast: «Sistema», a quien administra el negocio; «API», además,
+mientras la documentación de la API está mostrada (BASE-F91), y aparece o se va al cambiar el interruptor, sin
+recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan»
+(solo el propietario) y «Gestionar en erplora.com».
 
 ### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
-erplora.com, en una pestaña nueva y ya dentro con su cuenta, sin volver a escribir la contraseña. Solo en el navegador:
-en la app instalada no está.
+erplora.com, en una pestaña nueva y ya dentro con su cuenta, sin volver a escribir la contraseña. Solo lo ve el
+propietario, el único que cambia el plan en erplora.com, y solo en el navegador: en la app instalada no está.
 
 ### «Gestionar en erplora.com»
-Al pie del menú lateral, justo debajo de «Mejorar plan», con el icono de enlace externo; con el menú plegado a sus
+Al pie del menú lateral, justo debajo de «Mejorar plan» (si lo hay), con el icono de enlace externo; con el menú plegado a sus
 iconos (escritorio), queda solo el icono, que dice «Gestionar en erplora.com» al pasar por encima. Abre este negocio en
 el panel de erplora.com, ya dentro con su cuenta: en una pestaña nueva en el navegador y, en la app instalada, en el
 navegador del dispositivo.
@@ -156,8 +159,13 @@ Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué 
 
 ### La pantalla de una app que no se abre
 En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
-disponible en este negocio», con «Ir a Apps» (y «Mejorar plan» para quien administra, en el
+disponible en este negocio», con «Ir a Apps» (y «Mejorar plan» para el propietario, en el
 navegador).
+
+### Sin acceso
+En la misma dirección de una pantalla que el rol de la persona no abre, un candado con «No tienes acceso a esta
+pantalla» — «Tu rol en este negocio no la abre.», los nombres de quien puede darle acceso, cada uno con su avatar, y
+«Ir al Inicio».
 
 ### Ajustes · Negocio
 La segunda pestaña de las de abajo de «Ajustes» («General», «Negocio», «Impresión» y «Datos y copias»). La
@@ -185,7 +193,8 @@ con «Importar» (lo que se abre), «Exportar» y
 
 ### Sistema · Uso y plan
 Desde «Sistema» en el menú lateral. Cuatro pestañas abajo: «Uso y plan», «Actualizaciones», «Eventos caídos» y
-«Registros» (esta, solo para quien administra el negocio); se abre «Uso y plan»: su plan con «Mejorar plan», una línea
+«Registros» (esta, solo para quien administra el negocio); se abre «Uso y plan»: su plan con «Mejorar plan» (para el
+propietario), una línea
 que dice si le alcanza o tiene que ampliar y por qué, «Lo que incluye tu plan», de lo más lleno a lo menos, con su barra,
 y «Para tu información», con las cifras que ningún plan limita.
 
@@ -244,7 +253,7 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cuatro roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
+Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
 
 ### Empleados · API keys
 Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
@@ -285,7 +294,7 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 | Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
-| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». |
+| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla de una app que su rol no abre, abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
 
@@ -303,7 +312,7 @@ En el panel del asistente:
 | Cargando | Tres puntos que se mueven en la burbuja del asistente hasta que llega el primer texto («El asistente está escribiendo» para el lector de pantalla), y «Transcribiendo…» mientras se pasa a texto lo dictado. |
 | Vacío | Los destellos, «Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.» (abierto desde la puesta en marcha, «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.») y los atajos. Una respuesta que acaba sin decir nada: «(sin respuesta)». |
 | Error | En la burbuja, con su salida: «No se pudo contactar con el asistente. Comprueba la conexión y vuelve a intentarlo.», «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.» o «La respuesta se cortó.», con «Reintentar»; «Esta conversación es demasiado larga: empieza una nueva.» con «Nueva conversación»; «Tu sesión ha terminado. Vuelve a entrar para seguir hablando.» con «Volver a entrar». Sin Internet, en el pie, «Sin conexión: puedes escribir y enviar cuando vuelva.». |
-| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no administra ve «Pídele a quien administra el negocio que mejore el plan.» en lugar de «Mejorar plan». |
+| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no es el propietario ve «Pídele al propietario del negocio que mejore el plan.» en lugar de «Mejorar plan». |
 
 En la pantalla Ajustes · Datos y copias:
 
@@ -312,7 +321,7 @@ En la pantalla Ajustes · Datos y copias:
 | Cargando | «Cargando plantillas…»; en «Exportar» y «Restablecer», las filas en gris. |
 | Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
 | Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
-| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. |
+| Sin permiso | Quien no administra el negocio no tiene la pestaña «Datos y copias»: su dirección le abre «General» (BASE-F48), y la tarjeta de plantillas del Inicio no sale. Un administrador, en «Restablecer», deshace importaciones y, en lugar de «Restablecer el negocio» y «Copias de los datos», lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.». |
 
 En la pantalla Archivos:
 
@@ -443,6 +452,7 @@ En la pantalla Archivos:
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
 | BASE-F116 | Leer las novedades de ERPlora | hecho |
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
+| BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
@@ -697,18 +707,19 @@ Implicados: BASE-F40
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 Estado: hecho
-Actor: propietario, administrador, responsable, empleado
+Actor: propietario, administrador, responsable
 Pantalla: El menú lateral, «Mejorar plan», «Gestionar en erplora.com»
 Pasos:
-  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Lo ve cualquier
-     perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
-     sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
-     navegador: en la app instalada no está.
+  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Solo lo ve el
+     propietario: en erplora.com solo el propietario cambia el plan y paga. Con el menú plegado a sus iconos
+     (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el navegador: en la
+     app instalada no está.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com, ya dentro con su
      cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com. Igual
      desde cualquier otro «Mejorar plan» del Hub: Sistema, Empleados, Apps, el panel del asistente y la Bandeja de WhatsApp.
-  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, justo debajo de
-     «Mejorar plan», «Gestionar en erplora.com», con el icono de enlace externo (en el menú plegado, solo el icono).
+  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, al pie del menú (justo
+     debajo de «Mejorar plan», si lo tiene), «Gestionar en erplora.com», con el icono de enlace externo (en el menú
+     plegado, solo el icono).
      No vende: también está en la app instalada, salvo en la de Google Play.
   4. Lo pulsa: se abre este negocio en el panel de erplora.com, ya dentro con su cuenta, en una pestaña nueva; en la
      app instalada, en el navegador del dispositivo. El Hub se queda donde estaba.
@@ -721,7 +732,8 @@ pase no llega (el servidor da un error o no contesta en 8 segundos), se abre la 
 entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pestaña nueva, abre esa dirección el
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
 que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
-y la app de Google Play no tienen «Gestionar en erplora.com».
+y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
+ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran.
 Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -853,7 +865,7 @@ Pasos:
 Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en erplora.com.
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
-límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para quien administra en el
+límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para el propietario en el
 navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar» (BASE-F20). Una app que
 este negocio no puede usar tampoco: sale «No disponible» y, para quien administra, el motivo debajo («VeriFactu solo
 es para negocios de España.», VERIFACTU-F01). Cualquier otro fallo sale en un aviso con el nombre de la app y el
@@ -887,12 +899,12 @@ Pantalla: Apps
 Pasos:
   1. Una app de pago que el negocio no tiene contratada sale en «Añadir apps» y en «De pago» con «Necesita
      suscripción», y no está en «Mis apps» ni en el menú.
-  2. Quien administra el negocio, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de
-     erplora.com de este negocio en una pestaña nueva: allí ve el precio y la contrata.
+  2. El propietario, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de erplora.com de este
+     negocio en una pestaña nueva: allí ve el precio y la contrata.
   3. En cuanto erplora.com se lo dice al hub, la app pasa a «Activa» y aparece en «Mis apps» y en el menú, sin
      recargar.
-  4. Quien no administra el negocio, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
-     cuenta de ERPlora.» y ningún botón: el hub nunca vende.
+  4. Quien no es el propietario, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
+     cuenta de ERPlora.» y ningún botón: el hub nunca vende, y en erplora.com solo compra el propietario.
 Entra: lo que el negocio tiene contratado, tal y como erplora.com se lo pasa al hub.
 Sale: nada guardado ni cobrado en el hub.
 Si falla: hasta que erplora.com se lo dice al hub, la app sigue con «Necesita suscripción»; una pantalla suya
@@ -1031,9 +1043,9 @@ Entra: lo que el negocio tiene de cada app.
 Sale: nada.
 Si falla: «No se ha podido comprobar por qué no se abre esta app» — «Comprueba la conexión y vuelve a
 intentarlo.» con «Reintentar»: nunca un motivo inventado. Una dirección que no existe en el hub dice que no
-existe, como cualquier otra. Una app que la persona no puede ver se abre igual y cada pantalla dice que no tiene
-permiso.
-Implicados: ninguno
+existe, como cualquier otra. Una pantalla que el rol de la persona no abre dice «Sin acceso» (BASE-F118); si la app
+entera no se abre en el negocio, manda este motivo, que vale para todos.
+Implicados: BASE-F118
 
 ### BASE-F27 Ver una app de pago bloqueada
 Estado: hecho
@@ -1044,7 +1056,7 @@ Pasos:
      ha contratado.
   2. Al abrir cualquier pantalla suya ve «Suscripción necesaria»: el nombre de la app y «está deshabilitada porque
      este negocio no tiene su suscripción. Tus datos están a salvo y vuelven en cuanto se contrate.», con «Ir a
-     Apps» y, para quien administra en el navegador, «Mejorar plan».
+     Apps» y, para el propietario en el navegador, «Mejorar plan».
   3. La app sale del menú y de «Mis apps», y el hub no hace nada de lo que se le pida a esa app, venga de esta
      pantalla, de otro dispositivo, del asistente o de una integración.
   4. Si se contrata con la pantalla abierta, cambia al nombre de la app con «ya está lista» — «Ya se puede
@@ -1220,8 +1232,10 @@ Entra: el nombre, el idioma, para qué es y lo marcado.
 Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
 ni datos fiscales. En el negocio no se guarda nada.
 Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
-exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.».
-Implicados: BASE-F112 (dentro de la app)
+exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
+exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
+restablecer (BASE-F37).
+Implicados: BASE-F112 (dentro de la app), BASE-F37
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho
@@ -1246,7 +1260,7 @@ Implicados: ninguno
 
 ### BASE-F37 Restablecer el negocio por secciones
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario
 Pantalla: Ajustes · Datos y copias › Restablecer
 Pasos:
   1. En «Restablecer», «Restablecer el negocio»: «Borra definitivamente los datos que marques. No se puede
@@ -1275,8 +1289,11 @@ coincide.». Si la copia no se puede hacer, no se vacía nada: «No se ha vaciad
 copia de los datos, así que no se ha vaciado nada.» y «Volver a intentarlo», con las mismas secciones. Si lo que falla
 es vaciar, la copia se guarda: «No se han podido vaciar las secciones, así que no se ha quitado nada. La copia de los
 datos de antes se guarda.». Quien no administra el negocio lee «Solo un administrador puede deshacer importaciones o
-restablecer el negocio.».
-Implicados: ninguno
+restablecer el negocio.». Un administrador deshace importaciones (BASE-F34), pero en lugar de «Restablecer el negocio»
+y «Copias de los datos» lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.»:
+restablecer, ver las copias y descargarlas es solo del propietario, también por la API y desde el asistente, que le
+responden que no tiene permiso.
+Implicados: BASE-F34, BASE-F35
 
 ### BASE-F38 Ver Inicio al día después de importar una plantilla
 Estado: hecho
@@ -1340,9 +1357,10 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
 Pasos:
-  1. Abre «Sistema»: se abre «Uso y plan». Mientras carga: «Consultando el sistema…». Arriba, su plan («Plan Starter») y
-     «Mejorar plan», que abre la página del plan de este negocio en erplora.com (BASE-F11); en la app instalada, o donde
-     ese enlace no sale, sin botón, «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.».
+  1. Abre «Sistema»: se abre «Uso y plan». Mientras carga: «Consultando el sistema…». Arriba, su plan («Plan Starter») y,
+     para el propietario, «Mejorar plan», que abre la página del plan de este negocio en erplora.com (BASE-F11); al
+     administrador, en la app instalada o donde ese enlace no sale, sin botón, «Los planes se gestionan desde tu cuenta
+     de ERPlora, en erplora.com.».
   2. Debajo, una línea le dice si tiene que ampliar. En verde, «Tu plan te alcanza». En ámbar, «Te conviene ampliar:
      {motivo}», con los archivos o los mensajes del mes desde el 80 %: «casi no te quedan archivos», «casi no te quedan
      mensajes del asistente este mes» o «casi no te quedan mensajes de WhatsApp este mes». En rojo, «Tienes que ampliar:
@@ -1535,11 +1553,14 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes, Ajustes · Impresión
 Pasos:
   1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
-  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias»; se abre
-     «General» (BASE-F62). La pestaña elegida queda en el enlace, así que un enlace guardado vuelve a ella y Atrás
-     sale de Ajustes en vez de recorrer sus pestañas. En el móvil caben las cuatro, enteras.
+  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias», cada una solo para quien puede usar
+     lo que lleva: «Impresión», para quien configura la app Impresión (propietario, administrador y responsable), y
+     «Datos y copias», para quien administra el negocio. Un empleado tiene «General» y «Negocio». Se abre «General»
+     (BASE-F62). La pestaña elegida queda en el enlace, así que un enlace guardado vuelve a ella y Atrás sale de
+     Ajustes en vez de recorrer sus pestañas. En el móvil caben las cuatro, enteras.
   3. Los enlaces antiguos siguen llevando a su sitio: el de la antigua «General» abre «General», el de la antigua
-     pestaña de impuestos abre «Negocio», y el de una pestaña que ya no existe abre la primera.
+     pestaña de impuestos abre «Negocio», y el de una pestaña que ya no existe, o que la persona no tiene, abre la
+     primera.
   4. En «Impresión», «Impresoras y tique» («Da de alta tu impresora y configura el tique impreso y digital»)
      abre la app Impresión; si no está, dice «Instala la app Impresión para dar de alta tu impresora y configurar
      el tique» y lleva a «Apps».
@@ -2117,9 +2138,10 @@ Actor: propietario, administrador
 Pantalla: Empleados · Personal
 Pasos:
   1. En **Empleados › Personal**, encima de la tabla, cuántas plazas del plan están ocupadas: «{used} de {limit}
-     plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
+     plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas». La
+     gestoría no ocupa plaza: sale en la lista, pero no cuenta aquí ni en «Uso y plan» de Sistema.
   2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
-     trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Mejorar plan».
+     trabaje aquí, o pasa a un plan con más plazas.»; en la web, y para el propietario, con «Mejorar plan».
   3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope
      (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: las personas del negocio y las plazas de su plan, como las manda erplora.com.
@@ -2180,12 +2202,13 @@ Implicados: BASE-F77, BASE-F81
 
 ### BASE-F81 Entender cómo entra cada persona
 Estado: hecho
-Actor: propietario, administrador, encargado, empleado
+Actor: propietario, administrador, encargado, empleado, gestoría
 Pantalla: Empleados · Personal
 Pasos:
   1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya;
      en una fila, un nombre que no cabe se corta y sale entero al pasar por encima), «Email» (solo para quien ve el
-     contacto del equipo: propietario, administrador y encargado; BASE-F119), «Rol», «Acceso» y «Estado».
+     contacto del equipo: propietario, administrador y encargado; BASE-F119), «Rol» (la gestoría, la última),
+     «Acceso» y «Estado».
   2. «Acceso» dice cómo entra: «Cuenta» siempre, y «PIN» y «Placa» si los tiene (por ejemplo, «Cuenta + PIN +
      Placa»).
   3. «Estado» dice «Activo» o, si erplora.com ya la invitó y aún no ha entrado, «Aún no ha entrado».
@@ -2197,15 +2220,19 @@ Implicados: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 Ver los roles del negocio
 Estado: hecho
-Actor: propietario, administrador, encargado, empleado
+Actor: propietario, administrador, encargado, empleado, gestoría
 Pantalla: Empleados · Roles
 Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
-  2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
-     disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cuatro, los de erplora.com:
-     ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
-  3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
+  2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
+     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cinco, los de
+     erplora.com: ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
+  3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
+     totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
+     registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
+     facturas y no cambia ningún ajuste, y no ocupa plaza del plan (BASE-F77).
+  4. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
@@ -2299,7 +2326,7 @@ Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
 publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
-Implicados: BASE-F89, BASE-F90
+Implicados: BASE-F89, BASE-F90, BASE-F119
 
 ### BASE-F87 Rotar una llave de API
 Estado: hecho
@@ -2757,12 +2784,12 @@ Pasos:
      renuevan el 1 de noviembre.», y no un fallo de conexión. El pie dice lo mismo, sin repetir «Mejorar plan»:
      «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
      el mes ya gastado.
-  5. Quien administra el negocio ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan
-     en erplora.com, ya dentro con su cuenta (BASE-F11); en la app instalada desde la tienda no sale. Quien no
-     administra ve «Pídele a quien administra el negocio que mejore el plan.». No hay paquetes de mensajes: se amplía
+  5. El propietario ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan en
+     erplora.com, ya dentro con su cuenta (BASE-F11); en la app instalada desde la tienda no sale. Quien no es el
+     propietario ve «Pídele al propietario del negocio que mejore el plan.». No hay paquetes de mensajes: se amplía
      mejorando de plan.
-  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para quien
-     administra; el panel se abre igual.
+  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para el
+     propietario; el panel se abre igual.
 Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
 Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
@@ -3372,15 +3399,39 @@ erplora.com: si no se paga pronto, el negocio se suspende. No se borra nada.». 
 campana se queda con lo último que supo, como en BASE-F10.
 Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
+### BASE-F118 Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo
+Estado: hecho
+Actor: responsable, empleado
+Pantalla: Sin acceso
+Pasos:
+  1. Abre por su dirección (un enlace, el historial, una pestaña que se quedó abierta o escribiéndola) una pantalla de
+     una app que su rol no abre: una entrada que no sale en su menú, como «Reglas» de Impuestos para un empleado, o
+     cualquier pantalla que cuelgue de ella.
+  2. En lugar de la pantalla, en la misma dirección, sale «Sin acceso»: «No tienes acceso a esta pantalla» — «Tu rol en
+     este negocio no la abre.». Mientras busca a quién pedirlo: «Buscando quién puede darte acceso…».
+  3. Debajo, «Pide acceso a una de estas personas:» y el nombre de cada una, con su avatar: quien le puede cambiar el
+     rol en erplora.com (HUBS-F26). Un empleado ve al propietario y a los administradores; un responsable, solo al
+     propietario. Solo el nombre: ni el email ni el teléfono. Cuentan también los invitados que aún no han entrado.
+  4. «Ir al Inicio» lleva al Inicio.
+Entra: la sesión de la persona, que dice qué pantallas de cada app tiene cerradas por su rol (las mismas que no salen
+en su menú); las personas del negocio con su rol, de la última foto de erplora.com.
+Sale: nada.
+Si falla: si no se puede saber a quién pedirlo, «No hemos podido saber quién puede darte acceso» — «Pregunta a quien
+lleva el negocio o vuelve a intentarlo.» con «Reintentar», y la pantalla sigue diciendo que no tiene acceso. Sin nadie
+a quien nombrar: «Pide acceso a quien lleva el negocio.». Si la app entera no se abre en el negocio (apagada o sin su
+suscripción), sale su motivo (BASE-F26). El Hub rechaza igual lo que esa pantalla pediría: «Sin acceso» solo ahorra
+una pantalla de errores.
+Implicados: BASE-F26, HUBS-F26 (erplora.com)
+
 ### BASE-F119 Lo que se ve según los permisos de dato
 Estado: hecho
-Actor: propietario, administrador, encargado, empleado
-Pantalla: Empleados · Personal, Inicio · Resumen
+Actor: propietario, administrador, encargado, empleado, gestoría
+Pantalla: Empleados · Personal, Inicio · Resumen, Ventas · Ventas, Clientes
 Pasos:
   1. Además de lo que puede hacer, cada rol dice qué datos delicados ve, con cuatro permisos de dato: ver los costes,
      ver el contacto de los clientes, ver el contacto del equipo y ver los totales del negocio. El propietario, el
      administrador y el encargado tienen los cuatro; el empleado, solo el contacto de los clientes, que necesita
-     para atenderlos.
+     para atenderlos; la gestoría, solo los totales del negocio.
   2. Quien no tiene un permiso de dato no recibe ese dato por ningún camino: ni en la pantalla, ni por la API, ni en
      lo que contesta el asistente. Donde iría, el dato llega vacío y la pantalla no lo enseña.
   3. En **Empleados › Personal**, la columna «Email» solo sale a quien ve el contacto del equipo. Un empleado no ve
@@ -3388,11 +3439,16 @@ Pasos:
      va antes de la @.
   4. Un panel de Inicio cuya cifra es un dato que la persona no ve no le sale en el tablero ni entre los que puede
      añadir.
+  5. Una llave de API ve los datos que ve quien la crea: solo la crean el propietario y el administrador, que los ven
+     todos, así que una integración lee y escribe el coste de un producto como antes.
+  6. Los totales del negocio son las cifras de todo el negocio, más allá de lo que hace cada uno: con las ventas de
+     todos, las cifras de **Ventas** y sus paneles de Inicio son las del negocio entero; sin ellos, las de las ventas
+     de la persona. En **Clientes**, «Ingresos» solo sale a quien los ve.
 Entra: el rol de la persona en este negocio.
 Sale: nada guardado.
 Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
-Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
+Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
 
 ## Para quien lo mantiene
 
@@ -3404,7 +3460,10 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
   rechaza con 403 `permission_denied`. Un panel de Inicio no sale a quien no tiene el permiso de un campo marcado que
   lee su `map` (`visibility.widget_open`). `tests/test_guardrails_sensitive.py` exige la marca en todo campo de
   respuesta con nombre de coste, contacto o sueldo, o su entrada en `UNMARKED` con su motivo (la lista solo encoge), y
-  la misma marca en el filtro o el orden de una lectura que lo nombra.
+  la misma marca en el filtro o el orden de una lectura que lo nombra. Una lectura de cifras (`stats`, `summary`,
+  `report`, `by_staff`… o en un módulo `figures`) marca sus importes (`BUSINESS_TOTALS` los de todo el negocio) o está
+  en `UNMARKED_FIGURES` con su motivo: las de Ventas suman con `Owned.counted`, que ya cuenta solo lo propio a quien
+  no tiene los totales.
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
   `base.middleware.CustomDomainMiddleware`): `ALLOWED_HOSTS` no cambia. El SaaS nombra el dominio en la foto
   (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
@@ -3761,10 +3820,15 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
   `base/tenancy/tests/test_limits.py`.
 - Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`;
-  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
-  de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
-  en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
-  «Mejorar plan» solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
+  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppGatePage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
+  de `apps/<id>/frontend/routes.ts` lleva `meta.app`; la página va por nombre en la misma dirección, como `NotInAppPage`
+  del shell, y se comprueba también la primera dirección antes de montar). Pinta `AppBlockedPage.vue` cuando la app no
+  está `on` en `base.session.me` y `NoAccessPage.vue` («Sin acceso», BASE-F118) cuando la entrada de menú más larga de
+  la app que cubre la dirección está en `locked` de la sesión (las rutas de las entradas `Nav` que la persona no
+  abre); la decide `gateVerdict`, nunca la lista `apps`, que lleva toda app de la que la persona tiene algún permiso.
+  Los nombres salen de `base.access.grantors` (`base/queries/access_rights.py`): quien puede subirle el rol en
+  erplora.com, solo el nombre.
+  «Mejorar plan» y la Tienda, solo con `useMayBuy` (`base/frontend/lib/plan-link.ts`). e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
 - Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio nace con todo
   apagado, también una demo, salvo las obligatorias de su país que la plataforma
@@ -3889,7 +3953,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
   de `apps/sale/queries/business.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
   Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
   una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
-  `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
+  `#data`; `#tax` abre Negocio; `lib/settings-tabs.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
 - **La hora del negocio** (hub#687): la zona la lee un solo sitio, `base.business.business_zone()`: la del hub en el que se
@@ -3950,7 +4014,10 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
   la saca por `openExternalLink`. Un error u 8 s sin respuesta (`SIGN_TIMEOUT_MS`: `client.api.call` no tiene tiempo
   límite) abren la dirección de siempre, que sigue en el `href`. Todo «Mejorar plan» con pase es una sola pieza,
   `base/frontend/components/PlanUpgradeLink.vue` (`plan`; hub#853): recibe la dirección (`url`), dice «Mejorar plan» o lo
-  que su sitio le pone dentro, y quien la coloca decide si sale (solo en la web) y su clase y `data-testid`. La colocan
+  que su sitio le pone dentro, y quien la coloca decide su clase y `data-testid`. Si sale lo decide una sola regla,
+  `useMayBuy` de `base/frontend/lib/plan-link.ts`: en la web y con `base.own_business`, porque en erplora.com solo el
+  propietario compra (`usePlanLink` la aplica a la dirección de `hub-home`; `canUpgrade` del asistente y los enlaces a
+  la Tienda de `AppsPage` y `AppBlockedPage`, también). La colocan
   `UpgradePlanLink` (pie del menú, con su icono), `SystemUsage`, `PeopleList`, `AppsPage` y la Bandeja de WhatsApp
   (`InboxPage`, `MessageComposer`, `ChannelSettings`, con su «Mejorar el plan»); su test prohíbe que un `.vue` vuelva a
   escribir a mano `openSaasPass('plan', …)`. Además usan `useSaasPass` `ManageLink` (`business`) y `openPlan` de
@@ -3963,7 +4030,11 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
   `base.open_management` (propietario y administrador por `base.*`; el encargado, a mano en `base/apps.py`: no tiene
-  `base.administer_hub`). Lo pinta `ManageLink.vue` (`menu-manage`, `ion:open-outline`) al pie del menú lateral,
+  `base.administer_hub`). Lo que es solo del propietario es `base.own_business` (`OWNER_ONLY` de `base/permissions.py`):
+  `permissions_of_role` da al propietario todo lo declarado y al administrador todo menos eso, y ninguna app lo da a
+  otro rol (`base/tests/test_permissions.py`). Lo exigen `base.hub.reset`, `base.hub.dumps` y `base.hub.dump_link`, y
+  en la pantalla, «Mejorar plan», la Tienda y «Restablecer el negocio» con «Copias de los datos»
+  (`components/data/ResetPanel.vue`). Lo pinta `ManageLink.vue` (`menu-manage`, `ion:open-outline`) al pie del menú lateral,
   justo debajo de «Mejorar plan» (`UpgradePlanLink.vue`): los dos van en `SidebarFooter.vue`, la pieza
   `sidebarFooter` de `createShell` en `frontend/main.ts`; la barra de arriba solo lleva los destellos y la campana. Es
   un enlace con `target=_blank rel=noopener` que al pulsarlo lleva el pase y en la app instalada sale por
@@ -4378,9 +4449,12 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82
   `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
-- Menú lateral: `SIDEBAR` de `frontend/main.ts`; cada entrada lleva el `visible` del shell (`ShellSidebarItem`,
-  `packages/ui`) con el permiso de la operación de su pantalla (`allowedTo` de `base/frontend/lib/sidebar.ts`): un
-  empleado no ve «Sistema» (`base.administer_hub`).
+- Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
+  su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
+  además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`).
+- Pestañas de Ajustes: `SETTINGS_TABS` de `base/frontend/lib/settings-tabs.ts`, cada una con el permiso de lo que
+  lleva («Impresión», `printing.manage_settings`, el de la app a la que lleva; «Datos y copias», `base.administer_hub`);
+  `settingsTab` abre la del hash solo si la persona la tiene y, si no, la primera suya.
 - Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py`, `test_approved_calls.py` y `test_api_docs.py`; Vitest de
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
@@ -4688,7 +4762,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
-- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cuatro de
+- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cinco de
   erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar

@@ -21,7 +21,9 @@ import { useLocale, useT } from '../composables/useT';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import { formatDay, formatHm, formatHms, formatTime, liveSeconds } from '../lib/time';
 import type { PositionIn, RecordOut, RecordStatus } from '../operations';
-import { attendanceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('attendance');
 
 type Busy = '' | 'in' | 'out' | 'break';
 type Notice = { kind: 'success' | 'error' | 'info'; text: string } | null;
@@ -170,7 +172,7 @@ function endOf(day: RecordOut): string {
 <template>
   <AppPage
     :title="$t('attendance.title')"
-    :tabs="attendanceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('attendance.tabs.label')"
   >
     <PageNotices

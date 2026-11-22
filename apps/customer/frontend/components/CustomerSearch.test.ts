@@ -7,7 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { defineComponent, h, ref, render } from 'vue';
 
 import { customerRow, DETAIL, pageOf } from '../__tests__/fixtures';
-import { EMPLOYEE, flush, json, mountCustomer, refusal, sent, VIEWER } from '../__tests__/mount-customer';
+import { EMPLOYEE, flush, json, mountCustomer, refusal, sent, VIEWER, WITHOUT_CONTACT } from '../__tests__/mount-customer';
 import type { SessionMe } from '@erplora/ui/shell';
 import CustomerSearch, { type CustomerSnapshot, snapshotOf } from './CustomerSearch.vue';
 import source from './CustomerSearch.vue?raw';
@@ -287,6 +287,18 @@ describe('CustomerSearch: «+ New customer» (F18)', () => {
     await s.click('customer-search-quick-submit');
     expect(s.el('customer-search-quick-phone')!.errorText).toBe(PHONE_INVALID);
     expect(s.value.value).toBeNull();
+  });
+
+  it('whoever does not see the customers\' contact details is never told who has that phone: the card is created (F18)', async () => {
+    const s = await setup(null, WITHOUT_CONTACT, true);
+    await s.results([]);
+    await s.type('customer-picker-search', 'Marta');
+    await s.click('customer-search-quick-add');
+    await s.type('customer-search-quick-phone', '600 999 888');
+    s.net.onApi(() => json({ ...DETAIL, id: 'c9', name: 'Marta', email: null, phone: null }, 201));
+    await s.click('customer-search-quick-submit');
+    expect(s.net.api.map((c) => sent(c).path)).toEqual(['/api/customer/customers']);
+    expect(s.value.value?.customer_id).toBe('c9');
   });
 
   it('who cannot manage cards is not offered to create one', async () => {

@@ -130,7 +130,7 @@ def test_spanish_texts_of_the_workbook():
             "Cada mes",
         ]
         assert str(queries.VERDICTS["outside_schedule"]) == "Esa hora está fuera del horario del negocio."
-        assert str(services.CANNOT["confirm"]) == "Esta cita ya no se puede confirmar: ya no está pendiente."
+        assert str(services.writes.CANNOT["confirm"]) == "Esta cita ya no se puede confirmar: ya no está pendiente."
         assert str(queries.APPOINTMENT_NOT_FOUND) == "Esa cita no existe en este negocio."
 
 

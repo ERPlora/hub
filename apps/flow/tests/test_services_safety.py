@@ -17,6 +17,7 @@ from live.operations import get
 from apps.flow import services
 from apps.flow.models import FlowRun
 from apps.sale.models import Order
+from base.sensitive import DATA_PERMISSIONS
 
 from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
 
@@ -79,11 +80,11 @@ def test_a_step_acts_only_with_its_own_permission_so_an_operation_s_checks_still
     assert Order.objects.get(pk=check_with_a_line.id).status != "voided"
 
 
-def test_the_step_context_holds_its_operation_s_permission_and_its_app_s_reads():
+def test_the_step_context_holds_its_operation_s_permission_its_app_s_reads_and_the_data_permissions():
     flow = make_flow()
     started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
     ctx = services.engine._step_context(ctx_for(scope=A), started, flow, get("task.task.create"))
-    assert ctx.permissions == frozenset({"task.add", "task.view", "task.view_all"})
+    assert ctx.permissions == frozenset({"task.add", "task.view", "task.view_all"}) | DATA_PERMISSIONS
     assert ctx.actor == f"flow_run:{started.id}"
     assert not ctx.has("task.delete") and not ctx.has("customer.view")
 

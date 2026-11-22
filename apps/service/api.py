@@ -76,29 +76,29 @@ async def service_for_sale(request, params: Query[ServiceForSaleIn]):
 
 @bind(router, "service.service.create", "/service/services", status=201)
 async def service_create(request, data: ServiceIn):
-    return await run_operation(request, services.create_service, data)
+    return await run_operation(request, services.catalog.create_service, data)
 
 
 @bind(
     router, "service.service.bulk_create", "/service/services/bulk_create", status=201
 )
 async def service_bulk_create(request, data: ServiceBulkIn):
-    return await run_operation(request, services.bulk_create_services, data)
+    return await run_operation(request, services.catalog.bulk_create_services, data)
 
 
 @bind(router, "service.service.update", "/service/services/update")
 async def service_update(request, data: ServicePatchIn):
-    return await run_operation(request, services.update_service, data)
+    return await run_operation(request, services.catalog.update_service, data)
 
 
 @bind(router, "service.service.archive", "/service/services/archive")
 async def service_archive(request, data: ServiceRefIn):
-    return await run_operation(request, services.archive_service, data)
+    return await run_operation(request, services.catalog.archive_service, data)
 
 
 @bind(router, "service.service.restore", "/service/services/restore")
 async def service_restore(request, data: ServiceRefIn):
-    return await run_operation(request, services.restore_service, data)
+    return await run_operation(request, services.catalog.restore_service, data)
 
 
 @bind(router, "service.catalog.status", "/service/catalog/status")
@@ -121,17 +121,17 @@ async def category_get(request, params: Query[CategoryRefIn]):
 
 @bind(router, "service.category.create", "/service/categories", status=201)
 async def category_create(request, data: CategoryIn):
-    return await run_operation(request, services.create_category, data)
+    return await run_operation(request, services.categories.create_category, data)
 
 
 @bind(router, "service.category.update", "/service/categories/update")
 async def category_update(request, data: CategoryPatchIn):
-    return await run_operation(request, services.update_category, data)
+    return await run_operation(request, services.categories.update_category, data)
 
 
 @bind(router, "service.category.delete", "/service/categories/delete")
 async def category_delete(request, data: CategoryRefIn):
-    return await run_operation(request, services.delete_category, data)
+    return await run_operation(request, services.categories.delete_category, data)
 
 
 # Settings
@@ -144,7 +144,7 @@ async def settings_get(request):
 
 @bind(router, "service.settings.update", "/service/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 # Who performs each service
@@ -167,17 +167,17 @@ async def assignment_eligible(request, params: Query[EligibleIn]):
 
 @bind(router, "service.assignment.assign", "/service/assignments/assign")
 async def assignment_assign(request, data: AssignIn):
-    return await run_operation(request, services.assign, data)
+    return await run_operation(request, services.assignments.assign, data)
 
 
 @bind(router, "service.assignment.update", "/service/assignments/update")
 async def assignment_update(request, data: AssignmentPatchIn):
-    return await run_operation(request, services.update_assignment, data)
+    return await run_operation(request, services.assignments.update_assignment, data)
 
 
 @bind(router, "service.assignment.remove", "/service/assignments/remove")
 async def assignment_remove(request, data: AssignmentRefIn):
-    return await run_operation(request, services.remove_assignment, data)
+    return await run_operation(request, services.assignments.remove_assignment, data)
 
 
 # Packages
@@ -195,17 +195,17 @@ async def package_get(request, params: Query[PackageRefIn]):
 
 @bind(router, "service.package.create", "/service/packages", status=201)
 async def package_create(request, data: PackageIn):
-    return await run_operation(request, services.create_package, data)
+    return await run_operation(request, services.packages.create_package, data)
 
 
 @bind(router, "service.package.update", "/service/packages/update")
 async def package_update(request, data: PackagePatchIn):
-    return await run_operation(request, services.update_package, data)
+    return await run_operation(request, services.packages.update_package, data)
 
 
 @bind(router, "service.package.delete", "/service/packages/delete")
 async def package_delete(request, data: PackageRefIn):
-    return await run_operation(request, services.delete_package, data)
+    return await run_operation(request, services.packages.delete_package, data)
 
 
 # Vouchers sold
@@ -253,17 +253,17 @@ async def grant_tender_options(request, params: Query[TenderOptionsIn]):
 
 @bind(router, "service.grant.create", "/service/grants", status=201)
 async def grant_create(request, data: GrantIn):
-    return await run_operation(request, services.create_grant, data)
+    return await run_operation(request, services.grants.create_grant, data)
 
 
 @bind(router, "service.grant.void", "/service/grants/void")
 async def grant_void(request, data: VoidIn):
-    return await run_operation(request, services.void_grant, data)
+    return await run_operation(request, services.grants.void_grant, data)
 
 
 @bind(router, "service.grant.adjust", "/service/grants/adjust")
 async def grant_adjust(request, data: AdjustIn):
-    return await run_operation(request, services.adjust_grant, data)
+    return await run_operation(request, services.grants.adjust_grant, data)
 
 
 @bind(router, "service.grant.link", "/service/grants/link")
@@ -273,7 +273,7 @@ async def grant_link_sale(request, data: GrantSaleIn):
 
 @bind(router, "service.grant.redeem", "/service/grants/redeem")
 async def grant_redeem(request, data: RedeemIn):
-    return await run_operation(request, services.redeem, data)
+    return await run_operation(request, services.grants.redeem, data)
 
 
 # Movements
@@ -289,13 +289,13 @@ async def movement_list(request, params: Query[MovementListIn]):
 
 @bind(router, "service.service.set_image", "/service/services/image")
 async def service_image_set(request, data: ServiceImageIn):
-    return await run_operation(request, services.set_image, data)
+    return await run_operation(request, services.service_images.set_image, data)
 
 
 @bind(router, "service.service.upload_image", "/service/services/image/upload")
 @decorate_view(accept_body_up_to(MAX_PHOTO_BODY))
 async def service_image_upload(request, data: ServiceImageUploadIn):
-    return await run_operation(request, services.upload_image, data)
+    return await run_operation(request, services.service_images.upload_image, data)
 
 
 @bind(router, "service.service.suggest_image", "/service/services/image/suggest")

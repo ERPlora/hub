@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file -- small screens built for these tests */
-import { type SessionMe, type ShellConfig, useSession, useShellConfig } from '@erplora/ui/shell';
+import { AppPage, type SessionMe, type ShellConfig, useSession, useShellConfig } from '@erplora/ui/shell';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, inject, ref } from 'vue';
@@ -18,7 +18,9 @@ import {
   page,
   settle,
   type ShellApp,
+  itPaintsTheTabsItsSessionOpens,
   subId,
+  tabsOf,
   words,
 } from './mount-in-shell';
 
@@ -390,4 +392,33 @@ describe('the gestures and fixtures the tests share', () => {
     expect(page(['a', 'b'])).toEqual({ rows: ['a', 'b'], total: 2, limit: 50, offset: 0 });
     expect(page(['a'], 9, 1, 3)).toEqual({ rows: ['a'], total: 9, limit: 1, offset: 3 });
   });
+});
+
+describe('tabsOf', () => {
+  it("reads the tab bar a page gives its AppPage: each tab's id and label, in order", async () => {
+    const Page = defineComponent({
+      setup: () => () =>
+        h(AppPage, {
+          title: 'Probe',
+          tabs: [
+            { id: 'one', label: 'One', icon: 'ion:list-outline', to: '/probe/one' },
+            { id: 'two', label: 'Two', icon: 'ion:time-outline', to: '/probe/two' },
+          ],
+        }),
+    });
+    const m = await mountInShell(Page, {}, APP);
+    expect(tabsOf(m.wrapper)).toEqual([
+      ['one', 'One'],
+      ['two', 'Two'],
+    ]);
+    m.wrapper.unmount();
+  });
+});
+
+describe('itPaintsTheTabsItsSessionOpens', () => {
+  const Page = defineComponent({
+    setup: () => () =>
+      h(AppPage, { title: 'Probe', tabs: [{ id: 'one', label: 'One', icon: 'ion:list-outline', to: '/probe/one' }] }),
+  });
+  itPaintsTheTabsItsSessionOpens(() => mountInShell(Page, {}, APP), [['one', 'One']]);
 });

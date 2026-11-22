@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e1654930e3dac90479b37dd198811d475dd78f4f2b807b51ee8bc5c42a4f19c0 -->
+<!-- generated from WORKBOOK.md sha256:fdcb415bacc7ae6ed135e5f34b1ebd639ad6649a3067c310908515cf3b44ce57 -->
 
 ## What it is for and who it is for
 
@@ -28,7 +28,7 @@ Who uses it:
 
 - The **owner**, the **administrator** and the **manager** create, change and delete groups and
   options, and link or unlink them.
-- The **employee** (waiter, cashier) looks up the groups; the one who lives it every day is them, at the
+- The **employee** (waiter, cashier) does not open the groups (by its address, "No access" (BASE-F118)): they live them every day at the
   till.
 
 It is not a product variant (an option carries no stock or cost and does not take away stock) nor a
@@ -155,7 +155,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 
 ### MODIFIER-F01 Look up and search the groups
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager (an employee does not open Add-ons: by its address, "No access" (BASE-F118))
 Screen: Modifiers
 Steps:
 1. Open **Modifiers**.

@@ -25,8 +25,6 @@ export type ConsentSource = 'counter' | 'web_form' | 'phone' | 'email' | 'import
 
 export type CustomerSort =
   | 'name'
-  | 'email'
-  | 'phone'
   | 'tax_id'
   | 'company_name'
   | 'lifecycle_stage'
@@ -135,11 +133,12 @@ export interface ImportRowIn {
   notes?: string;
 }
 
+/** `email` and `phone` come null to whoever does not see the customers' contact details. */
 export interface CustomerRow {
   id: string;
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   tax_id: string;
   company_name: string;
   lifecycle_stage: CustomerStage;
@@ -164,7 +163,7 @@ export interface ConsentStateRow {
   purpose: string;
   channel: ConsentChannel | '';
   state: 'granted' | 'withdrawn';
-  contact_point: string;
+  contact_point: string | null;
   source: ConsentSource;
   notice_version: string;
   occurred_at: string;
@@ -196,14 +195,14 @@ export interface CustomerStatsOut {
   total: number;
   active: number;
   vip: number;
-  total_revenue: number;
+  total_revenue: number | null;
 }
 
 export interface PhoneMatch {
   id: string;
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
 }
 
 export interface ExportOut {
@@ -250,7 +249,7 @@ export interface ConsentRow {
   /** Empty for a permission that is not about reaching the person (health data, CUSTOMER-F32). */
   channel: ConsentChannel | '';
   state: 'granted' | 'withdrawn';
-  contact_point: string;
+  contact_point: string | null;
   source: ConsentSource;
   notice_text: string;
   notice_version: string;

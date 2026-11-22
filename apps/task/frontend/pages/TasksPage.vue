@@ -31,7 +31,9 @@ import { useLocale, useT } from '../composables/useT';
 import { dueTone as dueToneOn, formatDay, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
 import { keepCompletedInPlace } from '../lib/mine';
 import type { TaskListIn, TaskOut, TaskPriority, TaskSort, TaskStatus } from '../operations';
-import { taskTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('task');
 
 const STATUSES: readonly TaskStatus[] = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
 const PRIORITIES: readonly TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
@@ -215,7 +217,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
   <AppPage
     :title="$t('task.title')"
     content-layout="fill"
-    :tabs="taskTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('task.tabs.label')"
   >
     <div class="task-tasks__views">

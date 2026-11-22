@@ -78,7 +78,7 @@ def kinds(problems):
 
 
 def revision(family, environment=None, secrets=()):
-    """A revision as ecs-deploy.sh hands it over: what it registers, with Terraform's variables in the app container."""
+    """A revision as ecs_deploy.py hands it over: what it registers, with Terraform's variables in the app container."""
     environment = {"DEBUG": "False", "ERPLORA_ENVIRONMENT": "prod"} if environment is None else environment
     return {
         "family": f"erplora-prod-{family}",

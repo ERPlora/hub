@@ -16,8 +16,8 @@ de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`) con la clave `tab
   `ion:apps-outline`. También el paso «Tus mesas» del Inicio (el del módulo viejo). Hoy: `ion:grid-outline`,
   el del módulo.
 
-Al registrarlos, cambiar a la vez `apps.py` (`icon`, `navigation` y `setup`), `frontend/tabs.ts` y sus tests
-(`tests/test_apps.py`, `tests/test_integration_home.py`, `frontend/tabs.test.ts`) y correr `pnpm gen:app-icons`.
+Al registrarlos, cambiar a la vez `apps.py` (`icon`, `navigation` y `setup`), y sus tests
+(`tests/test_apps.py`, `tests/test_integration_home.py`) y correr `pnpm gen:app-icons`.
 
 ## Hechas
 
