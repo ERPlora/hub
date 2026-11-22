@@ -56,7 +56,7 @@ cancela por WhatsApp o por la reserva online con las reglas del negocio.
 | Permisos | 10 (`view_`, `add_` y `change_` de `appointment` y de `own_appointment`, `delete_appointment`, `view_schedule`, `manage_schedule` y `manage_settings`); el empleado, solo lo suyo |
 | Automatización de fábrica | «Cubrir el hueco cuando un cliente cancela» (`recipes.py`, FLOW-F33) |
 | Tareas programadas | ninguna (las series se reservan al crearlas, al editarlas y con «Reservar citas») |
-| Migraciones | `0001_initial`, `0002_appointment_order_id` y `0003_end_in_real_minutes` |
+| Migraciones | `0001_initial`, `0002_appointment_order_id`, `0003_end_in_real_minutes`, `0004_history_restored` y `0005_actor_without_address` (quien actuó guardado por su correo se queda con lo que va antes de la @) |
 | Admin | Django admin en `hubs.erplora.com`: citas, series, bloqueos, ajustes y contadores, para soporte; borrar una cita o una serie bloquea antes sus filas (`LockedDeletion`); lo que guarda no pasa por las operaciones ni deja aviso |
 
 Las decisiones de diseño (disponibilidad = Horarios ∩ Personal ∩ citas, solapes con bloqueo, numeración, reloj del

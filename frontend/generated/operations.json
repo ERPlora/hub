@@ -2999,6 +2999,10 @@
     "method": "get",
     "path": "/api/roles"
   },
+  "base.role.detail": {
+    "method": "get",
+    "path": "/api/roles/detail"
+  },
   "base.api_key.list": {
     "method": "get",
     "path": "/api/keys"

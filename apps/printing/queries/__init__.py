@@ -40,6 +40,7 @@ from apps.printing.schemas import (
     SettingsOut,
 )
 from base.ordering import list_order
+from base.queries.people import actor_name
 
 from .health import SEEN_WITHIN
 from .job_printer import active_printers, prints_on
@@ -66,15 +67,8 @@ PENDING = Q(status=PrintJob.Status.PENDING)
 
 
 def actor(ctx: OperationContext) -> str:
-    """Who acts, as a person reads it: a user's name (or e-mail, or username); the system's own label."""
-    who = ctx.actor
-    if who is None:
-        return ""
-    if hasattr(who, "get_username"):
-        label = who.get_full_name() or getattr(who, "email", "") or who.get_username()
-    else:
-        label = str(who)
-    return label[:128]
+    """Who acts, as a colleague reads it in the print queue: never their e-mail address."""
+    return actor_name(ctx.actor)[:128]
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────────────────────────

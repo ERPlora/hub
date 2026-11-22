@@ -11,6 +11,7 @@ vi.mock('./pages/SystemPage.vue', () => ({ default: { name: 'SystemPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 vi.mock('./pages/EmployeesPage.vue', () => ({ default: { name: 'EmployeesPage' } }));
 vi.mock('./pages/PersonPage.vue', () => ({ default: { name: 'PersonPage' } }));
+vi.mock('./pages/RolePage.vue', () => ({ default: { name: 'RolePage' } }));
 vi.mock('./pages/ApiDocsPage.vue', () => ({ default: { name: 'ApiDocsPage' } }));
 
 async function page(path: string): Promise<string> {
@@ -33,6 +34,7 @@ describe('base routes', () => {
       ['/settings', 'base-settings', true],
       // Employees and a person's page: the tab in the hash (`#roles`, `#apikeys`, `#approvals`).
       ['/employees', 'base-employees', true],
+      ['/employees/roles/:role', 'base-role', true],
       ['/employees/:person', 'base-person', true],
       ['/api-docs', 'base-api-docs', true],
       // Files: routes.files.test.ts.
@@ -50,6 +52,7 @@ describe('base routes', () => {
     expect(await page('/settings')).toBe('SettingsPage');
     expect(await page('/employees')).toBe('EmployeesPage');
     expect(await page('/employees/:person')).toBe('PersonPage');
+    expect(await page('/employees/roles/:role')).toBe('RolePage');
     expect(await page('/api-docs')).toBe('ApiDocsPage');
   });
 
