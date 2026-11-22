@@ -60,7 +60,7 @@ from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
-from base import bell
+from base import bell, visibility
 from base.business import business_zone, country_name, country_or_market
 
 logger = logging.getLogger(__name__)
@@ -391,7 +391,7 @@ def widgets(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_vertica
     panels = []
     for config in configs:
         for widget in config.widgets:
-            if not ctx.has(widget.permission):
+            if not visibility.widget_open(ctx, widget):
                 continue
             if widget.verticals and hub_vertical not in widget.verticals:
                 continue
