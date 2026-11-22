@@ -899,7 +899,7 @@ agenda tuya que enseñar.».
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
 - **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo de la skill

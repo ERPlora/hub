@@ -515,26 +515,26 @@ msgstr "entrada del historial"
 msgid "history"
 msgstr "historial"
 
-#: queries.py:79
+#: queries/tickets.py:39
 msgid "That kitchen ticket does not exist in this business."
 msgstr "Esa comanda no existe en este negocio."
 
-#: queries.py:81
+#: queries/tickets.py:40
 #, python-format
 msgid ""
 "“%(said)s” matches several tickets: %(names)s. Say which one by its number."
 msgstr ""
 "«%(said)s» coincide con varias comandas: %(names)s. Di cuál por su número."
 
-#: queries.py:83
+#: queries/scope.py:13
 msgid "That station does not exist in this business."
 msgstr "Esa estación no existe en este negocio."
 
-#: queries.py:84
+#: queries/tickets.py:43
 msgid "That dish is on no kitchen ticket of this business."
 msgstr "Ese plato no está en ninguna comanda de este negocio."
 
-#: queries.py:85
+#: queries/scope.py:14
 #, python-format
 msgid "“%(said)s” matches several stations: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias estaciones: %(names)s. Di cuál."

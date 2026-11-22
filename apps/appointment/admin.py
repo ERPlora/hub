@@ -21,7 +21,7 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
-from apps.appointment.services import lock_appointments, lock_series
+from apps.appointment.services.writes import lock_appointments, lock_series
 
 AUTOMATIC = ("id", "created_at", "updated_at")
 
