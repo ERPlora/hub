@@ -254,6 +254,7 @@ def test_a_customers_visits_come_newest_first_with_their_notes(salon):
 def test_a_caller_who_is_not_a_person_reads_a_visit_without_the_salons_notes_nor_the_contact(salon, actor):
     from apps.appointment.apps import AppointmentConfig
 
+    salon.lucia.email = "lucia@example.com"
     booked = make_appointment(
         salon.lucia,
         salon.ana,

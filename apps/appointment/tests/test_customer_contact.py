@@ -161,7 +161,7 @@ def test_the_live_agenda_answers_the_appointment_without_contact_to_whoever_lack
 
 def named_by(reference: str, beas) -> list[tuple[str, str, dict]]:
     """Every request of the agenda that names a customer, by ``reference``: listing her appointments, booking one,
-    several or a repeating one, and moving one as she asks."""
+    several or a repeating one, and moving or cancelling one as she asks."""
     booking = {"customer": reference, "services": [{"service": "Haircut"}], "staff": "Bea"}
     return [
         ("GET", "/appointment/appointments/for_customer", {"customer": reference}),
@@ -177,6 +177,11 @@ def named_by(reference: str, beas) -> list[tuple[str, str, dict]]:
             "/appointment/appointments/reschedule",
             {"id": str(beas.id), "start": wall(MONDAY, "17:00"), "on_behalf_of_customer": True, "customer": reference},
         ),
+        (
+            "POST",
+            "/appointment/appointments/cancel",
+            {"id": str(beas.id), "on_behalf_of_customer": True, "customer": reference},
+        ),
     ]
 
 
@@ -189,7 +194,7 @@ def ask(client, method: str, path: str, data: dict):
 def test_whoever_sees_the_contact_names_the_customer_by_her_phone_or_email(beas, sign_in, client, reference):
     sign_in("hub_employee")
     answers = [ask(client, *request) for request in named_by(reference, beas)]
-    assert [answer.status_code for answer in answers] == [200, 201, 201, 201, 200], [a.json() for a in answers]
+    assert [answer.status_code for answer in answers] == [200, 201, 201, 201, 200, 200], [a.json() for a in answers]
 
 
 @pytest.mark.usefixtures("anytime")
@@ -199,5 +204,5 @@ def test_without_it_a_phone_or_an_email_names_no_customer(beas, lacking, sign_in
     answers = [ask(client, *request) for request in named_by(reference, beas)]
     assert [(answer.status_code, answer.json()["error"]["code"]) for answer in answers] == [
         (404, "customer.customer_unavailable")
-    ] * 5
-    assert Appointment.objects.filter(customer=beas.customer).count() == 1
+    ] * 6
+    assert [(kept.id, kept.status) for kept in Appointment.objects.filter(customer=beas.customer)] == [(beas.id, beas.status)]

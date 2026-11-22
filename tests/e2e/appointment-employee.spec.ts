@@ -5,10 +5,10 @@
 // control: he sees both. Everything is named «E2E Apt …» and removed before and after.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { employeesRecord } from './appointment-helpers';
 import { pickDay } from './date-time-fields';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { pick, post } from './service-helpers';
+import { recordOf } from './staff-helpers';
 
 const TAG = 'E2E Apt';
 const RUN = Date.now().toString(36);
@@ -62,7 +62,7 @@ test('an employee sees and books her own agenda only, and the API agrees', async
   const owner = await signedIn(browser);
   try {
     // Her account linked to a record of Staff; a colleague beside her.
-    const bea = await employeesRecord(owner.context, named('Bea'));
+    const bea = await recordOf(owner.context, EMPLOYEE.email, named('Bea'));
     const ana = await post<{ id: string; full_name: string }>(owner.context, '/staff/members', { first_name: named('Ana'), last_name: 'Colleague' });
     const customer = await post<{ id: string; name: string }>(owner.context, '/customer/customers', {
       name: named('Marta'),

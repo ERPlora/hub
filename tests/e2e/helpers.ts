@@ -860,7 +860,7 @@ export async function signedInSpanish(
   return { context, page };
 }
 
-/** Saves the owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked. */
+/** Saves a signed-in session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked. */
 export async function saveSessionForTheSweep(context: BrowserContext): Promise<void> {
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 }

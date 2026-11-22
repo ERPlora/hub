@@ -5,12 +5,13 @@
 // (apps/appointment/tests/test_customer_contact.py).
 import { expect, test } from '@playwright/test';
 
-import { aMonday, employeesRecord, salonCleanUp } from './appointment-helpers';
+import { aMonday, salonCleanUp } from './appointment-helpers';
 import { cardDeletes, FLOW_VIEWPORTS, spanishMobile } from './customer-helpers';
 import { pickDay } from './date-time-fields';
 import { signedIn } from './flow-helpers';
-import { A, api, capture, EMPLOYEE, psql, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, psql, saveSessionForTheSweep, shown } from './helpers';
 import { post } from './service-helpers';
+import { recordOf } from './staff-helpers';
 
 const TAG = 'E2E AptContact';
 const DAY = aMonday(2);
@@ -28,9 +29,9 @@ for (const [index, viewport] of FLOW_VIEWPORTS.entries()) {
   test(`the employee's own appointment keeps the customer's phone and email at ${viewport.label}px`, async ({ browser }) => {
     const owner = await signedIn(browser, '/appointment/agenda', viewport);
     const employee = await signedIn(browser, '/appointment/agenda', viewport, EMPLOYEE);
-    if (process.env.E2E_SAVE_STORAGE_STATE) await employee.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    await saveSessionForTheSweep(employee.context);
     try {
-      const bea = await employeesRecord(owner.context, `${TAG} Bea`);
+      const bea = await recordOf(owner.context, EMPLOYEE.email, `${TAG} Bea`);
       const run = `${viewport.label}${Date.now().toString(36)}`;
       const phone = `+34${spanishMobile()}`;
       const email = `apt.contact.${run}@example.com`;

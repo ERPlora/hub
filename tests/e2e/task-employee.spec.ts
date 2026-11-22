@@ -9,7 +9,8 @@ import { expect, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
-import { cleanUp, named, post, recordOf, rowOf, signedIn, TAG } from './task-helpers';
+import { recordOf } from './staff-helpers';
+import { cleanUp, named, post, rowOf, signedIn, TAG } from './task-helpers';
 import { toastSaying } from './toast-helpers';
 
 test.beforeAll(cleanUp);
@@ -22,7 +23,7 @@ test('an employee works their own tasks and nobody else’s', async ({ browser }
   const employee = await signedIn(browser, '/task/tasks', EMPLOYEE);
   const owner = await signedIn(browser, '/task/tasks');
   try {
-    const mine = await recordOf(owner.context, EMPLOYEE.email, 'Emma');
+    const mine = await recordOf(owner.context, EMPLOYEE.email, `${TAG} Emma`);
     const colleague = await post<{ id: string }>(owner.context, '/staff/members', { first_name: `${TAG} Ana`, last_name: `Colleague${stamp}` });
     const ownTitle = named('Restock shampoo');
     const otherTitle = named('Ana only');

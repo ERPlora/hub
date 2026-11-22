@@ -4,7 +4,7 @@
 // A row action is service-helpers.ts's `rowAction`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, type Credentials, horizontalOverflow, hubUserIdOf, login, psql, shown, untilStill } from './helpers';
+import { A, api, capture, type Credentials, horizontalOverflow, login, psql, shown, untilStill } from './helpers';
 
 /** Every name a task spec gives starts like this. */
 export const TAG = 'E2E Task';
@@ -38,23 +38,6 @@ export async function choose(page: Page, select: Locator, label: string): Promis
   const popover = page.locator('ion-popover.select-popover');
   await popover.locator('ion-radio').filter({ hasText: new RegExp(`^\\s*${label}\\s*$`) }).click();
   await expect(popover).toHaveCount(0);
-}
-
-/** The account's person in the business's database (`base.HubUser`, what a record hangs from; never a fixed id: it
- * depends on the seed). */
-export const userIdOf = (email: string): string =>
-  hubUserIdOf(email);
-
-/**
- * The staff record linked to the account `email`, created (named `E2E Task …`) if it has none: one live
- * record per account, so one left by another spec is reused. The account must exist: sign it in first.
- */
-export async function recordOf(context: BrowserContext, email: string, label: string): Promise<{ id: string }> {
-  const user = userIdOf(email);
-  expect(user, `${email} has signed in once`).not.toBe('');
-  const existing = await api<{ rows: { id: string }[] }>(context, A, 'GET', `/staff/members?user_id=${user}`);
-  expect(existing.status).toBe(200);
-  return existing.data.rows[0] ?? (await post<{ id: string }>(context, '/staff/members', { first_name: `${TAG} ${label}`, last_name: Date.now().toString(36), user_id: user }));
 }
 
 export async function signedIn(
