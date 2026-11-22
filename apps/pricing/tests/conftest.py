@@ -61,12 +61,12 @@ def english():
 
 @pytest.fixture(autouse=True)
 def fixed_today(monkeypatch):
-    """The business's today is ``TODAY`` (``queries.business_today``), whatever the real date."""
+    """The business's today is ``TODAY`` (``queries.resolution.business_today``), whatever the real date."""
     try:
-        import apps.pricing.queries as queries
-    except ModuleNotFoundError:  # the tests of models.py and apps.py run before queries.py exists
+        import apps.pricing.queries.resolution as resolution
+    except ModuleNotFoundError:  # the tests of models.py and apps.py run before the queries package exists
         return TODAY
-    monkeypatch.setattr(queries, "business_today", lambda: TODAY)
+    monkeypatch.setattr(resolution, "business_today", lambda: TODAY)
     return TODAY
 
 

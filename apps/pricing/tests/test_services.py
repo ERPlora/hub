@@ -271,7 +271,7 @@ def test_without_services_a_service_cannot_be_priced(monkeypatch):
     def missing(name):
         raise UnknownOperation(name)
 
-    monkeypatch.setattr(queries, "get", missing)
+    monkeypatch.setattr(queries.other_apps, "get", missing)
     make_list("VIP")
     error = refused(Conflict, "pricing.price_item.add", {"price_list": "VIP", "service": "Haircut", "price": 1})
     assert error.code == "pricing.services_unavailable"
