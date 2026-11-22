@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, ionProp, mountBase, subId } from '../__tests__/mount-base';
 import type { AccessSettings } from '../operations/access';
 import PinPolicyCard from './PinPolicyCard.vue';
 
@@ -25,10 +25,6 @@ async function card(data: AccessSettings | null = FACTORY, options: Parameters<t
   return { ...mounted, call, sent, fire };
 }
 
-/** An Ionic control's state is a property of its element, not an attribute. */
-const prop = (wrapper: { get: (s: string) => { element: Element } }, testid: string, name: string): unknown =>
-  (wrapper.get(`[data-testid="${testid}"]`).element as unknown as Record<string, unknown>)[name];
-
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -36,11 +32,11 @@ afterEach(() => {
 describe('PinPolicyCard', () => {
   it('on: what it means, when it asks again and the digits', async () => {
     const { wrapper } = await card();
-    expect(prop(wrapper, 'pin-policy-show', 'checked')).toBe(true);
+    expect(ionProp(wrapper, 'pin-policy-show', 'checked')).toBe(true);
     expect(wrapper.text()).toContain('Staff choose their name and type their PIN');
-    expect(prop(wrapper, 'pin-policy-again', 'value')).toBe('shift');
+    expect(ionProp(wrapper, 'pin-policy-again', 'value')).toBe('shift');
     expect(wrapper.text()).toContain('The PIN pad asks again when the session ends');
-    expect(prop(wrapper, 'pin-policy-digits', 'value')).toBe('4');
+    expect(ionProp(wrapper, 'pin-policy-digits', 'value')).toBe('4');
   });
 
   it('a stop of minutes asks always, after those idle minutes, and says what happens', async () => {
@@ -69,20 +65,20 @@ describe('PinPolicyCard', () => {
     const { wrapper, sent, fire } = await card();
     await fire('pin-policy-digits', { value: '6' });
     expect(sent()).toEqual([{ pin_length: 6 }]);
-    expect(prop(wrapper, 'pin-policy-digits', 'value')).toBe('6');
+    expect(ionProp(wrapper, 'pin-policy-digits', 'value')).toBe('6');
     expect(wrapper.text()).toContain('Everyone types the same number of digits');
   });
 
   it('a refusal keeps what the Hub has and says so', async () => {
     const { wrapper, fire } = await card(FACTORY, {}, true);
     await fire('pin-policy-digits', { value: '6' });
-    expect(prop(wrapper, 'pin-policy-digits', 'value')).toBe('4');
+    expect(ionProp(wrapper, 'pin-policy-digits', 'value')).toBe('4');
     expect(wrapper.get('[data-testid="pin-policy-error"]').text()).toContain('Could not change it.');
   });
 
   it('whoever does not run the hub sees it, disabled, and why', async () => {
     const { wrapper } = await card({ ...FACTORY, can_change: false }, { session: EMPLOYEE });
-    expect(prop(wrapper, 'pin-policy-show', 'disabled')).toBe(true);
+    expect(ionProp(wrapper, 'pin-policy-show', 'disabled')).toBe(true);
     expect(wrapper.text()).toContain('Only an administrator can change whether it asks.');
   });
 

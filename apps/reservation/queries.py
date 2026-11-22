@@ -14,10 +14,9 @@ import re
 from dataclasses import replace
 from uuid import UUID
 
-from babel.dates import format_date, format_time, get_day_names
+from babel.dates import format_date, format_time
 from django.db.models import CharField, Count, F, Func, Q, QuerySet, Sum, Value
 from django.utils import timezone
-from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -31,6 +30,7 @@ from apps.reservation.models import (
     Settings,
     TimeSlot,
     WaitlistEntry,
+    weekday_name,
 )
 from apps.reservation.schemas import (
     BlockedDateDetailOut,
@@ -280,8 +280,7 @@ def entry_label(ctx: OperationContext, entry: WaitlistEntry) -> str:
 
 def slot_label(slot: TimeSlot, language: str) -> str:
     """As the slots' list says a slot: its weekday and its hours («Jueves · 20:00–23:30»)."""
-    weekday = capfirst(get_day_names("wide", locale=babel_locale(language))[slot.day_of_week])
-    return _named(weekday, _said_hours(slot.start_time, slot.end_time, language))
+    return _named(weekday_name(slot.day_of_week, language), _said_hours(slot.start_time, slot.end_time, language))
 
 
 def blocked_label(block: BlockedDate, language: str) -> str:

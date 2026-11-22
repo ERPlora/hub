@@ -52,7 +52,7 @@
 1111 apps/printing/services.py ERPlora/erplora-next#74
 1115 apps/printing/tests/test_services.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
-1031 apps/reservation/queries.py ERPlora/erplora-next#74
+1030 apps/reservation/queries.py ERPlora/erplora-next#74
 891 apps/reservation/schemas.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
@@ -105,7 +105,6 @@
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
 835 base/tenancy/migrator.py ERPlora/erplora-next#74
 777 base/tenancy/move.py ERPlora/erplora-next#74
-1180 base/tenancy/tests/test_provision.py ERPlora/erplora-next#74
 849 base/ws_print.py ERPlora/erplora-next#74
 625 control/models.py ERPlora/erplora-next#74
 1017 control/services.py ERPlora/erplora-next#74

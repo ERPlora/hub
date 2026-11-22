@@ -1,6 +1,6 @@
 // APPOINTMENT-F12, F14: «New repeating appointment» asks for Customer, Services, Professional, Repeats,
-// Day of the week (weekly and fortnightly only), Starts on, Time, Min., «Ends on (optional)» and «Number of
-// appointments (optional)», and «Create repeating appointment» creates it and books its window. «Edit
+// Day of the week (weekly and fortnightly only), Starts on, Time, «Duration (min)», «Ends on (optional)» and
+// «Number of appointments (optional)», and «Create repeating appointment» creates it and books its window. «Edit
 // repeating appointment» applies from a date on, says how many booked appointments it reaches and how
 // many charged ones it leaves alone, and «Save from this occurrence on» sends only what changed.
 import { Combo } from '@erplora/ui/components';
@@ -85,6 +85,7 @@ describe('SeriesFormModal: New repeating appointment', () => {
       'Day of the week',
       'Starts on',
     ]);
+    expect([s.field('time').label, s.field('minutes').label]).toEqual(['Time', 'Duration (min)']);
     expect([s.field('end_date').label, s.field('max_occurrences').label]).toEqual([
       'Ends on (optional)',
       'Number of appointments (optional)',
@@ -170,6 +171,7 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
     const s = await setup({ series: SERIES }, 'es');
     expect(s.inDoc('series-form')?.getAttribute('aria-label')).toBe('Editar cita periódica');
     expect(s.field('from_date').label).toBe('Desde');
+    expect(s.field('minutes').label).toBe('Duración (min)');
   });
 });
 
