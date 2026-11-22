@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:854d7e4ba638086715deaa456cbcabf2893b46596a233356cf1d0f34c0ab7ab4 -->
+<!-- generated from WORKBOOK.md sha256:ad848ae6ef3a3dbecaaa67ec0388508c70169f74257e57af6d4d00f38b3d9cf7 -->
 
 ## What it is for and who it is for
 
@@ -1923,13 +1923,23 @@ Steps:
      below what happens ("A till nobody touches for {n} minutes closes the session and shows the PIN pad: the
      next sale carries the name of the next person.").
   4. Each change is saved at once, with no button, and the card shows what the business confirms.
+  5. Through the assistant ("I want everyone to have to type their PIN at the till so we know who sells"), the
+     assistant reads how it is and says it by the names of this card: with the PIN pad on and "Until signing
+     out", each person already enters with their PIN and every sale carries their name. To ask again after
+     inactivity, it first asks how many minutes (1, 5, 10, 15 or 30): it never makes them up, nor do the stored
+     ones apply unseen. The card, with each datum on its own line (BASE-F98), says each control it changes by its
+     name and the value it will have here: "Show PIN pad: Yes" and "Ask again after inactivity: 10 min"; "Until
+     signing out", "Show PIN pad: No" or "PIN digits: 6 digits" depending on the change. If only the minutes
+     change and the business asks "Until signing out", it says "Ask again after inactivity: Until signing out",
+     which is what it will still say here (BASE-F97).
 In: how the business asks for the PIN.
 Out: whether it asks and when it asks again, for every till of the business. Turning it off and on again goes
 back to asking per shift.
 If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
 how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
-the controls off and "Only an administrator can change whether it asks.".
-Involved: BASE-F55, BASE-F59
+the controls off and "Only an administrator can change whether it asks.". Through the assistant, "after
+inactivity" without its minutes does not reach the card: it goes back to the assistant, which asks how many.
+Involved: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 See the devices someone has entered on
 Status: done
