@@ -16,6 +16,7 @@ from live.context import OperationContext, system_context
 from live.operations import get as get_operation
 
 from apps.demo.models import Item
+from base.api_keys import KeyCaller
 from base.models import Membership
 from base.queries import ownership
 from base.queries.ownership import Me, Owned, me
@@ -101,6 +102,50 @@ class TestOwned:
         ana = person("ana")
         assert (ITEMS.sees_all(ctx_of(ana)), ITEMS.sees_all(ctx_of(ana, "demo.view_all_items"))) == (False, True)
         assert ITEMS.sees_all(dataclasses.replace(ctx_of(ana), actor=None)) is True
+
+
+def key_of(maker: str) -> KeyCaller:
+    """An API key made by the person known as ``maker`` (``""``: made before its maker was recorded)."""
+    return KeyCaller(key_id="k1", name="Shop", prefix="erpk_live_ab", owner=maker)
+
+
+class TestAnApiKey:
+    """A key reads what has an owner as whoever made it (BASE-F125); at the counter it stays on the customer's side, so
+    it is still no person to ``me``."""
+
+    def test_without_the_all_permission_it_reads_only_its_makers(self, items):
+        assert set(ITEMS.visible(ctx_of(key_of("ana"))).values_list("pk", flat=True)) == {items["ana"]}
+
+    def test_with_it_it_reads_everyones(self, items):
+        assert ITEMS.visible(ctx_of(key_of("ana"), "demo.view_all_items")).count() == 2
+
+    def test_its_figures_are_its_makers_without_the_business_totals(self, items):
+        rows = ITEMS.counted(ctx_of(key_of("ana"), "demo.view_all_items"))
+        assert set(rows.values_list("name", flat=True)) == {"ana"}
+
+    def test_its_makers_staff_record_is_its_makers(self):
+        record = staff_record(person("ana"))
+        theirs = Item.objects.create(name=str(record.id))
+        Item.objects.create(name="someone else's")
+        by_record = Owned(Item, all_permission="demo.view_all_items", mine=lambda who: Q(name__in=map(str, who.records)))
+        assert list(by_record.visible(ctx_of(key_of("ana"))).values_list("pk", flat=True)) == [theirs.pk]
+
+    def test_one_made_before_its_maker_was_recorded_reaches_what_its_permission_opens(self, items):
+        assert ITEMS.visible(ctx_of(key_of(""))).count() == 2
+
+    def test_it_is_no_person_at_the_counter(self):
+        assert me(ctx_of(key_of("ana"))) is None
+
+
+def test_the_see_all_permissions_are_the_ones_the_declarations_name():
+    assert {
+        "sale.view_all_sales",
+        "cash_register.view_all_sessions",
+        "invoice.view_all_invoices",
+        "appointment.view_appointment",
+        "staff.view_compensation",
+        "demo.view_all_items",
+    } <= ownership.see_all_permissions()
 
 
 class TestCounted:
