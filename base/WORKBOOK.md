@@ -254,7 +254,12 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
+Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan. Tocar uno abre
+«Qué permite».
+
+### Empleados · Roles · Qué permite
+Un rol básico, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
+y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
 
 ### Empleados · API keys
 Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
@@ -417,7 +422,7 @@ En la pantalla Archivos:
 | BASE-F79 | Dar de alta o retirar la placa de una persona | hecho |
 | BASE-F80 | Reincorporar a una persona que salió del negocio | hecho |
 | BASE-F81 | Entender cómo entra cada persona | hecho |
-| BASE-F82 | Ver los roles del negocio | hecho |
+| BASE-F82 | Ver los roles del negocio y lo que permite cada uno | hecho |
 | BASE-F83 | Asignar un rol a una persona | hecho |
 | BASE-F84 | Aprobar con el PIN de un responsable | hecho |
 | BASE-F85 | Consultar quién aprobó qué | hecho |
@@ -2214,25 +2219,33 @@ Sale: nada guardado. Se pone al día sola cuando alguien elige o pierde su PIN o
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar».
 Implicados: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
-### BASE-F82 Ver los roles del negocio
+### BASE-F82 Ver los roles del negocio y lo que permite cada uno
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado, gestoría
-Pantalla: Empleados · Roles
+Pantalla: Empleados · Roles; Empleados · Roles · Qué permite
 Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
-     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cinco, los de
-     erplora.com: ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
+     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son los roles básicos de erplora.com:
+     cada app aporta lo que da a cada rol básico en ella, y una app puede traer un rol básico propio cuando su
+     funcionalidad lo pida.
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
      facturas y no cambia ningún ajuste, y no ocupa plaza del plan (BASE-F77).
-  4. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
-Entra: los roles y las personas del negocio.
+  4. Al tocar un rol se abre «Qué permite», con el nombre del rol arriba, «Lo que este rol deja hacer en este negocio,
+     app por app. Se da en erplora.com y aquí no se cambia.» y «Personas con este rol: 2». Debajo, un panel por app:
+     «El negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la
+     frase de cada permiso y su estado: «Permitido», «Con aprobación» (lo hace si un responsable lo aprueba con su PIN en ese
+     momento, BASE-F84) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con
+     aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada.
+  5. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
+Entra: los roles, las personas del negocio, las apps encendidas y lo que cada app da a cada rol.
 Sale: nada guardado.
-Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
-Implicados: BASE-F83
+Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; en «Qué permite», «No se pudo cargar lo que
+permite este rol.» con «Reintentar», y un rol que no es de los cinco, «Este rol no existe en este negocio.».
+Implicados: BASE-F83, BASE-F84
 
 ### BASE-F83 Asignar un rol a una persona
 Estado: hecho
@@ -2406,9 +2419,9 @@ En las pantallas de Empleados y en la Documentación de la API:
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
+| Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; «Cargando lo que permite este rol…» en «Qué permite»; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
 | Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía nadie ha tenido que autorizar nada en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
-| Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
+| Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar lo que permite este rol.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
 | Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
 
 ### BASE-F92 Abrir y cerrar el panel del asistente
@@ -4394,8 +4407,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
 - Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
-  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.list` (rutas `/api/people…`,
-  `/api/roles`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
+  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail}` (rutas `/api/people…`,
+  `/api/roles`, `/api/roles/detail`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
@@ -4542,8 +4555,9 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
   (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
   clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
-  (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
-  `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
+  (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests:
+  `control/tests/test_services_move_at_night.py::TestTheNight` y `::TestMoveAtNight`,
+  `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
   `control/tests/test_admin_move.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
   le traslada no existe todavía (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
@@ -4561,7 +4575,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   restauración a un momento y la copia aparte (BASE-F114) copian con las mismas piezas (hub#1524, nota siguiente).
   Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
   `base/tenancy/tests/test_move_bucket.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
-  de moto), `control/tests/test_services.py::TestMove` y
+  de moto), `control/tests/test_services_move.py::TestMove` y
   `control/tests/test_admin_move.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
@@ -4591,7 +4605,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   segunda. Una subida que falla o se para se aborta y no deja nada; la copia queda los 90 días del bucket, sin fila
   `HubDump`. Tests: `base/tenancy/tests/test_restore.py::TestTheCopyGoesThroughTheBucket`,
   `base/tenancy/tests/test_restore_aside.py::TestTheCopyGoesThroughTheBucket` (dos BD reales y el S3 de moto) y
-  `control/tests/test_services.py::TestRestore` y `::TestRestoreAside` (`test_a_copy_of_any_size_is_asked`).
+  `control/tests/test_services_restore.py::TestRestore` y `::TestRestoreAside`, con
+  `control/tests/test_services_restore_any_size.py::test_a_copy_of_any_size_is_asked`.
 - **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
   formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
   `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
@@ -4603,8 +4618,9 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   (`names.is_left_behind`), así que `connections.register_hub_alias` se niega a darle alias. Se borra con su fila a los
   `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
   es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
-  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
-  y `control/tests/test_admin_restore.py::TestRestoreToASeparateCopy`.
+  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer),
+  `control/tests/test_services_restore.py::TestRestoreAside` y
+  `control/tests/test_admin_restore.py::TestRestoreToASeparateCopy`.
 - **«Recuperar en el negocio…»** (BASE-F114, hub#1257, capa 2a) es `control.admin.RestoredCopyAdmin.recover_into_the_business`:
   su página (`RecoverForm`, la misma `action_confirmation.html` de las acciones de Hubs, con `AsksFirst`) y, por cada
   copia, `control.copy.recover`, que escribe una fila `control.CopyRecovery` con las apps pedidas y el idioma del personal.
@@ -4631,8 +4647,9 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   (hub#1356), y `cards_not_in_business` (con `has_live_twin`, la regla de la importación) con
   `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
   registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
-  (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
-  `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
+  (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`,
+  `control/tests/test_services_recover.py::TestRecover`, `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness`
+  y `tests/e2e/base-recover-from-copy.spec.ts`.
 
 ### Operaciones y sus flujos
 
@@ -4699,6 +4716,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
 | `base.role.list` | F82, F83 |
+| `base.role.detail` | F82 |
 | `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |
 | `base.approval.list`, `base.approval.export` | F85 |
 | `base.api_key.create` | F86 |
@@ -4768,8 +4786,9 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
-- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cinco de
-  erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
+- No deja que el negocio cree, ajuste ni encienda o apague roles: tiene los roles básicos de erplora.com, que se dan
+  al invitar; cada app aporta lo que da a cada rol básico en ella y puede traer un rol básico propio cuando su
+  funcionalidad lo pida, y «Qué permite» lo enseña sin dejar cambiarlo (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

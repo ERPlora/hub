@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // Employees › Roles: erplora.com's roles. A role is given when a person is invited on erplora.com and changed
-// there, so this list is read only. No module brings a role of its own, so there is nothing to turn on or off. The
-// link leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered
-// in the Google Play copy (`managementOffered`).
+// there, so this list is read only; a row opens what the role allows. The link leaves the Hub by `openExternalLink`
+// (the installed app opens nothing on a `_blank` link) and is never offered in the Google Play copy
+// (`managementOffered`).
 import { DataTable, type DataTableColumn, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { openExternalLink, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
@@ -16,6 +17,7 @@ import type { HubRoleRow } from '../operations/people';
 
 const { t, locale } = useBaseI18n();
 const session = useSession();
+const router = useRouter();
 const admin = computed(() => session.can('base.administer_hub'));
 const membersUrl = readJsonBlock<HubHome>('hub-home')?.members_url ?? '';
 const offered = managementOffered();
@@ -25,6 +27,7 @@ const { data, status, refresh } = useLive('base.role.list', {});
 const rows = computed<HubRoleRow[]>(() => data.value?.roles ?? []);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const number = (n: number) => new Intl.NumberFormat(locale.value).format(n);
+const open = (row: HubRoleRow) => void router.push(`/employees/roles/${row.key}`);
 
 const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
   { key: 'key', label: t('base.roles.columns.role'), format: (_, row) => t(roleKey(row.key)), width: 'minmax(10rem,2fr)' },
@@ -66,6 +69,8 @@ const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
       :empty-message="t('base.roles.empty')"
       :loading="data === undefined && !failed"
       :error="failed ? t('base.roles.error') : undefined"
+      row-clickable
+      @row-click="open"
       @retry="refresh()"
     >
       <template #origin>
