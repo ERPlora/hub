@@ -25,6 +25,7 @@ from apps.sale.schemas.fields import (
     SortDir,
     _text,
 )
+from base.sensitive import COSTS
 
 
 class SaleDishOut(Schema):
@@ -138,7 +139,9 @@ class SaleOut(Schema):
     tax_total: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
     discount_percent: Decimal = Field(description="Ticket discount in %.")
     discount_amount: int = Field(description="Every discount given, in cents.", json_schema_extra={"money": True})
-    gift_total: int = Field(description="Comps at cost, in cents.", json_schema_extra={"money": True})
+    gift_total: int | None = Field(
+        description="Comps at cost, in cents (empty without the costs).", json_schema_extra={"money": True, **COSTS}
+    )
     total: int = Field(description="Total charged, in cents.", json_schema_extra={"money": True})
     tendered_total: int = Field(description="Handed over, in cents.", json_schema_extra={"money": True})
     change_total: int = Field(description="Change given, in cents.", json_schema_extra={"money": True})

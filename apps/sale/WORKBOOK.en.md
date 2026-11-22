@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:885d68994dd3fe07fe800d30f397930dfa919f5edfd3c6d9ee58f8d159472f13 -->
+<!-- generated from WORKBOOK.md sha256:ffa460b7486d12e72abcdf86c47606052e5d71d676cba65174f9fa56fd599a06 -->
 
 ## What it is for and who it is for
 
@@ -715,9 +715,10 @@ Steps:
    check with its order, and the kitchen gets nothing new.
 In: nothing from other apps.
 Out: the comped line: it adds no money or VAT, but the sale notice carries it so that Inventory lowers
-the stock; the sale keeps the cost of what was comped.
+the stock; the sale keeps the cost of what was comped, which only whoever sees the costs sees: to anyone
+else the sale, its charge and the preview of the charge give it empty (BASE-F119).
 If it fails: "That change to the line could not be saved. The line is back as it was.".
-Involved: INVENTORY-F21
+Involved: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Attribute the check or a line to whoever serves
 Status: done
@@ -1529,9 +1530,11 @@ MODIFIER-F07, MODIFIER-F08
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a product is
-named by its id, its SKU or its name; a customer by their id, their name, their phone or their email; a
-sale by its id or its number; a section or a quick note by its id or its name; a payment method by its
-id, its name or its type ("cash", "card"). If a name matches several, it is refused saying which ones
+named by its id, its SKU or its name; a customer by their id or their name and, for whoever sees the
+customers' contact details, also by their phone or their email (to whoever does not see them, those words
+only match a name: 404 `customer.customer_unavailable`, BASE-F119); a sale by its id or its number; a
+section or a quick note by its id or its name; a payment method by its id, its name or its type ("cash",
+"card"). If a name matches several, it is refused saying which ones
 (409 `*_ambiguous`).
 
 What reads or touches a charged sale (the list, the sale, its document and its paper, "Issue now", voiding
@@ -1638,8 +1641,9 @@ the quick notes and what is refundable can be followed live.
 ### What it needs from other apps
 
 - **Taxes** (required): the rule and the VAT calculation of each line when charging.
-- **Customers** (required): the sale's customer record and its search by name or phone; the link of the
-  check with its customer is kept by Customers (`customer.order.link`).
+- **Customers** (required): the sale's customer record and its search by name or, for whoever sees the
+  customers' contact details, by phone or email; the link of the check with its customer is kept by
+  Customers (`customer.order.link`).
 - **Inventory** (optional): the sale catalog, the price, the unit and the tax category of each article,
   read with its own queries when the line is added.
 - **Staff** (optional): the team for the "Served by" chip, the record of whoever is signed in
@@ -1695,6 +1699,12 @@ the quick notes and what is refundable can be followed live.
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+
+Two data permissions of the platform (BASE-F119) trim what is seen in Sales: what the comps cost (SALE-F15)
+is only seen by whoever sees the costs (owner, administrator and manager), and naming a charge's customer
+by their phone or their email is only for whoever sees the customers' contact details (the employee too).
+Sales does not show the customer's email or phone: it keeps their name and, on an invoice, their tax ID
+and their address, which are tax details that everyone who sees the sale sees.
 
 What the employee cannot do in the POS they ask for on their own device and a manager approves it with
 their PIN or their badge ("An approval is needed", BASE-F84), once and for that very request: voiding and
