@@ -41,7 +41,7 @@ con ningún banco.
 | Operaciones | 4 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=` (`risk = "high"` en aprobar, enviar, completar y cancelar); 13 rutas en `/api/payment/…` |
 | Eventos | 9, `payment.payment.{created,approved,sent,completed,cancelled}` y `payment.method.{created,updated,deactivated,activated}` (`events.py`); no reacciona a ninguno de otra app |
 | Tarea programada | ninguna |
-| Migraciones | `0001_initial`, `0002_payment_trail`, `0003_payment_idempotency_key`, `0004_payment_currency_without_default` |
+| Migraciones | `0001_initial`, `0002_payment_trail`, `0003_payment_idempotency_key`, `0004_payment_currency_without_default`, `0005_actors_without_address` |
 | Admin | Django admin con CRUD de métodos, pagos y contadores en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (Pagos no es Ventas, referencia con `UPDATE … RETURNING`, idempotencia del alta,

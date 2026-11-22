@@ -35,13 +35,14 @@ def test_whoever_payments_saved_by_their_address_keeps_only_what_goes_before_it(
         return old.get_model(APP, model).objects.using(database.alias)
 
     method = rows("PaymentMethod").create(name="Bank", created_by=ADDRESS, updated_by=NAMED)
+    rows("PaymentMethod").create(name="Cash", created_by=NAMED, updated_by=ADDRESS)
     common = {"method": method, "payment_date": dt.date(2026, 11, 22), "amount": 1000, "currency": "EUR"}
     rows("Payment").create(
         reference="PAY-1", beneficiary_name=ADDRESS, created_by=ADDRESS, updated_by=ADDRESS, approved_by=ADDRESS, **common
     )
     rows("Payment").create(reference="PAY-2", beneficiary_name="Florist", created_by=NAMED, cancelled_by=ADDRESS, **common)
     cleaned = {
-        "methods": [(SHOWN, NAMED)],
+        "methods": [(NAMED, SHOWN), (SHOWN, NAMED)],
         "payments": [("Florist", NAMED, "", "", SHOWN), (ADDRESS, SHOWN, SHOWN, SHOWN, "")],
     }
 

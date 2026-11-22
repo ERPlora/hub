@@ -44,10 +44,15 @@ def test_whoever_a_cart_saved_by_their_address_keeps_only_what_goes_before_it(da
         cart=cart, order_number="OS-20261122-0001", customer_email=CUSTOMER, currency="EUR", created_by="",
         updated_by=ADDRESS,
     )
+    later = rows("Cart").create(session_token="sess_2", currency="EUR", created_by=NAMED, updated_by=ADDRESS)
+    rows("Order").create(
+        cart=later, order_number="OS-20261122-0002", customer_email=CUSTOMER, currency="EUR", created_by=ADDRESS,
+        updated_by="",
+    )
     cleaned = {
-        "carts": [(CUSTOMER, SHOWN, NAMED)],
+        "carts": [("", NAMED, SHOWN), (CUSTOMER, SHOWN, NAMED)],
         "items": [(SHOWN, SHOWN)],
-        "orders": [(CUSTOMER, "", SHOWN)],
+        "orders": [(CUSTOMER, "", SHOWN), (CUSTOMER, SHOWN, "")],
     }
 
     assert saved(migrate(database, AFTER), database) == cleaned
