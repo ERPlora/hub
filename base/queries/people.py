@@ -267,7 +267,11 @@ def person_label(user) -> str:
 
 
 def face_name(user) -> str:
-    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email (the
-    SaaS names an account without a name by its address: then the part before the «@»)."""
-    label = person_label(user)
-    return label.split("@", 1)[0] if "@" in label else label
+    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email."""
+    return without_address(person_label(user))
+
+
+def without_address(name: str) -> str:
+    """A name anyone may see, never an email: the SaaS names an account without a name by its address, so then the
+    part before the «@»."""
+    return name.split("@", 1)[0] if "@" in name else name

@@ -66,3 +66,8 @@ def test_by_its_route_an_employee_reads_the_names_and_nobody_without_a_session_d
     assert response.json() == {"grantors": [{"name": "Olga"}, {"name": "Adam"}]}
     client.logout()
     assert client.get("/api/access/grantors", HTTP_HOST=HOST).status_code in (401, 403)
+
+
+def test_an_account_named_by_its_email_is_named_by_the_part_before_the_at_never_its_address(people, make_user):
+    make_user("saas:5", host=A.key, role=Membership.Role.ADMIN, first_name="ines@example.com")
+    assert grantors(people["eva"]) == [{"name": "Olga"}, {"name": "Adam"}, {"name": "ines"}]
