@@ -969,8 +969,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 quien abre la página pública del tique, sin sesión y sin ningún otro permiso; ninguna automatización emite desde ella
 sola (riesgo alto, como sustituir un tique en el mostrador).
 
-La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir»: abre, imprime y
-descarga las facturas emitidas, sin emitir, rectificar ni configurar nada.
+La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir» y «Ver las facturas de
+todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, rectificar ni configurar nada.
 
 ## Para quien lo mantiene
 

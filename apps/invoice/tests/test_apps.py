@@ -102,8 +102,8 @@ def test_roles():
         "invoice.view_invoice",
         "invoice.add_invoice",
     }
-    # The accountancy firm reads, prints and downloads the invoices issued; it issues and rectifies none.
-    assert permissions_for_role([config], "hub_accountant") == {"invoice.view_invoice"}
+    # The accountancy firm reads, prints and downloads everyone's invoices; it issues and rectifies none.
+    assert permissions_for_role([config], "hub_accountant") == {"invoice.view_invoice", "invoice.view_all_invoices"}
 
 
 def test_navigation_is_the_three_tabs_with_registered_icons():

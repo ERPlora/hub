@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:337883dae3782186cd827d8527f8bcf27e4795e20202b8c5c0fa7a01da935ac9 -->
+<!-- generated from WORKBOOK.md sha256:aa102b64ce37080c510bb2a1bd639b67a976f4d5813fa9c9a323df0f9c851120 -->
 
 ## What it is for and who it is for
 
@@ -969,5 +969,6 @@ Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: o
 the ticket's public page holds `invoice.public`, without a session and without any other permission; no automation
 issues from it alone (high risk, as replacing a ticket at the counter).
 
-The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print": it opens,
-prints and downloads the invoices issued, without issuing, rectifying or setting up anything.
+The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print" and "View
+everyone's invoices": it opens, prints and downloads everyone's invoices issued, without issuing, rectifying or setting
+up anything.

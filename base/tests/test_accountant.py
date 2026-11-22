@@ -32,6 +32,7 @@ GRANTS = {
     "sale.view_all_sales",
     "sale.view_paymentmethod",
     "invoice.view_invoice",
+    "invoice.view_all_invoices",
     "tax.view",
     "verifactu.view_record",
 }
