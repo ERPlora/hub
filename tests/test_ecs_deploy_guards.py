@@ -9,7 +9,8 @@ the deploy with jq's exit code for it, 5.
 import json
 import re
 
-from ecs_deploy_doubles import DeployCase, one, task_definition
+from ecs_deploy_doubles import DeployCase
+from ecs_doubles import one, task_definition
 
 ROLE = "arn:aws:iam::123456789012:role/erplora-prod-hub"
 PROD_TAG = {"key": "Environment", "value": "prod"}

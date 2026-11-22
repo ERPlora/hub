@@ -7,7 +7,8 @@ before registering when app_env.py refuses, and records what it wrote.
 
 import copy
 
-from ecs_deploy_doubles import APP_ENV, DeployCase
+from ecs_deploy_doubles import DeployCase
+from ecs_doubles import APP_ENV
 
 SECRET = {"name": "PLATFORM_HUB_SLUG", "valueFrom": "arn:secret:x"}
 
