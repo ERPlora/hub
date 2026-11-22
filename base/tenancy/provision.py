@@ -59,6 +59,10 @@ logger = logging.getLogger(__name__)
 
 #: How long a hub's lease (``hub_due.lease_until``) lasts; every step renews it.
 LEASE = dt.timedelta(seconds=60)
+#: How often :func:`drop_now` tries again while another process holds the demo's lease, and how many times: for as
+#: long as a lease lasts, so the lease of a holder that died has run out by its last try.
+DROP_WAIT_SECONDS = 0.25
+DROP_WAIT_TRIES = round(LEASE.total_seconds() / DROP_WAIT_SECONDS)
 #: How many due hubs one pass of the worker takes, and for how long it goes on taking new ones: a few seconds a tick
 #: (the rest waits for the next), so the next tick's relay of the hubs is not held back long.
 DUE_BATCH = 20
@@ -127,14 +131,30 @@ def provision(
 
 def drop(hub, *, now: dt.datetime | None = None) -> bool:
     """Drop the demo ``hub`` that ended, under its lease, and purge it; whether this call purged it."""
-    now = now or timezone.now()
+    return bool(_drop_leased(hub.id, now or timezone.now()))
+
+
+def drop_now(hub) -> None:
+    """Drop the demo ``hub`` that ended, as :func:`drop`, but never leave it halfway because another process holds
+    its lease (the worker's pass took it first, to drop it or while it was still being made): wait for it and try
+    again, every :data:`DROP_WAIT_SECONDS` for as long as a lease lasts. ``manage.py demo_expire``'s, which then says
+    how the demo was left."""
+    for _ in range(DROP_WAIT_TRIES):
+        if _drop_leased(hub.id, timezone.now()) is not None:
+            return
+        time.sleep(DROP_WAIT_SECONDS)
+    _drop_leased(hub.id, timezone.now())
+
+
+def _drop_leased(hub_id, now: dt.datetime) -> bool | None:
+    """One try of :func:`drop`: whether it purged the demo, ``None`` when another process holds its lease."""
     with use_control():
-        if provisioning.claim_hub(hub.id, now, LEASE) is None:
-            return False
+        if provisioning.claim_hub(hub_id, now, LEASE) is None:
+            return None
         try:
-            return _drop(hub.id, now)
+            return _drop(hub_id, now)
         finally:
-            provisioning.release_hub(hub.id, timezone.now())
+            provisioning.release_hub(hub_id, timezone.now())
 
 
 def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: float = DUE_PASS_SECONDS) -> int:

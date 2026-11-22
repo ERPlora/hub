@@ -415,7 +415,7 @@ usuario `demo:<slug>`; una demo de antes de S2a no tiene BD que borrar) y la fil
 now» del admin (`hubs.localhost:8000/admin/control/hub/`, solo superusuarios) o, en cualquier entorno:
 
 ```bash
-uv run python manage.py demo_expire demo-1a2b3c4d   # base.demo.expire + una pasada del reaper → «demo-1a2b3c4d: purged»
+uv run python manage.py demo_expire demo-1a2b3c4d   # base.demo.expire + su borrado (espera al worker si se le adelantó) → «demo-1a2b3c4d: purged»
 ```
 
 Probarla en local, con el SaaS en `:8001` (su `HUB_INTERNAL_URL` por defecto apunta a `http://localhost:8000` y el
