@@ -64,6 +64,8 @@ A_CHECK_LINE = names("sale.record.get", by="line_id")
 A_SALE_LINE = names("sale.record.get", by="sale_line_id")
 A_TENDER = names("sale.record.get", by="payment_id")
 A_PRODUCT = names("sale.record.get", by="product_id")
+#: A product said in words is found as the write finds it; the card says the words when several fit or none does.
+A_PRODUCT_SAID = names("sale.record.get", by="product", as_said=True, unless=("product_id",))
 A_SERVICE = names("sale.record.get", by="service_id")
 A_MENU = names("sale.record.get", by="combo_id")
 A_DISH = names("sale.record.get", by="dish_id")

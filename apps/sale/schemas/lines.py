@@ -14,6 +14,7 @@ from apps.sale.schemas.fields import (
     A_MEMBER,
     A_MENU,
     A_PRODUCT,
+    A_PRODUCT_SAID,
     A_SERVICE,
     MAX_OPTIONS,
     SAY_WHICH_DEPARTMENT,
@@ -53,7 +54,10 @@ class ProductLineIn(LineFields):
 
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None, title=gettext_noop("Product"), description="The product's SKU or name, when its id is not known."
+        None,
+        title=gettext_noop("Product"),
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=A_PRODUCT_SAID,
     )
     option_ids: list[ModifierId] = Field(
         default_factory=list,
