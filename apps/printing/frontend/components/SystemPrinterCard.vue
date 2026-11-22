@@ -19,7 +19,7 @@ import { useAppDownloads } from '../../../../base/frontend/lib/app-downloads';
 import { HEALTH_PILLS } from '../../../../base/frontend/lib/home-health';
 import '../../../../base/frontend/settings.css';
 import { useT } from '../composables/useT';
-import type { StationState } from '../operations';
+import type { StationState } from '../operations/health';
 
 const t = useT();
 const router = useRouter();

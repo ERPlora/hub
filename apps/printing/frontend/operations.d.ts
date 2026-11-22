@@ -274,14 +274,6 @@ export interface CoverageOut {
   count: number;
 }
 
-/** Whether the station of a function answers now: the Home's health row and System's «Your printer». */
-export type StationState = 'ok' | 'no_signal' | 'not_configured';
-
-export interface DeviceHealthOut {
-  usage: Usage;
-  state: StationState;
-}
-
 /** A device set up to print. Its own id (X-Device-Id) is never sent back: it proves the device. */
 export interface DeviceOut {
   /** The registration's id: what «Edit» and «Retire» name. */
@@ -335,6 +327,5 @@ declare module '@erplora/ui/sdk' {
     'printing.device.update': { input: DeviceUpdateIn; output: DeviceOut };
     'printing.device.retire': { input: DeviceRefIn; output: DeviceOut };
     'printing.device.coverage': { input: { usage: Usage }; output: CoverageOut };
-    'printing.device.health': { input: { usage: Usage }; output: DeviceHealthOut };
   }
 }
