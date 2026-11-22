@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1d0e50c1cfe8e8108b3e2ffbc517ffd6c4bf6f1d79aa949180e3736ee1de7d6e -->
+<!-- generated from WORKBOOK.md sha256:0836bc6775af1427e3ce5185dba891434fd9be03df654c433565b59b0c99a808 -->
 
 ## What it is for and who it is for
 
@@ -214,8 +214,9 @@ photo), "Preferences" (language and appearance: palette, theme and interface siz
 "PIN".
 
 ### Settings · General
-What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad",
-for whoever runs the business "Devices" and, at the end, "API documentation".
+What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device" (in the
+ERPlora app on a computer, also "Start on login"), "PIN pad", for whoever runs the business "Devices" and, at the
+end, "API documentation".
 
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
@@ -285,8 +286,8 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 |---|---|
 | Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
-| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
-| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
+| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". In the app on a computer, "Could not change the start on login setting." (BASE-F120). |
+| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks."), except "Start on login", which belongs to the computer and not to the business, and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
 
@@ -455,6 +456,7 @@ On the Employees screens and the API documentation:
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
+| BASE-F120 | Start ERPlora on signing in to the computer | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -3452,3 +3454,20 @@ If it fails: a request through the API or to the assistant that filters or sorts
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
 Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+
+### BASE-F120 Start ERPlora on signing in to the computer
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Settings · General
+Steps:
+  1. In the ERPlora app on a computer, **Settings › General** carries under "This device" the switch "Start on
+     login" ("Open ERPlora when you sign in to this computer, so tickets always have somewhere to print."), off
+     from the factory. In a browser and in the Android app it does not show.
+  2. When it is moved, the Hub asks the app, which records it in the system and reads back what the system says
+     (HUB_APP-F27); meanwhile the switch waits.
+  3. The switch stays where the system says, not where it was moved.
+In: the switch, on the computer itself.
+Out: the system's start-up of this computer, not of the business. Nothing is saved in the Hub.
+If it fails: below it, "Could not change the start on login setting.", and the switch goes back to what the
+system says. An app older than this command does not show it.
+Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
