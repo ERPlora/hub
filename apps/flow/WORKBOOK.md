@@ -1526,8 +1526,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Una automatización y las citas «suyas»**:
   reservar, mover, confirmar y editar una cita piden «las suyas» (`appointment.add_own_appointment`,
   `appointment.change_own_appointment`), y el paso, que no es nadie del equipo, no tiene ficha. La regla vive en Citas
-  (`apps.appointment.queries.is_own`), la única app con permisos «propios», no aquí: quien no es una persona
-  (`by_person`) toma lo concedido sobre «las suyas» para todo el equipo y se juzga como la clienta. `_step_context`
+  (`apps.appointment.queries.ownership.is_own`), la única app con permisos «propios», no aquí: quien no es una persona
+  (`base.queries.ownership.me`) toma lo concedido sobre «las suyas» para todo el equipo y se juzga como la clienta. `_step_context`
   no cambia: el techo sigue siendo `grants` (sin ellos no hay cita) y nada se eleva a «todos los permisos». Vale igual
   para el paso de operación, el asistente que actúa solo y el cambio que hace tras el **Aprobar**, que corren con el
   mismo contexto (`test_services_appointment_steps.py`). Es como separa Square el permiso de comprador del de

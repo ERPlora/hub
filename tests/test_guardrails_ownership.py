@@ -68,17 +68,73 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "What refunds gave back on each professional's lines, for the close by professional that sale.view_reports "
         "opens.",
     ),
-    ("apps/cash_register/queries.py", "sale_lines"): (
+    ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
         "The tenders of the sales charged and voided while a register session was open: the session's takings.",
     ),
-    ("apps/cash_register/queries.py", "unassigned_totals"): (
+    ("apps/cash_register/queries/unassigned.py", "unassigned_totals"): (
         PART_OF_THE_WORK,
         "How many sale tenders and comps of a time window no register session copied, counted for the drawer.",
     ),
     ("apps/table/queries/__init__.py", "sessions_now"): (
         PART_OF_THE_WORK,
         "What the check of each table of the room charged, to say whether it is paid.",
+    ),
+    ("apps/appointment/queries/__init__.py", "load_detail"): (
+        PART_OF_THE_WORK,
+        "The appointment a booking or a change of the caller has just written, answered back to them.",
+    ),
+    ("apps/appointment/queries/__init__.py", "series_with_lines"): (
+        PART_OF_THE_WORK,
+        "The repeating appointment a write of the caller has just made or changed, answered back to them.",
+    ),
+    ("apps/appointment/queries/__init__.py", "load_agenda"): (
+        PART_OF_THE_WORK,
+        "The professional's busy times the booking rules weigh, so that nobody books over a colleague's appointment.",
+    ),
+    ("apps/appointment/queries/__init__.py", "conflicts_of"): (
+        PART_OF_THE_WORK,
+        "The appointments a time would overlap, which a booking asks to confirm; checking a free time names them only "
+        "to who may see that professional's agenda.",
+    ),
+    ("apps/appointment/queries/__init__.py", "count_active_for_service"): (
+        NO_ROW_READ,
+        "How many upcoming appointments carry a service and when the first is: the warning before it is archived.",
+    ),
+    ("apps/appointment/queries/__init__.py", "series_reach"): (
+        NO_ROW_READ,
+        "How many booked appointments an edit of a repeating appointment the caller sees would reach, and how many of "
+        "them are charged.",
+    ),
+    ("apps/appointment/queries/__init__.py", "appointments_deleted_in_business"): (
+        NO_ROW_READ,
+        "Which appointments of a separate copy the business still holds deleted, asked only by the platform when it "
+        "recovers the business.",
+    ),
+    ("apps/appointment/queries/__init__.py", "appointments_not_in_business"): (
+        NO_ROW_READ,
+        "Which appointments of a separate copy the business lacks, asked only by the platform when it recovers the "
+        "business.",
+    ),
+    ("apps/appointment/queries/__init__.py", "_made_again"): (
+        NO_ROW_READ,
+        "Whether a repeating appointment of a separate copy was made again since, asked only by the platform when it "
+        "recovers the business.",
+    ),
+    ("apps/appointment/queries/__init__.py", "series_deleted_in_business"): (
+        NO_ROW_READ,
+        "Which repeating appointments of a separate copy the business still holds deleted, asked only by the platform "
+        "when it recovers the business.",
+    ),
+    ("apps/appointment/queries/__init__.py", "series_not_in_business"): (
+        NO_ROW_READ,
+        "Which repeating appointments of a separate copy the business lacks, asked only by the platform when it "
+        "recovers the business.",
+    ),
+    ("apps/online_booking/queries.py", "load_detail"): (
+        PART_OF_THE_WORK,
+        "The online booking the caller has just confirmed, completed, marked as not shown or cancelled, answered back "
+        "to them.",
     ),
 }
 
@@ -169,7 +225,8 @@ def unscoped_reads(root: Path) -> set[tuple[str, str]]:
 
 
 def test_the_declarations_are_found():
-    assert owned_models(REPO)["Sale"] == "sale"
+    found = owned_models(REPO)
+    assert (found["Sale"], found["Appointment"], found["Recurring"]) == ("sale", "appointment", "appointment")
 
 
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():
@@ -214,6 +271,18 @@ def test_a_read_under_another_name_in_another_apps_queries_file_is_caught(tmp_pa
     relative = "from ..models import Sale\n\n\ndef peek():\n    return Sale._default_manager.all()\n"
     root = tree_with(tmp_path, {"apps/shop/queries.py": peek, "apps/sale/queries/other.py": relative})
     assert unscoped_reads(root) == {("apps/shop/queries.py", "peek"), ("apps/sale/queries/other.py", "peek")}
+
+
+def test_a_planted_read_of_an_appointment_or_a_series_is_caught_with_the_real_declaration(tmp_path):
+    declared = (REPO / "apps/appointment/queries/ownership.py").read_text(encoding="utf-8")
+    peek = (
+        "from apps.appointment.models import Appointment, Recurring\n\n\n"
+        "def peek():\n    return Appointment.objects.all()\n\n\n"
+        "def peek_series():\n    return Recurring.objects.all()\n"
+    )
+    inbox = "apps/online_booking/queries.py"
+    root = tree_with(tmp_path, {"apps/appointment/queries/ownership.py": declared, inbox: peek})
+    assert unscoped_reads(root) == {(inbox, "peek"), (inbox, "peek_series")}
 
 
 def test_the_declaration_a_services_door_and_another_model_called_alike_are_not_reads(tmp_path):

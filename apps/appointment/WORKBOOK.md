@@ -915,18 +915,30 @@ agenda tuya que enseñar.».
   `too_far`, `outside_schedule`, `outside_staff_hours`, `blocked`, `overlap`. `in_past` y `too_soon` solo
   para la clienta y las series; el mostrador los salta. Un día con `source = none` en Horarios no
   restringe; un día sin horario de Personal solo restringe por ausencias.
+- **Lo suyo o todo** (`queries/ownership.py`): `APPOINTMENTS` y `SERIES` declaran con `Owned` de base que una cita y
+  una cita periódica son de su profesional (`staff_id` entre las fichas de quien llama, `base.queries.ownership.me`).
+  Sin `appointment.view_appointment` una persona lee y toca solo esas: la lista, la ficha, su historial, las citas de
+  una clienta, los avisos, la campana, los carriles, las series y Reservas online leen por `APPOINTMENTS.visible(ctx)`
+  o `SERIES.visible(ctx)`, y las órdenes buscan la cita o la serie igual (`find_appointment`, `find_series`): la de
+  otro profesional da el mismo 404 (`appointment.appointment_not_found`, `appointment.recurring_not_found`) que una
+  que no existe. Quien no es una persona no tiene «suyas»: lee todas las que abre su permiso (una llave de API
+  abierta sobre la lista de citas antes leía la agenda vacía). Que una hora está ocupada no abre ninguna cita: a quien
+  comprueba una hora se le dice de quién es solo si ve esa agenda, la suya o con `view_appointment`, y a quien no es
+  una persona, solo con `view_appointment` (`sees_whose`). `tests/test_guardrails_ownership.py` prohíbe
+  `Appointment.objects` y `Recurring.objects` en los paquetes `queries` fuera de su lista cerrada, cada una con su
+  motivo (lo que una orden acaba de escribir, las reglas de la agenda, las cuentas y la recuperación desde una copia).
+  Tests: `tests/test_queries_ownership.py`, por la ruta real.
 - **«Las suyas» de quien no es una persona**:
   `may_book_for` y `may_change` piden `add_appointment`/`change_appointment`, o `add_own_appointment`/
-  `change_own_appointment` sobre una cita de la ficha propia (`is_own`). Quien no es una persona (`by_person`: el paso
-  de una automatización, una API key, la plataforma) no tiene ficha, así que con el permiso «propio» toma las de todo
-  el equipo, y `_judge` lo juzga siempre como la clienta: la que reserva sola elige cualquier profesional (la reserva
-  online ya llama con los permisos de todo el equipo). Antes, un paso al que se concedía reservar o mover nunca podía
-  («You may only book your own appointments.»), y una API key abierta sobre `appointment.appointment.create` tampoco.
-  No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue con «las suyas»; ver una cita sigue
-  pidiendo `view_appointment` (`find_appointment`). Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea
-  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services.py`
-  (`test_what_is_not_a_person_*`, `test_a_person_with_their_own_permission_*`) y
-  `apps/flow/tests/test_services_appointment_steps.py`.
+  `change_own_appointment` sobre una cita de la ficha propia (`is_own`, con la misma regla que las lecturas). Quien no
+  es una persona (el paso de una automatización, una API key, la plataforma) no tiene ficha, así que con el permiso
+  «propio» toma las de todo el equipo, y `_judge` lo juzga siempre como la clienta: la que reserva sola elige cualquier
+  profesional (la reserva online ya llama con los permisos de todo el equipo). Antes, un paso al que se concedía
+  reservar o mover nunca podía («You may only book your own appointments.»), y una API key abierta sobre
+  `appointment.appointment.create` tampoco. No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue
+  con «las suyas». Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea la cita por WhatsApp
+  (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services.py` (`test_what_is_not_a_person_*`,
+  `test_a_person_with_their_own_permission_*`) y `apps/flow/tests/test_services_appointment_steps.py`.
 - **Cancelar desde una automatización** (hub#634): `appointment.appointment.cancel` sigue siendo `risk: "high"`, así que
   solo lo recibe un paso que pregunta antes (`ASK_FIRST` de Automatizaciones). Como `is_own` le da a la automatización
   las citas de todo el equipo, la operación declara `ai.yes_permission = change_appointment`: con «solo las suyas», un

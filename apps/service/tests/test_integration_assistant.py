@@ -26,6 +26,7 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import INTERNAL, get, registry
 from pydantic import ValidationError
 
+from apps.appointment.tests.conftest import TESTER
 from apps.customer.models import Customer
 from apps.service.models import Assignment, Grant, Package
 from apps.service.schemas import MAX_CENTS
@@ -521,10 +522,11 @@ def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(h
 
 @HUB_DB
 def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_someone_else(hub_a):
-    """An employee sees her own appointments only (Appointments' rule): another's is left out, never by its id."""
+    """An employee, a person of the team, sees her own appointments only (Appointments' rule): another's is left out,
+    never by its id."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
-        shown = till_cards(till, person(hub_a, "hub_employee"))
+        shown = till_cards(till, dataclasses.replace(person(hub_a, "hub_employee"), actor=TESTER))
     expected = named_at_the_till(till)
     expected["service.grant.redeem"].pop("appointment_id")
     assert {write: values(card) for write, card in shown.items() if write in expected} == expected

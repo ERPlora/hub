@@ -2,8 +2,8 @@
 own transaction: the business's clock, the settings, who sees what, how a booking's customer, services
 and professional are resolved, and the agenda the rules (engine.py) judge.
 
-- **Who sees what**: ``appointment.view_appointment`` sees the whole diary; ``…view_own_appointment``
-  only the appointments of the staff record linked to the caller's account (none when it has none).
+- **Who sees what** (``ownership.py``): ``appointment.view_appointment`` sees the whole diary; ``…view_own_appointment``
+  only the appointments and series of the staff record linked to the caller's account (none when it has none).
 - **Availability = Schedules ∩ Staff ∩ appointments**: ``load_agenda`` reads ``schedule.hours.for_range``
   and ``staff.availability.for_member`` (their operations, with a reading context that adds
   ``schedule.view`` and ``staff.view``: booking needs no right in those apps), the blocks and the
@@ -69,6 +69,7 @@ from apps.appointment.schemas import (
     SlotsOut,
     VisitPage,
 )
+from apps.appointment.queries.ownership import APPOINTMENTS, SERIES, is_own, sees_whose
 from apps.customer.queries import card_in_business, cards_in_copy, find_customer
 from apps.schedule.queries import day_label, hours_for_range
 from apps.schedule.schemas import HoursRangeIn
@@ -81,7 +82,6 @@ from base.business import business_zone, zone_name
 from base.ordering import list_order_for
 from base.relay import by_platform
 
-VIEW_ALL = "appointment.view_appointment"
 VIEW_OWN = "appointment.view_own_appointment"
 ADD_ALL = "appointment.add_appointment"
 ADD_OWN = "appointment.add_own_appointment"
@@ -210,32 +210,6 @@ def own_staff_id(ctx: OperationContext) -> UUID | None:
     return member.id if member else None
 
 
-def sees_everyone(ctx: OperationContext) -> bool:
-    return ctx.has(VIEW_ALL)
-
-
-def visible(ctx: OperationContext, rows: QuerySet) -> QuerySet:
-    """``rows`` the caller may see: all of them, or those of their own staff record."""
-    if sees_everyone(ctx):
-        return rows
-    own = own_staff_id(ctx)
-    return rows.filter(staff_id=own) if own else rows.none()
-
-
-def sees_member(ctx: OperationContext, staff_id: UUID) -> bool:
-    """Whether the caller may see the appointments of the professional ``staff_id``."""
-    return sees_everyone(ctx) or staff_id == own_staff_id(ctx)
-
-
-def is_own(ctx: OperationContext, staff_id: UUID | None) -> bool:
-    """Whether «their own» appointments take those of ``staff_id``. A person's are their staff record's. A caller that
-    is not a person (``by_person``: a flow's step, an API key…) has none, so what it was granted on «its own» takes the
-    whole team's — as the customer, who books with any professional — and is judged by her rules."""
-    if not by_person(ctx):
-        return True
-    return staff_id is not None and staff_id == own_staff_id(ctx)
-
-
 def may_change(ctx: OperationContext, staff_id: UUID | None) -> bool:
     return ctx.has(CHANGE_ALL) or (ctx.has(CHANGE_OWN) and is_own(ctx, staff_id))
 
@@ -247,8 +221,9 @@ def may_book_for(ctx: OperationContext, staff_id: UUID | None) -> bool:
 # ── Appointments ─────────────────────────────────────────────────────────────────────────────
 
 
-def appointments() -> QuerySet[Appointment]:
-    return Appointment.objects.filter(deleted_at__isnull=True).prefetch_related("lines")
+def appointments(ctx: OperationContext) -> QuerySet[Appointment]:
+    """The live appointments the caller may see (``APPOINTMENTS``), with their lines."""
+    return APPOINTMENTS.visible(ctx).filter(deleted_at__isnull=True).prefetch_related("lines")
 
 
 def find_appointment(
@@ -259,7 +234,7 @@ def find_appointment(
     lock: bool = False,
 ) -> Appointment:
     """The live appointment named by id or number that the caller may see (``NotFound`` otherwise)."""
-    rows = visible(ctx, Appointment.objects.filter(deleted_at__isnull=True))
+    rows = APPOINTMENTS.visible(ctx).filter(deleted_at__isnull=True)
     rows = (
         rows.filter(pk=appointment_id)
         if appointment_id
@@ -417,7 +392,7 @@ def _page(rows: QuerySet, limit: int, offset: int, out) -> dict:
 )
 def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
     start, end = day_bounds(params.date_from, params.date_to)
-    rows = visible(ctx, appointments()).filter(start__gte=start, start__lt=end)
+    rows = appointments(ctx).filter(start__gte=start, start__lt=end)
     if params.staff_id or params.staff:
         rows = rows.filter(staff=resolve_member(params.staff_id, params.staff))
     if params.unassigned is not None:
@@ -538,7 +513,7 @@ def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
         params.customer_id, params.customer, live=params.customer_id is None
     )
     rows = (
-        visible(ctx, appointments()).filter(customer=customer).order_by("-start", "-id")
+        appointments(ctx).filter(customer=customer).order_by("-start", "-id")
     )
     return _page(
         rows,
@@ -575,11 +550,9 @@ def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
 )
 def count_active_for_service(ctx: OperationContext, data: CountForServiceIn) -> dict:
     service = catalog.find_service(data.service_id, data.service)
-    rows = (
-        appointments()
-        .filter(status__in=MOVABLE, start__gte=now(), lines__service=service)
-        .distinct()
-    )
+    rows = Appointment.objects.filter(
+        deleted_at__isnull=True, status__in=MOVABLE, start__gte=now(), lines__service=service
+    ).distinct()
     first = rows.order_by("start", "id").first()
     return {
         "count": rows.count(),
@@ -609,7 +582,7 @@ def count_active_for_service(ctx: OperationContext, data: CountForServiceIn) -> 
     },
 )
 def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
-    rows = visible(ctx, appointments()).filter(status=S.PENDING, start__gte=now())
+    rows = appointments(ctx).filter(status=S.PENDING, start__gte=now())
     first = rows.order_by("start", "id").first()
     return {
         "count": rows.count(),
@@ -649,7 +622,7 @@ def notices(ctx: OperationContext, data: NoticesIn) -> dict:
     """The customer's own bookings and cancellations since ``data.since`` (the front desk's are not told: who
     gave or cancelled it knows), of the agenda the caller sees, the newest first."""
     since = data.since or timezone.now() - NOTICES_WINDOW
-    rows = visible(ctx, appointments())
+    rows = appointments(ctx)
     told = [
         ("booked", item.created_at, item)
         for item in rows.filter(source__in=CUSTOMER_SOURCES, created_at__gte=since)
@@ -707,8 +680,8 @@ def takes_bookings(member: Member) -> bool:
 )
 def agenda_lanes(ctx: OperationContext, data: LanesIn) -> dict:
     start, end = day_bounds(data.date_from, data.date_to)
-    in_range = visible(ctx, appointments()).filter(start__gte=start, start__lt=end)
-    own = own_staff_id(ctx)
+    in_range = appointments(ctx).filter(start__gte=start, start__lt=end)
+    own, everyone = own_staff_id(ctx), APPOINTMENTS.sees_all(ctx)
 
     def lane(member: Member) -> dict:
         return {
@@ -718,7 +691,7 @@ def agenda_lanes(ctx: OperationContext, data: LanesIn) -> dict:
             "takes_bookings": takes_bookings(member),
         }
 
-    if sees_everyone(ctx):
+    if everyone:
         bookable = list(
             Member.objects.filter(
                 status=Member.Status.ACTIVE, is_bookable=True
@@ -737,7 +710,7 @@ def agenda_lanes(ctx: OperationContext, data: LanesIn) -> dict:
         "rows": [lane(member) for member in members],
         "unassigned": unassigned,
         "own_staff_id": own,
-        "sees_everyone": sees_everyone(ctx),
+        "sees_everyone": everyone,
         "timezone": zone_name(),
     }
 
@@ -919,7 +892,7 @@ def load_agenda(  # noqa: PLR0913
                 id=item.id,
                 label=f"{item.number} {item.customer_name}",
             )
-            for item in appointments()
+            for item in Appointment.objects.filter(deleted_at__isnull=True)
             .filter(staff=member, status__in=BUSY, start__lt=end, end__gt=start)
             .exclude(pk__in=exclude)
             .order_by("start", "id")
@@ -940,8 +913,8 @@ def load_agenda(  # noqa: PLR0913
 def conflicts_of(
     agenda: engine.Agenda, start: dt.datetime, end: dt.datetime
 ) -> list[dict]:
-    rows = appointments().filter(
-        pk__in=[period.id for period in engine.overlapping(agenda, start, end)]
+    rows = Appointment.objects.filter(
+        deleted_at__isnull=True, pk__in=[period.id for period in engine.overlapping(agenda, start, end)]
     )
     zone = business_zone()
     return [
@@ -1126,7 +1099,7 @@ def availability_check(ctx: OperationContext, data: CheckIn) -> dict:
         "code": code,
         "message": verdict_message(code) if code else "",
         # Whose appointments they are only for who may see that agenda: a colleague's time is just taken.
-        "conflicts": conflicts_of(agenda, start, end) if member and sees_member(ctx, member.id) else [],
+        "conflicts": conflicts_of(agenda, start, end) if member and sees_whose(ctx, member.id) else [],
     }
 
 
@@ -1215,17 +1188,17 @@ def series_with_lines() -> QuerySet[Recurring]:
 
 
 def series_rows(ctx: OperationContext) -> QuerySet[Recurring]:
-    return visible(ctx, series_with_lines().filter(deleted_at__isnull=True))
+    """The live series the caller may see (``SERIES``), with the services they book."""
+    return SERIES.visible(ctx).filter(deleted_at__isnull=True).prefetch_related("lines__service")
 
 
 def find_series(
-    ctx: OperationContext, series_id: UUID, *, lock: bool = False, rows=None
+    ctx: OperationContext, series_id: UUID, *, lock: bool = False, lines: bool = False
 ) -> Recurring:
-    """The live series the caller may see (``NotFound`` otherwise). It comes from ``rows`` when given (e.g.
-    ``series_with_lines()``, what its detail shows): one read, so a deletion committed meanwhile is either
-    not seen yet or not found, never a series that vanished or changed between two reads."""
-    found_in = Recurring.objects.all() if rows is None else rows
-    rows = visible(ctx, found_in.filter(deleted_at__isnull=True, pk=series_id))
+    """The live series the caller may see (``NotFound`` otherwise), with its services when ``lines`` (what its detail
+    shows): one read, so a deletion committed meanwhile is either not seen yet or not found, never a series that
+    vanished or changed between two reads."""
+    rows = (series_rows(ctx) if lines else SERIES.visible(ctx).filter(deleted_at__isnull=True)).filter(pk=series_id)
     if lock:
         rows = rows.select_for_update(of=("self",))
     found = rows.first()
@@ -1339,8 +1312,8 @@ def series_label(series: Recurring) -> str:
 def series_reach(series: Recurring, from_date: dt.date) -> tuple[int, int]:
     """``(upcoming, charged)``: the live appointments of the series from ``from_date`` on, and how many are charged."""
     start, _ = day_bounds(from_date, from_date)
-    rows = appointments().filter(
-        recurring=series, status__in=MOVABLE, start__gte=max(start, now())
+    rows = Appointment.objects.filter(
+        deleted_at__isnull=True, recurring=series, status__in=MOVABLE, start__gte=max(start, now())
     )
     counts = rows.aggregate(
         upcoming=Count("id"), charged=Count("id", filter=Q(sale_id__isnull=False))
@@ -1371,7 +1344,7 @@ def series_reach(series: Recurring, from_date: dt.date) -> tuple[int, int]:
     },
 )
 def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
-    series = find_series(ctx, data.id, rows=series_with_lines())
+    series = find_series(ctx, data.id, lines=True)
     dates, upcoming_date = engine.dates(pattern_of(series), until=today())
     remaining = [day for day in dates if day >= today()]
     next_date = remaining[0] if remaining else upcoming_date

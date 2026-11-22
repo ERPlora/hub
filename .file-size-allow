@@ -7,7 +7,7 @@
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
-1660 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
+1633 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
 1127 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
 2257 apps/appointment/services.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
