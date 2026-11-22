@@ -12,11 +12,13 @@ that day, by pages, signed as every ``/internal`` call: 409 ``usage_not_ready`` 
 a day missing or badly written. On the Hub, ``base.plan.usage`` says the size of the business's own database.
 """
 
+import contextlib
 import datetime as dt
 import logging
 import threading
 import uuid
 
+import psycopg
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
@@ -30,8 +32,8 @@ from live.operations import get
 from base import services, usage, worker, worker_data
 from base.models import Membership
 from base.storage import hub_prefix
+from base.tenancy import ops
 from base.tenancy.context import use_hub
-from base.tenancy.ops import connect_ops
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.hubs import make_cluster, make_hub  # noqa: F401 (fixtures)
@@ -44,9 +46,35 @@ DAY = dt.date(2026, 3, 10)
 NIGHT = dt.datetime(2026, 3, 11, 0, 15, tzinfo=dt.UTC)
 
 
-def size_in_the_catalog(name: str) -> int:
-    with connect_ops() as conn:
-        return conn.execute("SELECT pg_database_size(%s)", [name]).fetchone()[0]
+@pytest.fixture
+def catalog_read(monkeypatch) -> dict[str, int]:
+    """Each database's size as the measurement itself read it in the catalog, by name.
+
+    What it stored is compared with this reading, never with a later one: Postgres changes a database's size on its
+    own between two reads (:func:`vacuumed`)."""
+    read: dict[str, int] = {}
+    real = ops.connect_ops
+
+    class Recorded(psycopg.Cursor):
+        def fetchall(self):
+            rows = super().fetchall()
+            read.update(rows)
+            return rows
+
+    @contextlib.contextmanager
+    def recorded(*args, **kwargs):
+        with real(*args, **kwargs) as conn:
+            conn.cursor_factory = Recorded
+            yield conn
+
+    monkeypatch.setattr(ops, "connect_ops", recorded)
+    return read
+
+
+def vacuumed(name: str) -> None:
+    """Vacuum ``name`` as autovacuum does when its turn comes: no data is written, yet the database's size changes."""
+    with ops.connect_ops(name) as conn:
+        conn.execute("VACUUM")
 
 
 def visit(host: str, person: str, day: dt.date) -> None:
@@ -57,7 +85,9 @@ def visit(host: str, person: str, day: dt.date) -> None:
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_each_hub_with_its_own_database_is_measured_and_the_shared_one_is_skipped(hub_a, hub_b, caplog, settings, tmp_path):
+def test_each_hub_with_its_own_database_is_measured_and_the_shared_one_is_skipped(
+    hub_a, hub_b, caplog, settings, tmp_path, catalog_read
+):
     # The hub file store on this test's own folder: nothing lands in the checkout's media/.
     settings.STORAGES = {
         **settings.STORAGES,
@@ -72,12 +102,13 @@ def test_each_hub_with_its_own_database_is_measured_and_the_shared_one_is_skippe
 
     with caplog.at_level(logging.INFO, logger="base.usage"):
         measured = usage.measure(DAY, now=NIGHT)
+    vacuumed(hub_a.db_name)
 
     assert measured == 2
     rows = {row.hub_id: row for row in HubUsageDaily.objects.filter(day=DAY)}
     assert set(rows) == {hub_a.id, hub_b.id}
     a = rows[hub_a.id]
-    assert a.db_bytes == size_in_the_catalog(hub_a.db_name) > 0
+    assert a.db_bytes == catalog_read[hub_a.db_name] > 0
     assert (a.s3_bytes, a.active_users_1d, a.active_users_30d, a.measured_at) == (1234, 1, 2, NIGHT)
     assert (rows[hub_b.id].s3_bytes, rows[hub_b.id].active_users_1d) == (0, 0)
     assert "base.usage_shared_database" in caplog.text
@@ -117,12 +148,14 @@ def test_a_demo_a_hub_being_made_and_one_whose_database_is_gone_are_not_measured
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_measuring_again_a_day_replaces_its_figures(hub_a):
+def test_measuring_again_a_day_replaces_its_figures(hub_a, catalog_read):
     HubUsageDaily.objects.create(hub=hub_a, day=DAY, db_bytes=1, measured_at=NIGHT - dt.timedelta(days=1))
 
     usage.measure(DAY, now=NIGHT)
+    vacuumed(hub_a.db_name)
 
-    assert HubUsageDaily.objects.get(hub=hub_a, day=DAY).db_bytes == size_in_the_catalog(hub_a.db_name)
+    again = HubUsageDaily.objects.get(hub=hub_a, day=DAY)
+    assert (again.db_bytes, again.measured_at) == (catalog_read[hub_a.db_name], NIGHT)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
