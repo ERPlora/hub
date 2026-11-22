@@ -352,8 +352,8 @@ def session_revoke(ctx: OperationContext, data: SessionRevokeIn) -> dict:
     """End the Hub's sessions of the SaaS account ``data.user_id``: those on the business ``data.hub_id`` or, without
     it, every one of them, the Hub admin's included (as OIDC's back-channel logout).
 
-    The SaaS sends it after the COMMIT that removed the person from a business, changed their role or handed the
-    business over (with the business), or after a password change, «sign out everywhere» or deleting the account
+    The SaaS sends it after the COMMIT that removed the person from a business or handed the business over (with
+    the business), or after a password change, «sign out everywhere» or deleting the account
     (without it). The sessions are found through ``SessionOwner``, never by decoding the table's. Idempotent: what
     already ended counts nothing; a business the registry does not know ends nothing and answers as one without
     sessions. The hosts whose sessions ended wake after the COMMIT (:func:`_end_sessions`).
@@ -382,14 +382,15 @@ def _end_sessions(owners) -> int:
 def _apply_members(hub: Hub, members: list) -> list[str]:
     """Make the memberships of ``hub`` say what the photo's ``members`` say (HUBS-F26, F27 and F28 of the SaaS).
 
-    A person whose role changed has it now and a person no longer listed loses their membership; either way their
-    sessions on this business end (:func:`_end_sessions`), so the next thing they do runs with the permissions of
-    the photo, not of their login. Nobody is created: a person the Hub has not seen yet takes their role when they
-    first enter (:func:`open_session_from_saas`). Only the copies of SaaS accounts are the photo's (``saas:<id>``):
-    a demo's owner is not. Returns the SaaS accounts that left the business (their memberships gone).
+    A person whose role changed has it now and keeps their sessions: the business's open apps wake after the COMMIT
+    (:func:`_wake_open_apps`) and every request and live re-run reads the permissions of the new role. A person no
+    longer listed loses their membership and their sessions on this business end (:func:`_end_sessions`). Nobody is
+    created: a person the Hub has not seen yet takes their role when they first enter (:func:`open_session_from_saas`).
+    Only the copies of SaaS accounts are the photo's (``saas:<id>``): a demo's owner is not. Returns the SaaS accounts
+    that left the business (their memberships gone).
     """
     wanted = {str(member.user_id): member.role for member in members}
-    changed = []
+    changed_role = False
     left = []
     memberships = (
         Membership.objects.select_for_update(of=("self",))
@@ -405,19 +406,19 @@ def _apply_members(hub: Hub, members: list) -> list[str]:
         elif role != membership.role:
             membership.role = role
             membership.save(update_fields=["role"])
-        else:
-            continue
-        changed.append(saas_user_id)
-    if changed:
+            changed_role = True
+    if left:
         # A session that noted no host (from before the rule) is valid on every host, this business's too.
-        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host__in=[hub.slug, ""]))
+        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=left, host__in=[hub.slug, ""]))
+    if changed_role:
+        transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return left
 
 
 def _wake_open_apps(slug: str) -> None:
-    """The business of ``slug`` just stopped serving the app (suspended, cancelled), or some of its sessions ended:
-    every open live stream and print socket of its host re-runs now («*», everything may have changed), hears the host
-    gate and its session again (``base.operations.HubContextBuilder.refresh``) and ends if they no longer hold,
-    instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the SaaS, step 4: the devices with
-    the app open leave for the Hub's page)."""
+    """The business of ``slug`` just stopped serving the app (suspended, cancelled), some of its sessions ended, or
+    somebody's role in it changed: every open live stream and print socket of its host re-runs now («*», everything
+    may have changed), hears the host gate and its session again (``base.operations.HubContextBuilder.refresh``) and
+    ends if they no longer hold, instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the
+    SaaS, step 4: the devices with the app open leave for the Hub's page)."""
     notify(Scope("host", slug), [ALL_EVENTS])

@@ -11,6 +11,7 @@ import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { sessionChanged } from '../lib/access';
+import { gateAgain } from '../lib/app-gate';
 
 const route = useRoute();
 const router = useRouter();
@@ -31,7 +32,7 @@ watch(
     const app = route.meta.app;
     const entry = app ? apps?.find((candidate) => candidate.label === app) : undefined;
     if (!entry || entry.state === 'on') return;
-    void router.replace({ path: route.path, query: route.query, hash: route.hash, force: true });
+    gateAgain(router);
   },
 );
 </script>

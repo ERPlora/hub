@@ -10,7 +10,7 @@
 // is decided before the session arrives.
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Ref } from 'vue';
-import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw } from 'vue-router';
+import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw, Router } from 'vue-router';
 
 import { SIDEBAR } from './sidebar';
 
@@ -77,6 +77,12 @@ function longestCovering(entries: readonly string[], path: string): string | und
       (longest, candidate) => (longest === undefined || candidate.length > longest.length ? candidate : longest),
       undefined,
     );
+}
+
+/** The screen in front goes through the gate again in the same address: the session it was judged with changed. */
+export function gateAgain(router: Router): void {
+  const { path, query, hash } = router.currentRoute.value;
+  void router.replace({ path, query, hash, force: true });
 }
 
 /** The router guard: `true`, or the gate page in the same address. */
