@@ -14,7 +14,8 @@ from live.context import system_context
 from pydantic import ValidationError
 
 from apps.kitchen.models import KitchenSettings, Ticket, TicketItem
-from apps.kitchen.queries import saved_views, unsaved_views
+from apps.kitchen.queries.rounds import unsaved_views
+from apps.kitchen.queries.views import saved_views
 from apps.sale.models import OrderLine
 from base.models import Hub
 from base.tenancy.context import current_alias

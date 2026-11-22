@@ -4,8 +4,8 @@ its line in the History.
 Every write that touches a ticket starts by **settling** (``settle``): it locks the settings row (so every
 write of the kitchen of a business goes one after the other: two cooks at once never step on each
 other), saves the rounds Sales fired that the kitchen has not saved yet (the ones the relay's reaction
-has not brought yet, queries.py) and saves what Sales did to the tickets (``queries.effective``), with its
-History at the moment it happened, its events and its void slips. Then the operation finds its ticket,
+has not brought yet, queries.rounds) and saves what Sales did to the tickets (``queries.state.effective``),
+with its History at the moment it happened, its events and its void slips. Then the operation finds its ticket,
 already saved.
 
 Paper goes through Printing's operation by its name (``printing.job.create``), in a savepoint of the same
@@ -44,36 +44,25 @@ from apps.kitchen.models import (
     TicketItem,
     TicketStatus,
 )
-from apps.kitchen.queries import (
+from apps.kitchen.queries.outputs import ticket_out
+from apps.kitchen.queries.reads import (
     COOKING,
     EPOCH,
     IN_FLIGHT,
     MAX_CANDIDATES,
-    STATION_NOT_FOUND,
     STRUCK,
-    TICKET_NOT_FOUND,
     TO_DO,
-    Change,
-    TicketView,
     business_day,
-    category_routes,
     current_settings,
-    effective,
-    find_scope,
-    find_station,
-    find_ticket_view,
-    in_progress_by_station,
-    in_scope,
-    pending_rounds,
-    product_routes,
-    round_view,
-    routing,
-    saved_views,
     settings_out,
-    station_map,
-    station_row,
-    ticket_out,
 )
+from apps.kitchen.queries.rounds import pending_rounds, round_view
+from apps.kitchen.queries.routing import category_routes, product_routes, routing
+from apps.kitchen.queries.scope import STATION_NOT_FOUND, find_scope, find_station, in_scope, station_map
+from apps.kitchen.queries.state import effective
+from apps.kitchen.queries.stations import in_progress_by_station, station_row
+from apps.kitchen.queries.tickets import TICKET_NOT_FOUND, find_ticket_view
+from apps.kitchen.queries.views import Change, TicketView, saved_views
 from apps.kitchen.schemas import (
     DeletedOut,
     ItemBumpIn,
