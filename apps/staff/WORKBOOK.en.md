@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c46f2f31c9d1a16656e6b23e8562172a37c78f4cbae0aaf6a28656575c736c22 -->
+<!-- generated from WORKBOOK.md sha256:5484464dde998434a0b7755954523a96f1922907adb09e155410c3786d69d418 -->
 
 ## What it is for and who it is for
 
@@ -623,7 +623,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | The record of whoever holds the session, only its id and name: Sales attributes «Me» to it | anyone signed in | SALE-F16 | `staff.member.current` |
 | Rate, commission and HR notes, with the directory's filters, sorting and pages (the Rate/h column reads the same rows) | see the pay | F21 | `staff.member.compensation` |
 | The commission sheet: who can earn a commission, with their record, their account and their commission | see the pay | F21 | `staff.commission.summary` |
-| What each professional earned in a period (today, yesterday, this week, this month or two days): sold with refunds taken off, commission and totals; it says if the business has no Sales | see the pay (and the Sales figures) | F21 | `staff.commission.report` |
+| What each professional earned in a period (today, yesterday, this week, this month or two days): sold with refunds taken off, commission and totals; it says if the business has no Sales | see the pay (and the sales) | F21 | `staff.commission.report` |
 | The figures: records, active, on leave, inactive, away today and pending requests | see | F23 | `staff.member.stats` |
 | The roles with their active members, with filters and sorting | see | F04, F23 | `staff.role.list` |
 | A role by its id, also a retired one: what the assistant's card reads to name it (BASE-F97) | see | F01, F02, F04, F07 | `staff.role.detail` |
@@ -682,7 +682,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 ### What it reacts to and what it needs from other apps
 It reacts to no notice and requires no app. For **Commissions** it asks **Sales**, if the business has it,
 for what each professional sold in the period, with refunds already taken off (`sale.sale.by_staff`, with
-the Sales figures permission of whoever is looking), and it updates with its notices of a sale charged,
+the permission to see the sales of whoever is looking), and it updates with its notices of a sale charged,
 voided or refunded (`sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded`). Without Sales,
 Commissions says so and lists nobody. From the platform it uses the business's accounts (to link a record)
 and the business's time zone (for "today").
