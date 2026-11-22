@@ -17,7 +17,7 @@ from live.models import OutboxEvent
 from apps.attendance import events
 from apps.attendance.models import Correction
 from apps.flow.tests.test_relay import heard
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, run

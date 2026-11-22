@@ -6,7 +6,7 @@ from live.context import OperationContext, Scope
 from live.operations import get
 
 from base import activation
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy import migrator
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs

@@ -22,7 +22,8 @@ from live.models import OutboxEvent
 from apps.customer.models import Consent, Customer
 from apps.tax.models import TaxCategory
 from base import api_keys
-from base.models import ApiKey, Membership
+from base.models.api_keys import ApiKey
+from base.models import Membership
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.routes import bound_routes, spa_routes

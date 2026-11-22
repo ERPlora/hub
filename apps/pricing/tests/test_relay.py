@@ -17,7 +17,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import (

@@ -17,7 +17,7 @@ from live.operations import get
 
 from base import events, relay
 from base.services import relay_runs
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tests.routes import assert_bound
 from base.tests.test_queries_home import listen

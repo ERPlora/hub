@@ -21,7 +21,7 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.service.models import Assignment, Grant, Redemption
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, make_package, make_redemption, make_service, make_tax

@@ -30,7 +30,9 @@ from base import access, queries
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.session_host import PLATFORM_SESSION_HOST, session_host
-from base.models import Hub, HubUser, Membership, SessionOwner, TrustedDevice
+from base.models import Hub, HubUser, Membership
+from base.models.sessions import SessionOwner
+from base.models.access import TrustedDevice
 from base.registry import internal_only
 from base.schemas.sessions import HubUserSyncIn, HubUserSyncOut, SessionRevokeIn, SessionRevokeOut
 from control.models import HubVisit

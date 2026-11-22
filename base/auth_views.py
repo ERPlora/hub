@@ -54,7 +54,7 @@ from live.slugs import validate_hub_slug
 
 from base import access, auth, queries, services
 from base.services import demos, sessions
-from base.models import SessionOwner
+from base.models.sessions import SessionOwner
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
 

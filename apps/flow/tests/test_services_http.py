@@ -22,7 +22,7 @@ from live.errors import InvalidPayload
 from apps.flow import events, http, services, vault
 from apps.flow.models import Flow, FlowRun, Question, Secret
 from apps.task.models import Task
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import current_alias
 
 from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run

@@ -29,7 +29,7 @@ from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 from base import catalog, hub_visits, relay, scheduler, worker
 from base.catalog import RegisterResult
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 

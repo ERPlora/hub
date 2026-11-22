@@ -18,7 +18,7 @@ from live.outbox import record_event
 
 from base import activation, blueprint, entitlement, events
 from base.activation import CREATING
-from base.models import ImportBatch
+from base.models.blueprints import ImportBatch
 from base.permissions import ADMINISTER_HUB
 from base.schemas.apps import AppChangeIn
 from base.schemas.blueprints import (

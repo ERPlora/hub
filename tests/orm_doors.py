@@ -28,6 +28,11 @@ def is_door(path: PurePosixPath) -> bool:
     return folder.name in DOOR_PACKAGES and is_app(folder.parent) and path.stem not in DOOR_PACKAGES
 
 
+def is_schema_module(path: PurePosixPath) -> bool:
+    """A module of an app's ``models/`` package, one level deep: its schema split by entity, as ``models.py`` is."""
+    return path.parent.name == "models" and is_app(path.parent.parent)
+
+
 def door_packages(root: Path) -> list[PurePosixPath]:
     """The ``services/`` and ``queries/`` folders of every app under ``root``."""
     apps = [PurePosixPath(app) for app in PLATFORM_APPS]

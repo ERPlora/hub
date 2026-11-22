@@ -31,7 +31,9 @@ from live.operations import get as get_operation
 
 from base import apps_on, catalog, hub_visits, relay, scheduler, worker
 from base.catalog import RegisterResult
-from base.models import AppActivation, EventDelivery, TaskSchedule
+from base.models.activation import AppActivation
+from base.models.relay import EventDelivery
+from base.models.scheduler import TaskSchedule
 from base.services import relay_runs
 from base.tenancy.context import current, use_control, use_hub
 from base.tenancy.tests import hubs

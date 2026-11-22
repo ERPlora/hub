@@ -20,7 +20,9 @@ from live.errors import InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
 from base import blueprint
-from base.models import AppActivation, Hub, ImportBatch, Membership
+from base.models.activation import AppActivation
+from base.models import Hub, Membership
+from base.models.blueprints import ImportBatch
 from base.permissions import permissions_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.test_services_data import born

@@ -13,7 +13,9 @@ import pytest
 from django.utils import timezone
 
 from base import access, services
-from base.models import AccessSettings, Credential, Membership, SessionOwner
+from base.models.access import AccessSettings, Credential
+from base.models import Membership
+from base.models.sessions import SessionOwner
 from base.tenancy.context import use_hub
 from base.tests.test_access_pin import a_device
 from base.tests.test_auth_views import A, B, HOST, ON_HUB_A

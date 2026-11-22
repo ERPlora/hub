@@ -25,7 +25,8 @@ from live.operations import get
 
 from base import blueprint, events, services, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
-from base.models import AppActivation, ImportBatch
+from base.models.activation import AppActivation
+from base.models.blueprints import ImportBatch
 from base.tenancy import migrator
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs

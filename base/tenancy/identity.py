@@ -1,7 +1,7 @@
 """The identity of a hub's database.
 
-Every hub's database holds one row in ``base_hub_identity`` (``base.models.HubIdentity``): its hub's id, written
-when the database is made (:func:`write`). ``use_hub`` checks it the first time a process uses an alias
+Every hub's database holds one row in ``base_hub_identity`` (``base.models.identity.HubIdentity``): its hub's id,
+written when the database is made (:func:`write`). ``use_hub`` checks it the first time a process uses an alias
 (:func:`verify`): a database that says it is another hub, or has no identity table, is refused
 (``HubIdentityMismatch``) and nothing is served from it; one that is its hub is not read again in this process. A
 database that cannot be reached now raises its own ``DatabaseError``: passing, never taken for a mismatch. Outside any

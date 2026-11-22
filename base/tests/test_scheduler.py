@@ -26,7 +26,8 @@ from live.operations import Operation
 from ninja import Schema
 
 from base import scheduler
-from base.models import HubUser, TaskSchedule
+from base.models import HubUser
+from base.models.scheduler import TaskSchedule
 from base.scheduler import ScheduledTask
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tenancy.tests.concurrency import in_a_thread, plan_with_room

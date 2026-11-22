@@ -20,7 +20,8 @@ from live.operations import Operation
 from ninja import Schema
 
 from base import outbound
-from base.models import Hub, HubIdentity
+from base.models import Hub
+from base.models.identity import HubIdentity
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, HUB_DB, HUB_DB_COMMITTED

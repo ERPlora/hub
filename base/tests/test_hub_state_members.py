@@ -178,7 +178,7 @@ def test_the_open_apps_of_the_business_hear_it_after_the_commit(client, acme):
 def test_a_session_that_noted_no_host_ends_too_when_the_photo_takes_that_person_out(client, acme, beta):
     """A session from before the sessions noted their host is valid on every host, this business's too: the photo
     ends it as ``/internal/sessions/revoke`` with the business does, and leaves another person's alone."""
-    from base.models import SessionOwner
+    from base.models.sessions import SessionOwner
 
     ana_hostless, olga_hostless = login(ANA, beta, "hub_employee"), login(OLGA, beta, "hub_employee")
     SessionOwner.objects.filter(session_id__in=[ana_hostless, olga_hostless]).update(host="")

@@ -14,7 +14,8 @@ from live.meta import module_configs
 from live.operations import AI, get
 
 from base import meter
-from base.models import AppActivation, Membership
+from base.models.activation import AppActivation
+from base.models import Membership
 from base.permissions import permissions_for
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import limits

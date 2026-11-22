@@ -13,7 +13,7 @@ from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.routes import assert_bound
 

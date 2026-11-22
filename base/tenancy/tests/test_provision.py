@@ -35,10 +35,10 @@ from live.operations import get as get_operation
 
 from base import activation, services
 from base.activation import Activation
-from base.models import AppActivation, Location
+from base.models.activation import AppActivation
+from base.models.locations import Location
 from base.schemas.home import SetupStatusIn
-from base.tenancy import connections as tenancy_connections
-from base.tenancy import identity, migrator, names, ops, provision
+from base.tenancy import connections as tenancy_connections, identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import (  # noqa: F401
@@ -1064,7 +1064,7 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
 
     from django.core.management import call_command
 
-    from base.models import AppActivation
+    from base.models.activation import AppActivation
 
     settings.DEBUG = True
     started = timezone.now()

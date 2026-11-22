@@ -38,7 +38,7 @@ from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, A, connect, ctx_for, receive, run
-from base.models import TaskSchedule
+from base.models.scheduler import TaskSchedule
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 from base.tenancy.context import current_alias
 

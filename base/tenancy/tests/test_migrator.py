@@ -22,7 +22,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
 
 from base import catalog
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import migrator, names
 from base.tenancy.bootstrap import admin_conninfo as bootstrap_conninfo

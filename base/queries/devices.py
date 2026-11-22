@@ -11,7 +11,8 @@ from live.errors import NotFound
 from live.operations import AI, operation
 
 from base import access
-from base.models import SessionOwner, TrustedDevice
+from base.models.sessions import SessionOwner
+from base.models.access import TrustedDevice
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.devices import DeviceByIdIn, DeviceCurrentIn, DeviceCurrentOut, DeviceListIn, DeviceListOut, DeviceOut
 

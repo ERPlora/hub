@@ -16,7 +16,7 @@ from live.outbox import record_event
 
 from base import events, system
 from base.apps_on import active_apps
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.permissions import ADMINISTER_HUB
 from base.schemas.failed_events import (
     FailedEventCountOut,
