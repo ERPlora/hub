@@ -4,7 +4,6 @@ never «Run» or «Create»; and the test invoice's card says what it will issue
 the person types the word. Saying them sends nothing to the AEAT."""
 
 import json
-import socket
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,8 @@ from apps.verifactu.tests.conftest import HUB_DB, ctx_for, run
 from base import assistant
 from base.tests.test_assistant import named_actions, verb
 
-pytestmark = HUB_DB
+#: Saying a card sends nothing anywhere.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("offline")]
 
 CONNECTION_TEST = "verifactu.diagnostic.run"
 TEST_INVOICE = "verifactu.test_invoice.create"
@@ -34,17 +34,6 @@ TEST_INVOICE_FIELDS = {
         {"name": "vat", "label": "IVA", "kind": "text", "value": "21 %"},
     ],
 }
-
-
-@pytest.fixture(autouse=True)
-def offline(monkeypatch):
-    """Nothing here may leave the machine: a connection opened from Python fails the test (the database's is not)."""
-
-    def refuse(*args, **kwargs):
-        raise AssertionError(f"a test of the card opened a connection: {args!r}")
-
-    monkeypatch.setattr(socket.socket, "connect", refuse)
-    monkeypatch.setattr(socket, "create_connection", refuse)
 
 
 def screen_words(language: str) -> dict:
