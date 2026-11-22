@@ -27,7 +27,11 @@ from base.sensitive import COSTS, CUSTOMER_CONTACT
 
 #: The words of a field's name that say it carries a cost or someone's contact details or pay. A name matches when one
 #: of them is a whole part of it between underscores: ``unit_cost`` and ``customer_email`` do, ``costume`` does not.
-SENSITIVE_WORDS = ("cost", "margin", "email", "phone", "commission", "salary", "wage", "stock_value", "hourly_rate")
+#: What the comps cost the business is a cost too (``gift_total``); whether a line is one (``is_gift``) is not.
+SENSITIVE_WORDS = (
+    "cost", "margin", "email", "phone", "commission", "salary", "wage", "stock_value", "hourly_rate", "gift_total",
+    "total_gifts",
+)
 
 # ── Why a sensitive-sounding field may go unmarked ────────────────────────────────────────────────────────────────
 
@@ -361,12 +365,14 @@ def test_a_marked_one_is_not():
     assert unmarked_sensitive([operation("stock.line.list", MarkedLinesOut)]) == {}
 
 
-@pytest.mark.parametrize("name", ["unit_cost", "customer_email", "phone_number", "total_commission", "stock_value"])
+@pytest.mark.parametrize(
+    "name", ["unit_cost", "customer_email", "phone_number", "total_commission", "stock_value", "gift_total", "total_gifts"]
+)
 def test_the_sensitive_words_match_whole_parts_of_a_name(name):
     assert sensitive_name(name)
 
 
-@pytest.mark.parametrize("name", ["costume", "emails_sent_count_x", "telephone", "commissioning"])
+@pytest.mark.parametrize("name", ["costume", "emails_sent_count_x", "telephone", "commissioning", "is_gift", "gift_reason"])
 def test_and_only_whole_parts(name):
     assert not sensitive_name(name)
 
