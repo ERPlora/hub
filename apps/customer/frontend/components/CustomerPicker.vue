@@ -7,7 +7,7 @@
 // reads the search box by its hint, in the person's language, never Ionic's English «search text».
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon } from '@erplora/ui/shell';
+import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonSearchbar } from '@ionic/vue';
 import { computed, useTemplateRef } from 'vue';
 
@@ -34,7 +34,11 @@ const term = defineModel<string>('term', { default: '' });
 const emit = defineEmits<{ pick: [customer: CustomerRow] }>();
 
 const { t } = useCustomerI18n();
-const hint = computed(() => props.placeholder ?? t('customer.picker.search'));
+// Whoever does not see the customers' contact details searches only by name, tax id and company.
+const session = useSession();
+const hint = computed(
+  () => props.placeholder ?? t(session.can('base.view_customer_contact') ? 'customer.picker.search' : 'customer.picker.searchWithoutContact'),
+);
 useSearchbarName(useTemplateRef('bar'), () => hint.value);
 
 const FIRST = 20;

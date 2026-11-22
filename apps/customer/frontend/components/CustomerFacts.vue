@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The card's data, read-only (CUSTOMER-F03), with the birthday, anniversary, internal notes and custom
-// fields shown without opening Edit; money in the business's currency.
+// fields shown without opening Edit; money in the business's currency. The email and the phone come empty (null) to
+// whoever does not see the customers' contact details: then they have no line.
 import { formatDateTime, formatMoney } from '@erplora/ui/components';
 import { computed } from 'vue';
 
@@ -22,8 +23,8 @@ const facts = computed(() => {
   const c = props.customer;
   const address = [c.address, c.postal_code, c.city, countryName(c.country, locale.value)].filter((p) => p && p.trim()).join(', ');
   return [
-    { key: 'email', label: 'customer.detail.facts.email', value: dash(c.email) },
-    { key: 'phone', label: 'customer.detail.facts.phone', value: dash(formatPhone(c.phone)) },
+    ...(c.email === null ? [] : [{ key: 'email', label: 'customer.detail.facts.email', value: dash(c.email) }]),
+    ...(c.phone === null ? [] : [{ key: 'phone', label: 'customer.detail.facts.phone', value: dash(formatPhone(c.phone)) }]),
     { key: 'taxId', label: 'customer.detail.facts.taxId', value: dash(c.tax_id) },
     { key: 'company', label: 'customer.detail.facts.company', value: dash(c.company_name) },
     { key: 'address', label: 'customer.detail.facts.address', value: dash(address) },

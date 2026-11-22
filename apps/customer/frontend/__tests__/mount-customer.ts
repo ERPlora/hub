@@ -12,11 +12,13 @@ export type { ApiCall } from '../../../../packages/ui/src/sdk/__tests__/live-har
 export { business, IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/__tests__/business';
 
 const ALL = ['view', 'manage', 'configure', 'merge', 'export', 'delete', 'erase', 'record_activity'].map((p) => `customer.${p}`);
+/** The data permission of the customers' email and phone, which the four roles hold (base/apps.py). */
+const CONTACT = 'base.view_customer_contact';
 
 /** `hub_owner` / `hub_admin`: every customer permission. */
 export const OWNER: SessionMe = {
   user: { id: 'u1', label: 'Ana' },
-  permissions: ALL,
+  permissions: [...ALL, CONTACT],
   menu: [],
   apps: [],
   language: 'en',
@@ -25,14 +27,17 @@ export const OWNER: SessionMe = {
 /** `hub_manager`: everything but deleting and erasing. */
 export const MANAGER: SessionMe = {
   ...OWNER,
-  permissions: ALL.filter((p) => p !== 'customer.delete' && p !== 'customer.erase'),
+  permissions: [...ALL.filter((p) => p !== 'customer.delete' && p !== 'customer.erase'), CONTACT],
 };
 
 /** `hub_employee`: views and manages cards (role_permissions of apps.py). */
-export const EMPLOYEE: SessionMe = { ...OWNER, permissions: ['customer.view', 'customer.manage'] };
+export const EMPLOYEE: SessionMe = { ...OWNER, permissions: ['customer.view', 'customer.manage', CONTACT] };
 
 /** Only sees. */
-export const VIEWER: SessionMe = { ...OWNER, permissions: ['customer.view'] };
+export const VIEWER: SessionMe = { ...OWNER, permissions: ['customer.view', CONTACT] };
+
+/** Manages cards without seeing the customers' email and phone, as a role the business makes may. */
+export const WITHOUT_CONTACT: SessionMe = { ...OWNER, permissions: ['customer.view', 'customer.manage'] };
 
 export interface MountOptions {
   props?: Record<string, unknown>;
