@@ -15,8 +15,7 @@ from live.operations import registry
 from pydantic import ValidationError
 
 from apps.sale.models import Sale, SaleLine, VoucherSession
-from apps.sale.tests.conftest import ctx_for, run
-from apps.sale.tests.test_integration_service import by_staff, charged_open, professional, redeem
+from apps.sale.tests.conftest import by_staff, charged_open, ctx_for, professional, redeem, run
 from apps.service.models import Grant, Redemption
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
