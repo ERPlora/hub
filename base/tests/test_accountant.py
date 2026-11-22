@@ -14,10 +14,10 @@ from base.tenancy.tests.business import A, HUB_DB, in_business_a
 from base.tests.test_hub_state_members import member, role_of
 from base.tests.test_hub_state_members import photo as photo_put
 from base.tests.test_internal import PATH, signed
-from base.tests.test_people import get, people, photo, row
+from base.tests.test_people import eva, get, mario, olga, people, photo, row
 from base.tests.test_session_revoke import acme, login
 
-__all__ = ["acme", "in_business_a"]
+__all__ = ["acme", "eva", "in_business_a", "mario", "olga"]
 
 pytestmark = HUB_DB
 
@@ -43,21 +43,6 @@ GRANTS = {
 READING_COMMANDS = {"invoice.invoice.print", "sale.order.print_bill", "sale.sale.print", "verifactu.chain.validate"}
 
 GEMA = "0199c4b0-0000-7000-8000-00000000c0c0"
-
-
-@pytest.fixture
-def olga(make_user):
-    return make_user("saas:1", host=A.key, role=Membership.Role.OWNER, first_name="Olga", email="olga@example.com")
-
-
-@pytest.fixture
-def eva(make_user):
-    return make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", email="eva@example.com")
-
-
-@pytest.fixture
-def mario(make_user):
-    return make_user("saas:4", host=A.key, role=Membership.Role.MANAGER, first_name="Mario", email="mario@example.com")
 
 
 @pytest.fixture

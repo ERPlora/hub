@@ -6,26 +6,16 @@ Over HTTP, as the screens, the assistant and the API ask, with two employees who
 that reads them.
 """
 
-import json
-
 import pytest
 from django.test import Client
 
 from apps.invoice.tests.conftest import HUB_DB, ISSUER
 from apps.invoice.tests.test_api import LINE, RECIPIENT
-from base.tenancy.tests.business import HOST
+from apps.invoice.tests.test_queries_ownership import get, post
 
 pytestmark = HUB_DB
 
 REFUSED = "permission_denied"
-
-
-def get(client, path, **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=HOST)
-
-
-def post(client, path, data):
-    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=HOST)
 
 
 def signed_in(make_user, username: str, role: str) -> Client:
