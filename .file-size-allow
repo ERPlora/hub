@@ -40,7 +40,7 @@
 830 apps/modifier/queries/__init__.py ERPlora/erplora-next#74
 666 apps/modifier/schemas/__init__.py ERPlora/erplora-next#74
 687 apps/modifier/services/__init__.py ERPlora/erplora-next#74
-734 apps/online_booking/queries.py ERPlora/erplora-next#74
+732 apps/online_booking/queries.py ERPlora/erplora-next#74
 515 apps/online_booking/schemas.py ERPlora/erplora-next#74
 565 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
 621 apps/payment/services.py ERPlora/erplora-next#74

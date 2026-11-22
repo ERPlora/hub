@@ -230,7 +230,7 @@ async function confirmDelete(): Promise<void> {
       :error="status === 'error' && !blocked ? $t('online_booking.bookings.loadError') : undefined"
       :addable="false"
       :actions="actions"
-      :search-placeholder="$t('online_booking.bookings.search')"
+      :search-placeholder="$t(session.can('base.view_customer_contact') ? 'online_booking.bookings.search' : 'online_booking.bookings.searchWithoutContact')"
       :labels="{ loadError: $t('online_booking.bookings.loadError'), retry: $t('online_booking.live.retry') }"
       :columns="columns"
       @filters-change="onFilters"
