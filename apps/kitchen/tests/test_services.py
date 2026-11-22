@@ -17,7 +17,7 @@ from apps.kitchen.models import KitchenSettings, LogEntry, Station, Ticket, Tick
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, add_printers, charge, ctx_for, fire, fired_round, make_station
-from .conftest import open_check, route_product, run
+from .conftest import open_check, route_product, run, void_the_last_dish_to_cook
 
 pytestmark = HUB_DB
 
@@ -441,14 +441,7 @@ def test_the_pass_prints_when_a_ticket_is_ready_if_asked(clock, product, printer
 def test_the_pass_prints_when_a_void_leaves_the_ticket_ready(clock, product, printers):
     # F17 «every time a ticket turns ready»: also when the till voids the last dish still to cook.
     KitchenSettings.objects.update(print_pass=True)
-    order = open_check("Table 4")
-    add_line(order.id, product("Burger"))
-    add_line(order.id, product("Fries"))
-    ticket = run("kitchen.ticket.send", {"order_id": str(order.id)})
-    burger, fries = (item.id for item in ticket.items)
-    run("kitchen.item.bump", {"ticket_id": str(ticket.id), "item_ids": [str(burger)]})
-    clock.advance(minutes=1)
-    run("sale.order.void_line", {"order_id": str(order.id), "line_id": str(fries), "reason": "Cold"})
+    void_the_last_dish_to_cook(product, clock)
     sync()
     assert Ticket.objects.get().status == "ready"
     passes = [job for job in jobs() if "-pass-" in job.job_key]

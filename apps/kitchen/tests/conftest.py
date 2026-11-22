@@ -259,6 +259,19 @@ def fired_round(
     return fired.order, list(fired.order.lines)
 
 
+def void_the_last_dish_to_cook(product, clock) -> None:
+    """A Burger and Fries sent to the kitchen; the Burger bumped and, a minute later, the Fries voided in the till: the
+    last dish still to cook, so the next write of the kitchen turns the ticket ready."""
+    order = open_check("Table 4")
+    add_line(order.id, product("Burger"))
+    add_line(order.id, product("Fries"))
+    ticket = run("kitchen.ticket.send", {"order_id": str(order.id)})
+    burger, fries = (item.id for item in ticket.items)
+    run("kitchen.item.bump", {"ticket_id": str(ticket.id), "item_ids": [str(burger)]})
+    clock.advance(minutes=1)
+    run("sale.order.void_line", {"order_id": str(order.id), "line_id": str(fries), "reason": "Cold"})
+
+
 def now() -> dt.datetime:
     return timezone.now()
 
