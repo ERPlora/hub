@@ -1,7 +1,8 @@
 // Staff → Staff (WORKBOOK «Pantallas · Personal»; STAFF-F01–F06, F08, F21): the live
-// `staff.member.list` in a server-side DataTable — Name, Role, Email, Status and, only for whoever may
-// see the pay, Rate/h; Phone exists but starts hidden —, «Search member…», sort by any column, the
-// filters (first name, last name, email, phone, role, status, bookable, hire date, colour, Hub user),
+// `staff.member.list` in a server-side DataTable — Name, Role, Email (Phone exists but starts hidden) only for
+// whoever sees the team's contact details, Status and, only for whoever may see the pay, Rate/h —, «Search
+// member…», sort by any column but the contact details and the pay, the filters (first name, last name, email and
+// phone for whoever sees them, role, status, bookable, hire date, colour, Hub user),
 // 50 a page. «+» opens «New» for whoever may add; a row (or «Edit») opens «Edit · {name}» for whoever may
 // edit; «Deactivate» (confirmed) and «Terminate» (with its dialog) only for the owner and the admin.
 // «My record» opens one's own record when it is linked. Every change comes back through the stream.
@@ -156,19 +157,28 @@ describe('MembersPage: the live directory', () => {
     expect(employee.prop<Array<{ key: string }>>('columns').map((c) => c.key)).not.toContain('hourly_rate');
   });
 
-  it('sorts on the server by any column but the pay; a descending sort goes with a «-»', async () => {
+  it('sorts on the server by any column but the contact details and the pay; a descending sort goes with a «-»', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ key: string; sortable?: boolean }>>('columns').filter((c) => c.sortable).map((c) => c.key)).toEqual([
       'name',
       'role_name',
-      'email',
-      'phone',
       'status',
     ]);
-    s.table().vm.$emit('sortChange', { sort: 'email', dir: 'desc' });
+    s.table().vm.$emit('sortChange', { sort: 'role_name', dir: 'desc' });
     await flush();
-    expect(s.list()).toEqual([{ sort: '-email', limit: 50, offset: 0 }]);
+    expect(s.list()).toEqual([{ sort: '-role_name', limit: 50, offset: 0 }]);
+  });
+
+  it('whoever does not see the team’s contact details gets no Email or Phone column, so no column of dashes', async () => {
+    // flow: STAFF-F01, STAFF-F02 (la lista de Personal según el contacto del equipo)
+    const employee = await setup({ session: EMPLOYEE });
+    await employee.show(page(ROWS.map((row) => ({ ...row, email: null, phone: null }))));
+    expect(employee.prop<Array<{ key: string }>>('columns').map((c) => c.key)).toEqual(['name', 'role_name', 'status']);
+    expect(employee.cells(0)).toEqual(['Ana López', 'Stylist', 'Active']);
+    const manager = await setup({ session: MANAGER });
+    await manager.show(page(ROWS));
+    expect(manager.prop<Array<{ key: string }>>('columns').map((c) => c.key)).toEqual(['name', 'role_name', 'email', 'phone', 'status', 'hourly_rate']);
   });
 
   it('searches on the server; no member at all says «No staff members.», a search that finds none «No results»', async () => {
