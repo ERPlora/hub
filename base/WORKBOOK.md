@@ -3622,7 +3622,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
   nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries.home._platform_steps`) no cuenta
   las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
-  apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
+  apps de paja), `base/tenancy/tests/test_provision_apps.py` (dos BD reales: España, Portugal, sin país, una demo, dos
   negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
   `tests/e2e/base-sign-up-taxes-on.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
@@ -4102,7 +4102,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   las claves que `DeleteObjects` rechaza dentro de un 200: el hub sigue `dropping` con el error en `last_error`
   (`drop_failed: HubFilesNotDeleted: …`, `files_purge_failed: …`) y se reintenta; nunca queda `purged` con ficheros. El
   bucket tiene versionado: la clave deja su marcador de borrado y la versión antigua se va a los 90 días por la regla
-  `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`, `test_provision.py`.
+  `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`,
+  `test_provision_demos.py`.
 - Lo que dejaron las purgas de antes de hub#781 (una fila `purged` no vuelve a pasar por la purga) se borra una vez con
   `manage.py delete_leftover_hub_files` (hub#785): busca en el almacén las carpetas de arriba con forma de prefijo de hub
   (`base.files.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.demos.gone_hubs`): solo
