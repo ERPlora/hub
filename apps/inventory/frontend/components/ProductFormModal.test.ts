@@ -6,7 +6,7 @@
 // category are missing; amounts and quantities are read as typed; an edit sends only what changed;
 // a refusal stays in the dialog under its field. «Tax category» and «Categories» are `Combo` fields of
 // @erplora/ui that search the server (TaxCategorySelect, ProductCategoriesField).
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   expectAmountLeftWaitsForMoney,
@@ -14,13 +14,10 @@ import {
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations/business';
-import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
-import { ionModalStubOf } from '../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
 import {
   business,
   category,
   flush,
-  MANAGER,
   mountInventory,
   ok,
   page,
@@ -29,16 +26,14 @@ import {
   refusal,
   TAX_CATEGORIES,
   UNITS,
-  type ApiCall,
 } from '../__tests__/mount-inventory';
 import ProductFormModal from './ProductFormModal.vue';
-import { CATEGORIES, searches, setup } from '../__tests__/product-form';
+import { CATEGORIES, JAPANESE, searches, setup } from '../__tests__/product-form';
 
 afterEach(() => {
   document.body.innerHTML = '';
 });
 
-const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };
 const KUWAITI: Partial<Business> = { country: 'KW', country_name: 'Kuwait', currency: 'KWD', currency_label: 'KWD · Kuwaiti Dinar', currency_decimals: 3 };
 
 describe('ProductFormModal: new product', () => {
@@ -371,145 +366,6 @@ describe('ProductFormModal: editing', () => {
   });
 });
 
-// INVENTORY-F30/F31: «Photo» in the form, for who may change products. The image goes once the product is saved: a
-// library image or none with `set_image`, a photo of its own with `upload_image` («Uploading photo…»). If the product
-// saved and the photo did not, the dialog says so with «Retry» and keeps the photo it had.
-describe('ProductFormModal: photo', () => {
-  const LATTE = { reference: 'catalog:hospitality/latte', folder: 'hospitality', name: 'latte', title: 'Latte', url: '/p/catalog/hospitality/latte.webp' };
-  const WITH_PHOTO = { image: 'catalog:hospitality/americano', image_url: '/p/catalog/hospitality/americano.webp' };
-  const IMAGE = '/api/inventory/products/image';
-  const UPLOAD = '/api/inventory/products/image/upload';
-
-  /** The API: the library answers its search, every write answers the product (`saved`), the photo steps `photo`. */
-  function server(saved: Record<string, unknown>, photo: () => Response | Promise<Response> = () => ok(product(saved))) {
-    return (call: ApiCall): Response | Promise<Response> => {
-      const path = call.url.split('?')[0];
-      if (path === '/api/catalog/images') return ok({ rows: [LATTE], total: 1, limit: 60, offset: 0 });
-      if (path === IMAGE || path === UPLOAD) return photo();
-      if ((call.init.method ?? 'GET') === 'GET') return searches(CATEGORIES)(call);
-      return ok(product(saved), 201);
-    };
-  }
-
-  async function chooseFile(s: Awaited<ReturnType<typeof setup>>, file: File) {
-    const input = s.el('inventory-product-image-file') as unknown as HTMLInputElement;
-    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
-    input.dispatchEvent(new Event('change'));
-    await vi.waitFor(() => expect(s.el('inventory-product-image-preview')?.querySelector('img')?.getAttribute('src')).toMatch(/^data:/));
-  }
-
-  it('shows «Photo» with what the product has, to who may change products', async () => {
-    const s = await setup({ product: product(WITH_PHOTO) });
-    expect(s.el('inventory-product-image-label')?.textContent?.trim()).toBe('Photo');
-    expect(s.el('inventory-product-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(WITH_PHOTO.image_url);
-    expect(s.el('inventory-product-image-remove')?.textContent?.trim()).toBe('Remove photo');
-  });
-
-  it('who may create products but not change them does not see «Photo»', async () => {
-    const m = await mountInventory(ProductFormModal, {
-      props: { open: true, product: null, units: UNITS.rows },
-      attach: true,
-      session: { ...MANAGER, permissions: MANAGER.permissions.filter((p) => p !== 'inventory.change_product') },
-      api: searches(CATEGORIES),
-    });
-    await m.live();
-    expect(document.querySelector('[data-testid="inventory-product-image"]')).toBeNull();
-  });
-
-  it('a new product with a library image: the image goes once it is created, on the new product', async () => {
-    const s = await setup({}, { api: server({ id: 'p9' }) });
-    await s.fillRequired();
-    s.el('inventory-product-image-library')!.click();
-    await flush();
-    const search = s.calls('/api/catalog/images')[0];
-    expect(s.query(search).query).toBe('Coffee');
-    s.el('inventory-product-image-library-modal-image-hospitality-latte')!.click();
-    await flush();
-    expect(s.el('inventory-product-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(LATTE.url);
-    expect(s.calls(IMAGE)).toHaveLength(0);
-    await s.submit();
-    expect(s.calls('/api/inventory/products')).toHaveLength(1);
-    expect(s.sent(IMAGE)).toEqual({ id: 'p9', image: 'catalog:hospitality/latte' });
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
-  });
-
-  it('a photo of its own goes up after the changes, «Uploading photo…» meanwhile', async () => {
-    let release: (r: Response) => void = () => undefined;
-    const s = await setup({ product: product(WITH_PHOTO) }, { api: server({}, () => new Promise<Response>((resolve) => (release = resolve))) });
-    await chooseFile(s, new File(['ABC'], 'mine.png', { type: 'image/png' }));
-    await s.submit();
-    await vi.waitFor(() => expect(s.calls(UPLOAD)).toHaveLength(1));
-    expect(s.sent(UPLOAD)).toEqual({ id: 'p1', data_base64: 'QUJD' });
-    expect(s.el('inventory-product-form-submit')?.textContent?.trim()).toBe('Uploading photo…');
-    release(ok(product()));
-    await flush();
-    expect(s.calls(IMAGE)).toHaveLength(0);
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
-  });
-
-  it('«Remove photo» clears it on save; an unchanged photo sends nothing', async () => {
-    const s = await setup({ product: product(WITH_PHOTO) }, { api: server({}) });
-    await s.submit();
-    expect(s.calls(IMAGE)).toHaveLength(0);
-    expect(s.calls(UPLOAD)).toHaveLength(0);
-
-    const r = await setup({ product: product(WITH_PHOTO) }, { api: server({}) });
-    r.el('inventory-product-image-remove')!.click();
-    await flush();
-    await r.submit();
-    expect(r.sent(IMAGE)).toEqual({ id: 'p1', image: '' });
-  });
-
-  it('the product saved and the photo not: says why with «Retry», which sends only the photo', async () => {
-    let fail = true;
-    const s = await setup(
-      { product: product(WITH_PHOTO) },
-      { api: server({}, () => (fail ? refusal(503, 'base.photo_not_saved', 'The photo could not be saved. Try again.') : ok(product()))) },
-    );
-    await chooseFile(s, new File(['ABC'], 'mine.png', { type: 'image/png' }));
-    await s.submit();
-    await vi.waitFor(() => expect(s.el('inventory-product-photo-failed')).not.toBeNull());
-    expect(s.el('inventory-product-photo-failed')?.textContent).toContain(
-      'The product has been saved, but the photo has not: The photo could not be saved. Try again.',
-    );
-    expect(s.wrapper.emitted('update:open')).toBeUndefined();
-    expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
-    const updates = s.calls('/api/inventory/products/update').length;
-    fail = false;
-    s.el('inventory-product-photo-retry')!.click();
-    await vi.waitFor(() => expect(s.wrapper.emitted('update:open')).toEqual([[false]]));
-    expect(s.calls(UPLOAD)).toHaveLength(2);
-    expect(s.calls('/api/inventory/products/update')).toHaveLength(updates);
-  });
-
-  it('in Spanish', async () => {
-    const s = await setup({ product: product() }, { locale: 'es', api: server({}, () => refusal(422, 'base.photo_too_big', 'La foto pesa más de 2 MB. Elige una más ligera.')) });
-    expect(s.el('inventory-product-image-label')?.textContent?.trim()).toBe('Foto');
-    await chooseFile(s, new File(['ABC'], 'mine.png', { type: 'image/png' }));
-    await s.submit();
-    await vi.waitFor(() => expect(s.el('inventory-product-photo-failed')).not.toBeNull());
-    expect(s.el('inventory-product-photo-failed')?.textContent).toContain(
-      'El producto se ha guardado, pero la foto no: La foto pesa más de 2 MB. Elige una más ligera.',
-    );
-    expect(s.el('inventory-product-photo-retry')?.textContent?.trim()).toBe('Reintentar');
-  });
-
-  it('closing without saving discards the photo chosen; opening another product shows its own', async () => {
-    const s = await setup({ product: product(WITH_PHOTO) });
-    s.el('inventory-product-image-remove')!.click();
-    await flush();
-    await s.wrapper.setProps({ open: false });
-    await s.wrapper.setProps({ open: true });
-    await flush();
-    expect(s.el('inventory-product-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(WITH_PHOTO.image_url);
-    await s.wrapper.setProps({ open: false });
-    await s.wrapper.setProps({ product: product({ id: 'p2', name: 'Green tea' }), open: true });
-    await flush();
-    expect(s.el('inventory-product-image-preview')?.querySelector('img')).toBeNull();
-    expect(s.el('inventory-product-image-preview')?.textContent?.trim()).toBe('GT');
-  });
-});
-
 // hub#938 (INVENTORY-F01, F02): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
 // grey without a word, also when it opens after the read had failed (the page read the money on loading).
 describe('ProductFormModal: a business whose money cannot be read (hub#938)', () => {
@@ -520,194 +376,5 @@ describe('ProductFormModal: a business whose money cannot be read (hub#938)', ()
     const inDoc = (testid: string) => document.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
     const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
     await expectWindowSaysMoneyUnreadable({ ...m, inDoc }, 'inventory-product-form-submit', () => m.calls('/api/inventory/products/update'), opens);
-  });
-});
-
-// hub#1015 (INVENTORY-F01, F02; BASE-F05): on the installed app Android's Back closed «New product» and threw away what
-// had been typed, without a word. The window signs up with the system Back (`useUnsavedChanges`): while something typed
-// is not saved, Back on it asks «Discard changes?» («Keep editing» / «Discard changes») instead of closing it; as it
-// opened (nothing typed, or put back as it was), Back closes it as before. What Back does with that is pinned in
-// base/frontend/lib/system-back.test.ts and on the real app in tests/e2e/inventory-unsaved-changes.spec.ts.
-describe('ProductFormModal: Back with something typed asks first (hub#1015)', () => {
-  /** The window that holds Back in this dialog, if any: what the system Back asks before closing it. */
-  const holding = (s: { el: (id: string) => HTMLElement | null }) => unsavedChangesIn(s.el('inventory-product-form')!);
-
-  it('a new product as it opened holds nothing: Back closes it as before', async () => {
-    const s = await setup();
-    expect(holding(s)).toBeUndefined();
-  });
-
-  it.each([
-    ['inventory-product-name', 'Coffee'],
-    ['inventory-product-sku', 'CAF-1'],
-    ['inventory-product-price', '2,20'],
-    ['inventory-product-cost', '0,80'],
-    ['inventory-product-initial-stock', '5'],
-    ['inventory-product-threshold', '3'],
-    ['inventory-product-ean13', '4006381333931'],
-    ['inventory-product-description', 'Hot'],
-  ])('something typed in %s holds Back', async (id, value) => {
-    const s = await setup();
-    await s.type(id, value);
-    expect(holding(s)).toBeDefined();
-  });
-
-  it.each<[string, (s: Awaited<ReturnType<typeof setup>>) => Promise<void>]>([
-    ['the type', (s) => s.pick('inventory-product-type', 'service')],
-    ['the unit', (s) => s.pick('inventory-product-unit', 'kg')],
-    ['the tax category', (s) => s.choose('inventory-product-tax', 'product.generic')],
-    ['a category', (s) => s.choose('inventory-product-categories', 'c2')],
-    ['«Track stock for this item»', (s) => s.check('inventory-product-track-stock', !s.el('inventory-product-track-stock')!.checked)],
-  ])('%s chosen holds Back', async (_what, change) => {
-    const s = await setup();
-    await change(s);
-    expect(holding(s)).toBeDefined();
-  });
-
-  it('typed and put back as it was holds nothing', async () => {
-    const s = await setup();
-    await s.type('inventory-product-name', 'Coffee');
-    await s.type('inventory-product-name', '');
-    expect(holding(s)).toBeUndefined();
-  });
-
-  it('editing: as saved it holds nothing, also once the business answers and the price is rewritten in its currency', async () => {
-    const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
-    expect(holding(s)).toBeUndefined();
-    await s.answer(JAPANESE);
-    expect(s.el('inventory-product-price')?.value).toBe('220');
-    expect(holding(s)).toBeUndefined();
-    await s.type('inventory-product-name', 'Cola');
-    expect(holding(s)).toBeDefined();
-  });
-
-  it('editing: the photo removed holds Back', async () => {
-    const s = await setup({ product: product({ image: 'catalog:hospitality/americano', image_url: '/p/catalog/hospitality/americano.webp' }) });
-    expect(holding(s)).toBeUndefined();
-    s.el('inventory-product-image-remove')!.click();
-    await flush();
-    expect(holding(s)).toBeDefined();
-  });
-
-  it('asks «Discard changes?» with «Keep editing» and «Discard changes», in the window’s language', async () => {
-    const s = await setup({}, { locale: 'es' });
-    await s.type('inventory-product-name', 'Café');
-    const answer = holding(s)!.confirmDiscard();
-    await flush();
-    const asked = document.querySelector<HTMLElement>('[data-stub="ion-modal"][aria-label="¿Descartar los cambios?"]');
-    expect(asked?.querySelector('.ep-form-modal__cancel')?.textContent?.trim()).toBe('Seguir editando');
-    expect(asked?.querySelector('.ep-form-modal__submit')?.textContent?.trim()).toBe('Descartar cambios');
-    asked!.querySelector<HTMLElement>('.ep-form-modal__cancel')!.click();
-    await expect(answer).resolves.toBe(false);
-    expect(s.el('inventory-product-name')?.value).toBe('Café');
-  });
-
-  it('saved and closed, it holds nothing; opened again, nothing either', async () => {
-    const s = await setup({}, { api: (call) => ((call.init.method ?? 'GET') === 'GET' ? searches(CATEGORIES)(call) : ok(product(), 201)) });
-    await s.fillRequired();
-    await s.submit();
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
-    await s.wrapper.setProps({ open: false });
-    expect(holding(s)).toBeUndefined();
-    await s.wrapper.setProps({ open: true });
-    await flush();
-    expect(holding(s)).toBeUndefined();
-  });
-});
-
-// hub#1023 (INVENTORY-F01, F02): «Cancel» («Cancel editing»), the window's «×», Escape and a tap outside closed «New product»
-// and «Editing product» and threw away what had been typed, without a word, though Android's Back on it already asked
-// (hub#1015). Now every way out asks the same «Discard changes?» (`useUnsavedChanges` gives its FormModal the question as
-// `canDismiss`): «Keep editing» leaves the window as it was, «Discard changes» closes it; as it opened, they close it at
-// once. On the real app: tests/e2e/inventory-unsaved-changes.spec.ts.
-describe('ProductFormModal: Cancel, ×, Escape and a tap outside ask first with something typed (hub#1023)', () => {
-  const QUESTION = '[data-stub="ion-modal"][aria-label="Discard changes?"]';
-  const asked = () => document.querySelector<HTMLElement>(QUESTION);
-  const answer = async (part: 'cancel' | 'submit') => {
-    asked()!.querySelector<HTMLElement>(`.ep-form-modal__${part}`)!.click();
-    await flush();
-  };
-  const form = () => document.querySelector<HTMLElement>('[data-stub="ion-modal"][data-testid="inventory-product-form"]')!;
-  type Setup = Awaited<ReturnType<typeof setup>>;
-  const ways: [string, (s: Setup) => Promise<void>][] = [
-    ['«Cancel»', async (s) => {
-      s.el('inventory-product-form-cancel')!.click();
-      await flush();
-    }],
-    ['the «×»', async (s) => {
-      s.el('inventory-product-form-close')!.click();
-      await flush();
-    }],
-    ['Escape', async (s) => {
-      s.el('inventory-product-name')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-      await flush();
-    }],
-    // Not awaited: with a question up, the tap settles only once it is answered.
-    ['a tap outside', async () => {
-      void ionModalStubOf(form()).tapBackdrop();
-      await flush();
-    }],
-  ];
-
-  it.each(ways)('%s on «New product» as it opened closes it at once, without asking', async (_way, leave) => {
-    const s = await setup();
-    await leave(s);
-    expect(asked()).toBeNull();
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
-  });
-
-  it.each(ways)('%s with something typed asks «Discard changes?»; «Keep editing» keeps the window and what was typed', async (_way, leave) => {
-    const s = await setup();
-    await s.type('inventory-product-name', 'Coffee');
-    await leave(s);
-    expect(asked()).not.toBeNull();
-    expect(s.wrapper.emitted('update:open')).toBeUndefined();
-    await answer('cancel');
-    expect(s.wrapper.emitted('update:open')).toBeUndefined();
-    expect(s.el('inventory-product-name')?.value).toBe('Coffee');
-  });
-
-  it.each(ways)('%s with something typed, then «Discard changes», closes it and saves nothing', async (_way, leave) => {
-    const s = await setup();
-    await s.type('inventory-product-name', 'Coffee');
-    await leave(s);
-    await answer('submit');
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
-    expect(s.calls('/api/inventory/products').filter((c) => (c.init.method ?? 'GET') !== 'GET')).toHaveLength(0);
-  });
-
-  it('«Cancel editing» on «Editing product»: as saved it closes at once; with a change it asks, in Spanish too', async () => {
-    const s = await setup({ product: product({ price: 220 }) }, { locale: 'es' });
-    s.el('inventory-product-form-cancel')!.click();
-    await flush();
-    expect(document.querySelector('[data-stub="ion-modal"][aria-label="¿Descartar los cambios?"]')).toBeNull();
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
-
-    const t = await setup({ product: product({ price: 220 }) }, { locale: 'es' });
-    await t.type('inventory-product-name', 'Cola');
-    t.el('inventory-product-form-cancel')!.click();
-    await flush();
-    const question = [...document.querySelectorAll<HTMLElement>('[data-stub="ion-modal"][aria-label="¿Descartar los cambios?"]')].at(-1);
-    expect(question?.querySelector('.ep-form-modal__cancel')?.textContent?.trim()).toBe('Seguir editando');
-    expect(question?.querySelector('.ep-form-modal__submit')?.textContent?.trim()).toBe('Descartar cambios');
-    expect(t.wrapper.emitted('update:open')).toBeUndefined();
-  });
-
-  it('the photo chosen and not saved asks too', async () => {
-    const s = await setup({ product: product({ image: 'catalog:hospitality/americano', image_url: '/p/catalog/hospitality/americano.webp' }) });
-    s.el('inventory-product-image-remove')!.click();
-    await flush();
-    s.el('inventory-product-form-cancel')!.click();
-    await flush();
-    expect(asked()).not.toBeNull();
-    expect(s.wrapper.emitted('update:open')).toBeUndefined();
-  });
-
-  it('saved, it closes without asking', async () => {
-    const s = await setup({}, { api: (call) => ((call.init.method ?? 'GET') === 'GET' ? searches(CATEGORIES)(call) : ok(product(), 201)) });
-    await s.fillRequired();
-    await s.submit();
-    expect(asked()).toBeNull();
-    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
   });
 });
