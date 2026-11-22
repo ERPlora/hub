@@ -78,7 +78,14 @@ class FlowConfig(LiveAppConfig):
     )
     # Viewing, managing, and answering what an automation asks (FLOW-F29): what is asked of employees,
     # and what is asked of managers.
-    permissions = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
+    permissions = {
+        "flow.view": _("View automations, their runs and drafts"),
+        "flow.manage": _(
+            "Create, change, turn on, run and delete automations, and answer what they ask whoever runs the business"
+        ),
+        "flow.answer": _("Answer what automations ask employees"),
+        "flow.answer_manager": _("Answer what automations ask managers"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). An automation acts
     # in the name of the business with nobody watching: only the owner and the admin see,
     # change or run them; a manager and an employee only answer the questions asked of their role.

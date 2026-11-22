@@ -73,7 +73,7 @@ def test_payment_is_in_the_store_but_in_no_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert payment().permissions == PERMISSIONS
+    assert list(payment().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

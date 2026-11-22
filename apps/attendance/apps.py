@@ -39,13 +39,13 @@ class AttendanceConfig(LiveAppConfig):
     # money, goods received or a place in the waiting list.
     assistant_synonyms = (("clock", "mi salida", "mi entrada", "my departure", "my exit", "my arrival"),)
     # Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
-    permissions = [
-        "attendance.clock",
-        "attendance.view_all",
-        "attendance.correct",
-        "attendance.clock_others",
-        "attendance.manage_settings",
-    ]
+    permissions = {
+        "attendance.clock": _("Clock in and out, and see and export their own history"),
+        "attendance.view_all": _("View the whole team's shifts and who is in"),
+        "attendance.correct": _("Correct shifts"),
+        "attendance.clock_others": _("Clock other people in and out, and their breaks"),
+        "attendance.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["attendance.*"],

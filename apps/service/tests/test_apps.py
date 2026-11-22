@@ -90,7 +90,7 @@ def test_service_is_in_the_store_and_in_the_hair_salon_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert service().permissions == PERMISSIONS
+    assert list(service().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

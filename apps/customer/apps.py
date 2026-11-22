@@ -29,16 +29,16 @@ class CustomerConfig(LiveAppConfig):
     # The product's 21 permissions, folded where every role held them together. Not declared on
     # purpose: ``customer.record_purchase``, which only the system context holds (the product's
     # ``internal`` commands): owner and admin get every declared permission.
-    permissions = [
-        "customer.view",
-        "customer.manage",
-        "customer.configure",
-        "customer.merge",
-        "customer.export",
-        "customer.delete",
-        "customer.erase",
-        "customer.record_activity",
-    ]
+    permissions = {
+        "customer.view": _("View customers, groups, tags, activity, purchases and consents"),
+        "customer.manage": _("Add, edit and import customers, add notes, groups and tags, and record consent"),
+        "customer.configure": _("Create and change groups, tags and custom fields"),
+        "customer.merge": _("Merge duplicate customers"),
+        "customer.export": _("Export customers to CSV"),
+        "customer.delete": _("Delete customers, groups and tags"),
+        "customer.erase": _("Erase a customer's personal data"),
+        "customer.record_activity": _("Note in a customer's activity what other apps bring"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The rights at
     # the counter (view, create, edit, notes, consent, link the order) are the employee's.
     role_permissions = {

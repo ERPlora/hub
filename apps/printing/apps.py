@@ -48,12 +48,12 @@ class PrintingConfig(LiveAppConfig):
     # Nobody's models are read: whoever prints sends its document composed (printing.job.create).
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = [
-        "printing.view_settings",
-        "printing.manage_settings",
-        "printing.print",
-        "printing.manage_jobs",
-    ]
+    permissions = {
+        "printing.view_settings": _("View printers, settings and the queue"),
+        "printing.manage_settings": _("Manage printers, printing devices and settings"),
+        "printing.print": _("Print and test printers"),
+        "printing.manage_jobs": _("Retry and cancel print jobs"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The queue's retry
     # and cancel are the hub's administrator's.
     role_permissions = {

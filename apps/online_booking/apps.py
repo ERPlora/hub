@@ -33,14 +33,14 @@ class OnlineBookingConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # ``public`` is the public door's (the page without a session, served by base); owner and admin hold it
     # too, to preview the page.
-    permissions = [
-        "online_booking.view_booking",
-        "online_booking.change_booking",
-        "online_booking.confirm_booking",
-        "online_booking.delete_booking",
-        "online_booking.manage_settings",
-        "online_booking.public",
-    ]
+    permissions = {
+        "online_booking.view_booking": _("View online bookings"),
+        "online_booking.change_booking": _("Change bookings: complete, no-show and cancel"),
+        "online_booking.confirm_booking": _("Confirm bookings"),
+        "online_booking.delete_booking": _("Delete bookings"),
+        "online_booking.manage_settings": _("Set up the booking page"),
+        "online_booking.public": _("Try out the public booking page"),
+    }
     # The page base's public door serves without a session at /p/<slug>/book: whoever opens it holds
     # ``online_booking.public`` and nothing else.
     public_pages = {"book": "online_booking.public"}

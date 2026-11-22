@@ -1297,7 +1297,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   Las categorías se leen desde
   `0001_initial` y los servicios desde `0003_service_image`, la que les dio la imagen (a una copia anterior se le
   niegan los servicios con `recover_copy_behind`); una migración que añada, quite o renombre una de las columnas que
-  se leen cambia también `services_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
+  se leen cambia también `services_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py` (los servicios, y de
+  punta a punta con la base del negocio y su copia) y, por tema, `tests/test_recovery_categories.py`,
+  `tests/test_recovery_performers.py`, `tests/test_recovery_stands_for.py` y `tests/test_recovery_carried_on.py`.
 - **Saldo de un bono vendido**: usos = los congelados + la suma de los ajustes; usadas = las sesiones
   entregadas más las reservadas cuyo plazo no ha vencido; quedan = usos − usadas (sin límite si los
   usos congelados son nulos); caduca = compra + vigencia congelada + días regalados. Se calcula al

@@ -42,7 +42,10 @@ class ModifierConfig(LiveAppConfig):
     assistant_synonyms = (
         ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
     )
-    permissions = ["modifier.view", "modifier.manage"]
+    permissions = {
+        "modifier.view": _("View modifier groups and their options"),
+        "modifier.manage": _("Create, change and delete groups and options, and attach them to products"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier is an
     # employee: it reads the groups of a product and has its picks valued.
     role_permissions = {

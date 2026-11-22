@@ -50,7 +50,7 @@ def test_tax_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # Viewing includes calculating: the old `calculate_tax` went to the very same roles as `view_tax`.
-    assert tax().permissions == ["tax.view", "tax.manage"]
+    assert list(tax().permissions) == ["tax.view", "tax.manage"]
 
 
 def test_roles_are_the_customer_roles_with_the_hub_prefix():

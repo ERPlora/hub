@@ -603,3 +603,27 @@ msgstr "Cambiar un campo personalizado"
 
 msgid "Delete a custom field"
 msgstr "Eliminar un campo personalizado"
+
+msgid "View customers, groups, tags, activity, purchases and consents"
+msgstr "Ver los clientes, los grupos, las etiquetas, la actividad, las compras y los consentimientos"
+
+msgid "Add, edit and import customers, add notes, groups and tags, and record consent"
+msgstr "Dar de alta, editar e importar clientes, añadir notas, grupos y etiquetas, y registrar el consentimiento"
+
+msgid "Create and change groups, tags and custom fields"
+msgstr "Crear y cambiar grupos, etiquetas y campos personalizados"
+
+msgid "Merge duplicate customers"
+msgstr "Unir fichas de clientes duplicadas"
+
+msgid "Export customers to CSV"
+msgstr "Exportar clientes a CSV"
+
+msgid "Delete customers, groups and tags"
+msgstr "Eliminar fichas de clientes, grupos y etiquetas"
+
+msgid "Erase a customer's personal data"
+msgstr "Borrar los datos personales de un cliente"
+
+msgid "Note in a customer's activity what other apps bring"
+msgstr "Anotar en la actividad de un cliente lo que traen otras apps"

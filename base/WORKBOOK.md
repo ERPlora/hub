@@ -4559,7 +4559,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   cierra nada: el traslado acaba con `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La
   restauración a un momento y la copia aparte (BASE-F114) copian con las mismas piezas (hub#1524, nota siguiente).
   Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
-  `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
+  `base/tenancy/tests/test_move_bucket.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
   de moto), `control/tests/test_services.py::TestMove` y
   `control/tests/test_admin_move.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de

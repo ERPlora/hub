@@ -71,7 +71,7 @@ def test_verifactu_is_a_free_module_of_the_sales_group_in_no_template():
 
 
 def test_permissions():
-    assert verifactu().permissions == PERMISSIONS
+    assert list(verifactu().permissions) == PERMISSIONS
 
 
 def test_roles():

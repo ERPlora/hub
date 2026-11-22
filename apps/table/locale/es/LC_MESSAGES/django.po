@@ -421,3 +421,48 @@ msgstr "Añade las mesas de tu sala: sin ellas no hay comanda por mesa, ni divid
 #: apps.py:121
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View zones"
+msgstr "Ver zonas"
+
+msgid "Create zones"
+msgstr "Crear zonas"
+
+msgid "Change zones"
+msgstr "Cambiar zonas"
+
+msgid "Delete zones"
+msgstr "Borrar zonas"
+
+msgid "View tables"
+msgstr "Ver mesas"
+
+msgid "Create tables"
+msgstr "Crear mesas"
+
+msgid "Change and move tables"
+msgstr "Cambiar y mover mesas"
+
+msgid "Delete tables"
+msgstr "Borrar mesas"
+
+msgid "View table checks"
+msgstr "Ver las cuentas de mesa"
+
+msgid "Seat guests and open checks"
+msgstr "Sentar y abrir cuentas"
+
+msgid "Change checks: close, split, guests, park and hold"
+msgstr "Cambiar cuentas: cerrar, dividir, comensales, aparcar y retener"
+
+msgid "Move and merge checks"
+msgstr "Trasladar y fusionar cuentas"
+
+msgid "Delete checks from the history"
+msgstr "Borrar cuentas del historial"
+
+msgid "View the settings"
+msgstr "Ver los ajustes"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"

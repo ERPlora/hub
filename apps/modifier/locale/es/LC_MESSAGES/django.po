@@ -209,3 +209,9 @@ msgstr "Nombre en la comanda"
 
 msgid "Say which category: its id, or its name."
 msgstr "Di qué categoría: su id, o su nombre."
+
+msgid "View modifier groups and their options"
+msgstr "Ver los grupos de suplementos y sus opciones"
+
+msgid "Create, change and delete groups and options, and attach them to products"
+msgstr "Crear, cambiar y borrar grupos y opciones, y engancharlos a productos"
