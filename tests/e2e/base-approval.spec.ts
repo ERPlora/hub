@@ -14,7 +14,7 @@ import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, username
 import { usernameOf } from './business';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -71,10 +71,8 @@ test.beforeAll(async ({ browser }) => {
   await drawerOff(context);
   await createProduct(context, { name: 'E2E Base approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   // The cashier enters while nobody of the business has a PIN: the way in is erplora.com's, as every spec's.
-  const till = await browser.newContext({ baseURL: A });
-  cashier = { context: till, page: await till.newPage() };
-  await login(cashier.page, A, '/sale/sales', EMPLOYEE);
-  // At the cashier's till: an employee sees and voids only the sales they charged (SALE-F28).
+  cashier = await cashiersTill(browser);
+  const till = cashier.context;
   for (const label of [...VIEWPORTS.map((viewport) => viewport.label), SHORT.label, WRONG]) {
     tickets.set(label, await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] }));
   }

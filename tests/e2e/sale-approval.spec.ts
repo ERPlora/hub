@@ -27,7 +27,7 @@ import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -83,11 +83,9 @@ test.beforeAll(async ({ browser }) => {
   await drawerOff(context);
   article = await createProduct(context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   // The cashier enters while nobody of the business has a PIN: the way in is erplora.com's, as every spec's.
-  const till = await browser.newContext({ baseURL: A });
-  cashier = { context: till, page: await till.newPage() };
-  await login(cashier.page, A, '/sale/sales', EMPLOYEE);
+  cashier = await cashiersTill(browser);
+  const till = cashier.context;
   cashierName = await usernameOf(till);
-  // At the cashier's till: an employee sees, voids and refunds only the sales they charged (SALE-F28).
   toVoid = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toRefund = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toKeep = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
