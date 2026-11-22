@@ -29,6 +29,8 @@ from base.relay import by_platform
 from base.schemas.assistant import names, unless_given
 from base.sensitive import CUSTOMER_CONTACT
 
+from .contact import EMAIL, PHONE
+
 T = TypeVar("T")
 
 #: The largest values of the columns behind ``sort_order`` (int4) and an amount (int8): beyond, a 422.
@@ -923,8 +925,8 @@ class CustomerRestoreIn(CustomerRefIn, HungInCopyIn):
 class CustomerRow(Schema):
     id: UUID = Field(description="The customer's id.")
     name: str = Field(description="Name.")
-    email: str | None = Field(None, description="Email.", json_schema_extra=CUSTOMER_CONTACT)
-    phone: str | None = Field(None, description="Phone, in international format.", json_schema_extra=CUSTOMER_CONTACT)
+    email: str | None = EMAIL
+    phone: str | None = PHONE
     tax_id: str = Field(description="Tax id.")
     company_name: str = Field(description="Company.")
     lifecycle_stage: Stage = Field(description=STAGE)
@@ -956,9 +958,7 @@ class ConsentStateRow(Schema):
     state: Literal["granted", "withdrawn"] = Field(
         description="The last decision: granted or withdrawn."
     )
-    contact_point: str | None = Field(
-        None, description="The address it was given or withdrawn for.", json_schema_extra=CUSTOMER_CONTACT
-    )
+    contact_point: str | None = Field(None, description="The address it was given or withdrawn for.", json_schema_extra=CUSTOMER_CONTACT)
     source: ConsentSource = Field(description="Where it was decided.")
     notice_version: str = Field(description="The version of the words shown.")
     occurred_at: datetime = Field(description="When the customer said it.")
@@ -1008,8 +1008,8 @@ class CustomerStatsOut(Schema):
 class PhoneMatch(Schema):
     id: UUID = Field(description="The customer's id.")
     name: str = Field(description="Name.")
-    email: str | None = Field(None, description="Email.", json_schema_extra=CUSTOMER_CONTACT)
-    phone: str | None = Field(None, description="Phone, in international format.", json_schema_extra=CUSTOMER_CONTACT)
+    email: str | None = EMAIL
+    phone: str | None = PHONE
 
 
 class PhoneMatchOut(Schema):

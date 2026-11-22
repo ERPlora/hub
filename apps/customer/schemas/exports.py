@@ -4,13 +4,13 @@ A column marked with a data permission is left out of the file of whoever lacks 
 
 from ninja import Field, Schema
 
-from base.sensitive import CUSTOMER_CONTACT
+from .contact import EMAIL, PHONE
 
 
 class CustomerExportRow(Schema):
     name: str = Field(description="Name.")
-    email: str | None = Field(None, description="Email.", json_schema_extra=CUSTOMER_CONTACT)
-    phone: str | None = Field(None, description="Phone, in international format.", json_schema_extra=CUSTOMER_CONTACT)
+    email: str | None = EMAIL
+    phone: str | None = PHONE
     tax_id: str = Field(description="Tax id.")
     company_name: str = Field(description="Company.")
     address: str = Field(description="Street and number.")
