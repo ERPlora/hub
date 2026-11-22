@@ -18,7 +18,7 @@ from live.errors import Conflict, LiveMisuse, PermissionDenied
 from live.operations import UnknownOperation
 from live.models import OutboxEvent
 
-from apps.invoice import services
+from apps.invoice.services import issuing
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import A, HUB_DB, ctx_for, run
 from apps.verifactu import events as verifactu_events
@@ -84,7 +84,7 @@ def test_without_verifactu_the_document_is_issued_unavailable(issuer, monkeypatc
     def absent(name):
         raise UnknownOperation(name)
 
-    monkeypatch.setattr(services, "get_operation", absent)
+    monkeypatch.setattr(issuing, "get_operation", absent)
     invoice = manual()
     assert invoice.verifactu_status == "unavailable"
     assert not Record.objects.exists()
@@ -162,7 +162,7 @@ def test_a_transient_database_error_leaves_it_pending_for_its_reaction(
         def __call__(self, ctx, data):
             raise OperationalError("the connection dropped")
 
-    monkeypatch.setattr(services, "get_operation", lambda name: Interrupted())
+    monkeypatch.setattr(issuing, "get_operation", lambda name: Interrupted())
     invoice = manual()
     assert invoice.verifactu_status == "pending"
     assert not Record.objects.exists()
@@ -195,7 +195,7 @@ def test_a_programming_error_of_verifactu_undoes_the_issue(issuer, monkeypatch):
         def __call__(self, ctx, data):
             raise LiveMisuse("broken on purpose")
 
-    monkeypatch.setattr(services, "get_operation", lambda name: Broken())
+    monkeypatch.setattr(issuing, "get_operation", lambda name: Broken())
     with pytest.raises(LiveMisuse):
         manual()
     assert not Invoice.objects.exists()

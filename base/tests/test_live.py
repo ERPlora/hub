@@ -74,6 +74,8 @@ def test_the_three_queries_and_their_events():
         "base.system.cards": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),
         # Files: every write of the business's files, and the photo (the plan's space).
         "base.file.list": sorted({HUB_STATE_APPLIED, *FILE_EVENTS}),
+        # The person's own access: the photo brings the roles (their sessions stay open when one changes).
+        "base.session.access": [HUB_STATE_APPLIED],
     }
 
 

@@ -38,9 +38,15 @@ export interface Grantors {
   grantors: { name: string }[];
 }
 
+/** `base.SessionAccessOut`: a key of the session's permissions, which changes exactly when they do. */
+export interface SessionAccess {
+  key: string;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.access.grantors': { input: NoInput; output: Grantors };
+    'base.session.access': { input: NoInput; output: SessionAccess };
     'base.access.door': { input: NoInput; output: AccessDoor };
     'base.access.faces': { input: NoInput; output: AccessDoor };
     'base.access.settings': { input: NoInput; output: AccessSettings };

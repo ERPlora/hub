@@ -1102,7 +1102,9 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;
   `document_issuer.py`, el emisor de `InvoiceOut`), `fiscal.py` (aritmética pura: cierre por clave fiscal,
   prorrateo, formato del número), `document_issuer.py` (puro: el emisor de un documento y el NIF que imprime),
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `queries.py`, `services/` (un módulo por tema: `issuer`, `numbering`, `issuing`, `recipient`, `manual`,
+  `from_sale`, `substitution`, `rectifying`, `paying`, `series`, `platform_invoices`, `paper` y `public`; lo que
+  comparten todos, en `writes`), `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el
