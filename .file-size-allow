@@ -5,7 +5,6 @@
 # fits its cap, and no path or higher number is ever added.
 227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
-382 .github/scripts/nightly-e2e.sh ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1660 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
