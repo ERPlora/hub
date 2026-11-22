@@ -3,7 +3,6 @@
 # the issue is ERPlora/erplora-next#74, which tracks splitting them. The list only shrinks: a listed file may change but
 # never grows past its number, the number comes down to the file's size as it shrinks, a file leaves the list once it
 # fits its cap, and no path or higher number is ever added.
-227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74

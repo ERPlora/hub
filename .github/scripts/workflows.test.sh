@@ -83,7 +83,7 @@ check("build caches its layers in GitHub's cache",
           for step in steps(build) if "build-push-action" in str(step.get("uses", ""))))
 check("build tests the image before it pushes it", before(build, "docker/image.test.sh", "docker push"))
 check("the deploy never moves the environment back to an older commit",
-      before(deploy_job, "deploy-order.sh", "ecs-deploy.sh"))
+      before(deploy_job, "deploy-order.sh", "scripts/ecs_deploy.py"))
 check("the workflow only reads", deploy.get("permissions") == {"contents": "read"})
 
 # --- deploy.yml: the settings of deploy/app-env.json and the confirmation of a protected one ------
@@ -93,10 +93,10 @@ confirm_input = (dispatch.get("inputs") or {}).get("confirm_protected") or {}
 check("a manual deploy takes the confirmation of a protected setting, empty by default",
       confirm_input.get("type") == "string" and confirm_input.get("default") == ""
       and confirm_input.get("required") is False)
-ecs_step = next((step for step in steps(deploy_job) if "ecs-deploy.sh" in str(step.get("run", ""))), {})
-check("the deploy hands the confirmation to ecs-deploy.sh in its environment, never inline in the script",
+ecs_step = next((step for step in steps(deploy_job) if "scripts/ecs_deploy.py" in str(step.get("run", ""))), {})
+check("the deploy runs python3 scripts/ecs_deploy.py with the confirmation in its environment, never inline",
       (ecs_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
-      and "inputs.confirm_protected" not in str(ecs_step.get("run", "")))
+      and str(ecs_step.get("run", "")).split() == ["python3", "scripts/ecs_deploy.py"])
 checkout = next((step for step in steps(deploy_job) if "actions/checkout" in str(step.get("uses", ""))), {})
 check("the deploy checks out the whole history: it reads deploy/app-env.json of the commit it deploys",
       (checkout.get("with") or {}).get("fetch-depth") == 0)
