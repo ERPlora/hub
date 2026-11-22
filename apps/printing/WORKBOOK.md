@@ -534,14 +534,15 @@ Pasos:
 2. «Reintentar» lo devuelve a la cola con los intentos a cero, hacia la impresora que toque ahora:
    «Devuelto a la cola: lo imprimirá el próximo dispositivo que se conecte.».
 3. «Cancelar» pide un motivo (opcional) y lo retira: «Trabajo cancelado. No se imprimirá.». Queda en
-   la cola con quién, cuándo y por qué.
+   la cola con quién (por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el
+   correo entero), cuándo y por qué.
 Entra: el trabajo y, al cancelar, el motivo.
 Sale: el trabajo en cola otra vez o cancelado (avisa: `printing.job.retried`, `printing.job.cancelled`); nadie
 lo borra a mano: la cola lo olvida 30 días después de acabar (PRINTING-F20).
 Si falla: «Solo vuelve a la cola un trabajo pendiente o fallido, o uno enviado que no contestó; este está
 …», «Un trabajo que se está imprimiendo o ya se imprimió no se cancela; este está …». Sin permiso no se
 ven los botones.
-Implicados: PRINTING-F01
+Implicados: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Ir al texto del tique, que se escribe en Ventas
 Estado: hecho — el encabezado y el pie del tique viven en los ajustes de Ventas, y la nota de Ajustes lleva

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bad5ad64910700ead4654fd2a2d45631515788a22a45390de3abb575f65d2349 -->
+<!-- generated from WORKBOOK.md sha256:6ac98747ca8c4dc5449392c2862a4431f706f15cf28ff8540fa9e3695152c4b7 -->
 
 ## What it is for and who it is for
 
@@ -417,16 +417,17 @@ Actor: employee (their own), manager
 Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
-2. Each change with its time on the business clock, who made it ("Requested by the customer" if it was
-   them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate copy;
-   an API key, by its name) and what changed (from which professional or service to which, and the new time). A
+2. Each change with its time on the business clock, who made it (a team member, by their name or, if their
+   account has none, by what goes before the @ of their email, never the whole email; "Requested by the customer"
+   if it was them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate
+   copy; an API key, by its name) and what changed (from which professional or service to which, and the new time). A
    deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
    and "Restored".
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).
 If it fails: "The appointment history could not be loaded."
-Involved: APPOINTMENT-F11, BASE-F114
+Involved: APPOINTMENT-F11, BASE-F114, BASE-F119
 
 ### APPOINTMENT-F11 Delete an appointment
 Status: done

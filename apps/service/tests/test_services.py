@@ -1050,7 +1050,7 @@ def test_no_event_without_a_change(tax):
 
 
 def test_who_acted_is_kept_by_the_name_a_person_reads(make_user):
-    # «Voided by {who}», «Given by {who}»: the account's full name, else its email, else its username.
+    # «Voided by {who}», «Given by {who}»: the account's full name, else what goes before the «@» of its email.
     boss = make_user("saas:01a1355a")
     boss.first_name, boss.last_name = "Ana", "López"
     boss.save()
@@ -1063,7 +1063,7 @@ def test_who_acted_is_kept_by_the_name_a_person_reads(make_user):
     mail.email = "eva@example.com"
     mail.save()
     run("service.grant.redeem", {"id": str(grant.id)}, actor=mail)
-    assert Redemption.objects.get().actor == "eva@example.com"
+    assert Redemption.objects.get().actor == "eva"
 
 
 def test_assigning_again_keeps_the_main_service_unless_it_is_said(tax):
