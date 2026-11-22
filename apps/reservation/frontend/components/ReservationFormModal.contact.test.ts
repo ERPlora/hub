@@ -4,28 +4,27 @@
 import { describe, expect, it } from 'vitest';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
-import { click, ionValue, mountReservation, settle, WITHOUT_CONTACT } from '../__tests__/mount-reservation';
+import { openBookingPanel } from '../__tests__/booking-panel';
+import { click, ionValue, settle, WITHOUT_CONTACT } from '../__tests__/mount-reservation';
 import { reservationRow } from '../__tests__/rows';
-import ReservationFormModal from './ReservationFormModal.vue';
 
 const LUCIA = { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' };
 
 async function setup(props: Record<string, unknown>) {
-  const m = await mountReservation(ReservationFormModal, {
-    props: { open: false, reservation: null, day: '2026-10-15', ...props },
-    session: WITHOUT_CONTACT,
-  });
-  m.answerBy({
-    '/api/reservation/availability/tables': [200, { rows: [] }],
-    '/api/customer/customers/detail': [200, { id: 'c1', name: 'Lucía Pérez', phone: null, email: null }],
-  });
-  await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
-  await settle();
+  const card = { id: 'c1', name: 'Lucía Pérez', phone: null, email: null };
+  const m = await openBookingPanel({ props, session: WITHOUT_CONTACT, tables: { rows: [] }, card });
   const shown = () => ['guest_phone', 'guest_email'].filter((name) => m.inDoc(`reservation-form-${name}`) !== null);
   const field = (name: string) => m.inDoc(`reservation-form-${name}`) as HTMLElement;
-  const bodies = (path: string) => m.sent().filter((call) => call.path === path).map((call) => call.body);
-  return { ...m, shown, field, bodies };
+  return { ...m, shown, field };
+}
+
+/** A reservation that came without the guest's phone and email, edited: neither shown, and saving sends what changed. */
+async function editsWithoutThem(s: Awaited<ReturnType<typeof setup>>): Promise<void> {
+  expect(s.shown()).toEqual([]);
+  await ionValue(s.field('party_size'), '6', 'ionInput');
+  s.answer(200, reservationRow());
+  await click(s.inDoc('reservation-form-submit')!);
+  expect(s.bodies('/api/reservation/reservations/update')).toEqual([{ id: 'r1', party_size: 6, overbook: false }]);
 }
 
 describe('ReservationFormModal: the guest’s contact details it was not given', () => {
@@ -39,12 +38,7 @@ describe('ReservationFormModal: the guest’s contact details it was not given',
   });
 
   it('editing one that came without them shows neither and never sends them, so saving keeps them', async () => {
-    const s = await setup({ reservation: reservationRow({ status: 'confirmed', guest_phone: null, guest_email: null }) });
-    expect(s.shown()).toEqual([]);
-    await ionValue(s.field('party_size'), '6', 'ionInput');
-    s.answer(200, reservationRow());
-    await click(s.inDoc('reservation-form-submit')!);
-    expect(s.bodies('/api/reservation/reservations/update')).toEqual([{ id: 'r1', party_size: 6, overbook: false }]);
+    await editsWithoutThem(await setup({ reservation: reservationRow({ status: 'confirmed', guest_phone: null, guest_email: null }) }));
   });
 
   it('the same panel, after a new booking with a card, edits one that came without them the same way', async () => {
@@ -54,11 +48,7 @@ describe('ReservationFormModal: the guest’s contact details it was not given',
     await s.wrapper.setProps({ open: false });
     await s.wrapper.setProps({ reservation: reservationRow({ status: 'confirmed', guest_phone: null, guest_email: null }), open: true });
     await settle();
-    expect(s.shown()).toEqual([]);
-    await ionValue(s.field('party_size'), '6', 'ionInput');
-    s.answer(200, reservationRow());
-    await click(s.inDoc('reservation-form-submit')!);
-    expect(s.bodies('/api/reservation/reservations/update')).toEqual([{ id: 'r1', party_size: 6, overbook: false }]);
+    await editsWithoutThem(s);
   });
 
   it('a card picked without them books with the card’s, and leaving the card asks for them again', async () => {
