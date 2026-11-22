@@ -8,35 +8,22 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.staff import queries, services
-from apps.staff.schemas import (
-    AccountListIn,
-    AvailabilityIn,
+from apps.staff.schemas.accounts import AccountListIn
+from apps.staff.schemas.availability import AvailabilityIn
+from apps.staff.schemas.commissions import CommissionReportIn, CommissionSummaryIn
+from apps.staff.schemas.fields import ByIdIn, MemberRefIn
+from apps.staff.schemas.members import (
     BulkCreateIn,
-    ByIdIn,
-    CommissionReportIn,
-    CommissionSummaryIn,
     CompensationListIn,
     MemberIn,
     MemberListIn,
     MemberPatchIn,
-    MemberRefIn,
-    MyTimeOffIn,
-    RoleIn,
-    RoleListIn,
-    RolePatchIn,
-    ScheduleIn,
-    ScheduleListIn,
-    ScheduleRefIn,
-    ScheduleUpdateIn,
-    SetActiveIn,
-    SettingsIn,
     TerminateIn,
-    TimeOffIn,
-    TimeOffListIn,
-    TimeOffRefIn,
-    TimeOffRequestIn,
-    TodayIn,
 )
+from apps.staff.schemas.roles import RoleIn, RoleListIn, RolePatchIn
+from apps.staff.schemas.schedules import ScheduleIn, ScheduleListIn, ScheduleRefIn, ScheduleUpdateIn, SetActiveIn
+from apps.staff.schemas.settings import SettingsIn
+from apps.staff.schemas.time_off import MyTimeOffIn, TimeOffIn, TimeOffListIn, TimeOffRefIn, TimeOffRequestIn, TodayIn
 
 router = Router(tags=["staff"])
 

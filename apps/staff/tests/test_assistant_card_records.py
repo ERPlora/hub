@@ -11,7 +11,7 @@ from live.operations import get
 from pydantic import ValidationError
 
 from apps.staff.models import Member
-from apps.staff.schemas import TimeOffDetailOut
+from apps.staff.schemas.time_off import TimeOffDetailOut
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tests.test_assistant_card_values_references import AN_ID
