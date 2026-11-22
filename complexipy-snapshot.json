@@ -152,16 +152,22 @@
     ]
   },
   {
-    "path": "apps/invoice/services/__init__.py",
-    "file_name": "services.py",
+    "path": "apps/invoice/services/recipient.py",
+    "file_name": "recipient.py",
+    "functions": [
+      {
+        "name": "_recipient",
+        "complexity": 26
+      }
+    ]
+  },
+  {
+    "path": "apps/invoice/services/series.py",
+    "file_name": "series.py",
     "functions": [
       {
         "name": "update_series",
         "complexity": 17
-      },
-      {
-        "name": "_recipient",
-        "complexity": 26
       }
     ]
   },
