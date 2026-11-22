@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:30f9d1bd6ce49a4cf3044c440c9ac9b035313cf4d70ef7215a539fc7150cc89e -->
+<!-- generated from WORKBOOK.md sha256:5d6bff888c6f0647b596b98ed8a8c63892fbe1382e4d7410a3ce708717d14372 -->
 
 ## What it is for and who it is for
 
@@ -748,7 +748,8 @@ person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it. In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
+sends it or, if their account has no name, what goes before the @ of their e-mail, never the whole e-mail
+(BASE-F119). In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "Who serves the check could not be changed. It stays with whoever served it.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to

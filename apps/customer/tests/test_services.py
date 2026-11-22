@@ -88,14 +88,10 @@ from apps.customer.schemas import (
     FieldRefIn as FieldRef,
 )
 
-from apps.customer.services import (
-    ALREADY_IMPORTED,
-    DATE_IN_FUTURE,
-    FIELD_INACTIVE_LEFT,
-    FIELD_OPTION_LEFT,
-    FIELD_TYPE_LEFT,
-    HEALTH_TEST_DATE_MISSING,
-)
+from apps.customer.services.health import HEALTH_TEST_DATE_MISSING
+from apps.customer.services.importing import ALREADY_IMPORTED
+from apps.customer.services.recovery import FIELD_INACTIVE_LEFT, FIELD_OPTION_LEFT, FIELD_TYPE_LEFT
+from apps.customer.services.writes import DATE_IN_FUTURE
 
 from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import in_a_thread

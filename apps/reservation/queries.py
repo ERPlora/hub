@@ -23,6 +23,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
+from apps.customer.queries.contact import sees_contact
 from apps.reservation import engine
 from apps.reservation.models import (
     BlockedDate,
@@ -262,17 +263,19 @@ def _named(*parts: str) -> str:
     return " · ".join(part for part in parts if part)
 
 
-def reservation_label(reservation: Reservation, language: str) -> str:
-    """As the book's dialogs say a reservation before a step: its guest (her phone when she booked herself
-    without a name; nothing once her data were erased), its day and its time."""
-    who = reservation.guest_name or reservation.guest_phone
-    return _named(who, _said_day(reservation.date, language), _said_time(reservation.time, language))
+def _who(ctx: OperationContext, row: Reservation | WaitlistEntry) -> str:
+    """The guest as the dialogs say her: her name, else her phone to whoever sees it; nothing once erased."""
+    return row.guest_name or (row.guest_phone if sees_contact(ctx) else "")
 
 
-def entry_label(entry: WaitlistEntry, language: str) -> str:
+def reservation_label(ctx: OperationContext, reservation: Reservation) -> str:
+    """As the book's dialogs say a reservation before a step: its guest, its day and its time."""
+    return _named(_who(ctx, reservation), _said_day(reservation.date, ctx.language), _said_time(reservation.time, ctx.language))
+
+
+def entry_label(ctx: OperationContext, entry: WaitlistEntry) -> str:
     """As the waitlist's dialogs say an entry: its guest, the day and the time they would like."""
-    who = entry.guest_name or entry.guest_phone
-    return _named(who, _said_day(entry.date, language), _said_time(entry.preferred_time, language))
+    return _named(_who(ctx, entry), _said_day(entry.date, ctx.language), _said_time(entry.preferred_time, ctx.language))
 
 
 def slot_label(slot: TimeSlot, language: str) -> str:
@@ -312,10 +315,12 @@ def _phone_matches(said: str) -> Q:
     return match
 
 
-def _guest_matches(said: str) -> Q:
-    """The guest by part of the name, the email or the phone (however typed: spaces, prefix)."""
+def _guest_matches(ctx: OperationContext, said: str) -> Q:
+    """The guest by part of the name and, for whoever sees the customers' contact details, of the email or the phone
+    (however typed: spaces, prefix): a search by them would tell whose they are."""
     text = said.strip()
-    return Q(guest_name__icontains=text) | Q(guest_email__icontains=text) | _phone_matches(text)
+    named = Q(guest_name__icontains=text)
+    return (named | Q(guest_email__icontains=text) | _phone_matches(text)) if sees_contact(ctx) else named
 
 
 def _hhmm(field: str) -> Func:
@@ -331,17 +336,18 @@ def _when(day: dt.date, at: dt.time) -> str:
 
 
 def find_reservation(
+    ctx: OperationContext,
     reservation_id: UUID | None,
     guest: str | None,
     day: dt.date | None,
     *,
     lock: bool = False,
 ) -> Reservation:
-    """A live reservation by id or, as a person says it, by its guest's name or phone and its day (the
-    coming ones when no day is said; among several, the open ones)."""
+    """A live reservation by id or, as a person says it, by its guest's name or phone (``_guest_matches``) and its
+    day (the coming ones when no day is said; among several, the open ones)."""
     rows = reservations()
     if reservation_id is None:
-        named = rows.filter(_guest_matches(guest or ""))
+        named = rows.filter(_guest_matches(ctx, guest or ""))
         named = (
             named.filter(date=day)
             if day
@@ -377,12 +383,12 @@ def waiting_entries() -> QuerySet[WaitlistEntry]:
 
 
 def find_entry(
-    entry_id: UUID | None, guest: str | None, day: dt.date | None, *, lock: bool = False
+    ctx: OperationContext, entry_id: UUID | None, guest: str | None, day: dt.date | None, *, lock: bool = False
 ) -> WaitlistEntry:
-    """A live waitlist entry by id or by its guest (and day); among several, the ones still waiting."""
+    """A live waitlist entry by id or by its guest (``_guest_matches``) and day; among several, the ones waiting."""
     rows = waiting_entries()
     if entry_id is None:
-        named = rows.filter(_guest_matches(guest or ""))
+        named = rows.filter(_guest_matches(ctx, guest or ""))
         if day:
             named = named.filter(date=day)
         candidates = list(
@@ -569,11 +575,21 @@ def table_facts(
 # ── Operations ───────────────────────────────────────────────────────────────────────────────────
 
 
+#: The list's filters that narrow by one column as they come: the input's field → its lookup.
+RESERVATION_FILTERS = {
+    "date_from": "date__gte",
+    "date_to": "date__lte",
+    "status": "status",
+    "table_id": "table_id",
+    "customer_id": "customer_id",
+    "guest_name": "guest_name__icontains",
+    "party_size_from": "party_size__gte",
+    "party_size_to": "party_size__lte",
+}
 RESERVATION_SORTS = {
     "starts_at": ("date", "time"),
     "time": ("time", "date"),
     "guest_name": ("guest_name",),
-    "guest_phone": ("guest_phone",),
     "party_size": ("party_size",),
     "table": ("table__number",),
     "status": ("status",),
@@ -606,32 +622,17 @@ RESERVATION_SORTS = {
         "default; pages of up to 100."
     },
 )
-def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:  # noqa: C901
-    rows = reservations()
+def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
+    asked = {lookup: getattr(params, field) for field, lookup in RESERVATION_FILTERS.items() if getattr(params, field)}
+    rows = reservations().filter(**asked)
     if params.search:
-        rows = rows.filter(_guest_matches(params.search))
-    if params.date_from:
-        rows = rows.filter(date__gte=params.date_from)
-    if params.date_to:
-        rows = rows.filter(date__lte=params.date_to)
-    if params.status:
-        rows = rows.filter(status=params.status)
-    if params.table_id:
-        rows = rows.filter(table_id=params.table_id)
-    if params.customer_id:
-        rows = rows.filter(customer_id=params.customer_id)
-    if params.guest_name:
-        rows = rows.filter(guest_name__icontains=params.guest_name)
+        rows = rows.filter(_guest_matches(ctx, params.search))
     if params.guest_phone:
         rows = rows.filter(_phone_matches(params.guest_phone))
     if params.time:
         rows = rows.annotate(time_text=_hhmm("time")).filter(
             time_text__contains=params.time
         )
-    if params.party_size_from:
-        rows = rows.filter(party_size__gte=params.party_size_from)
-    if params.party_size_to:
-        rows = rows.filter(party_size__lte=params.party_size_to)
     return _page(
         rows.order_by(*list_order_for(params.sort, columns=RESERVATION_SORTS)),
         params,
@@ -663,8 +664,8 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     },
 )
 def get_reservation(ctx: OperationContext, params: ReservationRefIn) -> dict:
-    found = find_reservation(params.id, params.guest, params.day)
-    return {**reservation_out(ctx, found), "label": reservation_label(found, ctx.language)}
+    found = find_reservation(ctx, params.id, params.guest, params.day)
+    return {**reservation_out(ctx, found), "label": reservation_label(ctx, found)}
 
 
 @operation(
@@ -928,7 +929,6 @@ WAITLIST_SORTS = {
     "date": ("date", "preferred_time", "created_at"),
     "preferred_time": ("preferred_time", "date", "created_at"),
     "guest_name": ("guest_name",),
-    "guest_phone": ("guest_phone",),
     "party_size": ("party_size",),
     "is_contacted": ("is_contacted", "date", "preferred_time", "created_at"),
 }
@@ -959,7 +959,7 @@ WAITLIST_SORTS = {
 def list_waitlist(ctx: OperationContext, params: WaitlistListIn) -> dict:
     rows = waiting_entries()
     if params.search:
-        rows = rows.filter(_guest_matches(params.search))
+        rows = rows.filter(_guest_matches(ctx, params.search))
     if params.date_from:
         rows = rows.filter(date__gte=params.date_from)
     if params.date_to:
@@ -1000,8 +1000,8 @@ def list_waitlist(ctx: OperationContext, params: WaitlistListIn) -> dict:
     },
 )
 def get_entry(ctx: OperationContext, params: WaitlistRefIn) -> dict:
-    entry = find_entry(params.id, params.guest, params.day)
-    return {**entry_out(entry), "label": entry_label(entry, ctx.language)}
+    entry = find_entry(ctx, params.id, params.guest, params.day)
+    return {**entry_out(entry), "label": entry_label(ctx, entry)}
 
 
 @operation(

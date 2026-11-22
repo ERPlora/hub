@@ -24,9 +24,8 @@
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 1113 apps/customer/queries/__init__.py ERPlora/erplora-next#74
 1300 apps/customer/schemas/__init__.py ERPlora/erplora-next#74
-1882 apps/customer/services.py ERPlora/erplora-next#74
 1100 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
-2670 apps/customer/tests/test_services.py ERPlora/erplora-next#74
+2666 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 474 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74

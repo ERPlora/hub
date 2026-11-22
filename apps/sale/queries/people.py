@@ -8,16 +8,18 @@ from django.contrib.auth import get_user_model
 from live.context import OperationContext
 
 from apps.sale.queries.other_apps import call_app
-from base.queries.people import person_label as profile_name
+from base.queries.people import person_label as profile_name, without_address
 
 
 def person_label(who) -> str:
-    """A person as a person reads them: their name, else their e-mail; their username (the id of the session) only
-    as the last resort; anything else (the platform, an API key) as it is."""
+    """A person as a colleague reads them: their name, else what goes before the «@» of their e-mail (a colleague's
+    address only reaches whoever sees the team's contact details, and erplora.com names an account without a name by
+    it); their username (the id of the session) only as the last resort; anything else (the platform, an API key) as
+    it is."""
     if who is None:
         return ""
     if hasattr(who, "get_username"):
-        return who.get_full_name() or getattr(who, "email", "") or who.get_username()
+        return without_address(who.get_full_name() or getattr(who, "email", "")) or who.get_username()
     return str(who)
 
 

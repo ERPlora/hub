@@ -8,7 +8,7 @@ from live.live_registry import live_registry
 from apps.customer import events, services
 
 E = events
-SERVICES_SOURCE = Path(services.__file__).read_text()
+SERVICES_SOURCE = "".join(path.read_text() for path in sorted(Path(services.__file__).parent.glob("*.py")))
 #: A card that leaves the lists (deleted, merged into another or erased) or comes back to them (restored, CUSTOMER-F33).
 CARD_IN_OR_OUT = [E.CUSTOMER_DELETED, E.CUSTOMER_MERGED, E.CUSTOMER_ERASED, E.CUSTOMER_RESTORED]
 

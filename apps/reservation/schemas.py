@@ -32,8 +32,10 @@ from pydantic import (
     model_validator,
 )
 
+from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.reservation.models import MAX_GUESTS, MAX_MINUTES
 from base.schemas.assistant import names
+from base.sensitive import CUSTOMER_CONTACT
 
 T = TypeVar("T")
 
@@ -71,8 +73,6 @@ ReservationSort = Literal[
     "-time",
     "guest_name",
     "-guest_name",
-    "guest_phone",
-    "-guest_phone",
     "party_size",
     "-party_size",
     "table",
@@ -103,8 +103,6 @@ WaitlistSort = Literal[
     "-preferred_time",
     "guest_name",
     "-guest_name",
-    "guest_phone",
-    "-guest_phone",
     "party_size",
     "-party_size",
     "is_contacted",
@@ -202,7 +200,7 @@ class ReservationListIn(PageIn):
     search: str | None = Field(
         None,
         max_length=100,
-        description="Part of the guest's name, phone or email: searches the whole book, not only the days asked.",
+        description="Part of the guest's name (or phone or email, for whoever sees them): searches the whole book.",
     )
     date_from: dt.date | None = Field(
         None, description="First day, YYYY-MM-DD (included)."
@@ -228,6 +226,7 @@ class ReservationListIn(PageIn):
         None,
         max_length=60,
         description="Part of the guest's phone (the column filter).",
+        json_schema_extra=CUSTOMER_CONTACT,
     )
     time: str | None = Field(
         None,
@@ -256,7 +255,7 @@ class ReservationRefIn(In):
     guest: Said | None = Field(
         None,
         title=GUEST,
-        description="The guest's name or phone, when the id is not known («Ana», «600 111 222»).",
+        description="The guest's name (or phone, for whoever sees it), when the id is not known («Ana», «600 111 222»).",
     )
     day: dt.date | None = Field(
         None,
@@ -366,8 +365,8 @@ class ReservationOut(Schema):
     guest_name: str = Field(
         description="The guest's name; empty once the customer's data was erased."
     )
-    guest_phone: str = Field(description="The guest's phone.")
-    guest_email: str = Field(description="The guest's email.")
+    guest_phone: str | None = PHONE
+    guest_email: str | None = EMAIL
     date: dt.date = Field(description="The day.")
     time: dt.time = Field(description="The time, on the business's clock.")
     end_time: dt.time = Field(
@@ -687,7 +686,7 @@ class BlockedDatePage(Page[BlockedDateOut]):
 
 class WaitlistListIn(PageIn):
     search: str | None = Field(
-        None, max_length=100, description="Part of the guest's name, phone or email."
+        None, max_length=100, description="Part of the guest's name (or phone or email, for whoever sees them)."
     )
     date_from: dt.date | None = Field(None, description="From this day (included).")
     date_to: dt.date | None = Field(None, description="Until this day (included).")
@@ -706,6 +705,7 @@ class WaitlistListIn(PageIn):
         None,
         max_length=60,
         description="Part of the guest's phone (the column filter).",
+        json_schema_extra=CUSTOMER_CONTACT,
     )
     sort: WaitlistSort = Field(
         "position",
@@ -747,7 +747,7 @@ class WaitlistRefIn(In):
     guest: Said | None = Field(
         None,
         title=GUEST,
-        description="The guest's name or phone, when the id is not known.",
+        description="The guest's name (or phone, for whoever sees it), when the id is not known.",
     )
     day: dt.date | None = Field(
         None,
@@ -783,8 +783,8 @@ class WaitlistOut(Schema):
     guest_name: str = Field(
         description="The guest's name; empty once the customer's data was erased."
     )
-    guest_phone: str = Field(description="The guest's phone.")
-    guest_email: str = Field(description="The guest's email.")
+    guest_phone: str | None = PHONE
+    guest_email: str | None = EMAIL
     date: dt.date = Field(description="The day they want.")
     preferred_time: dt.time = Field(description="The time they would like.")
     party_size: int = Field(description="How many guests.")

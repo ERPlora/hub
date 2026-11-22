@@ -9,10 +9,10 @@ import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
-import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
+import { openBookingPanel } from '../__tests__/booking-panel';
+import { click, ionValue, settle } from '../__tests__/mount-reservation';
 import { freeTable, reservationRow } from '../__tests__/rows';
 import en from '../locale/en.json';
-import ReservationFormModal from './ReservationFormModal.vue';
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 
@@ -25,22 +25,12 @@ const TABLES = {
 };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountReservation(ReservationFormModal, {
-    props: { open: false, reservation: null, day: '2026-10-15', ...props },
-    locale,
-  });
-  m.answerBy({
-    '/api/reservation/availability/tables': [200, TABLES],
-    '/api/customer/customers/detail': [200, { id: 'c1', name: 'Lucía Pérez', phone: '+34600999888', email: 'lucia@x.es' }],
-  });
-  await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
-  await settle();
+  const card = { id: 'c1', name: 'Lucía Pérez', phone: '+34600999888', email: 'lucia@x.es' };
+  const m = await openBookingPanel({ props, locale, tables: TABLES, card });
   const field = (name: string) => m.inDoc(`reservation-form-${name}`) as Control;
   const submit = () => m.inDoc('reservation-form-submit') as Control;
   const tablePicker = () => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === 'reservation-form-table')!;
-  const bodies = (path: string) => m.sent().filter((call) => call.path === path).map((call) => call.body);
-  return { ...m, field, submit, tablePicker, bodies };
+  return { ...m, field, submit, tablePicker };
 }
 
 async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
