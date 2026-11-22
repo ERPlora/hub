@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6345d7586661d53eb3d79f9494f1f803ebb9d6da1ffb818340fda5705bd7e56f -->
+<!-- generated from WORKBOOK.md sha256:3db612b0f7d181fb812e1798f399957fab00e853ab633bb9642ad6e800252638 -->
 
 ## What it is for and who it is for
 
@@ -181,8 +181,8 @@ checkout" and "Receipt copies" (1, 2 or 3); another "Printer of each role" with 
 role ("Receipt", "Kitchen", "Bar", "Label"): "The first active one of this role" or one of its
 active printers. The note "The receipt header and footer are part of your till settings,
 where the ticket is printed from." with the link "Open the receipt settings" (if Sales is switched on). "Save settings" saves what
-changed and says "Settings saved.". Whoever cannot change them sees them locked with "You do not have permission
-to change these settings.". Loading: "Loading settings…". Error: "Could not load the
+changed and says "Settings saved.". Whoever cannot change them does not open them:
+by its address, "No access" (BASE-F118). Loading: "Loading settings…". Error: "Could not load the
 settings." with "Retry"; when saving, "Could not save the settings." with the reason, also below the
 role whose printer it refuses (PRINTING-F06).
 
@@ -195,7 +195,7 @@ role whose printer it refuses (PRINTING-F06).
 | Error | The warning of its screen with "Retry"; a refused action shows in its window, next to its field, or in a notice. |
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…" until the connection comes back. |
 | App inactive | "Printing is not active in this business." |
-| No permission | What they cannot do does not appear (in Devices, neither "Print from this device", nor "Edit", nor "Retire"); the settings show locked with "You do not have permission to change these settings.". |
+| No permission | What they cannot do does not appear (in Devices, neither "Print from this device", nor "Edit", nor "Retire"); the settings, by its address, "No access" (BASE-F118). |
 
 ## Unsaved changes on Android
 
@@ -232,7 +232,7 @@ the window without saving. With the window as it opened, Back closes it without 
 
 ### PRINTING-F01 See how printing is going
 Status: done
-Actor: administrator, manager, employee
+Actor: administrator, manager; the employee, only on the Home
 Screen: Home, Printers, Queue
 Steps:
 1. On **Home**, while no device set up reaches an active receipt printer,
@@ -343,7 +343,7 @@ Involved: PRINTING-F01, PRINTING-F06, INVENTORY-F25, PRINTING-F22
 
 ### PRINTING-F05 Do a test print
 Status: done
-Actor: administrator, manager, employee
+Actor: administrator, manager
 Screen: Printers
 Steps:
 1. Press "Test" on the printer's row.
@@ -378,7 +378,7 @@ deleted or moved to another role while it was being chosen), the reason also sho
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not
-show values and offers "Retry". Without permission, locked and without "Save settings".
+show values and offers "Retry". Without permission, "No access" (BASE-F118).
 Involved: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Print the receipt when charging
