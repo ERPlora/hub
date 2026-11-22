@@ -4,11 +4,15 @@
 // right to, one it turned off, one still activating — gets «why it does not open» (AppBlockedPage). A route under a
 // menu entry this person may not open gets «No access» (NoAccessPage): the session's `locked` entries decide it, by
 // the longest entry of the app that covers the address, never its `apps`, which list every app the person holds a
-// permission of. The server refuses what the screen would ask anyway (402, 403, or 404 `app_inactive` when it is
-// off): this only spares the person a screen of errors. Nothing is decided before the session arrives.
+// permission of. A platform screen, which belongs to no app, gets «No access» too when the person lacks the permission
+// of the side-menu entry that covers it, the same one that hides the entry. The server refuses what the screen would
+// ask anyway (402, 403, or 404 `app_inactive` when it is off): this only spares the person a screen of errors. Nothing
+// is decided before the session arrives.
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Ref } from 'vue';
 import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw } from 'vue-router';
+
+import { SIDEBAR } from './sidebar';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -39,8 +43,9 @@ type GatedRoute = Pick<RouteLocationNormalized, 'path' | 'meta'>;
 
 /** What the gate says of a route, for this session. */
 export function gateVerdict(me: SessionMe | undefined, to: GatedRoute): GateVerdict {
+  if (!me) return 'open';
   const app = to.meta.app;
-  if (!me || !app) return 'open';
+  if (!app) return isPlatformLocked(me, to.path) ? 'no-access' : 'open';
   const state = me.apps.find((candidate) => candidate.label === app)?.state;
   if (state !== undefined && state !== 'on') return 'blocked';
   return isLocked(me, app, to.path) ? 'no-access' : 'open';
@@ -50,12 +55,28 @@ function isLocked(me: SessionMe, app: string, path: string): boolean {
   const closed = me.locked?.[app] ?? [];
   if (closed.length === 0) return false;
   const opened = me.menu.find((section) => section.id === app)?.items.map((item) => item.path) ?? [];
-  const covering = [...opened, ...closed].filter((entry) => path === entry || path.startsWith(`${entry}/`));
-  const entry = covering.reduce<string | undefined>(
-    (longest, candidate) => (longest === undefined || candidate.length > longest.length ? candidate : longest),
-    undefined,
-  );
+  const entry = longestCovering([...opened, ...closed], path);
   return entry !== undefined && closed.includes(entry);
+}
+
+function isPlatformLocked(me: SessionMe, path: string): boolean {
+  const items = SIDEBAR.groups.flat();
+  const entry = longestCovering(
+    items.map((item) => item.to),
+    path,
+  );
+  const permission = items.find((item) => item.to === entry)?.permission;
+  return permission !== undefined && !me.permissions.includes('*') && !me.permissions.includes(permission);
+}
+
+/** The longest of `entries` that is `path` or one of its parents, segment by segment. */
+function longestCovering(entries: readonly string[], path: string): string | undefined {
+  return entries
+    .filter((entry) => path === entry || path.startsWith(`${entry}/`))
+    .reduce<string | undefined>(
+      (longest, candidate) => (longest === undefined || candidate.length > longest.length ? candidate : longest),
+      undefined,
+    );
 }
 
 /** The router guard: `true`, or the gate page in the same address. */

@@ -7,7 +7,7 @@ import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate, gateVerdict } from '.
 
 const ME: SessionMe = {
   user: { id: 'u1', label: 'Ana' },
-  permissions: [],
+  permissions: ['base.view_home'],
   menu: [],
   apps: [
     { label: 'tax', state: 'on' },
@@ -43,7 +43,7 @@ describe('createAppGate', () => {
     });
   });
 
-  it('lets through what is no app’s, an app the session does not list and a session not here yet', () => {
+  it('lets through a platform screen the person may open, an app the session does not list and a session not here yet', () => {
     expect(gate(to('/apps'))).toBe(true);
     expect(gate(to('/reports', 'reports'))).toBe(true);
     expect(createAppGate(ref(undefined))(to('/stock', 'stock'))).toBe(true);
@@ -57,7 +57,7 @@ describe('createAppGate', () => {
 /** An employee: Staff's members open, its settings locked; Taxes, whose every screen is locked, it may not see at all. */
 const EMPLOYEE: SessionMe = {
   user: { id: 'u2', label: 'Eva' },
-  permissions: [],
+  permissions: ['base.view_home', 'base.view_files'],
   menu: [
     { id: 'staff', label: 'Staff', items: [{ path: '/staff/members', label: 'Members', icon: 'ion:people-outline' }] },
     { id: 'reports', label: 'Reports', items: [{ path: '/reports/mine', label: 'Mine', icon: 'ion:person-outline' }] },
@@ -114,5 +114,36 @@ describe('the screens a person may not open', () => {
     expect(gateVerdict({ ...EMPLOYEE, locked: undefined }, to('/staff/settings', 'staff'))).toBe('open');
     expect(gateVerdict(undefined, to('/staff/settings', 'staff'))).toBe('open');
     expect(gateVerdict(EMPLOYEE, to('/apps'))).toBe('open');
+  });
+});
+
+describe('the platform’s screens, which belong to no app', () => {
+  const gate = createAppGate(ref(EMPLOYEE));
+
+  it('say «No access» in the same address when the person lacks the permission of their side-menu entry', () => {
+    expect(gate(to('/system', undefined, { hash: '#logs' }))).toEqual({
+      name: APP_BLOCKED_ROUTE.name,
+      params: { pathMatch: ['system'] },
+      query: {},
+      hash: '#logs',
+    });
+    const accountant: SessionMe = { ...EMPLOYEE, permissions: ['base.view_home'] };
+    expect(gateVerdict(accountant, to('/files'))).toBe('no-access');
+    expect(gateVerdict({ ...EMPLOYEE, permissions: [] }, to('/employees/42'))).toBe('no-access');
+  });
+
+  it('open with that permission, or with every permission', () => {
+    expect(gateVerdict(EMPLOYEE, to('/files'))).toBe('open');
+    expect(gateVerdict(EMPLOYEE, to('/employees/42'))).toBe('open');
+    expect(gateVerdict({ ...EMPLOYEE, permissions: ['base.administer_hub'] }, to('/system'))).toBe('open');
+    expect(gateVerdict({ ...EMPLOYEE, permissions: ['*'] }, to('/system'))).toBe('open');
+  });
+
+  it('leave open an address no side-menu entry covers, segment by segment', () => {
+    const nobody: SessionMe = { ...EMPLOYEE, permissions: [] };
+    expect(gateVerdict(nobody, to('/'))).toBe('open');
+    expect(gateVerdict(nobody, to('/profile'))).toBe('open');
+    expect(gateVerdict(nobody, to('/systems'))).toBe('open');
+    expect(gateVerdict(undefined, to('/system'))).toBe('open');
   });
 });
