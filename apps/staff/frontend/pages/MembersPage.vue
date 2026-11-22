@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Staff → Staff (WORKBOOK «Pantallas · Personal»; STAFF-F01–F06, F08, F21): the live
-// `staff.member.list` in a server-side DataTable — Name, Role, Email, Status and, for whoever may see
-// the pay, Rate/h (`staff.member.compensation`, the same rows page by page); Phone starts hidden —, «Search
-// member…», sort by any column, the old column filters behind the table's funnel, 50 a page. «+» opens «New»; a row or «Edit»
+// `staff.member.list` in a server-side DataTable — Name, Role, Email (Phone starts hidden) for whoever sees the
+// team's contact details, Status and, for whoever may see the pay, Rate/h (`staff.member.compensation`, the same
+// rows page by page) —, «Search member…», sort by any column but the contact details and the pay, the old column
+// filters behind the table's funnel, 50 a page. «+» opens «New»; a row or «Edit»
 // opens «Edit · {name}»; «Deactivate» (confirmed) and «Terminate» (its dialog) for the owner and the
 // admin. «My record» opens one's own record. Above the list, the figures of the old Home panels
 // (STAFF-F20, F23). Nothing here refetches: changes come through the stream.
@@ -49,6 +50,8 @@ const canAdd = computed(() => session.can('staff.add_member'));
 const canChange = computed(() => session.can('staff.change_member'));
 const canDelete = computed(() => session.can('staff.delete_member'));
 const canPay = session.can('staff.view_compensation');
+/** The team's email and phone reach only whoever sees them: for anyone else they come empty, so no column. */
+const canContact = computed(() => session.can('base.view_team_contact'));
 const canLink = computed(() => canAdd.value || canChange.value);
 
 // ── The list ───────────────────────────────────────────────────────────────────────────────────
@@ -108,8 +111,12 @@ const dash = (value: unknown): string => (value === null || value === undefined 
 const columns = computed<DataTableColumn<MemberOut>[]>(() => [
   { key: 'name', label: t('staff.members.columns.name'), sortable: true, priority: 'high', format: (_, row) => row.full_name },
   { key: 'role_name', label: t('staff.members.columns.role'), sortable: true, format: dash, filter: { type: 'lookup', load: findRoles } },
-  { key: 'email', label: t('staff.members.columns.email'), sortable: true, priority: 'low', format: dash, filter: { type: 'text' } },
-  { key: 'phone', label: t('staff.members.columns.phone'), sortable: true, hidden: true, format: dash, filter: { type: 'text' } },
+  ...(canContact.value
+    ? [
+        { key: 'email', label: t('staff.members.columns.email'), priority: 'low' as const, format: dash, filter: { type: 'text' as const } },
+        { key: 'phone', label: t('staff.members.columns.phone'), hidden: true, format: dash, filter: { type: 'text' as const } },
+      ]
+    : []),
   {
     key: 'status',
     label: t('staff.members.columns.status'),

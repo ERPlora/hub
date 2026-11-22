@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5c69b9ae7b538b8c82cd3d4f9cac88c0b5033920f1ca81c093f91d4981e3b725 -->
+<!-- generated from WORKBOOK.md sha256:d2b19f49173c00a6431af13cb32dbba76a94f8920ea7c98297533bb8812e7d75 -->
 
 ## What it is for and who it is for
 
@@ -74,19 +74,21 @@ settings. What a person cannot do does not show, and the app refuses it even if 
 the assistant.
 
 ### Staff
-Here is your team: one row per person with their name, their role, their email and their status (**Active**,
-**Inactive** or **On leave**) and, for whoever sees the pay, their hourly rate. Above it, three figures: **Active
+Here is your team: one row per person with their name, their role, their email (for whoever sees the team's contact
+details) and their status (**Active**, **Inactive** or **On leave**) and, for whoever sees the pay, their hourly rate. Above it, three figures: **Active
 staff**, **On leave today** and **Pending time off**. **+** adds a person and a row opens their record to edit it; the
 owner and the administrator also deactivate or terminate them from the row. Whoever has their account linked to a
 record sees it in **My record**.
 
 #### Detail
 Above the table, three figures: **Active staff**, **On leave today** and **Pending time off**
-(STAFF-F23). Below, the table with the search "Search member…" (first name, last name, email, phone,
-employee ID or role), columns **Name, Role, Email, Status** and, only for whoever can see the pay,
-**Rate/h**; **Phone** exists but starts hidden. It sorts by any column and filters by First name, Last
-name, Email, Phone, Role, Status (**Active**, **On leave**, **Inactive**), Bookable, hire date, color and
-user; 50 per page. Terminated records do not show.
+(STAFF-F23). Below, the table with the search "Search member…" (first name, last name, employee ID or role, and
+email and phone for whoever sees the team's contact details), columns **Name, Role, Email, Status** and, only for
+whoever can see the pay, **Rate/h**; **Phone** exists but starts hidden. **Email** and **Phone** only show to whoever
+sees the team's contact details (the owner, the administrator and the manager; BASE-F119): an employee sees the table
+without those two columns, with no gaps. It sorts by any column but Email, Phone and Rate/h, and filters by First name,
+Last name, Email and Phone (whoever sees the team's contact details), Role, Status (**Active**, **On leave**,
+**Inactive**), Bookable, hire date, color and user; 50 per page. Terminated records do not show.
 
 The **+** button opens **New**; a row opens **Edit · {name}**. Form: **First name, Last name, Email,
 Phone, Employee ID, Role** ("No role"), **Hub user** ("No Hub access"), **Status** (only when editing:
@@ -209,7 +211,8 @@ Steps:
 2. Write First name and Last name (required, up to 100 characters). If you want, Email, Phone, Employee
    ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
    appointments and, with the pay permission, Hourly rate and Commission (%). **Bookable** comes on.
-3. Tap Save: the person shows in the table as **Active**.
+3. Tap Save: the person shows in the table as **Active**, with their email and phone for whoever sees the team's
+   contact details.
 In: the form; the active roles (STAFF-F04), by id or by their name. The rate is typed in the business's
 currency and saved in its smallest unit (cents in euros; in yen, whole yen); the commission is a percentage
 from 0 to 100 with two decimals. Through the API or the assistant the initial
@@ -225,7 +228,7 @@ is checked before the confirmation card: no card shows, the assistant says that 
 which ones there are, and nothing is created. Save (also when editing) is grey while the business has not yet said its
 currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up.
-Involved: BASE-F97
+Involved: BASE-F97, BASE-F119
 
 ### STAFF-F02 Edit a professional's record
 Status: done (server and screen)
@@ -239,7 +242,8 @@ Steps:
    On leave (the final termination is done with **Terminate**, in the row). "No role" removes the role, "No Hub access" unlinks the
    account, and the Hire date can be **cleared**.
 3. Save: only what was sent changes.
-In: the record (and, with the permission, its rate, commission and notes).
+In: the record (its email and phone, to whoever sees the team's contact details; with the permission, its rate,
+commission and notes).
 Out: the changed record (`staff.member.updated`). Saving without changing anything does not announce.
 Setting Inactive here does not turn Bookable off; going back to Active does not turn it on
 either.
@@ -247,7 +251,7 @@ If it fails: the same refusals as when adding; "That staff member does not exist
 is no longer there (also if it was terminated); setting **Inactive** with pending or approved time off not
 yet ended: "That staff member has pending or approved time off that has not ended yet. Resolve it
 first.".
-Involved: none
+Involved: BASE-F119
 
 ### STAFF-F03 Link the record to an account of the business
 Status: done (server and screen)
@@ -341,8 +345,9 @@ Actor: employee (and any person with a linked record), assistant
 Screen: Staff (own view), Time Off
 Steps:
 1. A person with their account linked to their record taps **My record** in **Staff**, or opens **Time Off**.
-2. They see their record with **their own** rate and commission (without the HR notes), and their time
-   off with its reason and its notes.
+2. They see their record with **their own** rate and commission (without the HR notes) and their own email and
+   phone, even if they do not see the rest of the team's contact details, and their time off with its reason and its
+   notes.
 3. The record is read-only: a single button, **Close**.
 In: the account they get in with (it cannot be faked).
 Out: nothing changes. Without a linked record, the answer comes empty.
@@ -356,8 +361,8 @@ Screen: none
 Steps:
 1. An app that needs to name the team (the till in "Who is serving this check", and with it the kitchen
    ticket; Appointments, Services, Tasks) asks for the directory, with its permission to see the team.
-2. It receives, per person: name, email, phone, employee ID, role, account, status, bookable, hire date and
-   color; **never** the rate nor the commission. Up to 100 per page; it filters, among others, by user (to
+2. It receives, per person: name, email and phone (empty if whoever asks does not see the team's contact details),
+   employee ID, role, account, status, bookable, hire date and color; **never** the rate nor the commission. Up to 100 per page; it filters, among others, by user (to
    go from an account to its record).
 In: nothing; it is a read.
 Out: the directory of the records that are not terminated (also the Inactive and On leave ones).
@@ -612,9 +617,9 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The directory, with search, filters and sorting by any column, in pages (up to 100) | see | F09 | `staff.member.list` |
-| A person's record (without pay) | see | F02 | `staff.member.detail` |
-| My record, with my rate and my commission | see | F08 | `staff.member.mine` |
+| The directory, with search, filters and sorting by any column but the email and the phone, in pages (up to 100); the email and the phone, empty for whoever does not see the team's contact details, who neither searches nor filters by them | see | F01, F02, F09 | `staff.member.list` |
+| A person's record (without pay; the email and the phone, empty for whoever does not see the team's contact details) | see | F02 | `staff.member.detail` |
+| My record, with my rate, my commission, my email and my phone | see | F08 | `staff.member.mine` |
 | The record of whoever holds the session, only its id and name: Sales attributes «Me» to it | anyone signed in | SALE-F16 | `staff.member.current` |
 | Rate, commission and HR notes, with the directory's filters, sorting and pages (the Rate/h column reads the same rows) | see the pay | F21 | `staff.member.compensation` |
 | The commission sheet: who can earn a commission, with their record, their account and their commission | see the pay | F21 | `staff.commission.summary` |
@@ -694,6 +699,7 @@ the directory for "Who is serving this check" without needing Staff, and Automat
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | See the team, roles, schedules, availability, figures and settings | yes | yes | yes | yes | `staff.view` |
+| See the team's email and phone (a data permission of the platform) | yes | yes | yes | no | `base.view_team_contact` |
 | See rate, commission and HR notes | yes | yes | yes | no | `staff.view_compensation` |
 | Add records | yes | yes | yes | no | `staff.add_member` |
 | Edit records | yes | yes | yes | no | `staff.change_member` |
