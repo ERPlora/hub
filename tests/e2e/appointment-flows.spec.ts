@@ -12,6 +12,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
+import { pickDay, pickTime } from './date-time-fields';
 import { A, api, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, ownerPage, pick, post, rowAction, settled } from './service-helpers';
 
@@ -130,9 +131,7 @@ async function book(context: BrowserContext, who: Cast, start: string, source = 
 const statusOf = (id: string): string => psql(`select status from appointment_appointment where id = '${id}'`);
 
 async function goToDay(page: Page, day: string): Promise<void> {
-  const calendar = shown(page).locator('[data-testid=appointment-toolbar-calendar] input');
-  await calendar.fill(day);
-  await calendar.press('Tab');
+  await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), day);
   await expect(shown(page).locator('[data-testid=appointment-toolbar-date]')).not.toBeEmpty();
 }
 
@@ -224,9 +223,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await chooseCustomer(page, 'appointment-form', who);
       await pick(page, 'appointment-form-service-add', word(who.service.name), who.service.name);
       await pick(page, 'appointment-form-staff', word(who.member.full_name), who.member.full_name);
-      const dayInput = form.locator('[data-testid=appointment-form-day] input');
-      await dayInput.fill(DAY);
-      await dayInput.press('Tab');
+      await pickDay(page, form.locator('[data-testid=appointment-form-day]'), DAY);
       const free = form.locator('[data-testid=appointment-slots-time]', { hasText: /^10:00\s?AM$/ });
       await expect(free).toBeVisible();
       expect(await cutLabels(form), `labels cut in the appointment form at ${vp.label}`).toEqual([]);
@@ -251,7 +248,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(form.locator('ion-title')).toHaveText('Edit appointment');
       await form.locator('[data-testid=appointment-form-notes] textarea').fill('Bring the colour reference');
       await capture(page, 'APPOINTMENT-F22');
-      await form.locator('[data-testid=appointment-form-time] input').fill('11:00');
+      await pickTime(page, form.locator('[data-testid=appointment-form-time]'), '11:00');
       await capture(page, 'APPOINTMENT-F04');
       await form.locator('[data-testid=appointment-form-submit]').click();
       await expect(form).toBeHidden();
