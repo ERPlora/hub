@@ -17,6 +17,8 @@ export interface HelpFlow {
   screens: string[];
   steps: string;
   failure: string;
+  /** The YouTube video ids of the task's short videos, none when it has no videos. */
+  videos: string[];
 }
 
 /** `base.AppHelpOut`: in `language`, the person's own or else the WORKBOOK's source language. */
