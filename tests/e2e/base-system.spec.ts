@@ -5,13 +5,7 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
-import { A, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
-
-const VIEWPORTS = {
-  390: { width: 390, height: 844 },
-  834: { width: 834, height: 1112 },
-  1440: { width: 1440, height: 900 },
-} as const;
+import { A, horizontalOverflow, hostPage, psql, shot, shown, THREE_SIZES, untilStill } from './helpers';
 
 /** What the run plants carries it in its payload, so it goes after. */
 const TAG = 'e2e-base-system';
@@ -110,7 +104,7 @@ async function signedIn(browser: Browser, viewport: { width: number; height: num
   return hostPage(browser, A, { viewport, next });
 }
 
-for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+for (const { label, ...viewport } of THREE_SIZES) {
   const width = Number(label);
 
   test(`System and its tabs at ${width}`, async ({ browser }) => {
@@ -425,7 +419,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 test('BASE-F40 — what a task counted reaches control within its minute, under Daphne', async ({ browser }) => {
   test.setTimeout(180_000);
   const hubId = psql("select id from base_hub where slug = 'a'");
-  const { context, page } = await signedIn(browser, VIEWPORTS[1440], '/system');
+  const { context, page } = await signedIn(browser, THREE_SIZES[2], '/system');
   try {
     await expect(testid(page, 'system-usage-row-capacity')).toBeVisible();
     const requests = () => Number(psql(`select coalesce(sum(requests), 0) from control_hubactivitydaily where hub_id = '${hubId}'`));
@@ -445,7 +439,7 @@ test('BASE-F40 — what a task counted reaches control within its minute, under 
 });
 
 test('the screen reports an error nobody caught, by itself', async ({ browser }) => {
-  const { context, page } = await signedIn(browser, VIEWPORTS[1440], '/system');
+  const { context, page } = await signedIn(browser, THREE_SIZES[2], '/system');
   try {
     await expect(testid(page, 'tab-usage')).toBeVisible();
     const reported = page.waitForResponse((response) => response.url().endsWith('/api/error-report'));
