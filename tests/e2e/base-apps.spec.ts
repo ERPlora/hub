@@ -185,7 +185,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-test('the employee reads the apps on a phone, and «Usage and plan» is for whoever runs the business', async ({ browser }) => {
+test('the employee reads the apps on a phone', async ({ browser }) => {
   const viewport = VIEWPORTS[390];
   const { context, page } = await signedIn(browser, viewport, '/apps', true);
   try {
@@ -194,11 +194,6 @@ test('the employee reads the apps on a phone, and «Usage and plan» is for whoe
     await expect(demo).toBeVisible();
     await expect(testid(page, 'apps-row-demo-open')).toBeInViewport();
     await snap(page, 'BASE-G67-employee', 390);
-
-    await page.goto(`${A}/system#usage`);
-    await expect(testid(page, 'system-usage-denied')).toBeVisible();
-    await expect(testid(page, 'system-usage-retry')).toHaveCount(0);
-    await snap(page, 'BASE-G81-employee', 390);
   } finally {
     await (context as BrowserContext).close();
   }

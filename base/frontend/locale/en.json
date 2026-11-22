@@ -513,7 +513,6 @@
         },
         "loading": "Loading the failed events…",
         "errorBody": "The queue of failed events could not be loaded. Check the connection and try again.",
-        "denied": "Only the owner or an administrator can see the failed events.",
         "retried": "Event resent.",
         "retriedAll": "Events resent: {count}.",
         "nothingToRetry": "There was nothing to resend.",
@@ -557,7 +556,6 @@
       },
       "usage": {
         "loading": "Reading the system…",
-        "denied": "Only the owner or an administrator can see how much the hub is using.",
         "plan": "{name} plan",
         "planNames": {
           "free": "Free",
