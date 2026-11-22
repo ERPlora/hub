@@ -1,11 +1,10 @@
 """The SaaS ends a person's sessions in the Hub: ``POST /internal/sessions/revoke {user_id, hub_id?}`` (the
 back-channel logout of OIDC; without a hub it ends the admin's sessions of that account too).
 
-The SaaS sends it after removing a member, changing their role or handing a business over (with the business's id),
-and after a password change, «sign out everywhere» or deleting the account (without it): HUBS-F26, HUBS-F27 and
-HUBS-F28 of the SaaS. Every login notes whose and where its session is (``base.SessionOwner``: the SaaS account and the
-host the login noted), so the door ends exactly those sessions through that index, never decoding the sessions of the
-table. An open ``/api/live`` stream of an ended session gets no more results: its next re-run ends it with ``bye``,
+The SaaS sends it after removing a member or handing a business over (with the business's id), and after a password
+change, «sign out everywhere» or deleting the account (without it): HUBS-F27 and HUBS-F28 of the SaaS. Every login
+notes whose and where its session is (``base.SessionOwner``: the SaaS account and the host the login noted), so the
+door ends exactly those sessions through that index, never decoding the sessions of the table. An open ``/api/live`` stream of an ended session gets no more results: its next re-run ends it with ``bye``,
 and the door wakes the hub's open apps after the COMMIT so that re-run comes now.
 
 The businesses are ``hub_a`` (Acme) and ``hub_b`` (Beta), each on a database of its own, as every business is.
@@ -230,17 +229,18 @@ async def in_db(fn, *args, **kwargs):
     return await sync_to_async(call)()
 
 
-def open_stream(saas_id: str, hub: Hub) -> Stream:
-    """The ``/api/live`` stream a member of ``hub`` opens with the session of its login: ``demo.item.list``."""
-    key = login(saas_id, hub, role="hub_owner")
+def open_stream(saas_id: str, hub: Hub, role: str = "hub_owner", operation: str = "demo.item.list") -> Stream:
+    """The ``/api/live`` stream a member of ``hub`` with ``role`` opens with the session of its login, following
+    ``operation``."""
+    key = login(saas_id, hub, role=role)
     request = RequestFactory().get("/api/live", HTTP_HOST=f"{hub.slug}.localhost")
     SessionMiddleware(lambda r: None).process_request(request)
     request.session = request.session.__class__(key)
     request.user = Membership.objects.get(user__username=f"saas:{saas_id}", host=hub.slug).user
     request.LANGUAGE_CODE = "en"
     stream = Stream(HubContextBuilder().from_request(request))
-    op = get("demo.item.list")
-    stream.subs["items"] = Subscription(id="items", op=op, params=op.input.model_validate({}))
+    op = get(operation)
+    stream.subs[operation] = Subscription(id=operation, op=op, params=op.input.model_validate({}))
     return stream
 
 

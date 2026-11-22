@@ -60,7 +60,7 @@ async def invoice_document(request, params: Query[DocumentIn]):
 
 @bind(router, "invoice.invoice.print", "/invoice/invoices/print")
 async def invoice_print(request, data: DocumentIn):
-    return await run_operation(request, services.print_invoice, data)
+    return await run_operation(request, services.paper.print_invoice, data)
 
 
 @bind(router, "invoice.invoice.line_defaults", "/invoice/invoices/line_defaults")
@@ -70,22 +70,22 @@ async def invoice_line_defaults(request):
 
 @bind(router, "invoice.invoice.create", "/invoice/invoices", status=201)
 async def invoice_create(request, data: InvoiceCreateIn):
-    return await run_operation(request, services.create, data)
+    return await run_operation(request, services.manual.create, data)
 
 
 @bind(router, "invoice.invoice.create_from_sale", "/invoice/invoices/from_sale")
 async def invoice_create_from_sale(request, data: FromSaleIn):
-    return await run_operation(request, services.create_from_sale, data)
+    return await run_operation(request, services.from_sale.create_from_sale, data)
 
 
 @bind(router, "invoice.invoice.substitute", "/invoice/invoices/substitute")
 async def invoice_substitute(request, data: SubstituteIn):
-    return await run_operation(request, services.substitute, data)
+    return await run_operation(request, services.substitution.substitute, data)
 
 
 @bind(router, "invoice.invoice.mark_paid", "/invoice/invoices/mark_paid")
 async def invoice_mark_paid(request, data: MarkPaidIn):
-    return await run_operation(request, services.mark_paid, data)
+    return await run_operation(request, services.paying.mark_paid, data)
 
 
 @bind(
@@ -101,7 +101,7 @@ async def invoice_rectification_preview(
 
 @bind(router, "invoice.invoice.rectify", "/invoice/invoices/rectify")
 async def invoice_rectify(request, data: RectifyIn):
-    return await run_operation(request, services.rectify, data)
+    return await run_operation(request, services.rectifying.rectify, data)
 
 
 @bind(
@@ -110,14 +110,14 @@ async def invoice_rectify(request, data: RectifyIn):
     "/invoice/invoices/rectify_from_refund",
 )
 async def invoice_rectify_from_refund(request, data: FromRefundIn):
-    return await run_operation(request, services.rectify_from_refund, data)
+    return await run_operation(request, services.rectifying.rectify_from_refund, data)
 
 
 @bind(
     router, "invoice.invoice.rectify_from_void", "/invoice/invoices/rectify_from_void"
 )
 async def invoice_rectify_from_void(request, data: FromVoidIn):
-    return await run_operation(request, services.rectify_from_void, data)
+    return await run_operation(request, services.rectifying.rectify_from_void, data)
 
 
 # Refunds of the Sales app, as an invoice names them
@@ -148,12 +148,12 @@ async def series_get(request, params: Query[SeriesPeekIn]):
 
 @bind(router, "invoice.series.create", "/invoice/series", status=201)
 async def series_create(request, data: SeriesCreateIn):
-    return await run_operation(request, services.create_series, data)
+    return await run_operation(request, services.series.create_series, data)
 
 
 @bind(router, "invoice.series.update", "/invoice/series/update")
 async def series_update(request, data: SeriesUpdateIn):
-    return await run_operation(request, services.update_series, data)
+    return await run_operation(request, services.series.update_series, data)
 
 
 # Numbering
@@ -184,4 +184,4 @@ async def issuer_get(request):
 
 @bind(router, "invoice.issuer.update", "/invoice/issuer")
 async def issuer_update(request, data: IssuerIn):
-    return await run_operation(request, services.update_issuer, data)
+    return await run_operation(request, services.issuer.update_issuer, data)

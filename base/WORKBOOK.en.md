@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4d2a53c538695cb0b0cc36018b340859ac9f7229421d28a92037afe338226093 -->
+<!-- generated from WORKBOOK.md sha256:60a802eaa973786dee63bd0348a62e9e45803a6339d85fa0f343ffebee4cbd98 -->
 
 ## What it is for and who it is for
 
@@ -344,7 +344,7 @@ On the Employees screens and the API documentation:
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | done |
 | BASE-F12 | Ask the assistant to go over the setup | done |
-| BASE-F13 | Lose access on a role change or on leaving the business | done |
+| BASE-F13 | A role change or leaving the business with the hub open | done |
 | BASE-F14 | See the business's apps | done |
 | BASE-F15 | Open an app from Apps | done |
 | BASE-F16 | Look for an app in the catalogue | done |
@@ -745,28 +745,32 @@ Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
 Involved: BASE-F103
 
-### BASE-F13 Lose access on a role change or on leaving the business
+### BASE-F13 A role change or leaving the business with the hub open
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: any screen of the hub
 Steps:
   1. At erplora.com, whoever manages the business changes a person's role, removes them from the business
      or hands the ownership over to them.
-  2. At that moment that person's session in this business ends, on all their devices: what they have open
-     stops updating and the next thing they do asks them to sign in again. Their sessions in other
-     businesses stay open.
-  3. If they are still in the business, they come back in from erplora.com and already work with their new
-     role: what the new role allows appears and what it does not, disappears.
-  4. If they were removed, on coming back erplora.com tells them "You don't have access to this hub" and
-     they do not get in.
+  2. If their role changed, their session stays open and what they have open, on all their devices, moves
+     at that moment to what the new role allows, without reloading or signing in again: the menu, "My apps"
+     and the tabs show only what they may open; the screen in front of them turns into "No access" if the
+     new role does not open it, and one that said "No access" opens if they now may.
+  3. If they were removed from the business, at that moment their session in this business ends, on all
+     their devices: what they have open stops updating and the next thing they do asks them to sign in
+     again; on coming back, erplora.com tells them "You don't have access to this hub" and they do not get
+     in. Their sessions in other businesses stay open.
+  4. A handover of the ownership ends the session of both people in this business (HUBS-F28): they come
+     back in from erplora.com and already work with their new role.
   5. If they change their password, sign out everywhere or delete their account at erplora.com, all their
      sessions of the hub end, in all their businesses.
 In: the change erplora.com made (who, in which business and with which role, or that they are no longer
 there).
-Out: that person's sessions ended; their role in the business, up to date.
-If it fails: if the hub does not answer at that moment, erplora.com tries again shortly; meanwhile, the
-next time erplora.com passes the business's state to the hub those sessions end too.
-Involved: HUBS-F26, HUBS-F27, HUBS-F28
+Out: their role in the business, up to date, and what they have open with what that role allows; the
+sessions of whoever is no longer in the business, ended.
+If it fails: if the hub does not answer at that moment, erplora.com passes it again shortly and the change
+arrives then. A device without a connection gets it when it reconnects.
+Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
 
 ### BASE-F14 See the business's apps
 Status: done
@@ -2234,9 +2238,10 @@ Steps:
      "Members" of the business (in the installed app, in the device's browser; the Google Play copy does not have
      them).
   2. There they change the role.
-  3. Back here, the person shows with their new role and what they may do changes at once.
+  3. Back here, the person shows with their new role. If they have the hub open, what they see and what
+     they may do change at once, without ending their session (BASE-F13).
 In: the role chosen on erplora.com.
-Out: the person with their new role, as erplora.com sends it.
+Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
 

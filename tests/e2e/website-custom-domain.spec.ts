@@ -8,7 +8,8 @@
 // fails: the other specs expect `/` of `a` to jump to the login.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, internalPut, psql } from './helpers';
+import { A, api, capture, psql } from './helpers';
+import { keepPhotoOfA, type PhotoOfA } from './saas-photo';
 import { STACK } from './stack';
 import { atRest, ownerOfTheSite, photo, type Site } from './website-helpers';
 
@@ -28,20 +29,15 @@ const WIDE = { width: 1440, height: 900 };
 test.describe.configure({ mode: 'serial' });
 test.use({ launchOptions: { args: [`--host-resolver-rules=MAP ${DOMAIN} 127.0.0.1, MAP ${UNKNOWN} 127.0.0.1`] } });
 
-let hubId = '';
+let saasPhoto: PhotoOfA | undefined;
 let photoBefore: Record<string, unknown> = {};
 let found: Site | undefined;
 let owner: { context: BrowserContext; page: Page } | undefined;
-let version = Math.floor(Date.now() / 1000);
 
 /** The SaaS's photo of `a`: the one it found, with what the run says of its domain. */
 async function pushPhoto(customDomain: string | null): Promise<void> {
-  version += 1;
-  const body = JSON.stringify({ ...photoBefore, hub_id: hubId, slug: 'a', version, custom_domain: customDomain });
-  const response = await internalPut(`/internal/hubs/${hubId}/state`, body);
-  const answer = await response.text();
-  expect(response.status, answer).toBe(200);
-  expect(JSON.parse(answer)).toMatchObject({ applied: true, version });
+  if (!saasPhoto) throw new Error('No photo of a was kept before the run.');
+  await saasPhoto.send({ ...photoBefore, custom_domain: customDomain });
 }
 
 /** A visitor: a fresh context without a session. */
@@ -51,7 +47,7 @@ async function visitor(browser: Browser, viewport: { width: number; height: numb
 }
 
 test.beforeAll(async ({ browser }) => {
-  [hubId] = psql(`select id from base_hub where slug = 'a'`).split('|');
+  saasPhoto = keepPhotoOfA('e2e_website_custom_domain_photo_before');
   photoBefore = JSON.parse(psql(`select state from base_hub where slug = 'a'`) || '{}') as Record<string, unknown>;
   ({ owner, found } = await ownerOfTheSite(browser, WIDE));
   const cover = await api<{ id: string; url: string }>(owner.context, A, 'POST', '/website/images', {
@@ -85,6 +81,7 @@ test.afterAll(async () => {
       expect(offline.status, JSON.stringify(offline.data)).toBe(200);
     }
   } finally {
+    saasPhoto?.putBack();
     await owner?.context.close();
   }
 });
@@ -165,7 +162,7 @@ test(`${KEY}: the probe gives the business's id and nothing else; a host the Hub
   const { context, page } = await visitor(browser, WIDE);
   const probe = await page.goto(`${ON_DOMAIN}/.well-known/erplora-hub`);
   expect(probe?.status()).toBe(200);
-  expect(await probe?.json()).toEqual({ hub_id: hubId });
+  expect(await probe?.json()).toEqual({ hub_id: saasPhoto?.hubId });
   const unknown = await page.goto(`http://${UNKNOWN}:${STACK.hubPort}/`);
   expect(unknown?.status()).toBe(400);
   await context.close();
