@@ -17,7 +17,7 @@ Para qué: la pasada por todas las pantallas de la plataforma, en el móvil, la 
 3. BASE-F09 — la pestaña «Actividad».
 4. BASE-F14 — las pestañas de Apps.
 5. BASE-F48 — las pestañas de Ajustes.
-6. BASE-F82 — Empleados.
+6. BASE-F82 — Empleados, y «Qué permite» del empleado: en Ventas / TPV, «Anular una venta» con «Con aprobación».
 7. BASE-F39 — las cinco pestañas de Sistema.
 8. BASE-F72 — Archivos.
 9. BASE-F64 — Mi perfil.

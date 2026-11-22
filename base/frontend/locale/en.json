@@ -923,6 +923,20 @@
       "error": "The roles could not be loaded.",
       "change": "Change roles on erplora.com"
     },
+    "role": {
+      "title": "What it allows",
+      "intro": "What this role lets a person do in this business, app by app. It is given on erplora.com and is not changed here.",
+      "members": "People with this role: {n}",
+      "loading": "Loading what this role allows…",
+      "error": "Could not load what this role allows.",
+      "retry": "Retry",
+      "notFound": "This role does not exist in this business.",
+      "state": {
+        "on": "Allowed",
+        "approval": "With approval",
+        "off": "No"
+      }
+    },
     "person": {
       "title": "Person",
       "loading": "Loading…",
