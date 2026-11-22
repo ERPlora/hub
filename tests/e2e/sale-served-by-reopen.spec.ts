@@ -128,6 +128,7 @@ test('SALE-F16 (hub#2002): a table’s check left and opened again from the plan
     await expect(chip(page)).toContainText(`Served by ${LUCIA} Garcia`);
     await expect(await staffOf(page, soup)).toHaveText(`${LUCIA} Garcia`);
     await expect(await staffOf(page, steak)).toHaveText(`${MARTA} Garcia`);
+    await expect(shown(page).locator('[data-testid=pos-total]')).toContainText('25.00');
     await capture(page, `APP-SALE-SALE-F16-reopened-${size.label}`);
   }
 
