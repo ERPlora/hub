@@ -55,6 +55,11 @@ def eva(make_user):
 
 
 @pytest.fixture
+def mario(make_user):
+    return make_user("saas:4", host=A.key, role=Membership.Role.MANAGER, first_name="Mario", email="mario@example.com")
+
+
+@pytest.fixture
 def gema(make_user):
     return make_user("saas:5", host=A.key, role=ACCOUNTANT, first_name="Gema", email="gema@example.com")
 
@@ -90,21 +95,23 @@ class TestTheSaaSSendsIt:
 
 
 class TestItTakesNoPlaceOfThePlan:
-    def test_employees_lists_the_accountant_last_and_does_not_count_it_among_the_places(self, client, olga, eva, gema):
+    def test_employees_lists_the_accountant_last_and_does_not_count_it_among_the_places(
+        self, client, olga, mario, eva, gema
+    ):
         photo(
             members=[
                 {"user_id": "1", "role": "hub_owner", "email": "olga@example.com", "name": "Olga"},
                 {"user_id": GEMA, "role": "hub_accountant", "email": "asesoria@example.com", "name": "Asesoría"},
             ],
-            max_users=2,
+            max_users=3,
         )
         client.force_login(olga)
 
         answer = people(client)
 
-        assert [entry["id"] for entry in answer["people"]][1:] == ["saas:3", f"saas:{GEMA}", "saas:5"]
+        assert [entry["id"] for entry in answer["people"]] == ["saas:1", "saas:4", "saas:3", f"saas:{GEMA}", "saas:5"]
         assert {row(answer, person)["role"] for person in ("saas:5", f"saas:{GEMA}")} == {"hub_accountant"}
-        assert answer["seats"] == {"known": True, "used": 2, "limit": 2, "full": True}
+        assert answer["seats"] == {"known": True, "used": 3, "limit": 3, "full": True}
 
     def test_usage_and_plan_does_not_count_it_among_the_people(self, client, olga, eva, gema):
         Hub.objects.filter(slug=A.key).update(state={"plan": {"max_users": 3, "max_devices": 0}})
