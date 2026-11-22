@@ -1,16 +1,28 @@
 [
   {
-    "path": "apps/appointment/services.py",
-    "file_name": "services.py",
+    "path": "apps/appointment/services/moving.py",
+    "file_name": "moving.py",
+    "functions": [
+      {
+        "name": "_move",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "apps/appointment/services/series.py",
+    "file_name": "series.py",
     "functions": [
       {
         "name": "_book_window",
         "complexity": 21
-      },
-      {
-        "name": "_move",
-        "complexity": 27
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/appointment/services/series_update.py",
+    "file_name": "series_update.py",
+    "functions": [
       {
         "name": "update_series",
         "complexity": 76
