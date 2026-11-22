@@ -17,7 +17,7 @@ from apps.kitchen.models import KitchenSettings, LogEntry, Station, Ticket, Tick
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, add_printers, charge, ctx_for, fire, fired_round, make_station
-from .conftest import open_check, route_product, run, void_the_last_dish_to_cook
+from .conftest import open_check, route_product, run, sent_round, void_the_last_dish_to_cook
 
 pytestmark = HUB_DB
 
@@ -637,10 +637,7 @@ def test_reprinting_a_ticket_with_nothing_on_paper_says_so(clock, product):
 
 
 def test_cancelling_keeps_a_voided_dish_voided_and_prints_the_void_slip(clock, product, printers):
-    order = open_check("Table 4")
-    add_line(order.id, product("Burger"))
-    add_line(order.id, product("Fries"))
-    ticket = run("kitchen.ticket.send", {"order_id": str(order.id)})
+    order, ticket = sent_round(product, "Burger", "Fries")
     burger, fries = (item.id for item in ticket.items)
     run(
         "sale.order.void_line",
