@@ -432,7 +432,6 @@ function setHoursShown(shown: boolean): void {
               :value="openSections"
               @ion-change="followOpenSections"
             >
-              <!-- Top bar: always there, with «Log in». -->
               <ion-accordion
                 value="topbar"
                 data-testid="website-section-topbar"
@@ -452,6 +451,7 @@ function setHoursShown(shown: boolean): void {
                       data-testid="website-field-topbar-name"
                       :label="t('website.fields.name')"
                       label-placement="stacked"
+                      :helper-text="t('website.fields.nameHelp')"
                       :maxlength="80"
                       :value="draft.content.topbar.name"
                       :error-text="err('content.topbar.name')"

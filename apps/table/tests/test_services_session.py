@@ -257,6 +257,43 @@ def test_seating_with_a_customer_links_her_to_the_check(room):
     assert (session.customer_id, session.customer_name) == (ana.id, "Ana García")
 
 
+def test_seating_a_reserved_table_puts_the_reservations_customer_on_the_check(room):
+    ana = make_customer("Ana García", phone="+34600111222")
+    table = make_table("4", zone=room)
+    make_hold(table, starts_in=15, party_size=3, label="Ana", source="reservation", customer_id=ana.id)
+    session = seat(table, guests_count=3)
+    assert (session.customer_id, session.customer_name) == (ana.id, "Ana García")
+
+
+@pytest.mark.parametrize("picked_by", ["id", "name"])
+def test_a_customer_picked_before_seating_a_reserved_table_is_the_one_on_the_check(room, picked_by):
+    ana = make_customer("Ana García", phone="+34600111222")
+    luis = make_customer("Luis Pérez", phone="+34600333444")
+    table = make_table("4", zone=room)
+    make_hold(table, starts_in=15, party_size=3, label="Ana", source="reservation", customer_id=ana.id)
+    picked = {"customer_id": str(luis.id)} if picked_by == "id" else {"customer": "Luis Pérez"}
+    assert seat(table, **picked).customer_id == luis.id
+
+
+def test_a_check_brought_to_a_reserved_table_keeps_its_own_customer(room):
+    ana = make_customer("Ana García", phone="+34600111222")
+    luis = make_customer("Luis Pérez", phone="+34600333444")
+    bar = open_check("Bar")
+    run("customer.order.link", {"order_id": str(bar.id), "customer_id": str(luis.id)})
+    table = make_table("4", zone=room)
+    make_hold(table, starts_in=15, party_size=3, label="Ana", source="reservation", customer_id=ana.id)
+    assert seat(table, order_id=str(bar.id)).customer_id == luis.id
+
+
+def test_a_reservation_whose_card_was_deleted_seats_without_a_customer(room):
+    ana = make_customer("Ana García", phone="+34600111222")
+    run("customer.customer.delete", {"id": str(ana.id)})
+    table = make_table("4", zone=room)
+    make_hold(table, starts_in=15, party_size=3, label="Ana", source="reservation", customer_id=ana.id)
+    session = seat(table)
+    assert (session.status, session.customer_id) == ("open", None)
+
+
 def test_two_tables_seated_get_two_checks_and_the_same_table_twice_does_not():
     table = make_table("4")
     seat(table)

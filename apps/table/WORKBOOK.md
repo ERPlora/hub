@@ -491,14 +491,16 @@ Pasos:
 2. Toca un atajo del 1 al 8 (sienta de un toque) o ajusta con «−» y «+» y pulsa «Sentar N». Más que el
    aforo avisa «Supera el aforo de la mesa (4)» y deja sentar. Con el ajuste de comensales apagado,
    «Sentar» sienta con el aforo.
-3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta.
+3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta. En una Reservada, si no
+   eliges ninguna, la cuenta lleva el cliente de la reserva.
 4. La mesa pasa a Ocupada y en Ventas nace su cuenta abierta con el título «Mesa N» (la ve **Cuentas
    abiertas** del TPV). Quien sienta es el camarero de la cuenta.
 5. Con el asistente: «sienta a tres en la mesa 4» (con su zona si el número se repite).
-Entra: la mesa y los comensales; en una Reservada, los comensales de la reserva.
+Entra: la mesa y los comensales; en una Reservada, los comensales y el cliente de la reserva.
 Sale: la cuenta de mesa abierta con sus comensales, la hora y el camarero (avisa:
-`table.session.opened`); su cuenta en Ventas (avisa: `sale.order.opened`); las reservas retenidas en
-esa mesa que ya estaban Reservadas, gastadas (TABLE-F28; desde Reservas, solo la de esa reserva).
+`table.session.opened`); su cuenta en Ventas (avisa: `sale.order.opened`), con su cliente si lo hay
+(avisa: `customer.order.linked`); las reservas retenidas en esa mesa que ya estaban Reservadas, gastadas
+(TABLE-F28; desde Reservas, solo la de esa reserva).
 Si falla: si otro dispositivo la acaba de ocupar, «Otro dispositivo acaba de ocupar esa mesa. Se ha
 actualizado el plano.» y la mesa no se sienta. **Dos camareros que sientan la misma mesa a la vez
 dejan una sola cuenta**: el segundo recibe ese mismo aviso. Una mesa bloqueada, desactivada o borrada
@@ -808,9 +810,10 @@ Pantalla: Plano de sala (Servicio)
 Pasos:
 1. Llega el grupo de la reserva: la mesa está Reservada. Tócala; la pregunta de comensales viene con
    los de la reserva. Pulsa «Sentar N», como al sentar a cualquier grupo.
-2. La mesa pasa a Ocupada y la reserva se da por sentada: la mesa ya no vuelve a salir Reservada
-   por ella. Pasar o dividir una cuenta a esa mesa, o volver a sentar allí una aparcada, también la da
-   por sentada.
+2. La mesa pasa a Ocupada, su cuenta lleva el cliente de la reserva (o el que se elija antes con
+   «Asignar cliente»), igual que al sentarla desde Reservas, y la reserva se da por sentada: la mesa ya
+   no vuelve a salir Reservada por ella. Pasar o dividir una cuenta a esa mesa, o volver a sentar allí
+   una aparcada, también la da por sentada.
 3. Sentar a otro grupo en esa mesa horas antes de la reserva (la mesa aún Disponible) **no** da por
    sentada la reserva de la noche.
 4. Si se sienta desde Reservas («Sentar» en la reserva), solo cuenta esa reserva: con Ana a las 19:00 y
@@ -819,8 +822,9 @@ Pasos:
    la mesa no vuelve a salir Reservada para quien ya se sentó. Desde el plano no se sabe de qué reserva
    es el grupo, y se dan por sentadas todas las que ya tenían la mesa Reservada.
 Entra: la mesa Reservada (y, desde Reservas, la reserva que se sienta, RESERVATION-F11).
-Sale: las retenciones que la pintaban Reservada (desde Reservas, solo la suya), gastadas y sin nombre;
-una retención que aún no pintaba la mesa, soltada al sentar desde Reservas.
+Sale: la cuenta con el cliente de la reserva; las retenciones que la pintaban Reservada (desde Reservas,
+solo la suya), gastadas y sin nombre; una retención que aún no pintaba la mesa, soltada al sentar desde
+Reservas.
 Si falla: los mismos avisos que al sentar a un grupo en una mesa libre o reservada.
 Implicados: RESERVATION-F11, TABLE-F10, TABLE-F25
 
@@ -1106,7 +1110,8 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   en el acto (el defecto de 1–2 horas de TABLES-F29 desaparece).
 - **Sentar gasta las retenciones que ya pintan la mesa** (TABLE-F28): `table.session.open` con
   `reservation_id` (opcional; lo manda Reservas al sentar una reserva) gasta solo la retención de esa
-  reserva (`source = "reservation"`, `source_ref` = su id) y toma de ella los comensales si no vienen;
+  reserva (`source = "reservation"`, `source_ref` = su id) y toma de ella los comensales si no vienen y,
+  en una cuenta nueva sin cliente elegido, su cliente (`Hold.customer_id`, con `customer.order.link`);
   sin él (el plano, el TPV), todas las que ya entraron en su ventana. Trasladar, dividir y volver a
   sentar no dicen reserva: gastan todas. Una reserva sentada más de una hora antes de su hora no gasta
   nada (su retención aún no pinta la mesa): Reservas la suelta tras sentarla, con `table.hold.release`

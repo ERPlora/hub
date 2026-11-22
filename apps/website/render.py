@@ -78,7 +78,7 @@ def render_site(  # noqa: PLR0913
     content: dict,
     lang: str,
     *,
-    hub: str,
+    name: str,
     currency: str,
     catalog: dict | None = None,
     request: Any = None,
@@ -88,7 +88,8 @@ def render_site(  # noqa: PLR0913
     hub_address: str = "",
     canonical: str = "",
 ) -> str:
-    """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
+    """The page of ``template`` with ``theme`` and ``content`` in ``lang``, of the business that goes by ``name`` when
+    its bar names nobody (the one Settings › Business shows, or its address's slug when it has none, as a demo).
 
     ``currency`` is the business's (ISO 4217), its catalog's prices'; ``catalog`` is the snapshot the catalog section paints; ``preview`` marks the editor's preview (not indexed,
     links inert, no refresh); ``today`` (``mon`` … ``sun``, :func:`local_day`) is marked in the opening hours;
@@ -107,7 +108,7 @@ def render_site(  # noqa: PLR0913
     valid_content = Content.model_validate(content or {})
     with translation.override(lang):
         body = _body(valid_content, catalog, currency, today, reviews, preview)
-        site_name = valid_content.topbar.name or hub
+        site_name = valid_content.topbar.name or name
         context = {
             "lang": lang,
             "template": template,

@@ -13,7 +13,19 @@ from live.errors import NotFound, PermissionDenied
 from apps.website.queries import catalog_cache_key, live_version, published_page, read_catalog
 from apps.website.schemas import CatalogSection
 from apps.website import reviews
-from apps.website.tests.conftest import HOST, HUB_DB, PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
+from apps.website.tests.conftest import (
+    HOST,
+    HUB_DB,
+    NAMELESS,
+    PLACE_ID,
+    A,
+    B,
+    ctx_for,
+    full_content,
+    google_reviews,
+    page_names,
+    with_language,
+)
 from apps.website.tests.test_services import run
 from base.models import Hub
 from base.tenancy.context import use_hub
@@ -88,6 +100,17 @@ def test_the_preview_is_the_draft_rendered_with_a_fresh_catalog(services_catalog
     assert "Fresh food every day" in html and "Manicure" in html
     # In the editor's language.
     assert "Entrar" in run("website.site.preview", ctx=with_language(ctx_for(), "es")).html
+
+
+@pytest.mark.usefixtures("website_manifest")
+def test_the_preview_of_a_page_that_names_nobody_goes_by_the_business_s_name():
+    # flow: WEBSITE-F06 — the editor sees the name its visitors will see: the business's as erplora.com registered it
+    # (Settings › Business), never the slug of its address (hub#2084); a business without one (a demo), its address.
+    Hub.objects.filter(slug=A.key).update(name="Salón Aurora")
+    save(full_content(**NAMELESS))
+    assert page_names(run("website.site.preview").html) == ["Salón Aurora"] * 4
+    Hub.objects.filter(slug=A.key).update(name="")
+    assert page_names(run("website.site.preview").html) == [A.key] * 4
 
 
 def test_only_who_manages_the_website_previews_it():

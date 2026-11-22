@@ -20,6 +20,7 @@ import {
 import PALETTES from '../../palettes.json';
 import { SITE } from '../__tests__/site';
 import type { SiteOut } from '../operations';
+import en from '../locale/en.json';
 import GalleryEditor from '../components/GalleryEditor.vue';
 import ReviewsEditor from '../components/ReviewsEditor.vue';
 import WebsitePage from './WebsitePage.vue';
@@ -44,7 +45,7 @@ const IonModalStub = defineComponent({
   },
 });
 
-type Control = HTMLElement & { errorText?: string; value?: unknown; checked?: boolean };
+type Control = HTMLElement & { errorText?: string; helperText?: string; value?: unknown; checked?: boolean };
 
 async function setup(options: MountOptions = {}) {
   const m = await mountWebsite(WebsitePage, {
@@ -83,6 +84,14 @@ describe('WebsitePage', () => {
     expect(s.testid('website-loading').exists()).toBe(false);
     expect(s.control('website-field-hero-title').value).toBe('Fresh food');
     expect(s.control('website-field-topbar-name').value).toBe('Pepe');
+  });
+
+  it('under the business name, that left empty the page goes by the one in Settings › Business', async () => {
+    const s = await setup();
+    await s.show();
+    const help = s.control('website-field-topbar-name').helperText;
+    expect(help).toBeTruthy();
+    expect(help).toBe(en.website.fields.nameHelp);
   });
 
   it('a failed load says so instead of an empty form', async () => {
