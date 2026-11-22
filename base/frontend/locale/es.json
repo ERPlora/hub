@@ -234,6 +234,19 @@
       },
       "toApps": "Ir a Apps"
     },
+    "noAccess": {
+      "title": "Sin acceso",
+      "heading": "No tienes acceso a esta pantalla",
+      "body": "Tu rol en este negocio no la abre.",
+      "checking": "Buscando quién puede darte acceso…",
+      "ask": "Pide acceso a una de estas personas:",
+      "nobody": "Pide acceso a quien lleva el negocio.",
+      "error": {
+        "heading": "No hemos podido saber quién puede darte acceso",
+        "body": "Pregunta a quien lleva el negocio o vuelve a intentarlo."
+      },
+      "home": "Ir al Inicio"
+    },
     "systemPlan": {
       "title": "Sistema",
       "tabs": {
