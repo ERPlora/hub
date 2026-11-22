@@ -111,10 +111,11 @@ impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resu
 
 ### El menú lateral
 A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y las entradas de la plataforma en dos
-grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien puede abrir
-su pantalla: «Sistema», a quien administra el negocio; «API», mientras la documentación de la API está mostrada
-(BASE-F91), y aparece o se va al cambiar el interruptor, sin recargar. Un empleado ve «Inicio», «Empleados»,
-«Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan» (solo el propietario) y «Gestionar en erplora.com».
+grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien tiene el
+permiso con el que se abre su pantalla, como en Square o Toast: «Sistema», a quien administra el negocio; «API», además,
+mientras la documentación de la API está mostrada (BASE-F91), y aparece o se va al cambiar el interruptor, sin
+recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan»
+(solo el propietario) y «Gestionar en erplora.com».
 
 ### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
@@ -320,7 +321,7 @@ En la pantalla Ajustes · Datos y copias:
 | Cargando | «Cargando plantillas…»; en «Exportar» y «Restablecer», las filas en gris. |
 | Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
 | Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
-| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. Un administrador, en «Restablecer», deshace importaciones y, en lugar de «Restablecer el negocio» y «Copias de los datos», lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.». |
+| Sin permiso | Quien no administra el negocio no tiene la pestaña «Datos y copias»: su dirección le abre «General» (BASE-F48), y la tarjeta de plantillas del Inicio no sale. Un administrador, en «Restablecer», deshace importaciones y, en lugar de «Restablecer el negocio» y «Copias de los datos», lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.». |
 
 En la pantalla Archivos:
 
@@ -1547,11 +1548,14 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes, Ajustes · Impresión
 Pasos:
   1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
-  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias»; se abre
-     «General» (BASE-F62). La pestaña elegida queda en el enlace, así que un enlace guardado vuelve a ella y Atrás
-     sale de Ajustes en vez de recorrer sus pestañas. En el móvil caben las cuatro, enteras.
+  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias», cada una solo para quien puede usar
+     lo que lleva: «Impresión», para quien configura la app Impresión (propietario, administrador y responsable), y
+     «Datos y copias», para quien administra el negocio. Un empleado tiene «General» y «Negocio». Se abre «General»
+     (BASE-F62). La pestaña elegida queda en el enlace, así que un enlace guardado vuelve a ella y Atrás sale de
+     Ajustes en vez de recorrer sus pestañas. En el móvil caben las cuatro, enteras.
   3. Los enlaces antiguos siguen llevando a su sitio: el de la antigua «General» abre «General», el de la antigua
-     pestaña de impuestos abre «Negocio», y el de una pestaña que ya no existe abre la primera.
+     pestaña de impuestos abre «Negocio», y el de una pestaña que ya no existe, o que la persona no tiene, abre la
+     primera.
   4. En «Impresión», «Impresoras y tique» («Da de alta tu impresora y configura el tique impreso y digital»)
      abre la app Impresión; si no está, dice «Instala la app Impresión para dar de alta tu impresora y configurar
      el tique» y lleva a «Apps».
@@ -3931,7 +3935,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   de `apps/sale/queries/business.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
   Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
   una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
-  `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
+  `#data`; `#tax` abre Negocio; `lib/settings-tabs.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
 - **La hora del negocio** (hub#687): la zona la lee un solo sitio, `base.business.business_zone()`: la del hub en el que se
@@ -4427,9 +4431,12 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
-- Menú lateral: `SIDEBAR` de `frontend/main.ts`; cada entrada lleva el `visible` del shell (`ShellSidebarItem`,
-  `packages/ui`) con el permiso de la operación de su pantalla (`allowedTo` de `base/frontend/lib/sidebar.ts`): un
-  empleado no ve «Sistema» (`base.administer_hub`).
+- Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
+  su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
+  además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`).
+- Pestañas de Ajustes: `SETTINGS_TABS` de `base/frontend/lib/settings-tabs.ts`, cada una con el permiso de lo que
+  lleva («Impresión», `printing.manage_settings`, el de la app a la que lleva; «Datos y copias», `base.administer_hub`);
+  `settingsTab` abre la del hash solo si la persona la tiene y, si no, la primera suya.
 - Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py`, `test_approved_calls.py` y `test_api_docs.py`; Vitest de
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e

@@ -11,7 +11,6 @@ import {
   resetUserThemePreferences,
   type SessionMe,
   type SessionStatus,
-  type ShellSidebar,
   type ShellUserMenu,
   type ShellUserMenuItem,
   type ThemePalette,
@@ -31,33 +30,9 @@ import { hubAssistant } from '../base/frontend/lib/assistant-hub';
 import { reloadOrForgetGone } from '../base/frontend/lib/change-business';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { openReportProblem } from '../base/frontend/lib/report-problem';
-import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
+import { shellSidebar, SIDEBAR } from '../base/frontend/lib/sidebar';
 import { beforeSignOut } from '../base/frontend/lib/sign-out';
 import { OPERATION_ROUTES } from './generated/operation-routes';
-
-/**
- * The side menu: the platform's entries in two groups — Home (the shell's, first), Employees, Files · My plan, Apps,
- * System, API, Settings — and never a module (modules open from «My apps» and Home). The shell paints an entry only
- * once its screen exists in the router, so each appears by itself when `base` brings it; and only for whoever may open
- * it (`visible`: the permission its screen's operation asks), «API» only while the business shows its API's
- * documentation.
- * My plan has no screen in the Hub yet: it asks nothing until it has one.
- */
-export const SIDEBAR: ShellSidebar = {
-  groups: [
-    [
-      { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees', visible: allowedTo('base.view_home') },
-      { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files', visible: allowedTo('base.view_files') },
-    ],
-    [
-      { id: 'billing', labelKey: 'sidebar.billing', icon: 'ion:card-outline', to: '/billing' },
-      { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps', visible: allowedTo('base.view_home') },
-      { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system', visible: allowedTo('base.administer_hub') },
-      { id: 'api', labelKey: 'sidebar.api', icon: 'ion:code-slash-outline', to: '/api-docs', visible: useApiDocsShown },
-      { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings', visible: allowedTo('base.view_home') },
-    ],
-  ],
-};
 
 /**
  * base's pieces of the chrome: the assistant's sparkles at the end of the topbar, «Upgrade plan» and «Manage on
@@ -231,9 +206,9 @@ export async function boot(
     // «Home» first in the menu, and the shell's grid of apps as the fallback of `/` (where the login lands
     // without `next`): base's Home (base/frontend/routes.ts) is registered before it and wins `/`.
     home: true,
-    // The side menu, pinned from 992 px and a drawer below, with the QR in its footer and the rail toggle and
+    // base's side menu, pinned from 992 px and a drawer below, with the QR in its footer and the rail toggle and
     // «My apps» in the topbar.
-    sidebar: SIDEBAR,
+    sidebar: shellSidebar(SIDEBAR),
     userMenu: userMenu(doc),
     chrome: CHROME,
     actionNotices: useHubActionNotices,

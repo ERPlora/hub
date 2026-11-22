@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// The tab goes in the hash, replaced, so a link opens it and Back leaves the page instead of walking its tabs. The list
-// of devices is an administrator's: whoever does not run the hub reads why instead, and no list is asked for.
+// The tab goes in the hash, replaced, so a link opens it and Back leaves the page instead of walking its tabs. Each tab
+// is only for whoever holds its permission (lib/settings-tabs.ts), followed live. The list of devices is an
+// administrator's: whoever does not run the hub reads why instead, and no list is asked for.
 import { AppPage, type ShellTab, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -12,8 +13,8 @@ import PinPolicyCard from '../components/PinPolicyCard.vue';
 import BusinessPanel from '../components/settings/BusinessPanel.vue';
 import TicketsPanel from '../components/settings/TicketsPanel.vue';
 import DataPanel from '../components/data/DataPanel.vue';
-import { type SettingsTab, settingsTab } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
+import { type SettingsTab, settingsTab, settingsTabsOf } from '../lib/settings-tabs';
 import '../settings.css';
 
 const { t } = useBaseI18n();
@@ -22,14 +23,10 @@ const router = useRouter();
 const session = useSession();
 const canManage = computed(() => session.can('base.administer_hub'));
 
-const tabs = computed<ShellTab[]>(() => [
-  { id: 'general', label: t('base.settings.tabs.general'), icon: 'ion:settings-outline' },
-  { id: 'business', label: t('base.settings.tabs.business'), icon: 'ion:wallet-outline' },
-  { id: 'tickets', label: t('base.settings.tabs.tickets'), icon: 'lucide:receipt' },
-  { id: 'data', label: t('base.settings.tabs.data'), icon: 'ion:swap-vertical-outline' },
-]);
-const tab = computed<SettingsTab>({
-  get: () => settingsTab(route.hash),
+const open = computed(() => settingsTabsOf((permission) => session.can(permission)));
+const tabs = computed<ShellTab[]>(() => open.value.map(({ id, labelKey, icon }) => ({ id, label: t(labelKey), icon })));
+const tab = computed<SettingsTab | undefined>({
+  get: () => settingsTab(route.hash, open.value.map((entry) => entry.id)),
   set: (next) => void router.replace({ path: route.path, query: route.query, hash: `#${next}` }),
 });
 </script>
