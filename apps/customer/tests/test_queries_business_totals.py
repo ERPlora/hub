@@ -3,6 +3,7 @@ but what they all spent altogether is a figure of the whole business, so it reac
 totals (``base.view_business_totals``: the owner, the administrator and the manager). Anyone else gets it empty."""
 
 import pytest
+from django.apps import apps
 
 from apps.customer.models import Customer
 from apps.flow.tests.test_api import get
@@ -32,3 +33,12 @@ def test_an_employee_counts_the_customers_but_never_reads_what_they_all_spent(ma
 @pytest.mark.parametrize("role", ["hub_manager", "hub_admin", "hub_owner"])
 def test_whoever_sees_the_business_totals_reads_it(make_user, client, cards, role):
     assert stats_as(make_user, client, role)["total_revenue"] == 17000
+
+
+def test_the_business_totals_alone_open_it_without_the_costs(monkeypatch, make_user, client, cards):
+    # An employee given the business totals, as a business's own role could, and still without the costs.
+    config = apps.get_app_config("base")
+    granted = [*config.role_permissions["hub_employee"], "base.view_business_totals"]
+    monkeypatch.setattr(config, "role_permissions", {**config.role_permissions, "hub_employee": granted})
+    assert "base.view_costs" not in granted
+    assert stats_as(make_user, client, "hub_employee")["total_revenue"] == 17000
