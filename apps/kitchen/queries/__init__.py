@@ -7,12 +7,12 @@ them, the kitchen reads what Sales did (WORKBOOK «A qué reacciona»):
 - a round Sales fired that the kitchen has not saved yet is read from Sales' lines (``rounds.pending_rounds``)
   and shown as a ticket «not saved yet» (``saved = False``), with the id of its first line, the number
   it will have and its dishes routed by today's routing; the first write of the kitchen saves it
-  (services.settle);
+  (services.settling.settle);
 - what Sales did after (a line voided, the check voided or charged) is applied when read by
-  ``state.effective`` (KITCHEN-F27, F28, F29), without writing; services.settle applies the same function
+  ``state.effective`` (KITCHEN-F27, F28, F29), without writing; services.settling.settle applies the same function
   and saves its changes with their History.
 
-services.py reuses these helpers inside its own transaction. Every list pages (``limit`` ≤ 100) with
+services/ reuses these helpers inside its own transaction. Every list pages (``limit`` ≤ 100) with
 ``id`` as the last tie-break. ``find_*`` resolve how a person names a record (assistant, voice): by id,
 else a number or an exact name, else the only one that contains it; several → 409 ``*_ambiguous``.
 """
