@@ -28,8 +28,6 @@ describe('invoice catalogues (en source + es)', () => {
 
   it('keep the old screens’ words (WORKBOOK «Pantallas»)', () => {
     expect(ES.get('invoice.title')).toBe('Facturación');
-    expect(ES.get('invoice.tabs.invoices')).toBe('Facturas');
-    expect(ES.get('invoice.tabs.series')).toBe('Series');
     expect(ES.get('invoice.list.search')).toBe('Buscar facturas…');
     expect(ES.get('invoice.list.empty')).toBe('Aún no hay facturas.');
     expect(ES.get('invoice.list.actions.markPaid')).toBe('Marcar pagada');

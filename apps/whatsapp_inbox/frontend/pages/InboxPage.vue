@@ -22,6 +22,7 @@ import { AppPage, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
@@ -33,11 +34,11 @@ import { formatMessageTime } from '../lib/format';
 import { nearCap, noAllowance } from '../lib/plan';
 import { kindLabel } from '../lib/thread';
 import type { ConversationListIn, ConversationOut, ConversationStatus } from '../operations';
-import { inboxTabs } from '../tabs';
 
 const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
 const session = useSession();
+const tabs = useAppTabs('whatsapp_inbox');
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 /** Where the number is connected, reconnected or disconnected (WHATSAPP_INBOX-F01, F02). */
 const SETTINGS = '/whatsapp_inbox/settings';
@@ -169,7 +170,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
   <AppPage
     :title="$t('whatsapp_inbox.title')"
     content-layout="fill"
-    :tabs="inboxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('whatsapp_inbox.tabs.label')"
   >
     <div class="wa-inbox">

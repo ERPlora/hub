@@ -20,6 +20,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import GrantsSheet from '../components/GrantsSheet.vue';
 import MovementsSheet from '../components/MovementsSheet.vue';
 import OrphansSheet from '../components/OrphansSheet.vue';
@@ -30,12 +31,12 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatPercentBp, useBusinessMoney } from '../lib/format';
 import type { PackageListIn, PackageOut, PackageStatus } from '../operations';
-import { serviceTabs } from '../tabs';
 
 const STATUSES: readonly PackageStatus[] = ['active', 'archived', 'deleted'];
 const TONE: Record<PackageStatus, 'success' | 'neutral' | 'danger'> = { active: 'success', archived: 'neutral', deleted: 'danger' };
 
 const session = useSession();
+const tabs = useAppTabs('service');
 const t = useT();
 const locale = useLocale();
 /** The business's currency (its country's), a dash until it answers: never a euro by default. */
@@ -161,7 +162,7 @@ function onRowClick(row: PackageOut): void {
   <AppPage
     :title="$t('service.title')"
     content-layout="fill"
-    :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
   >
     <PageNotices

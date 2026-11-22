@@ -16,12 +16,6 @@ describe('sale catalogues (en source + es)', () => {
 
   it('keep the old screens’ words (WORKBOOK «Pantallas»)', () => {
     expect(ES.get('sale.title')).toBe('Ventas / TPV');
-    expect(ES.get('sale.tabs.pos')).toBe('Vender');
-    expect(ES.get('sale.tabs.sales')).toBe('Ventas');
-    expect(ES.get('sale.tabs.quickNotes')).toBe('Notas rápidas');
-    // «Departamentos» does not fit a fifth of a phone's tabbar.
-    expect(ES.get('sale.tabs.departments')).toBe('Secciones');
-    expect(ES.get('sale.tabs.settings')).toBe('Ajustes');
   });
 });
 

@@ -25,6 +25,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
@@ -36,9 +37,9 @@ import { useLocale, useT } from '../composables/useT';
 import { amountFilterErrors, formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
 import { AMOUNT_FILTERS, AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, SIGNED } from '../lib/sessionFilters';
 import type { CountType, SessionRow } from '../operations';
-import { cashRegisterTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('cash_register');
 const can = (permission: string) => computed(() => session.can(permission));
 const canOpen = can('cash_register.add_session');
 const canMove = can('cash_register.add_movement');
@@ -185,7 +186,7 @@ function onCounted(count: { type: CountType; total: number }): void {
   <AppPage
     :title="$t('cash_register.title')"
     content-layout="fill"
-    :tabs="cashRegisterTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cash_register.tabs.label')"
   >
     <header class="cash-sessions__header">

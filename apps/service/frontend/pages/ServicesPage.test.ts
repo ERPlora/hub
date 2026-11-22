@@ -9,7 +9,19 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { ServiceOut } from '../operations';
-import { business, EMPLOYEE, flush, JAPANESE, MANAGER, type MountOptions, mountService, OWNER, page, POLISH } from '../__tests__/mount-service';
+import {
+  business,
+  EMPLOYEE,
+  flush,
+  JAPANESE,
+  MANAGER,
+  type MountOptions,
+  mountService,
+  OWNER,
+  page,
+  POLISH,
+  tabsOf,
+} from '../__tests__/mount-service';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import ServicesPage from './ServicesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -334,5 +346,13 @@ describe('ServicesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('ServicesPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = MANAGER.menu;
+    const s = await setup({ session: { ...MANAGER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['services', 'Services']]);
   });
 });

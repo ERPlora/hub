@@ -24,6 +24,7 @@ import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CorrectionModal from '../components/CorrectionModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -36,7 +37,6 @@ import { useLocale, useT } from '../composables/useT';
 import { saveCsv } from '../lib/download';
 import { formatDay, formatHm, liveSeconds, monthBounds, monthLabel, monthOf, recentMonths, timeOfDay } from '../lib/time';
 import type { RecordListIn, RecordOut, RecordStatus } from '../operations';
-import { attendanceTabs } from '../tabs';
 
 const STATUSES: readonly RecordStatus[] = ['open', 'closed', 'needs_review'];
 const TONE: Record<RecordStatus, StatusPillTone> = { open: 'info', closed: 'neutral', needs_review: 'warning' };
@@ -46,6 +46,7 @@ const MONTHS_OFFERED = 49;
 const PEOPLE_PAGE = 20;
 
 const session = useSession();
+const tabs = useAppTabs('attendance');
 const client = useLiveClient();
 const t = useT();
 const locale = useLocale();
@@ -195,7 +196,7 @@ const cardTitle = (row: RecordOut): string => {
   <AppPage
     :title="$t('attendance.title')"
     content-layout="fill"
-    :tabs="attendanceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('attendance.tabs.label')"
   >
     <PageNotices

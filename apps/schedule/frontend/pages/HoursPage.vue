@@ -12,14 +12,15 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DayHoursModal from '../components/DayHoursModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { hoursSummary, statusOf } from '../lib/intervals';
 import type { WeekDayOut } from '../operations';
-import { scheduleTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('schedule');
 const t = useT();
 const locale = useLocale();
 const canChange = computed(() => session.can('schedule.change'));
@@ -69,7 +70,7 @@ async function confirmWeek(): Promise<void> {
   <AppPage
     :title="$t('schedule.title')"
     content-layout="fill"
-    :tabs="scheduleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('schedule.tabs.label')"
   >
     <PageNotices

@@ -19,6 +19,7 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { dayOf, formatShortDate, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
 import { STATUS_TONE } from '../../../appointment/frontend/lib/states';
 import CancelDialog from '../components/CancelDialog.vue';
@@ -28,7 +29,6 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { allowed, type InboxAction, inboxActions } from '../lib/actions';
 import type { BookingListIn, BookingRow, BookingSort, BookingStatus } from '../operations';
-import { onlineBookingTabs } from '../tabs';
 
 const STATUSES: readonly BookingStatus[] = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
 const ICONS: Record<InboxAction, string> = {
@@ -47,6 +47,7 @@ const COLORS: Record<InboxAction, string> = {
 };
 
 const session = useSession();
+const tabs = useAppTabs('online_booking');
 const t = useT();
 const locale = useLocale();
 
@@ -186,7 +187,7 @@ async function confirmDelete(): Promise<void> {
   <AppPage
     :title="$t('online_booking.title')"
     content-layout="fill"
-    :tabs="onlineBookingTabs(t, { settings: session.can('online_booking.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('online_booking.tabs.label')"
   >
     <PageNotices

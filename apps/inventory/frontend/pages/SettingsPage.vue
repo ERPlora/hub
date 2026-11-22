@@ -7,11 +7,11 @@ import { EmptyState } from '@erplora/ui/components';
 import { AppPage, useSession, useShellConfig } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import SettingsForm from '../components/SettingsForm.vue';
-import { useInventoryTabs } from '../composables/useInventoryTabs';
 
 const session = useSession();
-const tabs = useInventoryTabs();
+const tabs = useAppTabs('inventory');
 const { homePath } = useShellConfig();
 /** Decided once, when the page opens: a later shift change locks the form instead. */
 const allowed = session.can('inventory.manage_settings');

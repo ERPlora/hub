@@ -11,6 +11,7 @@ import { AppPage, HubIcon, toastError, toastSuccess, useSession, useSurface } fr
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
@@ -20,9 +21,9 @@ import type { PrinterDraft } from '../lib/discovery';
 import { deviceError, printerAddress, printerPaper, printerState, STATE_TONE } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { PrinterOut } from '../operations';
-import { printingTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('printing');
 const canManage = computed(() => session.can('printing.manage_settings'));
 const canPrint = computed(() => session.can('printing.print'));
 const t = useT();
@@ -140,7 +141,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
   <AppPage
     :title="$t('printing.title')"
     content-layout="fill"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
   >
     <div class="printing-printers page-fill">

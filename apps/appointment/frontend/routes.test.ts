@@ -2,9 +2,8 @@
 // reads the default export; menu, permissions and active apps come from the server).
 import { describe, expect, it, vi } from 'vitest';
 
-import { namedPaths, routeChecks } from '../../../base/frontend/__tests__/app-routes';
+import { menuPaths, namedPaths, routeChecks } from '../../../base/frontend/__tests__/app-routes';
 import routes from './routes';
-import { APPOINTMENT_TABS } from './tabs';
 
 // The pages, stubbed: `routeChecks` checks which one each route loads (app-routes.ts says why).
 vi.mock('./pages/AgendaPage.vue', () => ({ default: { name: 'AgendaPage' } }));
@@ -20,8 +19,8 @@ describe('appointment routes.ts', () => {
 
   routeChecks(import.meta.url, routes, ['AgendaPage', 'SettingsPage']);
 
-  it('has a page for every tab, and every path apps.py names (its menu entry, its bell counter) is one of them', () => {
-    expect(routes.map((r) => r.path)).toEqual(APPOINTMENT_TABS.map((tab) => tab.to));
+  it('has a page for every entry of its menu (its tabs), and every path apps.py names (its menu entry, its bell counter) is one of them', () => {
+    expect(routes.map((r) => r.path)).toEqual(menuPaths('appointment'));
     // Distinct paths: the two menu entries, and the bell's «Appointments to confirm», which leads to the Agenda.
     const paths = namedPaths('appointment');
     expect(paths).toEqual(['/appointment/agenda', '/appointment/settings']);

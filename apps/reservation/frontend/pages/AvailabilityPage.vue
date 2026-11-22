@@ -24,6 +24,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import BlockedDateFormModal from '../components/BlockedDateFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import SlotFormModal from '../components/SlotFormModal.vue';
@@ -34,11 +35,11 @@ import { formatShortDate, formatTime, todayIn, weekdayOf } from '../lib/clock';
 import { spansLine } from '../lib/states';
 import { WEEKDAYS, weekdayKey } from '../lib/weekdays';
 import type { BlockedDateOut, SlotLoadOut, TimeSlotOut } from '../operations';
-import { reservationTabs } from '../tabs';
 
 const FALLBACK_ZONE = 'Europe/Madrid';
 
 const session = useSession();
+const tabs = useAppTabs('reservation');
 const t = useT();
 const locale = useLocale();
 const canSlots = computed(() => session.can('reservation.change_timeslot'));
@@ -240,7 +241,7 @@ const isBlocked = computed(() => blockingError(noticeError.value));
 <template>
   <AppPage
     :title="$t('reservation.title')"
-    :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
   >
     <PageNotices

@@ -23,6 +23,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
@@ -31,7 +32,6 @@ import ImportTaxModal from '../components/ImportTaxModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
 import ProductFormModal from '../components/ProductFormModal.vue';
 import StockModal, { type StockAction } from '../components/StockModal.vue';
-import { useInventoryTabs } from '../composables/useInventoryTabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useProductImport } from '../composables/useProductImport';
 import { useServerTable } from '../composables/useServerTable';
@@ -47,7 +47,7 @@ const STATUS_FROM_QUERY: Record<string, ProductStatus> = { unconfigured: 'needs_
 
 const { t, locale } = useT();
 const business = useBusinessMoney();
-const tabs = useInventoryTabs();
+const tabs = useAppTabs('inventory');
 const session = useSession();
 const client = useLiveClient();
 const route = useRoute();

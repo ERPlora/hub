@@ -15,6 +15,7 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ZoneDeleteDialog from '../components/ZoneDeleteDialog.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
@@ -22,11 +23,11 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { ZoneColor, ZoneListIn, ZoneOut } from '../operations';
-import { tableTabs } from '../tabs';
 
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
 
 const session = useSession();
+const tabs = useAppTabs('table');
 const t = useT();
 const canAdd = computed(() => session.can('table.add_zone'));
 const canChange = computed(() => session.can('table.change_zone'));
@@ -113,7 +114,7 @@ function onAction({ actionId, row }: { actionId: string; row: ZoneOut }): void {
   <AppPage
     :title="$t('table.title')"
     content-layout="fill"
-    :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('table.tabs.label')"
   >
     <PageNotices

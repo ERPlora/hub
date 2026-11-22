@@ -18,11 +18,12 @@ import {
   JAPANESE,
   json,
   MANAGER,
-  type MountOptions,
   mountCustomer,
+  type MountOptions,
   POLISH,
   sent,
   subId,
+  tabsOf,
   VIEWER,
 } from '../__tests__/mount-customer';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
@@ -529,5 +530,12 @@ describe('CustomerListPage: «Spent» is read as every amount of the Hub', () =>
       await s.show(PAGE);
       return { filter: s.filter, query: () => s.params(LIST).at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
     },
+  });
+});
+
+describe('CustomerListPage: its tab bar', () => {
+  it('paints only the sections its person may open, each named as in the menu', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(tabsOf(s.wrapper)).toEqual([['customers', 'Customers']]);
   });
 });

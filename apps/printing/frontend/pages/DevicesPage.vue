@@ -9,15 +9,16 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DeviceModal from '../components/DeviceModal.vue';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut } from '../operations';
-import { printingTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('printing');
 const canManage = computed(() => session.can('printing.manage_settings'));
 const t = useT();
 const { confirm } = useConfirm();
@@ -118,7 +119,7 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
   <AppPage
     :title="$t('printing.title')"
     content-layout="fill"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
   >
     <div class="printing-devices page-fill">

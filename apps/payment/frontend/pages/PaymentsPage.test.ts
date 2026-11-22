@@ -23,6 +23,7 @@ import {
   page,
   POLISH,
   RECORDER,
+  tabsOf,
 } from '../__tests__/mount-payment';
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
@@ -357,5 +358,13 @@ describe('PaymentsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('PaymentsPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = RECORDER.menu;
+    const s = await setup({ session: { ...RECORDER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['payments', 'Payments']]);
   });
 });

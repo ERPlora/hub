@@ -11,6 +11,7 @@ import { AppPage, openExternalLink, toastSuccess, useSession } from '@erplora/ui
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import DiagnosticRouteRow from '../components/DiagnosticRouteRow.vue';
 import SettingsSendingRoute from '../components/SettingsSendingRoute.vue';
@@ -18,9 +19,9 @@ import { useLocale, useT } from '../composables/useT';
 import { environmentTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { DiagnosticOut } from '../operations';
-import { verifactuTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('verifactu');
 const canConfigure = computed(() => session.can('verifactu.configure'));
 const canSend = computed(() => session.can('verifactu.transmit_record'));
 const t = useT();
@@ -141,7 +142,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 <template>
   <AppPage
     :title="$t('verifactu.settings.title')"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
     content-layout="detail"
   >

@@ -2,9 +2,7 @@
   "cart_checkout": {
     "title": "Cart & Checkout",
     "tabs": {
-      "label": "Sections of Cart & Checkout",
-      "carts": "Carts",
-      "orders": "Orders"
+      "label": "Sections of Cart & Checkout"
     },
     "loading": "Loading…",
     "noResults": "No results",

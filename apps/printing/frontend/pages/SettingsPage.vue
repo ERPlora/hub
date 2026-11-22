@@ -6,17 +6,18 @@
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import SettingsCard from '../components/SettingsCard.vue';
-import { printingTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('printing');
 const canManage = computed(() => session.can('printing.manage_settings'));
 </script>
 
 <template>
   <AppPage
     :title="$t('printing.title')"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
     content-layout="detail"
   >

@@ -12,11 +12,11 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { searchTaxCategories } from '../lib/pickers';
 import type { SettingsOut } from '../operations';
-import { serviceTabs } from '../tabs';
 
 const NUMBERS = ['default_duration', 'default_buffer_time'] as const;
 const SWITCHES = ['show_prices', 'show_duration', 'allow_online_booking'] as const;
@@ -31,6 +31,7 @@ const LABELS: Record<(typeof NUMBERS)[number] | (typeof SWITCHES)[number], strin
 type Form = Record<(typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean> & { tax: ComboOption | null };
 
 const session = useSession();
+const tabs = useAppTabs('service');
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
@@ -66,7 +67,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('service.title')"
-    :tabs="serviceTabs($t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
     content-layout="detail"
   >

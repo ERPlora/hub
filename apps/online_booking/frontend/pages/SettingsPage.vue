@@ -7,11 +7,11 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { readAsBase64 } from '../../../../base/frontend/lib/upload';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { LogoUploadIn, SettingsOut } from '../operations';
-import { onlineBookingTabs } from '../tabs';
 
 const TEXTS = ['page_title', 'primary_color'] as const;
 const LONG_TEXTS = ['welcome_message', 'confirmation_message', 'cancellation_policy'] as const;
@@ -28,6 +28,7 @@ const SERVICE_WINDOW = 100;
 type Form = Record<(typeof STRINGS)[number] | (typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean>;
 
 const session = useSession();
+const tabs = useAppTabs('online_booking');
 const t = useT();
 const canManage = computed(() => session.can('online_booking.manage_settings'));
 
@@ -96,7 +97,7 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
 <template>
   <AppPage
     :title="$t('online_booking.title')"
-    :tabs="onlineBookingTabs(t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('online_booking.tabs.label')"
     content-layout="detail"
   >

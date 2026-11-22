@@ -22,6 +22,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonNote } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import DayBar from '../components/DayBar.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -33,13 +34,13 @@ import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
 import { allows, cancellationNote, type RowAction, shortNote, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
-import { reservationTabs } from '../tabs';
 
 /** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';
 const STATUSES: readonly ReservationStatus[] = ['pending', 'confirmed', 'seated', 'completed', 'cancelled', 'no_show'];
 
 const session = useSession();
+const tabs = useAppTabs('reservation');
 const t = useT();
 const locale = useLocale();
 const canAdd = computed(() => session.can('reservation.add_reservation'));
@@ -225,7 +226,7 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
   <AppPage
     :title="$t('reservation.title')"
     content-layout="fill"
-    :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
   >
     <DayBar

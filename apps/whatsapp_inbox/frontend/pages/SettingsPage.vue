@@ -7,10 +7,11 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ChannelSettings from '../components/ChannelSettings.vue';
-import { inboxTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('whatsapp_inbox');
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 </script>
 
@@ -18,7 +19,7 @@ const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
   <AppPage
     :title="$t('whatsapp_inbox.settingsTitle')"
     content-layout="detail"
-    :tabs="inboxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('whatsapp_inbox.tabs.label')"
   >
     <ChannelSettings v-if="canConfigure" />

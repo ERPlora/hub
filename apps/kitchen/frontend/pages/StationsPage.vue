@@ -18,6 +18,7 @@ import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RouteFormModal from '../components/RouteFormModal.vue';
 import StationFormModal from '../components/StationFormModal.vue';
@@ -25,9 +26,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { RouteOut, StationOut } from '../operations';
-import { kitchenTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('kitchen');
 const t = useT();
 const canManage = computed(() => session.can('kitchen.manage_station'));
 
@@ -135,7 +136,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
   <AppPage
     :title="$t('kitchen.title')"
     content-layout="fill"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <PageNotices

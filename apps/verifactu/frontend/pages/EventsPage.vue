@@ -9,13 +9,15 @@ import { AppPage } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { backwardsDays, filterParams, filtersInUse } from '../lib/filters';
 import { EVENT_KINDS, SEVERITIES, severityTone } from '../lib/record';
 import type { EventListIn, EventOut } from '../operations';
-import { verifactuTabs } from '../tabs';
+
+const tabs = useAppTabs('verifactu');
 
 const router = useRouter();
 const t = useT();
@@ -77,7 +79,7 @@ function open(row: EventOut): void {
   <AppPage
     :title="$t('verifactu.events.title')"
     content-layout="fill"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
   >
     <PageNotices

@@ -21,6 +21,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CustomerSearch, { type CustomerSnapshot, snapshotOf } from '../../../customer/frontend/components/CustomerSearch.vue';
 import CheckoutSheet from '../components/checkout/CheckoutSheet.vue';
 import DocumentModal from '../components/document/DocumentModal.vue';
@@ -55,11 +56,11 @@ import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
 import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
 import { refusal } from '../lib/refusal';
-import { saleTabs } from '../tabs';
 
 const t = useT();
 const locale = useLocale();
 const session = useSession();
+const tabs = useAppTabs('sale');
 
 // ── The till settings: nothing is shown until they are read ─────────────────────────────────────
 const settingsLive = useLive('sale.pos_settings.get', {});
@@ -588,7 +589,7 @@ onBeforeUnmount(() => {
 <template>
   <AppPage
     :title="$t('sale.title')"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <InlineFeedback

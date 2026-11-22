@@ -20,6 +20,7 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import FailOrderModal from '../components/FailOrderModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -27,13 +28,13 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { amountFilterErrors, filterCents, formatMoney, ORDER_TONE, recordMoney, TOTAL_BOUNDS, useBusinessMoney } from '../lib/format';
 import type { OrderListIn, OrderOut, OrderStatus } from '../operations';
-import { cartCheckoutTabs } from '../tabs';
 
 const STATUSES: readonly OrderStatus[] = ['initiated', 'paid', 'failed', 'completed'];
 /** Where an order may still fail from (the server's FAILABLE). */
 const FAILABLE: readonly OrderStatus[] = ['initiated', 'paid'];
 
 const session = useSession();
+const tabs = useAppTabs('cart_checkout');
 const t = useT();
 const locale = useLocale();
 const canCheckout = computed(() => session.can('cart_checkout.checkout'));
@@ -181,7 +182,7 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
   <AppPage
     :title="$t('cart_checkout.title')"
     content-layout="fill"
-    :tabs="cartCheckoutTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cart_checkout.tabs.label')"
   >
     <PageNotices

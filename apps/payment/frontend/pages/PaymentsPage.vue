@@ -21,6 +21,7 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
@@ -29,7 +30,6 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { filterCents, formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusinessMoney } from '../lib/format';
 import type { PaymentListIn, PaymentOut, PaymentStatus } from '../operations';
-import { paymentTabs } from '../tabs';
 
 const STATUSES: readonly PaymentStatus[] = ['draft', 'approved', 'sent', 'completed', 'cancelled'];
 type Step = 'approve' | 'mark_sent' | 'mark_completed';
@@ -42,6 +42,7 @@ const NEXT: Partial<Record<PaymentStatus, { step: Step; label: string; permissio
 const FINISHED: readonly PaymentStatus[] = ['completed', 'cancelled'];
 
 const session = useSession();
+const tabs = useAppTabs('payment');
 const t = useT();
 const locale = useLocale();
 const money = useBusinessMoney();
@@ -177,7 +178,7 @@ function onCreated(): void {
   <AppPage
     :title="$t('payment.title')"
     content-layout="fill"
-    :tabs="paymentTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('payment.tabs.label')"
   >
     <PageNotices

@@ -10,7 +10,16 @@ import type { Component } from 'vue';
 
 import { cardValues } from '../../../../base/frontend/__tests__/data-table-cards';
 import { itFillsThePage } from '../__tests__/list-fills-the-page';
-import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
+import {
+  click,
+  EMPLOYEE,
+  flush,
+  ionValue,
+  type MountOptions,
+  mountReservation,
+  page,
+  tabsOf,
+} from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
 import DayBar from '../components/DayBar.vue';
 import en from '../locale/en.json';
@@ -270,4 +279,11 @@ describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F1
 
 describe('ReservationsPage: the list fills the page', () => {
   itFillsThePage(setup);
+});
+
+describe('ReservationsPage: its tab bar', () => {
+  it('paints only the sections its person may open, each named as in the menu', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(tabsOf(s.wrapper)).toEqual([['reservations', 'Reservations'], ['waitlist', 'Waitlist']]);
+  });
 });

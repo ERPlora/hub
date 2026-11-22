@@ -19,6 +19,7 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
@@ -27,12 +28,12 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
-import { reservationTabs } from '../tabs';
 
 /** Until the settings answer with the business's zone: the day a new entry starts on. */
 const FALLBACK_ZONE = 'Europe/Madrid';
 
 const session = useSession();
+const tabs = useAppTabs('reservation');
 const t = useT();
 const locale = useLocale();
 const canChange = computed(() => session.can('reservation.change_waitlistentry'));
@@ -212,7 +213,7 @@ async function confirmRemove(): Promise<void> {
   <AppPage
     :title="$t('reservation.title')"
     content-layout="fill"
-    :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
   >
     <PageNotices

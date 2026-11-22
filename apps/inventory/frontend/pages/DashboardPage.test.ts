@@ -9,7 +9,17 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
+import {
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  mountInventory,
+  type MountOptions,
+  page,
+  subId,
+  tabsOf,
+} from '../__tests__/mount-inventory';
 import KpiTile from '../components/KpiTile.vue';
 import { formatMoney } from '../lib/format';
 import DashboardPage from './DashboardPage.vue';
@@ -200,5 +210,13 @@ describe('DashboardPage', () => {
     expect(s.testid('inventory-dashboard-without-cost').text()).toBe('3 productos sin coste registrado: el valor mostrado es parcial');
     await s.lowStock(page([], 0, 5));
     expect(s.prop('emptyMessage')).toBe('Sin productos en stock bajo.');
+  });
+});
+
+describe('DashboardPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = EMPLOYEE.menu;
+    const s = await setup({ session: { ...EMPLOYEE, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['dashboard', 'Dashboard']]);
   });
 });

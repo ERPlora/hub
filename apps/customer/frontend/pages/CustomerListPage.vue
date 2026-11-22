@@ -19,6 +19,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CustomerCreateModal from '../components/CustomerCreateModal.vue';
 import CustomerDeleteDialog from '../components/CustomerDeleteDialog.vue';
 import CustomerExportButton from '../components/CustomerExportButton.vue';
@@ -29,7 +30,6 @@ import { STAGES } from '../lib/customerForm';
 import { filterParams, filtersInUse, SOURCES, SPENT_ENDS } from '../lib/customerFilters';
 import { amountFilterErrors, useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
-import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { useCustomerImport } from '../lib/useCustomerImport';
 import { type SortDir, useListState } from '../lib/useListState';
@@ -38,6 +38,7 @@ import type { CustomerListIn, CustomerRow, CustomerSort } from '../operations';
 
 const router = useRouter();
 const session = useSession();
+const tabs = useAppTabs('customer');
 const canManage = computed(() => session.can('customer.manage'));
 const canExport = computed(() => session.can('customer.export'));
 const canDelete = computed(() => session.can('customer.delete'));
@@ -134,7 +135,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
   <AppPage
     :title="$t('customer.list.title')"
     content-layout="fill"
-    :tabs="customerTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('customer.tabs.label')"
   >
     <InlineFeedback

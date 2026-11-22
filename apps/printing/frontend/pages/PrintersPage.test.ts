@@ -7,7 +7,7 @@ import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/she
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
+import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, tabsOf, words } from '../__tests__/mount-printing';
 import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
@@ -218,5 +218,13 @@ describe('the note says what is true where it is read', () => {
     // The account the app opens in the system browser is a browser: it cannot reach printers either.
     applySurface('account');
     expect((await setup()).find('printing-printers-app-note').text()).toBe(en.printing.printers.appNote);
+  });
+});
+
+describe('PrintersPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = MANAGER.menu;
+    const s = await setup({ session: { ...MANAGER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['printers', 'Printers']]);
   });
 });

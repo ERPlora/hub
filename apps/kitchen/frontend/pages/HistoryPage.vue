@@ -5,16 +5,16 @@
 // «Search ticket or notes…» and a filter by action, 50 a page.
 import { DataTable, type DataTableColumn, type DataTableFilters, EmptyState } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, useSession } from '@erplora/ui/shell';
+import { AppPage } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime } from '../lib/format';
 import type { LogAction, LogOut } from '../operations';
-import { kitchenTabs } from '../tabs';
 
 const ACTIONS: readonly LogAction[] = [
   'received',
@@ -33,7 +33,7 @@ const ACTIONS: readonly LogAction[] = [
   'deleted',
 ];
 
-const session = useSession();
+const tabs = useAppTabs('kitchen');
 const t = useT();
 const locale = useLocale();
 const { data: settings } = useLive('kitchen.settings.get', {});
@@ -78,7 +78,7 @@ const columns = computed<DataTableColumn<LogOut>[]>(() => [
   <AppPage
     :title="$t('kitchen.title')"
     content-layout="fill"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <h2

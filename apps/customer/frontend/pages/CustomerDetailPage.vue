@@ -12,6 +12,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, useTemplateRef } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ActivityPanel from '../components/ActivityPanel.vue';
 import ConsentPanel from '../components/ConsentPanel.vue';
 import HealthPanel from '../components/HealthPanel.vue';
@@ -26,7 +27,6 @@ import MergePanel from '../components/MergePanel.vue';
 import PurchaseHistory from '../components/PurchaseHistory.vue';
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { type CustomerFields, ESSENTIAL_FIELDS, fieldsFromDetail, MORE_FIELDS, patchInput } from '../lib/customerForm';
-import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 
 const props = defineProps<{ id: string }>();
@@ -35,6 +35,7 @@ const LIST = '/customer/customers';
 const NONE: string[] = [];
 const router = useRouter();
 const session = useSession();
+const tabs = useAppTabs('customer');
 const canManage = computed(() => session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));
 // Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
@@ -109,7 +110,7 @@ async function save(): Promise<void> {
     :title="customer?.name ?? $t('customer.detail.title')"
     :back-href="LIST"
     content-layout="detail"
-    :tabs="customerTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('customer.tabs.label')"
   >
     <InlineFeedback

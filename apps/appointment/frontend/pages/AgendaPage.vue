@@ -14,6 +14,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import AgendaToolbar, { type AgendaSpan, type AgendaView } from '../components/AgendaToolbar.vue';
 import AppointmentFormModal, { type BookingPreset } from '../components/AppointmentFormModal.vue';
 import AppointmentList from '../components/AppointmentList.vue';
@@ -29,7 +30,6 @@ import { useT } from '../composables/useT';
 import { todayIn, wallInput, wallNowIn, weekDays } from '../lib/clock';
 import { allows } from '../lib/states';
 import type { AppointmentOut, AppointmentRow, AppointmentStatus } from '../operations';
-import { appointmentTabs } from '../tabs';
 
 /** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';
@@ -165,7 +165,7 @@ function onOutcome(text: string): void {
   actions.notice.value = { tone: 'success', text };
 }
 
-const tabs = computed(() => appointmentTabs(t, { settings: session.can('appointment.manage_settings') }));
+const tabs = useAppTabs('appointment');
 const listError = computed(() => (list.status.value === 'error' ? t('appointment.list.loadError') : undefined));
 </script>
 

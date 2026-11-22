@@ -17,17 +17,18 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import MethodFormModal from '../components/MethodFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { MethodListIn, MethodOut, MethodType } from '../operations';
-import { paymentTabs } from '../tabs';
 
 const TYPES: readonly MethodType[] = ['cash', 'transfer', 'card', 'sepa', 'check', 'other'];
 
 const session = useSession();
+const tabs = useAppTabs('payment');
 const t = useT();
 const canManage = computed(() => session.can('payment.add_payment'));
 
@@ -147,7 +148,7 @@ function onRowClick(row: MethodOut): void {
   <AppPage
     :title="$t('payment.title')"
     content-layout="fill"
-    :tabs="paymentTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('payment.tabs.label')"
   >
     <PageNotices

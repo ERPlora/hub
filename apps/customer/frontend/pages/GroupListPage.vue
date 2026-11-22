@@ -15,15 +15,16 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import GroupFormModal from '../components/GroupFormModal.vue';
-import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { type SortDir, useListState } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import type { GroupListIn, GroupRow } from '../operations';
 
 const session = useSession();
+const tabs = useAppTabs('customer');
 // Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
 const canConfigure = computed(() => session.can('customer.configure') || session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));
@@ -92,7 +93,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
   <AppPage
     :title="$t('customer.groups.title')"
     content-layout="fill"
-    :tabs="customerTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('customer.tabs.label')"
   >
     <InlineFeedback

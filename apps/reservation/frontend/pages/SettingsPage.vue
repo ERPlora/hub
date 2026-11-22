@@ -14,10 +14,10 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
-import { reservationTabs } from '../tabs';
 
 const STAFF_NUMBERS = ['default_duration_minutes', 'no_show_window_minutes'] as const;
 const GUEST_NUMBERS = ['min_party_size', 'max_party_size', 'min_advance_hours', 'max_advance_days'] as const;
@@ -39,6 +39,7 @@ const LABELS: Record<NumberField | ToggleField, string> = {
 type Form = Record<NumberField, string> & Record<ToggleField, boolean>;
 
 const session = useSession();
+const tabs = useAppTabs('reservation');
 const t = useT();
 const canManage = computed(() => session.can('reservation.manage_settings'));
 
@@ -68,7 +69,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('reservation.title')"
-    :tabs="reservationTabs($t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
     content-layout="detail"
   >

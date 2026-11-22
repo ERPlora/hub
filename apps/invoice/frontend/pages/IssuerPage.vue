@@ -12,14 +12,15 @@ import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { countryOptions } from '../../../customer/frontend/components/CustomerSearch.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 import type { IssuerIn, IssuerOut } from '../operations';
-import { invoiceTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('invoice');
 const canManage = computed(() => session.can('invoice.manage_issuer'));
 const t = useT();
 const locale = useLocale();
@@ -93,7 +94,7 @@ async function submit(): Promise<void> {
 <template>
   <AppPage
     :title="$t('invoice.title')"
-    :tabs="invoiceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('invoice.tabs.label')"
     content-layout="detail"
   >

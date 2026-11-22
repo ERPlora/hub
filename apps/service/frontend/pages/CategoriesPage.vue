@@ -9,15 +9,16 @@ import { useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CategoryFormModal from '../components/CategoryFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { CategoryOut } from '../operations';
-import { serviceTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('service');
 const t = useT();
 const canAdd = computed(() => session.can('service.add_category'));
 const canChange = computed(() => session.can('service.change_category'));
@@ -84,7 +85,7 @@ function onAction({ actionId, row }: { actionId: string; row: CategoryOut }): vo
   <AppPage
     :title="$t('service.title')"
     content-layout="fill"
-    :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
   >
     <PageNotices

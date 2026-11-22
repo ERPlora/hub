@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TaskOut } from '../operations';
-import { EMPLOYEE, flush, ionValue, mountTask, type MountOptions, page } from '../__tests__/mount-task';
+import { EMPLOYEE, flush, ionValue, type MountOptions, mountTask, page, tabsOf } from '../__tests__/mount-task';
 import { itKeepsTheFiltersBehindTheFunnel } from '../__tests__/filters-funnel';
 import { task } from '../__tests__/task';
 import TaskFormModal from '../components/TaskFormModal.vue';
@@ -253,5 +253,13 @@ describe('TasksPage: the list fills the page', () => {
     await ionValue(s.wrapper.find('[data-testid="task-views"]').element, 'mine', 'ionChange');
     expect(s.prop('testid')).toBe('task-mine');
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('TasksPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = EMPLOYEE.menu;
+    const s = await setup({ session: { ...EMPLOYEE, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['tasks', 'Tasks']]);
   });
 });

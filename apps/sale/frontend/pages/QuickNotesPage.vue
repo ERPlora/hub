@@ -9,15 +9,16 @@ import { useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ListNotices, { blockingError, type ListRefusal } from '../components/backoffice/ListNotices.vue';
 import QuickNoteFormModal from '../components/backoffice/QuickNoteFormModal.vue';
 import { refusal } from '../lib/refusal';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { QuickNoteOut } from '../operations';
-import { saleTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('sale');
 const canManage = computed(() => session.can('sale.manage_settings'));
 const t = useT();
 const { confirm } = useConfirm();
@@ -92,7 +93,7 @@ const cardTitle = (row: QuickNoteOut): string => row.text;
   <AppPage
     :title="$t('sale.title')"
     content-layout="fill"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <p

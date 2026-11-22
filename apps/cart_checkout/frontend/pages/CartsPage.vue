@@ -21,6 +21,7 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CartFormModal from '../components/CartFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -38,11 +39,11 @@ import {
   useBusinessMoney,
 } from '../lib/format';
 import type { CartListIn, CartOut, CartStatus } from '../operations';
-import { cartCheckoutTabs } from '../tabs';
 
 const STATUSES: readonly CartStatus[] = ['active', 'abandoned', 'converted', 'expired'];
 
 const session = useSession();
+const tabs = useAppTabs('cart_checkout');
 const t = useT();
 const locale = useLocale();
 const { confirm } = useConfirm();
@@ -199,7 +200,7 @@ function onCreated(): void {
   <AppPage
     :title="$t('cart_checkout.title')"
     content-layout="fill"
-    :tabs="cartCheckoutTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cart_checkout.tabs.label')"
   >
     <PageNotices

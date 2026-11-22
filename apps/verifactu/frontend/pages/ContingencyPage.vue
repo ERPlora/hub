@@ -11,16 +11,17 @@ import { IonButton } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { statusTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { QueueRowOut } from '../operations';
-import { verifactuTabs } from '../tabs';
 
 const router = useRouter();
 const session = useSession();
+const tabs = useAppTabs('verifactu');
 const canSend = computed(() => session.can('verifactu.transmit_record'));
 const t = useT();
 const locale = useLocale();
@@ -90,7 +91,7 @@ async function onAction({ actionId, row }: { actionId: string; row: QueueRowOut 
   <AppPage
     :title="$t('verifactu.contingency.title')"
     content-layout="fill"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
   >
     <PageNotices

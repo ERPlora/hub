@@ -10,7 +10,17 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { BookingRow } from '../operations';
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountOnlineBooking, page, settle } from '../__tests__/mount-online-booking';
+import {
+  EMPLOYEE,
+  flush,
+  MANAGER,
+  mountOnlineBooking,
+  type MountOptions,
+  OWNER,
+  page,
+  settle,
+  tabsOf,
+} from '../__tests__/mount-online-booking';
 import CancelDialog from '../components/CancelDialog.vue';
 import BookingsPage from './BookingsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -224,5 +234,13 @@ describe('BookingsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('BookingsPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = OWNER.menu;
+    const s = await setup({ session: { ...OWNER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['bookings', 'Bookings']]);
   });
 });

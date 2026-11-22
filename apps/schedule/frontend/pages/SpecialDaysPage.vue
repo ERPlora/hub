@@ -3,15 +3,17 @@
 // with its title, as the old screen — the special days (a date) and the overrides (a range of dates).
 import { AppPage } from '@erplora/ui/shell';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import OverridesList from '../components/OverridesList.vue';
 import SpecialDaysList from '../components/SpecialDaysList.vue';
-import { scheduleTabs } from '../tabs';
+
+const tabs = useAppTabs('schedule');
 </script>
 
 <template>
   <AppPage
     :title="$t('schedule.title')"
-    :tabs="scheduleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('schedule.tabs.label')"
   >
     <div class="schedule-special-days">

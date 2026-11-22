@@ -10,14 +10,15 @@ import { useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import SeriesFormModal from '../components/SeriesFormModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { SeriesOut } from '../operations';
-import { invoiceTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('invoice');
 const canManage = computed(() => session.can('invoice.manage_series'));
 const t = useT();
 
@@ -70,7 +71,7 @@ function onAction({ actionId, row }: { actionId: string; row: SeriesOut }): void
   <AppPage
     :title="$t('invoice.title')"
     content-layout="fill"
-    :tabs="invoiceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('invoice.tabs.label')"
   >
     <PageNotices

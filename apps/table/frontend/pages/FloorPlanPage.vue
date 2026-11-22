@@ -6,6 +6,7 @@ import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -20,7 +21,6 @@ import { useT } from '../composables/useT';
 import { paintedStatus, type PickMode, targetable } from '../lib/floor';
 import { zoneSummary, zoneTabs } from '../lib/floor-summary';
 import type { SettingsOut, TableCheckOut, TableOut, ZoneOut } from '../operations';
-import { tableTabs } from '../tabs';
 
 type Mode = 'service' | 'edit';
 interface Pick {
@@ -38,6 +38,7 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
+const sections = useAppTabs('table');
 const router = useRouter();
 const t = useT();
 const now = useNow();
@@ -224,7 +225,7 @@ function onZoneSaved(zone: ZoneOut): void {
 <template>
   <AppPage
     :title="$t('table.title')"
-    :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
+    :tabs="sections"
     :tabs-label="$t('table.tabs.label')"
     content-layout="fill"
   >

@@ -14,6 +14,7 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ProjectFormModal from '../components/ProjectFormModal.vue';
 import ProjectSheet from '../components/ProjectSheet.vue';
@@ -21,9 +22,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { ProjectListIn, ProjectOut, ProjectSort } from '../operations';
-import { taskTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('task');
 const t = useT();
 const canManage = computed(() => session.can('task.manage_project'));
 
@@ -99,7 +100,7 @@ const swatch = (row: unknown) => (row as ProjectOut).color;
   <AppPage
     :title="$t('task.title')"
     content-layout="fill"
-    :tabs="taskTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('task.tabs.label')"
   >
     <PageNotices

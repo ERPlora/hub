@@ -10,10 +10,10 @@ import { type InputOf, type OutputOf, useCommand, useLiveClient } from '@erplora
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CategoryFormModal from '../components/CategoryFormModal.vue';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportReportModal from '../components/ImportReportModal.vue';
-import { useInventoryTabs } from '../composables/useInventoryTabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
@@ -25,7 +25,7 @@ import { addReport, chunk, emptyReport, failRows, type ImportReport } from '../l
 type Category = OutputOf<'inventory.category.list'>['rows'][number];
 
 const { t } = useT();
-const tabs = useInventoryTabs();
+const tabs = useAppTabs('inventory');
 const session = useSession();
 const client = useLiveClient();
 const { confirm } = useConfirm();

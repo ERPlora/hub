@@ -21,6 +21,7 @@ import {
   type MountOptions,
   page,
   POLISH,
+  tabsOf,
   totalFilter,
 } from '../__tests__/mount-cart-checkout';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
@@ -374,4 +375,12 @@ describe('CartsPage: the business’s currency (cart-checkout-business-currency)
 
 describe('CartsPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
   itReadsAmountFiltersAsTheHub(totalFilter(setup, page(ROWS)));
+});
+
+describe('CartsPage: its tab bar', () => {
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = EMPLOYEE.menu;
+    const s = await setup({ session: { ...EMPLOYEE, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
+    expect(tabsOf(s.wrapper)).toEqual([['carts', 'Carts']]);
+  });
 });

@@ -12,9 +12,9 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import type { SettingsOut } from '../operations';
-import { staffTabs } from '../tabs';
 
 const TIMES = ['default_work_start', 'default_work_end'] as const;
 const NUMBERS = ['default_break_duration'] as const;
@@ -27,8 +27,8 @@ type Field = (typeof TIMES)[number] | (typeof NUMBERS)[number];
 type Form = Record<Field, string>;
 
 const session = useSession();
+const tabs = useAppTabs('staff');
 const canManage = computed(() => session.can('staff.manage_settings'));
-const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 const { data, status, error, refresh } = useLive('staff.settings.get', {});
 const settingsForm = useSettingsForm(
@@ -55,7 +55,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <AppPage
     :title="$t('staff.title')"
-    :tabs="staffTabs($t, { settings: canManage, commissions: canSeePay })"
+    :tabs="tabs"
     :tabs-label="$t('staff.tabs.label')"
     content-layout="detail"
   >

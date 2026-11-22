@@ -6,18 +6,19 @@
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import RegistersCard from '../components/RegistersCard.vue';
 import SettingsCard from '../components/SettingsCard.vue';
-import { cashRegisterTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('cash_register');
 const canManage = computed(() => session.can('cash_register.manage_settings'));
 </script>
 
 <template>
   <AppPage
     :title="$t('cash_register.title')"
-    :tabs="cashRegisterTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cash_register.tabs.label')"
     content-layout="detail"
   >

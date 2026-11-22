@@ -11,6 +11,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, effectScope, type EffectScope, onBeforeUnmount, onMounted, onScopeDispose, ref, shallowRef, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import KdsAllDayTable from '../components/KdsAllDayTable.vue';
 import KdsBoardSkeleton from '../components/KdsBoardSkeleton.vue';
 import KdsDisplayToolbar, { type DisplayView } from '../components/KdsDisplayToolbar.vue';
@@ -21,7 +22,6 @@ import { useT } from '../composables/useT';
 import { arrivals, rememberedStation, rememberStation } from '../lib/board';
 import { Chime } from '../lib/chime';
 import type { AllDayOut, Priority, SettingsOut, TicketOut } from '../operations';
-import { kitchenTabs } from '../tabs';
 
 const FACTORY: SettingsOut = {
   show_timer: true,
@@ -38,6 +38,7 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
+const tabs = useAppTabs('kitchen');
 const t = useT();
 const now = useNow();
 const canChange = computed(() => session.can('kitchen.change_ticket'));
@@ -172,7 +173,7 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
 <template>
   <AppPage
     :title="$t('kitchen.title')"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <div

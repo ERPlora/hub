@@ -6,9 +6,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AppointmentRow, LanesOut, SettingsOut } from '../operations';
-import { AppPage } from '@erplora/ui/shell';
 
-import { EMPLOYEE, mountAppointment, OWNER, page, settle } from '../__tests__/mount-appointment';
+import { EMPLOYEE, mountAppointment, OWNER, page, settle, tabsOf } from '../__tests__/mount-appointment';
 import AgendaToolbar from '../components/AgendaToolbar.vue';
 import AppointmentFormModal from '../components/AppointmentFormModal.vue';
 import AppointmentList from '../components/AppointmentList.vue';
@@ -226,10 +225,16 @@ describe('AgendaPage', () => {
   });
 
   it('the Settings tab is only for who may change them', async () => {
-    const tabs = async (session: typeof OWNER) =>
-      ((await setup(session)).wrapper.findComponent(AppPage).props('tabs') as Array<{ id: string }>).map((tab) => tab.id);
-    expect(await tabs(OWNER)).toEqual(['agenda', 'settings']);
-    expect(await tabs(EMPLOYEE)).toEqual(['agenda']);
+    const tabs = async (session: typeof OWNER) => tabsOf((await setup(session)).wrapper);
+    expect(await tabs(OWNER)).toEqual([['agenda', 'Agenda'], ['settings', 'Settings']]);
+    expect(await tabs(EMPLOYEE)).toEqual([['agenda', 'Agenda']]);
+  });
+
+  it('paints only the sections the session opens, each named as in the menu', async () => {
+    const [section] = OWNER.menu;
+    expect(tabsOf((await setup({ ...OWNER, menu: [{ ...section, items: section.items.slice(0, 1) }] })).wrapper)).toEqual([
+      ['agenda', 'Agenda'],
+    ]);
   });
 });
 

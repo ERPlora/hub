@@ -11,10 +11,10 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
-import { appointmentTabs } from '../tabs';
 
 const NUMBERS = [
   'default_duration',
@@ -31,6 +31,7 @@ type SwitchField = (typeof SWITCHES)[number];
 type Form = Record<NumberField, string> & Record<SwitchField, boolean>;
 
 const session = useSession();
+const tabs = useAppTabs('appointment');
 const t = useT();
 const canManage = computed(() => session.can('appointment.manage_settings'));
 
@@ -53,7 +54,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('appointment.title')"
-    :tabs="appointmentTabs(t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('appointment.tabs.label')"
     content-layout="detail"
   >

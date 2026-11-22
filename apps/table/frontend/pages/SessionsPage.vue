@@ -20,6 +20,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RestoreModal from '../components/RestoreModal.vue';
 import SessionDetailModal from '../components/SessionDetailModal.vue';
@@ -29,7 +30,6 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { clockTime, durationMinutes, durationTone, formatMoney, recordMoney } from '../lib/format';
 import type { SessionListIn, SessionOut, SessionStatus, SettingsOut } from '../operations';
-import { tableTabs } from '../tabs';
 
 type Segment = 'open' | 'closed' | 'all';
 const SEGMENTS: readonly Segment[] = ['open', 'closed', 'all'];
@@ -43,6 +43,7 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
+const tabs = useAppTabs('table');
 const t = useT();
 const locale = useLocale();
 const now = useNow();
@@ -215,7 +216,7 @@ async function confirmDelete(): Promise<void> {
   <AppPage
     :title="$t('table.title')"
     content-layout="fill"
-    :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('table.tabs.label')"
   >
     <PageNotices

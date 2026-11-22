@@ -2,9 +2,7 @@
   "payment": {
     "title": "Outgoing payments",
     "tabs": {
-      "label": "Sections of Payments",
-      "payments": "Payments",
-      "methods": "Methods"
+      "label": "Sections of Payments"
     },
     "loading": "Loading…",
     "noResults": "No results",

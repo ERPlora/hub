@@ -19,6 +19,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -29,7 +30,6 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime, formatMoney, useBusinessMoney } from '../lib/format';
 import type { OrderType, Priority, TicketListIn, TicketRowOut, TicketStatus } from '../operations';
-import { kitchenTabs } from '../tabs';
 
 const STATUSES: readonly TicketStatus[] = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
 const TYPES: readonly OrderType[] = ['dine_in', 'takeaway', 'delivery'];
@@ -38,6 +38,7 @@ const COOKING: readonly TicketStatus[] = ['pending', 'preparing'];
 const ON_THE_LINE: readonly TicketStatus[] = ['pending', 'preparing', 'ready'];
 
 const session = useSession();
+const tabs = useAppTabs('kitchen');
 const t = useT();
 const locale = useLocale();
 const canAdd = computed(() => session.can('kitchen.add_ticket'));
@@ -210,7 +211,7 @@ async function confirmCancel(): Promise<void> {
   <AppPage
     :title="$t('kitchen.title')"
     content-layout="fill"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <PageNotices

@@ -9,7 +9,18 @@ import { AppPage, applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { click, EMPLOYEE, errorFrame, flush, followUpgrade, type MountOptions, mountInbox, SIGNED } from '../__tests__/mount-inbox';
+import {
+  click,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  followUpgrade,
+  MANAGER,
+  mountInbox,
+  type MountOptions,
+  SIGNED,
+  tabsOf,
+} from '../__tests__/mount-inbox';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
 import InboxPage from './InboxPage.vue';
@@ -357,5 +368,12 @@ describe('InboxPage: the list fills the page', () => {
     const stack = s.table().element.parentElement;
     expect(stack?.parentElement?.classList.contains('hub-detail-shell--fill')).toBe(true);
     expect(stack?.contains(s.find('whatsapp-inbox-not-connected').element)).toBe(true);
+  });
+});
+
+describe('InboxPage: its tab bar', () => {
+  it('paints only the sections its person may open, each named as in the menu', async () => {
+    const s = await setup({ session: MANAGER });
+    expect(tabsOf(s.wrapper)).toEqual([['inbox', 'Inbox']]);
   });
 });

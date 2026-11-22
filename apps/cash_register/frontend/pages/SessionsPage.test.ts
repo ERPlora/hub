@@ -11,7 +11,16 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
-import { business, EMPLOYEE, errorFrame, flush, type MountOptions, mountCash, words } from '../__tests__/mount-cash-register';
+import {
+  business,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  mountCash,
+  type MountOptions,
+  tabsOf,
+  words,
+} from '../__tests__/mount-cash-register';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
@@ -367,5 +376,12 @@ describe('SessionsPage: the amounts are read as every amount of the Hub (hub#119
       const says = () => (s.table().props() as Record<string, unknown>).filterErrors as Record<string, string>;
       return { filter, query: () => s.tableParams().at(-1), says };
     },
+  });
+});
+
+describe('SessionsPage: its tab bar', () => {
+  it('paints only the sections its person may open, each named as in the menu', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(tabsOf(s.wrapper)).toEqual([['sessions', 'Cash register']]);
   });
 });

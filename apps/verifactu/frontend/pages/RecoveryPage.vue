@@ -21,6 +21,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -29,11 +30,11 @@ import { formatDate } from '../lib/format';
 import { AEAT_STATES, short } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { AeatRecordListIn, AeatRecordOut } from '../operations';
-import { verifactuTabs } from '../tabs';
 
 const HASH = /^[0-9a-fA-F]{64}$/;
 
 const session = useSession();
+const tabs = useAppTabs('verifactu');
 const canSend = computed(() => session.can('verifactu.transmit_record'));
 const canConfigure = computed(() => session.can('verifactu.configure'));
 const t = useT();
@@ -158,7 +159,7 @@ async function continueManually(): Promise<void> {
 <template>
   <AppPage
     :title="$t('verifactu.recovery.title')"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
     content-layout="detail"
   >

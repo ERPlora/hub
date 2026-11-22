@@ -22,6 +22,7 @@ import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -34,9 +35,9 @@ import { MEMBER_STATUSES, memberStatusTone } from '../lib/enums';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 import { accountSearch, roleSearch } from '../lib/pickers';
 import type { MemberListIn, MemberOut } from '../operations';
-import { staffTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('staff');
 const t = useT();
 const locale = useLocale();
 /** The business's currency (its country's): Rate/h is painted in it (staff-business-currency). */
@@ -48,7 +49,6 @@ const canChange = computed(() => session.can('staff.change_member'));
 const canDelete = computed(() => session.can('staff.delete_member'));
 const canPay = session.can('staff.view_compensation');
 const canLink = computed(() => canAdd.value || canChange.value);
-const canSettings = computed(() => session.can('staff.manage_settings'));
 
 // ── The list ───────────────────────────────────────────────────────────────────────────────────
 const table = useServerTable({ sort: 'name' });
@@ -199,7 +199,7 @@ async function deactivate(): Promise<void> {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings, commissions: canPay })"
+    :tabs="tabs"
     :tabs-label="$t('staff.tabs.label')"
   >
     <PageNotices

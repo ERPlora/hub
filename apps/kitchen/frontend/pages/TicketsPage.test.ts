@@ -9,7 +9,16 @@ import type { Component } from 'vue';
 
 import { cardIcons, switchToCards } from '../../../../base/frontend/__tests__/data-table-cards';
 import { business, NOW, POLISH, row, SETTINGS } from '../__tests__/kitchen';
-import { EMPLOYEE, flush, ionValue, type MountOptions, mountKitchen, page, settle } from '../__tests__/mount-kitchen';
+import {
+  EMPLOYEE,
+  flush,
+  ionValue,
+  mountKitchen,
+  type MountOptions,
+  page,
+  settle,
+  tabsOf,
+} from '../__tests__/mount-kitchen';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
 import type { TicketRowOut } from '../operations';
@@ -254,5 +263,12 @@ describe('TicketsPage: Android Back with unsaved changes (hub#1046, BASE-F05)', 
       change: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), 'Guest left', 'ionInput'),
       restore: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), '', 'ionInput'),
     });
+  });
+});
+
+describe('TicketsPage: its tab bar', () => {
+  it('paints only the sections its person may open, each named as in the menu', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(tabsOf(s.wrapper)).toEqual([['display', 'Display'], ['tickets', 'Tickets'], ['history', 'History']]);
   });
 });

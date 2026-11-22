@@ -2,12 +2,7 @@
   "sale": {
     "title": "Ventas / TPV",
     "tabs": {
-      "label": "Secciones de Ventas / TPV",
-      "pos": "Vender",
-      "sales": "Ventas",
-      "quickNotes": "Notas rápidas",
-      "departments": "Secciones",
-      "settings": "Ajustes"
+      "label": "Secciones de Ventas / TPV"
     },
     "live": {
       "retry": "Reintentar",

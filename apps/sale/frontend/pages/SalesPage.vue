@@ -26,6 +26,7 @@ import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import { type DayBounds, type Period, PERIODS, periodBounds } from '../components/sales/period';
@@ -40,7 +41,6 @@ import { amountFilterErrors, formatMoney, type Money, moneyOf, useBusinessMoney 
 import { refusal } from '../lib/refusal';
 import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES, TOTAL_ENDS } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
-import { saleTabs } from '../tabs';
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'sale.sales.period.today',
@@ -50,6 +50,7 @@ const PERIOD_LABELS: Record<Period, string> = {
 };
 
 const session = useSession();
+const tabs = useAppTabs('sale');
 const canReports = computed(() => session.can('sale.view_reports'));
 const canIssue = computed(() => session.can('sale.take_payment'));
 const t = useT();
@@ -233,7 +234,7 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
   <AppPage
     :title="$t('sale.title')"
     content-layout="fill"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <h2

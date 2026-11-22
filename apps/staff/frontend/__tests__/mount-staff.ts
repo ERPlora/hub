@@ -2,6 +2,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -14,7 +15,7 @@ export { business, IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/
 export const BUSINESS = 'base.business.get';
 
 /** Owner or admin: `staff.*` (apps.py `role_permissions`), listed one by one. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('staff', {
   user: { id: '1', label: 'Ana' },
   permissions: [
     'staff.view',
@@ -31,20 +32,20 @@ export const OWNER: SessionMe = {
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** A manager: everything but deactivating and terminating. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('staff', {
   ...OWNER,
   permissions: OWNER.permissions.filter((p) => p !== 'staff.delete_member'),
-};
+});
 
 /** An employee views the directory, the schedules and who is away, and asks for their own time off. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('staff', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
   permissions: ['staff.view', 'staff.view_time_off', 'staff.request_time_off'],
-};
+});
 
 export async function mountStaff(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, { path: '/staff/members', session: OWNER, messages: { en, es } });

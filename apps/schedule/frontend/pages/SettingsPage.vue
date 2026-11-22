@@ -10,10 +10,11 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
-import { scheduleTabs } from '../tabs';
 
 const session = useSession();
+const tabs = useAppTabs('schedule');
 const canManage = computed(() => session.can('schedule.manage_settings'));
 
 const { data: settings, status, error, refresh } = useLive('schedule.settings.get', {});
@@ -70,7 +71,7 @@ const saveError = computed(() => {
 <template>
   <AppPage
     :title="$t('schedule.title')"
-    :tabs="scheduleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('schedule.tabs.label')"
   >
     <PageNotices

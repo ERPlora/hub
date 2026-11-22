@@ -1,7 +1,6 @@
 """The inventory app declares its module metadata, its menu entries, its permissions, what each role gets, its help
 and its hooks of the Home."""
 
-import re
 from pathlib import Path
 
 from django.apps import apps
@@ -101,16 +100,10 @@ def test_owner_admin_and_manager_may_do_everything_the_employee_only_reads():
 FRONTEND = Path(apps.get_app_config("inventory").path) / "frontend"
 
 
-def tabbar() -> list[tuple[str, str]]:
-    """The id and route of each tab of the inventory's tab bar, Settings included, as the frontend declares them."""
-    source = (FRONTEND / "composables" / "useInventoryTabs.ts").read_text(encoding="utf-8")
-    return re.findall(r"\{ id: '(\w+)'.*? to: '([^']+)' \}", source)
-
-
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
-    # The help window names the screen in view by these entries and the assistant links each one, so they are the tab
-    # bar's sections, each with the permission that opens it. The first one keeps the cube: it is the icon of the
-    # launcher and of «My apps» (base.home.shell_icon).
+    # The tab bar shows the entries the person may open, the help window names the screen in view by them and the
+    # assistant links each one, each with the permission that opens it. The first one keeps the cube: it is the icon of
+    # the launcher and of «My apps» (base.home.shell_icon).
     entries = inventory().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.path, entry.icon, entry.permission) for entry in entries] == [
@@ -120,7 +113,6 @@ def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
         ("categories", "Categories", "/inventory/categories", "ion:list-outline", "inventory.view_category"),
         ("settings", "Settings", "/inventory/settings", "ion:settings-outline", "inventory.manage_settings"),
     ]
-    assert [(entry.id, entry.path) for entry in entries] == tabbar()
     assert home.shell_icon(inventory()) == "ion:cube-outline"
     shell = shell_icon_registry()
     for entry in entries:
@@ -133,8 +125,10 @@ def test_the_launcher_opens_where_the_inventory_s_root_lands():
     assert f"{{ path: '/inventory', redirect: '{inventory().navigation[0].path}'" in routes
 
 
-def test_the_help_window_s_tabs_are_the_tab_bar_s():
-    assert [(tab.id, tab.path) for tab in app_help.tabs_of(inventory())] == tabbar()
+def test_the_help_window_s_tabs_are_the_menu_s_entries():
+    assert [(tab.id, tab.path) for tab in app_help.tabs_of(inventory())] == [
+        (entry.id, entry.path) for entry in inventory().navigation
+    ]
 
 
 def test_its_help_window_plays_how_inventory_works_in_spanish_and_in_english():
