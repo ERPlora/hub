@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests for smoke-e2e.sh: run from a throwaway git checkout whose nightly-e2e.sh is a fake that logs the arguments
-# and the settings it gets, so what is checked is the smoke's own contract with the night's stack.
+# Tests for smoke-e2e.sh: run from a throwaway git checkout whose scripts/nightly_e2e.py is a fake that logs the
+# arguments and the settings it gets, so what is checked is the smoke's own contract with the night's stack.
 #   bash .github/scripts/smoke-e2e.test.sh
 set -euo pipefail
 
@@ -16,17 +16,22 @@ g() { git -c user.name=smoke -c user.email=smoke@example.com -c init.defaultBran
 
 checkout="$root/hub"
 scripts="$checkout/.github/scripts"
-mkdir -p "$scripts" "$root/home"
+mkdir -p "$scripts" "$checkout/scripts" "$root/home"
 if [ -f "$here/smoke-e2e.sh" ]; then
   cp "$here/smoke-e2e.sh" "$scripts/smoke-e2e.sh"
 else
   echo '#!/usr/bin/env bash' > "$scripts/smoke-e2e.sh"
 fi
-cat > "$scripts/nightly-e2e.sh" <<'EOF'
-#!/usr/bin/env bash
-echo "night args=$* GREP=${NIGHTLY_GREP-unset} REF=${NIGHTLY_HUB_REF-unset} MAX=${NIGHTLY_MAX_MINUTES-unset}" \
-  "DIR=${NIGHTLY_DIR-unset} PORT=${NIGHTLY_HUB_PORT-unset}" >> "$FAKE_CALLS"
-exit "${FAKE_EXIT:-0}"
+cat > "$checkout/scripts/nightly_e2e.py" <<'EOF'
+import os
+import sys
+
+settings = " ".join(f"{label}={os.environ.get(name, 'unset')}" for label, name in (
+    ("GREP", "NIGHTLY_GREP"), ("REF", "NIGHTLY_HUB_REF"), ("MAX", "NIGHTLY_MAX_MINUTES"), ("DIR", "NIGHTLY_DIR"),
+    ("PORT", "NIGHTLY_HUB_PORT")))
+with open(os.environ["FAKE_CALLS"], "a", encoding="utf-8") as calls:
+    calls.write(f"night args={' '.join(sys.argv[1:])} {settings}\n")
+sys.exit(int(os.environ.get("FAKE_EXIT", "0")))
 EOF
 chmod +x "$scripts"/*.sh
 g init -q "$checkout"

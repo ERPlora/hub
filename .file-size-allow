@@ -5,11 +5,10 @@
 # fits its cap, and no path or higher number is ever added.
 227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
-382 .github/scripts/nightly-e2e.sh ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
-1660 apps/appointment/queries.py ERPlora/erplora-next#74
-1127 apps/appointment/schemas.py ERPlora/erplora-next#74
+1660 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
+1127 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
 2257 apps/appointment/services.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 880 apps/attendance/queries.py ERPlora/erplora-next#74
@@ -26,8 +25,8 @@
 923 apps/combo/services.py ERPlora/erplora-next#74
 543 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
-1130 apps/customer/queries.py ERPlora/erplora-next#74
-1300 apps/customer/schemas.py ERPlora/erplora-next#74
+1130 apps/customer/queries/__init__.py ERPlora/erplora-next#74
+1300 apps/customer/schemas/__init__.py ERPlora/erplora-next#74
 1882 apps/customer/services.py ERPlora/erplora-next#74
 1100 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
 2670 apps/customer/tests/test_services.py ERPlora/erplora-next#74
