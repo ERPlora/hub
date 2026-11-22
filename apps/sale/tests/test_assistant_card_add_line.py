@@ -13,7 +13,7 @@ from live.operations import get, registry
 
 from apps.sale.models import OrderLine
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
-from base import assistant
+from base import activation, assistant
 
 pytestmark = HUB_DB
 
@@ -125,6 +125,12 @@ def test_without_tables_a_check_is_said_by_its_title(coffees, dining_room, monke
     order_id = seated_in_spanish()
     for name in [name for name in registry if name.startswith("table.")]:
         monkeypatch.delitem(registry, name)
+    assert said({"order_id": order_id, "product": "coffee"})["order_id"] == "Mesa 4"
+
+
+def test_with_tables_off_a_check_is_said_by_its_title(coffees, dining_room, monkeypatch):
+    order_id = seated_in_spanish()
+    monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"table"}))
     assert said({"order_id": order_id, "product": "coffee"})["order_id"] == "Mesa 4"
 
 
