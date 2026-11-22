@@ -94,7 +94,7 @@ class TestTheMaker:
 
         hub_registry.hub_state_apply(
             SYSTEM,
-            photo(1, (olga, "Olga", "", "hub_owner"), (admin, "Ana", "", "hub_admin"), hub_id=hub_a.id, slug=hub_a.slug),
+            photo(1, (admin, "Ana", "", "hub_admin"), (olga, "Olga", "", "hub_owner"), hub_id=hub_a.id, slug=hub_a.slug),
         )
 
         with use_hub(hub_a):
