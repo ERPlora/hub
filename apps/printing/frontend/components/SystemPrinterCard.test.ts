@@ -65,14 +65,8 @@ describe('SystemPrinterCard', () => {
 
   it('asks Printing about the receipt station, once, and follows no stream for it', async () => {
     embed(DOWNLOADS);
-    const asked: string[] = [];
-    const m = await card('en', {
-      [HEALTH]: () => {
-        asked.push(HEALTH);
-        return Promise.resolve(Response.json({ usage: 'receipt', state: 'ok' }));
-      },
-    });
-    expect(asked).toEqual([HEALTH]);
+    const m = await card();
+    expect(m.sent()).toEqual([{ method: 'GET', path: HEALTH, query: { usage: 'receipt' }, body: undefined }]);
     expect(m.client.stream.subscriptions('printing.device.health')).toEqual([]);
   });
 
