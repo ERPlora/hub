@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7b1a14960be8c34f046848020c3722a617d3468eb174506cf03cb76521b713cb -->
+<!-- generated from WORKBOOK.md sha256:a4588deb8c3c2b23a2d1760fef1ef38b4a036a56a541be98ba6d2ad05a4e85cc -->
 
 ## What it is for and who it is for
 
@@ -20,7 +20,7 @@ with the app on: its invoices and tickets go out without a VeriFactu record or Q
 
 Who uses it:
 
-- The **employee** looks at the records, the queue, the events and the state of the chain.
+- The **employee** does not open its screens (by its address, "No access" (BASE-F118)); their sales reach the AEAT all the same.
 - The **manager**, besides, sends a given record, processes and retries the queue, looks up what the AEAT has
   and tests the connection.
 - The **owner** and the **administrator**, besides, upload or remove the business's certificate, go

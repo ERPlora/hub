@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0781798398e546a306d8e654adaf73550c11ef26d10759b7ab902e8ea872739c -->
+<!-- generated from WORKBOOK.md sha256:de584fc2f012b0e9af4d227476ab38537a6090856df5dfc235fd91ea3d6eda6d -->
 
 ## What it is for and who it is for
 
@@ -240,7 +240,7 @@ settings sees it: out of the box, the administrator and the manager.
 Heading "Inventory" with "Allow selling without stock", "Low stock threshold" (with its explanation)
 and "Track stock", and "Save". It is seen and saved by whoever can manage the inventory settings: out
 of the box, the administrator and the manager. The employee and the cashier are not shown the tab; if
-they type its address, they see "This page does not exist". Loading: "Loading settings…". Error: "The
+they type its address, they see "No access" (BASE-F118). Loading: "Loading settings…". Error: "The
 settings could not be loaded." with "Retry", never the factory values as if they were the business's.
 
 ## States of each screen
@@ -252,7 +252,7 @@ settings could not be loaded." with "Retry", never the factory values as if they
 | Error | Dashboard: "Inventory metrics could not be loaded."; Settings: "The settings could not be loaded."; the tables, their notice with "Retry". A refusal of an action shows in its window, next to its field, or above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…" until the connection comes back. |
 | App inactive | "This app is not active in this business" instead of the figures and the table. |
-| No permission | What it cannot do does not appear (neither **+**, nor import or export, nor the stock actions, nor the switch: "Yes"/"No"); Settings does not show and its address says "This page does not exist"; if it loses the permission with Settings open, the fields lock with "You do not have permission to change these settings. Ask an administrator if you need it.". |
+| No permission | What it cannot do does not appear (neither **+**, nor import or export, nor the stock actions, nor the switch: "Yes"/"No"); Settings does not show and its address says "No access" (BASE-F118); if it loses the permission with Settings open, the fields lock with "You do not have permission to change these settings. Ask an administrator if you need it.". |
 
 ## Unsaved changes on Android
 

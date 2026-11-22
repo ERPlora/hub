@@ -37,8 +37,8 @@ otra app.
   elimina campos), exporta y anota en la actividad lo que traen otras apps.
 - El **empleado** (también en la caja): consulta, da de alta, edita la ficha, importa, añade notas,
   asigna grupos y etiquetas, registra el consentimiento y pone el cliente a la venta. Con el PIN de un
-  responsable, en su mismo dispositivo, une duplicados y crea o cambia grupos, etiquetas y campos
-  (BASE-F84).
+  responsable, en su mismo dispositivo, une duplicados (BASE-F84). Grupos, etiquetas y campos no los
+  abre: por su dirección, «Sin acceso» (BASE-F118).
 - El **cliente** no usa estas pantallas: sus datos entran por el mostrador, el TPV o su WhatsApp.
 
 ## Referencia adoptada
@@ -749,8 +749,8 @@ Implicados: WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F37, APPOINTM
 
 ### CUSTOMER-F27 Crear, cambiar y eliminar grupos de clientes
 Estado: hecho
-Actor: propietario, administrador, responsable; el empleado crea y cambia con el PIN de un responsable
-(eliminar: propietario y administrador)
+Actor: propietario, administrador, responsable (eliminar: propietario y administrador); un empleado no abre
+Grupos: por su dirección, «Sin acceso» (BASE-F118)
 Pantalla: Grupos
 Pasos:
 1. En **Grupos** pulsa **Añadir** («Nuevo grupo»): «Nombre» (obligatorio), «Descripción», «Color» y
@@ -760,9 +760,7 @@ Pasos:
    conservan) y sigue en la lista con el filtro de inactivos, desde donde se vuelve a activar.
 3. Para quitarlo, **Eliminar**: «¿Eliminar Socios? Las fichas que lo tienen lo pierden.» → «Grupo
    Socios eliminado».
-4. Si un empleado pulsa **Guardar**, antes se abre encima «Hace falta una aprobación» con «Se aprueba:
-   Crear un grupo de clientes» (o «Cambiar un grupo de clientes»), y un responsable lo aprueba con su
-   PIN (o su placa) en ese mismo dispositivo. Eliminar nunca se pide: el empleado no lo ve.
+4. Un empleado no abre Grupos: por su dirección, «Sin acceso» (BASE-F118), y se lo pide a quien lleva el negocio.
 Entra: los datos del grupo.
 Sale: el grupo, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.group.created`, `.updated`, `.deleted`). Eliminar un grupo lo quita de todas sus fichas
@@ -776,8 +774,8 @@ Implicados: BASE-F84
 
 ### CUSTOMER-F28 Crear, cambiar y eliminar etiquetas de clientes
 Estado: hecho
-Actor: propietario, administrador, responsable; el empleado crea y cambia con el PIN de un responsable
-(eliminar: propietario y administrador)
+Actor: propietario, administrador, responsable (eliminar: propietario y administrador); un empleado no abre
+Etiquetas: por su dirección, «Sin acceso» (BASE-F118)
 Pantalla: Etiquetas
 Pasos:
 1. En **Etiquetas** pulsa **Añadir** («Nueva etiqueta»): «Nombre» y «Color». **Guardar** →
@@ -786,8 +784,7 @@ Pasos:
    actualizada».
 3. **Eliminar**: «¿Eliminar Habitual? Las fichas que la tienen la pierden.» → «Etiqueta Habitual
    eliminada».
-4. Como en los grupos, el empleado guarda con el PIN de un responsable: «Se aprueba: Crear una etiqueta
-   de clientes» (o «Cambiar una etiqueta de clientes»). Eliminar no se le ofrece.
+4. Como en los grupos, un empleado no abre Etiquetas: por su dirección, «Sin acceso» (BASE-F118).
 Entra: nombre y color.
 Sale: la etiqueta, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.tag.created`, `.updated`, `.deleted`). Eliminarla la quita de todas sus fichas.
@@ -797,7 +794,7 @@ Implicados: BASE-F84
 
 ### CUSTOMER-F29 Definir los campos personalizados de la ficha
 Estado: hecho
-Actor: propietario, administrador, responsable; el empleado, con el PIN de un responsable
+Actor: propietario, administrador, responsable; un empleado no abre Campos: por su dirección, «Sin acceso» (BASE-F118)
 Pantalla: Campos
 Pasos:
 1. En **Campos** pulsa **Añadir** («Nuevo campo personalizado»): «Nombre», «Tipo» («Texto»,
@@ -809,9 +806,7 @@ Pasos:
    exige, y sus valores se quedan. Se cambia todo menos el tipo, si ya hay fichas con un valor.
    **Eliminar** → «¿Eliminar Talla? Se borran también los valores guardados en las fichas.» →
    «Campo Talla eliminado».
-4. Si quien guarda o elimina es un empleado, un responsable lo aprueba antes con su PIN (o su placa) en
-   ese mismo dispositivo: «Se aprueba: Crear un campo personalizado» («Cambiar…»,
-   «Eliminar un campo personalizado»).
+4. Como en los grupos, un empleado no abre Campos: por su dirección, «Sin acceso» (BASE-F118).
 Entra: la definición del campo.
 Sale: el campo y su aviso (`customer.field.created`, `.updated`, `.deleted`). «Obligatorio» solo se
 exige al guardar la ficha completa (CUSTOMER-F04), nunca al darla de alta (Clientes, TPV,
@@ -1081,7 +1076,7 @@ ellas las que usan los servicios de Clientes.
 |---|---|---|---|---|---|
 | Ver fichas, grupos, etiquetas, campos, actividad, compras y consentimientos | sí | sí | sí | sí | `customer.view` |
 | Dar de alta, editar, importar, añadir notas, asignar grupos y etiquetas, registrar el consentimiento y enlazar pedidos | sí | sí | sí | sí | `customer.manage` |
-| Crear y cambiar grupos, etiquetas y campos personalizados; eliminar campos | sí | sí | sí | con PIN | `customer.configure` |
+| Crear y cambiar grupos, etiquetas y campos personalizados; eliminar campos | sí | sí | sí | no («Sin acceso») | `customer.configure` |
 | Unir fichas duplicadas | sí | sí | sí | con PIN | `customer.merge` |
 | Exportar a CSV | sí | sí | sí | no | `customer.export` |
 | Anotar en la actividad lo que traen otras apps | sí | sí | sí | no | `customer.record_activity` |
@@ -1247,8 +1242,8 @@ en la ayuda de esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 - Las columnas exactas que entiende la importación están en el «Entra» de CUSTOMER-F08.
 - CUSTOMER-F12 se apoya en la búsqueda de CUSTOMER-F02, la lectura por teléfono de CUSTOMER-F10, el alta rápida
   del TPV de CUSTOMER-F18 y la fusión de CUSTOMER-F13.
-- El empleado que crea o cambia grupos, etiquetas y campos, o que fusiona fichas, lo hace con la aprobación de un
-  responsable de BASE-F84 (CUSTOMER-F13, F27, F28 y F29).
+- El empleado que fusiona fichas lo hace con la aprobación de un responsable de BASE-F84 (CUSTOMER-F13); Grupos,
+  Etiquetas y Campos son entradas de `customer.configure` y le dicen «Sin acceso» (BASE-F118).
 - El aviso bajo un campo de «Salud y alergias» se quita al corregir ese campo y lo que no es de un campo se queda en
   el bloque hasta el siguiente intento (hub#854, CUSTOMER-F32).
 - El buscador de cliente del TPV (CUSTOMER-F17 y F18) no es una pestaña de Clientes: sus flujos no salen en esta

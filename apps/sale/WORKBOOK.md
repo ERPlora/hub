@@ -237,7 +237,7 @@ poner una nota a una línea en **Vender**, salen como botones y basta con tocarl
 #### Detalle
 Explicación, tabla (Nota, Posición) con buscador, **+** para añadir y, por fila, «Editar» y
 «Eliminar». Vacía: «Todavía no hay notas rápidas…»; cargando: «Cargando notas rápidas…». Quien no
-tiene el permiso de ajustes la ve sin **+** ni acciones.
+tiene el permiso de ajustes no la abre: por su dirección, «Sin acceso» (BASE-F118).
 
 ### Secciones
 Las secciones son los departamentos de la caja para cobrar algo que no está en el catálogo, a precio
@@ -247,7 +247,7 @@ salen. Al tocar **Precio libre** en **Vender**, eliges la sección y escribes el
 #### Detalle
 Explicación, tabla (Nombre, IVA que cobra, Posición), **+** y, por fila, «Editar» y «Eliminar». Vacía:
 «Todavía no hay secciones…»; cargando: «Cargando secciones…». Quien no tiene el permiso de
-ajustes la ve sin **+** ni acciones.
+ajustes no la abre: por su dirección, «Sin acceso» (BASE-F118).
 
 ### Ajustes
 Aquí se decide cómo cobra la caja: qué formas de pago acepta, si exige cliente en cada venta, si deja
@@ -256,8 +256,8 @@ recibo. Pulsa **Guardar** para que los cambios valgan.
 
 #### Detalle
 Cabecera «TPV»: un interruptor o campo por ajuste y «Guardar». Cargando: «Cargando
-ajustes…»; error: «No se pudieron cargar los ajustes.» con «Reintentar»; sin permiso: «No tienes
-permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
+ajustes…»; error: «No se pudieron cargar los ajustes.» con «Reintentar»; sin permiso,
+por su dirección, «Sin acceso» (BASE-F118).
 
 ## Estados de cada pantalla
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:42166c961f97054ceffd5f81398c1b50fe673a24b5c747c5e37664c9a5051d31 -->
+<!-- generated from WORKBOOK.md sha256:6345d7586661d53eb3d79f9494f1f803ebb9d6da1ffb818340fda5705bd7e56f -->
 
 ## What it is for and who it is for
 
@@ -22,7 +22,7 @@ device does not take anybody's paper. If something does not come out, the queue 
 - The **owner** and the **administrator**: everything; they also retry and cancel stuck jobs.
 - The **manager**: adds and changes printers, the devices that print and the settings, and asks for
   printouts.
-- The **employee**: sees printers, settings and the queue, and asks for printouts (a test, a receipt).
+- The **employee**: does not open its screens (by its address, "No access" (BASE-F118)); asks for printouts from where they work (a receipt at the till).
 
 It serves the hair salon and the restaurant alike: both print the receipt and the labels; the kitchen and
 bar order is the restaurant's only.

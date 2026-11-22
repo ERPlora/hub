@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8024241cd608fd8bc2447f7222629f1c63a1bf53b8a4972a96e8170458108fdd -->
+<!-- generated from WORKBOOK.md sha256:5bf67ea2ee4c5c46fb3bd556e46335c1a2ca95bd1566733b1c104f79297a959b -->
 
 ## What it is for and who it is for
 
@@ -29,7 +29,7 @@ all of them learn when two cards are merged or a person's data is erased. Custom
   deletes fields), exports and notes in the activity what other apps bring.
 - The **employee** (also at the till): looks up, adds, edits the card, imports, adds notes, assigns
   groups and tags, records consent and puts the customer on the sale. With a manager's PIN, on their
-  own device, merges duplicates and creates or changes groups, tags and fields (BASE-F84).
+  own device, merges duplicates (BASE-F84). Groups, tags and fields they do not open: by its address, "No access" (BASE-F118).
 - The **customer** does not use these screens: their data comes in at the counter, at the till or
   through their WhatsApp.
 
@@ -742,8 +742,8 @@ Involved: WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F37, APPOINTMEN
 
 ### CUSTOMER-F27 Create, change and delete customer groups
 Status: done
-Actor: owner, administrator, manager; the employee creates and changes with a manager's PIN (deleting:
-owner and administrator)
+Actor: owner, administrator, manager (deleting: owner and administrator); an employee does not open
+Groups: by its address, "No access" (BASE-F118)
 Screen: Groups
 Steps:
 1. In **Groups** tap **Add** ("New group"): "Name" (required), "Description", "Color" and "Order".
@@ -753,9 +753,7 @@ Steps:
    in the list with the inactive filter, from where it is activated again.
 3. To remove it, **Delete**: "Delete Members? The customers who have it lose it." → "Group Members
    deleted".
-4. If an employee taps **Save**, "An approval is needed" opens on top first with "Approving: Create a
-   customer group" (or "Change a customer group"), and a manager approves it with their PIN (or their
-   badge) on that same device. Deleting is never asked for: the employee does not see it.
+4. An employee does not open Groups: by its address, "No access" (BASE-F118), and asks whoever runs the business.
 In: the group's details.
 Out: the group, which is assigned from each card (CUSTOMER-F06), and its notice
 (`customer.group.created`, `.updated`, `.deleted`). Deleting a group really removes it from all its
@@ -769,15 +767,14 @@ Involved: BASE-F84
 
 ### CUSTOMER-F28 Create, change and delete customer tags
 Status: done
-Actor: owner, administrator, manager; the employee creates and changes with a manager's PIN (deleting:
-owner and administrator)
+Actor: owner, administrator, manager (deleting: owner and administrator); an employee does not open
+Tags: by its address, "No access" (BASE-F118)
 Screen: Tags
 Steps:
 1. In **Tags** tap **Add** ("New tag"): "Name" and "Color". **Save** → "Tag created".
 2. When editing ("Edit · Regular") "Active" appears, as in the groups. **Save** → "Tag updated".
 3. **Delete**: "Delete Regular? The customers who have it lose it." → "Tag Regular deleted".
-4. As with the groups, the employee saves with a manager's PIN: "Approving: Create a customer tag" (or
-   "Change a customer tag"). Deleting is not offered to them.
+4. As with the groups, an employee does not open Tags: by its address, "No access" (BASE-F118).
 In: name and color.
 Out: the tag, which is assigned from each card (CUSTOMER-F06), and its notice (`customer.tag.created`,
 `.updated`, `.deleted`). Deleting it removes it from all its cards.
@@ -787,7 +784,7 @@ Involved: BASE-F84
 
 ### CUSTOMER-F29 Define the card's custom fields
 Status: done
-Actor: owner, administrator, manager; the employee, with a manager's PIN
+Actor: owner, administrator, manager; an employee does not open Fields: by its address, "No access" (BASE-F118)
 Screen: Fields
 Steps:
 1. In **Fields** tap **Add** ("New custom field"): "Name", "Type" ("Text", "Number", "Date", "Yes/No",
@@ -798,8 +795,7 @@ Steps:
    not demanded, and its values stay. Everything can be changed except the type, if there are already
    cards with a value. **Delete** → "Delete Size? The values saved on the cards are deleted too." →
    "Field Size deleted".
-4. If an employee saves or deletes, a manager approves it first with their PIN (or their badge) on that
-   same device: "Approving: Create a custom field" ("Change…", "Delete a custom field").
+4. As with the groups, an employee does not open Fields: by its address, "No access" (BASE-F118).
 In: the field's definition.
 Out: the field and its notice (`customer.field.created`, `.updated`, `.deleted`). "Required" is only
 demanded when saving the full card (CUSTOMER-F04), never when adding it (Customers, till, import or
@@ -1072,7 +1068,7 @@ who use the services of Customers.
 |---|---|---|---|---|---|
 | View cards, groups, tags, fields, activity, purchases and consents | yes | yes | yes | yes | `customer.view` |
 | Add, edit, import, add notes, assign groups and tags, record consent and link orders | yes | yes | yes | yes | `customer.manage` |
-| Create and change groups, tags and custom fields; delete fields | yes | yes | yes | with PIN | `customer.configure` |
+| Create and change groups, tags and custom fields; delete fields | yes | yes | yes | no ("No access") | `customer.configure` |
 | Merge duplicate cards | yes | yes | yes | with PIN | `customer.merge` |
 | Export to CSV | yes | yes | yes | no | `customer.export` |
 | Note in the activity what other apps bring | yes | yes | yes | no | `customer.record_activity` |

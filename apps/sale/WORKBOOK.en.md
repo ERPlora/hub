@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:97f0fddb626766c509181cfb6af4777f553c5b128086451a6ca0bf531e318358 -->
+<!-- generated from WORKBOOK.md sha256:17c2b84db7818623903d7ace02598d3639901831508a6bcf9ca9b57f68579075 -->
 
 ## What it is for and who it is for
 
@@ -225,8 +225,8 @@ you put a note on a line in **Sell**, they show as buttons and you just tap them
 
 #### Details
 Explanation, table (Note, Position) with search, **+** to add and, per row, "Edit" and "Delete". Empty:
-"No quick notes yet…"; loading: "Loading quick notes…". Whoever lacks the settings permission sees it
-without **+** or actions.
+"No quick notes yet…"; loading: "Loading quick notes…". Whoever lacks the settings permission does not
+open it: by its address, "No access" (BASE-F118).
 
 ### Sections
 Sections are the till's departments for charging something that is not in the catalogue, at an open
@@ -235,8 +235,8 @@ they show. When you tap **Open price** in **Sell**, you pick the section and typ
 
 #### Details
 Explanation, table (Name, VAT charged, Position), **+** and, per row, "Edit" and "Delete". Empty: "No
-sections yet…"; loading: "Loading sections…". Whoever lacks the settings permission sees it without
-**+** or actions.
+sections yet…"; loading: "Loading sections…". Whoever lacks the settings permission does not open
+it: by its address, "No access" (BASE-F118).
 
 ### Settings
 Here you decide how the till charges: which payment methods it takes, whether every sale needs a
@@ -245,8 +245,8 @@ write what goes at the top and the bottom of the receipt. Press **Save** for the
 
 #### Details
 Header "Point of sale": a switch or field per setting and "Save". Loading: "Loading
-settings…"; error: "Could not load settings." with "Retry"; without permission: "You do not have
-permission to change these settings. Ask an administrator if you need to.".
+settings…"; error: "Could not load settings." with "Retry"; without permission,
+by its address, "No access" (BASE-F118).
 
 ## States of each screen
 

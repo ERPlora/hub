@@ -31,7 +31,7 @@ dispositivo no se lleva el papel de nadie. Si algo no sale, la cola lo dice y de
 - El **propietario** y el **administrador**: todo; además reintentan y cancelan trabajos atascados.
 - El **responsable**: da de alta y cambia impresoras, los dispositivos que imprimen y los ajustes, y pide
   impresiones.
-- El **empleado**: ve impresoras, ajustes y cola, y pide impresiones (una prueba, un tique).
+- El **empleado**: no abre sus pantallas (por su dirección, «Sin acceso» (BASE-F118)); pide impresiones desde donde trabaja (un tique en el TPV).
 
 Sirve igual a la peluquería y al restaurante: los dos imprimen el tique y las etiquetas; la comanda de
 cocina y barra es solo del restaurante.
