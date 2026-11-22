@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // APPOINTMENT-F12, F14: the repeating appointment's panel. «New repeating appointment»: Customer, Services,
 // Professional (only who does them all), Repeats, Day of the week (weekly and fortnightly only), Starts on,
-// Time, Min. (the services' sum unless typed), «Ends on (optional)» and «Number of appointments
+// Time, «Duration (min)» (the services' sum unless typed), «Ends on (optional)» and «Number of appointments
 // (optional)»; «Create repeating appointment» creates it and books its window (the page shows what was
 // booked and skipped). «Edit repeating appointment»: the change applies from a date on («From») — the
 // panel says how many booked appointments it reaches and how many charged ones it leaves alone — and
