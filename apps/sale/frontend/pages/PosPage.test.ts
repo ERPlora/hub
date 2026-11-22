@@ -101,7 +101,7 @@ describe('PosPage: the screen', () => {
     expect(s.find('pos-loading').exists()).toBe(true);
     const appPage = s.wrapper.findComponent(AppPage);
     expect(appPage.props('title')).toBe('Sales & POS');
-    expect((appPage.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick_notes', 'departments', 'settings']);
+    expect((appPage.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick-notes', 'departments', 'settings']);
     await s.result('sale.pos_settings.get', settings());
     expect(s.find('pos-loading').exists()).toBe(false);
     expect(s.wrapper.findComponent(PosCatalog).exists()).toBe(true);
