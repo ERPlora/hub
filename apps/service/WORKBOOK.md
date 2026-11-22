@@ -1367,7 +1367,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`service.grant.list`, la línea de `sale.order.get`, `service.assignment.list`), para que el asistente lo
   busque en vez de pedir un id.
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
-  marcas `refers` de `schemas.py` (`A_SERVICE`, `A_CATEGORY`, `A_PACKAGE`, `AN_ASSIGNMENT`, `A_GRANT`, `A_SESSION`,
+  marcas `refers` de `schemas/fields.py` (`A_SERVICE`, `A_CATEGORY`, `A_PACKAGE`, `AN_ASSIGNMENT`, `A_GRANT`, `A_SESSION`,
   `A_MEMBER`, `A_CUSTOMER`), leídas como quien pregunta: el servicio, la categoría, el bono y la clienta por su nombre,
   el profesional por su nombre completo, la asignación por el servicio y el profesional («Corte · Ana López»), el bono
   vendido por el bono, la clienta y el día de la venta, porque una clienta puede tener dos iguales («Bono 5 cortes ·

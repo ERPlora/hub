@@ -10,7 +10,14 @@ from live.operations import operation
 from apps.service.models import Assignment
 from apps.service.queries.catalog import find_service
 from apps.service.queries.reads import _page
-from apps.service.schemas import AssignmentListIn, AssignmentPage, AssignmentDetailOut, ByIdIn, EligibleIn, EligiblePage
+from apps.service.schemas.assignments import (
+    AssignmentListIn,
+    AssignmentPage,
+    AssignmentDetailOut,
+    EligibleIn,
+    EligiblePage,
+)
+from apps.service.schemas.fields import ByIdIn
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 

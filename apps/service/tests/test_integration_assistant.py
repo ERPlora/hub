@@ -29,7 +29,7 @@ from pydantic import ValidationError
 from apps.appointment.tests.conftest import TESTER
 from apps.customer.models import Customer
 from apps.service.models import Assignment, Grant, Package
-from apps.service.schemas import MAX_CENTS
+from apps.service.schemas.fields import MAX_CENTS
 from base import assistant
 from base.business import business_zone
 from base.tenancy.context import use_hub

@@ -15,16 +15,8 @@ from live.models import OutboxEvent
 from pydantic import ValidationError
 
 from apps.service.models import Redemption
-from apps.service.schemas import (
-    ExpiredOut,
-    HoldIn,
-    ReturnIn,
-    SessionOut,
-    SessionRefIn,
-    SessionsOut,
-    SettleIn,
-    NoIn,
-)
+from apps.service.schemas.fields import NoIn
+from apps.service.schemas.sessions import ExpiredOut, HoldIn, ReturnIn, SessionOut, SessionRefIn, SessionsOut, SettleIn
 
 from .conftest import (
     HUB_DB, A, ctx_for, make_customer, make_grant, make_package, make_redemption, make_service, make_tax,

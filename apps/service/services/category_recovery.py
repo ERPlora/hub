@@ -14,15 +14,9 @@ from apps.service.queries.catalog import find_service, load_service
 from apps.service.queries.categories import find_category, load_category
 from apps.service.queries.reads import SYSTEM
 from apps.service.queries.recovery import left_by_deleting
-from apps.service.schemas import (
-    CategoryIn,
-    CategoryOut,
-    CategoryRecoveredOut,
-    CategoryRecoverIn,
-    ServiceLinkIn,
-    ServiceOut,
-    SubcategoryLinkIn,
-)
+from apps.service.schemas.catalog import ServiceOut
+from apps.service.schemas.categories import CategoryIn, CategoryOut
+from apps.service.schemas.recovery import CategoryRecoveredOut, CategoryRecoverIn, ServiceLinkIn, SubcategoryLinkIn
 from apps.service.services.categories import create_category, lock_tree
 from apps.service.services.writes import _actor, _apply
 from base.recovery import LeftOut, carries_on
