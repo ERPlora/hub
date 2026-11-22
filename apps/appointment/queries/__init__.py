@@ -69,7 +69,6 @@ from apps.appointment.schemas import (
     SlotsOut,
     VisitPage,
 )
-from apps.appointment.queries.ownership import APPOINTMENTS, SERIES, is_own, sees_whose
 from apps.customer.queries import card_in_business, cards_in_copy, find_customer
 from apps.schedule.queries import day_label, hours_for_range
 from apps.schedule.schemas import HoursRangeIn
@@ -81,6 +80,8 @@ from apps.staff.schemas.availability import AvailabilityIn
 from base.business import business_zone, zone_name
 from base.ordering import list_order_for
 from base.relay import by_platform
+
+from .ownership import APPOINTMENTS, SERIES, is_own, sees_whose
 
 VIEW_OWN = "appointment.view_own_appointment"
 ADD_ALL = "appointment.add_appointment"
