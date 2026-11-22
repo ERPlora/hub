@@ -131,4 +131,3 @@
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
 763 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
 520 tests/e2e/whatsapp-graph.ts ERPlora/erplora-next#74
-1201 tests/test_no_internal_references.py ERPlora/erplora-next#74
