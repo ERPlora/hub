@@ -68,13 +68,19 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "What refunds gave back on each professional's lines, for the close by professional that sale.view_reports "
         "opens.",
     ),
-    ("apps/cash_register/queries.py", "sale_lines"): (
+    ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
-        "The tenders of the sales charged and voided while a register session was open: the session's takings.",
+        "The tenders charged, voided and refunded while a register session was open, whoever charged them: what the "
+        "drawer took, which its expected cash adds up; the session itself is read through SESSIONS.",
     ),
-    ("apps/cash_register/queries.py", "unassigned_totals"): (
+    ("apps/cash_register/queries/unassigned.py", "unassigned_totals"): (
+        NO_ROW_READ,
+        "How many sale tenders and comps of a time window no register session copied, and their cash: counted in SQL.",
+    ),
+    ("apps/cash_register/queries/unassigned.py", "unassigned_window"): (
         PART_OF_THE_WORK,
-        "How many sale tenders and comps of a time window no register session copied, counted for the drawer.",
+        "Where the sale lines that fell in no shift start: when the last closed session opened and closed, whoever's "
+        "it was, never shown.",
     ),
     ("apps/table/queries/__init__.py", "sessions_now"): (
         PART_OF_THE_WORK,
@@ -170,6 +176,7 @@ def unscoped_reads(root: Path) -> set[tuple[str, str]]:
 
 def test_the_declarations_are_found():
     assert owned_models(REPO)["Sale"] == "sale"
+    assert owned_models(REPO)["Session"] == "cash_register"
 
 
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():

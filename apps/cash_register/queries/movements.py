@@ -59,9 +59,9 @@ def line_row(line: Line) -> dict:
 def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
     settings, now = current_settings(), timezone.now()
     if params.unassigned:
-        lines = unassigned_lines(settings, now)
+        lines = unassigned_lines(ctx, settings, now)
     else:
-        session = find_session(params.session_id, params.session)
+        session = find_session(ctx, params.session_id, params.session)
         lines = visible_lines(
             hides_expected(ctx, session, settings), lines_of(session, settings, now)
         )
