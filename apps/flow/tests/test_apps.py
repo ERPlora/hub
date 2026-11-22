@@ -136,7 +136,7 @@ def test_flow_has_the_store_metadata_and_belongs_to_both_verticals():
 
 
 def test_permissions():
-    assert flow_app().permissions == PERMISSIONS
+    assert list(flow_app().permissions) == PERMISSIONS
 
 
 def test_only_the_owner_and_the_admin_get_it_the_others_only_answer_what_they_are_asked():

@@ -84,7 +84,7 @@ def test_attendance_is_in_the_store_and_in_both_verticals():
 
 
 def test_permissions():
-    assert attendance().permissions == PERMISSIONS
+    assert list(attendance().permissions) == PERMISSIONS
 
 
 def test_roles():

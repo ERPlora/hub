@@ -115,7 +115,7 @@ def test_combo_has_the_store_metadata_and_belongs_to_the_restaurant():
 
 
 def test_permissions():
-    assert combo_app().permissions == PERMISSIONS
+    assert list(combo_app().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
