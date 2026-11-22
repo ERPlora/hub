@@ -61,7 +61,7 @@ def mark_read(ctx: OperationContext, data: ConversationRefIn) -> dict:
         conversation.unread_count = 0
         _save(conversation, "unread_count")
         record_event(ctx, events.CONVERSATION_READ, {"id": str(conversation.id)})
-    return conversation_out(conversation)
+    return conversation_out(ctx, conversation)
 
 
 def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
@@ -167,7 +167,7 @@ def assign(ctx: OperationContext, data: AssignIn) -> dict:
             events.ASSIGNED,
             {"id": str(conversation.id), "assigned_to_id": None if target is None else str(target)},
         )
-    return conversation_out(conversation)
+    return conversation_out(ctx, conversation)
 
 
 @operation(
@@ -207,7 +207,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
             events.STATUS_CHANGED,
             {"id": str(conversation.id), "status": data.status},
         )
-    return conversation_out(conversation)
+    return conversation_out(ctx, conversation)
 
 
 @operation(
@@ -305,4 +305,4 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
             events.CUSTOMER_LINKED,
             {"id": str(conversation.id), "customer_id": str(card.id) if card else None},
         )
-    return conversation_out(conversation)
+    return conversation_out(ctx, conversation)

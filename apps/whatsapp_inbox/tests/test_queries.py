@@ -122,7 +122,7 @@ def test_sorting_by_any_column_keeps_a_stable_order(three):
         "+34600222222",
         "+34600333333",
     ]
-    assert listed({"sort": "phone", "dir": "desc"}) == [
+    assert listed({"sort": "contact", "dir": "desc"}) == [
         "+34600333333",
         "+34600222222",
         "+34600111111",

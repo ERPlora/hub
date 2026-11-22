@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import { click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountInbox, settle } from '../__tests__/mount-inbox';
+import { click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountInbox, settle, WITHOUT_CONTACT } from '../__tests__/mount-inbox';
 import type { ChannelOut, ConversationDetailOut, MessageOut, NoteOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import ConversationPanel from './ConversationPanel.vue';
@@ -93,6 +93,14 @@ async function setup(over: Partial<ConversationDetailOut> = {}, options: MountOp
   return m;
 }
 
+describe('ConversationPanel: the customer’s number', () => {
+  it('is not painted when it came without it, and the masked number names whoever wrote without a name', async () => {
+    const s = await setup({ phone: null, contact_name: '', display_name: '+346••••1222' }, { session: WITHOUT_CONTACT });
+    expect(s.wrapper.find('[data-testid="whatsapp-inbox-detail-phone"]').exists()).toBe(false);
+    expect(s.find('whatsapp-inbox-detail-name').text()).toBe('+346••••1222');
+  });
+});
+
 describe('ConversationPanel: what it shows', () => {
   it('follows the conversation, its last 50 messages and its notes', async () => {
     const s = await setup();
@@ -100,7 +108,7 @@ describe('ConversationPanel: what it shows', () => {
     expect(s.params(MESSAGES)).toEqual([{ id: 'c1', limit: 50, offset: 0 }]);
     expect(s.params(NOTES)).toEqual([{ id: 'c1', limit: 100 }]);
     expect(s.find('whatsapp-inbox-detail-name').text()).toBe('Ana');
-    expect(s.find('whatsapp-inbox-detail-phone').text()).toBe('+34600111222');
+    expect(s.find('whatsapp-inbox-detail-phone').text()).toBe('+34 600 111 222');
     expect(s.find('whatsapp-inbox-detail-status').text()).toContain('Open');
     const thread = s.wrapper.findComponent(ThreadView);
     expect(thread.props('messages')).toHaveLength(1);

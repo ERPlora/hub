@@ -21,7 +21,7 @@ Para qué: conectar el número del negocio y llevar las conversaciones desde la 
 6. WHATSAPP_INBOX-F31 — una plantilla que sobra, borrada.
 7. WHATSAPP_INBOX-F03 — el móvil de pruebas escribe al negocio.
 8. WHATSAPP_INBOX-F09 — quién espera respuesta.
-9. WHATSAPP_INBOX-F05 — la conversación, abierta.
+9. WHATSAPP_INBOX-F05 — la conversación, buscada por el número y abierta por el empleado, que ve el número del cliente.
 10. WHATSAPP_INBOX-F06 — una foto y una nota de voz del cliente.
 11. WHATSAPP_INBOX-F07 — la conversación, asignada a una empleada.
 12. WHATSAPP_INBOX-F32 — la empleada contesta desde la bandeja.
