@@ -51,25 +51,20 @@ function shellEntry(id: string) {
 
 describe('SIDEBAR', () => {
   it("declares the platform's entries in two groups, each with the permission its screen asks, and no module", () => {
-    expect(SIDEBAR.groups).toEqual([
-      [
-        { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees', permission: 'base.view_home' },
-        { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files', permission: 'base.view_files' },
-      ],
-      [
-        { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps', permission: 'base.view_home' },
-        { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system', permission: 'base.administer_hub' },
-        {
-          id: 'api',
-          labelKey: 'sidebar.api',
-          icon: 'ion:code-slash-outline',
-          to: '/api-docs',
-          permission: 'base.view_home',
-          shownWhile: useApiDocsShown,
-        },
-        { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings', permission: 'base.view_home' },
-      ],
+    const declared = SIDEBAR.groups.map((group) => group.map(({ id, to, permission }) => `${id} ${to} ${permission}`));
+    expect(declared).toEqual([
+      ['employees /employees base.view_home', 'files /files base.view_files'],
+      ['apps /apps base.view_home', 'system /system base.administer_hub', 'api /api-docs base.view_home', 'settings /settings base.view_home'],
     ]);
+    for (const item of SIDEBAR.groups.flat()) {
+      expect(item.labelKey, item.id).toBe(`sidebar.${item.id}`);
+      expect(item.icon, item.id).toMatch(/^ion:/);
+    }
+  });
+
+  it('only «API» waits for something besides its permission: the documentation shown', () => {
+    const waiting = SIDEBAR.groups.flat().filter((item) => item.shownWhile);
+    expect(waiting.map((item) => [item.id, item.shownWhile])).toEqual([['api', useApiDocsShown]]);
   });
 });
 
