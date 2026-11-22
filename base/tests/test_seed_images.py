@@ -17,7 +17,7 @@ import pytest
 from django.conf import settings
 
 from base import image_catalog
-from base.blueprint import SEEDS_DIR
+from base.blueprint.seeds import SEEDS_DIR
 
 #: The datasets whose rows show an image on the till.
 WITH_IMAGE = ("inventory.product", "service.service")

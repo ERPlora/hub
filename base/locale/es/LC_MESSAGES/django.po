@@ -2115,11 +2115,11 @@ msgstr "Este archivo no es una imagen %(type)s."
 msgid "The image may be %(side)s pixels a side at most."
 msgstr "La imagen puede medir %(side)s píxeles por lado como mucho."
 
-#: blueprint.py
+#: blueprint/archive.py
 msgid "The file holds a photo that is not a WebP image of up to 2 MB, so it cannot be read."
 msgstr "El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así que no se puede leer."
 
-#: blueprint.py
+#: blueprint/photos.py
 msgid "«%(row)s»: its photo is not in the file, so it loads without it."
 msgstr "«%(row)s»: su foto no viene en el archivo, así que entra sin ella."
 

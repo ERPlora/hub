@@ -74,7 +74,7 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
     with translation.override(ctx.language):
         hub = Hub.objects.get(slug=ctx.scope.key)
         confirm_with = hub.name.strip() or ctx.scope.key
-        sections = blueprint.reset_plan(ctx)
+        sections = blueprint.removal.reset_plan(ctx)
         answer = {
             "dry_run": data.dry_run,
             "confirm_with": confirm_with,
@@ -195,7 +195,7 @@ def hub_reset_apply(ctx: OperationContext, data: HubResetApplyIn) -> dict:
     internal_only(ctx)
     chosen = list(dict.fromkeys(data.apps))
     with translation.override(ctx.language):
-        removed = blueprint.reset(ctx, chosen)
-    _stop_waiting(ctx, _waiting_loads(), None, blueprint.STOPPED_RESET)
+        removed = blueprint.removal.reset(ctx, chosen)
+    _stop_waiting(ctx, _waiting_loads(), None, blueprint.loads.STOPPED_RESET)
     record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
     return {"apps": removed["apps"]}

@@ -38,6 +38,7 @@ CYCLES_CONTRACT = "no-sibling-cycles"
 CYCLE_ANCESTORS = {
     "base",
     "base.api",
+    "base.blueprint",
     "base.tenancy",
     "base.services",
     "base.queries",

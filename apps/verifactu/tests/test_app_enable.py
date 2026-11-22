@@ -143,7 +143,7 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
 
 
 @HUB_DB
-@pytest.mark.parametrize("key", [seed.key for seed in blueprint.catalog()])
+@pytest.mark.parametrize("key", [seed.key for seed in blueprint.seeds.catalog()])
 def test_a_template_in_spain_leaves_verifactu_off_for_the_home_to_ask_and_turns_on_the_rest(born, load, key):
     """The review does not announce it and the load leaves it off, so «Finish setting up your business» asks its owner
     to turn it on; everything else the template lists goes on, what VeriFactu needs included."""

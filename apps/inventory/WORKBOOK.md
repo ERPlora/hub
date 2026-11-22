@@ -1579,7 +1579,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     («ProductFormModal: photo»), `ProductDetailModal.test.ts`, `frontend/pages/ProductsPage.test.ts`, las baldosas
     en `apps/sale/frontend/components/pos/*Tile*.test.ts`, y en Chrome `tests/e2e/inventory-photo.spec.ts` (F30, F31
     y F32 a 390, 834 y 1440). F33: `base/tests/test_blueprint_images.py`.
-  - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
+  - Blueprint (`base/blueprint/`): los `file:` viajan en `media/…` dentro del zip y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
     no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites
     (`base/tests/test_blueprint_images.py`): `MAX_FILE_BYTES` 20 MB, `MAX_INFLATED_BYTES` 100 MB, `MAX_ENTRIES` 1 000
     y cada `media/` un WebP de `MAX_PHOTO_BYTES` 2 MB (motivo `bad_photo`).

@@ -66,8 +66,8 @@ def events(name):
 
 
 def a_file(purpose="template", data=None, apps=("table",)):
-    bundle = blueprint.Bundle(
-        manifest=blueprint.manifest(
+    bundle = blueprint.archive.Bundle(
+        manifest=blueprint.archive.manifest(
             name="Bar Pepe",
             language="es",
             country="ES",
@@ -78,7 +78,7 @@ def a_file(purpose="template", data=None, apps=("table",)):
         ),
         data=data or {"table.zone": [{"name": "Patio", "description": "", "color": "warning", "sort_order": 1}]},
     )
-    return base64.b64encode(blueprint.write_zip(bundle)).decode()
+    return base64.b64encode(blueprint.archive.write_zip(bundle)).decode()
 
 
 # ── Load a template of the catalogue ───────────────────────────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ def test_a_file_that_is_not_a_blueprint_is_refused_with_its_reason(owner):
 def a_partial_load(owner, monkeypatch):
     """A load whose tables did not go in (the app was off then)."""
     with monkeypatch.context() as patch:
-        patch.setattr(blueprint, "active_apps", lambda scope: frozenset({"inventory"}))
+        patch.setattr(blueprint.loading, "active_apps", lambda scope: frozenset({"inventory"}))
         return call(owner, "base.blueprint.import", template="restaurant.es", apps=["inventory", "table"])
 
 
