@@ -79,3 +79,35 @@ def test_the_owner_and_the_admin_open_every_screen_of_every_app(make_user):
     assert menu_of(make_user("olga"), "hub_owner") == every
     assert menu_of(make_user("adrian"), "hub_admin") == every
     assert every.keys() == {config.label for config in module_configs() if config.navigation}
+
+
+# ── base.session.access: what a device follows to read its session again ──────────────────────────────────────────
+
+
+def access_key(user, permissions: frozenset[str]) -> str:
+    ctx = OperationContext(scope=A, actor=user, permissions=permissions, language="en")
+    return get("base.session.access")(ctx, get("base.session.access").input()).key
+
+
+def test_the_access_key_changes_with_what_the_role_gives(make_user):
+    ana = make_user("ana")
+    assert access_key(ana, permissions_of_role("hub_employee")) != access_key(ana, permissions_of_role("hub_manager"))
+    assert access_key(ana, permissions_of_role("hub_employee")) != access_key(ana, frozenset())
+
+
+def test_the_same_permissions_give_the_same_key_to_anyone(make_user):
+    ana, luis, employee = make_user("ana"), make_user("luis"), permissions_of_role("hub_employee")
+    assert access_key(ana, employee) == access_key(luis, employee)
+    assert access_key(ana, employee) == access_key(ana, frozenset(sorted(employee, reverse=True)))
+
+
+def test_an_anonymous_visitor_gets_a_key_too(make_user):
+    assert access_key(None, frozenset())
+
+
+def test_the_access_is_read_again_with_each_photo_of_erplora_com():
+    from live.live_registry import live_registry
+
+    from base.events import HUB_STATE_APPLIED
+
+    assert "base.session.access" in live_registry.affected([HUB_STATE_APPLIED])

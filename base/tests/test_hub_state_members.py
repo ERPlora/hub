@@ -2,12 +2,12 @@
 HUBS-F27 and HUBS-F28 of the SaaS).
 
 The photo lists who is in the business and with which role. In this business only: a person whose role changed gets
-it at once (``Membership.role``) and their sessions here end, so the new permission is the one they work with from
-now on; a person who is no longer in it loses their membership and their sessions here; a handover is both at once
-(the new owner ``hub_owner``, the former one with the role the photo says). Nobody is created: a person the Hub has
-not seen yet gets their role when they first enter. All of it in the photo's transaction (a photo out of contract
-changes nothing); the open apps hear it after its COMMIT. A photo older than the one kept, or one without
-``members``, changes no one.
+it at once (``Membership.role``) and keeps their sessions: every open app of the business re-runs after the COMMIT and
+works with the new role's permissions from then on, without signing in again; a person who is no longer in it loses
+their membership and their sessions here; a handover changes both roles (the new owner ``hub_owner``, the former one
+with the role the photo says; erplora.com ends their sessions itself through ``/internal/sessions/revoke``). Nobody is
+created: a person the Hub has not seen yet gets their role when they first enter. All of it in the photo's transaction
+(a photo out of contract changes nothing). A photo older than the one kept, or one without ``members``, changes no one.
 """
 
 import json
@@ -15,14 +15,23 @@ import json
 import psycopg
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import connections
+from django.test import RequestFactory
+from live.context import OperationContext
+from live.executor import Stream, Subscription, executor
+from live.operations import get
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
-from base.models import Membership
+from base.models import Hub, Membership
+from base.operations import HubContextBuilder
+from base.permissions import permissions_of_role
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED
 from base.tests.test_internal import HUB_ID, PATH, code, signed
-from base.tests.test_session_revoke import acme, alive, beta, login
+from base.tests.test_session_revoke import acme, alive, beta, in_db, login
 
 __all__ = ["acme", "beta"]
 
@@ -46,7 +55,7 @@ def role_of(saas_id: str, slug: str = A.key) -> str | None:
 
 @HUB_DB
 class TestTheMembersOfThePhoto:
-    def test_a_new_role_applies_now_and_ends_that_person_s_sessions_in_this_business_only(self, client, acme, beta):
+    def test_a_new_role_applies_now_in_this_business_only_and_keeps_that_person_s_sessions(self, client, acme, beta):
         ana_here, ana_on_beta = login(ANA, acme, "hub_employee"), login(ANA, beta, "hub_employee")
         olga_here = login(OLGA, acme, "hub_owner")
 
@@ -54,8 +63,7 @@ class TestTheMembersOfThePhoto:
 
         assert answer.json() == {"applied": True, "version": 1}
         assert (role_of(ANA), role_of(ANA, B.key), role_of(OLGA)) == ("hub_manager", "hub_employee", "hub_owner")
-        assert not alive(ana_here)
-        assert alive(ana_on_beta) and alive(olga_here)
+        assert alive(ana_here) and alive(ana_on_beta) and alive(olga_here)
 
     def test_whoever_is_no_longer_in_it_loses_the_membership_and_the_sessions_here(self, client, acme, beta):
         ana_here, ana_on_beta = login(ANA, acme, "hub_employee"), login(ANA, beta, "hub_employee")
@@ -68,12 +76,13 @@ class TestTheMembersOfThePhoto:
         assert role_of(OLGA) == "hub_owner" and alive(olga_here)
 
     def test_a_handover_makes_the_new_owner_and_gives_the_former_one_the_photo_s_role(self, client, acme):
+        """Their sessions are erplora.com's to end (``/internal/sessions/revoke``): the photo only changes roles."""
         ana_here, olga_here = login(ANA, acme, "hub_owner"), login(OLGA, acme, "hub_admin")
 
         signed(client, "put", PATH, photo(1, member(OLGA, "hub_owner"), member(ANA, "hub_admin")))
 
         assert (role_of(OLGA), role_of(ANA)) == ("hub_owner", "hub_admin")
-        assert not alive(ana_here) and not alive(olga_here)
+        assert alive(ana_here) and alive(olga_here)
 
     def test_someone_the_hub_has_not_seen_yet_is_not_created(self, client, acme):
         login(OLGA, acme, "hub_owner")
@@ -169,7 +178,7 @@ def test_the_open_apps_of_the_business_hear_it_after_the_commit(client, acme):
 
 
 @HUB_DB
-def test_a_session_that_noted_no_host_ends_too_when_the_photo_changes_that_person(client, acme, beta):
+def test_a_session_that_noted_no_host_ends_too_when_the_photo_takes_that_person_out(client, acme, beta):
     """A session from before the sessions noted their host is valid on every host, this business's too: the photo
     ends it as ``/internal/sessions/revoke`` with the business does, and leaves another person's alone."""
     from base.models import SessionOwner
@@ -178,7 +187,53 @@ def test_a_session_that_noted_no_host_ends_too_when_the_photo_changes_that_perso
     SessionOwner.objects.filter(session_id__in=[ana_hostless, olga_hostless]).update(host="")
     login(ANA, acme, "hub_employee")
 
-    signed(client, "put", PATH, photo(1, member(ANA, "hub_manager"), member(OLGA, "hub_owner")))
+    signed(client, "put", PATH, photo(1, member(OLGA, "hub_owner")))
 
-    assert role_of(ANA) == "hub_manager"
+    assert role_of(ANA) is None
     assert not alive(ana_hostless) and alive(olga_hostless)
+
+
+# ── The open apps of a person whose role changed ───────────────────────────────────────────────────────────────────
+
+
+def open_access_stream(saas_id: str, hub: Hub) -> Stream:
+    """The ``/api/live`` stream an employee of ``hub`` opens with the session of its login: ``base.session.access``,
+    what its device follows to read its session again."""
+    key = login(saas_id, hub, role="hub_employee")
+    request = RequestFactory().get("/api/live", HTTP_HOST=f"{hub.slug}.localhost")
+    SessionMiddleware(lambda r: None).process_request(request)
+    request.session = request.session.__class__(key)
+    request.user = Membership.objects.get(user__username=f"saas:{saas_id}", host=hub.slug).user
+    request.LANGUAGE_CODE = "en"
+    stream = Stream(HubContextBuilder().from_request(request))
+    op = get("base.session.access")
+    stream.subs["access"] = Subscription(id="access", op=op, params=op.input.model_validate({}))
+    return stream
+
+
+def access_of(role: str, hub: Hub) -> bytes:
+    """What ``base.session.access`` answers to a session of ``role`` in ``hub``, as a stream frame carries it."""
+    ctx = OperationContext(scope=A, actor=None, permissions=permissions_of_role(role), language="en")
+    with use_hub(hub):
+        return get("base.session.access")(ctx, get("base.session.access").input()).model_dump_json().encode()
+
+
+@pytest.fixture
+def fresh_executor():
+    executor.reset()
+    yield
+    executor.reset()
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+@pytest.mark.usefixtures("fresh_executor")
+async def test_the_open_stream_of_a_person_whose_role_changed_goes_on_with_the_new_role_s_access(client, hub_a):
+    stream = await in_db(open_access_stream, ANA, hub_a)
+    await executor.run_all(stream)
+    assert await in_db(access_of, "hub_employee", hub_a) in stream.queue.get_nowait()
+
+    await in_db(signed, client, "put", PATH, photo(1, member(ANA, "hub_manager")))
+    await executor.run_all(stream)
+
+    assert not stream.closed
+    assert await in_db(access_of, "hub_manager", hub_a) in stream.queue.get_nowait()

@@ -89,6 +89,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         OWN_SESSION,
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
+    "base.session.access": (
+        OWN_SESSION,
+        "A fingerprint of the device's own permissions, so it reads its session again when its role changes; an "
+        "anonymous visitor gets the key of having none.",
+    ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
     "base.app.activation_settle": (
         PLATFORM,

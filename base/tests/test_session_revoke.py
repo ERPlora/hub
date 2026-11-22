@@ -1,9 +1,8 @@
 """The SaaS ends a person's sessions in the Hub: ``POST /internal/sessions/revoke {user_id, hub_id?}`` (the
 back-channel logout of OIDC; without a hub it ends the admin's sessions of that account too).
 
-The SaaS sends it after removing a member, changing their role or handing a business over (with the business's id),
-and after a password change, «sign out everywhere» or deleting the account (without it): HUBS-F26, HUBS-F27 and
-HUBS-F28 of the SaaS. Every login notes whose and where its session is (``base.SessionOwner``: the SaaS account and the
+The SaaS sends it after removing a member or handing a business over (with the business's id), and after a password
+change, «sign out everywhere» or deleting the account (without it): HUBS-F27 and HUBS-F28 of the SaaS. Every login notes whose and where its session is (``base.SessionOwner``: the SaaS account and the
 host the login noted), so the door ends exactly those sessions through that index, never decoding the sessions of the
 table. An open ``/api/live`` stream of an ended session gets no more results: its next re-run ends it with ``bye``,
 and the door wakes the hub's open apps after the COMMIT so that re-run comes now.

@@ -339,7 +339,7 @@ En la pantalla Archivos:
 | BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | hecho |
 | BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | hecho |
 | BASE-F12 | Pedirle al asistente que repase la configuración | hecho |
-| BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
+| BASE-F13 | Cambiar de rol o salir del negocio con el hub abierto | hecho |
 | BASE-F14 | Ver las apps del negocio | hecho |
 | BASE-F15 | Abrir una app desde Apps | hecho |
 | BASE-F16 | Buscar una app en el catálogo | hecho |
@@ -737,25 +737,30 @@ Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
 Implicados: BASE-F103
 
-### BASE-F13 Perder el acceso al cambiar de rol o al salir del negocio
+### BASE-F13 Cambiar de rol o salir del negocio con el hub abierto
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: cualquier pantalla del hub
 Pasos:
   1. En erplora.com, quien gestiona el negocio le cambia el rol a una persona, la quita del negocio o le
      traspasa la propiedad.
-  2. En ese momento se cierra la sesión de esa persona en este negocio, en todos sus dispositivos: lo que
-     tiene abierto deja de ponerse al día y lo siguiente que haga le pide volver a entrar. Sus sesiones en
-     otros negocios siguen abiertas.
-  3. Si sigue en el negocio, vuelve a entrar desde erplora.com y trabaja ya con su rol nuevo: aparece lo
-     que el rol nuevo permite y desaparece lo que no.
-  4. Si la han quitado, al volver erplora.com le dice «No tienes acceso a este hub» y no entra.
+  2. Si le ha cambiado el rol, su sesión sigue abierta y lo que tiene abierto, en todos sus dispositivos,
+     pasa en ese momento a lo que permite el rol nuevo, sin recargar ni volver a entrar: el menú, «Mis apps»
+     y las pestañas enseñan solo lo que puede abrir; la pantalla que tiene delante pasa a «Sin acceso» si el
+     rol nuevo no la abre, y la que le decía «Sin acceso» se abre si ahora puede.
+  3. Si la han quitado del negocio, en ese momento se cierra su sesión en este negocio, en todos sus
+     dispositivos: lo que tiene abierto deja de ponerse al día y lo siguiente que haga le pide volver a
+     entrar; al volver, erplora.com le dice «No tienes acceso a este hub» y no entra. Sus sesiones en otros
+     negocios siguen abiertas.
+  4. Un traspaso de la propiedad cierra la sesión de las dos personas en este negocio (HUBS-F28): vuelven
+     a entrar desde erplora.com y trabajan ya con su rol nuevo.
   5. Si cambia su contraseña, cierra la sesión en todas partes o borra su cuenta en erplora.com, se cierran
      todas sus sesiones del hub, en todos sus negocios.
 Entra: el cambio que hizo erplora.com (quién, en qué negocio y con qué rol, o que ya no está).
-Sale: las sesiones de esa persona cerradas; su rol en el negocio, al día.
-Si falla: si el hub no responde en ese momento, erplora.com lo vuelve a intentar al poco; mientras, la
-siguiente vez que erplora.com le pase al hub el estado del negocio también se cierran esas sesiones.
+Sale: su rol en el negocio, al día, y lo que tiene abierto con lo que ese rol permite; las sesiones de quien
+ya no está en el negocio, cerradas.
+Si falla: si el hub no responde en ese momento, erplora.com se lo vuelve a pasar al poco y el cambio llega
+entonces. Un dispositivo sin conexión lo recibe al reconectar.
 Implicados: HUBS-F26, HUBS-F27, HUBS-F28
 
 ### BASE-F14 Ver las apps del negocio
@@ -2215,9 +2220,10 @@ Pasos:
      erplora.com» lleva a «Miembros» del negocio (en la app instalada, en el navegador del dispositivo; en la de
      Google Play no están).
   2. Allí le cambia el rol.
-  3. Al volver, la persona sale con su rol nuevo y lo que puede hacer cambia al momento.
+  3. Al volver, la persona sale con su rol nuevo. Si tiene el hub abierto, lo que ve y lo que puede hacer
+     cambian al momento, sin cerrar su sesión (BASE-F13).
 Entra: el rol que se elige en erplora.com.
-Sale: la persona con su rol nuevo, como lo manda erplora.com.
+Sale: la persona con su rol nuevo, como lo manda erplora.com, y su sesión abierta.
 Si falla: lo que diga erplora.com.
 Implicados: BASE-F82, BASE-F13
 
