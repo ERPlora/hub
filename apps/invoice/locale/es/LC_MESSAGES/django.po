@@ -487,63 +487,63 @@ msgstr "línea de factura"
 msgid "invoice lines"
 msgstr "líneas de factura"
 
-#: queries.py:51
+#: queries/rows.py:17
 msgid "Invoice not found."
 msgstr "Factura no encontrada."
 
-#: queries.py:52 services/numbering.py:15
+#: queries/series.py:18 services/numbering.py:15
 msgid "This numbering series does not exist."
 msgstr "Esa serie de numeración no existe."
 
-#: queries.py:55
+#: queries/documents.py:18
 msgid "Invoice"
 msgstr "Factura"
 
-#: queries.py:56
+#: queries/documents.py:19
 msgid "Simplified invoice"
 msgstr "Factura simplificada"
 
-#: queries.py:57
+#: queries/documents.py:20
 msgid "Rectifying invoice"
 msgstr "Factura rectificativa"
 
-#: queries.py:58
+#: queries/documents.py:21
 msgid "Copy"
 msgstr "Copia"
 
-#: queries.py:59
+#: queries/documents.py:22
 msgid "VAT"
 msgstr "IVA"
 
-#: queries.py:60
+#: queries/documents.py:23
 msgid "Equivalence surcharge"
 msgstr "Recargo de equivalencia"
 
-#: queries.py:61
+#: queries/documents.py:25
 msgctxt "invoice"
 msgid "Exempt"
 msgstr "Exento"
 
-#: queries.py:62
+#: queries/documents.py:26
 #, python-format
 msgid "Exempt (%(cause)s)"
 msgstr "Exento (%(cause)s)"
 
-#: queries.py:63
+#: queries/documents.py:27
 msgctxt "invoice"
 msgid "Not subject"
 msgstr "No sujeto"
 
-#: queries.py:64
+#: queries/documents.py:28
 msgid "Reverse charge"
 msgstr "Inversión del sujeto pasivo"
 
-#: queries.py:65
+#: queries/documents.py:29
 #, python-format
 msgid "Rectifies invoice %(number)s. Reason: %(reason)s"
 msgstr "Rectifica la factura %(number)s. Motivo: %(reason)s"
 
-#: queries.py:66
+#: queries/documents.py:30
 #, python-format
 msgid "Rectifies invoice %(number)s."
 msgstr "Rectifica la factura %(number)s."
@@ -703,15 +703,15 @@ msgstr ""
 "Esta factura no se puede marcar como pagada: solo se puede con una factura "
 "emitida que aún no esté pagada. No se ha cambiado nada."
 
-#: services.py:117
+#: queries/rectifying.py:19
 msgid "A rectifying invoice cannot be rectified."
 msgstr "Una rectificativa no se puede rectificar."
 
-#: services.py:118
+#: queries/rectifying.py:20
 msgid "The invoice is already cancelled."
 msgstr "La factura ya está cancelada."
 
-#: services.py:120
+#: queries/rectifying.py:21
 msgid ""
 "This ticket was already replaced by a full invoice: rectify the full "
 "invoice."
@@ -719,7 +719,7 @@ msgstr ""
 "Este tique ya se sustituyó por una factura completa: rectifica la factura "
 "completa."
 
-#: services.py:123
+#: queries/rectifying.py:22
 msgid ""
 "A rectifying invoice is dated the day it is issued: today, and never earlier"
 " than the invoice it corrects. Nothing was issued. Send it without a date "
@@ -729,7 +729,7 @@ msgstr ""
 "nunca anterior a la factura que corrige. No se ha emitido nada. Envíala sin "
 "fecha y quedará fechada hoy."
 
-#: services.py:126
+#: queries/rectifying.py:26
 msgid "Nothing is left to rectify on this invoice."
 msgstr "No queda nada por rectificar en esta factura."
 
@@ -767,7 +767,7 @@ msgstr ""
 msgid "The sale %(number)s is not voided."
 msgstr "La venta %(number)s no está anulada."
 
-#: services.py:140
+#: queries/refunds.py:14
 msgid "That refund does not exist."
 msgstr "Esa devolución no existe."
 
@@ -919,19 +919,19 @@ msgstr ""
 "La factura que rectifica este abono (%(number)s) nunca se emitió aquí: tiene "
 "que llegar antes."
 
-#: queries.py
+#: queries/platform_invoices.py:23
 msgid "This ERPlora invoice was never issued here."
 msgstr "Esta factura de ERPlora nunca se emitió aquí."
 
-#: queries.py
+#: queries/platform_invoices.py:24
 msgid "The platform hub has no issuer: run create_platform_hub."
 msgstr "El hub de plataforma no tiene emisor: ejecuta create_platform_hub."
 
-#: queries.py
+#: queries/platform_invoices.py:25
 msgid "VeriFactu does not answer in the platform hub."
 msgstr "VeriFactu no responde en el hub de plataforma."
 
-#: queries.py
+#: queries/platform_invoices.py:26
 msgid ""
 "Real filing with the AEAT is closed on this server: ERPlora's invoices would "
 "not reach it."
