@@ -3,7 +3,6 @@
 # the issue is ERPlora/erplora-next#74, which tracks splitting them. The list only shrinks: a listed file may change but
 # never grows past its number, the number comes down to the file's size as it shrinks, a file leaves the list once it
 # fits its cap, and no path or higher number is ever added.
-172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1634 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
@@ -40,7 +39,6 @@
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
-1700 apps/kitchen/services.py ERPlora/erplora-next#74
 830 apps/modifier/queries/__init__.py ERPlora/erplora-next#74
 666 apps/modifier/schemas/__init__.py ERPlora/erplora-next#74
 687 apps/modifier/services/__init__.py ERPlora/erplora-next#74
@@ -74,9 +72,8 @@
 686 apps/service/frontend/operations.d.ts ERPlora/erplora-next#74
 622 apps/service/models.py ERPlora/erplora-next#74
 1446 apps/service/schemas/__init__.py ERPlora/erplora-next#74
-1961 apps/service/services/__init__.py ERPlora/erplora-next#74
 1238 apps/service/tests/test_queries.py ERPlora/erplora-next#74
-1602 apps/service/tests/test_recovery.py ERPlora/erplora-next#74
+1598 apps/service/tests/test_recovery.py ERPlora/erplora-next#74
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
 600 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -124,7 +121,6 @@
 625 control/models.py ERPlora/erplora-next#74
 1017 control/services.py ERPlora/erplora-next#74
 1220 control/tests/test_services.py ERPlora/erplora-next#74
-109 docker/pgbouncer-entrypoint.sh ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74

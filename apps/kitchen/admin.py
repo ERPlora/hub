@@ -22,7 +22,7 @@ from apps.kitchen.models import (
     Ticket,
     TicketItem,
 )
-from apps.kitchen.services import locked_settings
+from apps.kitchen.services.writes import locked_settings
 
 AUTOMATIC = ("id", "created_at", "updated_at")
 

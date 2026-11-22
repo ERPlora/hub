@@ -176,8 +176,8 @@
     ]
   },
   {
-    "path": "apps/kitchen/services.py",
-    "file_name": "services.py",
+    "path": "apps/kitchen/services/by_hand.py",
+    "file_name": "by_hand.py",
     "functions": [
       {
         "name": "create_ticket",

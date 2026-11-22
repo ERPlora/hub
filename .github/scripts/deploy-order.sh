@@ -4,7 +4,7 @@
 # deploy job of an older push may get the lock after a newer push has deployed; it then deploys
 # nothing (the newer commit already contains it). A release redeploy goes back on purpose.
 # Reads the tag the environment runs (/erplora/<environment>/<project>/image_tag, which ecs_deploy.py
-# and ecs-rollback.sh record) and writes to $GITHUB_OUTPUT:
+# and ecs_rollback.py record) and writes to $GITHUB_OUTPUT:
 #   deploy=false  IMAGE_TAG is an ancestor of the running commit, and not that commit itself;
 #   deploy=true   a newer commit, the same one (a re-run), one off the running commit's line, a running
 #                 tag that is no full commit SHA (bootstrap), or a release redeploy (RELEASE given).
