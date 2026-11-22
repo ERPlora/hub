@@ -7,12 +7,11 @@ from django.utils import translation
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import AI, INTERNAL, operation
 
 from base import access, people as people_rules
 from base.models import Credential, Hub, HubUser, Membership, Profile
-from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_of_role
 from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
@@ -239,8 +238,6 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
     """Employees › Roles: erplora.com's four, from the top, with their people and permissions."""
     found = people_of(ctx.scope.key)
-    configs = all_live_app_configs()
-    everything = {permission for config in configs for permission in config.permissions}
     with translation.override(ctx.language):
         return {
             "roles": [
@@ -249,9 +246,7 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
                     "label": str(role.label),
                     "origin": "basic",
                     "members": sum(1 for person in found if person["role"] == role),
-                    "permissions": len(
-                        everything if role in FULL_ACCESS_ROLES else permissions_for_role(configs, role.value)
-                    ),
+                    "permissions": len(permissions_of_role(role.value)),
                 }
                 for role in people_rules.ROLE_ORDER
             ]

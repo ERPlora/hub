@@ -20,11 +20,7 @@
       "unavailable": "This customer is no longer available."
     },
     "tabs": {
-      "label": "Customer sections",
-      "customers": "Customers",
-      "groups": "Groups",
-      "tags": "Tags",
-      "fields": "Fields"
+      "label": "Customer sections"
     },
     "stage": {
       "lead": "Lead",

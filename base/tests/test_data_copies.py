@@ -4,12 +4,12 @@
   ``{available, dumps: [{id: its S3 key, kind, created_at, bytes, url}]}``, newest first, each link signed for 15
   minutes; ``available`` false for a business without its own database (it never gets a copy); 200 for a business
   that left (the 410 is its host's door, never ``/internal``); 404 for one unknown or purged.
-- ``base.hub.dumps`` (Settings › Data, who runs the business): the copies without links, and how the last reset went;
+- ``base.hub.dumps`` (Settings › Data, the owner's alone): the copies without links, and how the last reset went;
   a business without its own database is never served, so none of its copies is read.
 - ``base.hub.dump_link``: the link of one copy, asked on every click; never another business's copy.
 
-The copies are control's rows; who runs the business reads them from inside business A's own database, as production
-does, and business B's copies sit next to A's in control.
+The copies are control's rows; the owner reads them from inside business A's own database, as production does, and
+business B's copies sit next to A's in control.
 """
 
 import datetime as dt
@@ -201,7 +201,7 @@ def acme(hub_a):
 
 
 @HUB_DB
-def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went(acme, hub_b):
+def test_the_owner_sees_the_copies_and_how_the_reset_went(acme, hub_b):
     hub = acme
     first = copy(hub, "reset", 0)
     Hub.objects.filter(pk=hub.pk).update(
@@ -296,10 +296,11 @@ def test_without_a_bucket_there_is_no_link_to_give(no_dumps_bucket, acme):
     assert refused.value.message == "Ahora mismo no se puede descargar la copia. Inténtalo en un momento."
 
 
+@pytest.mark.parametrize("role", [Membership.Role.ADMIN, Membership.Role.MANAGER])
 @pytest.mark.parametrize("name", ["base.hub.dumps", "base.hub.dump_link"])
-def test_only_who_runs_the_business_reads_its_copies(dumps_bucket, name):
+def test_only_the_owner_reads_the_copies(dumps_bucket, name, role):
     made = copy(business(), "reset", 0)
     data = {"id": made.pk} if name == "base.hub.dump_link" else {}
 
     with pytest.raises(PermissionDenied):
-        call(person("acme", Membership.Role.MANAGER), name, **data)
+        call(person("acme", role), name, **data)

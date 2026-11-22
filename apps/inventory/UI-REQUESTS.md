@@ -9,7 +9,7 @@ migración con su clave `inventory:ui-…`. Ninguno rompe un flujo: todos tienen
 ## Ya en `@erplora/ui`, falta usarlo en la app (`inventory:ui-use-landed`)
 
 - Iconos ya registrados en el shell (`packages/ui/src/shell/icons.ts`):
-  - `ion:pricetags-outline` — pestaña **Categorías**; hoy `ion:list-outline` (`composables/useInventoryTabs.ts`).
+  - `ion:pricetags-outline` — pestaña **Categorías**; hoy `ion:list-outline` (`apps.py`, `navigation`).
   - `ion:close-circle-outline` — cifra **Agotados** del panel; hoy `ion:close-outline` (`pages/DashboardPage.vue`).
   - `ion:pricetag-outline` — cifra **Valor de existencias**; hoy `ion:wallet-outline`.
   - `ion:cloud-upload-outline` — botón **Importar CSV**; hoy `ion:cloud-outline` (`components/CsvButtons.vue`).
@@ -18,7 +18,8 @@ migración con su clave `inventory:ui-…`. Ninguno rompe un flujo: todos tienen
 
 Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`):
 
-- `ion:stats-chart-outline` — pestaña **Panel**; hoy `ion:speedometer-outline` (`composables/useInventoryTabs.ts`).
+- `ion:stats-chart-outline` — pestaña **Panel**; hoy `ion:cube-outline`, el del lanzador y de «Mis apps»
+  (`apps.py`, `navigation`).
 - `ion:eye-outline` — acción **Detalles** de un producto; hoy `ion:information-circle-outline` (`pages/ProductsPage.vue`).
 - `ion:calculator-outline` — acción **Contar stock** (fila y ficha); hoy `ion:keypad-outline`.
 - `ion:remove-circle-outline` — acción **Dar de baja stock**; hoy `ion:warning-outline`.

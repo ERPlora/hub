@@ -30,12 +30,14 @@ import { STAGES } from '../lib/customerForm';
 import { filterParams, filtersInUse, SOURCES, SPENT_ENDS } from '../lib/customerFilters';
 import { amountFilterErrors, useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
-import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { useCustomerImport } from '../lib/useCustomerImport';
 import { type SortDir, useListState } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import type { CustomerListIn, CustomerRow, CustomerSort } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('customer');
 
 const router = useRouter();
 const session = useSession();
@@ -141,7 +143,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
   <AppPage
     :title="$t('customer.list.title')"
     content-layout="fill"
-    :tabs="customerTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('customer.tabs.label')"
   >
     <InlineFeedback

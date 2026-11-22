@@ -8,7 +8,9 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import SettingsForm from '../components/backoffice/SettingsForm.vue';
-import { saleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('sale');
 
 const session = useSession();
 const canManage = computed(() => session.can('sale.manage_settings'));
@@ -17,7 +19,7 @@ const canManage = computed(() => session.can('sale.manage_settings'));
 <template>
   <AppPage
     :title="$t('sale.title')"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
     content-layout="detail"
   >

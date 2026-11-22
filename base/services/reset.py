@@ -1,6 +1,6 @@
 """The reset of a business: ``base.hub.reset`` and ``base.hub.reset_apply``.
 
-Asked by who runs it (``base.hub.reset``), done by the worker (``base.worker``, the data pass): a copy of its database
+Asked by its owner (``base.hub.reset``), done by the worker (``base.worker``, the data pass): a copy of its database
 first (``base.tenancy.dumps``, ``reset``) and, only if it was kept, the sections emptied in its database
 (``base.hub.reset_apply``), the event ``base.hub.data_reset`` recorded there. ``Hub.reset_requested_at`` is set while
 it is to do; ``Hub.reset_sections`` keeps what was asked and how it went, for Settings › Data (``base.hub.dumps``):
@@ -23,7 +23,7 @@ from live.outbox import notify, record_event
 
 from base import blueprint, events
 from base.models import Hub
-from base.permissions import ADMINISTER_HUB
+from base.permissions import OWN_BUSINESS
 from base.registry import internal_only
 from base.schemas.reset import HubResetApplyIn, HubResetApplyOut, HubResetIn, HubResetOut
 from base.services.blueprints import _stop_waiting, _waiting_loads, _who
@@ -44,7 +44,7 @@ def same_name(typed: str, name: str) -> bool:
 @operation(
     "base.hub.reset",
     kind="command",
-    permission=ADMINISTER_HUB,
+    permission=OWN_BUSINESS,
     input=HubResetIn,
     output=HubResetOut,
     ai=AI(

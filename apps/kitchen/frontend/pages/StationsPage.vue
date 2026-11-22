@@ -25,7 +25,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { RouteOut, StationOut } from '../operations';
-import { kitchenTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('kitchen');
 
 const session = useSession();
 const t = useT();
@@ -135,7 +137,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
   <AppPage
     :title="$t('kitchen.title')"
     content-layout="fill"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <PageNotices

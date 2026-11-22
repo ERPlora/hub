@@ -6,7 +6,8 @@ from an uploaded file). ``base.import.undo`` removes exactly the rows of one loa
 what each app would lose (``dry_run``) and, typed the business's name, asks for it: the worker copies the business's
 database first and only then empties the sections (``base/tests/test_worker_data.py``), so the answer is ``copying``
 and nothing is removed yet. A business without its own database is never served, so no reset reaches it; without a
-bucket for the copy it is unavailable, and a second one waits for the first. Each one only for who runs the hub.
+bucket for the copy it is unavailable, and a second one waits for the first. Loading and undoing are for who runs the
+hub; resetting, for its owner alone.
 
 Every test works in business A's own database, as production does.
 """
@@ -404,9 +405,10 @@ def test_a_reset_without_the_exact_name_or_a_section_removes_nothing(owner, own_
     assert asked() == (None, None)
 
 
-def test_who_does_not_run_the_hub_cannot_reset(manager, own_database):
+@pytest.mark.parametrize("role", [Membership.Role.ADMIN, Membership.Role.MANAGER])
+def test_only_the_owner_resets(role, own_database):
     with pytest.raises(PermissionDenied):
-        call(manager, "base.hub.reset", dry_run=True)
+        call(person(role, f"{role}-person"), "base.hub.reset", dry_run=True)
 
 
 # ── A business born with every app off: the blueprint turns its apps on, then loads ─────────────────────────────────

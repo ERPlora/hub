@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b98a1619ae73a998f2f42944141d5b5b34cbac4a059859e8c3ebd280e446a455 -->
+<!-- generated from WORKBOOK.md sha256:428de823adef0c33fe2ab4c66e32b9866b4be483266f342d2cc2f583a5d111a2 -->
 
 ## What it is for and who it is for
 
@@ -69,9 +69,8 @@ Initial setup, step by step:
 
 ## Screens
 
-The **Cash register** menu has two tabs: **Cash register** and **Settings**. Both show for everyone; only whoever
-has permission changes the settings, and the others see them locked. The buttons the profile cannot use do not
-show.
+The **Cash register** menu has two tabs: **Cash register** and **Settings**, this one only for whoever can change
+the settings. The buttons the profile cannot use do not show.
 
 ### Cash register
 Here you open and close the cash shifts and look back at the earlier ones. At the top you see the cash there should

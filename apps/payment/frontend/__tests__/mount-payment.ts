@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { type BusinessMountOptions, mountInShell } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business as baseBusiness } from '../../../../base/frontend/__tests__/business';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -18,27 +19,27 @@ export function business(fields: Partial<Business> = {}): Business {
 export { IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/__tests__/business';
 
 /** Owner, admin or manager: `payment.*` (apps.py `role_permissions`), listed one by one. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('payment', {
   user: { id: '1', label: 'Ana' },
   permissions: ['payment.view_payment', 'payment.add_payment', 'payment.approve_payment'],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** Records, sends and completes payments and manages the methods, but does not approve nor cancel. */
-export const RECORDER: SessionMe = {
+export const RECORDER: SessionMe = withMenu('payment', {
   ...OWNER,
   user: { id: '3', label: 'Carla' },
   permissions: ['payment.view_payment', 'payment.add_payment'],
-};
+});
 
 /** An employee only looks. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('payment', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
   permissions: ['payment.view_payment'],
-};
+});
 
 export type MountOptions = BusinessMountOptions;
 

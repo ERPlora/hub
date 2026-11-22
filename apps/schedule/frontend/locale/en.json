@@ -2,10 +2,7 @@
   "schedule": {
     "title": "Schedules",
     "tabs": {
-      "label": "Schedule sections",
-      "hours": "Hours",
-      "special_days": "Special days",
-      "settings": "Settings"
+      "label": "Schedule sections"
     },
     "days": {
       "0": "Monday",

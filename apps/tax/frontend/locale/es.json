@@ -2,11 +2,7 @@
   "tax": {
     "title": "Impuestos",
     "tabs": {
-      "label": "Secciones de impuestos",
-      "categories": "Categorías",
-      "rules": "Reglas",
-      "aliases": "Alias",
-      "settings": "Ajustes"
+      "label": "Secciones de impuestos"
     },
     "live": {
       "reconnecting": "Reconectando…",

@@ -1,7 +1,7 @@
 {
   "task": {
     "title": "Tasks",
-    "tabs": { "label": "Sections of Tasks", "tasks": "Tasks", "projects": "Projects" },
+    "tabs": { "label": "Sections of Tasks" },
     "views": { "label": "Which tasks", "all": "All", "mine": "My tasks" },
     "status": { "todo": "To Do", "in_progress": "In Progress", "blocked": "Blocked", "done": "Done", "cancelled": "Cancelled" },
     "priority": { "low": "Low", "medium": "Medium", "high": "High", "urgent": "Urgent" },

@@ -2,6 +2,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ADMIN,
   EMPLOYEE,
   errorFrame,
   flush,
@@ -118,6 +119,15 @@ describe('PeopleList', () => {
     expect(full.text()).toContain('Tu plan tiene todas las plazas ocupadas');
     expect(full.text()).toContain('Quita en erplora.com a alguien que ya no trabaje aquí, o pasa a un plan con más plazas.');
     expect(full.get('a[data-testid="people-upgrade"]').attributes('href')).toBe(PLAN_URL);
+  });
+
+  it('every place taken, to an administrator: why, without «Upgrade plan», for only the owner buys', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const m = await open({ session: ADMIN });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+    const full = m.wrapper.get('[data-testid="people-full"]');
+    expect(full.text()).toContain('Every place of your plan is taken');
+    expect(full.find('[data-testid="people-upgrade"]').exists()).toBe(false);
   });
 
   it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {

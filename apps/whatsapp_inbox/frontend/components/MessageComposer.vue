@@ -4,16 +4,16 @@
 // within Meta's 24 hours from the customer's last message (the server is the judge; the box also closes
 // when the window runs out on screen) and «Template» opens the approved ones. With the number not
 // connected (or to reconnect: WHATSAPP_INBOX-F02), the month spent (or a plan that includes none:
-// WHATSAPP_INBOX-F13, with «Upgrade plan» for whoever configures) or no erplora.com, nothing is offered and
+// WHATSAPP_INBOX-F13, with «Upgrade plan» for the owner) or no erplora.com, nothing is offered and
 // the reason is said. A refusal keeps the text with its reason, and sending it again carries the same key:
 // never sent twice. «Upgrade plan» sells, so only on the web (surface.ts), and goes with the pass (`PlanUpgradeLink`).
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
-import { useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
+import { useMayBuy } from '../../../../base/frontend/lib/plan-link';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { noAllowance } from '../lib/plan';
@@ -68,7 +68,6 @@ watch(
 );
 onBeforeUnmount(() => clearTimeout(timer));
 
-const session = useSession();
 const blocked = computed(() => props.conversation.send_blocked);
 /** Why nothing can be sent, in words: a plan that includes none is not «spent until next month», and a number
  *  WhatsApp took the permission of is «to reconnect», as «Your number» says, not «not connected». */
@@ -77,11 +76,9 @@ const blockedText = computed(() => {
   if (blocked.value === 'not_connected' && props.channel?.status === 'reconnect_needed') return t('whatsapp_inbox.composer.reconnectNeeded');
   return t(`whatsapp_inbox.composer.blocked.${blocked.value}`);
 });
-/** «Upgrade plan» at the cap, for whoever configures, with erplora.com to send them to, and only on the web. */
-const { isWeb } = useSurface();
-const upgradeUrl = computed(() =>
-  isWeb.value && blocked.value === 'cap_reached' && session.can('whatsapp_inbox.configure') ? (props.channel?.plans_url ?? '') : '',
-);
+/** «Upgrade plan» at the cap, for the owner (who alone buys), with erplora.com to send them to, and only on the web. */
+const mayBuy = useMayBuy();
+const upgradeUrl = computed(() => (mayBuy.value && blocked.value === 'cap_reached' ? (props.channel?.plans_url ?? '') : ''));
 const windowOpen = computed(() => {
   const end = props.conversation.window_expires_at;
   return props.conversation.window_open && !!end && new Date(end).getTime() > clock.value;

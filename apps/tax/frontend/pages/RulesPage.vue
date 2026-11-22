@@ -34,7 +34,9 @@ import { formatDate, formatPercent } from '../lib/format';
 import { categorySearch } from '../lib/pickers';
 import { OPERATION_CLASSES, ruleCardTitle, ruleCategoryText, TAX_TYPES } from '../lib/rules';
 import type { RuleListIn, RuleOut, RuleStatusFilter } from '../operations';
-import { taxTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('tax');
 
 const STATUSES: readonly RuleStatusFilter[] = ['active', 'inactive', 'all'];
 
@@ -226,7 +228,7 @@ function create(): void {
   <AppPage
     :title="$t('tax.title')"
     content-layout="fill"
-    :tabs="taxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('tax.tabs.label')"
   >
     <PageNotices

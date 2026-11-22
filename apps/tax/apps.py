@@ -48,7 +48,7 @@ class TaxConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon, and a keyword split over lines would look like one.
-    # The same icons as the tabbar (frontend/tabs.ts): the old menu's.
+    # The old menu's icons; each entry is also a tab of the app's pages.
     navigation = [
         Nav("categories", _("Categories"), "ion:pricetags-outline", "/tax/categories", permission="tax.manage"),
         Nav("rules", _("Rules"), "ion:receipt-outline", "/tax/rules", permission="tax.manage"),
@@ -74,4 +74,17 @@ class TaxConfig(LiveAppConfig):
             refresh_on=RULE_IN_FORCE_EVENTS,
         )
     ]
-    help = Help(videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"})
+    help = Help(
+        videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"},
+        flow_videos={
+            "TAX-F02": {"es": ["A9nFeyCvAbQ"], "en": ["nTVArJ9MhsA"]},
+            "TAX-F03": {"es": ["8_UzQyd7JiQ"], "en": ["-2AM34vDWm4"]},
+            "TAX-F04": {"es": ["8_UzQyd7JiQ"], "en": ["-2AM34vDWm4"]},
+            "TAX-F05": {"es": ["cs3OCfJvPjg"], "en": ["ZjucdTFQ8tM"]},
+            "TAX-F06": {"es": ["2uZNBribMXQ"], "en": ["ocI95rmmhvA"]},
+            "TAX-F07": {"es": ["Xifu7kVbOe0"], "en": ["zXiDlwQ1sTs"]},
+            "TAX-F08": {"es": ["zQgLuHvgn04"], "en": ["Ly_I_Une8YI"]},
+            "TAX-F13": {"es": ["E5-4AOlKnyM"], "en": ["obkc8TRqkf4"]},
+            "TAX-F14": {"es": ["E5-4AOlKnyM"], "en": ["obkc8TRqkf4"]},
+        },
+    )

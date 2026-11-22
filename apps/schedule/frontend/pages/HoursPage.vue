@@ -17,7 +17,9 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { hoursSummary, statusOf } from '../lib/intervals';
 import type { WeekDayOut } from '../operations';
-import { scheduleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('schedule');
 
 const session = useSession();
 const t = useT();
@@ -69,7 +71,7 @@ async function confirmWeek(): Promise<void> {
   <AppPage
     :title="$t('schedule.title')"
     content-layout="fill"
-    :tabs="scheduleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('schedule.tabs.label')"
   >
     <PageNotices

@@ -17,6 +17,7 @@ from apps.printing.models import PrintJob
 from apps.tax.models import TaxCategory
 from base import operations as base_operations
 from base.models import Hub
+from base.sensitive import DATA_PERMISSIONS
 from base.tenancy.context import use_hub
 
 from .conftest import A, B, HUB_DB, ctx_for, ctx_with
@@ -209,6 +210,7 @@ def test_erploras_own_hub_takes_its_currency_from_base_business_get_too(caller, 
 @pytest.mark.parametrize("caller", sorted(IN_YEN))
 def test_an_api_key_with_only_the_operation_s_permission_gets_the_business_s_currency(caller):
     # The key holds no permission of ``base.business.get``: the currency is read as the platform, never with its rights.
+    # Beside the operation's, a key holds only base's data permissions (it sees the costs as whoever made it).
     business_in("JP")
     through, in_yen, permissions = IN_YEN[caller]
-    assert through(ctx_with(*permissions)) == in_yen
+    assert through(ctx_with(*permissions, *DATA_PERMISSIONS)) == in_yen

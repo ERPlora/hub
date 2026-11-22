@@ -20,11 +20,7 @@
       "unavailable": "Este cliente ya no está disponible."
     },
     "tabs": {
-      "label": "Secciones de clientes",
-      "customers": "Clientes",
-      "groups": "Grupos",
-      "tags": "Etiquetas",
-      "fields": "Campos"
+      "label": "Secciones de clientes"
     },
     "stage": {
       "lead": "Contacto",

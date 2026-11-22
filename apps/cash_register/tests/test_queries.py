@@ -9,7 +9,7 @@ from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 
 from apps.cash_register.models import Count, Session
-from apps.cash_register.queries import DENOMINATIONS, count_total, currency_decimals
+from apps.cash_register.queries.currency import DENOMINATIONS, count_total, currency_decimals
 from apps.kitchen.tests.conftest import add_printers
 from base.tests.ordering import assert_reads_backwards, listed_with
 

@@ -486,7 +486,8 @@ pago» y ata Pagos a Ventas sin motivo.
 
 ### Cómo son las páginas
 
-- `frontend/pages/PaymentsPage.vue` y `MethodsPage.vue`, con la barra de pestañas de `frontend/tabs.ts`.
+- `frontend/pages/PaymentsPage.vue` y `MethodsPage.vue`, con la barra de pestañas de `useAppTabs` (las entradas del
+  menú que la persona puede abrir).
   La Fecha de Pagos filtra por rango (`daterange`: `payment_date_from` y `payment_date_to`, cada extremo
   por su lado).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),

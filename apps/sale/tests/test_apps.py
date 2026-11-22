@@ -2,6 +2,7 @@
 of the Home."""
 
 
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
@@ -9,13 +10,14 @@ from live.live_registry import live_registry
 from base.tests.shell_icons import shell_icon_registry
 from live.meta import (
     Category,
-    Help,
     LiveAppConfig,
     Nav,
     Widget,
     module_configs,
     permissions_for_role,
 )
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "sale.view_sale",
@@ -27,6 +29,7 @@ PERMISSIONS = [
     "sale.refund_sale",
     "sale.view_paymentmethod",
     "sale.add_paymentmethod",
+    "sale.view_all_sales",
     "sale.view_reports",
     "sale.manage_settings",
 ]
@@ -87,7 +90,7 @@ def test_roles():
     for role in ("hub_owner", "hub_admin", "hub_manager"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
     # The old cashier (the employee who also charges) is the employee now: it builds the check,
-    # charges it and reads the sales; voiding, refunding, figures and settings are the manager's.
+    # charges it and reads its own sales; everyone's, voiding, refunding, figures and settings are the manager's.
     assert permissions_for_role([config], "hub_employee") == {
         "sale.view_sale",
         "sale.add_sale",
@@ -308,4 +311,23 @@ def test_sales_has_no_setup_steps_nor_bell_counters():
 
 
 def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
-    assert sale().help == Help(videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"})
+    assert sale().help.videos == {"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("SALE-F01",), "0j9NMnpgXWM", "TALKAH4xCLM"),
+    (("SALE-F02",), "6IaIDRuKHzk", "glc7T7Xpyw0"),
+    (("SALE-F03",), "4iMjcVUNlGQ", "FjqB1ra8qPQ"),
+    (("SALE-F04", "SALE-F05"), "QZIskHcvbx4", "WBdK2Z-XHOQ"),
+    (("SALE-F11",), "gtsNNFvYHIw", "yViCguWhBP8"),
+    (("SALE-F13",), "VkHmRSouS8U", "yQGyb_bvMi8"),
+    (("SALE-F14",), "kG1MT9VEMjo", "B_-hW7QysXU"),
+    (("SALE-F15",), "ADneSwlsnlg", "8vLwV_6ILUQ"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("sale", language) == help_videos.by_task(TASK_VIDEOS, language)

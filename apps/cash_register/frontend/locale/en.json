@@ -2,9 +2,7 @@
   "cash_register": {
     "title": "Cash register",
     "tabs": {
-      "label": "Cash register sections",
-      "sessions": "Cash register",
-      "settings": "Settings"
+      "label": "Cash register sections"
     },
     "live": {
       "reconnecting": "Reconnecting… the figures may be out of date.",

@@ -29,7 +29,9 @@ import { backwardsDays, filterParams, filtersInUse, TOTAL_ENDS } from '../lib/fi
 import { amountFilterErrors, formatDate, formatMoney, useBusinessMoney } from '../lib/format';
 import { ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES, statusTone } from '../lib/record';
 import type { RecordListIn, RecordRowOut } from '../operations';
-import { verifactuTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('verifactu');
 
 const router = useRouter();
 const t = useT();
@@ -157,7 +159,7 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
   <AppPage
     :title="$t('verifactu.records.title')"
     content-layout="fill"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
   >
     <PageNotices

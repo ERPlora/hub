@@ -35,29 +35,23 @@ from apps.cash_register.models import (
     Settings,
     session_number,
 )
-from apps.cash_register.queries import (
-    actor,
-    business_currency,
-    count_row,
-    count_total,
-    currency_decimals,
-    current_settings,
-    expected_now,
-    find_register,
+from apps.cash_register.queries.auto_close import last_cut_off
+from apps.cash_register.queries.counts import count_row
+from apps.cash_register.queries.currency import count_total, currency_decimals, normalized_count
+from apps.cash_register.queries.figures import expected_now
+from apps.cash_register.queries.lines import sale_lines, stored_line
+from apps.cash_register.queries.movements import line_row
+from apps.cash_register.queries.people import actor
+from apps.cash_register.queries.registers import find_register, register_row
+from apps.cash_register.queries.sessions import (
     find_session,
     hides_expected,
-    last_cut_off,
-    line_row,
-    normalized_count,
-    register_row,
     require_count,
-    sale_lines,
     session_detail,
     session_row,
     session_to_close,
-    settings_row,
-    stored_line,
 )
+from apps.cash_register.queries.settings import current_settings, settings_row
 from apps.cash_register.schemas import (
     AutoCloseOut,
     CountAddIn,
@@ -76,6 +70,7 @@ from apps.cash_register.schemas import (
     SettingsOut,
     SettingsPatchIn,
 )
+from apps.sale.queries.business import business_currency
 from base.business import business_zone, paper_date
 
 SESSION_ALREADY_OPEN = _(

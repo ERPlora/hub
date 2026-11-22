@@ -26,8 +26,10 @@ import MergePanel from '../components/MergePanel.vue';
 import PurchaseHistory from '../components/PurchaseHistory.vue';
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { type CustomerFields, ESSENTIAL_FIELDS, fieldsFromDetail, MORE_FIELDS, patchInput } from '../lib/customerForm';
-import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('customer');
 
 const props = defineProps<{ id: string }>();
 
@@ -109,7 +111,7 @@ async function save(): Promise<void> {
     :title="customer?.name ?? $t('customer.detail.title')"
     :back-href="LIST"
     content-layout="detail"
-    :tabs="customerTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('customer.tabs.label')"
   >
     <InlineFeedback

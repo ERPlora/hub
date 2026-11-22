@@ -16,7 +16,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { categorySearch } from '../lib/pickers';
 import type { AliasListIn, AliasOut, AliasSource } from '../operations';
-import { taxTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('tax');
 
 const SOURCES: readonly AliasSource[] = ['shipped', 'learned'];
 
@@ -74,7 +76,7 @@ const cardTitle = (row: AliasOut): string => row.alias;
   <AppPage
     :title="$t('tax.title')"
     content-layout="fill"
-    :tabs="taxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('tax.tabs.label')"
   >
     <PageNotices
