@@ -707,3 +707,7 @@ msgstr "alergia del cliente"
 #: models.py:411
 msgid "allergy in the dish"
 msgstr "alergia en el plato"
+
+#: apps.py:101
+msgid "Settings"
+msgstr "Ajustes"

@@ -264,11 +264,21 @@ def activations_stuck(host: str, now: dt.datetime) -> int:
 
 
 def _first_screen(ctx: OperationContext, config: Any) -> str | None:
-    """The first entry of the module's menu, for a person who may see the module; else none."""
-    if not config.navigation or not _can_see(ctx, config):
-        return None
-    return config.navigation[0].path
+    """The first entry of the module's menu the person may open; none if it may open none."""
+    return next((nav.path for nav in open_entries(ctx, config)), None)
+
+
+def open_entries(ctx: OperationContext, config: Any) -> list[Any]:
+    """The entries of the module's menu the person may open: those whose permission it holds. One that names none
+    opens to nobody (``ctx.has(None)`` is true; ``live.E025`` refuses such an entry at startup)."""
+    return [nav for nav in config.navigation if nav.permission and ctx.has(nav.permission)]
 
 
 def _can_see(ctx: OperationContext, config: Any) -> bool:
+    """Whether the person sees the module in its menu and «My apps»: it may open one of its entries."""
+    return bool(open_entries(ctx, config))
+
+
+def _may_use(ctx: OperationContext, config: Any) -> bool:
+    """Whether the person holds any permission of the module, which other screens use without opening it."""
     return ctx.has(f"{config.label}.view") or any(ctx.has(permission) for permission in config.permissions)

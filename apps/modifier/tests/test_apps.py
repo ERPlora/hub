@@ -159,5 +159,5 @@ def test_the_pos_reads_are_open_to_api_keys():
     assert not exposed & {"modifier.link.drop_product", "modifier.link.drop_category"}
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert modifier().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert modifier().help == Help(videos={"es": "Hko8juygFws", "en": "hjdKTTO4WzU"})

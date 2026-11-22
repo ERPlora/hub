@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d0dff6f71b8e6977ec47d719a3c1ac7779218475a206532a383a34ba5bb48fc8 -->
+<!-- generated from WORKBOOK.md sha256:ef79f8f538d4051ac316f88fd9018a8cb70763577119d35270aa0d329213bcd7 -->
 
 ## What it is for and who it is for
 
@@ -139,9 +139,11 @@ does not go through the till.
 #### Detail
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
-Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes and Total
-(in the business's currency, its country's); search box "Search ticket or destination…" (by number and label), filters by Type, Priority and Status
-(each one a list with its words: "Dine in", "Rush", "To prepare"…), and table or card view. Actions per
+Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes (in words:
+"2 dishes"), Total (in the business's currency, its country's) and Sent; search box "Search ticket or destination…" (by number and label), filters by Type, Priority and Status
+(each one a list with its words: "Dine in", "Rush", "To prepare"…), and table or card view. The card's
+title is the short number and the destination ("#0013 Table 9"), the status goes in its tag and, below,
+every other datum has its column's icon in front, without repeating the destination. Actions per
 row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" menu, with confirmation and an
 optional reason); only the ones the profile can do show up, and the ones the state does not allow are
 hidden. Tapping a row opens its detail: the dishes with the customer's allergy, their menu, their modifiers, their

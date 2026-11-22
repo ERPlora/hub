@@ -6,7 +6,7 @@
 // «This appointment only» / «This and all following» for a series and shows the history below.
 // CUSTOMER-F25: a customer who is not there yet is created from the same search («+ New customer «…»»,
 // walk-in) and stays chosen, and what was already chosen for the appointment is kept, also when it fails.
-import { Combo, ConfirmDialog } from '@erplora/ui/components';
+import { Combo, ConfirmDialog, DateField, TimeField } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
@@ -17,7 +17,7 @@ import AppointmentFormModal from './AppointmentFormModal.vue';
 import AppointmentHistory from './AppointmentHistory.vue';
 import FreeSlots from './FreeSlots.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean };
 
 const BOOKED: AppointmentOut = {
   id: 'a1',
@@ -89,6 +89,9 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     staffPicker().vm.$emit('update:modelValue', { id, label });
     await settle();
   }
+  const when = (name: 'day' | 'time') => (name === 'day' ? m.wrapper.getComponent(DateField) : m.wrapper.getComponent(TimeField)).vm;
+  const kept = (name: 'day' | 'time') => when(name).$props.modelValue;
+  const pick = async (name: 'day' | 'time', value: string) => { when(name).$emit('update:modelValue', value); await settle(); };
   async function pickCustomer() {
     m.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
       customer_id: 'c1',
@@ -104,7 +107,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     await m.live();
     await m.result('base.business.get', business(fields));
   }
-  return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, pickCustomer, businessIn };
+  return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, kept, pick, pickCustomer, businessIn };
 }
 
 async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
@@ -112,8 +115,8 @@ async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
   await s.addService('cut', 'Haircut');
   await s.addService('colour', 'Colour');
   await s.pickStaff('s1', 'Ana López');
-  await ionValue(s.field('day'), '2026-10-19', 'ionInput');
-  await ionValue(s.field('time'), '10:00', 'ionInput');
+  await s.pick('day', '2026-10-19');
+  await s.pick('time', '10:00');
 }
 
 describe('AppointmentFormModal: New appointment', () => {
@@ -222,7 +225,7 @@ describe('AppointmentFormModal: New appointment', () => {
     await ionValue(s.field('minutes'), '75', 'ionInput');
     s.wrapper.findComponent(FreeSlots).vm.$emit('pick', '11:15');
     await settle();
-    expect(s.field('time').value).toBe('11:15');
+    expect(s.kept('time')).toBe('11:15');
     s.answer(201, BOOKED);
     await click(s.submit());
     const body = s.sent().find((call) => call.path === '/api/appointment/appointments')?.body as Record<string, unknown>;
@@ -254,7 +257,7 @@ describe('AppointmentFormModal: New appointment', () => {
     s.answer(422, { error: { code: 'appointment.invalid_local_time', message: 'x', fields: { start: 'That time does not exist.' } } });
     await click(s.submit());
     expect(s.field('time').errorText).toBe('That time does not exist.');
-    expect(s.field('time').value).toBe('10:00');
+    expect(s.kept('time')).toBe('10:00');
   });
 
   // The customer is chosen in Customers' own search, in a window of its own: no field of the form is typed in, and its
@@ -281,20 +284,17 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.sent().filter((call) => call.path === '/api/appointment/appointments')).toHaveLength(1);
   });
 
-  // The day and the time are the device's own date and time pickers (never a
-  // numeric keypad without «:» or «/»), and a time typed with the keyboard counts at once.
-  it('the day and the time are the device’s pickers, and a typed time counts at once', async () => {
+  // The day and the time are the app's own pickers (never the device's), shown as read; a picked time counts at once.
+  it('the day and the time are the app’s pickers, shown as read, and a picked time counts at once', async () => {
     const s = await setup();
-    const typeOf = (name: string) => (s.field(name) as Control & { type?: string; inputmode?: string });
-    expect([typeOf('day').type, typeOf('time').type]).toEqual(['date', 'time']);
-    expect([typeOf('day').inputmode, typeOf('time').inputmode]).toEqual([undefined, undefined]);
+    expect([s.field('day').readonly, s.field('time').readonly]).toEqual([true, true]);
     await s.pickCustomer();
     await s.addService('cut', 'Haircut');
     await s.pickStaff('s1', 'Ana López');
-    await ionValue(s.field('day'), '2026-10-19', 'ionInput');
+    await s.pick('day', '2026-10-19');
     expect(s.submit().disabled).toBe(true);
-    await ionValue(s.field('time'), '10:00', 'ionInput');
-    expect(s.submit().disabled).toBe(false);
+    await s.pick('time', '10:00');
+    expect([s.field('day').value, s.field('time').value, s.submit().disabled]).toEqual(['10/19/2026', expect.stringMatching(/^10:00\sAM$/), false]);
   });
 
   // Services or professionals that cannot load are never an empty list nor only the
@@ -318,14 +318,14 @@ describe('AppointmentFormModal: New appointment', () => {
     const s = await setup();
     await fillNew(s);
     expect(s.inDoc('appointment-form-past')).toBeNull();
-    await ionValue(s.field('day'), '2026-10-13', 'ionInput');
+    await s.pick('day', '2026-10-13');
     expect(s.inDoc('appointment-form-past')?.textContent).toContain('starts in the past');
   });
 
   it('comes with the professional and the time of the tapped slot', async () => {
     const s = await setup({ preset: { day: '2026-10-19', time: '16:30', staffId: 's2', staffName: 'Bea Ruiz' } });
     expect(s.staffPicker().props('modelValue')).toEqual({ id: 's2', label: 'Bea Ruiz' });
-    expect([s.field('day').value, s.field('time').value]).toEqual(['2026-10-19', '16:30']);
+    expect([s.kept('day'), s.kept('time')]).toEqual(['2026-10-19', '16:30']);
   });
 
   it('an employee books for herself only', async () => {
@@ -361,10 +361,10 @@ describe('AppointmentFormModal: Edit appointment', () => {
   it('comes filled in, sends only what changed and shows the history below', async () => {
     const s = await setup({ appointment: BOOKED });
     expect(s.inDoc('appointment-form')?.getAttribute('aria-label')).toBe('Edit appointment');
-    expect([s.field('day').value, s.field('time').value, s.field('minutes').value]).toEqual(['2026-10-19', '10:00', '30']);
+    expect([s.kept('day'), s.kept('time'), s.field('minutes').value]).toEqual(['2026-10-19', '10:00', '30']);
     expect(s.wrapper.findComponent(AppointmentHistory).props('appointmentId')).toBe('a1');
     expect(s.wrapper.findComponent(FreeSlots).props('excludeId')).toBe('a1');
-    await ionValue(s.field('time'), '11:00', 'ionInput');
+    await s.pick('time', '11:00');
     await ionValue(s.field('notes'), 'Bring photo', 'ionInput');
     s.answer(200, { ...BOOKED, start: '2026-10-19T11:00:00+02:00' });
     await click(s.submit());
@@ -387,7 +387,7 @@ describe('AppointmentFormModal: Edit appointment', () => {
 
   it('a series occurrence asks the scope; «This and all following» edits the series from its date', async () => {
     const s = await setup({ appointment: { ...BOOKED, recurring_id: 'r1', occurrence_date: '2026-10-19' } });
-    await ionValue(s.field('time'), '12:00', 'ionInput');
+    await s.pick('time', '12:00');
     await click(s.submit());
     const scope = s.inDoc('appointment-scope');
     expect(scope?.textContent).toContain('This appointment is part of a repeating series.');
@@ -402,7 +402,7 @@ describe('AppointmentFormModal: Edit appointment', () => {
       },
     ]);
     // Only what happened, never «0 cancelled».
-    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because they are already charged']);
+    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because it is already charged']);
   });
 });
 
@@ -434,8 +434,8 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
     await s.addService('cut', 'Haircut');
     await s.addService('colour', 'Colour');
     await s.pickStaff('s1', 'Ana López');
-    await ionValue(s.field('day'), '2026-10-19', 'ionInput');
-    await ionValue(s.field('time'), '10:00', 'ionInput');
+    await s.pick('day', '2026-10-19');
+    await s.pick('time', '10:00');
     await click(s.inDoc('customer-search-trigger'));
     await ionValue(s.inDoc('customer-picker-search'), 'Marta Ruiz', 'ionInput');
     await click(s.inDoc('customer-search-quick-add'));
@@ -447,7 +447,7 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
   function expectChoicesKept(s: Awaited<ReturnType<typeof setup>>) {
     expect([s.inDoc('appointment-form-service-cut'), s.inDoc('appointment-form-service-colour')].every(Boolean)).toBe(true);
     expect(s.staffPicker().props('modelValue')).toEqual({ id: 's1', label: 'Ana López' });
-    expect([s.field('day').value, s.field('time').value, s.field('minutes').value]).toEqual(['2026-10-19', '10:00', '90']);
+    expect([s.kept('day'), s.kept('time'), s.field('minutes').value]).toEqual(['2026-10-19', '10:00', '90']);
   }
 
   /** «Create and assign»: its submit button sends the quick form (an `ion-button` only does that once
@@ -522,8 +522,8 @@ describe('AppointmentFormModal: Android Back with unsaved changes (hub#1020, BAS
     const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
     await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('appointment-form'),
-      change: () => ionValue(s.field('time'), '10:00', 'ionInput'),
-      restore: () => ionValue(s.field('time'), '', 'ionInput'),
+      change: () => s.pick('time', '10:00'),
+      restore: () => s.pick('time', ''),
     });
   });
 });

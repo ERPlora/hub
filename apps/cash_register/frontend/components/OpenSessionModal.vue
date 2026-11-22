@@ -7,7 +7,8 @@
 // read inside the window, at its field, until the person corrects that field. «Open session» waits in grey until the
 // business has answered its money (the float is read in it; hub#921), and says so with «Retry» if that read fails
 // (hub#938). Success says «Session opened» and closes; the table and the «Open session» button follow by themselves
-// (live).
+// (live). Sales' charge sheet mounts it too, over the charge, by this file's name (SALE-F08): renaming it, or changing
+// its `open` model or its `opened` event, breaks that charge.
 import { FormModal, type FormModalError, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';

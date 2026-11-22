@@ -271,6 +271,7 @@ RESOLUTION_READS = {
     "sale.order.set_appointment": ("sale.order.list", "appointment.appointment.list"),
     "sale.order.set_label": ("sale.order.list",),
     "sale.order.set_line_staff": ("sale.order.list", "sale.order.get", "staff.member.list"),
+    "sale.order.set_staff": ("sale.order.list", "staff.member.list"),
     "sale.order.update_line": ("sale.order.list", "sale.order.get"),
     "sale.order.void_line": ("sale.order.list", "sale.order.get"),
     "sale.refund.list": ("sale.sale.list",),

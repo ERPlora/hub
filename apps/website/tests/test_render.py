@@ -59,7 +59,7 @@ def render(
         theme or THEME,
         full_content(gallery=gallery(), reviews={"place_ref": PLACE_ID}) if content is None else content,
         lang,
-        hub="a",
+        name="a",
         currency=currency,
         catalog=catalog_snapshot() if catalog is None else catalog,
         preview=preview,

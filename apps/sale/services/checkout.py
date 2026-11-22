@@ -44,6 +44,7 @@ from apps.sale.services.documents import RECIPIENT_KEYS, _fiscal_document, _issu
 from apps.sale.services.orders import _recount, _save_lines
 from apps.sale.services.printouts import _print_sale
 from apps.sale.services.sale_lines import _completed_payload, _sale_lines
+from base.business import business_zone
 
 CUSTOMER_REQUIRED = _("This business requires a customer on every sale.")
 INVOICE_RECIPIENT = _(
@@ -177,7 +178,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         )
 
     now = timezone.now()
-    day = timezone.localdate(now)
+    day = timezone.localdate(now, business_zone())
     parts = charge_parts(lines)
     valuation = valuate(
         parts,
@@ -210,7 +211,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
             {"order_id": str(order.id), "lines_count": len(lines)},
         )
 
-    served_by = _served_by(ctx, data.staff_id)
+    served_by = _served_by(ctx, data.staff_id, order.staff_id)
     sequence = _number(day)
     principal = max(legs, key=lambda leg: leg["amount"]) if legs else None
     try:

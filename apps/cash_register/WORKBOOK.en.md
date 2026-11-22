@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:43670fccfbc4fb891c273a5f5231bdce3c6a13a4c667bad4c6249f2a600535c0 -->
+<!-- generated from WORKBOOK.md sha256:b98a1619ae73a998f2f42944141d5b5b34cbac4a059859e8c3ebd280e446a455 -->
 
 ## What it is for and who it is for
 
@@ -249,7 +249,8 @@ Vertical: common
 Actor: employee, manager, administrator, assistant
 Screen: Cash register
 Steps:
-1. In **Cash register**, tap "Open session".
+1. In **Cash register**, tap "Open session". The same window opens in Sales, over the charge, on tapping
+   "Open a cash session" when charging in cash with the cash register closed.
 2. Choose the "Drawer" if there are several (with only one it is chosen by itself), type the "Opening
    float" as it reads ("150.50"; empty is 0) and, if you want, "Notes".
 3. Tap "Open session".
@@ -272,7 +273,7 @@ tapping "Open session" again; another field's stays until its own changes.
 the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
 be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up.
-Involved: CASH_REGISTER-F04, F09
+Involved: CASH_REGISTER-F04, F09, SALE-F08
 
 ### CASH_REGISTER-F04 Sell only with the cash register open
 Status: done — Sales applies it when charging (SALE-F08): it asks Cash register whether the cash register
@@ -542,8 +543,10 @@ Steps:
 2. The session open at that moment gets a "Void of …" for each payment method of the sale; the cash one
    lowers the expected cash. The line of the sale is not touched.
 3. It always goes to the shift open when voiding, even if the sale is from a shift already closed: the
-   closed one does not move. Voided in the same shift, the sale and its void offset each other and do not
-   count.
+   closed one does not move and, in the open one, the void counts in "Refunds".
+4. Voided in the same shift, the sale and its void offset each other: they count neither in "Sales", nor in
+   the sales of its payment method, nor in "Refunds", nor in "Comps", neither in the detail nor in the
+   printed report. "Movements" shows both.
 In: the voided sale and when it was voided (`sale.sale.voided`).
 Out: the void line. Each void is recorded only once.
 If it fails: with no open session, the void shows in "Sale lines in no shift". Voiding corrects nothing fiscal: the
@@ -729,8 +732,10 @@ this app with real sales):
    Only cash: card, transfer and others always charge.
 3. If Cash register is off in the Hub or the call fails, Sales charges anyway (the block gives way rather
    than stopping the sales).
-4. The Sell screen is not replaced: the refusal is read at the charge, with a button that takes you to
-   **Cash register** to open the session.
+4. The Sell screen is not replaced: the refusal is read at the charge, with a button that opens Cash
+   register's opening window over it (CASH_REGISTER-F03). Sales mounts it by its name, `OpenSessionModal`,
+   without importing Cash register; if it cannot load, the button takes you to **Cash register** to open
+   the session there.
 
 What Sales says about this is in its WORKBOOK (SALE-F08). What is charged in cash with no shift because
 Cash register was off or did not answer is seen in CASH_REGISTER-F17.

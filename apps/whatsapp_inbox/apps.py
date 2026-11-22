@@ -77,12 +77,16 @@ class WhatsappInboxConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only (UI-REQUESTS.md asks for logo-whatsapp).
     navigation = [
-        Nav("inbox", pgettext_lazy("whatsapp menu", "Inbox"), "ion:chatbubbles-outline", "/whatsapp_inbox/inbox"),
+        Nav(
+            "inbox", pgettext_lazy("whatsapp menu", "Inbox"), "ion:chatbubbles-outline", "/whatsapp_inbox/inbox",
+            permission="whatsapp_inbox.view",
+        ),
         Nav(
             "settings",
             pgettext_lazy("whatsapp menu", "Settings"),
             "ion:settings-outline",
             "/whatsapp_inbox/settings",
+            permission="whatsapp_inbox.configure",
         ),
     ]
     # The bell counts the customers waiting for an answer the inbox's summary counts, leading to the inbox

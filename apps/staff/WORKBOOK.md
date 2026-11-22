@@ -760,8 +760,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
 - El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
-  hub#771). Las comisiones piden las ventas por su día, que aún va en `TIME_ZONE` (hub#772): en otra zona, lo cobrado en
-  las horas en que los dos relojes no coinciden en el día cuenta en el de Madrid.
+  hub#771). Las comisiones piden las ventas por su día, que va en el mismo reloj.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
 - Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la
@@ -833,18 +832,16 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   (expand/contract, PLAN-DB), con su migración reversible, una vez desplegado hub#177. Al borrarlas,
   `apps/flow/tests/test_i18n.py` (recorre las columnas de cada modelo) dirá qué entradas del catálogo de
   Automatizaciones sobran.
-- **Comisiones en el menú**: es una pestaña de Personal para quien ve la compensación, no una entrada de
-  menú, porque una entrada no puede depender de un permiso (`live.meta.Nav`, «Cómo son las páginas»).
 - **Fechas y horas en el orden del idioma del negocio**: los
   campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga el suyo (`UI-REQUESTS.md`).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`,
-  `/staff/commissions` y `/staff/settings`; la barra de pestañas (`frontend/tabs.ts`) añade «Comisiones»
-  solo a quien ve la compensación (`staff.view_compensation`) y «Ajustes» solo a quien puede guardarlos
-  (`staff.manage_settings`). El menú de `apps.py` no las
-  lleva: una entrada de menú no puede depender de un permiso (`live.meta.Nav`).
+  `/staff/commissions` y `/staff/settings`. El menú de `apps.py` lleva las seis, cada una con el permiso que la abre:
+  Personal y Horarios, `staff.view`; Ausencias, `staff.view_time_off`; Comisiones, `staff.view_compensation`; Roles y
+  Ajustes, `staff.manage_settings`. La barra de pestañas (`frontend/tabs.ts`) añade «Comisiones» solo a quien ve la
+  compensación y «Ajustes» solo a quien puede guardarlos.
 - Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo
   resuelve el servidor en días del negocio, y «Personalizado» envía `date_from` y `date_to`. Su 422 sale
   bajo «Hasta». Hasta 575 px el periodo es un `ion-select` (popover, `mode="md"`) con las mismas opciones

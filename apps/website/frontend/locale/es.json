@@ -96,6 +96,7 @@
     },
     "fields": {
       "name": "Nombre del negocio",
+      "nameHelp": "Déjalo vacío para usar el de Ajustes › Negocio.",
       "logo": "Logotipo",
       "title": "Título",
       "tagline": "Lema",

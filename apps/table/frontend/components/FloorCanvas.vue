@@ -6,7 +6,7 @@ import { useFloorFit } from '../composables/useFloorFit';
 import { useFloorViews } from '../composables/useFloorViews';
 import { useStagePan } from '../composables/useStagePan';
 import { useT } from '../composables/useT';
-import { CELL, clampPosition, DRAG_THRESHOLD, keyDelta, planeSize, type Size } from '../lib/floor';
+import { CELL, clampPosition, DRAG_THRESHOLD, type Frame, keyDelta, planeSize, type Size, tablesFrame } from '../lib/floor';
 import { paintBox } from '../lib/floor-fit';
 import type { SettingsOut, TableOut } from '../operations';
 
@@ -25,6 +25,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [table: TableOut];
+  actions: [table: TableOut];
   move: [move: { table: TableOut; x: number; y: number }];
 }>();
 
@@ -56,8 +57,11 @@ const shown = computed(() =>
   }),
 );
 const size = computed(() => planeSize(shown.value, floor.value));
-/** «Edit plan» keeps a cell of room past the farthest table and the lowest one, to place a table beyond them. */
-const content = computed(() => (props.editable ? { w: size.value.w + CELL, h: size.value.h + CELL } : size.value));
+/** Service frames the zone's tables. «Edit plan» shows the plan from its corner, to place a table anywhere, and keeps
+ *  a cell of room past the farthest table and the lowest one, to place a table beyond them. */
+const content = computed<Frame>(() =>
+  props.editable ? { x: 0, y: 0, w: size.value.w + CELL, h: size.value.h + CELL } : tablesFrame(shown.value),
+);
 const tableIds = computed(() => props.tables.map((table) => table.id).join(' '));
 // While the plan is edited its scale holds: a move that changed the farthest table would zoom every table.
 const { fit } = useFloorFit(stage, content, () => (props.editable ? tableIds.value : content.value));
@@ -71,7 +75,7 @@ const tiles = computed(() =>
   shown.value.map((table, index) => ({
     table,
     view: views.value[index],
-    box: paintBox(table, fit.value),
+    box: paintBox(table, fit.value, content.value),
     inactive: props.editable && !table.in_service ? t('table.inactive') : '',
   })),
 );
@@ -119,6 +123,13 @@ function onClick(table: TableOut, event: MouseEvent): void {
   // In «Edit plan» a pointer's tap was answered on its release; a click with no pointer is Enter or Space.
   if (props.editable && event.detail !== 0) return;
   emit('select', table);
+}
+
+// In Service a long press on a touch screen, a right click or the menu key asks for the table's actions.
+function onContextMenu(table: TableOut, event: MouseEvent): void {
+  if (props.editable) return;
+  event.preventDefault();
+  if (!props.pick) emit('actions', table);
 }
 
 function onTileDown(table: TableOut, event: PointerEvent): void {
@@ -221,6 +232,7 @@ const edgeClasses = computed(() => Object.fromEntries(EDGES.map((edge) => [`tabl
           :data-x="tile.table.position_x"
           :data-y="tile.table.position_y"
           @click="onClick(tile.table, $event)"
+          @contextmenu="onContextMenu(tile.table, $event)"
           @pointerdown="onTileDown(tile.table, $event)"
           @keydown="onKeydown(tile.table, $event)"
         />

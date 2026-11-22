@@ -1,30 +1,29 @@
-"""What reaches the AEAT from a document issued at night in a business of another zone, frozen on what it receives today
-(review of hub#771).
+"""What reaches the AEAT from a document issued at night in a business of another zone, frozen on what it receives.
 
-The issue date of an invoice, the day of a sale and Taxes' «today» are on the deployment's clock, and they move together
-or not at all, under supervision (hub#772): the rate a «today» proposes or charges has to be the one in force on the date
-the record says. A «today» moved alone changes the TipoImpositivo and the Huella of a record without anybody asking for
-it, on the day a rate changes: the form proposes 10 % and the invoice goes out dated the day of the 21 %. Only hub#772
-rewrites these tables, on purpose. The records are sealed, never sent: nothing here leaves the machine. The business is
-``hub_a``, in its own database.
+The issue date of an invoice, the day of a sale and Taxes' «today» are on the business's clock, and they move together:
+the rate a «today» proposes or charges has to be the one in force on the date the record says, or the TipoImpositivo
+and the Huella of a record change on the day a rate changes (the form proposes 10 % and the invoice goes out dated the
+day of the 21 %). The hour a record is generated at is on the same clock, with its offset: east of Madrid, a record
+issued after its midnight is generated on the day it is issued, not the day before. The records are sealed, never
+sent: nothing here leaves the machine. The business is ``hub_a``, in its own database.
 """
 
 import datetime as dt
 import re
-import socket
 from typing import NamedTuple
 
 import pytest
 from django.utils import timezone
 
 from apps.invoice.models import Invoice
-from apps.tax.models import TaxCategory, TaxRule
+from apps.tax.models import TaxCategory
+from apps.tax.tests.conftest import turn_the_rate_at_midnight
 from apps.verifactu.models import Record
 from apps.verifactu.tests.conftest import HUB_DB, run
 from base.tenancy.context import use_hub
 from control.models import Hub
 
-pytestmark = [HUB_DB]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("nothing_leaves")]
 
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -68,22 +67,22 @@ INVOICE_OF_THE_2ND = ("02-11-2026", "Course", "10.00", "1.00", "11.00")
 SALES = [
     pytest.param(
         BOGOTA,
-        Sent(*SALE_OF_THE_3RD, "2026-11-03T05:30:00+01:00", "8B07FB386689F40651B358A7DD80C9A8084B60321D362DD986D9FDAB0D353D38"),
+        Sent(*SALE_OF_THE_2ND, "2026-11-02T23:30:00-05:00", "B439D6BE7E6DF76A8D1006F8777F20AF8EAF2B375A3353AC2D4EB3CE450AE624"),
         id="bogota-2330",
     ),
     pytest.param(
         CANARY,
-        Sent(*SALE_OF_THE_3RD, "2026-11-03T00:30:00+01:00", "71DB83BE150F194294F02949187D3729DF1544730430160ADAB444455B1635AE"),
+        Sent(*SALE_OF_THE_2ND, "2026-11-02T23:30:00+00:00", "F01C6B125FFB554DC1E0C26EF4209F46A11BDEB8F9D3F1B8351FF0D9A9ED5237"),
         id="canary-2330",
     ),
     pytest.param(
         TOKYO_NIGHT,
-        Sent(*SALE_OF_THE_2ND, "2026-11-02T15:30:00+01:00", "B1EC9B4B856B3E37A6CA6B5A7660F74591EC742058E74C540C50E0A249F81739"),
+        Sent(*SALE_OF_THE_2ND, "2026-11-02T23:30:00+09:00", "D6A7DBBBA787E4E3CF10436902F7CF9908F4939932557536E5D90F03F61BE4C3"),
         id="tokyo-2330",
     ),
     pytest.param(
         TOKYO_MORNING,
-        Sent(*SALE_OF_THE_2ND, "2026-11-02T16:30:00+01:00", "5F59845034F5C290CB760E7B522603AF7B3F301B73EC2845057F1FA3AD33EA77"),
+        Sent(*SALE_OF_THE_3RD, "2026-11-03T00:30:00+09:00", "E21D1397DEBFB2B2D8AC0A89A8487AE6ABF0311467578AF715D743D2F5AA1841"),
         id="tokyo-0030",
     ),
     pytest.param(
@@ -95,22 +94,22 @@ SALES = [
 INVOICES = [
     pytest.param(
         BOGOTA,
-        Sent(*INVOICE_OF_THE_3RD, "2026-11-03T05:30:00+01:00", "A545C1B73900F56E957AB494D4BA53BFA4AB8457E1408B091E8E6BB1E437D899"),
+        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T23:30:00-05:00", "7B8D362969E96DA7986D357DF065BBDA604127A6E1F636B1AC1140640B4A47F9"),
         id="bogota-2330",
     ),
     pytest.param(
         CANARY,
-        Sent(*INVOICE_OF_THE_3RD, "2026-11-03T00:30:00+01:00", "383FB438E5AB9EB792A18E28B09C0B85C4F6910CEB679DBF2B3FEDD28C0A1FAF"),
+        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T23:30:00+00:00", "87D122C8FC0FAE310A789D0F0904DEA9E1E22D43D1E15F1C7FB94229758F4ABB"),
         id="canary-2330",
     ),
     pytest.param(
         TOKYO_NIGHT,
-        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T15:30:00+01:00", "1FBC16CB19052777AFC320549648E1DCD9A032A80B6B18EDAADFE6476FFA76E9"),
+        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T23:30:00+09:00", "5B88CAC55D95ADCDCA2C6DEBF7818FAE6B0DBCBF15306A955A64CAF50AD462F0"),
         id="tokyo-2330",
     ),
     pytest.param(
         TOKYO_MORNING,
-        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T16:30:00+01:00", "F77A2B2A27D6941E51014CA94B4C01EEB20C1CDF5C2F4E94D0181315B5768460"),
+        Sent(*INVOICE_OF_THE_3RD, "2026-11-03T00:30:00+09:00", "7DC8AC473F66F7990CFF5DBCAF84557F206FE4897DCD32F7F440AB2C7B3D2583"),
         id="tokyo-0030",
     ),
     pytest.param(
@@ -130,18 +129,6 @@ def sent(invoice: Invoice) -> Sent:
 
 
 @pytest.fixture(autouse=True)
-def nothing_leaves(monkeypatch):
-    real = socket.socket.connect
-
-    def connect(self, address):
-        if isinstance(address, tuple) and address[0] not in ("127.0.0.1", "::1", "localhost"):
-            raise AssertionError(f"tried to connect to {address}")
-        return real(self, address)
-
-    monkeypatch.setattr(socket.socket, "connect", connect)
-
-
-@pytest.fixture(autouse=True)
 def business(hub_a):
     """The business ``A`` (``hub_a``), entered for the whole test."""
     with use_hub(hub_a):
@@ -158,10 +145,7 @@ def in_zone(business, zone: str):
 def rate_turns_at_midnight(business):
     """The issuer, and a general rate that changes at the turn of the night: 10 % until the 2nd, 21 % from the 3rd."""
     run("invoice.issuer.update", ISSUER)
-    category = TaxCategory.objects.get(key="product.generic")
-    TaxRule.objects.filter(category=category).delete()
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=dt.date(2026, 11, 2))
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="21", valid_from=dt.date(2026, 11, 3))
+    turn_the_rate_at_midnight(TaxCategory.objects.get(key="product.generic"))
 
 
 @pytest.mark.parametrize(("moment", "expected"), SALES)

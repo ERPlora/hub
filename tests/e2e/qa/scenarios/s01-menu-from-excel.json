@@ -56,7 +56,6 @@
     }
   ],
   "opening": "Te paso la carta de otoño, da de alta todo lo que hay en el Excel",
-  "offered": ["inventory.product.bulk_create"],
   "writes": [
     "inventory.product.bulk_create",
     "inventory.product.create",

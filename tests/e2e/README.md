@@ -632,8 +632,6 @@ negocio, no la redacción de las respuestas.
   (`uses`: herramienta, ruta en sus argumentos como `rows[name~pulpo].price`, y `where` si es de un solo registro) y las
   lecturas que pueden encontrarlos sin preguntar (`resolvers`). Un dato que el dueño dice de entrada no puede estar aquí:
   el formato lo rechaza;
-- `offered`: las herramientas que el turno tiene que ofrecer al mensaje de apertura (con sus archivos, si los lleva)
-  para que el trabajo se pueda empezar; vacío cuando lo correcto es preguntar antes de hacer nada;
 - `said` (opcional): cómo dice el dueño el trabajo. `half`, **a medias** («se han roto 3 botellas», «mañana no viene
   Daniel»): no deja claro qué quiere y lo correcto es preguntar antes de escribir nada; `whole`, **entero**, el mismo
   trabajo dicho con todo lo que hace falta, como control: lo correcto es hacerlo (o pedir solo el dato que falta). Sin
@@ -666,12 +664,11 @@ tienen que cumplirse. Si no, el escenario sale **excluido** con el motivo, igual
 podría aprobarlo en esa pila. Si el motivo es un defecto de una herramienta, va a su issue. Después se vuelve a poner la
 copia y se pregunta al modelo.
 
-**No ejecutable** (`assistant-precheck.ts`): antes de preguntar se pide al turno del asistente, como la dueña y sin
-modelo, qué herramientas ofrece al mensaje de apertura tal como lo manda el chat (texto y archivos). Si falta alguna de
-`offered`, el escenario sale «not runnable: tools not offered on the attached message» (o «… on the opening message»,
-sin archivos), aparte de los fallos del modelo: las herramientas se eligen por las palabras de la persona, así que ningún
-modelo podría hacer el trabajo. Un escenario con foto tampoco se pregunta a un modelo que no ve imágenes
-(`QA_ANSWER_VISION`).
+**No ejecutable** (`assistant-precheck.ts`): un escenario con foto no se pregunta a un modelo que no ve imágenes
+(`QA_ANSWER_VISION`); sale «not runnable: the model does not see images», aparte de los fallos del modelo. Las
+herramientas que el turno ofrece al mensaje de apertura nunca dejan fuera un escenario: cada turno ofrece también la
+búsqueda de las demás (`base.assistant.find_tools`), así que encontrar la que falta es trabajo del modelo y se puntúa
+como lo demás.
 
 **El dueño simulado** (`assistant-owner.ts`): un modelo fijo, el mismo para todos los modelos que se comparan,
 `QA_OWNER_MODEL` (por defecto `anthropic/claude-sonnet-5.5`) por OpenRouter, con temperatura 0 y el mínimo de razonamiento
@@ -704,6 +701,21 @@ ejecución diciendo su primer movimiento y lo que escribió, además de la compr
 `pnpm qa:bench-compare` lo suma por modelo aparte para los dos grupos: «Asking first: 1/2 said by halves asked before
 writing · 1 write before the owner made it clear · 2/2 said whole done».
 
+El corpus tiene **seis trabajos dichos a medias**, tres de restaurante y tres de peluquería, uno de ellos en inglés, y
+cada uno con su **control dicho entero**: el mismo nombre con `-whole` en vez de `-half`, y el mismo negocio (`vertical`,
+`seed`, `language`, `setup`), el mismo trabajo (`persona`, `goal`, `writes`, `golden`) y las mismas comprobaciones
+(`expect`, `forbidden`). Solo cambia cómo lo dice el dueño (`opening`, `upFront`, `ifAsked`) y, por eso, los datos que
+hay que preguntar (`mustAsk`). `assistant-scenario.test.ts` exige los seis pares y que cada control sea el mismo trabajo.
+
+| Dicho a medias | Negocio | Lo que quiere el dueño, y solo lo dice si se lo preguntan |
+|---|---|---|
+| `s11` «Se han roto 3 botellas» | restaurante | dar de baja del stock 3 botellas de agua por rotura |
+| `s13` «Mañana no viene Daniel» | peluquería | apuntar y aprobar su ausencia de mañana, todo el día |
+| `s15` «Hoy no ha venido el del pescado» | restaurante | marcar la lubina como agotada; la paella sí se puede pedir |
+| `s17` «We're closed on Monday» | restaurante, en inglés | cerrar solo el lunes que viene (fiesta local), sin tocar la semana habitual |
+| `s19` «Ha llamado Carla, que el jueves no puede» | peluquería | anular su cita del jueves, sin moverla a otro día |
+| `s21` «El tinte ha subido» | peluquería | cobrar el tinte de raíz a 38 €, sin tocar su coste ni otros servicios |
+
 **Nada llega a la AEAT.** La ejecución se niega si el Hub de la pila tiene `VERIFACTU_GATEWAY_URL` (sin pasarela, un
 registro fiscal se queda en local), y cada escenario acaba comprobando que ningún registro de `verifactu_record` salió
 del negocio. Ningún escenario llama a las herramientas que envían o consultan a la AEAT.
@@ -715,6 +727,8 @@ el entorno de la ejecución y del SaaS y las variables `QA_ANSWER_*` del modelo 
 ```bash
 # Solo los caminos dorados: sin modelo, sin claves ni SaaS sembrado (comprueba que cada escenario se puede hacer):
 QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
+# Solo los doce de preguntar antes de actuar (los seis dichos a medias y sus controles); con el modelo, el mismo --grep:
+QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts --grep '\-(half|whole) '
 # Con el modelo a prueba (aquí Qwen sin reserva), dos escenarios:
 export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=… QA_OPENROUTER_API_KEY=…
 QA_ANSWER_KIND=openai QA_ANSWER_MODEL=qwen3.7-plus QA_ANSWER_BASE_URL=<QWEN_ADDRESS> QA_ANSWER_KEY_ENV=DASHSCOPE_API_KEY \

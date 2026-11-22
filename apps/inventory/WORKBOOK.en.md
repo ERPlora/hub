@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:25c561d957e2aaed7fb6cdc6f8d0fa85e7817efbcbb0829b02ed7a98c0dfec8b -->
+<!-- generated from WORKBOOK.md sha256:0781798398e546a306d8e654adaf73550c11ef26d10759b7ab902e8ea872739c -->
 
 ## What it is for and who it is for
 
@@ -135,7 +135,8 @@ Missing tax category", whole while the row has room (also at 1280 px with the si
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
 "Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
 is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
-quantity…"), and does not filter; 50 per page; table or card view.
+quantity…"), and does not filter; 50 per page; table or card view. On a card, each value carries its name
+before it ("SKU QA-AGUA-01", "Price €1.50", "Stock 46").
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
@@ -673,7 +674,10 @@ Steps:
    physical products with stock control and with permission to move stock.
 2. In the write-off's window ("Write-off — Red wine") type the quantity and the reason (waste, breakage, own consumption…) and
    tap "Write off". Through the assistant: "write off 2 bottles of red wine for breakage"; it shows the
-   confirmation card with the product, the quantity and the reason.
+   confirmation card with the product, the quantity and the reason. Told in the same message as a count
+   ("three bottles of water got broken, and I just counted the soft drinks, there are 40 left"), the
+   breakage is written off all the same and the count is only of what was counted: a count
+   never records a breakage.
 3. In **Movements** "Decrease" shows with the quantity in negative and the reason.
 In: the product, the quantity (in its unit's step) and the reason. It can also be asked for through the
 API.

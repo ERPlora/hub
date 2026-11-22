@@ -42,9 +42,9 @@ class PricingConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry: lists and rules on one screen.
     navigation = [
-        Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists"),
+        Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists", permission="pricing.manage"),
     ]
-    help = Help()
+    help = Help(videos={"es": "cL0GmPik7GY", "en": "8fbHffF_tRg"})
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each price
@@ -57,8 +57,8 @@ class PricingConfig(LiveAppConfig):
             Recoverable(
                 label=_("Price list prices"),
                 reads_since="0001_initial",
-                read=queries.prices_in_copy,
-                missing=queries.prices_not_in_business,
+                read=queries.recovery.prices_in_copy,
+                missing=queries.recovery.prices_not_in_business,
                 create="pricing.price_item.add",
             )
         ]

@@ -27,6 +27,7 @@ from apps.sale.schemas.orders import (
     OrderSetAppointmentIn,
     OrderSetDiscountIn,
     OrderSetLabelIn,
+    OrderSetStaffIn,
     OrderSetLineDiscountIn,
     OrderSetLineStaffIn,
     OrderSplitIn,
@@ -267,6 +268,11 @@ async def order_set_line_discount_over_limit(request, data: OrderSetLineDiscount
 @bind(router, "sale.order.set_label", "/sale/orders/set_label")
 async def order_set_label(request, data: OrderSetLabelIn):
     return await run_operation(request, services.order_actions.set_label, data)
+
+
+@bind(router, "sale.order.set_staff", "/sale/orders/set_staff")
+async def order_set_staff(request, data: OrderSetStaffIn):
+    return await run_operation(request, services.order_actions.set_staff, data)
 
 
 @bind(router, "sale.order.set_appointment", "/sale/orders/set_appointment")

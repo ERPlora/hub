@@ -140,6 +140,22 @@ def full_content(**overrides) -> dict:
     return content
 
 
+#: Content whose bar names nobody and whose header has no title: the page goes by the business's own name.
+NAMELESS = {"topbar": {"name": "", "logo": None}, "hero": {"title": "", "tagline": "", "cover": None}}
+
+
+def page_names(html: str) -> list[str]:
+    """What the page calls the business: in the browser's tab, in the top bar, as the header's title and in the
+    footer."""
+    import re
+
+    tab = re.search(r"<title>([^<]*)</title>", html).group(1)
+    bar = re.search(r'class="navbar-brand[^"]*" href="/">\s*<span>([^<]*)</span>', html).group(1)
+    title = re.search(r"<h1[^>]*>([^<]*)</h1>", html).group(1)
+    footer = re.search(r'<a class="[^"]*" href="/">([^<]*)</a>', html[html.index("<footer") :]).group(1)
+    return [tab, bar, title, footer]
+
+
 def catalog_snapshot() -> dict:
     """A catalog as publish leaves it in ``published_content``."""
     return {

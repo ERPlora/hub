@@ -1630,7 +1630,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   hub de la operación que lo pidió (`base.outbound`).
 - La campana de la barra superior lee `whatsapp_inbox.conversation.count_awaiting_reply` (la declaración `bell`
   de `apps.py`, con el permiso `whatsapp_inbox.view`), que comparte con `summary` la única definición de
-  «esperando respuesta» (`AWAITING_REPLY` de `queries.py`: abierta y con el último mensaje del cliente o
+  «esperando respuesta» (`AWAITING_REPLY` de `queries/conversations.py`: abierta y con el último mensaje del cliente o
   `needs_attention`); se refresca con `AWAITING_REPLY_EVENTS` de `events.py`, que incluye
   `conversation.flagged`.
 - Los avisos del dispositivo (`notices` de `apps.py`) leen `whatsapp_inbox.conversation.notices`: una

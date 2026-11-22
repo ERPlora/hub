@@ -10,7 +10,7 @@
 // first asks «This appointment only» / «This and all following» (the latter edits the series from its
 // date). An overlap asks first (409 `appointment.overlap_needs_confirmation`: «Book anyway» sends it again
 // confirmed); any other refusal goes on top, a bad field under it, and what was typed stays.
-import { type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { type ComboOption, ConfirmDialog, DateField, FormModal, InlineFeedback, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
@@ -405,30 +405,21 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           {{ $t('appointment.form.staffNotForService') }}
         </InlineFeedback>
         <div class="appointment-form__when">
-          <ion-input
-            data-testid="appointment-form-day"
-            type="date"
-            :value="day"
+          <DateField
+            v-model="day"
+            testid="appointment-form-day"
             :label="$t('appointment.form.day')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :disabled="charged"
-            @ion-input="day = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="appointment-form-time"
-            type="time"
-            :value="time"
+          <TimeField
+            v-model="time"
+            testid="appointment-form-time"
             :label="$t('appointment.form.time')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :disabled="charged"
             name="start"
             :error-text="fieldErrors.start"
-            :class="invalid(fieldErrors.start)"
-            @ion-input="time = text($event.detail.value)"
           />
           <ion-input
             data-testid="appointment-form-minutes"

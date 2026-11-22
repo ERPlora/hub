@@ -20,6 +20,7 @@ from . import (
     orders as orders,
     other_apps as other_apps,
     payment_methods as payment_methods,
+    people as people,
     receipt_codes as receipt_codes,
     records as records,
     refunds as refunds,

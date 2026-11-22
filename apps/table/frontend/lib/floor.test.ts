@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TableOut } from '../operations';
-import { BOX, clampPosition, holdName, keyDelta, paintedStatus, planeSize, STATUS_TONE, targetable } from './floor';
+import { BOX, clampPosition, holdName, keyDelta, paintedStatus, planeSize, STATUS_TONE, tablesFrame, targetable } from './floor';
 
 function table(overrides: Partial<TableOut> = {}): TableOut {
   return {
@@ -43,6 +43,27 @@ describe('planeSize', () => {
 
   it('never shrinks below the floor kept while a table is dragged', () => {
     expect(planeSize([table()], { w: 900, h: 700 })).toEqual({ w: 900, h: 700 });
+  });
+});
+
+describe('tablesFrame', () => {
+  it('frames a lone table placed at the bottom right, not the empty corner of the plan before it', () => {
+    expect(tablesFrame([table({ position_x: 448, position_y: 254 })])).toEqual({ x: 448, y: 254, w: BOX + 10, h: BOX + 10 });
+  });
+
+  it('goes from the nearest edges of any table to the far edges of the farthest one', () => {
+    // The nearest edge across and the nearest one down belong to two tables in the middle of the list.
+    const tables = [
+      table({ position_x: 600, position_y: 300 }),
+      table({ id: 't2', position_x: 200, position_y: 400, height: 144 }),
+      table({ id: 't3', position_x: 400, position_y: 120 }),
+      table({ id: 't4', position_x: 500, position_y: 250 }),
+    ];
+    expect(tablesFrame(tables)).toEqual({ x: 200, y: 120, w: 600 + BOX + 10 - 200, h: 400 + 144 + 10 - 120 });
+  });
+
+  it('is empty without tables', () => {
+    expect(tablesFrame([])).toEqual({ x: 0, y: 0, w: 0, h: 0 });
   });
 });
 

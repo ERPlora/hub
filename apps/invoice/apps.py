@@ -70,9 +70,9 @@ class InvoiceConfig(LiveAppConfig):
     # `icon =` as the module's own icon. Registered icons only: the old `document-text-outline` and
     # `bookmark-outline` wait in UI-REQUESTS.md.
     navigation = [
-        Nav("invoices", _("Invoices"), "ion:receipt-outline", "/invoice/invoices"),
-        Nav("series", _("Series"), "ion:layers-outline", "/invoice/series"),
-        Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer"),
+        Nav("invoices", _("Invoices"), "ion:receipt-outline", "/invoice/invoices", permission="invoice.view_invoice"),
+        Nav("series", _("Series"), "ion:layers-outline", "/invoice/series", permission="invoice.manage_series"),
+        Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer", permission="invoice.manage_issuer"),
     ]
     help = Help()
     # The Home's steps: ⛔ «Your business details» (the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``)

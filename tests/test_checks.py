@@ -3,8 +3,9 @@
 It runs the guardrail tests of the size of each file, ruff, the import contracts and the cognitive complexity, the
 lists that only shrink included, in seconds, without the network or a database. Then it checks what the change touches:
 ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them, and pytest
-on its test files and on each touched module's ``tests/test_<module>.py``, on Postgres. A tree that breaks any of them
-fails the command, and its output names the file and the reason.
+on its test files and on each touched module's ``tests/test_<module>.py``, on Postgres; a touched WORKBOOK runs the
+tests that read the WORKBOOKs. A tree that breaks any of them fails the command, and its output names the file and the
+reason.
 
 What the change touches is what differs from the commit the command is given, uncommitted and untracked files included.
 Each test here gives it the HEAD of a tree of its own, so that it checks only what the test writes.
@@ -262,6 +263,40 @@ def test_a_module_of_a_package_runs_the_tests_named_after_it_and_after_its_packa
         Path("shop/tests/test_orders.py"),
         Path("shop/tests/test_services_orders.py"),
     ]
+
+
+#: The tests that read every WORKBOOK of the repository, whichever one changes.
+EVERY_WORKBOOK_TESTS = [
+    Path("base/tests/test_workbooks_scheduled_tasks.py"),
+    Path("tests/test_help_workbooks.py"),
+    Path("tests/test_qa_coverage.py"),
+    Path("tests/test_workbook_only_useful.py"),
+    Path("tests/test_workbook_translations.py"),
+]
+
+
+@pytest.mark.parametrize("workbook", ["shop/WORKBOOK.md", "shop/WORKBOOK.en.md"])
+def test_a_workbook_runs_the_tests_that_read_every_workbook_and_its_module_s_own(tmp_path, monkeypatch, workbook):
+    assert [test for test in EVERY_WORKBOOK_TESTS if not (REPO / test).is_file()] == []
+    helper = load_helper()
+    monkeypatch.chdir(tmp_path)
+    for path in (workbook, "shop/tests/test_workbook.py"):
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text("", encoding="utf-8")
+
+    assert helper.tests_of(Path(workbook)) == sorted([Path("shop/tests/test_workbook.py"), *EVERY_WORKBOOK_TESTS])
+
+
+def test_fast_fails_on_a_change_to_a_workbook_alone_that_its_tests_refuse(head_tree):
+    """A step that names another flow by its id: the published help refuses it."""
+    workbook = head_tree / "apps/inventory/WORKBOOK.md"
+    text = workbook.read_text(encoding="utf-8")
+    workbook.write_text(text.replace("\nPasos:\n1. ", "\nPasos:\n1. As in INVENTORY-F14, ", 1), encoding="utf-8")
+    done = checks(head_tree, "fast", "HEAD", database=True)
+    output = done.stdout + done.stderr
+    assert done.returncode == 1, output[-6000:]
+    assert "FAILED tests/test_help_workbooks.py::" in output, output[-6000:]
+    assert "has a flow id: 'INVENTORY-F14'" in output, output[-6000:]
 
 
 @pytest.mark.parametrize("args", [(), ("slow",)])

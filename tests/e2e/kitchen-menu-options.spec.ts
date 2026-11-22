@@ -2,7 +2,8 @@
 // kitchen display shows it with what the waiter chose, in Chrome with the real Sales, Modifiers, Menus, Kitchen and
 // Inventory apps: a burger with its options sheet («+CHEESE» under the dish, before the note) and a menu composed
 // course by course (its header with how many dishes, each dish indented under it, at its own station: the grill
-// sees only the hake, still under «MENU»); the card names its waiter, never the id of the session. A tap on the menu's header marks its dishes ready. The card in
+// sees only the hake, still under «MENU»); the menu's name and its count of dishes stay apart at every width; the card
+// names its waiter, never the id of the session. A tap on the menu's header marks its dishes ready. The card in
 // 390×844, 834×1112 and 1440×900. KITCHEN-F11: a dish marked ready keeps the width of its name, so its state icon never
 // splits a word («HAMBURGUESA» broke in two at 834 once its dish was done). What a run creates — products
 // `E2E-KMO-<run>-…`, the options group «E2E KMO <run>», the menu «e2e KMO Menu <run>», the station
@@ -11,6 +12,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { ionicLabelStylesLast } from './kitchen-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -96,6 +98,15 @@ async function drawnWord(dish: Locator, word: string): Promise<{ lines: number; 
     }
     return { lines: 0, word: 0, box };
   }, word);
+}
+
+/** How far the count of a menu's dishes sits from its name: to its right on the same line, or below it. */
+async function nameToCount(header: Locator): Promise<{ right: number; below: number }> {
+  return header.evaluate((item) => {
+    const name = item.querySelector('.ep-order-ticket__menu-name')!.getBoundingClientRect();
+    const count = item.querySelector('.ep-order-ticket__menu-count')!.getBoundingClientRect();
+    return { right: Math.round(count.left - name.right), below: Math.round(count.top - name.bottom) };
+  });
 }
 
 /** What any run left behind, before this one: its tickets, and also its checks — a round Sales fired and the kitchen
@@ -195,6 +206,16 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
   // Who sent it, by the name a person reads: never the id of the session («saas:…»).
   await expect(card.locator('[data-testid$=-waiter]')).toContainText('Waiter: ');
   await expect(card.locator('[data-testid$=-waiter]')).not.toContainText('saas:');
+
+  // «MENU» and «2 dishes» read as two things, never «MENU2 dishes»: on the tablet held either way, the phone and the
+  // desktop, with Ionic's label styles where the built app loads them.
+  await ionicLabelStylesLast(page);
+  for (const size of [...SIZES, { label: '1112', width: 1112, height: 834 }]) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await expect(header).toBeVisible();
+    const apart = await nameToCount(header);
+    expect(apart.right >= 8 || apart.below >= 0, `${size.label}: the count ${JSON.stringify(apart)} px from the menu's name`).toBe(true);
+  }
 
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });

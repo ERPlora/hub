@@ -16,7 +16,8 @@ from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway
 from apps.whatsapp_inbox.models import Channel, Template
-from apps.whatsapp_inbox.queries import META_RATE_LIMITED, live_templates, templates_of
+from apps.whatsapp_inbox.queries.reasons import META_RATE_LIMITED
+from apps.whatsapp_inbox.queries.templates import live_templates, templates_of
 from apps.whatsapp_inbox.schemas import (
     ChannelConnectIn,
     ChannelConnectOut,

@@ -6,8 +6,12 @@ Every ask of every tool of inventory bringing its tool among the first ten, role
 the asks and the guard that no ask copies a probe of layer 2.
 """
 
+import json
+from pathlib import Path
+
 import pytest
 from django.apps import apps
+from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
@@ -282,3 +286,71 @@ def test_the_hub_reads_the_menu_as_the_products_and_what_broke_as_breakage():
             ("three bottles of water got broken", shared.stem("roto")),
         ],
     )
+
+
+#: The QA's whole conversation of a breakage told together with a count: its opening is offered both writes of the job.
+BREAKAGE_AND_COUNT = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "scenarios" / "s06-breakage-and-count.json"
+
+
+@HUB_DB
+def test_a_breakage_told_with_a_count_is_offered_the_write_off_and_the_count(make_user):
+    """The count's words came first and left the write-off out of the tools a turn offers (91st), so the model counted
+    the broken bottles as stock instead of writing them off."""
+    scenario = json.loads(BREAKAGE_AND_COUNT.read_text(encoding="utf-8"))
+    assert {"inventory.stock.write_off", "inventory.stock.count"} <= set(scenario["writes"])
+
+    tools = offered_by_a_turn(make_user, scenario["language"], scenario["opening"])
+
+    assert {shared.tool_name(name) for name in scenario["writes"]} <= set(tools)
+
+
+#: The same breakage and count, said the other way round and in Spanish.
+BREAKAGE_WITH_A_COUNT = [
+    ("en", "I just counted the soft drinks, there are 40 left, and three bottles of water got broken"),
+    ("es", "Se han roto tres botellas de agua y acabo de contar los refrescos: quedan 40"),
+    ("es", "Se nos han roto 3 botellas de agua y he contado los refrescos: quedan 40"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize(("language", "text"), BREAKAGE_WITH_A_COUNT)
+def test_a_breakage_and_a_count_in_one_message_bring_both_writes(make_user, language, text):
+    tools = offered_by_a_turn(make_user, language, text)
+
+    assert {"inventory__stock__write_off", "inventory__stock__count"} <= set(tools)
+
+
+#: Stock told as broken, in each form Inventory says it: what a write-off takes out.
+BROKEN = [
+    "se ha roto una botella de vino",
+    "hay dos vasos rotos",
+    "dos platos por rotura",
+    "two glasses broke",
+    "a broken bottle of wine",
+]
+
+#: What is not stock told as broken, in Spanish and in English: «rota» and «rotas» say what the business's own things
+#: are (VeriFactu's chain, a table's leg), and «break» and «breakage» share the stem of a staff member's break.
+NOT_BROKEN_STOCK = [
+    "la asesora quiere saber si la cadena de huellas está rota",
+    "bloquea la mesa 2, que tiene las patas rotas",
+    "pon el descanso de Ana a las 12",
+    "Ana takes her break at 12",
+    "move Ana's break to 4 pm",
+    "record the breakage",
+]
+
+
+def test_the_hub_reads_stock_told_as_broken_as_stock_and_nothing_else_that_breaks():
+    """Inventory's own words: stock told as broken is stock, as a quantity in a unit is, so a breakage brings the
+    write-off whatever else the message counts; neither the platform's words nor live alone say so (positive control).
+    A chain or a table told as broken, and a staff member's break, name no stock."""
+    stock = shared.stem("stock")
+    assert_its_words_name("inventory", [(phrase, stock) for phrase in BROKEN])
+    own = apps.get_app_config("inventory").assistant_synonyms
+    named = [
+        phrase
+        for phrase in NOT_BROKEN_STOCK
+        if any(stock in concept for concept in shared.asked([phrase], own).concepts)
+    ]
+    assert named == []

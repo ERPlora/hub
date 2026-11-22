@@ -31,7 +31,6 @@
   },
   "attachments": [],
   "opening": "Mañana no viene Daniel",
-  "offered": [],
   "writes": ["staff.time_off.create", "staff.time_off.approve"],
   "cards": [],
   "expect": [

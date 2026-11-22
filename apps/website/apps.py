@@ -48,7 +48,9 @@ class WebsiteConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
     # module's own icon.
-    navigation = [Nav("site", pgettext_lazy("app name", "Website"), "ion:globe-outline", "/website")]
+    navigation = [
+        Nav("site", pgettext_lazy("app name", "Website"), "ion:globe-outline", "/website", permission="website.manage")
+    ]
     help = Help()
     # The closed lists kept inside the site's JSON (the palette, the background, the catalog's source, the days of the
     # opening hours), by the word the editor shows: the assistant's card says each value by it.

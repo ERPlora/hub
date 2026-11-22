@@ -18,6 +18,7 @@ from apps.verifactu.queries.route import config_row, issuer_configured, issuer_i
 from apps.verifactu.schemas.config import ConfigOut
 from apps.verifactu.schemas.fields import NoInput
 from apps.verifactu.schemas.own_certificate import CertificateUploadIn
+from base.business import business_zone
 
 from .sending import _back_in_the_queue, _unsent
 from .writes import CONFIGURE, ISSUER_MISSING, _actor, _event
@@ -39,7 +40,7 @@ def _certificate_event(ctx, key: str, row: OwnCertificate) -> None:
         {
             "holder": row.holder,
             "holder_tax_id": row.holder_tax_id,
-            "expires_on": timezone.localtime(row.expires_at).date().isoformat(),
+            "expires_on": timezone.localtime(row.expires_at, business_zone()).date().isoformat(),
         },
         environment=config_row().environment,
     )
@@ -82,7 +83,7 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
     if facts.expires_at <= timezone.now():
         raise Conflict(
             str(CERTIFICATE_EXPIRED)
-            % {"date": timezone.localtime(facts.expires_at).date().isoformat()},
+            % {"date": timezone.localtime(facts.expires_at, business_zone()).date().isoformat()},
             code="verifactu.certificate_invalid",
         )
     issuer = issuer_identity()[0].strip().upper()

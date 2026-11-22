@@ -64,18 +64,19 @@ def test_spanish_texts_of_the_workbook():
             "Productos",
             "Movimientos",
             "Categorías",
+            "Ajustes",
         ]
         assert str(queries.reads.PRODUCT_NOT_FOUND) == "Este producto no existe en este hub."
-        assert str(services.SKU_TAKEN) == "Ese SKU ya existe en el catálogo"
-        assert str(services.EAN13_TAKEN) == "Ese EAN-13 ya lo tiene otro producto del catálogo"
-        assert str(services.INSUFFICIENT_STOCK) == "No hay stock suficiente para completar la operación."
-        assert str(services.SERVICE_HAS_NO_STOCK) == "Un servicio no lleva stock."
-        assert str(services.ROW_NAME_OR_SKU_MISSING) == "Faltan nombre o SKU"
-        assert str(services.ROW_PRICE_NOT_NUMERIC) == "Precio no numérico"
-        assert str(services.ROW_SKU_REPEATED) == "SKU duplicado en el fichero"
-        assert str(services.ROW_OFF_GRID) == "La cantidad no respeta el incremento permitido para esta unidad"
-        assert str(services.ROW_TAX_CATEGORY_MISSING) == "Falta la categoría fiscal"
-        assert str(services.ROW_NAME_MISSING) == "Falta el nombre"
+        assert str(services.products.SKU_TAKEN) == "Ese SKU ya existe en el catálogo"
+        assert str(services.products.EAN13_TAKEN) == "Ese EAN-13 ya lo tiene otro producto del catálogo"
+        assert str(services.stock.INSUFFICIENT_STOCK) == "No hay stock suficiente para completar la operación."
+        assert str(services.writes.SERVICE_HAS_NO_STOCK) == "Un servicio no lleva stock."
+        assert str(services.imports.ROW_NAME_OR_SKU_MISSING) == "Faltan nombre o SKU"
+        assert str(services.imports.ROW_PRICE_NOT_NUMERIC) == "Precio no numérico"
+        assert str(services.imports.ROW_SKU_REPEATED) == "SKU duplicado en el fichero"
+        assert str(services.imports.ROW_OFF_GRID) == "La cantidad no respeta el incremento permitido para esta unidad"
+        assert str(services.imports.ROW_TAX_CATEGORY_MISSING) == "Falta la categoría fiscal"
+        assert str(services.imports.ROW_NAME_MISSING) == "Falta el nombre"
         assert [str(label) for label in StockMovement.Type.labels] == ["Inicial", "Recepción", "Venta", "Anulación", "Recuento", "Descuento", "Devolución"]
         assert str(Unit.HOUR.label) == "Hora (h)"
         assert str(AppCategory.CATALOG.label)  # the apps page's group comes from live, not from here
@@ -86,7 +87,8 @@ def test_the_menu_and_the_tab_bar_name_each_screen_alike(language):
     tabs = json.loads((LOCALE.parents[2] / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8"))
     with translation.override(language):
         menu = {nav.id: str(nav.label) for nav in apps.get_app_config("inventory").navigation}
-    assert menu == {screen: tabs["inventory"]["tabs"][screen] for screen in ("dashboard", "products", "movements", "categories")}
+    screens = ("dashboard", "products", "movements", "categories", "settings")
+    assert menu == {screen: tabs["inventory"]["tabs"][screen] for screen in screens}
 
 
 @HUB_DB

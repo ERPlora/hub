@@ -144,8 +144,8 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
   su número, y «Cerrar» en el móvil; el título editable («Cuenta nueva») y los chips de cliente,
   «Atiende …» y «Falta el cliente». Cada línea: nombre, precio por unidad, marca de descuento o
   «Invitación», nota y profesional debajo; botones de descuento, nota, invitación y el selector de
-  cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
-  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
+  cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N», el regalo y el botón ⊗
+  «Anular este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
   la fila «Descuento del tique» si lo hay, «Total», el botón de descuento, la impresora («Imprimir
   cuenta») y «Cobrar · <importe>». En el cajón del móvil, la barra de arriba y el pie con «Cobrar» se
   quedan siempre a la vista, encima de la barra de pestañas, y lo de en medio (título, chips, pestañas y
@@ -322,6 +322,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | hecho |
+| SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | no hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
 Estado: hecho
@@ -397,8 +398,9 @@ Actor: empleado, responsable
 Pantalla: Cobro
 Pasos:
 1. En la hoja **Cobro**, pulsa «Repartir el cobro». Arriba aparece «Restante».
-2. Elige un medio, marca el «Importe de este cobro» (en efectivo, lo entregado) y pulsa «Añadir este
-   cobro». Sin importe marcado, el cobro cubre todo lo que falta.
+2. Elige un medio: el «Importe de este cobro» (en efectivo, «Entregado») sale ya con todo lo que falta.
+   Para cobrar solo una parte, o si en efectivo entrega más, teclea otro importe, que sustituye al que
+   sale. Pulsa «Añadir este cobro».
 3. Los cobros tomados salen en «Cobros tomados»; la ✕ quita uno.
 4. Cuando el restante llega a 0, pulsa «Cobrar 18,50 €».
 Entra: los medios de pago y lo que entrega el cliente.
@@ -523,16 +525,21 @@ Pasos:
 1. Con «Activar caja» encendido en Caja y sin sesión de caja abierta, cobra en efectivo (también un
    cobro repartido con una parte en efectivo).
 2. La hoja **Cobro** no cobra nada y dice «La caja está cerrada: abre una sesión de caja para cobrar en
-   efectivo.»; a quien puede abrirla le ofrece «Abrir sesión de caja», que lleva a **Caja**. La
-   pantalla **Vender** no cambia: la cuenta sigue ahí.
-3. Abierta la sesión, vuelve a **Vender** y cobra. Con tarjeta, Bizum o transferencia se cobra siempre,
-   con la caja abierta o cerrada.
+   efectivo.»; a quien puede abrirla le ofrece «Abrir sesión de caja», que abre encima del cobro la
+   ventana de apertura de **Caja**, con «Cajón», «Fondo de apertura» y «Notas». La pantalla **Vender**
+   no cambia: la cuenta sigue ahí.
+3. Pulsa «Abrir sesión»: la ventana se cierra, sale «Sesión abierta» y el cobro sigue como estaba, ya
+   sin el aviso; «Cobrar» cobra en efectivo. Con tarjeta, Bizum o transferencia se cobra siempre, con la
+   caja abierta o cerrada.
 Entra: si la caja está activada y si hay sesión abierta, que Ventas pregunta a Caja
 (`cash_register.session.current`) con la sesión de quien cobra, solo cuando hay efectivo.
 Sale: nada propio; el cobro rechazado no gasta número.
 Si falla: si Caja no está activa en el negocio o no contesta, se cobra igual, para no parar las
-ventas, y Caja enseña ese cobro entre los de fuera de turno.
-Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
+ventas, y Caja enseña ese cobro entre los de fuera de turno. La ventana de apertura avisa como en Caja:
+fondo obligatorio, una sesión ya abierta en otro dispositivo, un importe ilegible; «Cancelar» la cierra
+y el cobro sigue con su aviso. Si la ventana no llega a cargarse, «Abrir sesión de caja» lleva a
+**Caja** para abrirla allí, y la cuenta sigue en **Vender**.
+Implicados: CASH_REGISTER-F03, CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Vender a precio libre por sección
 Estado: hecho
@@ -642,7 +649,7 @@ Si falla: los motivos de Menús salen dentro de la hoja («Al menú le falta ele
 llega a cocina sin sus platos. Una cantidad con decimales: «La cantidad no encaja con el escalón del producto
 (1 ud).». Si no se pueden leer los menús, encima de la rejilla «No se han podido leer los menús. Inténtalo de
 nuevo.» con «Reintentar», y los productos se venden igual. Sin Menús y combos activa, el TPV no ofrece menús.
-Implicados: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22
+Implicados: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22, SALE-F42
 
 ### SALE-F13 Poner una nota en una línea
 Estado: hecho
@@ -703,20 +710,21 @@ Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En la línea, toca el regalo («Invitar / quitar invitación»).
-2. La línea queda a 0 con la marca «Invitación»; tocarlo otra vez la vuelve a cobrar.
+1. En la línea, toca el regalo («Invitar / quitar invitación»). También en una línea ya enviada a cocina,
+   porque lo que se invita suele ser lo ya servido: el postre de la casa o el plato que salió mal.
+2. La línea queda a 0 con la marca «Invitación»; tocarlo otra vez la vuelve a cobrar. Una línea enviada
+   sigue en la cuenta con su comanda, y a cocina no le llega nada nuevo.
 Entra: nada de otras apps.
 Sale: la línea invitada: no suma dinero ni IVA, pero el aviso de venta la lleva para que Inventario
 baje el stock; la venta guarda el coste de lo invitado.
-Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.». Una
-línea ya enviada a cocina no se puede invitar.
+Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.».
 Implicados: INVENTORY-F21
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
 Estado: hecho
 Vertical: común
-Actor: empleado, responsable
-Pantalla: Vender
+Actor: empleado, responsable, asistente
+Pantalla: Vender; asistente
 Pasos:
 1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Tócalo.
 2. En «Quién atiende esta cuenta», elige a la persona del equipo de Personal o «Yo (quien tenga la
@@ -724,16 +732,24 @@ Pasos:
    Personal: si lo dejas en «Yo», esta venta no contará para nadie.»
 3. Las líneas que se añadan a partir de ahí quedan selladas con esa persona. Para corregir una línea
    ya puesta, toca el nombre que sale debajo de ella («De quién es esta línea») y elige otra persona o
-   «El profesional de la cuenta».
+   «El profesional de la cuenta». Una línea que llega con su profesional (la de una cita, la de una cuenta
+   hecha en otro dispositivo o antes de recargar) dice también su nombre, el que le da Personal.
 4. Cobra. Con el chip en «Yo», la venta se atribuye a tu ficha de Personal; una línea con su propio
    profesional (la de una cita, la que moviste) se queda con él. Después, el chip vuelve a «yo».
-Entra: el equipo de Personal (fichas activas) y la ficha de quien tiene la sesión.
+5. Con el asistente: «la cuenta de la mesa 6 la atiende Lucía». Queda guardado en la cuenta hasta cobrarla,
+   también en la cuenta nueva si se divide: la comanda que se envíe lleva su nombre y la venta es
+   suya, la cobre quien la cobre; las líneas ya puestas se quedan con quien tenían.
+Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesión y el nombre de la persona
+de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
 La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
-cocina no se reasigna.
+cocina no se reasigna. Con el asistente, alguien que no está en el equipo: «Ese miembro del personal no
+existe en este negocio.»; sin Personal activo: «Personal no está activo en este negocio.». Si Personal no
+puede decir de quién es una línea (apagado, sin permiso o una ficha que ya no está), la línea dice «el
+profesional asignado».
 Implicados: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
@@ -829,7 +845,8 @@ Pasos:
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
    del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
-4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
+4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento. Sí se puede invitar con su
+   regalo: se queda en la cuenta a 0 y a cocina no le llega nada nuevo.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «Croquetas»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
@@ -894,15 +911,20 @@ Pantalla: Vender
 Pasos:
 1. Con dos o más líneas, toca las líneas que paga esta persona (la línea, no sus botones): se marcan
    con un círculo.
-2. Pulsa «Cobrar»: la hoja dice «Cobrando 2 líneas de 12,00 €» y cobra solo esas.
-3. Tras cobrar se abre el **Documento de venta** de ese cobro y, detrás, la cuenta sigue abierta con
+2. Con líneas marcadas, el botón del pie dice lo que va a cobrar: «Cobrar 1 línea · 1,80 €» o
+   «Cobrar 2 líneas · 7,00 €», con lo que el servidor calcula para esas líneas, el mismo importe que
+   cobrará la hoja; mientras llega, una raya. La fila «Total» sigue siendo el de toda la cuenta. Sin
+   nada marcado, el botón vuelve a «Cobrar · 12,00 €».
+3. Pulsa «Cobrar»: la hoja dice «Cobrando 2 líneas de 12,00 €» y cobra solo esas.
+4. Tras cobrar se abre el **Documento de venta** de ese cobro y, detrás, la cuenta sigue abierta con
    lo que falta; lo cobrado ya no vuelve a salir. Cobrar la última línea pendiente cierra la cuenta.
    Se cobran las líneas que estaban marcadas al abrir la hoja, aunque después se marque otra.
 Entra: las líneas marcadas.
 Sale: una venta con esas líneas (avisa: venta cobrada); las líneas quedan atadas a su venta. El
 descuento en % de la cuenta se aplica a cada cobro; el de importe fijo, solo al que la cierra.
-Si falla: los mismos rechazos que un cobro normal, también el de la cuenta que cambió mientras se
-cobraba: la hoja cobra lo que enseñaba al abrirse, nunca lo de después. Si con la hoja abierta otro
+Si falla: si el servidor no puede calcular lo marcado, el pie lo dice con sus palabras y el botón enseña
+una raya, nunca el total de la cuenta. Al cobrar, los mismos rechazos que un cobro normal, también el de
+la cuenta que cambió mientras se cobraba: la hoja cobra lo que enseñaba al abrirse, nunca lo de después. Si con la hoja abierta otro
 dispositivo cierra la cuenta, la pantalla la suelta al cerrar la hoja y avisa; no se queda en pantalla
 una cuenta que ya no existe.
 Implicados: TABLE-F33
@@ -1430,6 +1452,45 @@ Por el asistente: «la hamburguesa de la mesa 4 es para un alérgico al gluten»
 tarjeta de confirmación, que dice la cuenta, el plato y los alérgenos por su nombre.
 Implicados: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
+### SALE-F42 Elegir los suplementos de un plato del menú
+Estado: no hecho — la hoja del menú todavía no pregunta los suplementos de cada plato, Menús no los suma al importe
+y la comanda no los lleva (hub#2019)
+Vertical: restaurante
+Actor: empleado, responsable
+Pantalla: Vender
+Pasos:
+1. Con Menús y combos y Suplementos activas, abre un menú en el TPV (SALE-F12) y elige un plato que tiene grupos de
+   suplementos, suyos o de su categoría, los mismos que pregunta cuando se vende suelto (el entrecot con «Punto de la
+   carne»): sus grupos se abren allí mismo, debajo del plato, con las reglas, los suplementos con su signo, los
+   alérgenos y las opciones por defecto de la hoja de un artículo suelto (SALE-F11). Un plato sin grupos se elige
+   como siempre.
+2. Elige las opciones. Quitar el plato, o cambiarlo por otro en un plato del menú de una sola elección, quita sus
+   opciones. Una elección que se repite (dos cafés) lleva las mismas opciones cada vez.
+3. Mientras un grupo obligatorio de un plato elegido no esté completo, el botón dice qué falta («Elige 1 en «Punto de
+   la carne»») y tocarlo señala ese grupo. Con todo completo, «Añadir · <total>» suma al precio cerrado los
+   suplementos del menú y los de las opciones elegidas.
+4. Púlsalo: el menú entra en la cuenta con cada plato y, debajo de él, sus opciones.
+5. Envía a cocina: cada plato lleva sus opciones debajo, en la pantalla y en el papel, como un plato suelto (COMBO-F11,
+   MODIFIER-F08). Cobra como siempre: el tique nombra las opciones bajo su plato y el menú cobra lo que valía al
+   pedirlo, opciones incluidas, aunque después cambien o se borren.
+Entra: los grupos y las opciones del producto de cada plato elegido, de Suplementos (MODIFIER-F06). Suplementos
+comprueba y valora las opciones de cada plato (MODIFIER-F07) y Menús las suma al importe del menú al añadir la línea
+y otra vez al cobrar, con el importe pedido (COMBO-F08).
+Sale: la línea del menú con las opciones de cada plato, su texto de cocina y sus alérgenos, congelados al pedirla
+(avisa: cuenta cambiada). «En el local», el menú sigue en una línea al IVA del menú, con las opciones dentro (art.
+91.Uno.2.2º LIVA), también una opción de otra categoría fiscal. «Para llevar», cada opción entra en el reparto del
+menú (COMBO-F09): una sin categoría fiscal propia, o con la de su plato, va con él, y el peso del plato es su precio de
+catálogo más el de esas opciones; una con otra categoría fiscal va a la suya de para llevar, pesa su precio de
+catálogo y sale en línea propia con su tipo bajo su plato, como en un plato suelto (MODIFIER-F07). Si con las
+opciones todo va a la misma categoría, el menú sigue en una línea. Las opciones no mueven stock (COMBO-F10).
+Si falla: los motivos de Suplementos salen dentro de la hoja, bajo el plato al que se refieren («Elige al menos 1 en
+«Punto de la carne».»…), y un menú con un grupo obligatorio sin elegir no entra en la cuenta, tampoco pedido por el
+asistente o la API, así que nunca llega a cocina sin el punto de la carne. Si no se pueden leer los grupos de un
+plato, la hoja lo dice bajo ese plato con «Reintentar» y el menú no se puede añadir. Sin Suplementos activa, los
+platos se eligen sin opciones, como hoy.
+Implicados: SALE-F11, SALE-F12, SALE-F40, COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, MODIFIER-F06,
+MODIFIER-F07, MODIFIER-F08
+
 ## Qué comparten los verticales
 
 | Pieza compartida | Flujos que la usan |
@@ -1499,6 +1560,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
 | Cambia la cantidad, la invitación o la nota de una línea | montar la cuenta | F01, F10, F13, F15 | `sale.order.update_line` |
 | Cambia de quién es una línea | montar la cuenta | F16 | `sale.order.set_line_staff` |
+| Dice quién atiende una cuenta abierta (o «yo»): la comanda lleva su nombre y la venta es suya | montar la cuenta | F16 | `sale.order.set_staff` |
 | Marca o quita la alergia del cliente en una línea sin enviar | montar la cuenta | F41 | `sale.order.set_line_allergy` |
 | Separa una línea de N unidades en N líneas | montar la cuenta | F27 | `sale.order.split_line` |
 | Quita una línea sin enviar | montar la cuenta | F01 | `sale.order.remove_line` |
@@ -1554,8 +1616,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
   enlace de la cuenta con su cliente lo guarda Clientes (`customer.order.link`).
 - **Inventario** (opcional): el catálogo de venta, el precio, la unidad y la categoría fiscal de cada
   artículo, leídos con sus propias consultas al añadir la línea.
-- **Personal** (opcional): el equipo para el chip «Atiende» y la ficha de quien tiene la sesión
-  (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo».
+- **Personal** (opcional): el equipo para el chip «Atiende», la ficha de quien tiene la sesión
+  (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo», y el nombre de la
+  persona de una línea que no se eligió en esa pantalla (`staff.member.detail`).
 - **Servicios** (opcional): sus servicios en oferta (`service.service.list_for_sale`, y
   `service.service.get` al añadir la línea y mientras dura el aviso de uno rechazado), los bonos de la
   clienta para un servicio
@@ -1708,10 +1771,9 @@ es una línea.
   método) los retiene con `FOR KEY SHARE` (`held`, también por id) antes de escribir lo que los apunta: el borrado
   espera y responde «No se puede eliminar», o la escritura que llega después recibe lo mismo que con una sección
   (422 en su campo) o un método (409) que no existen (`tests/test_concurrency.py`).
-- **El día de una venta sigue en `TIME_ZONE`**, no en la zona del negocio: Facturación copia el día a la
-  `operation_date` del registro de VeriFactu y el número a su descripción, y la fecha de emisión y el tipo del cobro están
-  en ese mismo reloj. Cambian juntos, con supervisión (hub#772); hasta entonces lo congela
-  `tests/test_guardrails_fiscal_clock.py`.
+- **El día de una venta va en la zona del negocio** (`base.business.business_zone`): Facturación copia el día a la
+  `operation_date` del registro de VeriFactu y el número a su descripción, y la fecha de emisión y el tipo del cobro
+  van en ese mismo reloj; lo congela `tests/test_guardrails_fiscal_clock.py`.
 - **Numeración**: `SaleCounter` por el día de la venta con `UPDATE … RETURNING`
   (asignar `F("last") + 1` y guardar: Django devuelve el valor con `RETURNING`), en la transacción del
   cobro: un rechazo no gasta número y nunca hay huecos. `AAAAMMDD-NNNN`, cuatro cifras como mínimo
@@ -1934,7 +1996,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **SALE-F19**: sentar es TABLE-F12, abrir la cuenta de la mesa TABLE-F10, volver a sentar TABLE-F24 y soltar
   TABLE-F13.
 - **SALE-F20**: «Enviar comanda (N)» se queda fija también en «Cuenta», la pestaña con la que se abre una cuenta (al
-  pulsar «Cobrar» en una mesa de Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
+  tocar una mesa ocupada en Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
   (hub#1017). En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a
   las pestañas y a una línea; en un móvil más bajo se desplazan con las líneas y «Cobrar» sigue a la vista, y lo
   mismo en la columna lateral de una pantalla igual de baja (hub#787). En la columna lateral, si la cabecera, las
@@ -1949,7 +2011,9 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   Facturación tenga hoy; la «Cabecera del recibo» se añade sin repetir lo que el emisor ya dice, y sin emisor ni
   cabecera sale el nombre con el que se dio de alta el negocio.
 - **SALE-F22**: si un cobro es parcial o total lo dicen las líneas fijadas al abrir la hoja, no lo marcado al
-  terminar.
+  terminar. La cifra del botón con líneas marcadas es `sale.checkout.preview` de esas líneas, la misma petición
+  que hace la hoja, nunca una suma de la pantalla: el descuento en % de la cuenta ya va dentro y el fijo solo
+  cuando lo marcado cierra la cuenta.
 - **SALE-F26**: «Cobrar» de la agenda lleva a `/sale/pos?order=<id>`. Enlazar una cita a una cuenta que ya no está
   abierta se rechaza, y a otra cuenta cuando ya tiene una abierta, con «Esa cita ya tiene una cuenta abierta: cobra
   esa (Cuentas abiertas).».
@@ -2015,7 +2079,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `requires` nuevo), igual que copia en la línea lo que vale la del cobro (`SaleLine.voucher_value`, hub#783). No la
   lee de Servicios al pedir las cifras: así la producción de un periodo no cambia si Servicios se apaga (como la del
   cobro, `test_a_session_keeps_counting_with_services_off`) y el informe no pide permisos de Servicios. El día es el
-  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, que hub#772 mueve entero. Una
+  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, el del negocio. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
 - **El código del tique para pedir la factura completa** (INVOICE-F04, hub#500): toda venta cobrada como tique

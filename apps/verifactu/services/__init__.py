@@ -11,7 +11,7 @@
   answer, as the gateway hands it back, settles each one. Nothing is ever taken as accepted without that answer.
 - A sealed record is never edited in its figures nor its XML: it is corrected with a new one.
 
-The clock is the Hub's time zone (Madrid): ``FechaHoraHusoGenRegistro`` carries its offset.
+The clock is the business's (``base.business.business_zone``): ``FechaHoraHusoGenRegistro`` carries its offset.
 """
 
 from . import (

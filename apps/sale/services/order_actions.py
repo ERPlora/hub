@@ -16,6 +16,7 @@ from apps.sale import events
 from apps.sale.models import Order, OrderLine
 from apps.sale.queries.business import actor
 from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, dish_allergens, find_order, order_detail
+from apps.sale.queries.people import member_name, person_label
 from apps.sale.schemas.orders import (
     OrderFireIn,
     OrderFireOut,
@@ -24,6 +25,7 @@ from apps.sale.schemas.orders import (
     OrderRefIn,
     OrderSetAppointmentIn,
     OrderSetLabelIn,
+    OrderSetStaffIn,
     OrderSplitIn,
     OrderSplitOut,
 )
@@ -42,19 +44,6 @@ NOTHING_TO_FIRE = _("There is nothing new to send to the kitchen.")
 APPOINTMENT_CHECK_OPEN = _(
     "That appointment already has an open check: charge that one (Open checks)."
 )
-
-
-def person_label(ctx: OperationContext) -> str:
-    """Who acts, as a person reads it (the waiter the kitchen prints): their name, else their e-mail; their
-    username (the id of the session) only as the last resort; the system, its own label."""
-    who = ctx.actor
-    if who is None:
-        return ""
-    if hasattr(who, "get_username"):
-        label = who.get_full_name() or getattr(who, "email", "") or who.get_username()
-    else:
-        label = str(who)
-    return label[:128]
 
 
 @operation(
@@ -106,8 +95,8 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "channel": data.channel,
             "priority": data.priority,
             "round_no": round_no,
-            # Who attends the check («Atiende» of the till), else who sends the round.
-            "waiter": data.waiter or person_label(ctx),
+            # Whoever the till names, else who serves the check, else who sends the round.
+            "waiter": (data.waiter or order.staff_name or person_label(ctx.actor))[:128],
             "items": [
                 {
                     "order_item_id": str(line.id),
@@ -186,7 +175,9 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
         )
         if not moving:
             raise Conflict(str(ORDER_CHANGED), code="sale.order_changed")
-    new_order = Order.objects.create(label=data.label, created_by=actor(ctx))
+    new_order = Order.objects.create(
+        label=data.label, staff_id=order.staff_id, staff_name=order.staff_name, created_by=actor(ctx)
+    )
     for position, line in enumerate(moving, start=1):
         line.order = new_order
         line.position = position
@@ -383,6 +374,40 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
     order = _still_open(data.order_id)
     order.label = data.label
     order.save(update_fields=["label", "updated_at"])
+    _touch(ctx, order)
+    return _out(order)
+
+
+@operation(
+    "sale.order.set_staff",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="sale.add_sale",
+    input=OrderSetStaffIn,
+    output=OrderOut,
+    ai=AI(
+        description="Say who serves an open check (a member of Staff), or empty for whoever holds the session: the lines "
+        "added from then on are theirs, the kitchen ticket names them and the sale is theirs; the lines already on it "
+        "keep whoever they had. Resolve the check with sale.order.list(search=...) and the person with "
+        "staff.member.list(search=...); never ask for order_id or staff_id.",
+        risk="normal",
+        asks={
+            "en": (
+                "Lucia is serving table 6",
+                "put Sergio in charge of the terrace check",
+            ),
+            "es": (
+                "la cuenta de la mesa 6 la atiende Lucía",
+                "que la cuenta de la terraza la lleve Sergio",
+            ),
+        },
+    ),
+)
+def set_staff(ctx: OperationContext, data: OrderSetStaffIn) -> dict:
+    order = _still_open(data.order_id)
+    order.staff_name = member_name(ctx, data.staff_id)
+    order.staff_id = data.staff_id
+    order.save(update_fields=["staff_id", "staff_name", "updated_at"])
     _touch(ctx, order)
     return _out(order)
 

@@ -15,6 +15,8 @@ QUANTITIES_OF_GOODS = (
 #: Goods noted down as arrived («apunta que han llegado…» is read «apunta que llegan…»), never «llegan» alone: people
 #: arrive too («han llegado dos más para la mesa 7»).
 GOODS_NOTED_AS_ARRIVED = ("apunta que llegan", "apuntame que llegan", "anota que llegan", "registra que llegan")
+#: Stock told as broken, the stock a write-off takes out.
+BROKEN_STOCK = ("roto", "rotura", "broke", "broken")
 
 
 class InventoryConfig(LiveAppConfig):
@@ -52,14 +54,16 @@ class InventoryConfig(LiveAppConfig):
     # down as arrived, which are also its stock (inventory.stock); not the bottles, cans or units a sale line or a cart
     # counts too. A restaurant's «carta» is its products, in the very group live says for them (with fewer words it would
     # be a second concept, and «los productos de la carta» would count the products twice). What broke is the breakage
-    # a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem is a staff member's break).
+    # a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem is a staff member's break), and
+    # told as broken («se han roto», «got broken») it is stock too, so beside a count it still brings the write-off;
+    # not «rota» nor «rotas», which say what the business's own things are («la cadena está rota»).
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
         (
             "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
             "delivery note", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED,
         ),
-        ("stock", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED),
+        ("stock", *BROKEN_STOCK, *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED),
         ("carta", "producto", "articulo", "product"),
         ("roto", "rota", "rotos", "rotas", "rotura", "broke", "broken"),
     )
@@ -94,10 +98,20 @@ class InventoryConfig(LiveAppConfig):
     # them and the assistant links each one by its name. The first keeps the cube: it is the launcher's and «My apps»'
     # icon, and its screen is where «/inventory» lands.
     navigation = [
-        Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard"),
-        Nav("products", _("Products"), "ion:cube-outline", "/inventory/products"),
-        Nav("movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements"),
-        Nav("categories", _("Categories"), "ion:list-outline", "/inventory/categories"),
+        Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard", permission="inventory.view_stock"),
+        Nav("products", _("Products"), "ion:cube-outline", "/inventory/products", permission="inventory.view_product"),
+        Nav(
+            "movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements",
+            permission="inventory.view_stock",
+        ),
+        Nav(
+            "categories", _("Categories"), "ion:list-outline", "/inventory/categories",
+            permission="inventory.view_category",
+        ),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/inventory/settings",
+            permission="inventory.manage_settings",
+        ),
     ]
     help = Help(videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"})
     # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in

@@ -10,7 +10,7 @@ from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway
 from apps.whatsapp_inbox.models import Conversation, Message, Template, TemplateSample
-from apps.whatsapp_inbox.queries import (
+from apps.whatsapp_inbox.queries.reasons import (
     HEADER_SAMPLE_MISSING_CODE,
     SAAS_UNREACHABLE_CODE,
     SEND_REFUSED_CODE,

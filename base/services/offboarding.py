@@ -41,6 +41,9 @@ from control.models import HubDue, HubDump
 OFFBOARDING_RETENTION = dt.timedelta(days=90)
 #: How long a business kept for its fiscal documents waits before it is looked at again.
 FISCAL_HOLD_RECHECK = dt.timedelta(days=1)
+#: How old the final copy of a business may be when its database goes. The bucket keeps a copy 90 days from when it was
+#: made, so one made before the business was kept for days would be gone soon after its database.
+FINAL_COPY_FRESH = dt.timedelta(days=1)
 
 
 def _offboarding_copied(hub_ref, cancelled_at) -> Exists:
@@ -159,9 +162,9 @@ def offboarding_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *,
 
 
 def offboarding_held(hub_id: UUID, now: dt.datetime, why: str, *, owner: str = LEASE_OWNER) -> None:
-    """The business ``hub_id`` keeps fiscal documents, and ``why`` (``fiscal_archive_missing: <apps>``,
-    ``fiscal_archived: <apps>``…) says how their archive stands: its database stays and it stays ``cancelled``, looked
-    at again after :data:`FISCAL_HOLD_RECHECK`. Its 90 days are not counted again."""
+    """The business ``hub_id`` keeps fiscal documents not archived yet, and ``why`` (``fiscal_archive_missing: <apps>``,
+    ``fiscal_archive_failed: …``…) says what keeps them: its database stays and it stays ``cancelled``, looked at again
+    after :data:`FISCAL_HOLD_RECHECK`. Its 90 days are not counted again."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().get(pk=hub_id)
         _holds(hub_id, owner, timezone.now())
@@ -197,11 +200,17 @@ def fiscal_archive_written(hub_id: UUID, made_at: dt.datetime, *, owner: str = L
         hub.save(update_fields=["fiscal_archived_at", "updated_at"])
 
 
-def final_copy_kept(hub: Hub) -> bool:
-    """Whether the copy of ``hub`` made after its 90 days is already kept (a drop that failed needs no second one)."""
-    return HubDump.objects.filter(
-        hub_id=hub.pk, kind=HubDump.Kind.OFFBOARDING, created_at__gte=hub.cancelled_at + OFFBOARDING_RETENTION
-    ).exists()
+def fiscal_archive_covers(hub: Hub, copy: HubDump) -> bool:
+    """Whether the fiscal archive of ``hub`` for this leaving (:func:`fiscal_archive_kept`) was made after its final
+    ``copy``, so it holds what was written while that copy was made too. Both times to the second, as an archive's."""
+    return fiscal_archive_kept(hub) and hub.fiscal_archived_at >= copy.created_at.replace(microsecond=0)
+
+
+def final_copy(hub: Hub, now: dt.datetime) -> HubDump | None:
+    """The latest copy of ``hub`` made after its 90 days and at most :data:`FINAL_COPY_FRESH` before ``now``, if any: a
+    drop tried again soon needs no second one, but one kept for days since needs a new one."""
+    since = max(hub.cancelled_at + OFFBOARDING_RETENTION, now - FINAL_COPY_FRESH)
+    return HubDump.objects.filter(hub_id=hub.pk, kind=HubDump.Kind.OFFBOARDING, created_at__gte=since).first()
 
 
 # Not an assistant tool: the worker's last step of a business past its 90 days, no person.

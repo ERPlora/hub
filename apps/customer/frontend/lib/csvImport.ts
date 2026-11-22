@@ -3,6 +3,7 @@
 // row (name required, email, phone, stage…) is the server's: a row it skips comes back with its
 // reason. Until `@erplora/ui` brings a CSV reader (UI-REQUESTS.md, papaparse), this one reads
 // RFC 4180 and the semicolons and tabs spreadsheets write.
+import { delimiterOf } from '../../../../base/frontend/lib/files';
 import type { ImportRowIn } from '../operations';
 import { countryCode } from './countries';
 
@@ -59,25 +60,8 @@ const HEADERS: Record<string, Field> = {
   foto: 'avatar',
 };
 
-const DELIMITERS = [',', ';', '\t'] as const;
-
 function normalize(header: string): string {
   return header.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-/** The delimiter of the header line: the one it holds most of, outside quotes. */
-function delimiterOf(text: string): string {
-  const firstLine = text.split(/\r?\n/, 1)[0].replace(/"[^"]*"/g, '');
-  let best: string = DELIMITERS[0];
-  let most = -1;
-  for (const delimiter of DELIMITERS) {
-    const count = firstLine.split(delimiter).length - 1;
-    if (count > most) {
-      best = delimiter;
-      most = count;
-    }
-  }
-  return best;
 }
 
 interface CsvRecord {

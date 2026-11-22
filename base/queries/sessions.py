@@ -10,7 +10,7 @@ from base import activation, entitlement, home
 from base.models import Hub, HubUser
 from base.schemas.sessions import SessionMeIn, SessionMeOut
 
-from .apps import _can_see
+from .apps import _can_see, _may_use, open_entries
 from .people import hub_user_of, person_label
 
 
@@ -19,7 +19,9 @@ from .people import hub_user_of, person_label
 def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     """The user, its permissions, and the menu and apps it may see on this scope, already translated.
 
-    Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
+    The menu lists the entries of each module the person may open (``Nav.permission``), and only the modules with one;
+    ``apps`` lists every module the person holds a permission of, since other screens read from it whether a module
+    is on (the till sells the modifiers and menus a cashier never opens). Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
     or a demo's hub): a platform app such as ``base`` is always on and never shows. A module its business has no
     right to (``base.entitlement``) or turned off (``base.activation``) is ``off`` and has no menu: the shell's gate
     tells why its screens do not open. ``demo`` says when the demo ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
@@ -33,7 +35,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
     creating = activation.creating_apps(ctx.scope) if blocked else frozenset()
     with translation.override(ctx.language):
-        visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
+        usable = [config for config in home.shown_modules(demo_hub=demo is not None) if _may_use(ctx, config)]
         return {
             "user": _user(ctx.actor, hub_user_of(ctx)),
             "scope": {"kind": ctx.scope.kind, "key": ctx.scope.key},
@@ -43,13 +45,14 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
                     "id": config.label,
                     "label": str(config.verbose_name),
                     "items": [
-                        {"path": nav.path, "label": str(nav.label), "icon": nav.icon} for nav in config.navigation
+                        {"path": nav.path, "label": str(nav.label), "icon": nav.icon}
+                        for nav in open_entries(ctx, config)
                     ],
                 }
-                for config in visible
-                if config.navigation and config.label not in blocked
+                for config in usable
+                if _can_see(ctx, config) and config.label not in blocked
             ],
-            "apps": [{"label": config.label, "state": _session_state(config.label, blocked, creating)} for config in visible],
+            "apps": [{"label": config.label, "state": _session_state(config.label, blocked, creating)} for config in usable],
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }

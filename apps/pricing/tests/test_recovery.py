@@ -43,7 +43,7 @@ def test_the_copy_gives_each_price_of_a_live_product_or_of_a_service_with_what_i
     # A deleted product's prices do not count (Inventory's deletion takes them away): none is read.
     make_item(vip, make_product("Old", "OLD-1", is_deleted=True), price=100)
 
-    read = queries.prices_in_copy(direct())
+    read = queries.recovery.prices_in_copy(direct())
 
     # With its product's SKU, to find the product the business made again if that one is gone (none for a service).
     assert sorted(read, key=lambda one: one["id"]) == [
@@ -62,7 +62,7 @@ def test_a_copy_without_the_apps_table_gives_nothing():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE pricing_priceitem CASCADE")
 
-    assert queries.prices_in_copy(direct()) == []
+    assert queries.recovery.prices_in_copy(direct()) == []
 
 
 def a_price_of_the_copy(price_list, *, product=None, service=None, price=1000, min_quantity="1") -> dict:
@@ -96,7 +96,7 @@ def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free()
     from_five = a_price_of_the_copy(bulk, product=shampoo, price=820, min_quantity="5")
     cut = a_price_of_the_copy(vip, service=haircut, price=1500)
 
-    lacking = queries.prices_not_in_business([still, put_back, service_put_back, from_five, cut])
+    lacking = queries.recovery.prices_not_in_business([still, put_back, service_put_back, from_five, cut])
 
     # As the list detail's add takes each, with its id in the copy: its list, its one article, price and quantity.
     assert lacking == [
@@ -109,7 +109,7 @@ def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free()
 
 @HUB_DB
 def test_with_nothing_read_nothing_is_lacking():
-    assert queries.prices_not_in_business([]) == []
+    assert queries.recovery.prices_not_in_business([]) == []
 
 
 def a_price_of_a_product_gone(price_list, sku: str, **fields) -> dict:
@@ -132,7 +132,7 @@ def test_a_product_no_longer_held_live_is_the_one_a_recovery_made_again_with_its
     conditioner = made_by_a_recovery("Conditioner", "CO-1")
     deleted = a_price_of_the_copy(vip, product=old, price=700)
 
-    lacking = queries.prices_not_in_business([gone, deleted])
+    lacking = queries.recovery.prices_not_in_business([gone, deleted])
 
     assert lacking == [
         {"id": gone["id"], "price_list_id": vip.id, "product_id": shampoo.id, "price": 900,
@@ -150,7 +150,7 @@ def test_the_copys_product_is_the_business_own_by_its_id_before_any_sku():
     # The copy knew it by another SKU: it is still live here, so its price is its own.
     price = a_price_of_the_copy(vip, product=shampoo) | {"sku": "SH-1"}
 
-    [lacking] = queries.prices_not_in_business([price])
+    [lacking] = queries.recovery.prices_not_in_business([price])
 
     assert lacking["product_id"] == shampoo.id
 
@@ -165,7 +165,7 @@ def test_a_product_made_again_by_hand_or_deleted_since_takes_none_of_the_copys_p
     made_by_a_recovery("Conditioner", "CO-1", is_deleted=True)
     deleted = a_price_of_a_product_gone(vip, "CO-1")
 
-    lacking = queries.prices_not_in_business([by_hand, deleted])
+    lacking = queries.recovery.prices_not_in_business([by_hand, deleted])
 
     # Each stays the copy's own product, which the list detail's add refuses as not found: not created, and why.
     assert [one["product_id"] for one in lacking] == [by_hand["product_id"], deleted["product_id"]]
@@ -180,7 +180,7 @@ def test_the_place_of_a_product_made_again_the_business_priced_since_stays_as_it
     taken = a_price_of_a_product_gone(vip, "SH-1", price=900)
     free = a_price_of_a_product_gone(vip, "SH-1", price=800, min_quantity="10") | {"product_id": taken["product_id"]}
 
-    lacking = queries.prices_not_in_business([taken, free])
+    lacking = queries.recovery.prices_not_in_business([taken, free])
 
     assert [(one["id"], one["product_id"]) for one in lacking] == [(free["id"], shampoo.id)]
 
@@ -201,7 +201,7 @@ def test_a_service_no_longer_held_is_the_one_a_recovery_made_again_for_it():
     gone = a_price_of_a_service_gone(vip, price=1500)
     haircut = made_again_for(gone["service_id"])
 
-    lacking = queries.prices_not_in_business([gone])
+    lacking = queries.recovery.prices_not_in_business([gone])
 
     assert lacking == [
         {"id": gone["id"], "price_list_id": vip.id, "service_id": haircut.id, "price": 1500,
@@ -215,7 +215,7 @@ def test_the_copys_service_is_the_business_own_while_it_holds_it():
     haircut = make_service("Haircut")
     made_again_for(haircut.id)
 
-    [lacking] = queries.prices_not_in_business([a_price_of_the_copy(vip, service=haircut)])
+    [lacking] = queries.recovery.prices_not_in_business([a_price_of_the_copy(vip, service=haircut)])
 
     assert lacking["service_id"] == haircut.id
 
@@ -227,7 +227,7 @@ def test_a_service_made_again_by_hand_takes_none_of_the_copys_prices():
     make_service("Haircut", created_by="ana")
     by_hand = a_price_of_a_service_gone(vip)
 
-    [lacking] = queries.prices_not_in_business([by_hand])
+    [lacking] = queries.recovery.prices_not_in_business([by_hand])
 
     # It stays the copy's own service, which the list detail's add refuses as not found: not created, and why.
     assert lacking["service_id"] == by_hand["service_id"]
@@ -244,7 +244,7 @@ def test_the_place_of_a_service_made_again_the_business_priced_since_stays_as_it
     other_list = a_price_of_the_copy(bulk, price=1400) | {"service_id": taken["service_id"]}
     from_five = a_price_of_the_copy(vip, price=1300, min_quantity="5") | {"service_id": taken["service_id"]}
 
-    lacking = queries.prices_not_in_business([taken, other_list, from_five])
+    lacking = queries.recovery.prices_not_in_business([taken, other_list, from_five])
 
     assert [(one["id"], one["service_id"]) for one in lacking] == [
         (other_list["id"], haircut.id),
@@ -262,9 +262,9 @@ def test_without_services_each_price_keeps_the_copys_service(monkeypatch):
     vip = make_list("VIP")
     gone = a_price_of_a_service_gone(vip)
     made_again_for(gone["service_id"])
-    monkeypatch.setattr(queries, "get", missing)
+    monkeypatch.setattr(queries.other_apps, "get", missing)
 
-    [lacking] = queries.prices_not_in_business([gone])
+    [lacking] = queries.recovery.prices_not_in_business([gone])
 
     # The list detail's add refuses it for the same reason: Services is not there.
     assert lacking["service_id"] == gone["service_id"]
@@ -274,8 +274,8 @@ def test_the_app_declares_its_prices_put_back_by_the_list_details_add():
     [prices] = apps.get_app_config("pricing").recoverable_from_copy()
 
     assert (prices.read, prices.missing, prices.create, prices.deleted, prices.restore) == (
-        queries.prices_in_copy,
-        queries.prices_not_in_business,
+        queries.recovery.prices_in_copy,
+        queries.recovery.prices_not_in_business,
         "pricing.price_item.add",
         None,
         "",

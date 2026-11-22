@@ -97,15 +97,14 @@ def test_roles():
     assert permissions_for_role([config], "hub_employee") == {"attendance.clock"}
 
 
-def test_navigation_is_two_entries_with_iconify_icons():
-    # Two menu entries, «Clock in» and «Records», with icons the shell registers.
+def test_navigation_is_three_entries_with_iconify_icons():
+    # «Clock in» and «Records», which everyone who clocks opens, and «Settings», which whoever may save them opens.
     entries = attendance().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [
-        (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
-    ] == [
-        ("clock", "Clock in", "ion:time-outline", "/attendance/clock"),
-        ("records", "Records", "ion:list-outline", "/attendance/records"),
+    assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [
+        ("clock", "Clock in", "ion:time-outline", "/attendance/clock", "attendance.clock"),
+        ("records", "Records", "ion:list-outline", "/attendance/records", "attendance.clock"),
+        ("settings", "Settings", "ion:settings-outline", "/attendance/settings", "attendance.manage_settings"),
     ]
 
 

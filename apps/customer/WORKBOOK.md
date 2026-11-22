@@ -1237,8 +1237,9 @@ cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres
 en la ayuda de esa pestaña. Lo que esas partes dejaron de decir, y quien mantiene Clientes necesita:
 
 - Los mensajes llevan el nombre real de la ficha, del grupo, de la etiqueta o del campo («¿Eliminar {nombre}?»,
-  «{absorbida} se fusionará en {superviviente}…», «Importación: {total} filas — {creadas} creadas, {omitidas}
-  omitidas.»); la ayuda los enseña con un ejemplo (Ana García, Socios, Habitual, Talla).
+  «{absorbida} se fusionará en {superviviente}…»); la ayuda los enseña con un ejemplo (Ana García, Socios, Habitual,
+  Talla). El resumen de la importación pone cada cifra en singular o en plural («1 fila», «3 filas», «1 omitida»):
+  cada cifra tiene su propio texto y el resumen los junta (CUSTOMER-F08).
 - El diálogo «Nuevo cliente» es el panel lateral del producto, pedido a `@erplora/ui` en `UI-REQUESTS.md`
   (CUSTOMER-F01).
 - El gastado de los filtros se lee como cualquier campo de importe del Hub y de las demás listas (hub#1196,

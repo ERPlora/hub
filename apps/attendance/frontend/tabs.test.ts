@@ -2,13 +2,11 @@
 // settings tab): Clock in, Records and Settings, as the footer tabbar of every attendance page. Each tab
 // follows its route, has a registered icon (an unregistered one paints nothing) and its label in the
 // reader's language. Settings is for everyone: whoever may not save reads it.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { ION_ICONS } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -37,8 +35,7 @@ describe('the attendance tabbar', () => {
   });
 
   it('wears the same icons and paths as the menu entries of apps.py', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.matchAll(/Nav\(\s*"([a-z]+)",\s*pgettext_lazy\([^)]*\),\s*"([^"]+)",\s*"([^"]+)",?\s*\)/g)].map((m) => [m[1], m[2], m[3]]);
-    expect(menu).toEqual(ATTENDANCE_TABS.filter((tab) => tab.id !== 'settings').map((tab) => [tab.id, tab.icon, tab.to]));
+    const menu = appMenu('attendance');
+    expect(menu.map((entry) => [entry.id, entry.icon, entry.path])).toEqual(ATTENDANCE_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

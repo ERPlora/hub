@@ -36,12 +36,12 @@ router = Router(tags=["pricing"])
 
 @bind(router, "pricing.price_list.list", "/pricing/price_lists")
 async def price_list_list(request, params: Query[PriceListListIn]):
-    return await run_operation(request, queries.list_price_lists, params)
+    return await run_operation(request, queries.price_lists.list_price_lists, params)
 
 
 @bind(router, "pricing.price_list.get", "/pricing/price_lists/detail")
 async def price_list_get(request, params: Query[PriceListRefIn]):
-    return await run_operation(request, queries.get_price_list, params)
+    return await run_operation(request, queries.price_lists.get_price_list, params)
 
 
 @bind(router, "pricing.price_list.create", "/pricing/price_lists", status=201)
@@ -74,12 +74,12 @@ async def price_list_activate(request, data: PriceListRefIn):
 
 @bind(router, "pricing.price_item.list", "/pricing/price_items")
 async def price_item_list(request, params: Query[PriceItemListIn]):
-    return await run_operation(request, queries.list_price_items, params)
+    return await run_operation(request, queries.prices.list_price_items, params)
 
 
 @bind(router, "pricing.price_item.get", "/pricing/price_items/detail")
 async def price_item_get(request, params: Query[PriceItemIdIn]):
-    return await run_operation(request, queries.get_price_item, params)
+    return await run_operation(request, queries.prices.get_price_item, params)
 
 
 @bind(router, "pricing.price_item.add", "/pricing/price_items", status=201)
@@ -102,12 +102,12 @@ async def price_item_remove(request, data: PriceItemRefIn):
 
 @bind(router, "pricing.rule.list", "/pricing/rules")
 async def rule_list(request, params: Query[RuleListIn]):
-    return await run_operation(request, queries.list_rules, params)
+    return await run_operation(request, queries.rules.list_rules, params)
 
 
 @bind(router, "pricing.rule.get", "/pricing/rules/detail")
 async def rule_get(request, params: Query[RuleRefIn]):
-    return await run_operation(request, queries.get_rule, params)
+    return await run_operation(request, queries.rules.get_rule, params)
 
 
 @bind(router, "pricing.rule.create", "/pricing/rules", status=201)
@@ -135,7 +135,7 @@ async def rule_activate(request, data: RuleRefIn):
 
 @bind(router, "pricing.price.resolve", "/pricing/prices/resolve")
 async def price_resolve(request, params: Query[ResolveIn]):
-    return await run_operation(request, queries.resolve_price, params)
+    return await run_operation(request, queries.resolution.resolve_price, params)
 
 
 # What a price or a rule points at in another app
@@ -143,4 +143,4 @@ async def price_resolve(request, params: Query[ResolveIn]):
 
 @bind(router, "pricing.catalog.get", "/pricing/catalog/detail")
 async def catalog_get(request, params: Query[CatalogRefIn]):
-    return await run_operation(request, queries.get_catalog_record, params)
+    return await run_operation(request, queries.catalog.get_catalog_record, params)

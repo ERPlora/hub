@@ -13,7 +13,6 @@
   },
   "attachments": [],
   "opening": "Borra eso que ya no vendemos y pon el café con leche a 190 euros",
-  "offered": [],
   "writes": ["inventory.product.delete", "inventory.product.update"],
   "cards": [
     {

@@ -1,21 +1,21 @@
 // flow: FLOW-F01 FLOW-F02 FLOW-F03 FLOW-F04 FLOW-F05 FLOW-F06 FLOW-F07 FLOW-F08 FLOW-F09 FLOW-F10 FLOW-F11 FLOW-F12 FLOW-F13 FLOW-F14 FLOW-F15 FLOW-F16 FLOW-F18 FLOW-F19
-// Every flow of Automations with a screen (apps/flow/WORKBOOK.md), end to end in each of the three sizes,
-// as the owner and against the real Tasks app, with one screenshot per flow and size.
-// The guide (F08) and a link to a card (F05, an unknown one opens nothing)
-// come first; a card of the gallery is used (F04), back by the same link lands on it again, and it is
-// allowed and withdrawn (F12). One automation is built from scratch (F09): «Something happens» (which the
+// Every flow of Automations with a screen (apps/flow/WORKBOOK.md), end to end in each of the three sizes, as the owner
+// and against the real Tasks app, with one screenshot per flow and size. The guide (F08) and a link to a card (F05, an
+// unknown one opens nothing) come first; a card of the gallery is used (F04), back by the same link lands on it again,
+// and it is allowed and withdrawn (F12). One automation is built from scratch (F09): «Something happens» (which the
 // worker's relay starts on its own, F21) finds an event by its technical name, then a weekly schedule keeps its day
-// when the time changes (F10); a task, a condition that compares two data and a wait that is removed (F11);
-// tried (F13), allowed, turned on and saved (F14), run by hand (F15) and read in its history (F16). The
-// list searches, filters, sorts, switches by its named switch and in bulk (F02, F03), copies and deletes
-// (F06, F07). Two drafts of the assistant: one discarded (F19), the other reviewed, saved, allowed, turned
-// on and run (F18). What a run creates is tagged `E2E FlowF` (plus the ids of the cards it used) and goes.
+// when the time changes (F10); a task, a condition that compares two data and a wait that is removed (F11); tried
+// (F13), allowed, turned on and saved (F14), run by hand (F15) and read in its history (F16). The list searches,
+// filters, sorts, switches by its named switch and in bulk (F02, F03), copies and deletes (F06, F07). Two drafts of the
+// assistant: one discarded (F19), the other reviewed, saved, allowed, turned on and run (F18). What a run creates is
+// tagged `E2E FlowF` (plus the ids of the cards it used) and goes.
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { rowAction } from './service-helpers';
 import { pick } from './task-helpers';
+import { expectBarAction } from './topbar';
 
 const TAG = 'E2E FlowF';
 /** Automations made from a card of the gallery: they carry the card's name, so they go by their ids. */
@@ -78,14 +78,14 @@ for (const viewport of VIEWPORTS) {
     try {
       // FLOW-F01: the drafts (if any), the automations (if any) and the gallery, always.
       await expect(shown(page).locator('[data-testid=flow-gallery]')).toContainText('Pick one and it becomes yours, paused');
-      await expect(shown(page).locator('[data-testid=flow-new]')).toBeVisible();
+      await expectBarAction(page, 'flow-new');
       await expect(shown(page).locator('[data-testid=flow-card-welcome]')).toBeVisible();
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F01');
 
       // FLOW-F08: the guide, with what it cannot do yet.
       await shown(page).locator('[data-testid=flow-gallery-guide]').click();
-      await page.waitForURL(/\/flow\/guide$/);
+      await page.waitForURL(/\/flow\/automations\/guide$/);
       for (const part of ['what', 'first', 'permissions', 'worked', 'limits']) {
         await expect(shown(page).locator(`[data-testid=flow-guide-section-${part}]`)).toBeVisible();
       }

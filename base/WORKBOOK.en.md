@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ca337e58c80e814b1fe16fa294412ee7de71b3bc1272ec7521dd528cb32d2b98 -->
+<!-- generated from WORKBOOK.md sha256:ebb885196720dbd35c0d741b92d6e76ef982961ce6d9563908f448b292c009b0 -->
 
 ## What it is for and who it is for
 
@@ -58,8 +58,8 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
 
 - **"Start with a business like yours"**, only for who administers the business and while the business has
   nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
-- **"My apps"**: one tile per app, with its icon and its name; the ones opened most in this browser,
-  first. On a phone, with six apps or more, the first four and "View all apps".
+- **"My apps"**: one tile per app the person can open, with its icon and its name; the ones opened most in this
+  browser, first. On a phone, with six apps or more, the first four and "View all apps".
 - **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
   icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
   available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
@@ -430,7 +430,7 @@ On the Employees screens and the API documentation:
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
-| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents writes them to the fiscal archive, but still keeps its database (hub#738) |
+| BASE-F109 | Delete a deleted business after its 90 days | done |
 | BASE-F110 | Open the business's website on its own domain | done |
 | BASE-F111 | Wait for the database when it is cut for a moment | done |
 | BASE-F112 | Save a downloaded file inside the app | done |
@@ -541,9 +541,16 @@ Actor: owner, administrator, manager, employee
 Screen: Home · Summary · the top bar of any screen
 Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
-     fit, the whole name shows on hover).
+     fit, the whole name shows on hover). An app shows if their role lets them open at least one of its screens. An
+     employee has the ones of their daily work: Sales & POS, Cash register, Tables, Kitchen, Reservations, Online
+     booking, Appointments, Customers, Inventory, Invoicing, Services, Staff, Time clock, Tasks, Cart & Checkout and
+     the WhatsApp inbox, and Automations to answer what an automation asks them. The ones that set up the business
+     (Taxes, Price Lists, Modifiers, Menus and combos, Payments, Schedules, VeriFactu, Printing and Website) belong to
+     whoever manages them: the employee does not have them, even though the till and the assistant keep using what
+     they read from them.
   2. The ones opened most in this browser go first.
-  3. They tap a tile: the app opens. An app that is being turned on says "Activating…" and opens nothing.
+  3. They tap a tile: the first screen of the app the person can open opens. An app that is being turned on says
+     "Activating…" and opens nothing.
   4. On a phone, with six apps or more, the first four show and "View all apps", which shows the rest.
      "Add apps", the last one, leads to Apps.
   5. To leave an app, tap "My apps" in the bar: the main screen of an app has no "Back". The sheet starts
@@ -777,7 +784,7 @@ Actor: owner, administrator, manager, employee
 Screen: Apps
 Steps:
   1. On the row of an app in "My apps", they tap "Open".
-  2. The first screen of that app the person can see opens.
+  2. The first screen of that app the person's role lets them open opens.
 In: the app's menu and what the person can see.
 Out: nothing saved.
 If it fails: an app the person cannot open, or that is not running, has no "Open" (it does not show greyed
@@ -2019,7 +2026,8 @@ Steps:
      "Close".
   2. It shows images (whole in the viewer, never larger than the original, with "Zoom in" and "Zoom out"), PDFs (the
      first 30 pages; if it is longer, "Showing the first {shown} of {total} pages. Download the file to read it
-     all."), text, logs and code, CSV and TSV as a table, audio and video. Of a very long text, "Showing the beginning
+     all."), text, logs and code, CSV and TSV as a table (a CSV in its own columns, whether separated by commas or by
+     semicolons, as Spanish Excel saves it), audio and video. Of a very long text, "Showing the beginning
      of the file. Download it to read it all."; of a table of more than 500 rows, "Showing the first {shown} rows.
      Download the file to see them all.".
   3. A data file (.json) is shown as a tree that folds and unfolds by parts, like the browsers' JSON viewer: the first
@@ -2833,45 +2841,49 @@ write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Delete a deleted business after its 90 days
-Status: partial — a business with documents writes them to the fiscal archive, but still keeps its database (hub#738)
+Status: done
 Actor: nobody: the Hub does it by itself, nobody presses anything
 Screen: None; the business's address goes on saying "This hub is no longer available."
 Steps:
   1. A business deleted on erplora.com (HUBS-F18, HUBS-F20) reaches its 90 days. Until then its database stays intact
      and it can be restored.
   2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
-     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it first
+     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any and they cannot
+     be archived yet (there is no fiscal archive, or a VeriFactu record awaits the AEAT's answer), it stops: the
+     business stays deleted, with its database, and is checked again the next day.
+  3. It makes the final copy of its data, kept for 90 days in the copies store; if it already has one less than a day
+     old (an earlier attempt that did not get to drop it), it makes no other. Meanwhile the business can still be
+     restored and erplora.com still sees its copies.
+  4. When it ends it checks again for documents, also those that came in during the copy, and if it keeps any it
      writes them to the fiscal archive, where they are kept for 6 years and nobody can delete them: each table of
      those documents as it is stored, with nothing rebuilt; the PDF of each invoice as it was handed to the customer,
      in its own language or the business's and with the VeriFactu QR if it has its record, one per
      invoice; and last a list that counts the rows and the PDFs and carries the fingerprint of each file, written only
-     once every file has been read back the same. It does so once per deletion, and if a VeriFactu record still awaits
-     the AEAT's answer, it waits for it. Then it stops: the business stays deleted, with its database, and is checked
-     again the next day.
-  3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
-     business can still be restored and erplora.com still sees its copies. When it ends it checks again for
-     documents, in case one came in during the copy.
-  4. It drops that business's database, and only that one. From here it never comes back.
-  5. It deletes its files from the store, those of Files and those its apps keep, and only its own.
-  6. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
+     once every file has been read back the same. An archive made before the final copy does not count: it is made
+     again after it.
+  5. It drops that business's database, and only that one. From here it never comes back.
+  6. It deletes its files from the store, those of Files and those its apps keep, and only its own.
+  7. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
      people and their sessions go with it.
 In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
 platform's business or one moving to another server.
-Out: the final copy, and the database and the files gone, with the event `base.hub.purged`; from there erplora.com no
-longer lists its copies. Or, with documents, its fiscal archive written (on the row, `fiscal_archived_at` and the
-reason `fiscal_archived: <apps>`) and the database and the files kept; where there is no fiscal archive, the reason is
-`fiscal_archive_missing: <apps>`, and while a record awaits the AEAT, `fiscal_archive_waiting: verifactu`.
+Out: the final copy and, with documents, its fiscal archive (on the row, `fiscal_archived_at`); and the database and
+the files gone, with the event `base.hub.purged`; from there erplora.com no longer lists its copies. If its documents
+cannot be archived, nothing is deleted: the database and the files are kept and the row says why,
+`fiscal_archive_missing: <apps>` where there is no fiscal archive, `fiscal_archive_waiting: verifactu` while a record
+awaits the AEAT and `fiscal_archive_failed` if the archive could not be written whole.
 If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
 tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
-already was one. If the store does not delete its files, the business stays being dropped, with no mark and
-`files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
-that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
-copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
-mid-copy, the next one takes it up. If it shuts down mid-way through the fiscal archive, the next attempt for that
-deletion uses the PDFs already uploaded and does not make them again. If the fiscal archive cannot be written whole, or
-a file does not read back as it was written, it is not taken as done: the row says `fiscal_archive_failed` with the
-reason and it is tried again the next day in another folder of the archive (what was already up stays, since nobody can
-delete it, and without its final list it does not count).
+already was one less than a day old. If the store does not delete its files, the business stays being dropped, with no
+mark and `files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database
+stays. A row that does not name the business's own database drops nothing (`invalid_database_name`). A business
+restored during the copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the
+Hub shuts down mid-copy, the next one takes it up. If it shuts down mid-way through the fiscal archive, the next attempt
+for that deletion uses the PDFs already uploaded and does not make them again. If the fiscal archive cannot be written
+whole, or a file does not read back as it was written, it is not taken as done and nothing is deleted: the row says
+`fiscal_archive_failed` with the reason and it is tried again the next day in another folder of the archive (what was
+already up stays, since nobody can delete it, and without its final list it does not count), with a new final copy if
+the one there is more than a day old.
 Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired), INVOICE-F18
 (each invoice's A4 that goes to the archive)
 

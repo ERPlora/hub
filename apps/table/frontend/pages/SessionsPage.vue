@@ -86,6 +86,18 @@ const blocked = computed(() => blockingError(error.value));
 const minutesOf = (row: SessionOut) => durationMinutes(row.opened_at, row.closed_at, now.value);
 const when = (iso: string | null) => clockTime(iso, now.value, locale.value, settings.value.timezone);
 
+const finishedColumns = (): DataTableColumn<SessionOut>[] => [
+  {
+    key: 'paid_total',
+    label: t('table.sessions.columns.paid'),
+    sortable: true,
+    align: 'right',
+    format: (_, row) => formatMoney(row.paid_total, locale.value, recordMoney(row)),
+    cardIcon: 'ion:cash-outline',
+  },
+  { key: 'closed_at', label: t('table.sessions.columns.closedAt'), sortable: true, width: 'minmax(8.5rem,1fr)', format: (_, row) => when(row.closed_at), cardIcon: 'ion:log-out-outline' },
+];
+
 const columns = computed<DataTableColumn<SessionOut>[]>(() => {
   const finished = segment.value !== 'open';
   return [
@@ -96,33 +108,31 @@ const columns = computed<DataTableColumn<SessionOut>[]>(() => {
       priority: 'high',
       format: (_, row) => row.table_number ?? t('table.sessions.noTable'),
     },
-    ...(finished
-      ? ([
-          { key: 'paid_total', label: t('table.sessions.columns.paid'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.paid_total, locale.value, recordMoney(row)) },
-          { key: 'closed_at', label: t('table.sessions.columns.closedAt'), sortable: true, width: 'minmax(8.5rem,1fr)', format: (_, row) => when(row.closed_at) },
-        ] as DataTableColumn<SessionOut>[])
-      : []),
+    ...(finished ? finishedColumns() : []),
     {
       key: 'zone_name',
       label: t('table.sessions.columns.zone'),
       sortable: true,
       format: (_, row) => row.zone_name ?? t('table.none'),
+      cardIcon: 'ion:layers-outline',
       filter: { type: 'select', key: 'zone_id', options: (zoneList.value?.rows ?? []).map((zone) => ({ value: zone.id, label: zone.name })) },
     },
     {
       key: 'waiter_name',
       label: t('table.sessions.columns.waiter'),
       format: (_, row) => row.waiter_name || t('table.none'),
+      cardIcon: 'ion:person-outline',
       filter: { type: 'select', key: 'waiter_id', options: (waiterList.value?.rows ?? []).map((waiter) => ({ value: waiter.id, label: waiter.name })) },
     },
-    { key: 'guests_count', label: t('table.sessions.columns.guests'), sortable: true, align: 'right', format: (_, row) => t('table.pax', { count: row.guests_count }) },
-    { key: 'opened_at', label: t('table.sessions.columns.openedAt'), sortable: true, width: 'minmax(8.5rem,1fr)', format: (_, row) => when(row.opened_at) },
+    { key: 'guests_count', label: t('table.sessions.columns.guests'), sortable: true, align: 'right', format: (_, row) => t('table.pax', { count: row.guests_count }), cardIcon: 'ion:people-outline' },
+    { key: 'opened_at', label: t('table.sessions.columns.openedAt'), sortable: true, width: 'minmax(8.5rem,1fr)', format: (_, row) => when(row.opened_at), cardIcon: 'ion:log-in-outline' },
     {
       key: 'duration',
       label: t('table.sessions.columns.duration'),
       align: 'right',
       cell: 'duration',
       format: (_, row) => t('table.minutes', { minutes: minutesOf(row) }),
+      cardIcon: 'ion:time-outline',
     },
     {
       key: 'status',
@@ -246,6 +256,7 @@ async function confirmDelete(): Promise<void> {
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: SessionOut) => (row.table_number ? t('table.tableLabel', { number: row.table_number }) : t('table.sessions.noTable'))"
+      card-title-column="table_number"
       :card-icon="() => 'time-outline'"
       :entity-label="{ one: $t('table.sessions.entity.one'), many: $t('table.sessions.entity.many') }"
       :loading="status === 'loading'"

@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.queries import find_conversation
+from apps.whatsapp_inbox.queries.conversations import find_conversation
 from apps.whatsapp_inbox.schemas import ClaimErasureOut, ConversationRefIn, ErasedOut, RecordErasureIn, RecordOut
 from base import outbound
 

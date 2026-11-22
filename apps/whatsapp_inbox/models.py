@@ -256,7 +256,7 @@ class Message(UUIDModel):
         _("status"), max_length=10, choices=Status.choices, default=Status.RECEIVED
     )
     # The Hub's code of what went wrong (or Meta's); the words only for a refusal the Hub has no name for, as they
-    # came: the Hub's own are said when it is read, in the reader's language (queries.message_reason).
+    # came: the Hub's own are said when it is read, in the reader's language (queries.reasons.message_reason).
     error_code = models.CharField(_("error code"), max_length=64, blank=True)
     error_message = models.CharField(_("error"), max_length=500, blank=True)
     # Meta's id; empty (NULL) while a message the Hub queued has not left yet.
@@ -494,8 +494,8 @@ class Template(UUIDModel):
     )
     # The key the Hub sends with this hand-over (Idempotency-Key): a retry never registers it twice.
     submit_key = models.UUIDField(_("send key"), null=True, blank=True)
-    # The code of the last hand-over or deletion that did not end well and, only for a refusal of Meta's the Hub
-    # has no name for, Meta's reason as it came: the Hub's own words are said when it is read (queries.template_reason).
+    # The code of the last hand-over or deletion that did not end well and, only for a refusal of Meta's the Hub has
+    # no name for, Meta's reason as it came: the Hub's words are said when it is read (queries.reasons.template_reason).
     submit_error_code = models.CharField(_("error code"), max_length=64, blank=True)
     submit_error = models.CharField(_("error"), max_length=500, blank=True)
     submit_at = models.DateTimeField(_("handed over at"), null=True, blank=True)

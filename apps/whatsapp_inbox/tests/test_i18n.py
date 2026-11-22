@@ -96,7 +96,7 @@ def test_spanish_texts():
             "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle "
             "con una plantilla aprobada."
         )
-        assert str(queries.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
+        assert str(queries.reasons.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
 
 
 def test_spanish_says_the_inboxs_own_words_not_an_earlier_apps():

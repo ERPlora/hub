@@ -65,7 +65,6 @@ from apps.kitchen.queries import (
     in_progress_by_station,
     in_scope,
     pending_rounds,
-    person_label,
     product_routes,
     round_view,
     routing,
@@ -100,6 +99,8 @@ from apps.kitchen.schemas import (
     TicketSyncIn,
 )
 from apps.sale.models import OrderLine
+from apps.sale.queries.people import person_label
+from base.business import paper_time
 from base.queries.catalog_images import business_language
 
 logger = logging.getLogger(__name__)
@@ -476,6 +477,7 @@ def _sheet(  # noqa: PLR0913
         "waiter": ticket.waiter,
         "priority": str(URGENT) if rush else "",
         "duplicate": duplicate,
+        "time": paper_time(timezone.now() if negative else ticket.received_at),
         "items": [_paper_dish(item, negative) for item in items],
     }
 
@@ -1211,9 +1213,7 @@ def reprint_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
     if outcome is UNAVAILABLE:
         raise Conflict(str(PRINTING_UNAVAILABLE), code="kitchen.printing_unavailable")
     if isinstance(outcome, str):
-        raise Conflict(
-            str(PRINT_FAILED) % {"reason": outcome}, code="kitchen.print_failed"
-        )
+        raise Conflict(str(PRINT_FAILED) % {"reason": outcome}, code="kitchen.print_failed")
     _went_to_paper(ticket, outcome)
     write_log(ticket.id, LogAction.REPRINTED, who=actor(ctx))
     _ticket_event(ctx, events.TICKET_REPRINTED, ticket)

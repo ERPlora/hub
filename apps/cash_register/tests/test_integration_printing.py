@@ -4,9 +4,11 @@ session's figures as the paper shows them. Without Printing in the business, or 
 printer in it (the paper would wait for ever), nothing is queued and the screen prints through the browser;
 a blind count does not print an open session's figures to whoever may not see the expected cash."""
 
+import dataclasses
 import datetime as dt
 
 import pytest
+from django.test import RequestFactory
 from django.utils import timezone
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import registry
@@ -18,6 +20,7 @@ from apps.cash_register.tests.conftest import (
     ctx_for,
     open_session,
     run,
+    void,
 )
 from apps.printing.models import PrintJob
 
@@ -114,6 +117,12 @@ def test_other_payment_methods_are_a_line_only_when_there_were_some(shift):
     assert "Sales with other payment methods" in labels
 
 
+def test_a_sale_voided_in_the_same_shift_is_on_the_paper_neither_as_a_sale_nor_as_a_refund(shift):
+    void(charge(payments=[{"method": "card"}]))
+    printed = dict(lines(PrintJob.objects.get(pk=print_report(shift).job_id)))
+    assert [printed[label] for label in ("Sales", "Card sales", "Refunds", "Expected")] == [1.5, 0.0, 0.0, 101.0]
+
+
 def test_every_print_is_a_paper_of_its_own(shift):
     first, second = print_report(shift), print_report(shift)
     assert first.job_id != second.job_id
@@ -135,6 +144,19 @@ def test_without_an_active_receipt_printer_nothing_is_queued_and_the_screen_prin
 def test_the_receipt_printer_named_is_said(shift):
     run("printing.settings.update", {"receipt_printer": "Till"})
     assert print_report(shift).printer == "Till"
+
+
+def test_with_two_tills_the_report_comes_out_at_the_till_that_prints_it(shift, till):
+    """PRINTING-F22: the terrace's till prints its shift report on its own receipt printer, not the business's."""
+    terrace = run(
+        "printing.printer.create",
+        {"name": "Till 2", "kind": "network", "address": "192.168.1.51", "usage": "receipt"},
+    )
+    at_the_terrace = dataclasses.replace(ctx_for("hub_manager"), request=RequestFactory().post("/", HTTP_X_DEVICE_ID="terrace"))
+    run("printing.device.register", {"name": "Terrace", "printers": [str(terrace.id)]}, at_the_terrace)
+    out = print_report(shift, at_the_terrace)
+    assert (out.queued, out.printer) == (True, "Till 2")
+    assert PrintJob.objects.get(pk=out.job_id).printer_id == terrace.id
 
 
 def test_without_printing_in_the_business_nothing_is_queued_and_the_screen_prints(shift, monkeypatch):
@@ -191,3 +213,16 @@ def test_the_paper_speaks_the_language_of_whoever_prints(shift):
         "Ventas en efectivo",
         "Ventas con tarjeta",
     ]
+
+
+def test_the_z_says_when_the_session_closed_and_the_x_when_it_is_printed(shift, monkeypatch, in_business_a):
+    """The device printed its own hour on the report: the paper brings the hour of what it reports, on the
+    business's clock. At 23:30 of the 2nd in Bogotá it is already the 3rd in Madrid."""
+    monkeypatch.setattr(in_business_a, "timezone", "America/Bogota")
+    night = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
+    with monkeypatch.context() as clock:
+        clock.setattr(timezone, "now", lambda: night)
+        assert PrintJob.objects.get(pk=print_report(shift).job_id).document["date"] == "02/11/2026 23:30"
+    run("cash_register.session.close", {"session_id": str(shift.id), "closing_balance": 10090})
+    Session.objects.filter(pk=shift.id).update(closed_at=night)
+    assert PrintJob.objects.get(pk=print_report(shift).job_id).document["date"] == "02/11/2026 23:30"

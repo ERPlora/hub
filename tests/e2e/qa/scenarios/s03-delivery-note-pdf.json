@@ -36,7 +36,6 @@
     }
   ],
   "opening": "Ha llegado el pedido, te paso el albarán. Mételo en el stock",
-  "offered": ["inventory.stock.receive"],
   "writes": [
     "inventory.stock.receive",
     "inventory.product.create",

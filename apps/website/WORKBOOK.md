@@ -88,8 +88,9 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
 - **Fondo de la página**: **Claro**, **Oscuro** o **Automático** (por defecto): automático sigue el dispositivo de
   cada visitante, oscuro si está en modo oscuro y claro si no; lo dice una nota debajo.
 - **Secciones**, en este orden, cada una plegable (las ocultas dicen «Oculta» bajo su nombre):
-  - **Barra superior** (siempre en la página): nombre del negocio (hasta 80) y logotipo; **Entrar** siempre.
-  - **Cabecera** (siempre): título (hasta 80), lema (hasta 160) y foto de portada.
+  - **Barra superior** (siempre en la página): nombre del negocio (hasta 80; vacío = el de **Ajustes › Negocio**, y lo
+    dice debajo del campo) y logotipo; **Entrar** siempre.
+  - **Cabecera** (siempre): título (hasta 80; vacío = el nombre del negocio), lema (hasta 160) y foto de portada.
   - **Sobre nosotros**: interruptor **Mostrar**, encabezado (vacío = «Sobre nosotros»), texto (hasta 4000, con
     **negrita**, listas y enlaces en Markdown; nada de HTML) y una foto.
   - **Catálogo**: **Mostrar**, encabezado (vacío = «Nuestros productos» o «Nuestros servicios»), **Qué mostrar**
@@ -353,7 +354,9 @@ Pasos:
    siempre.
 Entra: la dirección del negocio.
 Sale: la página publicada, con su propia política de seguridad (sin scripts del usuario: solo el paquete de la
-página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre. La
+página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre. El
+nombre de la barra, de la cabecera sin título, del pie y de la pestaña es el que escribió el propietario o, vacío, el
+del negocio en **Ajustes › Negocio**, y un cambio de ese nombre en erplora.com se ve en la siguiente visita. La
 página le dice al buscador cuál es su dirección principal: el dominio propio del negocio si se abre en él (BASE-F110),
 también desde esta dirección, que no redirige porque sigue siendo la entrada del equipo; sin dominio propio, esta.
 Si falla: sin publicar, desconectada o con la app apagada, la dirección lleva al acceso del equipo; quien hace más de
@@ -496,9 +499,14 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `<link rel="canonical">` absoluto a `https://<dominio>/` mientras la puerta abre la web en ese dominio
   (`base.custom_domains.served_on`: el de la fila del negocio, si el mapa se lo da a él; uno que nombran dos negocios no
   es de nadie), y si no a `https://<slug>.<dominio del Hub>/`. Sin redirección, como el dominio integrado de Squarespace:
-  la dirección de erplora.com sigue siendo la entrada del equipo. La página se guarda con la dirección que nombra
-  (`{"main": …, "html": …}`) y se vuelve a pintar si ya no es la de ahora, así que un cambio de dominio no espera a que
-  caduque; las claves y `forget_cached` no cambian. La vista previa no nombra ninguna (`render_site(canonical="")`).
+  la dirección de erplora.com sigue siendo la entrada del equipo. La página se guarda con la dirección que nombra y el
+  nombre que enseña (`{"marks": {"main": …, "name": …}, "html": …}`) y se vuelve a pintar si alguna ya no es la de
+  ahora, así que un cambio de dominio o de nombre no espera a que caduque; las claves y `forget_cached` no cambian. La
+  vista previa no nombra ninguna (`render_site(canonical="")`).
+- **El nombre de la página** (hub#2084, `render_site(name=…)`): el de la barra superior o, vacío, el del negocio tal
+  como lo registró erplora.com (`Hub.name`, el de Ajustes › Negocio), y sin él (una demo) el slug de su dirección. La
+  página pública lo lee de la fila del registro que ya cargó el host (ninguna operación por visita, como la moneda) y
+  la vista previa, de `base.operations.business_name` (`base.business.get` leído como la plataforma).
 - **La barra y el pie de las cuatro plantillas** son componentes (`templates/website/_topbar.html`, `_footer.html`, y sus
   piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
   una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.

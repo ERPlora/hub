@@ -61,12 +61,18 @@ class AttendanceConfig(LiveAppConfig):
             pgettext_lazy("attendance menu", "Clock in"),
             "ion:time-outline",
             "/attendance/clock",
+            permission="attendance.clock",
         ),
         Nav(
             "records",
             pgettext_lazy("attendance menu", "Records"),
             "ion:list-outline",
             "/attendance/records",
+            permission="attendance.clock",
+        ),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/attendance/settings",
+            permission="attendance.manage_settings",
         ),
     ]
     # The Home's panel «Clocked in now» (ATTENDANCE-F11), on the count of what Records lists, in every business.

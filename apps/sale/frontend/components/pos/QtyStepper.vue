@@ -28,7 +28,8 @@ function reset(): void {
 }
 watch(shown, reset);
 
-const QUANTITY = /^\d+(?:\.\d{1,3})?$/;
+/** Any decimals: the step of the line's unit is the server's to judge, and its refusal says which step it is. */
+const QUANTITY = /^\d+(?:\.\d+)?$/;
 
 function ask(next: number): void {
   emit('change', String(Math.round(next * 1000) / 1000));
@@ -40,7 +41,7 @@ function onChange(): void {
     reset();
     return;
   }
-  ask(Number(typed));
+  emit('change', typed);
 }
 
 const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
@@ -118,10 +119,12 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
 .pos-qty__btn:disabled {
   opacity: 0.4;
 }
+/* As wide as the figure it holds, so a weight reads whole («0,532»). */
 .pos-qty__field {
-  width: 2.3rem;
+  field-sizing: content;
+  min-width: 2.3rem;
   height: 2.75rem;
-  padding: 0;
+  padding: 0 0.35rem;
   font: inherit;
   font-weight: 700;
   text-align: center;
@@ -129,6 +132,12 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
   background: transparent;
   border: none;
   border-inline: 1px solid var(--ep-border);
+}
+/* Without field-sizing (before Chrome 123, Safari 26.2 and Firefox 152) a text field is twenty characters wide. */
+@supports not (field-sizing: content) {
+  .pos-qty__field {
+    width: 2.3rem;
+  }
 }
 .pos-qty__unit {
   padding: 0 0.25rem;

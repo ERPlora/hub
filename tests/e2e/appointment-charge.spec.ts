@@ -1,10 +1,12 @@
 // «Charge» from the agenda to the till, in Chrome (WORKBOOK APPOINTMENT-F17, SALE-F26): an appointment of
 // a professional who does the haircut at her own price (Services · «Who does it») is charged from its row;
 // the till opens with that check on screen — titled «customer · number», its service line at the price
-// booked, not the catalog's — and back on the agenda the row says «Go to the check», which returns to the
-// same check (one per appointment). Everything is named «E2E Apt Charge …» and removed before and after.
+// booked, not the catalog's, with her name under it — and back on the agenda the row says «Go to the
+// check», which returns to the same check (one per appointment). Everything is named «E2E Apt Charge …»
+// and removed before and after.
 import { expect, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, psql, shot, shown } from './helpers';
 import { ownerPage, post, rowAction } from './service-helpers';
 
@@ -78,9 +80,7 @@ test('«Charge» ends on the till with the appointment’s check, at the price b
     });
     expect(booked.total).toBe(3000);
 
-    const calendar = shown(page).locator('[data-testid=appointment-toolbar-calendar] input');
-    await calendar.fill(DAY);
-    await calendar.press('Tab');
+    await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), DAY);
     await rowAction(page, 'appointment-list', booked.id, 'charge');
     await page.waitForURL(/\/sale\/pos\?order=/);
     const orderId = new URL(page.url()).searchParams.get('order');
@@ -88,13 +88,13 @@ test('«Charge» ends on the till with the appointment’s check, at the price b
     await expect(till.locator('[data-testid=pos-check-title]')).toHaveValue(`${customer.name} · ${booked.number}`);
     const lineId = psql(`select id from sale_orderline where order_id = '${orderId}'`);
     await expect(till.locator(`[data-testid=pos-line-${lineId}]`)).toContainText(named('Haircut'));
+    await expect(till.locator(`[data-testid=pos-line-${lineId}-staff]`)).toHaveText(`${named('Ana')} Senior`);
     await expect(till.locator('[data-testid=pos-total]')).toContainText('30.00');
     await page.screenshot({ path: shot('appointment-charge-till') });
 
     // Back on the agenda: «Go to the check» returns to the same one.
     await page.goto(`${A}/appointment/agenda`);
-    await calendar.fill(DAY);
-    await calendar.press('Tab');
+    await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), DAY);
     await expect(shown(page).locator(`[data-testid=appointment-list-row-${booked.id}-charge]`)).toContainText('Go to the check');
     await rowAction(page, 'appointment-list', booked.id, 'charge');
     await page.waitForURL(new RegExp(`/sale/pos\\?order=${orderId}`));

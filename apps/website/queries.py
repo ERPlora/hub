@@ -60,7 +60,7 @@ from apps.website.schemas import (
     Theme,
 )
 from base.apps_on import active_apps
-from base.operations import business_currency
+from base.operations import business_currency, business_name
 from base.registry import hub_by_slug
 from base.throttle import RateLimited, allow, client_address
 
@@ -201,7 +201,7 @@ def preview_site(ctx: OperationContext, data: NoIn) -> dict:
         now["theme"],
         now["content"],
         ctx.language,
-        hub=ctx.scope.key,
+        name=business_name(ctx.scope) or ctx.scope.key,
         currency=business_currency(ctx.scope),
         catalog=catalog,
         preview=True,

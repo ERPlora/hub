@@ -15,7 +15,8 @@ import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, openTillCart, stamp } from './sale-helpers';
 import { ownerPage, post, rowAction, settled } from './service-helpers';
-import { bookingDays, bookingTimes, type BookingTimes, RESERVED_LEAD_MINUTES, untilMidnight } from './table-clock';
+import { reservationTimes } from './table-booking';
+import { bookingDays, RESERVED_LEAD_MINUTES } from './table-clock';
 
 const RUN = stamp();
 const TAG = `E2E Tbf ${RUN}`;
@@ -76,20 +77,6 @@ async function flowShots(page: Page, flows: string[], ready: () => Promise<void>
     for (const flow of flows) await page.screenshot({ path: shot(`APP-TABLE-${flow}-${size.label}`) });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-}
-
-/** The times of a test's reservations (table-clock.ts). In the last minutes of the day none of today is left: the
- *  test waits for midnight first (less than ten minutes), its timeout stretched by exactly that wait. */
-async function reservationTimes(): Promise<BookingTimes> {
-  const now = new Date();
-  const times = bookingTimes(now);
-  if (times) return times;
-  const wait = untilMidnight(now) + 1_000;
-  test.setTimeout(test.info().timeout + wait);
-  await new Promise((done) => setTimeout(done, wait));
-  const after = bookingTimes(new Date());
-  expect(after, 'a time of the new day after midnight').not.toBeNull();
-  return after!;
 }
 
 /** A wall-clock time («20:00») as the plan paints it (`clock` of `apps/table/frontend/lib/format.ts`): the
@@ -403,7 +390,8 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     expect(seated.checks.map((check) => check.customer_name)).toEqual([ana.name]);
     const check = await api<{ label: string; status: string }>(context, A, 'GET', `/sale/orders/detail?order_id=${seated.checks[0].order_id}`);
     expect([check.data.label, check.data.status]).toEqual(['Table 1', 'open']);
-    await tile(page, one.id).click();
+    // A long press on an occupied table (a right click here) opens its window with its actions.
+    await tile(page, one.id).click({ button: 'right' });
     await expect(sheet(page)).toContainText(ana.name);
     await flowShots(page, ['TABLE-F32'], async () => {
       await expect(sheet(page).locator('[data-testid=table-sheet-summary]')).toBeVisible();
@@ -418,16 +406,16 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     // Each size opens the window afresh: a new size may relay the page out under an open window.
     await flowShots(page, ['TABLE-F14'], async () => {
       await closeSheet(page);
-      await tile(page, one.id).click();
+      await tile(page, one.id).click({ button: 'right' });
       await sheet(page).locator('[data-testid=table-sheet-action-guests]').click();
       await expect(guests(page).locator('[data-testid=table-guests-value]')).toContainText('4');
     });
     await closeSheet(page);
 
-    // TABLE-F11: «Charge» opens the till with the table's check on screen.
+    // TABLE-F11: a tap on the occupied table opens the till with its check on screen, with no window on the way.
     await tile(page, one.id).click();
-    await sheet(page).locator('[data-testid=table-sheet-action-charge]').click();
     await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 1');
+    await expect(sheet(page)).toBeHidden();
     await flowShots(page, ['TABLE-F11'], async () => {
       await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 1');
     });
@@ -439,7 +427,6 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     await floor(page);
     await seat(page, two.id, 2);
     await tile(page, two.id).click();
-    await sheet(page).locator('[data-testid=table-sheet-action-charge]').click();
     await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
     await expect(shown(page).locator('[data-testid=pos-customer-chip]')).toHaveCount(0);
     const next = (await tableNo(context, '2')).checks;
@@ -509,7 +496,7 @@ test('TABLE-F15, F16, F17: transfer a check, merge two tables and split a check'
     await addCoffee(context, orderOne);
 
     // TABLE-F16: table 2 (the till's check) merged into table 1: one check of Sales with both lines.
-    await tile(page, two.id).click();
+    await tile(page, two.id).click({ button: 'right' });
     await sheet(page).locator('[data-testid=table-sheet-action-merge]').click();
     await expect(shown(page).locator('[data-testid=table-floor-pick]')).toContainText('Merge 2 with…');
     await flowShots(page, ['TABLE-F16'], async () => {
@@ -523,7 +510,7 @@ test('TABLE-F15, F16, F17: transfer a check, merge two tables and split a check'
     expect(absorbed.data.status).toBe('voided');
 
     // TABLE-F15: table 1's check moves to table 2, with its guests and its title.
-    await tile(page, one.id).click();
+    await tile(page, one.id).click({ button: 'right' });
     await sheet(page).locator('[data-testid=table-sheet-action-transfer]').click();
     await expect(shown(page).locator('[data-testid=table-floor-pick]')).toContainText('Transfer 1 to…');
     await flowShots(page, ['TABLE-F15'], async () => {
@@ -539,7 +526,7 @@ test('TABLE-F15, F16, F17: transfer a check, merge two tables and split a check'
 
     // TABLE-F17: one line goes to a second check at the same table.
     const [firstLine] = merged.data.lines;
-    await tile(page, two.id).click();
+    await tile(page, two.id).click({ button: 'right' });
     await expect(sheet(page)).toBeVisible();
     await settled(page);
     await sheet(page).locator('[data-testid=table-sheet-action-split]').click();
@@ -654,7 +641,7 @@ test('TABLE-F21, F22, F23, F13, F24: the checks of the room in Sessions', async 
     await floor(page);
     await seat(page, one.id, 2);
     const parked = (await tableNo(context, '1')).checks[0];
-    await tile(page, one.id).click();
+    await tile(page, one.id).click({ button: 'right' });
     await flowShots(page, ['TABLE-F13'], async () => {
       await expect(sheet(page).locator('[data-testid=table-sheet-action-park]')).toBeVisible();
     });

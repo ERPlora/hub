@@ -75,19 +75,22 @@ class CustomerConfig(LiveAppConfig):
             label=_("Customers"),
             icon="ion:people-outline",
             path="/customer/customers",
+            permission="customer.view",
         ),
         Nav(
             id="groups",
             label=_("Groups"),
             icon="ion:people-outline",
             path="/customer/groups",
+            permission="customer.configure",
         ),
-        Nav(id="tags", label=_("Tags"), icon="ion:pricetags", path="/customer/tags"),
+        Nav(id="tags", label=_("Tags"), icon="ion:pricetags", path="/customer/tags", permission="customer.configure"),
         Nav(
             id="fields",
             label=_("Fields"),
             icon="ion:layers-outline",
             path="/customer/fields",
+            permission="customer.configure",
         ),
     ]
     help = Help()

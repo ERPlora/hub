@@ -223,8 +223,9 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
       await expect(tile(page, one.id)).toContainText('Occupied');
     });
 
-    // Transfer the party to table 2: the plan picks a free table.
-    await tile(page, one.id).click();
+    // Transfer the party to table 2: a long press on the table (a right click here) opens its actions, and the plan picks
+    // a free table.
+    await tile(page, one.id).click({ button: 'right' });
     await page.locator('[data-testid=table-sheet-action-transfer]').click();
     await expect(shown(page).locator('[data-testid=table-floor-pick]')).toContainText('Transfer 1 to…');
     await tile(page, two.id).click();
@@ -248,7 +249,7 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     await shots(page, 'table-floor-bill', async () => {
       await expect(tile(page, two.id)).toContainText('€1.50');
     });
-    await tile(page, one.id).click();
+    await tile(page, one.id).click({ button: 'right' });
     await page.locator('[data-testid=table-sheet-action-merge]').click();
     await tile(page, two.id).click();
     await expect(tile(page, one.id)).toContainText('Available');
@@ -262,14 +263,14 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     expect(removed.status).toBe(200);
     await expect(tile(page, two.id)).toContainText('€3.00');
 
-    // «Charge» goes to the till with the table's check: waited for by what the till shows, not by its URL (the till
-    // drops `?order=` as soon as it has loaded the check, sometimes before a URL check sees it). Charged whole there,
-    // by card, the table frees itself on a plan another device keeps open (live, no reload).
+    // A tap on the occupied table goes straight to the till with its check, with no window on the way: waited for by what
+    // the till shows, not by its URL (the till drops `?order=` as soon as it has loaded the check, sometimes before a URL
+    // check sees it). Charged whole there, by card, the table frees itself on a plan another device keeps open (live, no
+    // reload).
     const plan = await ownerPage(browser, '/table/floor-plan');
     await chooseZone(plan.page, SERVICE);
     await expect(tile(plan.page, two.id)).toContainText('Occupied');
     await tile(page, two.id).click();
-    await page.locator('[data-testid=table-sheet-action-charge]').click();
     const till = shown(page);
     await expect(till.locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
     await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
@@ -284,7 +285,7 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     await page.locator('[data-testid=table-guests-quick-1]').click();
     await expect(tile(page, one.id)).toContainText('Occupied');
     await table('1');
-    await tile(page, one.id).click();
+    await tile(page, one.id).click({ button: 'right' });
     await page.locator('[data-testid=table-sheet-action-close]').click();
     await page.locator('[data-testid=table-sheet-close-confirm]').click();
     await expect(tile(page, one.id)).toContainText('Available');

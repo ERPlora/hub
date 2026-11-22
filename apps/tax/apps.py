@@ -50,11 +50,11 @@ class TaxConfig(LiveAppConfig):
     # `icon =` as the module's own icon, and a keyword split over lines would look like one.
     # The same icons as the tabbar (frontend/tabs.ts): the old menu's.
     navigation = [
-        Nav("categories", _("Categories"), "ion:pricetags-outline", "/tax/categories"),
-        Nav("rules", _("Rules"), "ion:receipt-outline", "/tax/rules"),
-        Nav("aliases", _("Aliases"), "ion:swap-horizontal-outline", "/tax/aliases"),
+        Nav("categories", _("Categories"), "ion:pricetags-outline", "/tax/categories", permission="tax.manage"),
+        Nav("rules", _("Rules"), "ion:receipt-outline", "/tax/rules", permission="tax.manage"),
+        Nav("aliases", _("Aliases"), "ion:swap-horizontal-outline", "/tax/aliases", permission="tax.manage"),
         # The business's tax region (TAX-F11).
-        Nav("settings", _("Settings"), "ion:settings-outline", "/tax/settings"),
+        Nav("settings", _("Settings"), "ion:settings-outline", "/tax/settings", permission="tax.manage"),
     ]
     # The Home's step «Your taxes», order 20 and important, done once one active root rule of any country applies today
     # (TAX-F17: the query and the words of the notice of the tax screens), for whoever manages taxes, leading to the
@@ -74,4 +74,4 @@ class TaxConfig(LiveAppConfig):
             refresh_on=RULE_IN_FORCE_EVENTS,
         )
     ]
-    help = Help()
+    help = Help(videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"})

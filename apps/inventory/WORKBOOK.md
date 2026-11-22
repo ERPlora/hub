@@ -145,7 +145,8 @@ producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, prec
 desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
 de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
 puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;
-vista de tabla o de tarjetas.
+vista de tabla o de tarjetas. En la tarjeta, cada dato lleva su nombre delante («SKU QA-AGUA-01», «Precio 1,50 €»,
+«Stock 46»).
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
@@ -690,7 +691,9 @@ Pasos:
    sale en productos físicos con control de stock y con permiso de mover stock.
 2. En la ventana de la baja («Baja — Vino tinto») escribe la cantidad y el motivo (merma, rotura, consumo propio…) y pulsa
    «Dar de baja». Por el asistente: «da de baja 2 botellas de vino tinto por rotura»; enseña la
-   tarjeta de confirmación con el producto, la cantidad y el motivo.
+   tarjeta de confirmación con el producto, la cantidad y el motivo. Contada en el mismo mensaje que un
+   recuento («se han roto tres botellas de agua y he contado los refrescos: quedan 40»), la rotura se da
+   de baja igual y el recuento es solo de lo contado: un recuento nunca apunta una rotura.
 3. En **Movimientos** sale «Descuento» con la cantidad en negativo y el motivo.
 Entra: el producto, la cantidad (en el escalón de su unidad) y el motivo. También se puede pedir
 por la API.
@@ -1420,7 +1423,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
 ## El servidor
 
-- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`, `services.py`,
+- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
@@ -1429,7 +1432,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   foto (F30, F31) y `inventory.category.get`, lectura interna (`ai=INTERNAL`, sin API): solo nombra la categoría en
   la tarjeta del asistente; el modelo encuentra las categorías en su lista.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#526): nombra el registro que una escritura señala por su
-  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el producto por su `name` con
+  id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: el producto por su `name` con
   `inventory.product.get` (`A_PRODUCT`: el `id` de `ProductRefIn` y el `product_id` de `_ProductLineRef`, también en
   cada línea de una recepción) y la categoría por su `name` con `inventory.category.get` (`A_CATEGORY`: el `id` de
   `CategoryRefIn`, el `category_id` de `ProductCategoryIn` y cada elemento de `category_ids`). El `id` lleva el título

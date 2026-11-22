@@ -11,16 +11,10 @@ from live.errors import InvalidPayload
 from live.operations import get
 
 from apps.inventory.models import Category, Product
-from apps.inventory.schemas import (
-    CategoryImportIn,
-    CategoryIn,
-    ForSaleListIn,
-    ProductImportIn,
-    ProductIn,
-    ProductListIn,
-    ProductPatchIn,
-    ProductRefIn,
-)
+from apps.inventory.schemas.categories import CategoryIn
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.imports import CategoryImportIn, ProductImportIn
+from apps.inventory.schemas.products import ForSaleListIn, ProductIn, ProductListIn, ProductPatchIn
 from apps.tax.models import TaxCategory
 
 from .conftest import HUB_DB, ctx_for

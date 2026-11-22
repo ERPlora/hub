@@ -13,7 +13,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, api, collectProblems, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { capture } from './kitchen-helpers';
+import { capture, ionicLabelStylesLast } from './kitchen-helpers';
 import { cleanSales, stamp } from './sale-helpers';
 import { ownerPage } from './service-helpers';
 
@@ -374,12 +374,7 @@ test('KITCHEN-F10: the destination and waiter keep whole words on separate lines
     const destination = card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-label]`);
     const waiter = card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-waiter]`);
     await expect(waiter).toHaveText('Waiter: owner@example.com');
-    // The built sheet can put Ionic after the theme; reproduce that cascade with Ionic's own rule.
-    await page.evaluate(() => {
-      const ionic = Array.from(document.querySelectorAll('style')).find((style) => style.textContent?.includes('.item.sc-ion-label-ios-h'));
-      if (!ionic) throw new Error('Ionic label styles not found');
-      ionic.parentElement?.append(ionic);
-    });
+    await ionicLabelStylesLast(page);
 
     for (const size of [
       { width: 375, height: 667, columns: 1 },

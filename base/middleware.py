@@ -69,9 +69,6 @@ whose every place in this process is taken (its plan's transactions at once, ``b
 with the same envelope): the envelope, or for a page (the admin, the website) its message as text. A view that touches
 a module whose tables the business does not have yet (``AppNotCreated``, ``base.tenancy.router``) answers its 404
 ``app_inactive`` the same way; the admin's page goes back to its index, saying so.
-
-``SessionHostMiddleware``: a session is a session of the host it was opened on (the login notes it);
-on another hub's host, or on the platform host, it is anonymous (401).
 """
 
 import logging
@@ -80,14 +77,12 @@ from contextlib import nullcontext
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.contrib.auth.signals import user_logged_in
 from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
 from django.http.request import split_domain_port, validate_host
 from django.template.loader import render_to_string
 from django.urls import get_script_prefix, reverse
-from django.dispatch import receiver
 from django.utils.cache import add_never_cache_headers
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
@@ -481,59 +476,3 @@ def _admin_hub(request: HttpRequest):
     session = getattr(request, "session", None)
     slug = session.get(ADMIN_HUB_SESSION_KEY) if session is not None else None
     return registry.hub_by_slug(slug) if slug else None
-
-
-# ── A session is its host's ──────────────────────────────────────────────────────────────────────────────────────
-
-#: Where the login noted the host a session was opened on: a hub's slug, or :data:`PLATFORM_SESSION_HOST`.
-SESSION_HOST_KEY = "hub_host"
-#: The platform host's mark (no hub's slug can be it: ``live.slugs``).
-PLATFORM_SESSION_HOST = "@platform"
-
-
-def session_host(request: HttpRequest) -> str | None:
-    """The host a session of this request belongs to: the hub's slug, the platform host's mark, or ``None``."""
-    if getattr(request, "platform_host", False):
-        return PLATFORM_SESSION_HOST
-    hub = getattr(request, "hub", None)
-    return hub.slug if hub is not None else None
-
-
-def opened_elsewhere(request: HttpRequest) -> bool:
-    """Whether the request's session was opened on another host than the request's (a hub's or the platform's).
-
-    The one rule of every way in that reads a session: ``SessionHostMiddleware`` and the print socket
-    (``base.ws_print``). A session with no host noted (from before the rule) is not.
-    """
-    host = session_host(request)
-    if host is None:
-        return False
-    noted = request.session.get(SESSION_HOST_KEY)
-    return noted is not None and noted != host
-
-
-@receiver(user_logged_in)
-def note_the_sessions_host(sender, request, user, **kwargs) -> None:
-    """Every login notes its host in the new session (the SaaS's jump, a demo's, the admin's)."""
-    host = session_host(request) if request is not None else None
-    if host is not None and hasattr(request, "session"):
-        request.session[SESSION_HOST_KEY] = host
-
-
-class SessionHostMiddleware(MiddlewareMixin):
-    """Placed right after ``AuthenticationMiddleware``: a session opened on another host is no session here.
-
-    Sessions stay in control's database in this phase (plan, decision 3): a session of hub B would otherwise be
-    valid on A's host for a user who is a member of both. Here it is anonymous (401 on the API; on a page, the
-    SaaS's login, as without a session). A session from before this rule, with no host noted, stays valid until it
-    expires; ``/internal`` and the open paths, with no hub, are left alone.
-    """
-
-    def process_request(self, request: HttpRequest) -> None:
-        if opened_elsewhere(request):
-            request.user = AnonymousUser()
-
-            async def anonymous():
-                return request.user
-
-            request.auser = anonymous

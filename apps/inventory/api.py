@@ -11,34 +11,23 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.inventory import queries, services
-from apps.inventory.schemas import (
-    CategoryFiltersIn,
-    CategoryImportIn,
-    CategoryIn,
-    CategoryListIn,
-    CategoryPatchIn,
-    CategoryRefIn,
-    ConfigPatchIn,
-    CountIn,
+from apps.inventory.schemas.categories import CategoryFiltersIn, CategoryIn, CategoryListIn, CategoryPatchIn
+from apps.inventory.schemas.fields import CategoryRefIn, ProductRefIn
+from apps.inventory.schemas.imports import CategoryImportIn, ProductImportIn
+from apps.inventory.schemas.movements import MovementListIn
+from apps.inventory.schemas.product_categories import ProductCategoryIn, ProductCategoryListIn
+from apps.inventory.schemas.product_images import ProductImageIn, ProductImageSuggestIn, ProductImageUploadIn
+from apps.inventory.schemas.products import (
     ForSaleListIn,
-    LowStockListIn,
-    MovementListIn,
-    ProductCategoryIn,
-    ProductCategoryListIn,
     ProductFiltersIn,
-    ProductImageIn,
-    ProductImageSuggestIn,
-    ProductImageUploadIn,
-    ProductImportIn,
     ProductIn,
     ProductListIn,
     ProductPatchIn,
-    ProductRefIn,
     ProductSoldOutIn,
-    ReceiveIn,
-    UnitListIn,
-    WriteOffIn,
 )
+from apps.inventory.schemas.settings import ConfigPatchIn
+from apps.inventory.schemas.stock import CountIn, LowStockListIn, ReceiveIn, WriteOffIn
+from apps.inventory.schemas.units import UnitListIn
 from base.request_body import accept_body_up_to
 
 router = Router(tags=["inventory"])
@@ -77,32 +66,32 @@ async def product_export(request, params: Query[ProductFiltersIn]):
 
 @bind(router, "inventory.product.create", "/inventory/products", status=201)
 async def product_create(request, data: ProductIn):
-    return await run_operation(request, services.create_product, data)
+    return await run_operation(request, services.products.create_product, data)
 
 
 @bind(router, "inventory.product.bulk_create", "/inventory/products/bulk_create")
 async def product_bulk_create(request, data: ProductImportIn):
-    return await run_operation(request, services.bulk_create_products, data)
+    return await run_operation(request, services.imports.bulk_create_products, data)
 
 
 @bind(router, "inventory.product.update", "/inventory/products/update")
 async def product_update(request, data: ProductPatchIn):
-    return await run_operation(request, services.update_product, data)
+    return await run_operation(request, services.products.update_product, data)
 
 
 @bind(router, "inventory.product.delete", "/inventory/products/delete")
 async def product_delete(request, data: ProductRefIn):
-    return await run_operation(request, services.delete_product, data)
+    return await run_operation(request, services.products.delete_product, data)
 
 
 @bind(router, "inventory.product.set_sold_out", "/inventory/products/sold_out")
 async def product_set_sold_out(request, data: ProductSoldOutIn):
-    return await run_operation(request, services.set_sold_out, data)
+    return await run_operation(request, services.products.set_sold_out, data)
 
 
 @bind(router, "inventory.product.print_label", "/inventory/products/print_label")
 async def product_print_label(request, data: ProductRefIn):
-    return await run_operation(request, services.print_label, data)
+    return await run_operation(request, services.labels.print_label, data)
 
 
 # Products in categories
@@ -115,12 +104,12 @@ async def product_category_list(request, params: Query[ProductCategoryListIn]):
 
 @bind(router, "inventory.product_category.add", "/inventory/product_categories/add")
 async def product_category_add(request, data: ProductCategoryIn):
-    return await run_operation(request, services.add_product_category, data)
+    return await run_operation(request, services.product_categories.add_product_category, data)
 
 
 @bind(router, "inventory.product_category.remove", "/inventory/product_categories/remove")
 async def product_category_remove(request, data: ProductCategoryIn):
-    return await run_operation(request, services.remove_product_category, data)
+    return await run_operation(request, services.product_categories.remove_product_category, data)
 
 
 # Categories
@@ -138,22 +127,22 @@ async def category_export(request, params: Query[CategoryFiltersIn]):
 
 @bind(router, "inventory.category.create", "/inventory/categories", status=201)
 async def category_create(request, data: CategoryIn):
-    return await run_operation(request, services.create_category, data)
+    return await run_operation(request, services.categories.create_category, data)
 
 
 @bind(router, "inventory.category.bulk_create", "/inventory/categories/bulk_create")
 async def category_bulk_create(request, data: CategoryImportIn):
-    return await run_operation(request, services.bulk_create_categories, data)
+    return await run_operation(request, services.imports.bulk_create_categories, data)
 
 
 @bind(router, "inventory.category.update", "/inventory/categories/update")
 async def category_update(request, data: CategoryPatchIn):
-    return await run_operation(request, services.update_category, data)
+    return await run_operation(request, services.categories.update_category, data)
 
 
 @bind(router, "inventory.category.delete", "/inventory/categories/delete")
 async def category_delete(request, data: CategoryRefIn):
-    return await run_operation(request, services.delete_category, data)
+    return await run_operation(request, services.categories.delete_category, data)
 
 
 # Stock
@@ -171,17 +160,17 @@ async def stock_summary(request):
 
 @bind(router, "inventory.stock.receive", "/inventory/stock/receive")
 async def stock_receive(request, data: ReceiveIn):
-    return await run_operation(request, services.receive_stock, data)
+    return await run_operation(request, services.stock.receive_stock, data)
 
 
 @bind(router, "inventory.stock.count", "/inventory/stock/count")
 async def stock_count(request, data: CountIn):
-    return await run_operation(request, services.count_stock, data)
+    return await run_operation(request, services.stock.count_stock, data)
 
 
 @bind(router, "inventory.stock.write_off", "/inventory/stock/write_off")
 async def stock_write_off(request, data: WriteOffIn):
-    return await run_operation(request, services.write_off_stock, data)
+    return await run_operation(request, services.stock.write_off_stock, data)
 
 
 # Units and settings
@@ -199,7 +188,7 @@ async def config_get(request):
 
 @bind(router, "inventory.config.update", "/inventory/config")
 async def config_update(request, data: ConfigPatchIn):
-    return await run_operation(request, services.update_config, data)
+    return await run_operation(request, services.settings.update_config, data)
 
 
 # The product's image (base.images)
@@ -207,13 +196,13 @@ async def config_update(request, data: ConfigPatchIn):
 
 @bind(router, "inventory.product.set_image", "/inventory/products/image")
 async def product_image_set(request, data: ProductImageIn):
-    return await run_operation(request, services.set_image, data)
+    return await run_operation(request, services.product_images.set_image, data)
 
 
 @bind(router, "inventory.product.upload_image", "/inventory/products/image/upload")
 @decorate_view(accept_body_up_to(MAX_PHOTO_BODY))
 async def product_image_upload(request, data: ProductImageUploadIn):
-    return await run_operation(request, services.upload_image, data)
+    return await run_operation(request, services.product_images.upload_image, data)
 
 
 @bind(router, "inventory.product.suggest_image", "/inventory/products/image/suggest")

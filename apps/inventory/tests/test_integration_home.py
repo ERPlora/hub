@@ -15,7 +15,8 @@ from live.live_registry import live_registry
 from live.operations import get
 from live.outbox import channel_for
 
-from apps.inventory.schemas import ProductIn, ProductPatchIn, ProductRefIn
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.products import ProductIn, ProductPatchIn
 from apps.inventory.tests.conftest import A, B, HOST, HUB_DB, HUB_DB_COMMITTED, ctx_for, ctx_with
 from apps.tax.models import TaxCategory
 from base.schemas.home import SetupStatusIn, WidgetListIn

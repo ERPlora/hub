@@ -8,15 +8,16 @@ The worker's data pass (``base.worker_data._data``), under the row's lease, take
    then its files, that business's prefix in the store and no other (``base.files.delete_hub_files``);
 3. ``purged``: ``base.hub.purge``, in one transaction of control, leaves the row as a tombstone.
 
-**A business with fiscal documents is not dropped.** Its fiscal records and invoices must be kept for 6 years
-(Código de Comercio, art. 30): every app that keeps such documents answers ``fiscal_documents_kept()`` on its
-``LiveAppConfig``, and with any of them (asked before the copy and again after it: the worker still serves the business
-meanwhile) the business stays ``cancelled`` with its database and is looked at again the next day. An app that cannot
-be read keeps the database too: only an app without tables there has nothing to say. Before it stays, its documents go
-to the fiscal archive (``base.tenancy.fiscal_archive``) once, its row saying how that stands: ``fiscal_archive_missing``
-(no archive named), ``fiscal_archive_waiting`` (a record the tax authority has not answered yet),
-``fiscal_archive_failed`` (tried again the next day) or ``fiscal_archived``, with ``fiscal_archived_at``. Its database
-stays all the same: dropping an archived business is a step of its own, not taken yet.
+**A business with fiscal documents is dropped only once they are archived.** Its fiscal records and invoices must be
+kept for 6 years (Código de Comercio, art. 30): every app that keeps such documents answers ``fiscal_documents_kept()``
+on its ``LiveAppConfig``, asked before the copy and again after it (the worker still serves the business meanwhile).
+With any of them, the documents go to the fiscal archive (``base.tenancy.fiscal_archive``) after the final copy, so
+that what was written while the copy was made is in it too, and its row notes ``fiscal_archived_at``; only then is the
+database dropped. While that cannot be, the business stays ``cancelled`` with its database, looked at again the next
+day, its row saying why: ``fiscal_archive_missing`` (no archive named), ``fiscal_archive_waiting`` (a record the tax
+authority has not answered yet) or ``fiscal_archive_failed`` (the archive could not be written whole and verified).
+An app that cannot be read keeps the database too: only an app without tables there has nothing to say. A final copy
+is made again when the one there is older than a day: the bucket keeps each 90 days from when it was made.
 
 Each step is safe to run again: a copy kept is not made twice, a database or a file already gone is no failure. Whatever
 fails leaves it in its status with ``attempts``, ``last_error`` and ``next_attempt_at`` (1 min, 5 min, 15 min, then every
@@ -79,26 +80,35 @@ def _own_database(hub: Hub) -> None:
         )
 
 
-def _held(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) -> bool:
-    """Whether ``hub`` keeps fiscal documents, archived first if they can be, and how that stands noted on its row."""
+def _held(hub: Hub, now: dt.datetime, why: Callable[[list[str]], str | None]) -> bool:
+    """Whether ``hub`` keeps fiscal documents that cannot go yet, by what ``why`` says of the apps that keep them: if so,
+    it stays, and that is noted on its row."""
     kept = fiscal_documents_kept(hub)
-    if kept:
-        why = _archived(hub, kept, cancelled)
-        services.offboarding.offboarding_held(hub.pk, now, why)
-        logger.info("base.tenancy.offboarding.held hub=%s %s: its database stays.", hub.slug, why)
-    return bool(kept)
+    reason = why(kept) if kept else None
+    if reason:
+        services.offboarding.offboarding_held(hub.pk, now, reason)
+        logger.info("base.tenancy.offboarding.held hub=%s %s: its database stays.", hub.slug, reason)
+    return bool(reason)
 
 
-def _archived(hub: Hub, kept: list[str], cancelled: Callable[[], bool] | None) -> str:
-    """How the fiscal archive of ``hub``'s documents (those of ``kept``) stands, written now if it can be."""
-    apps = ", ".join(kept)
-    if services.offboarding.fiscal_archive_kept(hub):
-        return f"fiscal_archived: {apps}"
+def _not_archivable(hub: Hub, kept: list[str]) -> str | None:
+    """What keeps the fiscal documents of ``kept`` in ``hub``'s database out of the archive now, if anything."""
     if not fiscal_archive.configured():
-        return f"fiscal_archive_missing: {apps}"
+        return f"fiscal_archive_missing: {', '.join(kept)}"
     waiting = fiscal_archive.waiting(hub, kept)
     if waiting:
         return f"fiscal_archive_waiting: {', '.join(waiting)}"
+    return None
+
+
+def _not_archived(hub: Hub, kept: list[str], copy: HubDump, cancelled: Callable[[], bool] | None) -> str | None:
+    """Why the fiscal documents of ``kept`` are not in an archive made after ``copy``, written now if it can be; ``None``
+    once they are."""
+    blocked = _not_archivable(hub, kept)
+    if blocked:
+        return blocked
+    if services.offboarding.fiscal_archive_covers(hub, copy):
+        return None
     try:
         made_at = fiscal_archive.write(
             hub,
@@ -111,26 +121,32 @@ def _archived(hub: Hub, kept: list[str], cancelled: Callable[[], bool] | None) -
         logger.warning("base.tenancy.offboarding.fiscal_archive_failed hub=%s: %s", hub.slug, failed)
         return f"fiscal_archive_failed: {failed}"
     services.offboarding.fiscal_archive_written(hub.pk, made_at)
-    return f"fiscal_archived: {apps}"
+    logger.info("base.tenancy.offboarding.fiscal_archived hub=%s apps=%s", hub.slug, ",".join(kept))
+    return None
+
+
+def _ready_to_drop(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) -> bool:
+    """Whether ``hub``'s database can go: its final copy is fresh and its fiscal documents, if any, are archived after
+    it. If not, nothing goes: it is kept, or left as it is for its next attempt."""
+    if _held(hub, now, lambda kept: _not_archivable(hub, kept)):
+        return False
+    hub = services.offboarding.offboarding_archiving(hub.pk, now, provision.LEASE)
+    if hub is None:
+        return False
+    copy = services.offboarding.final_copy(hub, now) or dumps.dump_hub(
+        hub,
+        kind=HubDump.Kind.OFFBOARDING,
+        heartbeat=lambda: services.reset.renew_lease(hub.pk, provision.LEASE),
+        cancelled=cancelled,
+    )
+    return not _held(hub, now, lambda kept: _not_archived(hub, kept, copy, cancelled))
 
 
 def _retire(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) -> None:
     if hub.db_name:
         _own_database(hub)
     if hub.status != Hub.Status.DROPPING and hub.db_name and registry.database_is_made(hub):
-        if _held(hub, now, cancelled):
-            return
-        hub = services.offboarding.offboarding_archiving(hub.pk, now, provision.LEASE)
-        if hub is None:
-            return
-        if not services.offboarding.final_copy_kept(hub):
-            dumps.dump_hub(
-                hub,
-                kind=HubDump.Kind.OFFBOARDING,
-                heartbeat=lambda: services.reset.renew_lease(hub.pk, provision.LEASE),
-                cancelled=cancelled,
-            )
-        if _held(hub, now, cancelled):
+        if not _ready_to_drop(hub, now, cancelled):
             return
     dropping = services.offboarding.offboarding_dropping(hub.pk, now, provision.LEASE)
     if dropping is None:

@@ -259,6 +259,7 @@
         "receipt_copies": "Receipt copies"
       },
       "automatic": "The first active one of this role",
+      "receiptPerDevice": "From a device with its own receipt printer, the receipt comes out of its own.",
       "receiptText": "The receipt header and footer are part of your till settings, where the ticket is printed from.",
       "receiptLink": "Open the receipt settings",
       "save": "Save settings",
@@ -268,6 +269,12 @@
       "loadError": "Could not load the settings.",
       "loadErrorBody": "Try again in a moment.",
       "noPermission": "You do not have permission to change these settings."
+    },
+    "deviceErrors": {
+      "unreachable": "The printer does not answer. Check that it is on and connected.",
+      "bluetoothPermission": "ERPlora is not allowed to use Bluetooth. Allow “Nearby devices” in the device's settings.",
+      "invalidAddress": "The printer's address is not valid. Correct it by editing the printer.",
+      "updateApp": "This device could not prepare the document. Update the ERPlora app."
     },
     "host": {
       "drawerFailed": "The cash drawer did not open: check that “{printer}” is on and connected.",

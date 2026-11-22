@@ -16,7 +16,9 @@ from live.operations import operation
 from apps.inventory.queries.categories import _categories, _filter_categories
 from apps.inventory.queries.products import _products, filter_products
 from apps.inventory.queries.settings import current_settings
-from apps.inventory.schemas import CategoryFiltersIn, ExportOut, ProductFiltersIn
+from apps.inventory.schemas.categories import CategoryFiltersIn
+from apps.inventory.schemas.exports import ExportOut
+from apps.inventory.schemas.products import ProductFiltersIn
 from base import allergens
 from base import operations as platform
 from base.business import money_text
@@ -44,7 +46,7 @@ CSV_CONTENT_TYPE = "text/csv"
 # Excel reads a CSV as UTF-8 only with it.
 BOM = "\ufeff"
 #: What a spreadsheet runs as a formula at the start of a cell (=HYPERLINK, @SUM…): a text cell that
-#: starts so gets an apostrophe in front, which the import takes back (services.EXPORT_GUARD).
+#: starts so gets an apostrophe in front, which the import takes back (services.imports.EXPORT_GUARD).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 

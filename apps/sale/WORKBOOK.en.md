@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:875650a9b6582bed1f73c8fdd0f896e41d98a9ea8dba7cd59204cf51058142c2 -->
+<!-- generated from WORKBOOK.md sha256:b679f835a0d710d3c503924fb7a590f7b342eeb123ed7fac606e07ed6f09c654 -->
 
 ## What it is for and who it is for
 
@@ -134,13 +134,13 @@ or with the phone's back button. Two areas:
   number, and "Close" on a phone; the editable title ("New check") and the chips for the customer,
   "Served by …" and "Customer required". Each line: name, unit price, discount mark or "Comp", note and
   professional underneath; buttons for discount, note, comp and the quantity selector (a line sent to the
-  kitchen only shows its quantity, "Order N" and the ⊗ button "Void this item"; one paid with a voucher,
-  "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket discount" row
-  if there is one, "Total", the discount button, the printer ("Print bill") and "Charge · <amount>". In
-  the phone's drawer, the top bar and the footer with "Charge" always stay in view, above the tab bar,
-  and what is in between (title, chips, tabs and lines) scrolls. The customer button's name takes two
-  lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its icon and
-  the customer chip in the heading already names them.
+  kitchen only shows its quantity, "Order N", the gift and the ⊗ button "Void this item"; one paid with a
+  voucher, "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket
+  discount" row if there is one, "Total", the discount button, the printer ("Print bill") and "Charge ·
+  <amount>". In the phone's drawer, the top bar and the footer with "Charge" always stay in view, above
+  the tab bar, and what is in between (title, chips, tabs and lines) scrolls. The customer button's name
+  takes two lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its
+  icon and the customer chip in the heading already names them.
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
@@ -311,6 +311,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 | SALE-F40 | See a dish's allergens when ordering it | common | done |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | done |
+| SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | not done |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -386,8 +387,9 @@ Actor: employee, manager
 Screen: Charge
 Steps:
 1. In the **Charge** sheet, press "Split the payment". "Remaining" appears at the top.
-2. Choose a method, enter the "Amount for this payment" (in cash, what is tendered) and press "Add this
-   payment". With no amount entered, the payment covers all that is left.
+2. Choose a method: the "Amount for this payment" (in cash, "Tendered") already shows all that is left.
+   To charge only part of it, or if more cash is handed over, type another amount, which replaces the one
+   shown. Press "Add this payment".
 3. The payments taken show in "Payments taken"; the ✕ removes one.
 4. When the remainder reaches 0, press "Charge €18.50".
 In: the payment methods and what the customer hands over.
@@ -513,16 +515,22 @@ Steps:
 1. With "Turn on the cash register" on in Cash register and no open cash session, charge in cash (also
    a split payment with a part in cash).
 2. The **Charge** sheet charges nothing and says "The cash register is closed: open a cash session to
-   charge in cash."; to whoever can open it, it offers "Open a cash session", which leads to **Cash
-   register**. The **Sell** screen does not change: the check is still there.
-3. With the session open, go back to **Sell** and charge. By card, Bizum or bank transfer it always
-   charges, with the cash register open or closed.
+   charge in cash."; to whoever can open it, it offers "Open a cash session", which opens **Cash
+   register**'s opening window over the charge, with "Drawer", "Opening float" and "Notes".
+   The **Sell** screen does not change: the check is still there.
+3. Tap "Open session": the window closes, "Session opened" shows and the charge goes on as it was, now
+   without the notice; "Charge" charges in cash. By card, Bizum or bank transfer it always charges, with
+   the cash register open or closed.
 In: whether the cash register is turned on and whether there is an open session, which Sales asks Cash
 register (`cash_register.session.current`) with the session of whoever charges, only when there is cash.
 Out: nothing of its own; the refused charge does not use up a number.
 If it fails: if Cash register is not active in the business or does not answer, the sale is charged just
-the same, so as not to stop the sales, and Cash register shows that charge among the ones in no shift.
-Involved: CASH_REGISTER-F04, CASH_REGISTER-F17
+the same, so as not to stop the sales, and Cash register shows that charge among the ones in no shift. The
+opening window gives the same notices as in Cash register: a required float, a session already open on
+another device, an unreadable amount; "Cancel" closes it and the charge keeps its notice.
+If the window cannot load, "Open a cash session" takes you to **Cash register** to open it there, and the
+check stays in **Sell**.
+Involved: CASH_REGISTER-F03, CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Sell at an open price by section
 Status: done
@@ -634,7 +642,7 @@ is sold out."…). A half-made menu does not go into the check, not through the 
 reaches the kitchen without its dishes. A quantity with decimals: "The quantity does not fit the step of the
 product (1 ud).". If the menus cannot be read, above the grid "The menus could not be read. Try again." with
 "Retry", and the products sell just the same. Without Menus and combos active, the POS offers no menus.
-Involved: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22
+Involved: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22, SALE-F42
 
 ### SALE-F13 Put a note on a line
 Status: done
@@ -695,20 +703,22 @@ Vertical: common
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. On the line, tap the gift ("Comp / un-comp line").
-2. The line goes to 0 with the "Comp" mark; tapping it again charges it again.
+1. On the line, tap the gift ("Comp / un-comp line"). Also on a line already sent to the kitchen,
+   because what is comped is usually what was already served: the dessert on the house or the dish
+   that came out wrong.
+2. The line goes to 0 with the "Comp" mark; tapping it again charges it again. A sent line stays on the
+   check with its order, and the kitchen gets nothing new.
 In: nothing from other apps.
 Out: the comped line: it adds no money or VAT, but the sale notice carries it so that Inventory lowers
 the stock; the sale keeps the cost of what was comped.
-If it fails: "That change to the line could not be saved. The line is back as it was.". A line already
-sent to the kitchen cannot be comped.
+If it fails: "That change to the line could not be saved. The line is back as it was.".
 Involved: INVENTORY-F21
 
 ### SALE-F16 Attribute the check or a line to whoever serves
 Status: done
 Vertical: common
-Actor: employee, manager
-Screen: Sell
+Actor: employee, manager, assistant
+Screen: Sell; assistant
 Steps:
 1. In the check's header, the "Served by me" chip says who it is attributed to. Tap it.
 2. In "Who is serving this check", choose the person from the Staff team or "Me (whoever is signed in)".
@@ -716,16 +726,25 @@ Steps:
    Staff: left on «Me», this sale counts for nobody."
 3. The lines added from then on are stamped with that person. To correct a line already in, tap the
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
+   A line that arrives with its professional (an appointment's, one of a check built on another device or
+   before a reload) also shows their name, the one Staff gives.
 4. Charge. With the chip on "Me", the sale is attributed to your Staff record; a line with its own
    professional (an appointment's, the one you moved) keeps them. Afterwards, the chip goes back to "me".
-In: the Staff team (active records) and the record of whoever is signed in.
+5. With the assistant: "Lucía is serving table 6's check". It stays saved on the check until it is charged,
+   also on the new check if it is split: the kitchen order sent carries their name and the sale
+   is theirs, whoever charges it; the lines already in keep whoever they had.
+In: the Staff team (active records), the record of whoever is signed in and the name of each line's
+person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
 sends it.
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
-the kitchen is not reassigned.
+the kitchen is not reassigned. With the assistant, someone not on the team: "That staff member does not
+exist in this business."; without Staff active: "Staff is not active in this business.". If Staff cannot
+say whose a line is (off, no permission or a record that is gone), the line says "the assigned
+professional".
 Involved: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Park a check and retrieve it
@@ -822,7 +841,8 @@ Steps:
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad can be tapped from the first moment. If the send fails, the
    charge does not open and it says why.
-4. A sent line is locked: no quantity, no note, no discount, no comp.
+4. A sent line is locked: no quantity, no note, no discount. It can still be comped with its gift: it
+   stays on the check at 0 and the kitchen gets nothing new.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «Croquettes»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to
    approve it.", the one-tap reasons ("Ordered by mistake", "Customer changed their mind", "Sold out",
@@ -889,15 +909,21 @@ Screen: Sell
 Steps:
 1. With two or more lines, tap the lines this person pays for (the line, not its buttons): they are
    marked with a circle.
-2. Press "Charge": the sheet says "Paying 2 lines of €12.00" and charges only those.
-3. After charging, the **Sale document** of that charge opens and, behind it, the check stays open with
+2. With lines marked, the button at the foot says what it will charge: "Charge 1 line · €1.80" or
+   "Charge 2 lines · €7.00", with what the server works out for those lines, the same amount the sheet
+   will charge; while it arrives, a dash. The "Total" row stays the whole check's. With nothing marked,
+   the button goes back to "Charge · €12.00".
+3. Press "Charge": the sheet says "Paying 2 lines of €12.00" and charges only those.
+4. After charging, the **Sale document** of that charge opens and, behind it, the check stays open with
    what is left; what was charged does not show again. Charging the last pending line closes the check.
    The lines charged are those marked when the sheet opened, even if another one is marked later.
 In: the marked lines.
 Out: a sale with those lines (announces: sale charged); the lines are left tied to their sale. The
 check's % discount applies to each charge; the fixed-amount one, only to the one that closes it.
-If it fails: the same refusals as a normal charge, also that of the check that changed while it was
-being charged: the sheet charges what it showed when it opened, never what came later. If, with the sheet
+If it fails: if the server cannot work out what is marked, the foot says so in its words and the button
+shows a dash, never the whole check's total. When charging, the same refusals as a normal charge, also
+that of the check that changed while it was being charged: the sheet charges what it showed when it
+opened, never what came later. If, with the sheet
 open, another device closes the check, the screen lets it go on closing the sheet and warns; a check that
 no longer exists does not stay on screen.
 Involved: TABLE-F33
@@ -1423,6 +1449,46 @@ Through the assistant: "the burger on table 4 is for someone allergic to gluten"
 the confirmation card, which says the check, the dish and the allergens by their name.
 Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
+### SALE-F42 Choose the modifiers of a dish in a menu
+Status: not done — the menu sheet does not ask yet for the modifiers of each dish, Menus does not add them to the
+amount and the kitchen order does not carry them (hub#2019)
+Vertical: restaurant
+Actor: employee, manager
+Screen: Sell
+Steps:
+1. With Menus and combos and Modifiers active, open a menu in the POS (SALE-F12) and choose a dish that has modifier
+   groups, its own or its category's, the same ones it asks for when sold on its own (the entrecôte with "Meat
+   doneness"): its groups open right there, under the dish, with the rules, the extra charges with their sign, the
+   allergens and the default options of the sheet of an article on its own (SALE-F11). A dish without groups is
+   chosen as always.
+2. Choose the options. Removing the dish, or changing it for another in a single-choice course, removes its
+   options. A choice that is repeated (two coffees) carries the same options each time.
+3. While a required group of a chosen dish is not complete, the button says what is missing ("Choose 1 in «Meat
+   doneness»") and tapping it points to that group. With everything complete, "Add · <total>" adds to the set price
+   the menu's extra charges and those of the chosen options.
+4. Press it: the menu goes into the check with each dish and, under it, its options.
+5. Send to the kitchen: each dish carries its options under it, on the screen and on paper, like a dish on its own
+   (COMBO-F11, MODIFIER-F08). Charge as always: the ticket names the options under their dish and the menu charges
+   what it was worth when ordered, options included, even if they change or are deleted later.
+In: the groups and options of the product of each chosen dish, from Modifiers (MODIFIER-F06). Modifiers checks and
+prices the options of each dish (MODIFIER-F07) and Menus adds them to the menu's amount when the line is added and
+again when charging, with the amount ordered (COMBO-F08).
+Out: the menu line with the options of each dish, their kitchen text and their allergens, frozen when ordered
+(announces: check changed). "Eat in", the menu stays on one line at the menu's VAT, with the options inside (art.
+91.Uno.2.2º LIVA), an option with another tax category too. "Take away", each option takes part in the menu's
+split (COMBO-F09): one without a tax category of its own, or with its dish's, goes with it, and the dish's weight is
+its catalog price plus that of those options; one with another tax category goes to its own take-away category,
+weighs its catalog price and shows on its own line with its rate under its dish, as on a dish on its own
+(MODIFIER-F07). If with the options everything goes to the same category, the menu stays on one line. The options do
+not move stock (COMBO-F10).
+If it fails: Modifiers' reasons show inside the sheet, under the dish they refer to ("Choose at least 1 in «Meat
+doneness»."…), and a menu with a required group left unchosen does not go into the check, not through the assistant
+or the API either, so it never reaches the kitchen without the meat doneness. If a dish's groups cannot be read, the
+sheet says so under that dish with "Retry" and the menu cannot be added. Without Modifiers active, the dishes are
+chosen without options, as today.
+Involved: SALE-F11, SALE-F12, SALE-F40, COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, MODIFIER-F06,
+MODIFIER-F07, MODIFIER-F08
+
 ## What the verticals share
 
 | Shared piece | Flows that use it |
@@ -1492,6 +1558,7 @@ the quick notes and what is refundable can be followed live.
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
 | Changes a line's quantity, comp or note | build the check | F01, F10, F13, F15 | `sale.order.update_line` |
 | Changes whose line it is | build the check | F16 | `sale.order.set_line_staff` |
+| Says who serves an open check (or "me"): the kitchen order carries their name and the sale is theirs | build the check | F16 | `sale.order.set_staff` |
 | Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |
@@ -1547,8 +1614,9 @@ the quick notes and what is refundable can be followed live.
   check with its customer is kept by Customers (`customer.order.link`).
 - **Inventory** (optional): the sale catalog, the price, the unit and the tax category of each article,
   read with its own queries when the line is added.
-- **Staff** (optional): the team for the "Served by" chip and the record of whoever is signed in
-  (`staff.member.current`, without Staff's permission), to which the charge attributes "Me".
+- **Staff** (optional): the team for the "Served by" chip, the record of whoever is signed in
+  (`staff.member.current`, without Staff's permission), to which the charge attributes "Me", and the name
+  of the person of a line not chosen on that screen (`staff.member.detail`).
 - **Services** (optional): its services on offer (`service.service.list_for_sale`, and
   `service.service.get` when the line is added and while the notice of a refused one lasts), the client's
   vouchers for a service

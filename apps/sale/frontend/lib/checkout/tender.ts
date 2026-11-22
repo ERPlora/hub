@@ -67,6 +67,12 @@ export function planLeg(
   return { amount, tendered: needsTendered(method) && typed > amount ? typed : amount };
 }
 
+/** What the row over the keypad shows: what was typed, or, in a split with nothing typed, all that is left,
+ *  which is what «Add this payment» takes then. Typing replaces it, because the keypad itself holds nothing. */
+export function keypadAmount(typed: number, remaining: number, splitting: boolean): number {
+  return splitting && typed === 0 ? remaining : typed;
+}
+
 /** The change of the legs: it comes out of cash only and is never shared out. */
 export function changeDue(legs: readonly Leg[]): number {
   return legs.reduce((sum, leg) => sum + (needsTendered(leg.method) ? Math.max(0, leg.tendered - leg.amount) : 0), 0);

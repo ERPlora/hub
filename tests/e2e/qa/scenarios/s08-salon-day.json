@@ -116,7 +116,6 @@
   },
   "attachments": [],
   "opening": "Hola, te pego los servicios nuevos: Barba, 12 €, 20 min. Corte y barba, 22 €, 45 min. Alisado de keratina, 90 €. Dalos de alta",
-  "offered": ["service.service.create"],
   "writes": [
     "service.service.create",
     "service.service.bulk_create",

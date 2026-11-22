@@ -48,8 +48,10 @@ test('«Import CSV» creates the good rows of a spreadsheet\'s file and reports 
   );
   await shown(page).locator('[data-testid=customer-import] ~ input[type=file]').setInputFiles(csv);
   const report = shown(page).locator('[data-testid=customer-import-report]');
-  await expect(report.locator('[data-testid=customer-import-summary]')).toHaveText(/3 rows — 2 created, 1 skipped|3 filas — 2 creadas, 1 omitidas/);
-  await expect(report.locator('[data-testid=customer-import-skipped] li')).toHaveText([/^(Row|Fila) 3: /]);
+  await expect(report.locator('[data-testid=customer-import-summary]')).toHaveText(/^(Import: 3 rows — 2 created, 1 skipped\.|Importación: 3 filas — 2 creadas, 1 omitida\.)$/);
+  await expect(report.locator('[data-testid=customer-import-skipped] li')).toHaveText([
+    /^(Row 3: Name: This field is required\.|Fila 3: Nombre: Este campo es obligatorio\.)$/,
+  ]);
   await expect(report.locator('[data-testid=customer-import-warnings] li')).toHaveText([/^(Row|Fila) 4: /]);
   await page.screenshot({ path: shot('customer-import-report') });
 
