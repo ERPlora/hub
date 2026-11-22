@@ -5,18 +5,20 @@ import datetime as dt
 from django.db.models import Count as CountOf
 from django.db.models import Exists, OuterRef, Q, Sum
 from django.db.models.functions import Coalesce
+from live.context import OperationContext
 
 from apps.cash_register.models import Movement, Session, Settings
 from apps.cash_register.queries.auto_close import auto_close_due_at
 from apps.cash_register.queries.lines import CASH, Line, _between, sale_lines
+from apps.cash_register.queries.ownership import SESSIONS
 from apps.sale.models import RefundPayment, Sale, SalePayment
 
 Window = tuple[dt.datetime, dt.datetime | None]
 
 
-def open_session_now() -> Session | None:
+def open_session_now(ctx: OperationContext) -> Session | None:
     return (
-        Session.objects.select_related("register")
+        SESSIONS.visible(ctx).select_related("register")
         .filter(status=Session.Status.OPEN)
         .first()
     )
@@ -52,8 +54,8 @@ def unassigned_window(
     return (latest.opened_at, None) if latest else None
 
 
-def unassigned_lines(settings: Settings, now: dt.datetime) -> list[Line]:
-    window = unassigned_window(open_session_now(), settings, now)
+def unassigned_lines(ctx: OperationContext, settings: Settings, now: dt.datetime) -> list[Line]:
+    window = unassigned_window(open_session_now(ctx), settings, now)
     return sale_lines(*window) if window else []
 
 

@@ -22,6 +22,7 @@ from . import (
     auto_close as auto_close,
     figures as figures,
     lines as lines,
+    ownership as ownership,
     people as people,
     unassigned as unassigned,
 )

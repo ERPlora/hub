@@ -10,11 +10,12 @@ def visible_lines(hidden: bool, lines: list[Line]) -> list[Line]:
     return [line for line in lines if line.type in Movement.MANUAL] if hidden else lines
 
 
-def figures(session: Session, lines: list[Line], *, hidden: bool) -> dict:
+def figures(session: Session, lines: list[Line], *, hidden: bool, costs: bool) -> dict:
     """The summary of a session (the X/Z report): totals by type and tender, expected, counted, difference.
 
     Hidden (a blind count, an open session, a reader without `view_expected_totals`): no total that adds
-    up to the expected — only the float, and the lines written by hand counted."""
+    up to the expected — only the float, and the lines written by hand counted. Without ``costs`` (a reader who
+    does not see the costs), no total of what the comps cost: the paper, which prints these, leaves it out too."""
     # A tender charged and voided in this session cancels out (both stay listed); a void of an earlier one is a refund.
     voids = {line.sale_payment_id for line in lines if line.type == "void"}
     voided_here = voids & {line.sale_payment_id for line in lines if line.type == "sale"}
@@ -60,7 +61,7 @@ def figures(session: Session, lines: list[Line], *, hidden: bool) -> dict:
         "total_refunds": total([line for line in counted if line.type in ("refund", "void")]),
         "total_cash_in": total([line for line in lines if line.type == "in"]),
         "total_cash_out": total([line for line in lines if line.type == "out"]),
-        "total_gifts": sum(line.gift_total for line in sales),
+        "total_gifts": sum(line.gift_total for line in sales) if costs else None,
         "expected_cash": expected,
         "counted": session.closing_balance,
         "difference": session.difference,

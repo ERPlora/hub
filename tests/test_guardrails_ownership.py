@@ -64,6 +64,11 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         PART_OF_THE_WORK,
         "How many sale tenders and comps of a time window no register session copied, counted for the drawer.",
     ),
+    ("apps/cash_register/queries/unassigned.py", "unassigned_window"): (
+        PART_OF_THE_WORK,
+        "Where the sale lines that fell in no shift start: when the last closed session opened and closed, whoever's "
+        "it was, never shown.",
+    ),
     ("apps/table/queries/__init__.py", "sessions_now"): (
         PART_OF_THE_WORK,
         "What the check of each table of the room charged, to say whether it is paid.",
@@ -280,6 +285,7 @@ def test_the_declarations_are_found():
     assert (found["Sale"], found["VoucherSession"]) == ("sale", "sale")
     assert found["Invoice"] == "invoice"
     assert (found["Appointment"], found["Recurring"]) == ("appointment", "appointment")
+    assert found["Session"] == "cash_register"
 
 
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():

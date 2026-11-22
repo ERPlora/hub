@@ -85,7 +85,7 @@ def shift_review(ctx: OperationContext) -> dict:
     },
 )
 def closing_summary(ctx: OperationContext, params: ClosingSummaryIn) -> dict:
-    session = session_to_close(params.session_id, params.session)
+    session = session_to_close(ctx, params.session_id, params.session)
     settings = current_settings()
     require_count(params.closing_balance, settings)
     hidden = hides_expected(ctx, session, settings)

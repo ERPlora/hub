@@ -45,7 +45,7 @@ def count_row(count: Count) -> dict:
     },
 )
 def list_counts(ctx: OperationContext, params: CountListIn) -> dict:
-    session = find_session(params.session_id, params.session)
+    session = find_session(ctx, params.session_id, params.session)
     counts = Count.objects.filter(session=session).order_by(
         *list_order(params.sort, descending=params.dir == "desc")
     )
