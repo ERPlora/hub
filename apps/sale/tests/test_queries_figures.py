@@ -123,7 +123,13 @@ class TestAnEmployeeCountsOnlyHerOwnSales:
 
     def test_also_with_the_business_totals_she_counts_only_hers(self, monkeypatch, people, anas_record):
         grant(monkeypatch, "base", "hub_employee", add=["base.view_business_totals"])
-        assert period(people["ana"][1]) == (1, 150, 0)
+        ana = people["ana"][1]
+        assert period(ana) == (1, 150, 0)
+        # Nor do the totals open the sessions other professionals did outside the till.
+        assert by_staff(ana) == [
+            (str(anas_record), 0, 0, 0, 0, ANAS_SESSION),
+            (str(CARLA), 1, 150, 0, 150, 150),
+        ]
 
     def test_the_home_panels_she_is_offered_read_only_her_sales(self, people, anas_record):
         ana = people["ana"][1]
@@ -152,6 +158,9 @@ class TestWhoCountsTheWholeBusiness:
         # She still opens every sale one by one; her own figures are of the sales she charged: none.
         assert get(marta, "/sale/sales")["total"] == 2
         assert period(marta) == (0, 0, 0)
+        today = get(marta, "/sale/sales/today")
+        assert (today["total"], today["tickets"]) == (0, 0)
+        assert get(marta, "/sale/sales/last_7_days")["rows"][-1]["total"] == 0
         assert by_staff(marta) == []
 
     def test_a_caller_that_is_not_a_person_counts_what_its_permission_opens(self, anas_record):
