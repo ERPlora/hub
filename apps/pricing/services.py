@@ -29,18 +29,9 @@ from apps.inventory.models import Product, fits_unit, increment_of
 from apps.inventory.queries.reads import find_category, find_product, held
 from apps.pricing import events
 from apps.pricing.models import ACTOR_MAX_LENGTH, DiscountRule, PriceItem, PriceList
-from apps.pricing.queries import (
-    ITEM_NOT_FOUND,
-    call_service,
-    find_list,
-    find_rule,
-    item_row,
-    list_row,
-    live_items,
-    load_item,
-    rule_row,
-    snapshot_values,
-)
+from apps.pricing.queries.other_apps import call_service
+from apps.pricing.queries.reads import ITEM_NOT_FOUND, find_list, find_rule, live_items
+from apps.pricing.queries.rows import item_row, list_row, load_item, rule_row, snapshot_values
 from apps.pricing.schemas import (
     DEFAULT_CURRENCY,
     DEFAULT_HAS_GROUP,

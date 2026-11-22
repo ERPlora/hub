@@ -135,7 +135,8 @@ incluido»), **Vigencia** («Siempre», «Desde 1 jul 2026», «Hasta…» o las
 (cuántos tiene) y **Estado** (Activa o Inactiva). Se ordena por Código, Nombre, Divisa, Grupo e Impuesto
 (por defecto, por nombre) y se filtra, con el embudo de la barra, por Código, Nombre y Divisa (por el
 texto que contienen), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido;
-**Inactivas**, o **Todos** para las dos); 50 por página, en lista o en tarjetas.
+**Inactivas**, o **Todos** para las dos); 50 por página, en lista o en tarjetas. En la tarjeta, cada dato lleva su
+nombre delante («Código QA-TERRAZA», «Divisa EUR», «Precios 1»).
 
 - **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (la del negocio),
   **Impuesto** (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
@@ -628,7 +629,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
   Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
@@ -723,8 +724,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   por alto la relación con sus tablas, que no existen (`base/tenancy/deletion.py`). El grupo de clientes es un
   UUID por eso mismo.
 - **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Price
-  list prices». `queries.prices_in_copy` lee con su propio SQL los `PriceItem` de la copia que cuentan allí (de un
-  servicio o de un producto no borrado, como `live_items`) y `queries.prices_not_in_business` deja los que el negocio no
+  list prices». `queries.recovery.prices_in_copy` lee con su propio SQL los `PriceItem` de la copia que cuentan allí (de un
+  servicio o de un producto no borrado, como `live_items`) y `queries.recovery.prices_not_in_business` deja los que el negocio no
   tiene ni por id ni por sitio (tarifa, producto o servicio y `min_quantity`, el índice único); la plataforma los crea
   con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Cada precio va al artículo que hace del de
   la copia: el producto por `inventory.queries.recovery.products_standing_for` (su SKU) y el servicio por

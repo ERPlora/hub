@@ -239,9 +239,25 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await rowOf(page, 'task-projects', projectName).click();
         await expect(projectSheet.locator('[data-testid=task-project-sheet-code]')).toContainText(code);
         await expect(projectSheet.locator('[data-testid=task-project-sheet-tasks-heading]')).toHaveText('Tasks in this project (1)');
-        await projectSheet.locator('[data-testid=task-project-sheet-name] input').fill(renamedProject);
+        const nameInput = projectSheet.locator('[data-testid=task-project-sheet-name] input');
+        await expect(nameInput).toHaveValue(projectName);
+        expect(await nameInput.evaluate((input) => input.scrollWidth - input.clientWidth), 'the whole name is visible').toBeLessThanOrEqual(0);
+        const tops = await Promise.all(
+          ['save', 'toggle', 'delete'].map((id) => projectSheet.locator(`[data-testid=task-project-sheet-${id}]`).evaluate((button) => Math.round(button.getBoundingClientRect().top))),
+        );
+        expect(new Set(tops).size, 'Save, Deactivate and Delete on one row').toBe(1);
+        await nameInput.fill(renamedProject);
         await projectSheet.locator('[data-testid=task-project-sheet-save]').click();
-        await expect(projectSheet.locator('[data-testid=task-project-sheet-title]')).toContainText(renamedProject);
+        const title = projectSheet.locator('[data-testid=task-project-sheet-title]');
+        await expect(title).toContainText(renamedProject);
+        const titleFits = await title.evaluate((name) => {
+          const bar = name.closest('ion-title')?.shadowRoot?.querySelector('.toolbar-title')?.getBoundingClientRect();
+          if (!bar) return false;
+          const style = getComputedStyle(name);
+          const whole = name.scrollWidth <= name.clientWidth || (style.textOverflow === 'ellipsis' && style.overflowX === 'hidden');
+          return name.getBoundingClientRect().right <= Math.ceil(bar.right) && whole;
+        });
+        expect(titleFits, 'the title is whole or ends in «…» inside its bar').toBe(true);
         await projectSheet.locator('[data-testid=task-project-sheet-toggle]').click();
         await expect(projectSheet.locator('[data-testid=task-project-sheet-state]')).toHaveText('Inactive');
         await projectSheet.locator('[data-testid=task-project-sheet-new-task] input').fill(label('Paint the door'));

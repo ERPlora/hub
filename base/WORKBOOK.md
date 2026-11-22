@@ -2028,7 +2028,8 @@ Pasos:
      «Descargar» y «Cerrar».
   2. Enseña imágenes (enteras en el visor, nunca más grandes que el original, con «Ampliar» y «Reducir»), PDF (las
      primeras 30 páginas; si es más largo, «Mostrando las primeras {shown} de {total} páginas. Descarga el archivo
-     para leerlo entero.»), texto, registros y código, CSV y TSV como tabla, audio y vídeo. De un texto muy largo,
+     para leerlo entero.»), texto, registros y código, CSV y TSV como tabla (un CSV con sus columnas, vaya separado
+     por comas o por punto y coma, como lo guarda Excel en español), audio y vídeo. De un texto muy largo,
      «Mostrando el principio del archivo. Descárgalo para leerlo entero.»; de una tabla de más de 500 filas,
      «Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.».
   3. Un archivo de datos (.json) se ve como un árbol que se pliega y se despliega por partes, como el visor de JSON de
