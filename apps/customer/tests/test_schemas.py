@@ -4,8 +4,10 @@ Every field carries a description: the schemas are the JSON Schema of the assist
 """
 
 import inspect
+import pkgutil
 import uuid
 from datetime import date
+from importlib import import_module
 
 import pydantic
 import pytest
@@ -13,27 +15,18 @@ from django.utils import translation
 from ninja import Schema
 
 from apps.customer import schemas
-from apps.customer.schemas import (
-    ActivityIn,
-    ConsentGrantIn,
-    ConsentWithdrawIn,
-    CustomerIn,
-    CustomerListIn,
-    CustomerPatchIn,
-    CustomerRefIn,
-    FieldIn,
-    FieldPatchIn,
-    GroupIn,
-    GroupPatchIn,
-    ImportIn,
-    MergeIn,
-    NoteIn,
-    OrderLinkIn,
-    PageIn,
-    PurchaseRecordIn,
-    SetGroupsIn,
-    TagIn,
-)
+from apps.customer.schemas.activity import ActivityIn, NoteIn
+from apps.customer.schemas.cards import CustomerIn, CustomerListIn, CustomerPatchIn
+from apps.customer.schemas.consent import ConsentGrantIn, ConsentWithdrawIn
+from apps.customer.schemas.custom_fields import FieldIn, FieldPatchIn
+from apps.customer.schemas.fields import CustomerRefIn, PageIn
+from apps.customer.schemas.groups import GroupIn, GroupPatchIn
+from apps.customer.schemas.importing import ImportIn
+from apps.customer.schemas.memberships import SetGroupsIn
+from apps.customer.schemas.merging import MergeIn
+from apps.customer.schemas.orders import OrderLinkIn
+from apps.customer.schemas.purchases import PurchaseRecordIn
+from apps.customer.schemas.tags import TagIn
 
 ID = uuid.uuid7()
 
@@ -56,13 +49,18 @@ def messages(schema, **data):
 
 
 def all_schemas():
-    return [
-        value
-        for value in vars(schemas).values()
-        if inspect.isclass(value)
-        and issubclass(value, Schema)
-        and value.__module__ == schemas.__name__
-    ]
+    """Every schema of the package once. A ``Page[X]`` keeps the module of ``Page`` itself, not the one that names it."""
+    modules = [import_module(f"{schemas.__name__}.{info.name}") for info in pkgutil.iter_modules(schemas.__path__)]
+    return list(
+        dict.fromkeys(
+            value
+            for module in modules
+            for value in vars(module).values()
+            if inspect.isclass(value)
+            and issubclass(value, Schema)
+            and value.__module__.startswith(f"{schemas.__name__}.")
+        )
+    )
 
 
 def test_every_field_of_every_schema_has_a_description():

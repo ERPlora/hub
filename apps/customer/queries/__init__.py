@@ -31,53 +31,27 @@ from apps.customer.models import (
     Purchase,
 )
 from apps.customer.phones import candidates
-from apps.customer.schemas import (
-    ActivityListIn,
-    ActivityPage,
+from apps.customer.schemas.activity import ActivityListIn, ActivityPage
+from apps.customer.schemas.cards import (
     ByPhoneIn,
-    ConsentHistoryIn,
-    ConsentPage,
-    ConsentStateIn,
-    ConsentStateOut,
     CustomerDetailOut,
-    CustomerExportIn,
     CustomerFilters,
     CustomerListIn,
     CustomerPage,
-    CustomerRefIn,
     CustomerStatsIn,
     CustomerStatsOut,
-    DivergencePage,
-    DivergencesIn,
-    ExportOut,
-    FieldListIn,
-    FieldPage,
-    FieldRefIn,
-    FieldRow,
-    FieldValueOfCopyIn,
-    GroupListIn,
-    GroupOfCopyIn,
-    GroupPage,
-    GroupRefIn,
-    GroupRow,
-    HealthDetailIn,
-    HealthOut,
-    OrderCustomerOut,
-    OrderIn,
-    OrderListIn,
-    OrderNamedOut,
-    OrderPage,
-    PageIn,
     PhoneMatchOut,
-    PurchaseListIn,
-    PurchasePage,
-    TagListIn,
-    TagOfCopyIn,
-    TagPage,
-    TagRefIn,
-    TagRow,
 )
-from apps.customer.schemas.exports import CustomerExportRow
+from apps.customer.schemas.consent import ConsentHistoryIn, ConsentPage, ConsentStateIn, ConsentStateOut
+from apps.customer.schemas.custom_fields import FieldListIn, FieldPage, FieldRow
+from apps.customer.schemas.exports import CustomerExportIn, ExportOut, CustomerExportRow
+from apps.customer.schemas.fields import CustomerRefIn, FieldRefIn, GroupRefIn, PageIn, TagRefIn
+from apps.customer.schemas.groups import GroupListIn, GroupPage, GroupRow
+from apps.customer.schemas.health import HealthDetailIn, HealthOut
+from apps.customer.schemas.orders import OrderCustomerOut, OrderIn, OrderListIn, OrderNamedOut, OrderPage
+from apps.customer.schemas.purchases import DivergencePage, DivergencesIn, PurchaseListIn, PurchasePage
+from apps.customer.schemas.recovery import FieldValueOfCopyIn, GroupOfCopyIn, TagOfCopyIn
+from apps.customer.schemas.tags import TagListIn, TagPage, TagRow
 from apps.customer.search import normalize, search_term
 from base import operations as platform
 from base.business import currency_decimals

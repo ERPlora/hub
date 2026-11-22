@@ -10,7 +10,7 @@ from live.errors import InvalidPayload
 
 from apps.customer.models import Customer, CustomField, CustomFieldValue
 from apps.customer.queries import FIELD_UNAVAILABLE
-from apps.customer.schemas import FieldValueIn
+from apps.customer.schemas.cards import FieldValueIn
 from apps.customer.services.writes import lock_rows
 
 FIELD_REQUIRED = _("This field is required.")

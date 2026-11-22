@@ -26,7 +26,7 @@ from live.errors import OperationError
 from live.operations import atomic, get
 
 from apps.customer.models import CustomerGroup
-from apps.customer.schemas import GroupRefIn
+from apps.customer.schemas.fields import GroupRefIn
 from apps.inventory.models import Category
 from apps.inventory.tests import test_concurrency as inventory
 from apps.inventory.tests.test_concurrency import (
