@@ -1,8 +1,8 @@
 """Control's commands: the database clusters the hubs' databases are on.
 
-The Hub admin (``control.admin``) registers, edits, closes and deletes a cluster only through these operations, for
-the platform's admins (staff and superuser, ``platform_admin``) or the platform itself; support only reads. Each runs
-on control (the registry's scope) and records its event in control's outbox in the same transaction.
+The Hub admin (``control.admin_clusters``) registers, edits, closes and deletes a cluster only through these
+operations, for the platform's admins (staff and superuser, ``platform_admin``) or the platform itself; support only
+reads. Each runs on control (the registry's scope) and records its event in control's outbox in the same transaction.
 
 - A cluster with a ``secret_name`` is saved only once its app's secret (``<secret_name>/app``) resolves through
   ``base.tenancy.credentials.credentials_for``: the web, where the admin runs, may read only that one, so the

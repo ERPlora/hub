@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.text import capfirst
 
 from control import admin as control_admin
+from control import admin_recoveries
 from control.models import Cluster, Hub
 from control.tests import test_admin_move
 from control.tests.conftest import events
@@ -618,7 +619,7 @@ def test_the_recovery_speaks_spanish(client, root):
     # And it starts none of the business's automations.
     assert "Lo que vuelve no es nada nuevo para el negocio: no arranca ninguna de sus automatizaciones" in html
     with translation.override("es"):
-        said = control_admin.CopyRecoveryAdmin.result_said(
+        said = admin_recoveries.CopyRecoveryAdmin.result_said(
             {"app": "customer", "restored": 2, "created": 1, "not_created": 1, "reasons": [], "refused": ""}
         )
     assert said == "Clientes: se restauraron 2, se creó 1, 1 sin crear"
@@ -632,7 +633,7 @@ def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appoi
     creados»."""
     from django.utils import translation
 
-    said = control_admin.CopyRecoveryAdmin.result_said
+    said = admin_recoveries.CopyRecoveryAdmin.result_said
     with translation.override("es"):
         assert said({"app": "appointment", "created": 2, "not_created": 1, "reasons": [], "refused": ""}) == (
             "Citas, Citas periódicas: se crearon 2, 1 sin crear"
@@ -650,7 +651,7 @@ def test_each_thing_an_app_gives_back_is_said_in_spanish_by_its_own_name():
     """A result keeps the name of what it counts as the code writes it: Recoveries says it in the reader's language."""
     from django.utils import translation
 
-    said = control_admin.CopyRecoveryAdmin.result_said
+    said = admin_recoveries.CopyRecoveryAdmin.result_said
     nothing = {"restored": 0, "not_created": 0, "reasons": [], "refused": ""}
     with translation.override("es"):
         assert said(nothing | {"app": "service", "label": "Service categories", "created": 1}) == (
@@ -666,7 +667,7 @@ def test_what_a_record_came_back_without_is_said_in_spanish():
     """In words that fit a service as well as a card or an appointment: «1 con notas», never «1 notado»."""
     from django.utils import translation
 
-    said = control_admin.CopyRecoveryAdmin.result_said
+    said = admin_recoveries.CopyRecoveryAdmin.result_said
     nothing = {"restored": 0, "not_created": 0, "reasons": [], "refused": ""}
     note = {"id": str(uuid.uuid7()), "note": "service.member_terminated: …"}
     with translation.override("es"):
@@ -675,7 +676,7 @@ def test_what_a_record_came_back_without_is_said_in_spanish():
         )
         cards = {"app": "customer", "label": "Customers", "restored": 1, "created": 1}
         assert said(nothing | cards | {"noted": 2, "notes": [note]}) == "Clientes: se restauró 1, se creó 1, 2 con notas"
-        assert str(control_admin.CopyRecoveryAdmin.notes.short_description) == "notas"
+        assert str(admin_recoveries.CopyRecoveryAdmin.notes.short_description) == "notas"
 
 
 def test_the_separate_copy_speaks_spanish(client, root):

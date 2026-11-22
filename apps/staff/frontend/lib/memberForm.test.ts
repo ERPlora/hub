@@ -162,6 +162,12 @@ describe('formFromRecord (Edit · {name})', () => {
       notes: '',
     });
   });
+
+  it('a contact detail that comes null (not seen) stays empty, and Save never sends it unless typed', () => {
+    const form = formFromRecord({ ...DETAIL, email: null, phone: null }, PAY, 'en');
+    expect([form.email, form.phone]).toEqual(['', '']);
+    expect(patchPayload('m1', form, form, { pay: true, money: EUR })).toEqual({ id: 'm1' });
+  });
 });
 
 describe('patchPayload (Edit sends only what changed)', () => {
