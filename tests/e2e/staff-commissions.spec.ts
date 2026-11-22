@@ -224,8 +224,10 @@ test('STAFF-F21 (la fila propia): an employee opens Commissions and sees only he
     const bea = await member(owner.context, 'Bea', '10');
     const sku = `${SKU}-OWN`;
     await createProduct(owner.context, { name: 'E2E Own cut', sku, price: 1800, tax_category_key: 'product.generic' });
-    // The owner charges a sale attributed to Bea whose cut Eva did: Eva cannot open it, and it is still hers.
+    // The owner charges a sale attributed to Bea whose cut Eva did (a line's professional wins over the sale's): Eva
+    // cannot open it, and the cut is still hers. And one cut of Bea's own.
     await chargeByApi(owner.context, { lines: [{ product: sku, staff_id: eva.id }], staff_id: bea.id, payments: CARD });
+    await chargeByApi(owner.context, { lines: [{ product: sku }], staff_id: bea.id, payments: CARD });
 
     const hers = await api<{ rows: ReportRow[] }>(employee.context, A, 'GET', '/staff/commissions/report');
     expect(hers.status).toBe(200);
