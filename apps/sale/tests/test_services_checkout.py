@@ -165,6 +165,8 @@ def test_the_sale_event_carries_what_inventory_and_customer_read(catalog, custom
             "tendered": 1000,
             "change": 758,
             "reference": "",
+            "extra": 0,
+            "extra_label": "",
         }
     ]
     coffee, water = payload["items"]

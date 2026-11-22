@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2214d6d0bd5ff08de3ca6b61255083bd2793b07076c6a0578535b18b831f6cdc -->
+<!-- generated from WORKBOOK.md sha256:3891be20d06af9ec50e4ce71a6f4b012f4598d8736effe4f4900ca4fe98a1d33 -->
 
 ## What it is for and who it is for
 
@@ -1387,7 +1387,8 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-Status: not done — the Charge sheet does not paint other apps' steps yet, nor does the sale keep what was charged on top
+Status: not done — the sale already keeps apart, in each payment, what another app adds (through the API and the
+assistant), but the Charge sheet does not paint other apps' steps yet, nor does the Sale document show what was added
 (hub#1497, hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager
@@ -1411,8 +1412,11 @@ charged notice carries it apart; the **Sales** figures (SALE-F28) do not add it.
 (TIP-F02).
 If it fails: if the step's app is turned off with the sheet open, the row goes away and it charges without it.
 If the sale is charged and the step cannot save its own, the sale stays charged and the sheet says the step's
-notice with "Retry" (TIP-F02); the retry uses the same attempt key and never charges twice (SALE-F06). The
-ticket's cap (€3,000) and the cash cap (€1,000) look at the sale's total, as always: the tip is no price.
+notice with "Retry" (TIP-F02); the retry uses the same attempt key and never charges twice (SALE-F06), and that
+same key with another added amount is another charge: "That attempt key was already used for another charge. Open it
+again to charge this one.". An added amount that does not say what it is does not charge: "Say what the amount added
+to this payment is (a tip, for instance).". The ticket's cap (€3,000) and the cash cap (€1,000) look at the sale's
+total, as always: the tip is no price.
 Involved: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 See a dish's allergens when ordering it
@@ -1615,7 +1619,7 @@ the quick notes and what is refundable can be followed live.
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
-| Sale charged | Charge | The sale, its number, check, document, amounts in cents, currency, moment, customer and their fiscal copy, who served, appointment, payments and lines (product or service, quantity, whether it is a service, whether a voucher paid it, amounts) | `sale.sale.completed` |
+| Sale charged | Charge | The sale, its number, check, document, amounts in cents, currency, moment, customer and their fiscal copy, who served, appointment, payments (each with what another app added to it apart, and its name) and lines (product or service, quantity, whether it is a service, whether a voucher paid it, amounts) | `sale.sale.completed` |
 | Sale born from an appointment | Charge a check with an appointment | The sale, the appointment, who served and the total | `sale.sale.created_from_appointment` |
 | Sale voided | Void | The sale, its number, reason, who and when, total, customer, check and document | `sale.sale.voided` |
 | Sale refunded | Refund | The sale, the refund, the amount, the reason, whether it is left fully refunded, the payments and the refunded lines | `sale.sale.refunded` |
