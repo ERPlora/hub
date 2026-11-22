@@ -62,11 +62,17 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true },
   },
   // ── People and permissions ───────────────
-  // Employees, its tab in the hash; a person's page is for whoever runs the business.
+  // Employees, its tab in the hash; a person's page is for whoever runs the business; what a role allows, for anyone.
   {
     path: '/employees',
     name: 'base-employees',
     component: () => import('./pages/EmployeesPage.vue'),
+    meta: { auth: true },
+  },
+  {
+    path: '/employees/roles/:role',
+    name: 'base-role',
+    component: () => import('./pages/RolePage.vue'),
     meta: { auth: true },
   },
   {

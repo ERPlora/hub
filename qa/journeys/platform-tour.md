@@ -19,7 +19,7 @@ Para qué: la pasada por todas las pantallas de la plataforma, en el móvil, la 
 4. BASE-F14 — las pestañas de Apps.
 5. BASE-F48 — las pestañas de Ajustes.
 6. BASE-F120 — en la app del ordenador, «Arrancar al iniciar sesión» se enciende y se apaga; en el navegador no sale.
-7. BASE-F82 — Empleados.
+7. BASE-F82 — Empleados, y «Qué permite» del empleado: en Ventas / TPV, «Anular una venta» con «Con aprobación».
 8. BASE-F39 — las cinco pestañas de Sistema.
 9. BASE-F72 — Archivos.
 10. BASE-F64 — Mi perfil.

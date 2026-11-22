@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8bfd2c46980d819f1ba48e85cd48c3a97a2fdf65a23decb291c56ae6bd06b638 -->
+<!-- generated from WORKBOOK.md sha256:2f0d3f81fab33e5504b94cecb3bc0e9a47a514add07ca66e5d04a3df8fc91007 -->
 
 ## What it is for and who it is for
 
@@ -242,7 +242,11 @@ Employees.
 
 ### Employees · Roles
 The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
-give.
+give. Tapping one opens "What it allows".
+
+### Employees · Roles · What it allows
+A basic role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
+and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
 The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
@@ -325,9 +329,9 @@ On the Employees screens and the API documentation:
 
 | State | What the person sees |
 |---|---|
-| Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; the faces in grey in "An approval is needed"; "Loading the documentation…". |
+| Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; "Loading what this role allows…" in "What it allows"; the faces in grey in "An approval is needed"; "Loading the documentation…". |
 | Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "Nobody has had to approve anything in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
-| Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
+| Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load what this role allows.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
@@ -414,7 +418,7 @@ On the Employees screens and the API documentation:
 | BASE-F79 | Give a person a badge or take it away | done |
 | BASE-F80 | Bring back a person who left the business | done |
 | BASE-F81 | Understand how each person gets in | done |
-| BASE-F82 | See the business's roles | done |
+| BASE-F82 | See the business's roles and what each one allows | done |
 | BASE-F83 | Give a person a role | done |
 | BASE-F84 | Approve with a manager's PIN | done |
 | BASE-F85 | Look up who approved what | done |
@@ -2206,25 +2210,34 @@ Out: nothing saved. It updates by itself when somebody chooses or loses their PI
 If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
-### BASE-F82 See the business's roles
+### BASE-F82 See the business's roles and what each one allows
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
-Screen: Employees · Roles
+Screen: Employees · Roles; Employees · Roles · What it allows
 Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
   2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
-     available", how many people have it and how many permissions it gives. It is always these five, erplora.com's:
-     no app adds roles of its own; each app says what each of them can do in it.
+     available", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
+     each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
+     features call for it.
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
      change any setting, and it takes no place of the plan (BASE-F77).
-  4. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
-In: the roles and the people of the business.
+  4. Tapping a role opens "What it allows", with the role's name at the top, "What this role lets a person do in this
+     business, app by app. It is given on erplora.com and is not changed here." and "People with this role: 2".
+     Below, a panel per app: "The business" first, then each app that is on by its name and "Sensitive data" last.
+     In each panel, the phrase of each permission and its state: "Allowed", "With approval" (the person does it if a
+     manager approves it with their PIN there and then, BASE-F84) or "No". For example, the employee sees in "Sales
+     & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
+     changed here.
+  5. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
+In: the roles, the people of the business, the apps that are on and what each app gives each role.
 Out: nothing saved.
-If it fails: "The roles could not be loaded." with "Retry".
-Involved: BASE-F83
+If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
+allows." with "Retry", and a role that is not one of the five, "This role does not exist in this business.".
+Involved: BASE-F83, BASE-F84
 
 ### BASE-F83 Give a person a role
 Status: done
