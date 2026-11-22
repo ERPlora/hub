@@ -6,19 +6,14 @@ import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 
-import { flush, mountBase, OWNER } from '../__tests__/mount-base';
+import { openFollower } from '../__tests__/followers';
+import { flush, OWNER } from '../__tests__/mount-base';
 import { sessionChanged } from '../lib/access';
 import AccessFollower from './AccessFollower.vue';
 
-const me = ref<SessionMe | undefined>();
-vi.mock('@erplora/ui/shell', async (importOriginal) => {
-  const shell = await importOriginal<typeof import('@erplora/ui/shell')>();
-  return { ...shell, useSession: () => shell.createShellSession(me, ref('live')) };
-});
-vi.mock('../lib/access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/access')>()),
-  sessionChanged: vi.fn(),
-}));
+vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
+
+const me = ref<SessionMe>(OWNER);
 
 /** Taxes' «Rules» is open to a manager and closed to an employee; the till is open to both. */
 const MANAGER: SessionMe = {
@@ -35,14 +30,7 @@ const MANAGER: SessionMe = {
 };
 const EMPLOYEE: SessionMe = { ...MANAGER, menu: MANAGER.menu.slice(1), locked: { tax: ['/tax/rules'] } };
 
-async function open(path = '/') {
-  const m = await mountBase(AccessFollower, { path });
-  m.router.addRoute({ path: '/tax/rules', component: { template: '<div />' }, meta: { auth: true, app: 'tax' } });
-  m.router.addRoute({ path: '/sale/pos', component: { template: '<div />' }, meta: { auth: true, app: 'sale' } });
-  await m.router.replace(path);
-  const call = await m.live();
-  return { ...m, call };
-}
+const open = (path = '/') => openFollower(AccessFollower, { session: me, path, screens: ['/tax/rules', '/sale/pos'] });
 
 beforeEach(() => {
   me.value = OWNER;

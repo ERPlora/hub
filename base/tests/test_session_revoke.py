@@ -229,17 +229,18 @@ async def in_db(fn, *args, **kwargs):
     return await sync_to_async(call)()
 
 
-def open_stream(saas_id: str, hub: Hub) -> Stream:
-    """The ``/api/live`` stream a member of ``hub`` opens with the session of its login: ``demo.item.list``."""
-    key = login(saas_id, hub, role="hub_owner")
+def open_stream(saas_id: str, hub: Hub, role: str = "hub_owner", operation: str = "demo.item.list") -> Stream:
+    """The ``/api/live`` stream a member of ``hub`` with ``role`` opens with the session of its login, following
+    ``operation``."""
+    key = login(saas_id, hub, role=role)
     request = RequestFactory().get("/api/live", HTTP_HOST=f"{hub.slug}.localhost")
     SessionMiddleware(lambda r: None).process_request(request)
     request.session = request.session.__class__(key)
     request.user = Membership.objects.get(user__username=f"saas:{saas_id}", host=hub.slug).user
     request.LANGUAGE_CODE = "en"
     stream = Stream(HubContextBuilder().from_request(request))
-    op = get("demo.item.list")
-    stream.subs["items"] = Subscription(id="items", op=op, params=op.input.model_validate({}))
+    op = get(operation)
+    stream.subs[operation] = Subscription(id=operation, op=op, params=op.input.model_validate({}))
     return stream
 
 

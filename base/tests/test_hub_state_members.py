@@ -15,25 +15,22 @@ import json
 import psycopg
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import connections
-from django.test import RequestFactory
 from live.context import OperationContext
-from live.executor import Stream, Subscription, executor
+from live.executor import executor
 from live.operations import get
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
 from base.models import Hub, Membership
-from base.operations import HubContextBuilder
 from base.permissions import permissions_of_role
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED
 from base.tests.test_internal import HUB_ID, PATH, code, signed
-from base.tests.test_session_revoke import acme, alive, beta, in_db, login
+from base.tests.test_session_revoke import acme, alive, beta, fresh_executor, in_db, login, open_stream
 
-__all__ = ["acme", "beta"]
+__all__ = ["acme", "beta", "fresh_executor"]
 
 ANA = "0199c4b0-0000-7000-8000-00000000a0a0"
 OLGA = "0199c4b0-0000-7000-8000-00000000b0b0"
@@ -196,21 +193,6 @@ def test_a_session_that_noted_no_host_ends_too_when_the_photo_takes_that_person_
 # ── The open apps of a person whose role changed ───────────────────────────────────────────────────────────────────
 
 
-def open_access_stream(saas_id: str, hub: Hub) -> Stream:
-    """The ``/api/live`` stream an employee of ``hub`` opens with the session of its login: ``base.session.access``,
-    what its device follows to read its session again."""
-    key = login(saas_id, hub, role="hub_employee")
-    request = RequestFactory().get("/api/live", HTTP_HOST=f"{hub.slug}.localhost")
-    SessionMiddleware(lambda r: None).process_request(request)
-    request.session = request.session.__class__(key)
-    request.user = Membership.objects.get(user__username=f"saas:{saas_id}", host=hub.slug).user
-    request.LANGUAGE_CODE = "en"
-    stream = Stream(HubContextBuilder().from_request(request))
-    op = get("base.session.access")
-    stream.subs["access"] = Subscription(id="access", op=op, params=op.input.model_validate({}))
-    return stream
-
-
 def access_of(role: str, hub: Hub) -> bytes:
     """What ``base.session.access`` answers to a session of ``role`` in ``hub``, as a stream frame carries it."""
     ctx = OperationContext(scope=A, actor=None, permissions=permissions_of_role(role), language="en")
@@ -218,17 +200,10 @@ def access_of(role: str, hub: Hub) -> bytes:
         return get("base.session.access")(ctx, get("base.session.access").input()).model_dump_json().encode()
 
 
-@pytest.fixture
-def fresh_executor():
-    executor.reset()
-    yield
-    executor.reset()
-
-
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 @pytest.mark.usefixtures("fresh_executor")
 async def test_the_open_stream_of_a_person_whose_role_changed_goes_on_with_the_new_role_s_access(client, hub_a):
-    stream = await in_db(open_access_stream, ANA, hub_a)
+    stream = await in_db(open_stream, ANA, hub_a, "hub_employee", "base.session.access")
     await executor.run_all(stream)
     assert await in_db(access_of, "hub_employee", hub_a) in stream.queue.get_nowait()
 

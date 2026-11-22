@@ -3,22 +3,14 @@
 // Taxes' «Rules» sees «No access»; made a manager, the screen opens; back to employee, «No access» again. Never a
 // reload nor a new sign-in: the same page and the same session all along. The photo is sent the way the SaaS sends it
 // (`PUT /internal/hubs/{id}/state`, signed) with every person of `a`, and `a`'s photo and roles are put back after.
-import { createHmac } from 'node:crypto';
-
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, EMPLOYEE, hostPage, psql, shown, testid, THREE_SIZES } from './helpers';
-import { STACK } from './stack';
-
-/** The secret `/internal` is signed with; the local default of both projects. */
-const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
-/** The copy the run keeps of `a`'s photo. */
-const BACKUP = 'e2e_base_role_change_photo_before';
+import { keepPhotoOfA, type PhotoOfA } from './saas-photo';
 
 type Member = { user_id: string; role: string };
 
-let hubId = '';
-let version = Math.floor(Date.now() / 1000);
+let photo: PhotoOfA | undefined;
 let members: Member[] = [];
 
 /** erplora.com's people of `a`, with the role each has in the Hub now: the photo lists them all or drops the rest. */
@@ -35,19 +27,8 @@ function peopleOfA(): Member[] {
 
 /** The SaaS's photo of `a` with `roles` changed by account; every other person keeps theirs. */
 async function pushRoles(roles: Record<string, string>): Promise<void> {
-  version += 1;
-  const listed = members.map((member) => ({ ...member, role: roles[member.user_id] ?? member.role }));
-  const body = JSON.stringify({ hub_id: hubId, slug: 'a', version, members: listed });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${hubId}/state`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
-  const answer = await response.text();
-  expect(response.status, answer).toBe(200);
-  expect(JSON.parse(answer)).toMatchObject({ applied: true, version });
+  if (!photo) throw new Error('No photo of a was kept before the run.');
+  await photo.send({ members: members.map((member) => ({ ...member, role: roles[member.user_id] ?? member.role })) });
 }
 
 /** The Hub's session `context` holds for `a`. */
@@ -60,24 +41,12 @@ const stillHere = (page: Page): Promise<boolean | undefined> =>
   page.evaluate(() => (window as { e2eStillHere?: boolean }).e2eStillHere);
 
 test.beforeAll(() => {
-  hubId = psql("select id from base_hub where slug = 'a'");
-  version = Math.max(version, Number(psql(`select state_version from base_hub where id = '${hubId}'`)));
-  psql(
-    [
-      `drop table if exists ${BACKUP}`,
-      `create table ${BACKUP} as select id, state, state_version from base_hub where id = '${hubId}'`,
-    ].join('; '),
-  );
+  photo = keepPhotoOfA('e2e_base_role_change_photo_before');
 });
 
 test.afterAll(async () => {
   if (members.length) await pushRoles({});
-  psql(
-    [
-      `update base_hub h set state = b.state, state_version = b.state_version from ${BACKUP} b where b.id = h.id`,
-      `drop table ${BACKUP}`,
-    ].join('; '),
-  );
+  photo?.putBack();
 });
 
 test('BASE-F13: a role changed on erplora.com turns the open screen into «No access», or opens it, without a reload', async ({
