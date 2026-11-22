@@ -515,26 +515,26 @@ msgstr "entrada del historial"
 msgid "history"
 msgstr "historial"
 
-#: queries.py:79
+#: queries/tickets.py:39
 msgid "That kitchen ticket does not exist in this business."
 msgstr "Esa comanda no existe en este negocio."
 
-#: queries.py:81
+#: queries/tickets.py:40
 #, python-format
 msgid ""
 "“%(said)s” matches several tickets: %(names)s. Say which one by its number."
 msgstr ""
 "«%(said)s» coincide con varias comandas: %(names)s. Di cuál por su número."
 
-#: queries.py:83
+#: queries/scope.py:13
 msgid "That station does not exist in this business."
 msgstr "Esa estación no existe en este negocio."
 
-#: queries.py:84
+#: queries/tickets.py:43
 msgid "That dish is on no kitchen ticket of this business."
 msgstr "Ese plato no está en ninguna comanda de este negocio."
 
-#: queries.py:85
+#: queries/scope.py:14
 #, python-format
 msgid "“%(said)s” matches several stations: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias estaciones: %(names)s. Di cuál."
@@ -580,7 +580,7 @@ msgstr "Cuenta de origen"
 msgid "Into check"
 msgstr "Cuenta de destino"
 
-#: services.py:107
+#: services/settling.py:40
 msgid ""
 "That kitchen ticket is no longer in the state this action requires. Refresh "
 "and try again."
@@ -588,15 +588,15 @@ msgstr ""
 "Esa comanda ya no está en el estado que requiere esta acción. Actualiza e "
 "inténtalo de nuevo."
 
-#: services.py:109
+#: services/journey.py:28
 msgid "That ticket is no longer being cooked."
 msgstr "Esa comanda ya no se cocina."
 
-#: services.py:110
+#: services/journey.py:29
 msgid "That ticket is VIP: a rush does not change its priority."
 msgstr "Esa comanda es VIP: marcarla urgente no cambia su prioridad."
 
-#: services.py:112
+#: services/journey.py:30
 msgid ""
 "That ticket cannot be deleted: it comes from a check or it is already being "
 "cooked. Cancel it instead."
@@ -604,20 +604,20 @@ msgstr ""
 "Esa comanda no se puede borrar: viene de una cuenta o ya se está cocinando. "
 "Cancélala."
 
-#: services.py:114
+#: services/dishes.py:19
 msgid "That dish is not on this ticket."
 msgstr "Ese plato no está en esta comanda."
 
-#: services.py:116
+#: services/journey.py:33
 msgid "Nothing of this ticket goes to paper: its stations are screen only."
 msgstr ""
 "Nada de esta comanda sale en papel: sus estaciones son solo de pantalla."
 
-#: services.py:118
+#: services/rounds.py:20
 msgid "Nothing on this check is cooked: services do not go to the kitchen."
 msgstr "Nada de esta cuenta se cocina: los servicios no van a cocina."
 
-#: services.py:119
+#: services/journey.py:36
 msgid ""
 "No printer prints this ticket: turn on Printing and add an active kitchen or "
 "bar printer."
@@ -625,16 +625,16 @@ msgstr ""
 "Ninguna impresora imprime esta comanda: activa Impresión y añade una "
 "impresora de cocina o de barra activa."
 
-#: services.py:120
+#: services/journey.py:37
 #, python-format
 msgid "The ticket could not be printed: %(reason)s"
 msgstr "No se pudo imprimir la comanda: %(reason)s"
 
-#: services.py:122
+#: services/stations.py:21
 msgid "There is already a station with that name. Choose a different name."
 msgstr "Ya hay una estación con ese nombre. Elige otro nombre."
 
-#: services.py:125
+#: services/stations.py:24
 msgid ""
 "This station cannot be deleted: products or categories are routed to it, or "
 "it has dishes to cook. Move them to another station first."
@@ -642,46 +642,46 @@ msgstr ""
 "Esta estación no se puede eliminar: tiene productos o categorías enrutados, "
 "o platos por hacer. Pásalos antes a otra estación."
 
-#: services.py:129
+#: services/routing.py:19
 msgid "That station is switched off: switch it on or choose another one."
 msgstr "Esa estación está desactivada: actívala o elige otra."
 
-#: services.py:131
+#: services/catalog.py:11
 msgid "That product does not exist in the catalogue."
 msgstr "Ese producto no existe en el catálogo."
 
-#: services.py:132
+#: services/catalog.py:12
 #, python-format
 msgid "“%(said)s” matches several products: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varios productos: %(names)s. Di cuál."
 
-#: services.py:133
+#: services/catalog.py:13
 msgid "That category does not exist in the catalogue."
 msgstr "Esa categoría no existe en el catálogo."
 
-#: services.py:135
+#: services/catalog.py:14
 #, python-format
 msgid "“%(said)s” matches several categories: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias categorías: %(names)s. Di cuál."
 
-#: services.py:137
+#: services/routing.py:22
 msgid "Nothing is routed from that product or category."
 msgstr "Ese producto o esa categoría no van a ninguna estación."
 
-#: services.py:138
+#: services/settings.py:16
 msgid "The amber warning has to come before the red one."
 msgstr "El aviso ámbar tiene que llegar antes que el rojo."
 
-#: services.py:139
+#: services/paper.py:20
 msgid "!! URGENT !!"
 msgstr "!! URGENTE !!"
 
-#: services.py:140
+#: services/paper.py:21
 #, python-format
 msgid "VOIDED DISH · %(label)s"
 msgstr "PLATO ANULADO · %(label)s"
 
-#: services.py:141
+#: services/paper.py:22
 #, python-format
 msgid "CANCELLED · %(label)s"
 msgstr "ANULADA · %(label)s"

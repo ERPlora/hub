@@ -3,11 +3,11 @@
 // call and what «Save» sends (only what changed). Every rule on the values is the server's.
 import type { CustomerDetailOut, CustomerIn, CustomerPatchIn, CustomerSource, CustomerStage, PreferredChannel } from '../operations';
 
-/** Everything the form edits; dates as `YYYY-MM-DD` or `''`. */
+/** Everything the form edits; dates as `YYYY-MM-DD` or `''`; an email or a phone the card came without, `null`. */
 export interface CustomerFields {
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   tax_id: string;
   company_name: string;
   address: string;
@@ -88,6 +88,8 @@ export function blankCustomer(): CustomerFields {
 export function createInput(form: CustomerFields): CustomerIn {
   const input: CustomerIn & { is_active?: boolean } = {
     ...form,
+    email: form.email ?? '',
+    phone: form.phone ?? '',
     birthday: form.birthday || null,
     anniversary: form.anniversary || null,
   };

@@ -21,8 +21,8 @@ cambia su sustituto en la misma PR del puntero.
 - `ion:bag-check-outline` — icono del módulo, de la entrada de menú y de la pestaña **Carritos** (el del
   producto actual). **Hoy:** `lucide:shopping-bag`, la misma bolsa sin la marca, ya registrada.
 
-Al registrarlo, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts` y sus tests
-(`tests/test_apps.py`, `frontend/tabs.test.ts`), y correr `pnpm gen:app-icons`.
+Al registrarlo, cambiar a la vez `apps.py` (`icon` y `navigation`), y sus tests
+(`tests/test_apps.py`), y correr `pnpm gen:app-icons`.
 
 ## Piezas compartidas que viven copiadas en la app
 

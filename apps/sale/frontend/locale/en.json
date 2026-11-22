@@ -2,12 +2,7 @@
   "sale": {
     "title": "Sales & POS",
     "tabs": {
-      "label": "Sales & POS sections",
-      "pos": "Sell",
-      "sales": "Sales",
-      "quickNotes": "Quick notes",
-      "departments": "Sections",
-      "settings": "Settings"
+      "label": "Sales & POS sections"
     },
     "live": {
       "retry": "Retry",
@@ -100,6 +95,7 @@
       "lineChangeFailed": "That change to the line could not be saved. The line is back as it was.",
       "lineNotSaved": "Couldn't save that item — tap again",
       "lineStaffFailed": "The line could not be moved to another professional. It stays with the one it had.",
+      "staffSaveFailed": "Who serves the check could not be changed. It stays with whoever served it.",
       "discountTicket": "Ticket discount",
       "total": "Total",
       "printPrebill": "Print bill",
@@ -246,7 +242,8 @@
         "less": "One less {name}",
         "loadFailed": "The options of this product could not be read. Try again.",
         "chooseRange": "Choose {n} to {max}",
-        "atLeast": "Choose at least {n}"
+        "atLeast": "Choose at least {n}",
+        "loading": "Loading options…"
       },
       "menu": {
         "badge": "Menu",

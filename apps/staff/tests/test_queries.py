@@ -12,14 +12,11 @@ from live.operations import get
 from apps.staff.models import Member, StaffSettings, TimeOff
 from apps.staff.queries import ROLE_UNAVAILABLE
 from base.services.sessions import ensure_hub_user
-from apps.staff.schemas import (
-    AccountListIn,
-    AccountPage,
-    AvailabilityIn,
-    AvailabilityOut,
-    ByIdIn,
-    CommissionPage,
-    CommissionSummaryIn,
+from apps.staff.schemas.accounts import AccountListIn, AccountPage
+from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
+from apps.staff.schemas.commissions import CommissionPage, CommissionSummaryIn
+from apps.staff.schemas.fields import ByIdIn, MemberRefIn
+from apps.staff.schemas.members import (
     CompensationListIn,
     CompensationPage,
     CurrentMemberIn,
@@ -27,20 +24,16 @@ from apps.staff.schemas import (
     MemberDetailOut,
     MemberListIn,
     MemberPage,
-    MemberRefIn,
     MemberStatsIn,
     MemberStatsOut,
     MineIn,
     MineOut,
+)
+from apps.staff.schemas.roles import RoleListIn, RoleOut, RolePage
+from apps.staff.schemas.schedules import ScheduleListIn, ScheduleDetailOut, SchedulePage
+from apps.staff.schemas.settings import SettingsGetIn, SettingsOut
+from apps.staff.schemas.time_off import (
     MyTimeOffIn,
-    RoleListIn,
-    RoleOut,
-    RolePage,
-    ScheduleListIn,
-    ScheduleDetailOut,
-    SchedulePage,
-    SettingsGetIn,
-    SettingsOut,
     TimeOffDetailOut,
     TimeOffNamedOut,
     TimeOffDetailPage,
@@ -279,8 +272,8 @@ def test_the_directory_by_its_linked_user(make_user):
 
 
 def test_every_column_sorts_both_ways_with_id_as_the_tie_break():
-    ana = make_member("Ana", "Zamora", hire_date=dt.date(2026, 1, 1), email="z@x.es")
-    bea = make_member("Bea", "Alonso", hire_date=dt.date(2025, 1, 1), email="a@x.es")
+    ana = make_member("Ana", "Zamora", hire_date=dt.date(2026, 1, 1))
+    bea = make_member("Bea", "Alonso", hire_date=dt.date(2025, 1, 1))
     carla = make_member("Carla", "Alonso")
 
     def order(sort):
@@ -289,7 +282,6 @@ def test_every_column_sorts_both_ways_with_id_as_the_tie_break():
     assert order("name") == [ana.id, bea.id, carla.id]
     assert order("-name") == [carla.id, bea.id, ana.id]
     assert order("last_name") == [bea.id, carla.id, ana.id]
-    assert order("email")[:2] == [carla.id, bea.id]  # empty first
     # A missing date goes last whichever the direction, so the dated rows lead.
     assert order("hire_date") == [bea.id, ana.id, carla.id]
     assert order("-hire_date") == [ana.id, bea.id, carla.id]
@@ -491,8 +483,8 @@ def test_the_pay_sheet_pages_and_sorts_as_the_directory():
     make_member("Eva", email="eva@shop.es", status=Member.Status.INACTIVE)
     for params in (
         {"search": "shop", "sort": "-name", "limit": 2, "offset": 1},
-        {"email": "shop", "status": "active", "sort": "email", "limit": 2},
-        {"is_bookable": True, "sort": "-email", "limit": 100},
+        {"email": "shop", "status": "active", "sort": "first_name", "limit": 2},
+        {"is_bookable": True, "sort": "-first_name", "limit": 100},
     ):
         directory = run("staff.member.list", MemberListIn(**params))
         pay = run("staff.member.compensation", CompensationListIn(**params))

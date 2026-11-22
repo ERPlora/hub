@@ -2157,6 +2157,7 @@
       "payment_id": "Pago",
       "payment_method": "Forma de pago",
       "payment_method_name": "Nombre de la forma de pago",
+      "payment_methods": "Formas de pago",
       "payments": "Pagos",
       "pending": "Pendiente",
       "pending_count": "Pendientes",

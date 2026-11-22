@@ -88,14 +88,16 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const people = shown(page).locator('[data-testid="people-row"], [data-testid="people-card"]');
     await expect(people.first()).toBeVisible();
     await expect(shown(page).getByText('Account').first()).toBeVisible();
+    // The owner sees the team's contact details: each person's address (BASE-F119).
+    await expect(shown(page).getByText('employee@example.com', { exact: true }).first()).toBeVisible();
     await snap(page, 'BASE-G142', width);
     // The side menu: whoever runs the business sees every entry with a screen; «API» only with the docs shown.
     await expect.poll(() => menuIds(page)).toEqual(OWNER_MENU);
     await snapMenu(page, 'FIX-SIDEBAR-owner', width);
-    // «Roles»: the four of erplora.com.
+    // «Roles»: the five of erplora.com.
     await tab(page, 'roles');
     await expect(page).toHaveURL(/\/employees#roles$/);
-    await expect(shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]')).toHaveCount(4);
+    await expect(shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]')).toHaveCount(5);
     await expect(testid(page, 'roles-change')).toHaveAttribute('href', /\/members$/);
     await snap(page, 'BASE-G143', width);
     await noProblems(problems);
@@ -174,6 +176,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(testid(page, 'tab-personal')).toHaveClass(/segment-button-checked/);
     await expect(testid(page, 'tab-apikeys')).toHaveCount(0);
     await expect(testid(page, 'tab-approvals')).toHaveCount(0);
+    // An employee does not see the team's contact details: nobody's address, not even their own, nor in a name that
+    // erplora.com made of it (BASE-F119).
+    await expect(shown(page).getByText('@example.com')).toHaveCount(0);
     await snap(page, 'BASE-G11-employee', width);
     // The menu never offers what the employee cannot open (System is for
     // whoever runs the business; Square and Toast hide it the same).

@@ -1,6 +1,6 @@
 """Events of the kitchen app (``kitchen.<entity>.<fact>``) and its reactions to Sales' events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids, numbers and a reason, never a person's name (WORKBOOK «Lo que avisa»).
 
 Reactions, each through an operation of this app run as the system, in its own transaction:
@@ -13,7 +13,7 @@ Reactions, each through an operation of this app run as the system, in its own t
 The outbox relay (``base/relay.py``, in the worker's loop, running in production since hub#105) hands each
 delivered event to ``react`` a moment after Sales' COMMIT; every reaction is idempotent, so a repeated
 delivery changes nothing. For the moment between that COMMIT and the reaction, what Sales did is also
-read on every read and saved on every write (queries.py, services.py), so the board never waits for the
+read on every read and saved on every write (queries, services), so the board never waits for the
 worker's tick.
 """
 

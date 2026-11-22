@@ -8,7 +8,17 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { pageOf } from '../__tests__/fixtures';
-import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountCustomer, subId, VIEWER } from '../__tests__/mount-customer';
+import {
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  mountCustomer,
+  type MountOptions,
+  subId,
+  VIEWER,
+} from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import GroupFormModal from '../components/GroupFormModal.vue';
 import type { GroupRow } from '../operations';
@@ -163,4 +173,8 @@ describe('GroupListPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('GroupListPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['customers', 'Customers']]);
 });

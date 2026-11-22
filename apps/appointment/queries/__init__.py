@@ -1,0 +1,1634 @@
+"""Read operations of the appointment app (``READ ONLY``), and the helpers services.py reuses inside its
+own transaction: the business's clock, the settings, who sees what, how a booking's customer, services
+and professional are resolved, and the agenda the rules (engine.py) judge.
+
+- **Who sees what** (``ownership.py``): ``appointment.view_appointment`` sees the whole diary; ``…view_own_appointment``
+  only the appointments and series of the staff record linked to the caller's account (none when it has none).
+- **Availability = Schedules ∩ Staff ∩ appointments**: ``load_agenda`` reads ``schedule.hours.for_range``
+  and ``staff.availability.for_member`` (their operations, with a reading context that adds
+  ``schedule.view`` and ``staff.view``: booking needs no right in those apps), the blocks and the
+  professional's appointments, and hands them to ``engine``.
+- **Who may do a service**: the active, bookable professionals with an active assignment for it; a
+  service nobody is assigned to may be done by the whole bookable team (the diary's rule, not Staff's
+  nor Services'). Several services: whoever may do every one.
+- Every list pages (``limit`` ≤ 100) with ``id`` as the last tie-break.
+"""
+
+import datetime as dt
+from dataclasses import replace
+from uuid import UUID
+
+from django.db.models import Count, Exists, OuterRef, Q, QuerySet
+from django.utils import timezone, translation
+from django.utils.dates import WEEKDAYS
+from django.utils.text import capfirst
+from django.utils.translation import gettext_lazy as _
+from live.context import OperationContext
+from live.errors import Conflict, InvalidPayload, NotFound
+from live.operations import INTERNAL, operation
+from psycopg import sql
+
+from apps.appointment import engine
+from apps.appointment.models import (
+    Appointment,
+    AppointmentService,
+    BlockedTime,
+    History,
+    Recurring,
+    RecurringService,
+    Settings,
+)
+from apps.appointment.schemas import (
+    AppointmentListIn,
+    AppointmentOut,
+    AppointmentPage,
+    AppointmentRefIn,
+    BlockedTimeListIn,
+    BlockedTimeNamedOut,
+    BlockedTimePage,
+    BlockedTimeRefIn,
+    CheckIn,
+    CheckOut,
+    CountForServiceIn,
+    CountOut,
+    ForCustomerIn,
+    HistoryIn,
+    HistoryPage,
+    LanesIn,
+    LanesOut,
+    NoIn,
+    NoticesIn,
+    NoticesOut,
+    RecurringDetailOut,
+    RecurringGetIn,
+    RecurringListIn,
+    RecurringPage,
+    ServiceRefIn,
+    SettingsOut,
+    SlotsIn,
+    SlotsOut,
+    VisitPage,
+)
+from apps.customer.queries import card_in_business, cards_in_copy, find_customer
+from apps.schedule.queries import day_label, hours_for_range
+from apps.schedule.schemas import HoursRangeIn
+from apps.service.models import Assignment, Service
+from apps.service.queries import catalog, recovery
+from apps.staff.models import Member
+from apps.staff.queries import member_availability, own_member, resolve_member
+from apps.staff.schemas.availability import AvailabilityIn
+from base.business import business_zone, zone_name
+from base.ordering import list_order_for
+from base.relay import by_platform
+
+from .ownership import APPOINTMENTS, SERIES, is_own, sees_whose
+
+VIEW_OWN = "appointment.view_own_appointment"
+ADD_ALL = "appointment.add_appointment"
+ADD_OWN = "appointment.add_own_appointment"
+CHANGE_ALL = "appointment.change_appointment"
+CHANGE_OWN = "appointment.change_own_appointment"
+
+S = Appointment.Status
+#: What occupies the professional's time.
+BUSY = (S.PENDING, S.CONFIRMED, S.IN_PROGRESS)
+#: What can still move.
+MOVABLE = (S.PENDING, S.CONFIRMED)
+CUSTOMER_SOURCES = (Appointment.Source.ONLINE, Appointment.Source.WHATSAPP)
+#: The window a series books when the maximum advance is 0 (no limit).
+SERIES_DEFAULT_WINDOW = 90
+#: How many professionals the free times of «anybody who does it» look at.
+MAX_PROFESSIONALS = 30
+#: Schedules answers at most 366 days at once, Staff 731.
+HOURS_CHUNK = 366
+STAFF_CHUNK = 731
+
+APPOINTMENT_NOT_FOUND = _("That appointment does not exist in this business.")
+RECURRING_NOT_FOUND = _("That repeating appointment does not exist in this business.")
+BLOCK_NOT_FOUND = _("That blocked period does not exist in this business.")
+SERVICE_NOT_BOOKABLE = _("“%(name)s” cannot be booked: it is archived or not bookable.")
+STAFF_NOT_BOOKABLE = _("%(name)s cannot take appointments: inactive or not bookable.")
+STAFF_NOT_ELIGIBLE = _("%(name)s does not perform “%(service)s”.")
+INVALID_LOCAL_TIME = _(
+    "That time does not exist on the business's clock: the change of time skips it. Pick another one."
+)
+
+#: Why a time cannot be booked (engine.CODES) → what the person reads.
+VERDICTS = {
+    "invalid_start": _("That start date and time is not valid."),
+    "in_past": _("That time has already passed."),
+    "too_soon": _("This appointment must be booked further in advance."),
+    "too_far": _("This appointment cannot be booked that far in advance."),
+    "outside_schedule": _("That time is outside the business's opening hours."),
+    "outside_staff_hours": _(
+        "That professional does not work at that time. Pick another time or another professional."
+    ),
+    "blocked": _("That time is blocked in the agenda."),
+    "overlap": _(
+        "That professional already has an appointment at that time. Pick another time or another professional."
+    ),
+    "service_unavailable": _("A service of this series can no longer be booked."),
+}
+
+
+def verdict_message(code: str) -> str:
+    return str(VERDICTS.get(code, VERDICTS["invalid_start"]))
+
+
+# ── The business's clock and settings ────────────────────────────────────────────────────────
+
+
+def now() -> dt.datetime:
+    return timezone.now()
+
+
+def today() -> dt.date:
+    return engine.wall(now(), business_zone()).date()
+
+
+def read_moment(value: dt.datetime, field: str) -> dt.datetime:
+    """A time as sent (wall clock or instant) read on the business's clock; 422 on ``field`` if skipped."""
+    try:
+        return engine.aware(value.replace(second=0, microsecond=0), business_zone())
+    except engine.NonexistentTime:
+        message = str(INVALID_LOCAL_TIME)
+        raise InvalidPayload(
+            message, code="appointment.invalid_local_time", fields={field: message}
+        ) from None
+
+
+def current_settings() -> Settings:
+    """The saved settings, or the factory ones (unsaved) while nobody saved them."""
+    return Settings.objects.first() or Settings()
+
+
+def rules_of(settings: Settings) -> engine.Rules:
+    return engine.Rules(
+        min_notice=settings.min_booking_notice,
+        max_advance_days=settings.max_advance_booking,
+        allow_overlap=settings.allow_overlapping,
+        calendar_start_hour=settings.calendar_start_hour,
+        calendar_end_hour=settings.calendar_end_hour,
+        slot_interval=settings.slot_interval,
+    )
+
+
+def settings_out(settings: Settings) -> dict:
+    fields = (
+        "default_duration",
+        "min_booking_notice",
+        "max_advance_booking",
+        "allow_overlapping",
+        "allow_customer_cancellation",
+        "cancellation_notice_hours",
+        "calendar_start_hour",
+        "calendar_end_hour",
+        "slot_interval",
+        "auto_confirm_online",
+    )
+    return {
+        **{field: getattr(settings, field) for field in fields},
+        "timezone": zone_name(),
+    }
+
+
+def day_bounds(
+    date_from: dt.date, date_to: dt.date | None
+) -> tuple[dt.datetime, dt.datetime]:
+    """The instants of the business days ``date_from`` … ``date_to`` (included)."""
+    zone = business_zone()
+    last = date_to or date_from
+    return engine.midnight(date_from, zone), engine.midnight(
+        last + dt.timedelta(days=1), zone
+    )
+
+
+# ── Who sees what ────────────────────────────────────────────────────────────────────────────
+
+
+def own_staff_id(ctx: OperationContext) -> UUID | None:
+    member = own_member(ctx)
+    return member.id if member else None
+
+
+def may_change(ctx: OperationContext, staff_id: UUID | None) -> bool:
+    return ctx.has(CHANGE_ALL) or (ctx.has(CHANGE_OWN) and is_own(ctx, staff_id))
+
+
+def may_book_for(ctx: OperationContext, staff_id: UUID | None) -> bool:
+    return ctx.has(ADD_ALL) or (ctx.has(ADD_OWN) and is_own(ctx, staff_id))
+
+
+# ── Appointments ─────────────────────────────────────────────────────────────────────────────
+
+
+def appointments(ctx: OperationContext) -> QuerySet[Appointment]:
+    """The live appointments the caller may see (``APPOINTMENTS``), with their lines."""
+    return APPOINTMENTS.visible(ctx).filter(deleted_at__isnull=True).prefetch_related("lines")
+
+
+def find_appointment(
+    ctx: OperationContext,
+    appointment_id: UUID | None,
+    number: str | None,
+    *,
+    lock: bool = False,
+) -> Appointment:
+    """The live appointment named by id or number that the caller may see (``NotFound`` otherwise)."""
+    rows = APPOINTMENTS.visible(ctx).filter(deleted_at__isnull=True)
+    rows = (
+        rows.filter(pk=appointment_id)
+        if appointment_id
+        else rows.filter(number__iexact=number or "")
+    )
+    if lock:
+        rows = rows.select_for_update(of=("self",))
+    found = rows.first()
+    if found is None:
+        raise NotFound(
+            str(APPOINTMENT_NOT_FOUND), code="appointment.appointment_not_found"
+        )
+    return found
+
+
+def _lines(appointment: Appointment) -> list[dict]:
+    return [
+        {
+            "service_id": line.service_id,
+            "name": line.name,
+            "price": line.price,
+            "duration_minutes": line.duration_minutes,
+        }
+        for line in appointment.lines.all()
+    ]
+
+
+def row(appointment: Appointment) -> dict:
+    """An ``AppointmentRow``: what the agenda lists (no contact, no notes), on the business's clock."""
+    zone = business_zone()
+    lines = _lines(appointment)
+    return {
+        "id": appointment.id,
+        "number": appointment.number,
+        "customer_id": appointment.customer_id,
+        "customer_name": appointment.customer_name,
+        "staff_id": appointment.staff_id,
+        "staff_name": appointment.staff_name,
+        "start": appointment.start.astimezone(zone),
+        "end": appointment.end.astimezone(zone),
+        "duration_minutes": appointment.duration_minutes,
+        "status": appointment.status,
+        "source": appointment.source,
+        "services": lines,
+        "service_names": ", ".join(line["name"] for line in lines),
+        "total": sum(line["price"] for line in lines),
+        "booked_by_customer": appointment.source in CUSTOMER_SOURCES,
+        "sale_id": appointment.sale_id,
+        "order_id": appointment.order_id,
+        "recurring_id": appointment.recurring_id,
+        "occurrence_date": appointment.occurrence_date,
+    }
+
+
+def by_person(ctx: OperationContext) -> bool:
+    """Whether a person of the team acts (a user account). Only a person gets the front desk's exceptions
+    and reads what is the salon's: an automation — a flow's step, the platform itself, an anonymous caller,
+    any kind still to come — is judged and answered as the customer."""
+    return hasattr(ctx.actor, "get_username")
+
+
+#: What a caller that is not a person never reads: the customer's contact, the salon's notes and a
+#: cancellation's reason (they may hold health data). The market's client-facing surfaces never show them.
+PRIVATE = ("customer_phone", "customer_email", "notes", "internal_notes", "cancellation_reason")
+
+
+def for_caller(ctx: OperationContext, answer: dict) -> dict:
+    """``answer`` as ``ctx`` may read it: whole for a person, without ``PRIVATE`` for anyone else."""
+    if by_person(ctx):
+        return answer
+    return {name: "" if name in PRIVATE else value for name, value in answer.items()}
+
+
+def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
+    """``start``'s day and hour ready to say (a flow's template has no clock nor formatter): the weekday and the date in
+    the caller's language, and the hour in 24 hours."""
+    wall = start.astimezone(business_zone())
+    return {"start_date_label": day_label(wall.date(), ctx.language), "start_time_label": f"{wall:%H:%M}"}
+
+
+def appointment_label(appointment: Appointment, said: dict) -> str:
+    """How a card names an appointment: its customer (nothing once her data were erased), its day and hour (``said``,
+    ``start_labels``) and its professional (nothing when it has none)."""
+    parts = (appointment.customer_name, said["start_date_label"], said["start_time_label"], appointment.staff_name)
+    return " · ".join(part for part in parts if part)
+
+
+def detail(ctx: OperationContext, appointment: Appointment) -> dict:
+    """An ``AppointmentOut``: everything, contact and notes included (for a person; ``for_caller``)."""
+    said = start_labels(ctx, appointment.start)
+    return for_caller(
+        ctx,
+        {
+            **row(appointment),
+            "customer_phone": appointment.customer_phone,
+            "customer_email": appointment.customer_email,
+            "notes": appointment.notes,
+            "internal_notes": appointment.internal_notes,
+            "cancelled_at": appointment.cancelled_at,
+            "cancellation_reason": appointment.cancellation_reason,
+            "cancelled_by_customer": appointment.cancelled_by_customer,
+            "charged_at": appointment.charged_at,
+            "created_at": appointment.created_at,
+            "updated_at": appointment.updated_at,
+            **said,
+            "label": appointment_label(appointment, said),
+        },
+    )
+
+
+def load_detail(ctx: OperationContext, appointment_id: UUID) -> dict:
+    return detail(ctx, Appointment.objects.prefetch_related("lines").get(pk=appointment_id))
+
+
+APPOINTMENT_ORDER = {
+    "start": ("start",),
+    "number": ("number",),
+    "customer_name": ("customer_name",),
+    "staff_name": ("staff_name",),
+    "status": ("status",),
+}
+
+
+def _page(rows: QuerySet, limit: int, offset: int, out) -> dict:
+    return {
+        "rows": [out(item) for item in rows[offset : offset + limit]],
+        "total": rows.count(),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@operation(
+    "appointment.appointment.list",
+    kind="query",
+    permission=VIEW_OWN,
+    input=AppointmentListIn,
+    output=AppointmentPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "what appointments do we have on Friday?",
+                "show me next week's appointments with Lucía",
+            ),
+            "es": (
+                "¿qué citas hay el viernes?",
+                "enséñame las citas de la semana que viene con Lucía",
+            ),
+        },
+        "description": "List the appointments of one business day or a range of days (on the business's clock), "
+        "with customer, services, professional, status and whether they are charged; filter by professional (name), "
+        "status, customer or a search text. Contact details and notes are not included."
+    },
+)
+def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
+    start, end = day_bounds(params.date_from, params.date_to)
+    rows = appointments(ctx).filter(start__gte=start, start__lt=end)
+    if params.staff_id or params.staff:
+        rows = rows.filter(staff=resolve_member(params.staff_id, params.staff))
+    if params.unassigned is not None:
+        rows = rows.filter(staff__isnull=params.unassigned)
+    if params.customer_id:
+        rows = rows.filter(customer_id=params.customer_id)
+    if params.status:
+        rows = rows.filter(status=params.status)
+    if params.search:
+        text = params.search
+        named = AppointmentService.objects.filter(
+            appointment=OuterRef("pk"), name__icontains=text
+        )
+        rows = rows.filter(
+            Q(number__icontains=text) | Q(customer_name__icontains=text) | Exists(named)
+        )
+    page = _page(
+        rows.order_by(*list_order_for(params.sort, columns=APPOINTMENT_ORDER)),
+        params.limit,
+        params.offset,
+        row,
+    )
+    return {**page, "timezone": zone_name()}
+
+
+@operation(
+    "appointment.appointment.get",
+    kind="query",
+    permission=VIEW_OWN,
+    input=AppointmentRefIn,
+    output=AppointmentOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "show me appointment APT-0042",
+                "what phone number is on appointment 17?",
+            ),
+            "es": (
+                "enséñame la cita APT-0042",
+                "¿qué teléfono tiene puesto la cita número 17?",
+            ),
+        },
+        "description": "Get one appointment by its id or its number (APT-…), with contact, notes and charge."
+    },
+)
+def get_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
+    return detail(ctx, find_appointment(ctx, data.id, data.number))
+
+
+@operation(
+    "appointment.appointment.history",
+    kind="query",
+    permission=VIEW_OWN,
+    input=HistoryIn,
+    output=HistoryPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "who moved Pilar's appointment and when?",
+                "show me the history of appointment APT-0042",
+            ),
+            "es": (
+                "¿quién movió la cita de Pilar y cuándo?",
+                "historial de cambios de la cita APT-0042",
+            ),
+        },
+        "description": "The history of one appointment: every change, when, who did it (or that the customer asked), "
+        "and what changed (time, professional, service, status, charge)."
+    },
+)
+def appointment_history(ctx: OperationContext, data: HistoryIn) -> dict:
+    appointment = find_appointment(ctx, data.id, data.number)
+    rows = History.objects.filter(appointment=appointment).order_by("at", "id")
+
+    def out(line: History) -> dict:
+        return {
+            "id": line.id,
+            "action": line.action,
+            "at": line.at.astimezone(business_zone()),
+            "actor": line.actor,
+            "by_customer": line.by_customer,
+            "by_platform": by_platform(line.actor),
+            "reason": line.reason,
+            "old_value": line.old_value,
+            "new_value": line.new_value,
+        }
+
+    return _page(rows, data.limit, data.offset, out)
+
+
+@operation(
+    "appointment.appointment.list_for_customer",
+    kind="query",
+    permission=VIEW_OWN,
+    input=ForCustomerIn,
+    output=VisitPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "which appointments has Teresa had with us?",
+                "Teresa's past and upcoming appointments",
+            ),
+            "es": (
+                "¿qué citas ha tenido Teresa con nosotros?",
+                "todas las citas de Teresa, pasadas y futuras",
+            ),
+        },
+        "description": "A customer's appointments, the newest first (named by her name, phone or email), with "
+        "services, professional, status and the visit's notes (the internal one may hold a colour formula)."
+    },
+)
+def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
+    customer = find_customer(
+        ctx,
+        params.customer_id, params.customer, live=params.customer_id is None
+    )
+    rows = (
+        appointments(ctx).filter(customer=customer).order_by("-start", "-id")
+    )
+    return _page(
+        rows,
+        params.limit,
+        params.offset,
+        lambda item: for_caller(
+            ctx,
+            {**row(item), "notes": item.notes, "internal_notes": item.internal_notes},
+        ),
+    )
+
+
+@operation(
+    "appointment.appointment.count_active_for_service",
+    kind="query",
+    permission=VIEW_OWN,
+    input=CountForServiceIn,
+    output=CountOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "how many upcoming appointments still include the keratin treatment?",
+                "are there future appointments with highlights before I archive them?",
+            ),
+            "es": (
+                "¿cuántas citas futuras llevan todavía el alisado de keratina?",
+                "antes de archivar las mechas, ¿cuántas citas por delante las incluyen?",
+            ),
+        },
+        "description": "How many upcoming live appointments (pending or confirmed) carry a service, and when the "
+        "first one is: what to warn about before archiving the service."
+    },
+)
+def count_active_for_service(ctx: OperationContext, data: CountForServiceIn) -> dict:
+    service = catalog.find_service(data.service_id, data.service)
+    rows = Appointment.objects.filter(
+        deleted_at__isnull=True, status__in=MOVABLE, start__gte=now(), lines__service=service
+    ).distinct()
+    first = rows.order_by("start", "id").first()
+    return {
+        "count": rows.count(),
+        "earliest": first.start.astimezone(business_zone()) if first else None,
+    }
+
+
+@operation(
+    "appointment.appointment.count_to_confirm",
+    kind="query",
+    permission=VIEW_OWN,
+    input=NoIn,
+    output=CountOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "how many appointments still need my confirmation?",
+                "are any appointments left unconfirmed?",
+            ),
+            "es": (
+                "¿cuántas citas me quedan por confirmar?",
+                "¿hay citas sin confirmar todavía?",
+            ),
+        },
+        "description": "How many upcoming appointments are still pending: bookings to confirm."
+    },
+)
+def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
+    rows = appointments(ctx).filter(status=S.PENDING, start__gte=now())
+    first = rows.order_by("start", "id").first()
+    return {
+        "count": rows.count(),
+        "earliest": first.start.astimezone(business_zone()) if first else None,
+    }
+
+
+# ── What the team is told as it happens (APPOINTMENT-F28) ────────────────────────────────────
+
+#: How far back the notices go when nobody says.
+NOTICES_WINDOW = dt.timedelta(hours=24)
+
+
+@operation(
+    "appointment.appointment.notices",
+    kind="query",
+    permission=VIEW_OWN,
+    input=NoticesIn,
+    output=NoticesOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "which appointments did customers book themselves this week?",
+                "any appointments the customers cancelled on their own lately?",
+            ),
+            "es": (
+                "¿qué citas han cogido las clientas ellas mismas esta semana?",
+                "¿qué citas han anulado los propios clientes últimamente?",
+            ),
+        },
+        "description": "What customers did themselves lately (WhatsApp, the online booking): the appointments they "
+        "booked and the ones they cancelled, the newest first, with who, which services, when and with whom."
+    },
+)
+def notices(ctx: OperationContext, data: NoticesIn) -> dict:
+    """The customer's own bookings and cancellations since ``data.since`` (the front desk's are not told: who
+    gave or cancelled it knows), of the agenda the caller sees, the newest first."""
+    since = data.since or timezone.now() - NOTICES_WINDOW
+    rows = appointments(ctx)
+    told = [
+        ("booked", item.created_at, item)
+        for item in rows.filter(source__in=CUSTOMER_SOURCES, created_at__gte=since)
+    ] + [
+        ("cancelled", item.cancelled_at, item)
+        for item in rows.filter(cancelled_by_customer=True, cancelled_at__gte=since)
+    ]
+    told.sort(key=lambda notice: (notice[1], notice[2].id, notice[0] == "cancelled"), reverse=True)
+    return {
+        "rows": [
+            {
+                "kind": kind,
+                "at": at,
+                "id": item.id,
+                "number": item.number,
+                "customer_name": item.customer_name,
+                "service_names": row(item)["service_names"],
+                "staff_name": item.staff_name,
+                "start": item.start.astimezone(business_zone()),
+                **start_labels(ctx, item.start),
+            }
+            for kind, at, item in told[: data.limit]
+        ]
+    }
+
+
+# ── The agenda's lanes ───────────────────────────────────────────────────────────────────────
+
+
+def takes_bookings(member: Member) -> bool:
+    return member.status == Member.Status.ACTIVE and member.is_bookable
+
+
+@operation(
+    "appointment.agenda.lanes",
+    kind="query",
+    permission=VIEW_OWN,
+    input=LanesIn,
+    output=LanesOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "show tomorrow's agenda split by stylist",
+                "Thursday's agenda in one column per hairdresser",
+            ),
+            "es": (
+                "la agenda del jueves por columnas de cada peluquera",
+                "enséñame la agenda de mañana repartida por persona",
+            ),
+        },
+        "description": "The rows of the agenda by professional for some days: the bookable team, then whoever no "
+        "longer takes bookings but still has appointments those days, and how many appointments have no professional."
+    },
+)
+def agenda_lanes(ctx: OperationContext, data: LanesIn) -> dict:
+    start, end = day_bounds(data.date_from, data.date_to)
+    in_range = appointments(ctx).filter(start__gte=start, start__lt=end)
+    own, everyone = own_staff_id(ctx), APPOINTMENTS.sees_all(ctx)
+
+    def lane(member: Member) -> dict:
+        return {
+            "staff_id": member.id,
+            "name": member.full_name,
+            "color": member.color,
+            "takes_bookings": takes_bookings(member),
+        }
+
+    if everyone:
+        bookable = list(
+            Member.objects.filter(
+                status=Member.Status.ACTIVE, is_bookable=True
+            ).order_by("first_name", "last_name", "id")
+        )
+        shown = {member.id for member in bookable}
+        kept = Member.objects.filter(
+            pk__in=in_range.exclude(staff__isnull=True).values("staff_id")
+        ).exclude(pk__in=shown)
+        members = bookable + list(kept.order_by("first_name", "last_name", "id"))
+        unassigned = in_range.filter(staff__isnull=True).count()
+    else:
+        members = list(Member.objects.filter(pk=own)) if own else []
+        unassigned = 0
+    return {
+        "rows": [lane(member) for member in members],
+        "unassigned": unassigned,
+        "own_staff_id": own,
+        "sees_everyone": everyone,
+        "timezone": zone_name(),
+    }
+
+
+# ── What a booking is made of ────────────────────────────────────────────────────────────────
+
+
+def resolve_services(refs: list[ServiceRefIn]) -> list[Service]:
+    """The services named, in order: each offered and bookable (409 ``appointment.service_not_bookable``)."""
+    services = []
+    for ref in refs:
+        try:
+            service = catalog.find_service(ref.service_id, ref.service)
+        except NotFound:
+            if ref.service_id is not None:
+                raise
+            # Named, it may be an archived one: say so, not «does not exist».
+            service = catalog.find_service(None, ref.service, archived=True)
+        if not (service.is_active and service.is_bookable):
+            raise Conflict(
+                str(SERVICE_NOT_BOOKABLE) % {"name": service.name},
+                code="appointment.service_not_bookable",
+            )
+        services.append(service)
+    return services
+
+
+def _assignments(services: list[Service]) -> QuerySet[Assignment]:
+    return Assignment.objects.filter(
+        service__in=services,
+        is_active=True,
+        member__status=Member.Status.ACTIVE,
+        member__is_bookable=True,
+    )
+
+
+def bookable_members(services: list[Service]) -> list[Member]:
+    """Whoever may do every service: its assigned professionals, or the bookable team when nobody is."""
+    team = Member.objects.filter(status=Member.Status.ACTIVE, is_bookable=True)
+    assigned = _assignments(services)
+    for service in services:
+        ids = [a.member_id for a in assigned if a.service_id == service.id]
+        if ids:
+            team = team.filter(pk__in=ids)
+    return list(team.order_by("first_name", "last_name", "id")[:MAX_PROFESSIONALS])
+
+
+def check_member(member: Member, services: list[Service]) -> None:
+    """``member`` takes bookings and may do every service (409 otherwise)."""
+    if not takes_bookings(member):
+        raise Conflict(
+            str(STAFF_NOT_BOOKABLE) % {"name": member.full_name},
+            code="appointment.staff_not_bookable",
+        )
+    assigned = list(_assignments(services))
+    for service in services:
+        ids = {a.member_id for a in assigned if a.service_id == service.id}
+        if ids and member.id not in ids:
+            raise Conflict(
+                str(STAFF_NOT_ELIGIBLE)
+                % {"name": member.full_name, "service": service.name},
+                code="appointment.staff_not_eligible",
+            )
+
+
+def lines_for(member: Member | None, services: list[Service]) -> list[dict]:
+    """Each service as the booking freezes it: its name, and the professional's own price and length if set."""
+    own = (
+        {
+            a.service_id: a
+            for a in Assignment.objects.filter(
+                member=member, service__in=services, is_active=True
+            )
+        }
+        if member
+        else {}
+    )
+    out = []
+    for position, service in enumerate(services):
+        assignment = own.get(service.id)
+        out.append(
+            {
+                "service": service,
+                "name": service.name,
+                "price": assignment.custom_price
+                if assignment and assignment.custom_price is not None
+                else service.price,
+                "duration_minutes": (
+                    assignment.custom_duration
+                    if assignment and assignment.custom_duration is not None
+                    else service.duration_minutes
+                ),
+                "position": position,
+            }
+        )
+    return out
+
+
+# ── The agenda the rules judge ───────────────────────────────────────────────────────────────
+
+
+def reader(ctx: OperationContext) -> OperationContext:
+    """``ctx`` able to read the hours of Schedules and Staff (booking needs no right in those apps)."""
+    return replace(ctx, permissions=ctx.permissions | {"schedule.view", "staff.view"})
+
+
+def _chunks(date_from: dt.date, date_to: dt.date, size: int):
+    start = date_from
+    while start <= date_to:
+        end = min(date_to, start + dt.timedelta(days=size - 1))
+        yield start, end
+        start = end + dt.timedelta(days=1)
+
+
+def business_days(ctx: OperationContext, date_from: dt.date, date_to: dt.date) -> dict:
+    """The business's hours of ``date_from - 1`` … ``date_to`` (the eve too: its overnight tail)."""
+    out = {}
+    for start, end in _chunks(date_from - dt.timedelta(days=1), date_to, HOURS_CHUNK):
+        hours = hours_for_range(reader(ctx), HoursRangeIn(date_from=start, date_to=end))
+        for day in hours.days:
+            out[day.date] = engine.BusinessDay(
+                day.date,
+                restricted=day.source != "none",
+                spans=tuple((span.start, span.end) for span in day.spans),
+            )
+    return out
+
+
+def staff_days(
+    ctx: OperationContext, member: Member, date_from: dt.date, date_to: dt.date
+) -> dict:
+    out = {}
+    for start, end in _chunks(date_from, date_to, STAFF_CHUNK):
+        answer = member_availability(
+            reader(ctx),
+            AvailabilityIn(member_id=member.id, date_from=start, date_to=end),
+        )
+        for day in answer.days:
+            out[day.date] = engine.StaffDay(
+                day.date,
+                has_schedule=day.schedule_id is not None,
+                available=tuple((span.start, span.end) for span in day.available),
+                absences=tuple(
+                    (None, None)
+                    if absence.is_full_day
+                    else (absence.start_time, absence.end_time)
+                    for absence in day.time_off
+                ),
+            )
+    return out
+
+
+def load_agenda(  # noqa: PLR0913
+    ctx: OperationContext,
+    member: Member | None,
+    date_from: dt.date,
+    date_to: dt.date,
+    *,
+    exclude: tuple = (),
+    settings: Settings | None = None,
+) -> engine.Agenda:
+    """Everything the rules need about ``member`` (or the business alone) from ``date_from`` to ``date_to``."""
+    zone = business_zone()
+    start, end = day_bounds(
+        date_from - dt.timedelta(days=1), date_to + dt.timedelta(days=1)
+    )
+    blocks = BlockedTime.objects.filter(start__lt=end, end__gt=start)
+    blocks = (
+        blocks.filter(Q(staff__isnull=True) | Q(staff=member))
+        if member
+        else blocks.filter(staff__isnull=True)
+    )
+    busy = []
+    if member is not None:
+        busy = [
+            engine.Period(
+                item.start,
+                item.end,
+                id=item.id,
+                label=f"{item.number} {item.customer_name}",
+            )
+            for item in Appointment.objects.filter(deleted_at__isnull=True)
+            .filter(staff=member, status__in=BUSY, start__lt=end, end__gt=start)
+            .exclude(pk__in=exclude)
+            .order_by("start", "id")
+        ]
+    return engine.Agenda(
+        zone=zone,
+        rules=rules_of(settings or current_settings()),
+        business=business_days(ctx, date_from, date_to),
+        staff=staff_days(ctx, member, date_from, date_to) if member else None,
+        blocks=[
+            engine.Period(block.start, block.end, id=block.id, label=block.title)
+            for block in blocks
+        ],
+        busy=busy,
+    )
+
+
+def conflicts_of(
+    agenda: engine.Agenda, start: dt.datetime, end: dt.datetime
+) -> list[dict]:
+    rows = Appointment.objects.filter(
+        deleted_at__isnull=True, pk__in=[period.id for period in engine.overlapping(agenda, start, end)]
+    )
+    zone = business_zone()
+    return [
+        {
+            "id": item.id,
+            "number": item.number,
+            "customer_name": item.customer_name,
+            "start": item.start.astimezone(zone),
+            "end": item.end.astimezone(zone),
+        }
+        for item in rows.order_by("start", "id")
+    ]
+
+
+def _who_and_how_long(
+    services_refs, staff_id, staff, minutes
+) -> tuple[list[Service], list[Member], dict]:
+    """The services, the professionals to look at and each one's length (``minutes`` wins)."""
+    services = resolve_services(services_refs) if services_refs else []
+    if staff_id or staff:
+        members = [resolve_member(staff_id, staff)]
+    elif services:
+        members = bookable_members(services)
+    else:
+        members = list(
+            Member.objects.filter(
+                status=Member.Status.ACTIVE, is_bookable=True
+            ).order_by("first_name", "last_name", "id")[:MAX_PROFESSIONALS]
+        )
+    lengths = {
+        member.id: minutes
+        or sum(line["duration_minutes"] for line in lines_for(member, services))
+        for member in members
+    }
+    return services, members, lengths
+
+
+@operation(
+    "appointment.availability.slots",
+    kind="query",
+    permission="appointment.view_schedule",
+    input=SlotsIn,
+    output=SlotsOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "what free times are there on Saturday for a manicure?",
+                "when could Inés fit a colour on Thursday?",
+            ),
+            "es": (
+                "¿qué horas libres hay el sábado para una manicura?",
+                "¿a qué horas puede coger Inés un tinte el jueves?",
+            ),
+        },
+        "description": "The free times of a business day to book some services (or a length), for one professional "
+        "(by name) or for anybody who does them: each time says which professionals are free. It crosses the "
+        "opening hours (Schedules), each professional's shift and time off (Staff), blocked time and the appointments "
+        "already booked. for_customer=true when the customer books herself (the minimum notice applies)."
+    },
+)
+def availability_slots(ctx: OperationContext, data: SlotsIn) -> dict:
+    services, members, lengths = _who_and_how_long(
+        data.service_refs(), data.staff_id, data.staff, data.duration_minutes
+    )
+    settings = current_settings()
+    moment = now()
+    found: dict[dt.datetime, dict] = {}
+    for member in members:
+        agenda = load_agenda(
+            ctx,
+            member,
+            data.date,
+            data.date,
+            exclude=(data.exclude_id,),
+            settings=settings,
+        )
+        for slot in engine.slots(
+            agenda,
+            data.date,
+            lengths[member.id],
+            now=moment,
+            customer=data.for_customer,
+        ):
+            entry = found.setdefault(
+                slot.start,
+                {
+                    "start": slot.start,
+                    "end": slot.end,
+                    "within_notice": slot.within_notice,
+                    "staff_ids": [],
+                },
+            )
+            entry["staff_ids"].append(member.id)
+    if not members:
+        agenda = load_agenda(ctx, None, data.date, data.date, settings=settings)
+        minutes = (
+            data.duration_minutes
+            or sum(s.duration_minutes for s in services)
+            or settings.default_duration
+        )
+        for slot in engine.slots(
+            agenda, data.date, minutes, now=moment, customer=data.for_customer
+        ):
+            found[slot.start] = {
+                "start": slot.start,
+                "end": slot.end,
+                "within_notice": slot.within_notice,
+                "staff_ids": [],
+            }
+    zone = business_zone()
+    duration = (
+        lengths[members[0].id]
+        if len(members) == 1
+        else data.duration_minutes
+        or sum(s.duration_minutes for s in services)
+        or settings.default_duration
+    )
+    return {
+        "date": data.date,
+        "timezone": zone_name(),
+        "duration_minutes": duration,
+        "slots": [
+            {
+                **entry,
+                "start": entry["start"].astimezone(zone),
+                "end": entry["end"].astimezone(zone),
+            }
+            for _, entry in sorted(found.items())
+        ],
+    }
+
+
+@operation(
+    "appointment.availability.check",
+    kind="query",
+    permission="appointment.view_schedule",
+    input=CheckIn,
+    output=CheckOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "check if Sara can take an appointment on Friday at 6 pm",
+                "is 9:30 tomorrow bookable, and if not, why?",
+            ),
+            "es": (
+                "¿se puede dar cita a Sara el viernes a las 18:00?",
+                "¿mañana a las 9:30 se puede citar a alguien o por qué no?",
+            ),
+        },
+        "description": "Whether a time can be booked (for a professional, by name, or the business alone) and why not: "
+        "invalid_start, in_past, too_soon, too_far, outside_schedule (the business is shut), outside_staff_hours (the "
+        "professional does not work then or is off), blocked or overlap (with the appointments it overlaps). The same "
+        "rules a booking applies."
+    },
+)
+def availability_check(ctx: OperationContext, data: CheckIn) -> dict:
+    start = read_moment(data.start, "start")
+    member = (
+        resolve_member(data.staff_id, data.staff)
+        if (data.staff_id or data.staff)
+        else None
+    )
+    refs = data.service_refs()
+    services = resolve_services(refs) if refs else []
+    minutes = data.duration_minutes or sum(
+        line["duration_minutes"] for line in lines_for(member, services)
+    )
+    end = engine.ends_at(start, minutes)
+    zone = business_zone()
+    agenda = load_agenda(
+        ctx,
+        member,
+        engine.wall(start, zone).date(),
+        engine.wall(end, zone).date(),
+        exclude=(data.exclude_id,),
+    )
+    code = engine.verdict(agenda, start, end, now=now(), customer=data.for_customer)
+    return {
+        "available": code is None,
+        "code": code,
+        "message": verdict_message(code) if code else "",
+        # Whose appointments they are only for who may see that agenda: a colleague's time is just taken.
+        "conflicts": conflicts_of(agenda, start, end) if member and sees_whose(ctx, member.id) else [],
+    }
+
+
+# ── Blocks ───────────────────────────────────────────────────────────────────────────────────
+
+
+def blocked_out(block: BlockedTime) -> dict:
+    zone = business_zone()
+    return {
+        "id": block.id,
+        "title": block.title,
+        "block_type": block.block_type,
+        "start": block.start.astimezone(zone),
+        "end": block.end.astimezone(zone),
+        "all_day": block.all_day,
+        "staff_id": block.staff_id,
+        "staff_name": block.staff.full_name if block.staff else "",
+        "reason": block.reason,
+    }
+
+
+@operation(
+    "appointment.blocked_time.list",
+    kind="query",
+    permission="appointment.view_schedule",
+    input=BlockedTimeListIn,
+    output=BlockedTimePage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "which blocked periods are on the agenda this month?",
+                "is anything blocked off next week?",
+            ),
+            "es": (
+                "¿qué bloqueos tiene la agenda este mes?",
+                "¿hay algún rato bloqueado la semana que viene?",
+            ),
+        },
+        "description": "The blocked periods (holidays, a professional's break) that touch some business days."
+    },
+)
+def list_blocked_times(ctx: OperationContext, params: BlockedTimeListIn) -> dict:
+    start, end = day_bounds(params.date_from, params.date_to)
+    rows = BlockedTime.objects.select_related("staff").filter(
+        start__lt=end, end__gt=start
+    )
+    if params.staff_id:
+        rows = rows.filter(Q(staff__isnull=True) | Q(staff_id=params.staff_id))
+    return _page(rows.order_by("start", "id"), params.limit, params.offset, blocked_out)
+
+
+def block_label(ctx: OperationContext, block: dict) -> str:
+    """How a person names a blocked period (``blocked_out``): its title, as the Agenda paints it, its day, its hour (none
+    for a whole day) and its professional (none for the whole business's)."""
+    said = start_labels(ctx, block["start"])
+    hour = "" if block["all_day"] else said["start_time_label"]
+    parts = (block["title"], said["start_date_label"], hour, block["staff_name"])
+    return " · ".join(part for part in parts if part)
+
+
+@operation(
+    "appointment.blocked_time.get",
+    kind="query",
+    permission="appointment.view_schedule",
+    input=BlockedTimeRefIn,
+    output=BlockedTimeNamedOut,
+    ai=INTERNAL,
+)
+def get_blocked_time(ctx: OperationContext, data: BlockedTimeRefIn) -> dict:
+    """One blocked period with its name: what names one on the assistant's card (``schemas.A_BLOCK``); the model and the
+    Agenda read the blocks by their list."""
+    block = BlockedTime.objects.select_related("staff").filter(pk=data.id).first()
+    if block is None:
+        raise NotFound(str(BLOCK_NOT_FOUND), code="appointment.blocked_time_not_found")
+    said = blocked_out(block)
+    return {**said, "label": block_label(ctx, said)}
+
+
+# ── Series ───────────────────────────────────────────────────────────────────────────────────
+
+
+def series_with_lines() -> QuerySet[Recurring]:
+    """The series with the services they book (what ``series_out`` shows)."""
+    return Recurring.objects.prefetch_related("lines__service")
+
+
+def series_rows(ctx: OperationContext) -> QuerySet[Recurring]:
+    """The live series the caller may see (``SERIES``), with the services they book."""
+    return SERIES.visible(ctx).filter(deleted_at__isnull=True).prefetch_related("lines__service")
+
+
+def find_series(
+    ctx: OperationContext, series_id: UUID, *, lock: bool = False, lines: bool = False
+) -> Recurring:
+    """The live series the caller may see (``NotFound`` otherwise), with its services when ``lines`` (what its detail
+    shows): one read, so a deletion committed meanwhile is either not seen yet or not found, never a series that
+    vanished or changed between two reads."""
+    rows = (series_rows(ctx) if lines else SERIES.visible(ctx).filter(deleted_at__isnull=True)).filter(pk=series_id)
+    if lock:
+        rows = rows.select_for_update(of=("self",))
+    found = rows.first()
+    if found is None:
+        raise NotFound(str(RECURRING_NOT_FOUND), code="appointment.recurring_not_found")
+    return found
+
+
+def pattern_of(series: Recurring) -> engine.Pattern:
+    return engine.Pattern(
+        series.frequency,
+        series.day_of_week,
+        series.start_date,
+        series.end_date,
+        series.max_occurrences,
+    )
+
+
+def series_out(series: Recurring) -> dict:
+    lines = [
+        {"service_id": line.service_id, "name": line.service.name}
+        for line in series.lines.all()
+    ]
+    return {
+        "id": series.id,
+        "customer_id": series.customer_id,
+        "customer_name": series.customer_name,
+        "staff_id": series.staff_id,
+        "staff_name": series.staff_name,
+        "services": lines,
+        "service_names": ", ".join(line["name"] for line in lines),
+        "frequency": series.frequency,
+        "day_of_week": series.day_of_week,
+        "time": series.time,
+        "duration_minutes": series.duration_minutes,
+        "start_date": series.start_date,
+        "end_date": series.end_date,
+        "max_occurrences": series.max_occurrences,
+        "is_active": series.is_active,
+        "split_from_id": series.split_from_id,
+        "created_at": series.created_at,
+    }
+
+
+def load_series(series_id: UUID) -> dict:
+    return series_out(series_with_lines().get(pk=series_id))
+
+
+RECURRING_ORDER = {
+    "customer_name": ("customer_name",),
+    "staff_name": ("staff_name",),
+    "start_date": ("start_date",),
+    "time": ("time",),
+}
+
+
+@operation(
+    "appointment.recurring.list",
+    kind="query",
+    permission=VIEW_OWN,
+    input=RecurringListIn,
+    output=RecurringPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "which repeating appointments do we have?",
+                "list the recurring appointments that are still running",
+            ),
+            "es": (
+                "¿qué citas fijas que se repiten tenemos?",
+                "las citas recurrentes que siguen en marcha",
+            ),
+        },
+        "description": "List the repeating appointments (series) with customer, services, professional, rule and "
+        "whether they are active; search by a name, filter by active, repetition or professional."
+    },
+)
+def list_series(ctx: OperationContext, params: RecurringListIn) -> dict:
+    rows = series_rows(ctx)
+    if params.search:
+        text = params.search
+        rows = rows.filter(
+            Q(customer_name__icontains=text)
+            | Q(staff_name__icontains=text)
+            | Q(lines__service__name__icontains=text)
+        ).distinct()
+    if params.is_active is not None:
+        rows = rows.filter(is_active=params.is_active)
+    if params.frequency:
+        rows = rows.filter(frequency=params.frequency)
+    if params.staff_id:
+        rows = rows.filter(staff_id=params.staff_id)
+    return _page(
+        rows.order_by(*list_order_for(params.sort, columns=RECURRING_ORDER)),
+        params.limit,
+        params.offset,
+        series_out,
+    )
+
+
+def series_label(series: Recurring) -> str:
+    """How a person names ``series`` in the active language, as each card of the series list is titled: its customer
+    (nothing once her data were erased), its repetition, its weekday (only a weekly or biweekly one keeps one) and its
+    hour."""
+    weekday = "" if series.day_of_week is None else WEEKDAYS[series.day_of_week]
+    parts = (series.customer_name, series.get_frequency_display(), capfirst(weekday), f"{series.time:%H:%M}")
+    return " · ".join(str(part) for part in parts if part)
+
+
+def series_reach(series: Recurring, from_date: dt.date) -> tuple[int, int]:
+    """``(upcoming, charged)``: the live appointments of the series from ``from_date`` on, and how many are charged."""
+    start, _ = day_bounds(from_date, from_date)
+    rows = Appointment.objects.filter(
+        deleted_at__isnull=True, recurring=series, status__in=MOVABLE, start__gte=max(start, now())
+    )
+    counts = rows.aggregate(
+        upcoming=Count("id"), charged=Count("id", filter=Q(sale_id__isnull=False))
+    )
+    return counts["upcoming"], counts["charged"]
+
+
+@operation(
+    "appointment.recurring.get",
+    kind="query",
+    permission=VIEW_OWN,
+    input=RecurringGetIn,
+    output=RecurringDetailOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "when is the next date of Paula's weekly appointment?",
+                "show me Paula's repeating appointment in detail",
+            ),
+            "es": (
+                "¿cuándo toca la próxima cita fija de Paula?",
+                "dame el detalle de la cita fija de Paula",
+            ),
+        },
+        "description": "One repeating appointment with its next date and how many booked appointments an edit from a "
+        "date would reach (and how many of those are charged, which an edit never touches)."
+    },
+)
+def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
+    series = find_series(ctx, data.id, lines=True)
+    dates, upcoming_date = engine.dates(pattern_of(series), until=today())
+    remaining = [day for day in dates if day >= today()]
+    next_date = remaining[0] if remaining else upcoming_date
+    upcoming, charged = series_reach(series, data.from_date or today())
+    with translation.override(ctx.language):
+        label = series_label(series)
+    return {
+        **series_out(series),
+        "next_date": next_date,
+        "upcoming": upcoming,
+        "charged": charged,
+        "label": label,
+    }
+
+
+# ── Settings ─────────────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "appointment.settings.get",
+    kind="query",
+    permission=VIEW_OWN,
+    input=NoIn,
+    output=SettingsOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "what are our appointment booking rules?",
+                "what's the minimum notice for an appointment?",
+            ),
+            "es": (
+                "¿qué antelación mínima piden las citas?",
+                "¿cómo están puestas las reglas de las citas?",
+            ),
+        },
+        "description": "The booking rules: default length, minimum notice and maximum advance, overlaps, the "
+        "customer's cancellation policy, the calendar window, the slot interval and whether the customer's own "
+        "bookings are born confirmed; and the business's time zone."
+    },
+)
+def get_settings(ctx: OperationContext, data: NoIn) -> dict:
+    return settings_out(current_settings())
+
+
+# ── What a separate copy of the business gives back (hub#1284; BASE-F114, APPOINTMENT-F01) ──────────────────────
+
+#: A series' rule, as its create takes it.
+RULE_FIELDS = ("frequency", "day_of_week", "time", "duration_minutes", "start_date", "end_date", "max_occurrences")
+#: What an appointment of a separate copy is read with (``appointments_in_copy``): each a column since ``0001_initial``.
+COPY_FIELDS = ("id", "customer", "staff", "start", "duration_minutes", "notes", "internal_notes", "source")
+#: What the appointment kept of its customer when it was booked: who she is when the copy no longer has her card live.
+KEPT_OF_THE_CUSTOMER = ("customer_name", "customer_phone", "customer_email")
+#: Still booked: a cancelled one, a no-show or one done is not lacking from the agenda.
+BOOKED = [Appointment.Status.PENDING.value, Appointment.Status.CONFIRMED.value]
+
+
+def appointments_in_copy(conn) -> list[dict]:
+    """hub#1284: each appointment of a separate copy of the business still to come and still booked (pending or
+    confirmed, neither deleted nor charged: a charged one is the till's), by its start, with its ``id`` there, what
+    ``appointment.appointment.create`` takes (its services in their order, its professional, its start, its minutes,
+    its notes and how it was booked), the card of its customer there (``customer_card``, ``_card_of``) and every
+    service of the copy as Services reads it (``services_in_copy``, hub#1341: read once, the same list in each), which
+    ``appointments_not_in_business`` matches the business's by; nothing where the app's table is not there. One gone by
+    is not read: it was charged or not, and the agenda books none in the past. ``conn`` is the copy's direct, read-only
+    connection (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias), so it is
+    read by its own SQL over the models' names, never the ORM."""
+    table = Appointment._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    read = (*COPY_FIELDS, *KEPT_OF_THE_CUSTOMER)
+    names = (*read, "status", "deleted_at", "charged_at", "sale_id")
+    column = {field: sql.Identifier(Appointment._meta.get_field(field).column) for field in names}
+    query = sql.SQL(
+        "SELECT {} FROM {} WHERE {} IS NULL AND {} IS NULL AND {} IS NULL AND {} = ANY(%s) AND {} > %s ORDER BY {}, {}"
+    ).format(
+        sql.SQL(", ").join(column[field] for field in read),
+        sql.Identifier(table),
+        column["deleted_at"],
+        column["charged_at"],
+        column["sale_id"],
+        column["status"],
+        column["start"],
+        column["start"],
+        column["id"],
+    )
+    rows = [dict(zip(read, row, strict=True)) for row in conn.execute(query, [BOOKED, timezone.now()])]
+    services = _lines_in_copy(conn, AppointmentService, "appointment", [row["id"] for row in rows])
+    cards = {card["id"]: card for card in cards_in_copy(conn)}
+    # All of them, never the appointments' alone: Services matches by the whole copy (``services_in_business``).
+    copy_services = recovery.services_in_copy(conn) if rows else []
+    return [
+        {
+            "id": row["id"],
+            "customer_card": _card_of(cards.get(row["customer"]), row),
+            "staff_id": row["staff"],
+            "services": services.get(row["id"], []),
+            "start": row["start"],
+            "duration_minutes": row["duration_minutes"],
+            "notes": row["notes"],
+            "internal_notes": row["internal_notes"],
+            "source": row["source"],
+            "services_in_copy": copy_services,
+        }
+        for row in rows
+    ]
+
+
+def _lines_in_copy(conn, lines, owner: str, ids: list[UUID]) -> dict[UUID, list[dict]]:
+    """``{id of an appointment or a series of the copy: its services in their order}``, as its create takes them, of
+    ``ids``: ``lines`` is the model of its services (``AppointmentService``, ``RecurringService``), ``owner`` its field
+    that points at the appointment or the series."""
+    if not ids:
+        return {}
+    column = {field: sql.Identifier(lines._meta.get_field(field).column) for field in (owner, "service", "position")}
+    query = sql.SQL("SELECT {}, {} FROM {} WHERE {} = ANY(%s) ORDER BY {}, {}").format(
+        column[owner],
+        column["service"],
+        sql.Identifier(lines._meta.db_table),
+        column[owner],
+        column[owner],
+        column["position"],
+    )
+    services: dict[UUID, list[dict]] = {}
+    for record, service in conn.execute(query, [ids]):
+        services.setdefault(record, []).append({"service_id": service})
+    return services
+
+
+def _card_of(card: dict | None, row: dict) -> dict:
+    """The customer of an appointment or a series of the copy as Customers matches her (``card_in_business``): the
+    copy's live card (``cards_in_copy``), or, when the copy no longer has it live, what the appointment or the series
+    kept of her (a series keeps her name alone)."""
+    if card is None:
+        kept = {field.removeprefix("customer_"): row.get(field, "") for field in KEPT_OF_THE_CUSTOMER}
+        card = {"id": row["customer"]} | kept
+    return {field: card[field] for field in ("id", "name", "phone", "email")}
+
+
+def appointments_deleted_in_business(appointments: list[dict]) -> list[dict]:
+    """hub#1326: the appointments of a separate copy (``appointments_in_copy``) the business still holds deleted
+    (APPOINTMENT-F11), in their order, for ``appointment.appointment.restore``: the same appointment back, with its
+    number, its history and its series. The same by its id, whatever the copy says of it. Never one booked again since,
+    as the business holds it: a live one of its customer at its moment, or of its series on its date (that one
+    stays)."""
+    live = Appointment.objects.filter(deleted_at__isnull=True)
+    again = live.filter(customer_id=OuterRef("customer_id"), start=OuterRef("start"))
+    rebooked = live.filter(recurring_id=OuterRef("recurring_id"), occurrence_date=OuterRef("occurrence_date"))
+    held = set(
+        Appointment.objects.filter(pk__in=[one["id"] for one in appointments], deleted_at__isnull=False)
+        .exclude(Exists(again))
+        .exclude(Exists(rebooked))
+        .values_list("pk", flat=True)
+    )
+    return [one for one in appointments if one["id"] in held]
+
+
+def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
+    """hub#1284: the appointments of a separate copy (``appointments_in_copy``) the business lacks, in their order, each
+    as ``appointment.appointment.create`` takes it here, with its ``id`` there. Not lacking: one the business holds,
+    live or deleted, whatever became of it since (moved, cancelled, done: it stays as it is; a deleted one comes back the
+    same, ``appointments_deleted_in_business``, hub#1326), and one booked again, by hand or brought back already (a live
+    appointment of the same customer at the same moment). Lacking: one gone altogether.
+
+    Its customer is the business's card of hers by Customers' own rule (``card_in_business``: the same card, the one it
+    was merged into or the one made again); without one, the copy's, which the create refuses with why: an appointment
+    never comes back for a customer the business does not have. Each of its services is the business's by Services' own
+    rule, given every service of the copy (``services_in_business``, hub#1341: the same one, or the one made again, by
+    hand or brought back by Services first, the apps going in the order of their ``requires``); without one, the
+    copy's, which the create refuses with why. Its professional, by her id (one who leaves keeps hers): the create
+    refuses one not bookable any more, as it refuses a moment that does not fit the agenda now."""
+    held = set(Appointment.objects.filter(pk__in=[one["id"] for one in appointments]).values_list("pk", flat=True))
+    # The same list in each (``appointments_in_copy``): every service of the copy, matched once.
+    services = recovery.services_in_business(appointments[0]["services_in_copy"]) if appointments else {}
+    lacking = []
+    for one in appointments:
+        if one["id"] in held:
+            continue
+        customer = card_in_business(one["customer_card"]) or one["customer_card"]["id"]
+        if Appointment.objects.filter(deleted_at__isnull=True, customer_id=customer, start=one["start"]).exists():
+            continue
+        lacking.append(_as_created_here(one, customer, services))
+    return lacking
+
+
+def _as_created_here(one: dict, customer: UUID, services: dict[UUID, UUID]) -> dict:
+    """An appointment or a series of the copy as its create takes it in the business, with its ``id`` there: for
+    ``customer``, the business's card of hers, and each of its services the business's (``services``, from
+    ``services_in_business``) or, without one, the copy's, which the create refuses with why."""
+    create = {key: value for key, value in one.items() if key not in ("id", "customer_card", "services_in_copy")}
+    create["services"] = [
+        {"service_id": services.get(line["service_id"], line["service_id"])} for line in one["services"]
+    ]
+    return {"id": one["id"], "customer_id": customer} | create
+
+
+#: What a series of a separate copy is read with (``series_in_copy``): each a column since ``0001_initial``.
+SERIES_COPY_FIELDS = ("id", "customer", "customer_name", "staff", *RULE_FIELDS)
+
+
+def series_in_copy(conn) -> list[dict]:
+    """hub#1327: each series of a separate copy of the business still booking (neither deleted nor paused, with its
+    professional and not ended by its end date: one that books nothing is not lacking, as a cancelled appointment is
+    not), by its id, with its ``id`` there, what ``appointment.recurring.create`` takes (its services in their order,
+    its professional and its rule), the card of its customer there (``customer_card``, ``_card_of``) and every service
+    of the copy as Services reads it (``services_in_copy``: read once, the same list in each), which
+    ``series_not_in_business`` matches the business's by; nothing where the app's table is not there. ``conn`` is the
+    copy's direct, read-only connection, so it is read by its own SQL over the models' names, never the ORM."""
+    table = Recurring._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    column = {
+        field: sql.Identifier(Recurring._meta.get_field(field).column)
+        for field in (*SERIES_COPY_FIELDS, "deleted_at", "is_active")
+    }
+    query = sql.SQL(
+        "SELECT {} FROM {} WHERE {} IS NULL AND {} AND {} IS NOT NULL AND ({} IS NULL OR {} >= %s) ORDER BY {}"
+    ).format(
+        sql.SQL(", ").join(column[field] for field in SERIES_COPY_FIELDS),
+        sql.Identifier(table),
+        column["deleted_at"],
+        column["is_active"],
+        column["staff"],
+        column["end_date"],
+        column["end_date"],
+        column["id"],
+    )
+    rows = [dict(zip(SERIES_COPY_FIELDS, row, strict=True)) for row in conn.execute(query, [today()])]
+    if not rows:
+        return []
+    services = _lines_in_copy(conn, RecurringService, "recurring", [row["id"] for row in rows])
+    cards = {card["id"]: card for card in cards_in_copy(conn)}
+    copy_services = recovery.services_in_copy(conn)
+    return [
+        {
+            "id": row["id"],
+            "customer_card": _card_of(cards.get(row["customer"]), row),
+            "staff_id": row["staff"],
+            "services": services.get(row["id"], []),
+            **{field: row[field] for field in RULE_FIELDS},
+            "services_in_copy": copy_services,
+        }
+        for row in rows
+    ]
+
+
+#: What makes two series of a customer the same one: they repeat the same way, on the same day, at the same time.
+SAME_RULE = ("frequency", "day_of_week", "time")
+
+
+def _made_again(customer: UUID, rule: dict) -> bool:
+    """Whether the business holds a live series of ``customer`` with ``rule``'s ``SAME_RULE``: the same series made
+    again since, by hand or brought back already, whoever does it."""
+    same = {field: rule[field] for field in SAME_RULE}
+    return Recurring.objects.filter(deleted_at__isnull=True, customer_id=customer, **same).exists()
+
+
+def series_deleted_in_business(series: list[dict]) -> list[dict]:
+    """hub#1327: the series of a separate copy (``series_in_copy``) the business still holds deleted (APPOINTMENT-F15),
+    in their order, for ``appointment.recurring.restore``: the same series back, with the appointments it booked. The
+    same by its id, whatever the copy says of it; never one made again since, as the business holds it (that one
+    stays)."""
+    held = Recurring.objects.filter(pk__in=[one["id"] for one in series], deleted_at__isnull=False)
+    rows = held.values("id", "customer_id", *SAME_RULE)
+    back = {row["id"] for row in rows if not _made_again(row["customer_id"], row)}
+    return [one for one in series if one["id"] in back]
+
+
+def series_not_in_business(series: list[dict]) -> list[dict]:
+    """hub#1327: the series of a separate copy (``series_in_copy``) the business lacks, in their order, each as
+    ``appointment.recurring.create`` takes it here (``_as_created_here``), with its ``id`` there. Not lacking: one the
+    business holds, live or deleted (a deleted one comes back the same, ``series_deleted_in_business``), and one made
+    again for the business's card of her customer (``_made_again``). Its customer and its services are matched as an
+    appointment's are (``appointments_not_in_business``); the create refuses with why what is not there any more, and
+    books the dates of its window that still fit, so none where an appointment came back before it."""
+    held = set(Recurring.objects.filter(pk__in=[one["id"] for one in series]).values_list("pk", flat=True))
+    # The same list in each (``series_in_copy``): every service of the copy, matched once.
+    services = recovery.services_in_business(series[0]["services_in_copy"]) if series else {}
+    lacking = []
+    for one in series:
+        if one["id"] in held:
+            continue
+        customer = card_in_business(one["customer_card"]) or one["customer_card"]["id"]
+        if not _made_again(customer, one):
+            lacking.append(_as_created_here(one, customer, services))
+    return lacking

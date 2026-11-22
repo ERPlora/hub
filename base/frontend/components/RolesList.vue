@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Employees › Roles: erplora.com's four roles. A role is given when a person is invited on erplora.com and changed
+// Employees › Roles: erplora.com's roles. A role is given when a person is invited on erplora.com and changed
 // there, so this list is read only. No module brings a role of its own, so there is nothing to turn on or off. The
 // link leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered
 // in the Google Play copy (`managementOffered`).

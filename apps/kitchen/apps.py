@@ -87,8 +87,8 @@ class KitchenConfig(LiveAppConfig):
         ],
     }
     # Positional (id, label, icon, path). Registered icons only: `tv`, `clipboard-outline` and
-    # `flame-outline` wait in UI-REQUESTS.md. The same icons as the tabbar (frontend/tabs.ts). Each entry opens with its
-    # permission: Stations and Settings, to whoever may change them.
+    # `flame-outline` wait in UI-REQUESTS.md. Each entry is also a tab of the app's pages and opens
+    # with its permission: Stations and Settings, to whoever may change them.
     navigation = [
         Nav("display", _("Display"), "ion:desktop-outline", "/kitchen/display", permission="kitchen.view_ticket"),
         Nav("tickets", _("Tickets"), "ion:list-outline", "/kitchen/tickets", permission="kitchen.view_ticket"),

@@ -37,4 +37,5 @@ Para qué: abrir la caja, llevar la agenda del día (citas que llegan, se mueven
 22. APPOINTMENT-F14 — desde la tercera, a otra hora.
 23. APPOINTMENT-F15 — la serie, en pausa y reactivada.
 24. APPOINTMENT-F11 — el propietario borra una cita de prueba.
-25. CASH_REGISTER-F09 — Ana cierra la caja.
+25. BASE-F55, APPOINTMENT-F27 — Bea, empleada, entra con su PIN: en la agenda solo están su fila y sus citas.
+26. CASH_REGISTER-F09 — Ana cierra la caja.

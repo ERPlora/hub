@@ -103,18 +103,18 @@ def test_spanish_texts_of_the_workbook():
             "Sesiones",
             "Ajustes",
         ]
-        assert str(services.TABLE_HAS_OPEN_SESSION) == (
+        assert str(services.tables.TABLE_HAS_OPEN_SESSION) == (
             "Esa mesa tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa."
         )
         assert (
-            str(services.ZONE_HAS_TABLES)
+            str(services.zones.ZONE_HAS_TABLES)
             == "Esta zona todavía tiene mesas. Muévelas a otra zona o bórralas antes."
         )
-        assert str(services.BILL_OPEN) == (
+        assert str(services.seating.BILL_OPEN) == (
             "La cuenta de esta mesa sigue abierta en Ventas: cóbrala, pásala a otra mesa o elimínala desde el TPV."
         )
         assert (
-            str(services.NUMBER_TAKEN) == "Ya hay una mesa con ese número en esta zona."
+            str(services.tables.NUMBER_TAKEN) == "Ya hay una mesa con ese número en esta zona."
         )
         assert str(queries.TABLE_NOT_FOUND) == "Esa mesa no existe en este negocio."
         assert [str(label) for label in TableSession.Status.labels] == [

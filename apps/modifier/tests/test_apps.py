@@ -2,9 +2,13 @@
 
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 
 def modifier():
@@ -160,4 +164,18 @@ def test_the_pos_reads_are_open_to_api_keys():
 
 
 def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
-    assert modifier().help == Help(videos={"es": "Hko8juygFws", "en": "hjdKTTO4WzU"})
+    assert modifier().help.videos == {"es": "Hko8juygFws", "en": "hjdKTTO4WzU"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("MODIFIER-F02", "MODIFIER-F03"), "if9y7jkrZoc", "-Yc6my6DL9k"),
+    (("MODIFIER-F04",), "ETY8VcEep0c", "mew_vXeVubc"),
+    (("MODIFIER-F05",), "cS91BrL7M1g", "IgB8rNmlNeU"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("modifier", language) == help_videos.by_task(TASK_VIDEOS, language)

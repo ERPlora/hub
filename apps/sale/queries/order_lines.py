@@ -16,6 +16,7 @@ from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provi
 from apps.sale.queries.other_apps import call_app
 from apps.sale.schemas.lines import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
 from base.allergens import in_order
+from base.sensitive import recording_costs
 
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
@@ -59,10 +60,15 @@ def inventory_units(ctx: OperationContext) -> dict:
 MODIFIER_RESOLVE = "modifier.selection.resolve"
 #: Menus' check and pricing of a menu line (COMBO-F08, F09), asked by name.
 COMBO_RESOLVE = "combo.combo.resolve"
+#: What Menus takes of an option of Modifiers to price a dish's options (SALE-F42).
+DISH_OPTION_FIELDS = ("option_id", "name", "kitchen_name", "price_delta", "tax_category_key", "own_line", "allergens")
 
 
 def _dish_label(dish: dict) -> str:
-    return dish["product_name"] if dish["quantity"] == 1 else f"{dish['quantity']}× {dish['product_name']}"
+    """A dish as the kitchen's text of the line names it: «2× Coffee», with its options' kitchen names («Steak (RARE)»)."""
+    label = dish["product_name"] if dish["quantity"] == 1 else f"{dish['quantity']}× {dish['product_name']}"
+    options = [option["kitchen_name"] for option in dish.get("options", [])]
+    return f"{label} ({', '.join(options)})" if options else label
 
 
 def _resolved_menu(ctx: OperationContext, request: dict) -> dict:
@@ -76,10 +82,40 @@ def _product(ctx: OperationContext, data: dict):
 
 
 def _with_allergens(ctx: OperationContext, menu: dict) -> dict:
-    """Menus' answer with each dish carrying the allergens Inventory declares for its product today (SALE-F40)."""
+    """Menus' answer with each dish carrying the allergens Inventory declares for its product today (SALE-F40) and those
+    its options add (SALE-F42)."""
     for dish in menu["components"]:
-        dish["allergens"] = _product(ctx, {"id": dish["product_id"]}).allergens
+        picked = [code for option in dish.get("options", []) for code in option["allergens"]]
+        dish["allergens"] = in_order([*_product(ctx, {"id": dish["product_id"]}).allergens, *picked])
     return menu
+
+
+def _options_by_dish(ctx: OperationContext, data: ComboLineFields, combo_id) -> dict[str, list]:
+    """The options of Modifiers chosen for each dish, by its choice of Menus: a dish named by its product is found by
+    Menus; two picks of one dish carry the options of both."""
+    chosen: dict[str, list] = {}
+    for choice in data.choices:
+        if not choice.option_ids:
+            continue
+        option_id = choice.option_id
+        if option_id is None:
+            said = {"combo_id": combo_id, "group": choice.group, "product": choice.product}
+            option_id = call_app(ctx, "combo.option.get", said, "sale.combo_unavailable").id
+        chosen[str(option_id)] = [*chosen.get(str(option_id), []), *choice.option_ids]
+    return chosen
+
+
+def _dish_options(ctx: OperationContext, data: ComboLineFields, menu: dict) -> dict[str, list]:
+    """The options of each dish of ``menu`` as Modifiers checks and values them for the dish's product (MODIFIER-F07),
+    asked for every dish while Modifiers is on, so a required group left empty refuses the menu also through the API
+    and the assistant (SALE-F42); none without Modifiers."""
+    chosen = _options_by_dish(ctx, data, menu["combo_id"])
+    valued = {}
+    for dish in menu["components"]:
+        picked = _options(ctx, dish["product_id"], chosen.get(str(dish["option_id"]), []))
+        options = [pick.model_dump(mode="json") for pick in picked.picks] if picked else []
+        valued[str(dish["option_id"])] = [{key: option[key] for key in DISH_OPTION_FIELDS} for option in options]
+    return valued
 
 
 def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine:
@@ -91,9 +127,17 @@ def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine
         {
             "id": data.combo_id,
             "combo": data.combo,
-            "choices": [choice.model_dump(exclude_none=True) for choice in data.choices],
+            "choices": [choice.model_dump(exclude_none=True, exclude={"option_ids"}) for choice in data.choices],
         },
     )
+    options = _dish_options(ctx, data, answer)
+    if any(options.values()):
+        # Menus prices the menu again, now with each dish's options.
+        dishes = [
+            {"option_id": dish["option_id"], "quantity": dish["quantity"], "options": options[str(dish["option_id"])]}
+            for dish in answer["components"]
+        ]
+        answer = _resolved_menu(ctx, {"id": answer["combo_id"], "choices": dishes})
     return new_line(
         ctx,
         data,
@@ -123,7 +167,7 @@ def refresh_combos(ctx: OperationContext, lines: Iterable[OrderLine]) -> None:
                 {
                     "id": line.combo_id,
                     "choices": [
-                        {"option_id": dish["option_id"], "quantity": dish["quantity"]}
+                        {"option_id": dish["option_id"], "quantity": dish["quantity"], "options": _frozen_options(dish)}
                         for dish in line.combo["components"]
                     ],
                     "amount": line.unit_price,
@@ -137,8 +181,13 @@ def refresh_combos(ctx: OperationContext, lines: Iterable[OrderLine]) -> None:
         line.tax_category_key = answer["tax_category_key"] or ""
 
 
-def _options(ctx: OperationContext, product, option_ids: list[UUID]) -> dict | None:
-    """Modifiers' check and valuation of the options chosen for ``product`` (MODIFIER-F07), always asked when
+def _frozen_options(dish: dict) -> list[dict]:
+    """The options a dish of a menu froze, as Menus takes them again to charge it; none on a dish ordered without."""
+    return [{key: option[key] for key in DISH_OPTION_FIELDS} for option in dish.get("options", [])]
+
+
+def _options(ctx: OperationContext, product_id, option_ids: list[UUID]) -> dict | None:
+    """Modifiers' check and valuation of the options chosen for a product (MODIFIER-F07), always asked when
     Modifiers is on, also with none chosen (it refuses a required group left empty, which the API and the
     assistant do not go through the sheet for). Modifiers off or absent: ``None`` without options, 409
     ``sale.modifier_unavailable`` with them. Its refusals reach the seller as they are."""
@@ -146,7 +195,7 @@ def _options(ctx: OperationContext, product, option_ids: list[UUID]) -> dict | N
         return call_app(
             ctx,
             MODIFIER_RESOLVE,
-            {"product_id": product.id, "option_ids": option_ids},
+            {"product_id": product_id, "option_ids": option_ids},
             "sale.modifier_unavailable",
         )
     except Conflict as refused:
@@ -168,7 +217,8 @@ def freeze_product_line(
     """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
     new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
     try:
-        product = _product(ctx, {"id": data.product_id, "product": data.product})
+        # The line keeps the cost even when whoever sells does not see it (base.view_costs): it values the comps.
+        product = _product(recording_costs(ctx), {"id": data.product_id, "product": data.product})
     except NotFound:
         raise Conflict(
             str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available"
@@ -187,7 +237,7 @@ def freeze_product_line(
     unit = units[product.unit]
     priced_in = units[product.pricing_unit]
     check_grid(data.quantity, unit[2], product.unit)
-    chosen = _options(ctx, product, data.option_ids)
+    chosen = _options(ctx, product.id, data.option_ids)
     picks = [pick.model_dump(mode="json") for pick in chosen.picks] if chosen else []
     return new_line(
         ctx,

@@ -250,10 +250,12 @@ def test_a_split_payment_takes_the_change_out_of_the_cash(catalog):
         ("card", 800, 800, 0),
     ]
     assert (sale.payment_method_name, sale.tendered_total, sale.change_total) == (
-        "Cash",
+        "Cash + Card",
         2800,
         1000,
     )
+    # The sale keeps its largest tender as its main method: the completed event carries it.
+    assert dict(events())["sale.sale.completed"]["payment_method_name"] == "Cash"
 
 
 def test_payments_must_add_up_to_the_total(catalog):

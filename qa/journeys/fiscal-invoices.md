@@ -21,15 +21,16 @@ Para qué: las facturas que pide un cliente o se hacen a mano, sus rectificacion
 7. INVOICE-F03 — una factura a mano por un evento privado.
 8. INVOICE-F16, INVOICE-F17 — esa factura, buscada y abierta.
 9. INVOICE-F18 — en PDF.
-10. INVOICE-F19 — pagada por transferencia.
-11. INVOICE-F08 — rectificada a mano.
-12. VERIFACTU-F16, VERIFACTU-F17 — los registros de la factura y de la rectificativa.
-13. VERIFACTU-F20 — sin conexión a internet, un cobro entra en la cola y sale al volver.
-14. VERIFACTU-F21, VERIFACTU-F22 — la cola, a mano y entrada a entrada.
-15. VERIFACTU-F35 — se pregunta a la AEAT si ya tiene uno de la cola.
-16. VERIFACTU-F24 — un registro rechazado por la AEAT.
-17. VERIFACTU-F25 — ese registro, reenviado.
-18. VERIFACTU-F30 — un registro enviado por error, anulado.
-19. VERIFACTU-F26 — la cadena de huellas, verificada.
-20. VERIFACTU-F27 — lo que tiene la AEAT.
-21. VERIFACTU-F31 — los envíos, vigilados desde las pantallas.
+10. INVOICE-F16, INVOICE-F17, INVOICE-F18 — una empleada solo ve, abre e imprime sus facturas: la de su compañero no le sale en la lista ni se abre por su número.
+11. INVOICE-F19 — pagada por transferencia.
+12. INVOICE-F08 — rectificada a mano.
+13. VERIFACTU-F16, VERIFACTU-F17 — los registros de la factura y de la rectificativa.
+14. VERIFACTU-F20 — sin conexión a internet, un cobro entra en la cola y sale al volver.
+15. VERIFACTU-F21, VERIFACTU-F22 — la cola, a mano y entrada a entrada.
+16. VERIFACTU-F35 — se pregunta a la AEAT si ya tiene uno de la cola.
+17. VERIFACTU-F24 — un registro rechazado por la AEAT.
+18. VERIFACTU-F25 — ese registro, reenviado.
+19. VERIFACTU-F30 — un registro enviado por error, anulado.
+20. VERIFACTU-F26 — la cadena de huellas, verificada.
+21. VERIFACTU-F27 — lo que tiene la AEAT.
+22. VERIFACTU-F31 — los envíos, vigilados desde las pantallas.

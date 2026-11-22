@@ -2,6 +2,7 @@
 
 from . import (
     access as access,
+    access_rights as access_rights,
     api_keys as api_keys,
     app_help as app_help,
     approvals as approvals,
@@ -17,6 +18,7 @@ from . import (
     health as health,
     home as home,
     hubs as hubs,
+    ownership as ownership,
     people as people,
     profile as profile,
     release_notes as release_notes,

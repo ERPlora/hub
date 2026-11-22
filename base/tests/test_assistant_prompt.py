@@ -96,6 +96,8 @@ def _said(language="en", **who):
         (Membership.Role.MANAGER, "es", "Encargado"),
         (Membership.Role.EMPLOYEE, "en", "Employee"),
         (Membership.Role.EMPLOYEE, "es", "Empleado"),
+        (Membership.Role.ACCOUNTANT, "en", "Accountant"),
+        (Membership.Role.ACCOUNTANT, "es", "Gestoría"),
     ],
 )
 def test_the_instructions_name_the_persons_role_in_the_chat_language(role, language, name):
@@ -109,7 +111,12 @@ def test_the_instructions_name_the_persons_role_in_the_chat_language(role, langu
 
 @pytest.mark.parametrize(
     ("role", "who"),
-    [(Membership.Role.EMPLOYEE, "a manager or the owner"), (Membership.Role.MANAGER, "the owner or an administrator")],
+    [
+        (Membership.Role.EMPLOYEE, "a manager or the owner"),
+        (Membership.Role.MANAGER, "the owner or an administrator"),
+        # The accountancy firm only reads: what it cannot do, whoever runs the business does.
+        (Membership.Role.ACCOUNTANT, "the owner or an administrator"),
+    ],
 )
 def test_a_role_that_cannot_do_something_is_told_who_can_and_no_other_tool_is_tried(role, who):
     """A tool may be missing for their role or because its app is off or out of the plan (``active_apps``): the model

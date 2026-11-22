@@ -34,7 +34,9 @@ import { LEAVE_TYPES, REQUEST_STATUSES, requestStatusTone } from '../lib/enums';
 import { formatDate, formatTime } from '../lib/format';
 import { memberSearch } from '../lib/pickers';
 import type { TimeOffDetailOut, TimeOffListIn, TimeOffOut } from '../operations';
-import { staffTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('staff');
 
 type View = 'all' | 'mine';
 
@@ -45,8 +47,6 @@ const client = useLiveClient();
 
 const canManage = computed(() => session.can('staff.manage_time_off'));
 const canRequest = computed(() => session.can('staff.request_time_off'));
-const canSettings = computed(() => session.can('staff.manage_settings'));
-const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 // ── The lists ──────────────────────────────────────────────────────────────────────────────────
 const view = ref<View>('all');
@@ -246,7 +246,7 @@ function add(): void {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings, commissions: canSeePay })"
+    :tabs="tabs"
     :tabs-label="$t('staff.tabs.label')"
   >
     <PageNotices

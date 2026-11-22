@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:becf7f63b3ac82cbb358902aea4f8abf0afe215e95498b99ede7900d8266deea -->
+<!-- generated from WORKBOOK.md sha256:627c5864767b36932b006d96bf7cacce22baac974720c665ac2433ed986b7d51 -->
 
 ## What it is for and who it is for
 
@@ -28,7 +28,7 @@ Who uses it:
 
 - The **owner**, the **administrator** and the **manager** create categories, rules and aliases, set an end
   date on a rule and deactivate or restore it.
-- The **employee** only looks and calculates.
+- The **employee** does not open its screens (by its address, "No access" (BASE-F118)); the till and the assistant calculate with its rules.
 - The **assistant** (by voice or by text, with the session of whoever speaks) does the same: "deactivate the beer
   rule in Germany", "end the reduced rate on 31 December". Before an action it asks for confirmation with its card
   (BASE-F97), which names each rule as the Rules list tells it apart, never by its identifier: by its category, a
@@ -616,3 +616,5 @@ Nothing: Taxes depends on no app and reacts to no notice of others.
 | Create categories, rules and aliases; set an end date, deactivate and restore rules; change the tax region | yes | yes | yes | no | `tax.manage` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+The accountancy firm (`hub_accountant`) only has "View categories, rules, aliases and the tax region, and calculate",
+like the employee: it reads the taxes on each sale and each invoice, and changes nothing.

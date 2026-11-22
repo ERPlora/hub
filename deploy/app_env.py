@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Checks the hub's settings of each environment (deploy/app-env.json) and applies one environment's to a deploy.
 
-.github/scripts/ecs-deploy.sh runs it once it has prepared every revision it will register, one <family>.json per
-family in its work directory, and before it registers any:
+scripts/ecs_deploy.py runs it once it has prepared every revision it will register, one <family>.json per family in
+its work directory, and before it registers any:
 
     deploy/app_env.py <workdir> <environment> <commit> <region> [--confirm=NAME=value[,NAME=value]]
 
 It reads deploy/app-env.json of the commit being deployed, the settings in force in /erplora/<environment>/hub/app_env
 (ERPlora/aws README, "Ajustes de la app") and, in prod, the latest ACTIVE revision of the SaaS. When every check passes
-it writes its family's settings into each <family>.json, and app_env.json with what ecs-deploy.sh records once the
+it writes its family's settings into each <family>.json, and app_env.json with what ecs_deploy.py records once the
 deploy succeeds; otherwise it reports every problem and changes nothing. Standard library only: it runs on the deploy
 runner's python3.
 """
@@ -328,7 +328,7 @@ def apply(workdir, environment, commit, region, confirm):
 
 
 def write_settings(workdir, settings):
-    """What ecs-deploy.sh and ecs-rollback.sh record in app_env once they succeed: compact JSON, keys sorted."""
+    """What ecs_deploy.py and ecs_rollback.py record in app_env once they succeed: compact JSON, keys sorted."""
     (workdir / "app_env.json").write_text(json.dumps(settings, sort_keys=True, separators=(",", ":")))
 
 

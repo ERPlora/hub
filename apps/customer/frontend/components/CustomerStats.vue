@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // The four figures above the customer list (WORKBOOK «Pantallas · Clientes»): Customers, Active,
 // VIP and Revenue (in the business's currency: customer-business-currency), followed live from
-// `customer.customer.stats`; a write anywhere re-runs it on the server. The cards are the product's `ok-kpi` (label over a big value) rebuilt here until
-// `@erplora/ui` has a KPI card (UI-REQUESTS.md).
+// `customer.customer.stats`; a write anywhere re-runs it on the server. Revenue is the whole business's: it comes
+// empty to whoever does not see the business totals, and its card is left out. The cards are the product's `ok-kpi`
+// (label over a big value) rebuilt here until `@erplora/ui` has a KPI card (UI-REQUESTS.md).
 import { formatMoney } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
@@ -18,17 +19,14 @@ const loading = computed(() => data.value === undefined);
 
 const figures = computed(() => {
   const stats = data.value;
-  return [
+  const counts = [
     { id: 'total', label: 'customer.stats.customers', raw: stats?.total, text: stats ? String(stats.total) : '…' },
     { id: 'active', label: 'customer.stats.active', raw: stats?.active, text: stats ? String(stats.active) : '…' },
     { id: 'vip', label: 'customer.stats.vip', raw: stats?.vip, text: stats ? String(stats.vip) : '…' },
-    {
-      id: 'revenue',
-      label: 'customer.stats.revenue',
-      raw: stats?.total_revenue,
-      text: stats ? formatMoney(stats.total_revenue, locale.value, money.value) : '…',
-    },
   ];
+  if (stats?.total_revenue === null) return counts;
+  const revenue = stats ? formatMoney(stats.total_revenue, locale.value, money.value) : '…';
+  return [...counts, { id: 'revenue', label: 'customer.stats.revenue', raw: stats?.total_revenue, text: revenue }];
 });
 </script>
 

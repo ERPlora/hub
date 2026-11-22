@@ -536,14 +536,15 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 
 ### Cómo son las páginas
 
-- `frontend/pages/CartsPage.vue` y `OrdersPage.vue`, con la barra de pestañas de `frontend/tabs.ts`.
+- `frontend/pages/CartsPage.vue` y `OrdersPage.vue`, con la barra de pestañas de `useAppTabs` (las entradas del
+  menú que la persona puede abrir).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `payment`),
   formularios en `FormModal` (`CartFormModal`, `FailOrderModal`), confirmación de borrar con
   `useConfirm`, importes y cantidades con `lib/format.ts`.
 - La barra de arriba lleva el nombre de la app (`cart_checkout.title`); la pestaña la
   añade el shell.
 - Los importes agrupan los millares también con cuatro cifras (`useGrouping: 'always'`: el CLDR del
-  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }` y se lee con el
+  español deja `1234,56 €`; hub#1090). El filtro de Total es `{ type: 'range', amount: true }` y se lee con el
   lector común de las listas (hub#1196): `filterCents` y `amountFilterErrors` de `base/frontend/lib/money.ts`
   (sobre `parseMoney` de `@erplora/ui`) sobre `TOTAL_BOUNDS`; las dos páginas corren la tabla de textos de
   `base/frontend/__tests__/amount-filter.ts` (pm#521).

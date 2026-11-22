@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Checks the hub's settings the revisions a rollback goes back to run, and writes what it records.
 
-.github/scripts/ecs-rollback.sh runs it once it has found the revisions the services go back to, before it moves any,
+scripts/ecs_rollback.py runs it once it has found the revisions the services go back to, before it moves any,
 with what `aws ecs describe-task-definition --include TAGS` answers for each in <workdir>/<family>.json:
 
     deploy/app_env_rollback.py <workdir> <environment> <region> [--confirm=NAME=value[,NAME=value]]
@@ -9,7 +9,7 @@ with what `aws ecs describe-task-definition --include TAGS` answers for each in 
 A rollback registers nothing: the services run the settings those revisions were registered with, whatever
 deploy/app-env.json says today. So it reads the hub settings of each revision's app container and puts them through
 the deploy's checks (deploy/app_env.py): the rules of each environment and, in prod, the lock against the settings in
-force and the SaaS charging. Then it writes app_env.json with what ecs-rollback.sh records once the rollback
+force and the SaaS charging. Then it writes app_env.json with what ecs_rollback.py records once the rollback
 succeeds; otherwise it reports every problem and changes nothing. Standard library only: it runs on the deploy
 runner's python3.
 """

@@ -14,7 +14,9 @@ import { computed } from 'vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
-import { tableTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('table');
 
 const NUMBERS = ['timer_warning_minutes', 'timer_critical_minutes'] as const;
 const LABELS: Record<(typeof NUMBERS)[number], [string, string]> = {
@@ -48,7 +50,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('table.title')"
-    :tabs="tableTabs($t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('table.tabs.label')"
     content-layout="detail"
   >

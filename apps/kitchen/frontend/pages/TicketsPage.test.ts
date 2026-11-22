@@ -9,7 +9,16 @@ import type { Component } from 'vue';
 
 import { cardIcons, switchToCards } from '../../../../base/frontend/__tests__/data-table-cards';
 import { business, NOW, POLISH, row, SETTINGS } from '../__tests__/kitchen';
-import { EMPLOYEE, flush, ionValue, type MountOptions, mountKitchen, page, settle } from '../__tests__/mount-kitchen';
+import {
+  EMPLOYEE,
+  flush,
+  ionValue,
+  itPaintsTheTabsItsSessionOpens,
+  mountKitchen,
+  type MountOptions,
+  page,
+  settle,
+} from '../__tests__/mount-kitchen';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
 import type { TicketRowOut } from '../operations';
@@ -255,4 +264,11 @@ describe('TicketsPage: Android Back with unsaved changes (hub#1046, BASE-F05)', 
       restore: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), '', 'ionInput'),
     });
   });
+});
+
+describe('TicketsPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['display', 'Display'], ['tickets', 'Tickets'], ['history', 'History']],
+  );
 });

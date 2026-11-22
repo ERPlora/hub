@@ -10,7 +10,7 @@ from live.operations import AI, operation
 
 from apps.sale.models import FiscalStatus, Sale, Settings
 from apps.sale.queries.other_apps import call_app
-from apps.sale.queries.sales import find_sale, sale_detail
+from apps.sale.queries.sales import sale_detail, visible_sale
 from apps.sale.schemas.sales import SaleOut, SaleRefIn
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ def issue_documents(ctx: OperationContext, data: SaleRefIn) -> dict:
     operation of Invoicing with the caller's session. Invoicing gives each one it issues to the sale or the
     refund (``sale.sale.record_invoice``, in this transaction, INVOICE-F06): only an answer with no document
     (nothing left to declare) is written here. Any refusal reaches the caller and nothing is kept."""
-    sale = find_sale(data.sale_id, data.sale, lock=True)
+    sale = visible_sale(ctx, data.sale_id, data.sale, lock=True)
     _issue_waiting_document(ctx, sale, strict=True)
     if sale.void_invoice_status == FiscalStatus.PENDING:
         document = _fiscal_document(

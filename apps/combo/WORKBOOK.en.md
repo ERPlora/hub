@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:784ca09bf77278ba18df2564d2e7b2b289f3166131f9a6c00205a965d7de19a1 -->
+<!-- generated from WORKBOOK.md sha256:d2a15b0413790d503adb007aa67f15046121ab4f1d0742b6a687544eb6003629 -->
 
 ## What it is for and who it is for
 
@@ -354,7 +354,8 @@ Steps:
    in price, a dish runs out (the last flan served), it is taken off sale or it is withdrawn: when charging,
    Menus only checks again the dishes, the portions and how it is billed (COMBO-F09).
 In: the menu (by id or by name) and the choices (by id, or by the product's name or SKU,
-with the course if needed), with how many of each one; when charging an open check, the amount ordered.
+with the course if needed), with how many of each one and the Modifiers options of each one, already priced by
+Modifiers (SALE-F42), whose price adds to the amount; when charging an open check, the amount ordered.
 Out: the menu's line with its amount, its kitchen name and its dishes, in the order of the courses and
 of the choice, and how it is billed (COMBO-F09). Menus keeps nothing; the sale belongs to Sales.
 If it fails: the line does not go into the check and the sheet (or the assistant, or the API) says why:
@@ -387,7 +388,7 @@ Steps:
    money.
 4. The check shown before charging splits the same way as the charge.
 In: way of selling and VAT category of the menu and the choices; catalogue price and tax category of
-each product, from Inventory.
+each product, from Inventory; the Modifiers options of each dish, which enter the split as SALE-F42 says.
 Out: the split, with the tax category of each line; Sales calculates base and tax with Taxes.
 At the till the menu's setting rules: a check is not marked "to take away". Through the assistant or the API a
 menu "eaten in" can be asked for to take away or for delivery, and then it is split as one "to take
@@ -436,7 +437,8 @@ Steps:
    quantity times the menus ordered and the menu's note on each dish (KITCHEN-F06).
 3. On the paper of each station comes the same menu header with its dishes under it.
 In: the menu's line of the open check, with what Menus gave when it was ordered (COMBO-F08): its kitchen
-name and each dish with its product, its category and how many times it was chosen.
+name and each dish with its product, its category, how many times it was chosen and its Modifiers options, which
+Kitchen puts under the dish (SALE-F42).
 Out: nothing from this module; the kitchen ticket belongs to Kitchen (announces: kitchen ticket sent).
 If it fails: a menu missing a compulsory course does not go into the check (Menus refuses it when it is
 ordered), so it never reaches the kitchen half done. A dish that is a service is not cooked.

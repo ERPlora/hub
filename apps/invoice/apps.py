@@ -44,6 +44,7 @@ class InvoiceConfig(LiveAppConfig):
     )
     permissions = [
         "invoice.view_invoice",
+        "invoice.view_all_invoices",
         "invoice.add_invoice",
         "invoice.rectify_invoice",
         "invoice.manage_series",
@@ -60,11 +61,13 @@ class InvoiceConfig(LiveAppConfig):
         "hub_admin": ["invoice.*"],
         "hub_manager": [
             "invoice.view_invoice",
+            "invoice.view_all_invoices",
             "invoice.add_invoice",
             "invoice.rectify_invoice",
             "invoice.manage_series",
         ],
         "hub_employee": ["invoice.view_invoice", "invoice.add_invoice"],
+        "hub_accountant": ["invoice.view_invoice", "invoice.view_all_invoices"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: the old `document-text-outline` and

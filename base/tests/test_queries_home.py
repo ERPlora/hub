@@ -23,11 +23,12 @@ from live.operations import Operation, get, registry
 from live.outbox import channel_for
 from live.models import OutboxEvent
 from psycopg.conninfo import make_conninfo
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from apps.demo.models import Item
 from apps.demo.schemas import ItemIn
 from base.models import Hub, Membership
+from base.sensitive import COSTS, VIEW_COSTS
 from base.schemas.home import (
     NoticeListIn,
     NoticeListOut,
@@ -708,6 +709,29 @@ def test_a_panel_of_some_verticals_shows_only_in_a_hub_of_one_of_them(modules):
 
     Hub.objects.filter(slug=A.key).update(vertical="restaurant")
     assert [w["key"] for w in widget_list(ctx())] == ["stock.tables"]
+
+
+class StockFiguresOut(BaseModel):
+    stock_value: float | None = Field(None, json_schema_extra=COSTS)
+    products_in_stock: int = 0
+
+
+def test_a_panel_whose_figure_is_a_cost_is_not_on_the_list_of_who_does_not_see_costs(modules, monkeypatch):
+    # The same figures read by two panels: the stock's value at cost needs «view costs»; its count of products, nothing.
+    monkeypatch.setitem(
+        registry,
+        "stock.figures.get",
+        Operation(name="stock.figures.get", kind="query", permission=None, input=AnyIn, output=StockFiguresOut,
+                  expose_api=False, ai=None, fn=lambda ctx, data: {}),
+    )
+    modules(module("stock", widgets=[
+        Widget(key="value", title="Stock value", kind="kpi", operation="stock.figures.get", map={"value": "stock_value"}),
+        Widget(key="count", title="In stock", kind="stat", operation="stock.figures.get",
+               map={"value": "products_in_stock"}),
+    ]))
+
+    assert [w["key"] for w in widget_list(ctx())] == ["stock.count"]
+    assert [w["key"] for w in widget_list(ctx(VIEW_COSTS))] == ["stock.value", "stock.count"]
 
 
 def test_panels_of_a_module_off_or_out_of_the_store(modules, settings):

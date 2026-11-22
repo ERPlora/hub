@@ -28,7 +28,7 @@ encendida: sus facturas y tiques salen sin registro ni QR de VeriFactu, como con
 
 Quién la usa:
 
-- El **empleado** consulta los registros, la cola, los eventos y el estado de la cadena.
+- El **empleado** no abre sus pantallas (por su dirección, «Sin acceso» (BASE-F118)); sus ventas llegan igual a la AEAT.
 - El **responsable**, además, envía un registro concreto, procesa y reintenta la cola, consulta lo que
   tiene la AEAT y prueba la conexión.
 - El **propietario** y el **administrador**, además, suben o quitan el certificado del negocio, pasan a
@@ -110,8 +110,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Seis pestañas en el pie de cada página de VeriFactu (las del menú, en este orden): Registros, Contingencia,
-Eventos, Recuperación, Configuración y Ajustes. Todas se ven con el permiso de consulta; los botones que
-la persona no puede usar no aparecen.
+Eventos, Recuperación, Configuración y Ajustes. Las cuatro primeras, para quien envía registros;
+Configuración y Ajustes, solo para quien configura VeriFactu. Los botones que la persona no puede usar no aparecen.
 
 ### Registros
 Cada factura y cada tique que emites tiene aquí su registro de VeriFactu, lo último arriba, con su estado ante la

@@ -29,7 +29,7 @@ transferencias; «Enviado» y «Completado» los marca una persona cuando el ban
 
 Quién la usa:
 
-- El **empleado**: solo mira la lista de pagos y la de métodos.
+- El **empleado** no abre Pagos (por su dirección, «Sin acceso» (BASE-F118)).
 - El **responsable**, el **administrador** y el **propietario**: además registran pagos, los marcan
   como enviados y completados, los aprueban y los cancelan, y gestionan los métodos de pago.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo. Antes de una
@@ -262,7 +262,7 @@ Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
 Estado: hecho
-Actor: empleado, responsable, administrador, propietario, asistente
+Actor: responsable, administrador, propietario, asistente (un empleado no abre Pagos: por su dirección, «Sin acceso» (BASE-F118))
 Pantalla: Pagos
 Pasos:
 1. Abre **Pagos**.
@@ -486,13 +486,14 @@ pago» y ata Pagos a Ventas sin motivo.
 
 ### Cómo son las páginas
 
-- `frontend/pages/PaymentsPage.vue` y `MethodsPage.vue`, con la barra de pestañas de `frontend/tabs.ts`.
+- `frontend/pages/PaymentsPage.vue` y `MethodsPage.vue`, con la barra de pestañas de `useAppTabs` (las entradas del
+  menú que la persona puede abrir).
   La Fecha de Pagos filtra por rango (`daterange`: `payment_date_from` y `payment_date_to`, cada extremo
   por su lado).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
   con el `MoneyInput` de `@erplora/ui/components` y su `parseMoney` (hub#924).
-- Los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `useGrouping: 'always'` en
+- Los importes agrupan los millares también con cuatro cifras (`1.234,56 €`; `useGrouping: 'always'` en
   `lib/format.ts`, porque el CLDR del español espera a cinco: hub#1090, que salió de payments#20), como
   Carrito y Tarifas.
 - Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md`: los iconos y las piezas que viven copiadas en

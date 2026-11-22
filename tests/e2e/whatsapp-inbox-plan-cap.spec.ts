@@ -33,28 +33,13 @@ import {
   restorePhoto,
   seedErplora,
 } from './whatsapp-helpers';
+import { SET_PLAN } from './whatsapp-seed';
 
 test.describe.configure({ mode: 'serial' });
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-ZERO-LIMIT-SHOWN-UNLIMITED';
 const NEAR = 'FIX-HUB-WHATSAPP-INBOX-WORKBOOK-KEEPS-SETTLED-DECISIONS-OPEN';
 const SPENT = 'FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED';
-// In erplora.com: the WhatsApp messages a month of `a`'s plan become WA_LIMIT, and its photo is pushed to this Hub.
-const SET_PLAN = `
-import json, os
-from django.db import transaction
-from django.utils import timezone
-from hubs import queries, services
-from hubs.models import Hub
-hub = Hub.objects.get(slug="a")
-plan = queries.effective_plan(hub.id, timezone.now())
-before = plan.whatsapp_messages_per_month
-plan.whatsapp_messages_per_month = int(os.environ["WA_LIMIT"])
-plan.save(update_fields=["whatsapp_messages_per_month"])
-with transaction.atomic():
-    services.bump_state(hub.id)
-print(json.dumps({"before": before, "delivered": services.sync_hub(hub.id)}))
-`;
 
 function setPlan(limit: number): { before: number; delivered: boolean } {
   return inErplora(['manage.py', 'shell', '-c', SET_PLAN], { WA_LIMIT: String(limit) });

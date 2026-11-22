@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { type BusinessMountOptions, mountInShell, overBase, settle } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business, IN_YEN as JAPANESE } from '../../../../base/frontend/__tests__/business';
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
@@ -23,16 +24,16 @@ export const CASH_PERMISSIONS = [
   'cash_register.manage_settings',
 ];
 
-export const ADMIN: SessionMe = {
+export const ADMIN: SessionMe = withMenu('cash_register', {
   user: { id: 'u1', label: 'Ana' },
   permissions: [...CASH_PERMISSIONS, 'sale.view_sale'],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** The employee (the old cashier too): opens, records, counts and closes; no settings, no blind expected. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('cash_register', {
   ...ADMIN,
   permissions: [
     'cash_register.view_session',
@@ -44,7 +45,7 @@ export const EMPLOYEE: SessionMe = {
     'cash_register.add_count',
     'sale.view_sale',
   ],
-};
+});
 
 /** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
  *  (flow business-currency: the money of every screen is the business's). */

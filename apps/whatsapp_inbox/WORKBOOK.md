@@ -114,8 +114,8 @@ del mes, los que quedan («Te quedan 30 de 150 mensajes de WhatsApp de tu plan e
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
 llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.») o un plan que
 no incluye ninguno («Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se
-puede enviar nada hasta que mejores el plan.»), los tres con **Mejorar el plan** para quien puede configurar, en
-el navegador (en la app instalada no está: lo que vende solo está en la web).
+puede enviar nada hasta que mejores el plan.»), los tres con **Mejorar el plan** para el propietario, en
+el navegador (en la app instalada no está: lo que vende solo está en la web, y en erplora.com solo compra el propietario).
 Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
 «Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
 motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una nota de voz que no carga: «No se ha
@@ -136,7 +136,7 @@ reconectar, **Desconectar**, que pregunta antes); **Este mes** (los mensajes
 enviados frente a los del plan; desde el 80 %, «Te quedan 30 de 150 mensajes de tu plan este mes.», y en el tope
 «Has usado todos los mensajes de tu plan este mes.»; si el plan no incluye ninguno, «Tu plan no incluye mensajes de
 WhatsApp.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este mes.»; desde
-el 80 % y en el tope, **Mejorar el plan**, que abre los planes de erplora.com, solo en el navegador); y **Plantillas de Meta**: tabla con **Nombre**,
+el 80 % y en el tope, **Mejorar el plan**, que abre los planes de erplora.com, solo para el propietario y en el navegador); y **Plantillas de Meta**: tabla con **Nombre**,
 **Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
 Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
 debajo, cuando toca, «Enviándose a Meta…», «No aceptada: …», «Cambios sin enviar: …» o «Borrándose en
@@ -454,16 +454,16 @@ Pasos:
 1. **Ajustes → Este mes** enseña los mensajes enviados este mes frente a los del plan; los dos
    números los pone erplora.com. Si el plan no incluye mensajes de WhatsApp, lo dice («Tu plan no incluye
    mensajes de WhatsApp.»), nunca que no tiene límite; desde el 80 % de los del plan, por ejemplo, «Te quedan 30
-   de 150 mensajes de tu plan este mes.» con **Mejorar el plan** (en el navegador; en la app instalada no está); en el tope, «Has usado todos los mensajes de tu
+   de 150 mensajes de tu plan este mes.» con **Mejorar el plan** (para el propietario, en el navegador; en la app instalada no está); en el tope, «Has usado todos los mensajes de tu
    plan este mes.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este
    mes.».
 2. Desde el 80 % de los mensajes del mes, la bandeja lo avisa encima de la lista, por ejemplo, «Te quedan 30 de 150
-   mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve, en el navegador, **Mejorar el plan**, que
+   mensajes de WhatsApp de tu plan este mes.»; el propietario ve, en el navegador, **Mejorar el plan**, que
    abre los planes de erplora.com ya dentro con su cuenta. Por debajo del 80 %, nada. La cuenta se mueve
    sola, sin recargar.
 3. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
-   enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve, en el navegador, **Mejorar el
+   enviar nada.» cuando el plan no incluye ninguno); el propietario ve, en el navegador, **Mejorar el
    plan**, que abre los planes de erplora.com ya dentro con su cuenta.
 4. Lo que escriben los clientes se sigue guardando.
 5. Al cambiar de mes (el de erplora.com, que cuenta los mensajes en UTC: en España, a la 1:00 o las 2:00 del día 1) el
@@ -1330,11 +1330,11 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   `message.notify`) y `submit_key` (`template.create`, `template.update`) por su marca `attempt_key`
   (PLAN-HUB §47), aunque lleguen vacías o sin forma de UUID, y nombra el archivo de la cabecera
   (`header_sample`) por el nombre con que se eligió, con la lectura `template_sample.detail` (marca `refers`
-  de `A_SAMPLE` en `schemas.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
+  de `A_SAMPLE` en `schemas/fields.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
   automatización sin persona delante, lo deja fuera, nunca por su id
   (`tests/test_integration_assistant.py`).
 - **La misma tarjeta nombra el registro que toca cada escritura** (hub#571) con las marcas `refers` de
-  `schemas.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
+  `schemas/fields.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
   `ConversationRefIn` y de `SendIn`) por su `display_name` con `conversation.detail`; la ficha que se une
   (`A_CUSTOMER`) con `customer.customer.detail` de Clientes, que es requisito; el mensaje que se reintenta
   (`A_MESSAGE`) con `message.get`, por su texto, si no su pie, su archivo o su plantilla; la nota que se

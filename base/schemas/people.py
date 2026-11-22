@@ -7,10 +7,15 @@ from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
+from base.models import Membership
 from base.schemas.assistant import names
+from base.sensitive import TEAM_CONTACT
 
 
 # ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
+
+#: erplora.com's roles of a business, as its photo and its login send them.
+HubRole = Literal[*Membership.Role.values]
 
 
 class PersonListIn(Schema):
@@ -29,8 +34,11 @@ class PersonOut(Schema):
     id: str = Field(description="The person in this hub: their account's local name (``saas:<id>``).")
     name: str
     initials: str
-    email: str = Field(description="Their erplora.com address; empty for whom does not run the business.")
-    role: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    email: str | None = Field(
+        description="Their erplora.com address; null for whoever does not see the team's contact details.",
+        json_schema_extra=TEAM_CONTACT,
+    )
+    role: HubRole
     ways: PersonWaysOut
     entered: bool = Field(description="False: erplora.com names them, and they have not entered this hub yet.")
     me: bool
@@ -82,9 +90,9 @@ class RoleListIn(Schema):
 
 
 class RoleOut(Schema):
-    key: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    key: HubRole
     label: str
-    origin: Literal["basic"] = Field(description="Where the role comes from: erplora.com's own four.")
+    origin: Literal["basic"] = Field(description="Where the role comes from: erplora.com's own.")
     members: int
     permissions: int = Field(description="How many permissions of the apps of this deployment it gives.")
 

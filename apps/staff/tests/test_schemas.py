@@ -8,22 +8,17 @@ import pydantic
 import pytest
 from django.utils import translation
 
-from apps.staff.schemas import (
+from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
+from apps.staff.schemas.commissions import CommissionOut, CommissionPage
+from apps.staff.schemas.fields import ByIdIn, MemberRefIn, Page, PageIn
+from apps.staff.schemas.members import (
     MEMBER_SORTS,
-    ROLE_SORTS,
-    TIME_OFF_SORTS,
-    AvailabilityIn,
-    AvailabilityOut,
     BulkCreatedOut,
     BulkCreateIn,
     BulkMemberIn,
-    ByIdIn,
-    CommissionOut,
-    CommissionPage,
     CompensationListIn,
     CompensationOut,
     CompensationPage,
-    DayIn,
     MemberDetailOut,
     MemberIn,
     MemberListIn,
@@ -31,24 +26,15 @@ from apps.staff.schemas import (
     MemberOut,
     MemberPage,
     MemberPatchIn,
-    MemberRefIn,
     MemberStatsOut,
     MineOut,
-    Page,
-    PageIn,
-    RoleIn,
-    RoleListIn,
-    RoleOut,
-    RolePage,
-    RolePatchIn,
-    ScheduleIn,
-    ScheduleListIn,
-    ScheduleOut,
-    ScheduleUpdateIn,
-    SetActiveIn,
-    SettingsIn,
-    SettingsOut,
     TerminateIn,
+)
+from apps.staff.schemas.roles import ROLE_SORTS, RoleIn, RoleListIn, RoleOut, RolePage, RolePatchIn
+from apps.staff.schemas.schedules import DayIn, ScheduleIn, ScheduleListIn, ScheduleOut, ScheduleUpdateIn, SetActiveIn
+from apps.staff.schemas.settings import SettingsIn, SettingsOut
+from apps.staff.schemas.time_off import (
+    TIME_OFF_SORTS,
     TimeOffDetailOut,
     TimeOffIn,
     TimeOffListIn,
@@ -161,13 +147,11 @@ def test_member_list_filters_and_sorts():
     assert invalid_fields(MemberListIn, status="terminated") == {"status"}
     assert MemberListIn(sort="-hire_date").sort == "-hire_date"
     assert invalid_fields(MemberListIn, sort="salary") == {"sort"}
-    # Every column of the list sorts both ways.
+    # Every column of the list sorts both ways, but the email and the phone, by which nobody sorts the team.
     assert set(MEMBER_SORTS) == {
         "name",
         "first_name",
         "last_name",
-        "email",
-        "phone",
         "role_name",
         "status",
         "is_bookable",

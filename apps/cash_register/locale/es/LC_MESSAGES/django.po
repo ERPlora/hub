@@ -136,6 +136,12 @@ msgstr "cerrada el"
 msgid "closed by"
 msgstr "cerrada por"
 
+msgid "opener's account"
+msgstr "cuenta de quien la abrió"
+
+msgid "closer's account"
+msgstr "cuenta de quien la cerró"
+
 msgid "counted cash"
 msgstr "efectivo contado"
 

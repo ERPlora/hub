@@ -84,6 +84,14 @@ class ComboChoiceIn(Closed):
     quantity: int = Field(
         1, ge=1, le=MAX_OPTIONS, description="How many times it is picked in one menu (two coffees: 2)."
     )
+    option_ids: list[ModifierId] = Field(
+        default_factory=list,
+        max_length=MAX_OPTIONS,
+        title=gettext_noop("Modifiers"),
+        description="The options of Modifiers chosen for the dish (modifier.group.for_target of its product), in the "
+        "order they were chosen: the same the dish asks sold on its own. Each pick of the dish carries them all. "
+        "Modifiers checks and values them, and their price adds to the menu's, frozen on the line.",
+    )
 
     @model_validator(mode="after")
     def _named(self):

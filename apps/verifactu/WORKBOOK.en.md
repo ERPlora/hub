@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7b1a14960be8c34f046848020c3722a617d3468eb174506cf03cb76521b713cb -->
+<!-- generated from WORKBOOK.md sha256:6cd82f5b1dbbf4790b233767c6206e8062fc7a1876062dceb96b0611430d2ae6 -->
 
 ## What it is for and who it is for
 
@@ -20,7 +20,7 @@ with the app on: its invoices and tickets go out without a VeriFactu record or Q
 
 Who uses it:
 
-- The **employee** looks at the records, the queue, the events and the state of the chain.
+- The **employee** does not open its screens (by its address, "No access" (BASE-F118)); their sales reach the AEAT all the same.
 - The **manager**, besides, sends a given record, processes and retries the queue, looks up what the AEAT has
   and tests the connection.
 - The **owner** and the **administrator**, besides, upload or remove the business's certificate, go
@@ -104,8 +104,8 @@ Initial setup, step by step:
 ## Screens
 
 Six tabs at the foot of every VeriFactu page (those of the menu, in this order): Records, Contingency, Events,
-Recovery, Configuration and Settings. All of them show with the view permission; the buttons the person cannot
-use do not show.
+Recovery, Configuration and Settings. The first four, for whoever sends records;
+Configuration and Settings, only for whoever configures VeriFactu. The buttons the person cannot use do not show.
 
 ### Records
 Every invoice and every ticket you issue has its VeriFactu record here, the latest on top, with its status at the

@@ -25,6 +25,7 @@ from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "cash_register.view_session",
+    "cash_register.view_all_sessions",
     "cash_register.add_session",
     "cash_register.close_session",
     "cash_register.view_movement",
@@ -81,7 +82,7 @@ def test_it_is_in_the_store_and_in_both_verticals():
 
 
 def test_permissions():
-    # The product's ten but «view reports», which no operation asked for (it was the home panel's).
+    # The product's ten but «view reports», which no operation asked for (it was the home panel's), and «view all sessions».
     assert config().permissions == PERMISSIONS
 
 
@@ -97,12 +98,13 @@ def test_roles_are_the_four_customer_roles():
 def test_what_each_role_may_do():
     for role in ("hub_owner", "hub_admin"):
         assert permissions_for_role([config()], role) == set(PERMISSIONS), role
-    # The manager sees the expected cash of a blind count; settings and drawers are the admin's.
+    # The manager sees the expected cash of a blind count and every shift; settings and drawers are the admin's.
     assert permissions_for_role([config()], "hub_manager") == {
         *TILL,
         "cash_register.view_expected_totals",
+        "cash_register.view_all_sessions",
     }
-    # The employee is the cashier: opens, records, counts and closes.
+    # The employee is the cashier: opens, records, counts and closes, and reads their own shifts.
     assert permissions_for_role([config()], "hub_employee") == set(TILL)
 
 

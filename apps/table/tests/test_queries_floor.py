@@ -1,17 +1,20 @@
 """What the floor paints of each table's bill (TABLE-F33): an occupied table carries what is left to charge on all its
 open checks of Sales, the same figure Open checks shows; a table nobody sits at carries none. And whether it has asked
 for the bill (TABLE-F34): one of its open checks had its bill printed in Sales, until that check is charged in full or
-deleted. The plan reads both with the checks it already reads, so a room with more occupied tables costs no more
-queries."""
+deleted. And who serves it: who serves its check in Sales («Served by» of the till, SALE-F16), or who seated it while
+nobody was chosen. The plan reads all of it with the checks it already reads, so a room with more occupied tables costs
+no more queries."""
 
 import pytest
 from django.db import connections
 from django.test.utils import CaptureQueriesContext
+from live.context import system_context
 
 from base.tenancy.context import current_alias
 
 from .conftest import (
     HUB_DB,
+    A,
     add_line,
     charge,
     make_hold,
@@ -182,4 +185,36 @@ def test_the_bills_are_read_with_the_checks_not_one_query_per_table(coffee):
         order_id = seat(number).order_id
         add_line(order_id, coffee)
         print_bill(order_id)
+    assert floor_queries() == one
+
+
+def served_by(table_id) -> tuple[str, list[str]]:
+    """Who the plan says serves the table and each of its checks, as the list and the single read both say it."""
+    single = run("table.table.get", {"id": str(table_id)})
+    [listed] = [row for row in run("table.table.list", {"limit": 100}).rows if row.id == table_id]
+    said = (single.waiter_name, [check.waiter_name for check in single.checks])
+    assert (listed.waiter_name, [check.waiter_name for check in listed.checks]) == said
+    return said
+
+
+def serve(order_id, staff_id):
+    run("sale.order.set_staff", {"order_id": str(order_id), "staff_id": staff_id and str(staff_id)})
+
+
+def test_a_table_is_served_by_who_serves_its_check_and_by_who_seated_it_while_nobody_is_chosen():
+    session = make_session(make_table("6"), order_id=open_check("Table 6").id, waiter_name="Luis Pérez")
+    assert served_by(session.table_id) == ("Luis Pérez", ["Luis Pérez"])
+    lucia = run("staff.member.create", {"first_name": "Lucia", "last_name": "Garcia"}, system_context(A))
+    serve(session.order_id, lucia.id)
+    assert served_by(session.table_id) == ("Lucia Garcia", ["Lucia Garcia"])
+    serve(session.order_id, None)
+    assert served_by(session.table_id) == ("Luis Pérez", ["Luis Pérez"])
+
+
+def test_who_serves_is_read_with_the_checks_not_one_query_per_table(coffee):
+    seat("1")
+    one = floor_queries()
+    lucia = run("staff.member.create", {"first_name": "Lucia", "last_name": "Garcia"}, system_context(A))
+    for number in ("2", "3"):
+        serve(seat(number).order_id, lucia.id)
     assert floor_queries() == one

@@ -2,7 +2,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent } from 'vue';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { ADMIN, EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations/apps';
 import AppBlockedPage from './AppBlockedPage.vue';
 
@@ -86,6 +86,13 @@ describe('AppBlockedPage', () => {
     const inApp = await open();
     await inApp.result(inApp.call, 'base.app.list', LIST);
     expect(inApp.wrapper.find('[data-testid="app-blocked-buy"]').exists()).toBe(false);
+  });
+
+  it('an administrator gets no link either: on erplora.com only the owner buys', async () => {
+    const m = await open('/stock/items', { session: ADMIN });
+    await m.result(m.call, 'base.app.list', LIST);
+    expect(m.wrapper.find('[data-testid="app-blocked-buy"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="app-blocked-subscription"]').text()).toContain('erplora.com');
   });
 
   it('bought meanwhile: it offers to open the app with a full load (the session comes up to date)', async () => {

@@ -155,6 +155,34 @@ class TestTheVideo:
         assert ask(language="en-gb")["video"] == VIDEO_EN
 
 
+class TestTheFlowVideos:
+    """Each task of the window carries the short videos the module declares for its flow, in the person's language."""
+
+    CREATE, CHARGE = "L4LipaZOq40", "hzMXqJHeFos"
+
+    def videos(self, language: str) -> dict[str, list[str]]:
+        return {flow["id"]: flow["videos"] for flow in ask(language=language)["flows"]}
+
+    def test_a_flow_has_the_videos_of_the_person_s_language(self, table, monkeypatch):
+        flows = {"TABLE-F01": {"es": [VIDEO_ES, self.CREATE], "en": [VIDEO_EN]}}
+        monkeypatch.setattr(table, "help", Help(flow_videos=flows))
+        assert self.videos("es")["TABLE-F01"] == [VIDEO_ES, self.CREATE]
+        assert self.videos("en")["TABLE-F01"] == [VIDEO_EN]
+
+    def test_a_flow_without_videos_in_the_person_s_language_has_the_source_s(self, table, monkeypatch):
+        monkeypatch.setattr(table, "help", Help(flow_videos={"TABLE-F02": {"es": [self.CHARGE]}}))
+        assert self.videos("en")["TABLE-F02"] == [self.CHARGE]
+
+    def test_a_regional_language_has_its_base_language_s(self, table, monkeypatch, settings):
+        settings.LANGUAGES = [*settings.LANGUAGES, ("en-gb", "British English")]
+        monkeypatch.setattr(table, "help", Help(flow_videos={"TABLE-F02": {"es": [self.CHARGE], "en": [VIDEO_EN]}}))
+        assert self.videos("en-gb")["TABLE-F02"] == [VIDEO_EN]
+
+    def test_a_flow_without_videos_has_none_and_the_others_keep_theirs(self, table, monkeypatch):
+        monkeypatch.setattr(table, "help", Help(flow_videos={"TABLE-F02": {"es": [self.CHARGE]}}))
+        assert self.videos("es") == {"TABLE-F01": [], "TABLE-F02": [self.CHARGE], "TABLE-F03": []}
+
+
 class TestReadOnce:
     """A module's WORKBOOKs only change with a new image: each module and language is read and cut once per process."""
 

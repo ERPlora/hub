@@ -2,6 +2,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ADMIN,
   EMPLOYEE,
   errorFrame,
   flush,
@@ -120,6 +121,15 @@ describe('PeopleList', () => {
     expect(full.get('a[data-testid="people-upgrade"]').attributes('href')).toBe(PLAN_URL);
   });
 
+  it('every place taken, to an administrator: why, without «Upgrade plan», for only the owner buys', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const m = await open({ session: ADMIN });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+    const full = m.wrapper.get('[data-testid="people-full"]');
+    expect(full.text()).toContain('Every place of your plan is taken');
+    expect(full.find('[data-testid="people-upgrade"]').exists()).toBe(false);
+  });
+
   it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     const m = await open({ onApi: () => Response.json({ url: SIGNED }) });
@@ -215,11 +225,25 @@ describe('PeopleList', () => {
   it('anyone else sees the list, without opening a person nor inviting', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     const m = await open({ session: EMPLOYEE });
-    await m.result(m.call, 'base.person.list', { people: PEOPLE.map((p) => ({ ...p, email: '' })), seats: SEATS });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE.map((p) => ({ ...p, email: null })), seats: SEATS });
     await m.wrapper.findAll('[data-testid="people-row"]')[1].trigger('click');
     await flush();
     expect(m.router.currentRoute.value.path).toBe('/employees');
     expect(m.wrapper.find('[data-testid="people-invite"]').exists()).toBe(false);
+  });
+
+  it('the «Email» column is for whoever sees the team’s contact details, even without running the business', async () => {
+    const manager = { ...EMPLOYEE, permissions: ['base.view_home', 'base.view_team_contact'] };
+    const m = await open({ session: manager });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: SEATS });
+    expect(m.wrapper.text()).toContain('Email');
+    expect(m.wrapper.findAll('[data-testid="people-row"]')[1].text()).toContain('eva@example.com');
+  });
+
+  it('without it there is no «Email» column, not even for who runs the business', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.person.list', { people: PEOPLE.map((p) => ({ ...p, email: null })), seats: SEATS });
+    expect(m.wrapper.text()).not.toContain('Email');
   });
 
   it('a list that cannot be read says so with «Retry», never «nobody»', async () => {

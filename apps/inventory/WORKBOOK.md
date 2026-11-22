@@ -116,14 +116,16 @@ o la API).
 
 ### Panel
 Las cifras del stock de un vistazo: «Productos seguidos» (los que llevan control de stock), «En stock»,
-«Agotados», «Stock bajo» y «Valor de existencias», a coste. Toca una de las cuatro primeras para ir a
+«Agotados», «Stock bajo» y «Valor de existencias», a coste, que solo sale a quien ve los costes (el propietario,
+el administrador y el encargado). Toca una de las cuatro primeras para ir a
 Productos. Debajo, la tabla «Productos con stock bajo», del que menos tiene al que más, con el umbral de
 cada uno. Se pone al día sola con cada venta y cada movimiento.
 
 #### Detalle
 Cifras de arriba: «Productos seguidos», «En stock», «Agotados», «Stock bajo» y «Valor de
 existencias» («a coste»). Las cuatro primeras llevan a Productos. Si hay artículos con control de
-stock sin coste, la nota «N producto(s) sin coste registrado: el valor mostrado es parcial».
+stock sin coste, la nota «N producto(s) sin coste registrado: el valor mostrado es parcial». Quien no ve los
+costes no tiene ni el valor ni la nota.
 Debajo, la tabla «Productos con stock bajo» (Nombre, SKU, Stock, Umbral), 5 por página.
 Vacía: «Sin productos en stock bajo.». Cargando: «Cargando…». Error: «No se pudieron cargar las
 métricas del inventario.» y el aviso de la tabla con «Reintentar».
@@ -251,7 +253,7 @@ inventario: de fábrica, el administrador y el responsable.
 Cabecera «Inventario» con «Permitir vender sin stock», «Umbral de stock bajo» (con su explicación)
 y «Controlar stock», y «Guardar». La ve y la guarda quien puede gestionar los ajustes del
 inventario: de fábrica, el administrador y el responsable. Al empleado y al cajero no se les enseña
-la pestaña; si escriben su dirección, ven «Esta página no existe». Cargando: «Cargando ajustes…».
+la pestaña; si escriben su dirección, ven «Sin acceso» (BASE-F118). Cargando: «Cargando ajustes…».
 Error: «No se pudieron cargar los ajustes.» con «Reintentar», nunca los valores de fábrica como si
 fueran los del negocio.
 
@@ -264,7 +266,7 @@ fueran los del negocio.
 | Error | Panel: «No se pudieron cargar las métricas del inventario.»; Ajustes: «No se pudieron cargar los ajustes.»; las tablas, su aviso con «Reintentar». Un rechazo de una acción sale en su ventana, junto a su campo, o encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva | «Esta app no está activa en este negocio» en lugar de las cifras y de la tabla. |
-| Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Esta página no existe»; si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
+| Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Sin acceso» (BASE-F118); si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
 
 ## Cambios sin guardar en Android
 
@@ -365,8 +367,10 @@ negativo.». Una cantidad que no encaja en
 la unidad: «La cantidad no respeta el incremento permitido para esta unidad». Un SKU que ya tiene
 otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: «Ese EAN-13 ya lo tiene
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
-llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada.
-Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
+llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada. El coste solo lo escribe
+quien ve los costes: un alta con coste de quien no los ve, por el asistente o la API, se rechaza como una operación
+sin permiso y no se guarda nada; sin coste, el producto se da de alta con coste 0.
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
 los productos que el negocio ya no tiene en absoluto, cada uno por esta misma alta; uno eliminado vuelve el mismo,
 INVENTORY-F34)
 
@@ -391,8 +395,9 @@ cada categoría añadida o quitada. El precio nuevo vale para lo que se añada a
 ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Ventas).
 Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada.
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
-un producto con stock. Cuenta su stock a cero y cámbiala después.».
-Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
+un producto con stock. Cuenta su stock a cero y cámbiala después.». Cambiar el coste es de quien ve los costes: a
+quien no los ve se le rechaza como una operación sin permiso, y el resto de un cambio sin coste se guarda.
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119
 
 ### INVENTORY-F03 Activar y desactivar un producto
 Estado: hecho
@@ -555,8 +560,9 @@ otro producto del catálogo» y «Falta la categoría fiscal» o «Categoría fi
 creada, se dice en el informe y sus filas quedan como fallidas con ese motivo. «Cancelar» en la
 ventana fiscal no importa nada. «Parar» deja lo ya creado y el informe dice «La importación se
 paró a medias. Lo que ya se había creado está contado abajo; el resto del fichero se quedó como
-estaba.».
-Implicados: TAX-F02, TAX-F14, TAX-F15
+estaba.». Los costes solo los importa quien ve los costes: un fichero con costes de quien no los ve se rechaza
+entero como una operación sin permiso y no se crea nada.
+Implicados: TAX-F02, TAX-F14, TAX-F15, BASE-F119
 
 ### INVENTORY-F10 Importar categorías desde un CSV
 Estado: hecho
@@ -591,12 +597,12 @@ Pasos:
 Entra: los productos o las categorías que cumplen la búsqueda y los filtros.
 Sale: el fichero, con las mismas cabeceras que reconoce la importación (Nombre, SKU, Precio, Coste,
 Stock, Umbral, EAN-13, Descripción, Alérgenos, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
-pantalla (2,20 €, 3 unidades), de modo que se puede volver a importar sin cambiar nada. No guarda
-ni avisa nada.
+pantalla (2,20 €, 3 unidades), de modo que se puede volver a importar sin cambiar nada. La columna «Coste» solo
+la lleva el fichero de quien ve los costes; el de quien no los ve sale sin ella. No guarda ni avisa nada.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
 sale y la app no lo entrega por ninguna otra puerta. Un texto que una hoja de cálculo ejecutaría como
 fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la importación quita.
-Implicados: BASE-F112 (dentro de la app)
+Implicados: BASE-F112 (dentro de la app), BASE-F119
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
 Estado: hecho
@@ -655,8 +661,9 @@ permitido para esta unidad», un coste ilegible («Esto no es un importe…») o
 cualquier otro rechazo salen dentro de la ventana. Un servicio no se recibe: no tiene el botón, y por el
 asistente o la API se rechaza con «Un servicio no lleva stock.». Una recepción con una línea sin
 producto, con un producto que no existe o con cantidad cero se rechaza entera, diciendo qué línea
-falla: no entra ninguna.
-Implicados: ninguno
+falla: no entra ninguna. El coste unitario solo lo escribe quien ve los costes: una recepción con coste de quien no
+los ve se rechaza como una operación sin permiso, y sin coste se registra y el producto conserva el que tenía.
+Implicados: BASE-F119
 
 ### INVENTORY-F14 Contar el stock de un producto
 Estado: hecho
@@ -734,8 +741,8 @@ Actor: administrador, responsable, empleado, cajero
 Pantalla: Panel
 Pasos:
 1. Abre la pestaña **Panel** de Inventario: «Productos seguidos», «En stock», «Agotados» (saldo 0 o menos),
-   «Stock bajo» (saldo igual o menor que su umbral) y «Valor de existencias» a coste. Tocar una de
-   las cuatro primeras lleva a **Productos**.
+   «Stock bajo» (saldo igual o menor que su umbral) y «Valor de existencias» a coste, este solo para quien ve los
+   costes. Tocar una de las cuatro primeras lleva a **Productos**.
 2. Debajo, «Productos con stock bajo», del que menos tiene al que más, con su umbral.
 3. En el **Inicio**, los paneles de Inventario: «Productos con stock bajo» (la cifra de «Stock
    bajo»), «Valor de existencias (a coste)» y «Productos con menos stock» (los cinco que menos
@@ -749,8 +756,9 @@ Si falla: «No se pudieron cargar las métricas del inventario.» y el aviso de 
 «Reintentar»; en el Inicio, un panel que no se puede leer dice «No disponible». El panel y los
 paneles del Inicio se refrescan solos con cualquier movimiento de stock (venta, anulación,
 recepción, recuento, baja), con cualquier alta, cambio o eliminación de un producto y al guardar los
-ajustes. Los paneles del Inicio los ve quien puede ver los productos.
-Implicados: ninguno
+ajustes. Los paneles del Inicio los ve quien puede ver los productos, y el del valor, solo quien además ve los
+costes: el empleado no lo tiene en el tablero ni entre los que puede añadir.
+Implicados: BASE-F119
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
 Estado: hecho
@@ -1251,13 +1259,13 @@ puede ver, o lo que ya no existe, no sale.
 |---|---|---|---|
 | Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
-| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad, alérgenos y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
+| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste (vacío para quien no ve los costes), categoría fiscal, unidad, alérgenos y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
 | Una categoría por su id o su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver categorías | F06, F07, F08 | `inventory.category.get` |
 | El libro de movimientos: fecha, producto, tipo, cantidad, saldo, motivo, referencia y quién lo hizo | ver stock | F16 | `inventory.movement.list` |
-| Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
+| Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste (vacío para quien no ve los costes) y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
 | Los ajustes del inventario | gestionar ajustes | F19 | `inventory.config.get` |
 | Hasta cinco imágenes de la librería para la foto de un producto, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver productos | F30 | `inventory.product.suggest_image` |
@@ -1567,7 +1575,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     artículo da las mismas candidatas, paginadas; `suggest_image` es la herramienta del asistente. Lista:
     columna `photo` (`ItemImage` de 40 px) en `ProductsPage.vue`; ficha: 128 px arriba en
     `ProductDetailModal.vue`. Tests: `base/frontend/lib/item-image.test.ts`, `base/frontend/components/ItemImage.test.ts`,
-    `ImageLibraryModal.test.ts`, `ImageField.test.ts`, `frontend/components/ProductFormModal.test.ts`
+    `ImageLibraryModal.test.ts`, `ImageField.test.ts`, `frontend/components/ProductFormModal.photo.test.ts`
     («ProductFormModal: photo»), `ProductDetailModal.test.ts`, `frontend/pages/ProductsPage.test.ts`, las baldosas
     en `apps/sale/frontend/components/pos/*Tile*.test.ts`, y en Chrome `tests/e2e/inventory-photo.spec.ts` (F30, F31
     y F32 a 390, 834 y 1440). F33: `base/tests/test_blueprint_images.py`.

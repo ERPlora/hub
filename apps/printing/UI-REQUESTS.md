@@ -6,16 +6,16 @@ contra `@erplora/ui` `origin/main` `667b7fb` y `ERPlora/app` `origin/main` `da47
 
 ## Iconos
 
-- `ion:print-outline` — icono del módulo (`apps.py`: `icon`), entrada de menú y pestaña **Impresoras**
-  (`frontend/tabs.ts`), acción «Probar» de la tabla, cabecera de los ajustes y, en el Inicio, el paso
+- `ion:print-outline` — icono del módulo (`apps.py`: `icon`), entrada de menú y pestaña **Impresoras**,
+  acción «Probar» de la tabla, cabecera de los ajustes y, en el Inicio, el paso
   «Configura la impresora» y las filas «Nadie está imprimiendo «…»» de la campana (`apps.py`: `setup` y
   `bell`; el viejo pintaba ahí `print-outline`). Es el icono del producto actual (`print`; Caja, Facturación
   y Ventas lo piden también). Hoy: `lucide:receipt`. Sigue sin estar en `packages/ui/src/shell/icons.ts`
   (solo `finger-print-outline`).
 
-Al registrarlo, cambiar a la vez `apps.py` (`icon`, `navigation`, `setup` y `bell`), `frontend/tabs.ts`, la
+Al registrarlo, cambiar a la vez `apps.py` (`icon`, `navigation`, `setup` y `bell`), la
 acción `test` de `frontend/pages/PrintersPage.vue`, `frontend/components/SettingsCard.vue`, sus tests
-(`tests/test_apps.py`, `tests/test_integration_home.py`, `frontend/tabs.test.ts`) y regenerar `pnpm gen:app-icons`.
+(`tests/test_apps.py`, `tests/test_integration_home.py`) y regenerar `pnpm gen:app-icons`.
 
 ## App nativa (`ERPlora/app`, otro carril)
 

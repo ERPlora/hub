@@ -31,10 +31,11 @@ negocios:
 ### Quién la usa y qué hace cada uno
 
 - El **empleado** (camarero, recepcionista, cajero): monta la cuenta, pone notas, invita una línea,
-  aplica descuentos hasta el máximo del negocio, aparca y recupera cuentas, cobra y consulta las
-  ventas.
+  aplica descuentos hasta el máximo del negocio, aparca y recupera cuentas, cobra y consulta sus
+  ventas y sus cifras: las que cobró y las que se le atribuyeron.
 - El **responsable**: además vende a precio libre, aplica descuentos por encima del máximo, anula una
-  cuenta abierta o una línea ya enviada a cocina, anula y devuelve ventas, ve las cifras y prepara las
+  cuenta abierta o una línea ya enviada a cocina, anula y devuelve ventas, ve las ventas de todos y las
+  cifras de todo el negocio y prepara las
   notas rápidas, las secciones, los medios de pago y los ajustes del TPV.
 - El **propietario** y el **administrador**: todo.
 
@@ -117,7 +118,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Ventas / TPV se abre desde el menú **Ventas / TPV** y tiene cinco entradas: **Vender**, **Ventas**,
-**Notas rápidas**, **Secciones** y **Ajustes**. «Secciones» son los departamentos del TPV: la
+**Notas rápidas**, **Secciones** y **Ajustes**; las tres últimas, solo para quien puede cambiar los ajustes de
+Ventas. «Secciones» son los departamentos del TPV: la
 palabra corta cabe en la barra de pestañas de un móvil con las cinco a la vista.
 
 ### Vender
@@ -199,7 +201,8 @@ Ventana «Cuenta» que abre la impresora del pie («Imprimir cuenta»): el papel
 ### Ventas
 Aquí están las ventas ya cobradas, con las cifras del día o del periodo que elijas. Busca una venta por
 su número o por el cliente para ver su tique, reimprimirlo, anularla o devolverla. Si no tienes permiso
-para anular o devolver, un responsable te lo aprueba con su PIN.
+para anular o devolver, un responsable te lo aprueba con su PIN. Un empleado ve solo sus ventas, las que
+cobró y las que se le atribuyeron; el responsable, el propietario y el administrador ven las de todos.
 
 #### Detalle
 Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tiques», «Ingresos»,
@@ -237,7 +240,7 @@ poner una nota a una línea en **Vender**, salen como botones y basta con tocarl
 #### Detalle
 Explicación, tabla (Nota, Posición) con buscador, **+** para añadir y, por fila, «Editar» y
 «Eliminar». Vacía: «Todavía no hay notas rápidas…»; cargando: «Cargando notas rápidas…». Quien no
-tiene el permiso de ajustes la ve sin **+** ni acciones.
+tiene el permiso de ajustes no la abre: por su dirección, «Sin acceso» (BASE-F118).
 
 ### Secciones
 Las secciones son los departamentos de la caja para cobrar algo que no está en el catálogo, a precio
@@ -247,7 +250,7 @@ salen. Al tocar **Precio libre** en **Vender**, eliges la sección y escribes el
 #### Detalle
 Explicación, tabla (Nombre, IVA que cobra, Posición), **+** y, por fila, «Editar» y «Eliminar». Vacía:
 «Todavía no hay secciones…»; cargando: «Cargando secciones…». Quien no tiene el permiso de
-ajustes la ve sin **+** ni acciones.
+ajustes no la abre: por su dirección, «Sin acceso» (BASE-F118).
 
 ### Ajustes
 Aquí se decide cómo cobra la caja: qué formas de pago acepta, si exige cliente en cada venta, si deja
@@ -256,8 +259,8 @@ recibo. Pulsa **Guardar** para que los cambios valgan.
 
 #### Detalle
 Cabecera «TPV»: un interruptor o campo por ajuste y «Guardar». Cargando: «Cargando
-ajustes…»; error: «No se pudieron cargar los ajustes.» con «Reintentar»; sin permiso: «No tienes
-permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
+ajustes…»; error: «No se pudieron cargar los ajustes.» con «Reintentar»; sin permiso,
+por su dirección, «Sin acceso» (BASE-F118).
 
 ## Estados de cada pantalla
 
@@ -322,7 +325,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | hecho |
-| SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | no hecho |
+| SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
 Estado: hecho
@@ -726,10 +729,14 @@ Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Vender; asistente
 Pasos:
-1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Tócalo.
+1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Quién atiende es un dato
+   de la cuenta que guarda el Hub: al salir de ella y volver (desde el plano, desde «Cuentas abiertas» o
+   en otro dispositivo), el chip sigue diciendo esa persona. Tócalo.
 2. En «Quién atiende esta cuenta», elige a la persona del equipo de Personal o «Yo (quien tenga la
    sesión)». Si tu cuenta no tiene ficha en Personal, la hoja lo avisa: «Tu cuenta no tiene ficha en
-   Personal: si lo dejas en «Yo», esta venta no contará para nadie.»
+   Personal: si lo dejas en «Yo», esta venta no contará para nadie.» Con la cuenta abierta queda guardado
+   en ella al momento; sin cuenta todavía, la cuenta nace con esa persona al añadir lo primero, y la que
+   abre Mesas al elegirle una mesa queda también con ella.
 3. Las líneas que se añadan a partir de ahí quedan selladas con esa persona. Para corregir una línea
    ya puesta, toca el nombre que sale debajo de ella («De quién es esta línea») y elige otra persona o
    «El profesional de la cuenta». Una línea que llega con su profesional (la de una cita, la de una cuenta
@@ -743,14 +750,16 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía. En
+Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
+«No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
-cocina no se reasigna. Con el asistente, alguien que no está en el equipo: «Ese miembro del personal no
-existe en este negocio.»; sin Personal activo: «Personal no está activo en este negocio.». Si Personal no
-puede decir de quién es una línea (apagado, sin permiso o una ficha que ya no está), la línea dice «el
-profesional asignado».
-Implicados: STAFF-F21, KITCHEN-F18
+cocina no se reasigna. Si Personal no puede decir de quién es una línea (apagado, sin permiso o una ficha
+que ya no está), la línea dice «el profesional asignado». Con el asistente, alguien que no está en el equipo:
+«Ese miembro del personal no existe en este negocio.»; sin Personal activo: «Personal no está activo en
+este negocio.».
+Implicados: STAFF-F21, KITCHEN-F18, TABLE-F09
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
 Estado: hecho
@@ -1034,7 +1043,7 @@ Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-
 ### SALE-F28 Consultar el historial y las cifras de ventas
 Estado: hecho
 Vertical: común
-Actor: empleado (historial), responsable (cifras)
+Actor: empleado (el historial y las cifras de sus ventas), responsable (los de todas)
 Pantalla: Ventas
 Pasos:
 1. Abre **Ventas / TPV → Ventas**. Arriba, el periodo («Hoy» por defecto, «7 días», «30 días»,
@@ -1046,19 +1055,28 @@ Pasos:
    territorio a mitad, por ejemplo), se llama «Impuestos». Sin ventas en el periodo, lleva el impuesto del
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
+   Son las cifras de todo el negocio para el responsable, el propietario y el administrador, que ven las
+   ventas de todos y los totales del negocio; quien no tiene esos dos permisos, como el empleado, ve las de
+   sus ventas, las mismas que le da la tabla.
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
-   5,00 €» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
-   estado, pago, fecha o total, u ordena.
+   5,00 €» si se devolvió una parte) y Total. Una venta cobrada con varios medios dice en «Pago»
+   todos, una vez cada uno y en el orden en que se cobraron: «Efectivo + Tarjeta». Busca con
+   «Buscar número o cliente…», filtra por estado, pago, fecha o total, u ordena; el filtro de pago
+   encuentra una venta por cualquiera de sus medios. Un empleado solo ve sus ventas: las que cobró él y
+   las que se atribuyeron a su ficha de Personal (el chip «Atiende»). El responsable, el propietario y
+   el administrador ven las de todos.
 4. Toca una fila para ver su documento. La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
 5. Las cifras de hoy también están en el **Inicio**, en el tablero: «Ventas
    hoy» y «Tiques hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
-   hoy) y «Actividad reciente» (las ocho últimas ventas, la más nueva arriba, con su número y su
-   cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
-   una venta, sin recargar. Quien no tiene permiso de informes solo puede poner «Actividad reciente».
+   hoy) y «Actividad reciente» (las ocho últimas ventas que la persona ve, la más nueva arriba, con su
+   número y su cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
+   una venta, sin recargar. Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el
+   negocio o sus ventas.
 Entra: nada de otras apps.
 Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
-la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
+y, de las sesiones de bono gastadas fuera del cobro, las de su ficha. Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
@@ -1078,20 +1096,19 @@ producción de quien lo vendió, sin pasar nunca de lo que a esa línea le queda
 Las ventas cobradas antes siguen como estaban: su línea cuenta para quien la vendió y las sesiones de esos
 bonos no cuentan para nadie, así que nada cuenta dos veces.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
-«No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
-no tiene permiso de informes ve la tabla, sin las cifras. El filtro de total se escribe como cualquier
+«No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». El filtro de total se escribe como cualquier
 importe del Hub («1.000,50», «1,000.50», «2 500» y «12,50 €» filtran); uno que no se puede leer lo dice
 bajo su campo con las palabras del campo de importe («Esto no es un
 importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000» en
 euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial, «La fecha
 final no puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
-Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 Estado: hecho
 Vertical: común
-Actor: empleado, responsable
+Actor: empleado (de sus ventas), responsable (de todas)
 Pantalla: Documento de venta
 Pasos:
 1. En **Ventas**, toca la fila o la acción «Documento»; también se abre solo tras cobrar, la cuenta
@@ -1102,8 +1119,9 @@ Pasos:
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
-   de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
-   cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
+   de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago (cobrada con
+   varios medios, todos: «Efectivo + Tarjeta»), entregado y cambio, y el pie. Con **VeriFactu**, antes
+   del pie va el QR fiscal: «QR tributario:» encima,
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
    no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o
@@ -1136,7 +1154,9 @@ Si falla: «Cargando documento…» y «Error cargando el documento» (también 
 fiscal: el papel nunca sale sin él). Si no se imprime, «No se pudo imprimir»; si la app instalada no
 abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir la cuenta para la mesa.
 «Emitir ahora» rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin
-motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.».
+motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.». Una venta que la persona no ve (la
+de otro, para un empleado) no se abre, no se reimprime ni se emite: la ventana dice «Error cargando el
+documento» y la API o el asistente, «Esa venta no existe.».
 Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
@@ -1158,7 +1178,8 @@ Con Facturación, la rectificativa del tique entero (R5, serie «RECT») en la m
 (INVOICE-F07); si el tique había quedado pendiente, se emite antes, en la misma anulación. Si Facturación
 sigue sin poder, la anulación sigue adelante y los dos documentos quedan pendientes, a la vista
 (SALE-F29, «Emitir ahora»). Inventario repone el stock (INVENTORY-F23) y Clientes resta la compra (CUSTOMER-F21).
-Si falla: sin motivo, «Hace falta un motivo para anular una venta»; si se cobró como factura
+Si falla: sin motivo, «Hace falta un motivo para anular una venta»; una venta que la persona no ve (la de
+otro, para un empleado), «Esa venta no existe.»; si se cobró como factura
 completa, «Esta venta lleva factura completa: emite una factura rectificativa en vez de anularla.»;
 con devoluciones, «Esta venta ya tiene devoluciones: devuelve el importe que queda en vez de
 anularla.»; anulada desde otro dispositivo a la vez, «Esta venta ya está anulada.». Un rechazo se lee
@@ -1196,7 +1217,8 @@ Sale: el documento de devolución con una fila por forma de pago, las líneas qu
 unidades, su motivo y quién la hizo (avisa: venta devuelta, con las líneas devueltas y si queda
 devuelta del todo) y, con Facturación, su rectificativa en la misma devolución (R5 de un tique, R1 de
 una factura; por diferencias, o lo que queda si cierra la venta: INVOICE-F09, F10).
-Si falla: «Tarjeta: 20,00 € es más que los 12,00 € que quedan por devolver.», «Tarjeta: elige por
+Si falla: una venta que la persona no ve (la de otro, para un empleado), «Esa venta no existe.»;
+«Tarjeta: 20,00 € es más que los 12,00 € que quedan por devolver.», «Tarjeta: elige por
 dónde vuelve este dinero.», «Una devolución necesita un motivo.», «No queda dinero por devolver en
 esta venta.». Si otra devolución se lleva a la vez lo último de una línea marcada: «Una de las líneas
 marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para ver lo que queda.». Si
@@ -1453,26 +1475,25 @@ tarjeta de confirmación, que dice la cuenta, el plato y los alérgenos por su n
 Implicados: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
 ### SALE-F42 Elegir los suplementos de un plato del menú
-Estado: no hecho — la hoja del menú todavía no pregunta los suplementos de cada plato, Menús no los suma al importe
-y la comanda no los lleva (hub#2019)
+Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. Con Menús y combos y Suplementos activas, abre un menú en el TPV (SALE-F12) y elige un plato que tiene grupos de
+1. Con Menús y combos y Suplementos activas, abre un menú en el TPV y elige un plato que tiene grupos de
    suplementos, suyos o de su categoría, los mismos que pregunta cuando se vende suelto (el entrecot con «Punto de la
    carne»): sus grupos se abren allí mismo, debajo del plato, con las reglas, los suplementos con su signo, los
-   alérgenos y las opciones por defecto de la hoja de un artículo suelto (SALE-F11). Un plato sin grupos se elige
-   como siempre.
+   alérgenos y las opciones por defecto de la hoja de un artículo suelto. Un plato sin grupos se elige como siempre.
 2. Elige las opciones. Quitar el plato, o cambiarlo por otro en un plato del menú de una sola elección, quita sus
    opciones. Una elección que se repite (dos cafés) lleva las mismas opciones cada vez.
 3. Mientras un grupo obligatorio de un plato elegido no esté completo, el botón dice qué falta («Elige 1 en «Punto de
-   la carne»») y tocarlo señala ese grupo. Con todo completo, «Añadir · <total>» suma al precio cerrado los
+   la carne»») y tocarlo señala ese grupo. Con todo completo, «Añadir · 16,50 €» suma al precio cerrado los
    suplementos del menú y los de las opciones elegidas.
-4. Púlsalo: el menú entra en la cuenta con cada plato y, debajo de él, sus opciones.
-5. Envía a cocina: cada plato lleva sus opciones debajo, en la pantalla y en el papel, como un plato suelto (COMBO-F11,
-   MODIFIER-F08). Cobra como siempre: el tique nombra las opciones bajo su plato y el menú cobra lo que valía al
-   pedirlo, opciones incluidas, aunque después cambien o se borren.
+4. Púlsalo: el menú entra en la cuenta con sus platos debajo y, junto a cada plato, sus opciones («Entrecot (Poco
+   hecho, Queso)»).
+5. Envía a cocina: cada plato lleva sus opciones debajo, en la pantalla y en el papel, como un plato suelto. Cobra
+   como siempre: el tique nombra las opciones junto a su plato, bajo el menú, y el menú cobra lo
+   que valía al pedirlo, opciones incluidas, aunque después cambien o se borren.
 Entra: los grupos y las opciones del producto de cada plato elegido, de Suplementos (MODIFIER-F06). Suplementos
 comprueba y valora las opciones de cada plato (MODIFIER-F07) y Menús las suma al importe del menú al añadir la línea
 y otra vez al cobrar, con el importe pedido (COMBO-F08).
@@ -1512,6 +1533,10 @@ venta por su id o su número; una sección o una nota rápida por su id o su nom
 pago por su id, su nombre o su tipo («efectivo», «tarjeta»). Si un nombre casa con varios, se rechaza
 diciendo cuáles (409 `*_ambiguous`).
 
+Lo que lee o toca una venta ya cobrada (la lista, la venta, su documento y su papel, «Emitir ahora», anular y
+devolver) solo alcanza las ventas que la persona ve: sin «Ver todas las ventas», las que cobró y las que se le
+atribuyeron. Una que no ve no existe para ella (404 `sale.sale_not_found`).
+
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
@@ -1520,10 +1545,10 @@ diciendo cuáles (409 `*_ambiguous`).
 | Una venta entera: cabecera, cliente con su NIF y domicilio (en una factura), líneas, cobros, desglose de IVA y lo devuelto | ver ventas | F29 | `sale.sale.get` |
 | El negocio tal como lo nombra el papel: nombre, NIF y líneas (domicilio y cabecera del recibo); de una venta, los de su documento fiscal | ver ventas | F21, F29 | `sale.letterhead.get` |
 | La venta grabada con una clave de intento de cobro | ver ventas | F06 | `sale.sale.by_idempotency_key` |
-| Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
-| Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
-| Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
+| Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | ver ventas | F28 | `sale.sale.stats` |
+| Lo vendido hoy y los tiques de hoy | ver ventas | F28 | `sale.sale.today` |
+| Lo vendido cada uno de los últimos 7 días | ver ventas | F28 | `sale.sale.last_7_days` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | ver ventas | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
@@ -1656,7 +1681,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas | sí | sí | sí | sí | `sale.view_sale` |
+| Ver ventas y sus cifras, cuentas, ajustes del TPV, secciones y notas rápidas | sí | sí | sí | sí | `sale.view_sale` |
 | Montar la cuenta (abrir, añadir, cambiar, quitar, dividir, juntar, enviar a cocina, descuento hasta el máximo) | sí | sí | sí | sí | `sale.add_sale` |
 | Cobrar | sí | sí | sí | sí | `sale.take_payment` |
 | Vender a precio libre | sí | sí | sí | no | `sale.sell_open_price` |
@@ -1665,7 +1690,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Devolver | sí | sí | sí | no | `sale.refund_sale` |
 | Ver los medios de pago | sí | sí | sí | sí | `sale.view_paymentmethod` |
 | Crear medios de pago | sí | sí | sí | no | `sale.add_paymentmethod` |
-| Ver las cifras | sí | sí | sí | no | `sale.view_reports` |
+| Ver las ventas de todos (sin él, solo las suyas: las que cobró y las que se le atribuyeron) y, con los totales del negocio (`base.view_business_totals`), las cifras de todo el negocio (sin los dos, las de sus ventas) | sí | sí | sí | no | `sale.view_all_sales` |
 | Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
@@ -1675,15 +1700,19 @@ con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para
 y devolver una venta, anular una línea enviada a cocina, eliminar una cuenta con algo pedido, vender a
 precio libre y los descuentos por encima del máximo. La acción aprobada hace todo lo que hace la del
 responsable (también lo que mueven Facturación y Servicios: la rectificativa y las sesiones de bono que
-vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las cifras, los ajustes y crear medios
-de pago no se aprueban.
+vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras de todo
+el negocio, los ajustes y crear medios de pago no se aprueban.
+
+La gestoría (`hub_accountant`) solo lee: «Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas», «Ver
+los medios de pago» y «Ver las ventas de todos». No monta cuentas, no cobra, no anula ni devuelve, nadie le aprueba
+nada y no toca los ajustes.
 
 Lo que toca la sesión de un bono pide además el permiso de Servicios, porque es Servicios quien la
 mueve con la sesión de quien vende: pagar una línea con bono, deshacerlo, quitar, anular o cobrar una
-línea pagada con bono, «Gastar sesiones» (`service.redeem_package`, lo tienen los cuatro papeles); anular
+línea pagada con bono, «Gastar sesiones» (`service.redeem_package`, lo tienen todos los papeles menos la gestoría); anular
 o devolver una venta con sesiones, «Devolver sesiones de bono» (`service.return_session`: propietario,
 administrador y responsable, los mismos que anulan y devuelven). Al revés, decir quién hizo una sesión gastada
-fuera del cobro (SERVICE-F21) pide «Montar la cuenta» (`sale.add_sale`, los cuatro papeles), como decir de quién
+fuera del cobro (SERVICE-F21) pide «Montar la cuenta» (`sale.add_sale`, todos los papeles menos la gestoría), como decir de quién
 es una línea.
 
 ## Para quien lo mantiene
@@ -1701,7 +1730,9 @@ es una línea.
   ajenas. **Inventario no es requisito** (PLAN §20.5): la línea guarda una copia del producto (id como
   UUID sin clave ajena, nombre, SKU, unidad, precio, coste y categoría fiscal) y el producto se lee con
   las operaciones de Inventario (`inventory.product.get`, `inventory.unit.list`) al añadir la línea,
-  con la sesión de quien vende, por la misma puerta `call_app`. Inventario apagado → `sale.catalog_unavailable`;
+  con la sesión de quien vende, por la misma puerta `call_app`. El coste se lee con `base.sensitive.recording_costs`,
+  porque quien vende puede no ver los costes y la línea lo guarda igual para valorar lo invitado; lo mismo con el
+  servicio de Servicios (`service.service.get`). Inventario apagado → `sale.catalog_unavailable`;
   el precio libre sigue.
   El equipo de Personal y la cita son UUID opacos (`staff_id`, `appointment_id`).
 - **Servicios no es requisito** (como Inventario): la línea de un servicio guarda una copia (id como
@@ -2035,6 +2066,18 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 
 ### Decisiones de plataforma
 
+- **Lo suyo o todo** (`apps/sale/queries/ownership.py`): `SALES` declara de quién es una venta con
+  `base.queries.ownership.Owned`. Es de la persona si la cobró (`created_by` es su usuario) o si se atribuyó a su ficha
+  de Personal (`staff_id`; la ficha la dice Personal por su `own_records`, sin que Ventas la requiera). Quien no
+  tiene `sale.view_all_sales` lee y toca solo esas (`SALES.visible(ctx)` y `visible_sale`, con el mismo 404
+  `sale.sale_not_found` que una venta que no existe). Quien no es una persona (una llave de API, una automatización,
+  la plataforma) no tiene «suyas»: alcanza las que le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
+  el periodo, hoy, los 7 días y lo de cada profesional) suman `SALES.counted(ctx)`: el negocio entero solo con
+  `sale.view_all_sales` y `base.view_business_totals`, y si no, las suyas, aunque abra las de todos una a una. Lo de
+  cada profesional lee `SaleLine`, que no es de nadie: filtra sus líneas con `sale__in` sobre esas ventas, y las
+  sesiones de bono fuera del cobro con `VOUCHER_SESSIONS` (las de su ficha). `tests/test_guardrails_ownership.py`
+  prohíbe `Sale.objects` y `VoucherSession.objects` en los paquetes `queries` fuera de su lista cerrada, cada entrada
+  con su motivo.
 - **Ids sin clave ajena hacia apps fuera de `requires`** (precedente PLAN §20.5, `product_id`): la venta
   guarda `invoice_id` de Facturación y la línea `service_id`, `voucher_session_id`, `staff_id` y la
   cuenta `appointment_id`, como UUID opacos; Ventas sigue sin requerir Facturación, Caja, Citas ni

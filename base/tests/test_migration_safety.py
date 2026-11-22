@@ -1,6 +1,6 @@
 """Migrations the code of before survives (expand/contract; README «Migraciones que conviven…»).
 
-The deploy (``.github/scripts/ecs-deploy.sh``) runs ``hub-migrate`` before it replaces the services, and a
+The deploy (``scripts/ecs_deploy.py``) runs ``hub-migrate`` before it replaces the services, and a
 rollback puts the code of before back on the migrated schema: for a while, the code of before reads and writes
 the tables of the new one. Four kinds of operation break it:
 

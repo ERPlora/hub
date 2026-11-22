@@ -26,7 +26,9 @@ import { useLocale, useT } from '../composables/useT';
 import { JOB_TONE, jobDetail, jobFlags, jobTitle } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { JobListIn, JobOut, JobStatus, Usage } from '../operations';
-import { printingTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('printing');
 
 const STATUSES: readonly JobStatus[] = ['pending', 'sent', 'done', 'failed', 'cancelled'];
 const USAGES: readonly Usage[] = ['receipt', 'kitchen', 'bar', 'label'];
@@ -143,7 +145,7 @@ function onAction({ actionId, row }: { actionId: string; row: JobOut }): void {
   <AppPage
     :title="$t('printing.title')"
     content-layout="fill"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
   >
     <h2

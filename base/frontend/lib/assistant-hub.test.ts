@@ -18,7 +18,7 @@ import { ApiError } from '@erplora/ui/sdk';
 import type { ShellSession } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, flush, memoryStorage, mountBase, OWNER, tap } from '../__tests__/mount-base';
+import { ADMIN, EMPLOYEE, flush, memoryStorage, mountBase, OWNER, tap } from '../__tests__/mount-base';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations/home';
@@ -178,9 +178,18 @@ describe('HUB_ASSISTANT: who', () => {
     expect(HUB_ASSISTANT.canUse!(session(['demo.view']))).toBe(false);
   });
 
-  it('whoever administers the business upgrades the plan', () => {
+  it('only the owner upgrades the plan, as on erplora.com', () => {
     expect(HUB_ASSISTANT.canUpgrade!(session(OWNER.permissions))).toBe(true);
+    expect(HUB_ASSISTANT.canUpgrade!(session(ADMIN.permissions))).toBe(false);
     expect(HUB_ASSISTANT.canUpgrade!(session(EMPLOYEE.permissions))).toBe(false);
+  });
+
+  it('whoever may not upgrade it is told to ask the owner, administrator included', () => {
+    const key = HUB_ASSISTANT.spentNoteKey!;
+    expect([said(en)(key), said(es)(key)]).toEqual([
+      "Ask the business's owner to upgrade the plan.",
+      'Pídele al propietario del negocio que mejore el plan.',
+    ]);
   });
 
   it("the plan's page is erplora.com's the Home's block gives; without it, none", () => {

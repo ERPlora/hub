@@ -11,8 +11,9 @@ from live.models import UUIDModel
 
 from apps.customer.search import searchable
 
-#: The fields ``search_text`` is built from, in this order.
+#: The fields ``search_text`` is built from, in this order; ``search_text_without_contact`` leaves out the contact ones.
 SEARCHED_FIELDS = ("name", "email", "phone", "tax_id", "company_name")
+CONTACT_FIELDS = ("email", "phone")
 
 
 class CustomerGroup(UUIDModel):
@@ -133,6 +134,11 @@ class Customer(UUIDModel):
     last_purchase_at = models.DateTimeField(_("last purchase"), null=True, blank=True)
     # Name, email, phone, tax id and company, lowercased and without accents (apps.customer.search).
     search_text = models.TextField(_("search text"), blank=True, editable=False)
+    # The same without email and phone: what is searched for whoever does not see them (base.view_customer_contact).
+    # Empty in the database too: a migration of another app that makes a card with its own copy of this model gives none.
+    search_text_without_contact = models.TextField(
+        _("search text without contact details"), blank=True, default="", db_default="", editable=False
+    )
     groups = models.ManyToManyField(
         CustomerGroup, related_name="customers", blank=True, verbose_name=_("groups")
     )
@@ -170,13 +176,14 @@ class Customer(UUIDModel):
         return self.name
 
     def save(self, *args, **kwargs) -> None:
-        """Keeps ``search_text`` in step with the fields it is built from, also on partial saves."""
-        self.search_text = searchable(
-            *(getattr(self, field) for field in SEARCHED_FIELDS)
+        """Keeps both search texts in step with the fields they are built from, also on partial saves."""
+        self.search_text = searchable(*(getattr(self, field) for field in SEARCHED_FIELDS))
+        self.search_text_without_contact = searchable(
+            *(getattr(self, field) for field in SEARCHED_FIELDS if field not in CONTACT_FIELDS)
         )
         update_fields = kwargs.get("update_fields")
-        if update_fields is not None and "search_text" not in update_fields:
-            kwargs["update_fields"] = [*update_fields, "search_text"]
+        if update_fields is not None:
+            kwargs["update_fields"] = {*update_fields, "search_text", "search_text_without_contact"}
         super().save(*args, **kwargs)
 
 

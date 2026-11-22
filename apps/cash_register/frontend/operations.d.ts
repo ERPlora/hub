@@ -232,7 +232,7 @@ export interface MovementRow {
   sale_id: string | null;
   sale_number: string;
   document_type: string;
-  gift_total: number;
+  gift_total: number | null;
   created_at: string;
   created_by: string;
 }

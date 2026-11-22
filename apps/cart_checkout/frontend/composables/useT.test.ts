@@ -17,16 +17,16 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('cart_checkout.tabs.carts')} · ${t('cart_checkout.orders.failForm.title', { number: 'OS-1' })}`);
+          const text = computed(() => `${t('cart_checkout.tabs.label')} · ${t('cart_checkout.orders.failForm.title', { number: 'OS-1' })}`);
           return () => h('p', text.value);
         },
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('Carts · Fail order — OS-1');
+    expect(wrapper.text()).toBe('Sections of Cart & Checkout · Fail order — OS-1');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toBe('Carritos · Fallar pedido — OS-1');
+    expect(wrapper.text()).toBe('Secciones de Carrito y pago · Fallar pedido — OS-1');
   });
 
   it('only works inside a component, which is where the app’s translator lives', () => {

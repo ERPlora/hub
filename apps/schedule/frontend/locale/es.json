@@ -2,10 +2,7 @@
   "schedule": {
     "title": "Horarios",
     "tabs": {
-      "label": "Secciones de Horarios",
-      "hours": "Horario",
-      "special_days": "Días especiales",
-      "settings": "Ajustes"
+      "label": "Secciones de Horarios"
     },
     "days": {
       "0": "Lunes",

@@ -47,6 +47,8 @@ class Teammate:
 
     pk = None
     email = ""
+    is_authenticated = True
+    is_active = True
 
     def get_username(self) -> str:
         return "tester"

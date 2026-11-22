@@ -24,8 +24,9 @@ para siempre. Sirve igual a la peluquería y al restaurante.
 
 ### Quién la usa y qué hace cada uno
 
-- El **empleado** que hace de cajero: abre, apunta, cuenta y cierra.
-- El **responsable**: lo mismo y, además, ve el efectivo esperado aunque el arqueo sea ciego.
+- El **empleado** que hace de cajero: abre, apunta, cuenta y cierra. Ve sus turnos (los que abrió o cerró él) y el
+  que está abierto, que es el cajón de todos los que cobran.
+- El **responsable**: lo mismo y, además, ve el efectivo esperado aunque el arqueo sea ciego y los turnos de todos.
 - El **propietario** y el **administrador**: todo, y además configuran la caja y dan de alta los
   cajones.
 
@@ -75,12 +76,14 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
-El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**. Las dos salen a todos; los ajustes solo los cambia quien
-tiene permiso, y los demás los ven bloqueados. Los botones que el perfil no puede usar no salen.
+El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**, esta solo para quien puede cambiar los ajustes; los
+demás, por su dirección, ven «Sin acceso» (BASE-F118). Los botones que el perfil no puede usar no salen.
 
 ### Caja
 Aquí abres y cierras los turnos de caja y repasas los anteriores. Arriba ves el efectivo que debería haber ahora en
-el cajón y los últimos descuadres; debajo, la lista de sesiones, de la más reciente a la más antigua. Pulsa **Abrir
+el cajón y los últimos descuadres; debajo, la lista de sesiones, de la más reciente a la más antigua. El empleado ve
+solo sus sesiones (las que abrió o cerró él) y la que está abierta; el responsable, el administrador y el propietario
+ven las de todos. Pulsa **Abrir
 sesión** para empezar el turno con el dinero que hay en el cajón. En la fila de la sesión abierta apuntas un
 **Movimiento** (dinero que entra o sale a mano), haces el **Arqueo** contando billetes y monedas y la cierras con
 **Cerrar** al acabar el turno. Tocar una fila abre el detalle de la sesión, con sus movimientos, sus arqueos y el informe para
@@ -137,7 +140,8 @@ Desde **Caja**, «Detalle» o tocar una fila: se abre como página, con su flech
 en dos columnas: Estado, Cajón, Abierta (cuándo y quién), Cerrada (cuándo y quién, o «Cerrada sola»),
 Movimientos (cuántos), Fondo de apertura, Ventas (todas las formas de pago) y, debajo, Ventas en
 efectivo, Ventas con tarjeta y Ventas con otras formas de pago (esta solo si hubo), Devoluciones,
-Entradas, Salidas, Invitaciones, Esperado, Contado y Diferencia, y las notas de apertura y de cierre. Con la app
+Entradas, Salidas, Invitaciones, Esperado, Contado y Diferencia, y las notas de apertura y de cierre. Las
+invitaciones van a su coste: quien no ve los costes las ve «—». Con la app
 Propinas encendida, además, «Propinas en efectivo», «Propinas con tarjeta» y «Propinas pagadas»
 (CASH_REGISTER-F18).
 En una sesión abierta Contado y Diferencia salen «—». Debajo, dos tablas, de lo más reciente a lo más
@@ -158,8 +162,8 @@ Menú **Caja → Ajustes**. Una tarjeta «Caja» con «Activar caja», «Exigir 
 recuento al cierre», «Permitir saldo negativo», «Arqueo ciego», «Cierre automático diario» y «Hora del
 cierre automático» (de 00:00 a 23:00, en horas en punto), y «Guardar». Debajo, la tarjeta «Cajones»:
 la lista de cajones (nombre, activo) con «Añadir cajón», «Cambiar nombre» y «Desactivar»/«Activar».
-Quien no puede cambiar los ajustes los ve bloqueados con «No tienes permiso para cambiar estos
-ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los ajustes.» con
+Quien no puede cambiar los ajustes no los abre:
+por su dirección, «Sin acceso» (BASE-F118). Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los ajustes.» con
 «Reintentar»; al guardar, «No se pudieron guardar los ajustes.». Guardado: «Ajustes guardados.».
 «Guardar» se enciende al cambiar algo y, mientras los ajustes no se han guardado nunca, también sin
 cambios: así el negocio se queda con los de fábrica.
@@ -228,7 +232,7 @@ el primer guardado sin cambios). Sin guardar nunca, valen los de fábrica y «Tu
 abrir una sesión no lo cuenta como hecho.
 Si falla: «No se pudieron guardar los ajustes.» con el motivo, y los ajustes quedan como estaban. Si
 la lectura falla, la pantalla no enseña valores (nunca los de fábrica como si fueran los del negocio)
-y ofrece «Reintentar». Sin el permiso de ajustes, los campos salen bloqueados, no hay «Guardar» y el
+y ofrece «Reintentar». Sin el permiso de ajustes, la pantalla dice «Sin acceso» y el
 Inicio no le enseña el paso «Tu caja».
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 
@@ -475,17 +479,23 @@ Vertical: común
 Actor: responsable, administrador, empleado
 Pantalla: Detalle de la sesión
 Pasos:
-1. En Caja, pulsa «Detalle» o toca la fila de cualquier sesión, abierta o cerrada.
+1. En Caja, pulsa «Detalle» o toca la fila de una sesión de la lista, abierta o cerrada. El empleado tiene en la
+   lista sus sesiones (las que abrió o cerró él) y la que está abierta, aunque la abriera otro: es el cajón en el
+   que cobra, cuenta y cierra. El responsable, el administrador y el propietario tienen las de todos.
 2. Lee el resumen: quién abrió y cerró, el cajón, el fondo, las ventas por forma de pago, devoluciones,
-   entradas, salidas, invitaciones aparte (son coste, no efectivo), esperado, contado, diferencia y las
-   notas.
+   entradas, salidas, invitaciones aparte (son coste, no efectivo; quien no ve los costes las ve «—»),
+   esperado, contado, diferencia y las notas. Las cifras son las de todo el cajón: también lo que cobró un
+   compañero mientras la sesión estaba abierta.
 3. Repasa Movimientos: cada venta se nombra por su documento («Tique …», «Factura …»), una devolución
    «Devolución de …» y una anulación «Anulación de …»; un movimiento a mano enseña su concepto. Y repasa
    Arqueos.
 4. Pulsa «Volver».
 Entra: la sesión elegida; el número y el documento de cada venta, de Ventas.
 Sale: nada; es de solo lectura.
-Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabla con «Reintentar».
+Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabla con «Reintentar». La sesión
+de otro empleado no existe para quien no ve las de todos: por su enlace, su número o el asistente, «Esa sesión
+de caja no existe.», como una que no existe, y lo mismo sus
+movimientos, sus arqueos y su informe.
 Implicados: SALE-F28
 
 ### CASH_REGISTER-F12 Ver la caja en los paneles del inicio
@@ -501,11 +511,12 @@ Pasos:
    a ciegas, no.
 2. «Descuadres recientes» se añade con ⋮ («Personalizar panel»), donde va agrupado bajo «Caja»: una
    línea por cada una de las ocho últimas sesiones cerradas, de la que se cerró más tarde a la más
-   antigua, con su número y su diferencia con signo y céntimos. Lo tiene quien ve las sesiones.
+   antigua, con su número y su diferencia con signo y céntimos. Lo tiene quien ve las sesiones, con las
+   que ve: el empleado, las suyas.
 3. Además, en **Caja**, encima de la tabla salen dos tarjetas. «Sesión actual» enseña el «Esperado en el
    cajón» de la sesión abierta y su número, y se mueve solo con cada cobro y cada movimiento; sin sesión
    abierta, «No hay ninguna sesión abierta.».
-4. «Descuadres recientes» enseña la diferencia de las ocho últimas sesiones cerradas, de la que se cerró
+4. «Descuadres recientes» enseña la diferencia de las ocho últimas sesiones cerradas que ves, de la que se cerró
    más tarde a la más antigua, con su signo y sus céntimos y una barra tan larga como la diferencia:
    roja si faltó, verde si sobró. Una sesión cerrada sola, sin recuento, sale «—».
 Entra: la sesión abierta, las sesiones cerradas y la moneda del negocio.
@@ -585,7 +596,8 @@ Pasos:
    caja (Z)».
 3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
    se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
-   entradas, salidas, invitaciones, el esperado y, en el Z, el contado y el descuadre.
+   entradas, salidas, invitaciones (solo si quien imprime ve los costes), el esperado y, en el Z, el contado y
+   el descuadre.
 4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
    dispositivo con el mismo informe (en la cola esperaría para siempre): el del navegador o, en la app
    instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»),
@@ -597,7 +609,7 @@ Si falla: «No se pudo imprimir.» con el motivo de Impresión (por ejemplo, sin
 instalada no abre su pantalla de impresión, con el suyo («…: esta versión de la app de ERPlora no puede
 imprimir; actualízala», «…: el servicio de impresión del dispositivo no se abrió»…). Con el arqueo ciego,
 quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el esperado); en una
-cerrada sí.
+cerrada sí. El informe de una sesión que no ve (la de otro empleado) no se imprime: «Esa sesión de caja no existe.»
 Implicados: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
@@ -752,6 +764,7 @@ Caja estaba apagada o no respondió se ve en CASH_REGISTER-F17.
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver sesiones, ajustes, cajones y moneda | sí | sí | sí | sí | `cash_register.view_session` |
+| Ver las sesiones de todos (sin él, solo las que abrió o cerró y la abierta) | sí | sí | sí | no | `cash_register.view_all_sessions` |
 | Abrir sesión | sí | sí | sí | sí | `cash_register.add_session` |
 | Cerrar sesión | sí | sí | sí | sí | `cash_register.close_session` |
 | Ver movimientos | sí | sí | sí | sí | `cash_register.view_movement` |
@@ -770,7 +783,23 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   por fichero, más `tests/test_integration_sale.py` (ventas reales de Ventas) y
   `tests/test_concurrency.py` (sesiones reales en hilos).
 - **`requires = ["sale"]`**. Quién abre, cierra o apunta se guarda como el actor del contexto (texto,
-  como Ventas), no como clave ajena a Personal: Caja no requiere Personal.
+  como Ventas), no como clave ajena a Personal: Caja no requiere Personal. La sesión guarda además el usuario de quien
+  la abre y de quien la cierra (`opened_by_username`, `closed_by_username`; vacío si no fue una persona: el cierre
+  solo, una llave de API), porque el nombre cambia y el usuario no. La migración `0003_session_people` rellena las
+  sesiones de antes con la única persona del negocio cuyo nombre, email o usuario es su texto; si no hay ninguna o hay
+  varias, se queda vacío y solo la ve quien ve las de todos.
+- **Lo suyo o todo** (`queries/ownership.py`): `SESSIONS` declara de quién es una sesión con
+  `base.queries.ownership.Owned`: de quien la abrió o la cerró, y la abierta de todos, porque hay una sola por negocio
+  y es el cajón en el que se cobra (Ventas la pide con la sesión de quien cobra, F04), se cuenta y se cierra. Quien no
+  tiene `cash_register.view_all_sessions` lee y escribe solo en esas (`find_session`, `named_or_open`,
+  `session_to_close`, la lista y la sesión actual, con el mismo 404 `cash_register.session_not_found` que una que no
+  existe); quien no es una persona (una llave, una automatización, la plataforma) alcanza las que le abre su permiso.
+  Lo que suma una sesión es todo el cajón: `lines.sale_lines` lee las ventas de todos los que cobraron en ella, y
+  `unassigned_window` y `unassigned_totals` miran la última sesión cerrada y cuentan lo de fuera de turno sin mirar de
+  quién es; las tres están en la lista cerrada de `tests/test_guardrails_ownership.py` con su motivo.
+- **Coste de las invitaciones**: `SessionSummary.total_gifts` y `MovementRow.gift_total` llevan la marca `COSTS`
+  (`base.sensitive`): a quien no tiene `base.view_costs` le llegan vacíos por cualquier puerta, y el informe X/Z en papel
+  deja fuera la línea de invitaciones (`figures(..., costs=…)`).
 - **Modelos**: `Settings` (una fila; sin ella valen los de fábrica), `Register` (cajón; nunca se
   borra), `Session` (número `S-AAMMDD-NNNN`, día de negocio, fondo, esperado, contado y diferencia
   congelados al cerrar, cerrada sola), `SessionCounter` (uno por día de negocio), `Movement` (líneas:

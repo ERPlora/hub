@@ -32,8 +32,8 @@ Inspección (art. 34.9 del Estatuto de los Trabajadores, Real Decreto-ley 8/2019
 
 ### Quién la usa y qué hace cada uno
 
-- El **empleado** ficha la entrada, la salida y sus pausas, ve sus jornadas, su historial de
-  correcciones y los ajustes (sin poder cambiarlos), y exporta sus jornadas en CSV.
+- El **empleado** ficha la entrada, la salida y sus pausas, ve sus jornadas y su historial de
+  correcciones, y exporta sus jornadas en CSV. Los ajustes no los abre: por su dirección, «Sin acceso» (BASE-F118).
 - El **responsable**, el **administrador** y el **propietario** además ven las jornadas de todo el
   equipo y quién está dentro ahora, corrigen jornadas con motivo, fichan la entrada o la salida de
   otra persona (por el asistente o la API: «ficha la salida de Ana») y cambian los ajustes.
@@ -102,13 +102,13 @@ ahora» encima de Registros. Solo lo tiene quien ve las jornadas de todo el equi
 ### Ajustes
 Aquí un responsable decide si se pide la ubicación a quien ficha desde su propio móvil, a qué distancia del local se
 puede fichar y dónde está el local. También elige tras cuántas horas una jornada que nadie cerró pasa a «Por
-revisar». Los demás ven los ajustes sin poder cambiarlos.
+revisar». Solo quien puede cambiarlos ve esta pestaña.
 
 #### Detalle
 La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal» (debajo,
 dónde se marca un dispositivo como personal), «Radio permitido», «Ubicación del lugar de trabajo»
-(Latitud, Longitud y «Usar mi ubicación actual») y «Marcar a revisar tras (horas)». Solo un responsable o un administrador puede guardar; los demás la ven
-en solo lectura con «Solo un responsable o un administrador puede cambiar estos ajustes.».
+(Latitud, Longitud y «Usar mi ubicación actual») y «Marcar a revisar tras (horas)». Solo un responsable o un administrador la abre y la guarda; un empleado,
+por su dirección, «Sin acceso» (BASE-F118).
 
 ## Estados de cada pantalla
 
@@ -250,7 +250,7 @@ denegada, «Usar mi ubicación actual» deja lo escrito y avisa, debajo del bot�
 ubicación está denegado. Permite la ubicación en este navegador para leer la posición del lugar de
 trabajo o escribe las coordenadas.» (en la app instalada, que no tiene navegador, «El acceso a la
 ubicación está denegado. Permite la ubicación en los ajustes del dispositivo para leer la posición del
-lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los ajustes en solo lectura. Como en
+lugar de trabajo o escribe las coordenadas.»); un empleado no los abre: por su dirección, «Sin acceso». Como en
 las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
 corrige ese campo (las coordenadas, como el par que son: corregir una quita el motivo de las dos); los dos
 vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
@@ -600,8 +600,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/routes.ts`: `/attendance/clock`, `/attendance/records` y `/attendance/settings`; la barra
-  de pestañas (`frontend/tabs.ts`) son las tres, «Ajustes» para todos (en solo lectura para quien no
-  puede guardar).
+  de pestañas son las entradas del menú que la persona puede abrir (`useAppTabs`, en
+  `base/frontend/lib/app-tabs.ts`): «Ajustes», solo para quien puede cambiarlos.
 - Fichar se suscribe a `attendance.record.current`, `attendance.settings.get` y `base.device.current`
   (el modo de este dispositivo, que decide si se lee la posición); el reloj, el tiempo
   desde la entrada y los totales de hoy corren con un temporizador de un segundo sobre el `as_of` del
@@ -616,10 +616,10 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   enviar va bajo su campo, como el 422 del servidor, y la etiqueta larga del interruptor parte línea
   para que el formulario quepa en un móvil. Lo que falla al leer la ubicación sale bajo «Usar mi ubicación
   actual» (`attendance-settings-location-error`), no junto a «Guardar», que en un móvil queda fuera de la
-  vista desde el botón; el error al guardar y «Ajustes guardados» van encima de «Guardar», en el pie común
+  vista desde el botón; el error al guardar y «Ajustes guardados.» van encima de «Guardar», en el pie común
   de Ajustes (`SettingsFormFooter` de `@erplora/ui`, hub#897). Con la ubicación denegada, `nativeBridge()` de
   `@erplora/ui/shell` elige el aviso: en la app instalada, `attendance.settings.locationDeniedInApp` (los
-  ajustes del dispositivo), como la tecla «Hablar» del TPV (SALE-F01). Tests: `SettingsPage.test.ts` y la
+  ajustes del dispositivo), como la tecla del micrófono del TPV (SALE-F01). Tests: `SettingsPage.test.ts` y la
   e2e `tests/e2e/attendance-settings-location.spec.ts` (la ubicación sin conceder, en un fichero propio:
   `attendance-flows.spec.ts` la concede para F04).
 

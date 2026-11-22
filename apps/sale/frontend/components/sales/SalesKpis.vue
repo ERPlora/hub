@@ -7,7 +7,8 @@
 // figures not read yet, name it by the business territory's, as Taxes publishes it (`useTaxName`, live).
 // A figure not read yet, or that could not be read, is «—», never a zero; a failure adds «Error loading
 // metrics».
-// The page mounts it only for whoever may see the reports (`sale.view_reports`).
+// Whoever reads the sales gets them: the whole business's with everyone's sales and the business totals, else
+// those of their own sales (`SALES.counted` on the server).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';

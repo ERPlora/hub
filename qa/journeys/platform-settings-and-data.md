@@ -22,4 +22,4 @@ Para qué: sacar una copia del negocio, traer datos con un fichero propio, desha
 7. BASE-F32 — el informe: las filas mal escritas no entran.
 8. BASE-F33 — se vuelve al informe, se corrigen las filas y se reintenta.
 9. BASE-F34 — la importación, deshecha.
-10. BASE-F37 — el negocio, restablecido por secciones.
+10. BASE-F37 — el negocio, restablecido por secciones; lo hace el propietario, porque el administrador no restablece.

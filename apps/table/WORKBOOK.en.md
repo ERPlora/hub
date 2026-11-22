@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d462d743960502264b330e87ab57313b6990472d785ace4e99c63458d0546453 -->
+<!-- generated from WORKBOOK.md sha256:25d3baab83db604eb2e1008da0a98b526e835de9387eb2063c577638b7825c81 -->
 
 ## What it is for and who it is for
 
@@ -100,8 +100,8 @@ Initial setup, step by step:
 ## Screens
 
 The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sessions** and
-**Settings** (this one only for whoever can change them). No other one is hidden by permission; the
-buttons the profile cannot use do not show.
+**Settings**. **Zones** and **Tables** show only to whoever can change them, and **Settings**, to whoever
+can change it; the buttons the profile cannot use do not show.
 
 ### Floor plan
 Here you see at a glance how the room is doing: each table in its place, with its colour and, when it is
@@ -469,7 +469,8 @@ Steps:
    writing, with an icon, shape, seats and colour: Available, Occupied, Reserved or Blocked.
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
-   its name and time. Who serves it is seen in its window.
+   its name and time. Who serves it is seen in its window: whoever serves its check in Sales (the till's
+   "Served by" chip) or, if nobody changed it, whoever seated it.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
    the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
@@ -477,7 +478,7 @@ Steps:
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".
-Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F19
+Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done
@@ -1087,4 +1088,4 @@ hears every notice of Tables, like those of any app.
 
 The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Seating, splitting and joining also ask for "Build the
-check" of Sales (`sale.add_sale`), which the four roles have.
+check" of Sales (`sale.add_sale`), which every role but the accountancy firm has.

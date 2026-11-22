@@ -25,11 +25,8 @@ describe('reservation catalogues (en source + es)', () => {
     }
   });
 
-  it('keep the old screens’ words: tabs, columns, searches, empty states, buttons', () => {
+  it('keep the old screens’ words: columns, searches, empty states, buttons', () => {
     expectWords(CATALOGUES, [
-      ['reservation.tabs.reservations', 'Reservations', 'Reservas'],
-      ['reservation.tabs.waitlist', 'Waitlist', 'Lista de espera'],
-      ['reservation.tabs.availability', 'Availability', 'Disponibilidad'],
       ['reservation.availability.occupancy', 'Occupancy', 'Ocupación'],
       ['reservation.availability.slots', 'Time slots', 'Franjas horarias'],
       ['reservation.availability.blocked', 'Blocked dates', 'Fechas bloqueadas'],

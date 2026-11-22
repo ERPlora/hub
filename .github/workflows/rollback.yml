@@ -1,7 +1,7 @@
 name: rollback
 
 # Manual: puts the hub's services of one environment back on the ACTIVE revision right before the
-# one they run and records its settings and image tag (ecs-rollback.sh): hub and worker in prod (run it
+# one they run and records its settings and image tag (scripts/ecs_rollback.py): hub and worker in prod (run it
 # on main), hub-pre and worker-pre in pre (run it on pre; deploy-env.sh checks the branch). The settings
 # those revisions run go through the deploy's checks first (deploy/app_env_rollback.py). Migrations are
 # not undone. Scheduled hub tasks of prod run the latest ACTIVE worker revision, so they keep the newer
@@ -47,7 +47,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       CONFIRM: ${{ inputs.confirm }}
     steps:
-      # Before assuming the role; ecs-rollback.sh checks CONFIRM again.
+      # Before assuming the role; scripts/ecs_rollback.py checks CONFIRM again.
       - name: Check the confirmation and the repository variables
         run: |
           if [ "$CONFIRM" != ROLLBACK ]; then
@@ -80,4 +80,4 @@ jobs:
         env:
           ENVIRONMENT: ${{ steps.target.outputs.environment }}
           CONFIRM_PROTECTED: ${{ inputs.confirm_protected }}
-        run: bash .github/scripts/ecs-rollback.sh
+        run: python3 scripts/ecs_rollback.py

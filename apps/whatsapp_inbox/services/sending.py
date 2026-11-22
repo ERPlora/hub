@@ -23,7 +23,8 @@ from apps.whatsapp_inbox.queries.messages import MESSAGE_NOT_FOUND, message_out
 from apps.whatsapp_inbox.queries.reads import e164, live_conversations, preview
 from apps.whatsapp_inbox.queries.reasons import CAP_REACHED, NOT_CONNECTED
 from apps.whatsapp_inbox.queries.templates import live_templates
-from apps.whatsapp_inbox.schemas import MessageOut, MessageRefIn, SendIn
+from apps.whatsapp_inbox.schemas.messages import MessageOut, MessageRefIn
+from apps.whatsapp_inbox.schemas.sending import SendIn
 from base.services.sessions import acting_hub_user
 
 from .deliveries import _ON_ITS_WAY, deliver

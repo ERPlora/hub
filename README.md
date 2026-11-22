@@ -340,7 +340,8 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
 
 PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m).
 
-- **Restablecer el negocio** (`base.hub.reset`, Ajustes › Datos): sin `dry_run` ya no vacía en la petición; anota lo
+- **Restablecer el negocio** (`base.hub.reset`, Ajustes › Datos; solo el propietario, `base.own_business`): sin
+  `dry_run` ya no vacía en la petición; anota lo
   pedido en el registro (`Hub.reset_requested_at`, `Hub.reset_sections`), lo deja debido en `hub_due` y responde
   `status: "copying"`. El worker (`base/worker_data.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
   (`base/tenancy/dumps.py`) y, solo si la copia quedó guardada, vacía las secciones en su BD con
@@ -375,8 +376,8 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   descargan el fichero como `erplora-<slug>-<fecha>-<tipo>.dump`. En local y en los tests, `HUB_DUMPS_ENDPOINT_URL`
   apunta boto3 a otro S3 (los tests: el servidor de moto, `base/tenancy/tests/s3.py`); sin `HUB_DUMPS_BUCKET` no hay
   copias y el restablecimiento responde 503.
-- **Ajustes › Datos › Restablecer › «Copias»** (`base.hub.dumps`, vivo; `base.hub.dump_link` en cada «Descargar»):
-  las copias del negocio y su último restablecimiento.
+- **Ajustes › Datos › Restablecer › «Copias»** (`base.hub.dumps`, vivo; `base.hub.dump_link` en cada «Descargar»; solo
+  el propietario, `base.own_business`): las copias del negocio y su último restablecimiento.
 - **Uso nocturno** (`base/usage.py`, pase `_usage` del worker): a las 00:15 UTC mide el día que acabó (antes de que
   el SaaS lo pida a las 01:15 y fuera de la copia de Aurora de 02:00–03:00) para cada negocio con BD propia:
   `pg_database_size` desde el catálogo de su cluster (conexión de mantenimiento del migrador, sin abrir la BD del
@@ -606,7 +607,7 @@ cuatro apps (`db_constraint=False`) y el `RunPython` de `attendance/0002`: donde
 
 ### Migraciones que conviven con el código anterior
 
-`ecs-deploy.sh` corre `hub-migrate` (`migrate_hubs`: control, plantillas y hubs atrasados; espera hasta
+`scripts/ecs_deploy.py` corre `hub-migrate` (`migrate_hubs`: control, plantillas y hubs atrasados; espera hasta
 `MIGRATE_TIMEOUT_SECONDS`, 3600 s por defecto) **antes** de cambiar los servicios, y un rollback devuelve el código anterior
 sobre el esquema ya migrado: durante un rato, el código anterior lee y escribe las tablas del nuevo (expand/contract,
 PLAN-DB §7). Por eso, en una migración:

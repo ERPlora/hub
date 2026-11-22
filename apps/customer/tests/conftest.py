@@ -10,12 +10,11 @@ from collections.abc import Callable
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope
-from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
 from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.sale.tests.conftest import db_dsn, make_user, night_elsewhere
-from base.permissions import FULL_ACCESS_ROLES
+from base.permissions import permissions_of_role
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
@@ -48,18 +47,10 @@ def ctx_for(
 ) -> OperationContext:
     """The context a user with ``role`` on ``scope`` gets, as ``base.permissions`` computes it.
 
-    Owner and admin get every permission every app declares; the other roles, what each app's
-    ``role_permissions`` gives them. ``permissions`` replaces the role's when a test needs a
-    combination no role has.
+    ``permissions`` replaces the role's when a test needs a combination no role has.
     """
     if permissions is None:
-        configs = all_live_app_configs()
-        if role in FULL_ACCESS_ROLES:
-            permissions = frozenset(
-                permission for config in configs for permission in config.permissions
-            )
-        else:
-            permissions = permissions_for_role(configs, role)
+        permissions = permissions_of_role(role)
     return OperationContext(scope=scope, actor=actor, permissions=permissions, language=language)
 
 

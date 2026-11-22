@@ -358,7 +358,8 @@ Pasos:
    se agote un plato (el último flan servido), se quite de la venta o se retire: al cobrar, Menús solo
    vuelve a comprobar los platos, las raciones y cómo se factura (COMBO-F09).
 Entra: el menú (por id o por nombre) y las elecciones (por id, o por el nombre o el SKU del producto,
-con el plato si hace falta), con cuántas de cada una; al cobrar una cuenta abierta, el importe pedido.
+con el plato si hace falta), con cuántas de cada una y las opciones de Suplementos de cada una, ya valoradas por
+Suplementos (SALE-F42), que suman su precio al importe; al cobrar una cuenta abierta, el importe pedido.
 Sale: la línea del menú con su importe, su nombre de cocina y sus platos, en el orden de los platos y
 de la elección, y cómo se factura (COMBO-F09). Menús no guarda nada; la venta es de Ventas.
 Si falla: la línea no entra en la cuenta y la hoja (o el asistente, o la API) dice por qué: «Ese menú
@@ -391,7 +392,7 @@ Pasos:
    dinero.
 4. La cuenta que se enseña antes de cobrar reparte igual que el cobro.
 Entra: forma de venta y tipo de IVA del menú y las elecciones; precio de catálogo y categoría fiscal de
-cada producto, de Inventario.
+cada producto, de Inventario; las opciones de Suplementos de cada plato, que entran en el reparto como dice SALE-F42.
 Sale: el reparto, con la categoría fiscal de cada línea; Ventas calcula base y cuota con Impuestos.
 En el TPV manda el ajuste del menú: una cuenta no se marca «para llevar». Por el asistente o la API se
 puede pedir un menú «en el local» para llevar o a domicilio, y entonces se reparte como uno «para
@@ -440,7 +441,8 @@ Pasos:
    cantidad por los menús pedidos y la nota del menú en cada plato (KITCHEN-F06).
 3. En el papel de cada estación sale la misma cabecera del menú con sus platos debajo.
 Entra: la línea del menú de la cuenta abierta, con lo que dio Menús al pedirla (COMBO-F08): su nombre
-de cocina y cada plato con su producto, su categoría y cuántas veces se eligió.
+de cocina y cada plato con su producto, su categoría, cuántas veces se eligió y sus opciones de Suplementos, que
+Cocina pone debajo del plato (SALE-F42).
 Sale: nada de este módulo; la comanda es de Cocina (avisa: comanda enviada).
 Si falla: un menú al que le falta un plato obligatorio no entra en la cuenta (Menús lo rechaza al
 pedirlo), así que nunca llega a cocina a medias. Un plato que es un servicio no se cocina.
@@ -851,10 +853,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`inventory.product.list`, activos), de categoría fiscal con `Combo` (`tax.category.list`).
 - Reordenar: `ion-reorder-group` (asa) y los botones subir/bajar, que acaban en la misma operación
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
-- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+- **Millares**: los importes agrupan los millares también con cuatro cifras (`1.234,56 €`; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#654).
 - Los importes se escriben en el `MoneyInput` de `@erplora/ui/components` (el suplemento, con `signed` y su botón
-  ±) y se leen con su `parseMoney` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
+  ±) y se leen con su `parseMoney` (coma o punto, el `1.250` ambiguo se pregunta, el suplemento admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
   `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es
   ruido al leer, el de otra moneda no. Mientras el negocio no contesta, un importe es «—» (nunca un
   euro ni decimales supuestos), el campo dice solo «Precio cerrado» o «Suplemento» y salir de él no lo reformatea. Si contesta (o
@@ -865,10 +867,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   final de `MenuFormModal.vue` (tras guardar el menú, `combo.combo.set_image` o `combo.combo.upload_image`; un
   fallo se queda en la ventana con «Reintentar», que solo manda la foto, y «Guardar» apagado), la columna `photo`
   (`ItemImage` de 40 px) en `MenusPage.vue` y la baldosa del TPV en `apps/sale/frontend/components/pos/ComboTiles.vue`.
-  Tests: `frontend/components/MenuFormModal.test.ts` («MenuFormModal: photo»), `frontend/pages/MenusPage.test.ts`,
+  Tests: `frontend/components/MenuFormModal.test.ts` (`MenuFormModal: photo`), `frontend/pages/MenusPage.test.ts`,
   `apps/sale/frontend/components/pos/ComboTiles.test.ts` y en Chrome `tests/e2e/combo-photo.spec.ts`. Las cuatro
   imágenes `menu_*` de la librería son hoy el mismo archivo (una bandeja de desayuno) y su manifiesto las titula
-  así: buscar «menú del día» no las encuentra.
+  así: buscar `menú del día` no las encuentra.
 - Iconos registrados en la shell; `restaurant-outline` y `arrow-up-outline` esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
   `ion-reorder` con su icono propio.
 

@@ -396,7 +396,7 @@ test('the till on a phone: the cart is the drawer behind the button with its cou
   expect((await newestSaleOf(context, water.sku)).total).toBe(110);
 });
 
-test('the employee charges at the till and sees «Void» and «Refund» on their sale, but never reads the figures', async ({ browser }) => {
+test('the employee charges at the till and sees «Void» and «Refund» on their sale, and the figures of their own sales', async ({ browser }) => {
   const { context, page } = await hostPage(browser, A, { next: '/sale/pos', credentials: EMPLOYEE });
   try {
     await tillReady(page);
@@ -411,7 +411,10 @@ test('the employee charges at the till and sees «Void» and «Refund» on their
 
     await page.goto(`${A}/sale/sales`);
     await shown(page).locator('[data-testid=sales-table-row]').first().waitFor({ state: 'visible' });
-    await expect(shown(page).locator('[data-testid=sales-kpis]')).toHaveCount(0);
+    // Today's tickets are the ones they charged: what the server counts for them, never the whole business's.
+    const theirs = await api<{ tickets: number }>(context, A, 'GET', '/sale/sales/today');
+    expect(theirs.status).toBe(200);
+    await expect(shown(page).locator('[data-testid=sales-kpi-tickets]')).toHaveText(String(theirs.data.tickets));
     // The cashier sees «Void» and «Refund» (hub#250): either asks a
     // manager's approval, which sale-approval.spec.ts walks end to end.
     const sold = await newestSaleOf(context, water.sku);

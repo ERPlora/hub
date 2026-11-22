@@ -1,14 +1,14 @@
-// Taxes for an employee (`hub_employee`: `tax.view` only; the WORKBOOK's who may do what): the three lists
-// are there, with the read-only notice («You can view the tax rules but not change them.»), without «+»
-// and without the row actions of Rules; the API refuses every write with 403 `permission_denied`.
-// The owner's Rules is the positive control: the same hooks are there for who may manage.
+// Taxes for an employee (`hub_employee`: `tax.view` only, which the till needs; the WORKBOOK's who may do what): its
+// screens set the business up, so its menu does not show them and by their address they say «No access» (BASE-F118);
+// the API refuses every write with 403 `permission_denied` and still answers its reads. The owner's Rules is the
+// positive control: the same screen opens, with «+» and the row actions, for who may manage.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, hostPage, shot, shown, testid } from './helpers';
 
 type Envelope = { error?: { code: string } };
 
-test('an employee sees Categories, Rules and Aliases read-only, and the API refuses its writes', async ({ browser }) => {
+test('an employee gets «No access» on Categories, Rules and Aliases, and the API refuses its writes', async ({ browser }) => {
   const owner = await hostPage(browser, A, { next: '/tax/rules' });
   const employee = await hostPage(browser, A, { next: '/tax/categories', credentials: EMPLOYEE });
   const { page } = employee;
@@ -17,20 +17,14 @@ test('an employee sees Categories, Rules and Aliases read-only, and the API refu
     await shown(owner.page).locator('[data-testid=tax-rules-row]').first().waitFor({ state: 'visible' });
     await expect(shown(owner.page).locator('[data-testid=tax-rules-add]')).toBeVisible();
     await expect(shown(owner.page).locator('[data-testid$=-deactivate]').first()).toBeAttached();
-    await expect(shown(owner.page).locator('[data-testid=tax-rules-readonly]')).toHaveCount(0);
+    await expect(testid(owner.page, 'no-access')).toHaveCount(0);
 
     for (const section of ['categories', 'rules', 'aliases'] as const) {
       await page.goto(`${A}/tax/${section}`);
-      const view = shown(page);
-      await view.locator(`[data-testid=tax-${section}-row]`).first().waitFor({ state: 'visible' });
-      await expect(view.locator(`[data-testid=tax-${section}-readonly]`)).toContainText(
-        /You can view the tax rules but not change them\.|Puedes consultar las reglas fiscales pero no modificarlas\./,
-      );
-      await expect(view.locator(`[data-testid=tax-${section}-add]`), section).toHaveCount(0);
+      await expect(testid(page, 'no-access'), section).toBeVisible();
+      await expect(shown(page).locator(`[data-testid=tax-${section}-add]`), section).toHaveCount(0);
       await page.screenshot({ path: shot(`tax-employee-${section}`) });
     }
-    // Rules: no row action at all.
-    await expect(shown(page).locator('[data-testid^=tax-rules-row-]')).toHaveCount(0);
 
     // By the API: every write refused with 403 permission_denied.
     const writes: ReadonlyArray<readonly [string, unknown]> = [

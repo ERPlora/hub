@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b679f835a0d710d3c503924fb7a590f7b342eeb123ed7fac606e07ed6f09c654 -->
+<!-- generated from WORKBOOK.md sha256:885d68994dd3fe07fe800d30f397930dfa919f5edfd3c6d9ee58f8d159472f13 -->
 
 ## What it is for and who it is for
 
@@ -22,9 +22,11 @@ businesses:
 ### Who uses it and what each one does
 
 - The **employee** (waiter, receptionist, cashier): builds the check, adds notes, comps a line, applies
-  discounts up to the business's maximum, parks and retrieves checks, charges and looks up the sales.
+  discounts up to the business's maximum, parks and retrieves checks, charges and looks up their sales
+  and their figures: the ones they charged and the ones attributed to them.
 - The **manager**: also sells at an open price, applies discounts above the maximum, voids an open check
-  or a line already sent to the kitchen, voids and refunds sales, sees the figures and prepares the quick
+  or a line already sent to the kitchen, voids and refunds sales, sees everyone's sales and the whole
+  business's figures and prepares the quick
   notes, the sections, the payment methods and the POS settings.
 - The **owner** and the **administrator**: everything.
 
@@ -107,7 +109,8 @@ Initial setup, step by step:
 ## Screens
 
 Sales & POS opens from the **Sales & POS** menu and has five entries: **Sell**, **Sales**,
-**Quick notes**, **Sections** and **Settings**. "Sections" are the till's departments: the short
+**Quick notes**, **Sections** and **Settings**; the last three, only for whoever can change the Sales
+settings. "Sections" are the till's departments: the short
 word fits in a phone's tab bar with all five in sight.
 
 ### Sell
@@ -189,7 +192,9 @@ is not an invoice. The fiscal receipt is issued on payment.", and the print and 
 ### Sales
 Here are the sales already charged, with the figures for today or for the period you choose. Look a sale
 up by its number or by the customer to see its ticket, reprint it, void it or refund it. If you are not
-allowed to void or refund, a manager approves it for you with their PIN.
+allowed to void or refund, a manager approves it for you with their PIN. An employee sees only their own
+sales, the ones they charged and the ones attributed to them; the manager, the owner and the
+administrator see everyone's.
 
 #### Details
 Title "Sales", period ("Today", "7 days", "30 days", "All"), six figures ("Tickets", "Revenue", "Avg.
@@ -225,8 +230,8 @@ you put a note on a line in **Sell**, they show as buttons and you just tap them
 
 #### Details
 Explanation, table (Note, Position) with search, **+** to add and, per row, "Edit" and "Delete". Empty:
-"No quick notes yet…"; loading: "Loading quick notes…". Whoever lacks the settings permission sees it
-without **+** or actions.
+"No quick notes yet…"; loading: "Loading quick notes…". Whoever lacks the settings permission does not
+open it: by its address, "No access" (BASE-F118).
 
 ### Sections
 Sections are the till's departments for charging something that is not in the catalogue, at an open
@@ -235,8 +240,8 @@ they show. When you tap **Open price** in **Sell**, you pick the section and typ
 
 #### Details
 Explanation, table (Name, VAT charged, Position), **+** and, per row, "Edit" and "Delete". Empty: "No
-sections yet…"; loading: "Loading sections…". Whoever lacks the settings permission sees it without
-**+** or actions.
+sections yet…"; loading: "Loading sections…". Whoever lacks the settings permission does not open
+it: by its address, "No access" (BASE-F118).
 
 ### Settings
 Here you decide how the till charges: which payment methods it takes, whether every sale needs a
@@ -245,8 +250,8 @@ write what goes at the top and the bottom of the receipt. Press **Save** for the
 
 #### Details
 Header "Point of sale": a switch or field per setting and "Save". Loading: "Loading
-settings…"; error: "Could not load settings." with "Retry"; without permission: "You do not have
-permission to change these settings. Ask an administrator if you need to.".
+settings…"; error: "Could not load settings." with "Retry"; without permission,
+by its address, "No access" (BASE-F118).
 
 ## States of each screen
 
@@ -311,7 +316,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 | SALE-F40 | See a dish's allergens when ordering it | common | done |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | done |
-| SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | not done |
+| SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | done |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -720,10 +725,14 @@ Vertical: common
 Actor: employee, manager, assistant
 Screen: Sell; assistant
 Steps:
-1. In the check's header, the "Served by me" chip says who it is attributed to. Tap it.
+1. In the check's header, the "Served by me" chip says who it is attributed to. Who serves is part of the
+   check and the Hub keeps it: when you leave the check and come back to it (from the floor plan, from
+   "Open checks" or on another device), the chip still says that person. Tap it.
 2. In "Who is serving this check", choose the person from the Staff team or "Me (whoever is signed in)".
    If your account has no record in Staff, the sheet warns about it: "Your account has no record in
-   Staff: left on «Me», this sale counts for nobody."
+   Staff: left on «Me», this sale counts for nobody." With the check open it is saved on it at once;
+   with no check yet, the check is opened with that person when the first item goes in, and the one
+   Tables opens when a table is picked for it is theirs too.
 3. The lines added from then on are stamped with that person. To correct a line already in, tap the
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
    A line that arrives with its professional (an appointment's, one of a check built on another device or
@@ -738,14 +747,15 @@ person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it.
+sends it. In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
+"Who serves the check could not be changed. It stays with whoever served it.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
-the kitchen is not reassigned. With the assistant, someone not on the team: "That staff member does not
-exist in this business."; without Staff active: "Staff is not active in this business.". If Staff cannot
-say whose a line is (off, no permission or a record that is gone), the line says "the assigned
-professional".
-Involved: STAFF-F21, KITCHEN-F18
+the kitchen is not reassigned. If Staff cannot say whose a line is (off, no permission or a record that
+is gone), the line says "the assigned professional". With the assistant, someone not on the team: "That
+staff member does not exist in this business."; without Staff active: "Staff is not active in this
+business.".
+Involved: STAFF-F21, KITCHEN-F18, TABLE-F09
 
 ### SALE-F17 Park a check and retrieve it
 Status: done
@@ -1034,7 +1044,7 @@ Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F2
 ### SALE-F28 Look up the sales history and figures
 Status: done
 Vertical: common
-Actor: employee (history), manager (figures)
+Actor: employee (the history and the figures of their sales), manager (everyone's)
 Screen: Sales
 Steps:
 1. Open **Sales & POS → Sales**. At the top, the period ("Today" by default, "7 days", "30 days",
@@ -1046,20 +1056,30 @@ Steps:
    territory halfway, for example), it is called "Taxes". With no sales in the period, it carries the tax
    of the territory in **Taxes → Settings**, and changes at once if the territory is changed. With "7
    days", under the figures, what was sold on each of those days, from oldest to today ("Wed 14 ·
-   €120.50").
+   €120.50"). They are the whole business's figures for the manager, the owner and the administrator,
+   who see everyone's sales and the business totals; whoever lacks those two permissions, like the
+   employee, sees those of their own sales, the same ones the table gives them.
 3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "€5.00 left to
-   refund" if part was refunded) and Total. Search with "Search number or customer…", filter by status,
-   payment, date or total, or sort.
+   refund" if part was refunded) and Total. A sale charged with several methods shows them all under
+   "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
+   number or customer…", filter by status, payment, date or total, or sort; the payment filter finds a
+   sale by any of its methods. An employee only sees their own sales: the ones they charged and the ones
+   attributed to their Staff record (the "Served by" chip). The manager, the owner and the administrator
+   see everyone's.
 4. Tap a row to see its document. The table reloads by itself when a sale is charged, voided
    or refunded.
 5. Today's figures are also on **Home**, on the board: "Today's sales" and
    "Today's tickets" show from the start; "Sales, last 7 days" (one bar per day, from oldest to today) and
-   "Recent activity" (the last eight sales, the newest on top, with their number and their customer) are
+   "Recent activity" (the last eight sales the person sees, the newest on top, with their number and their
+   customer) are
    added with ⋮ ("Customize panel"). They update by themselves when a sale is charged, voided or refunded,
-   without reloading. Whoever lacks the reports permission can only add "Recent activity".
+   without reloading. The panels count by the same rule as the screen's figures: the whole business or
+   their own sales.
 In: nothing from other apps.
 Out: nothing saved. What each professional sold in the period (Staff and the assistant ask for it for the
-commission) already takes off what was refunded: what goes back, to whoever sold it; the money that goes
+commission) counts by the same rule: whoever does not see the whole business gets only the lines of their
+own sales and, of the voucher sessions spent outside the till, those of their record. It already takes off
+what was refunded: what goes back, to whoever sold it; the money that goes
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
 Each refund counts on its sale's day and is shared out to the cent: with what nobody served, it adds up
@@ -1078,20 +1098,19 @@ voucher of 100.00 € in 3 sessions, sold by A and done by B, gives 0 to A and 1
 period's "Revenue". Sales charged before stay as they were: their line counts for whoever sold it and the
 sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
-last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
-table, without the figures. The total filter is written like any amount in the Hub ("1.000,50",
+last 7 days could not be read.". Empty: "No sales yet.". The total filter is written like any amount in the Hub ("1.000,50",
 "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its field
 in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
 cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date
 before the start one, "The end date cannot be before the start date."; neither of them filters and the
 period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
-Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
+Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
 Status: done
 Vertical: common
-Actor: employee, manager
+Actor: employee (of their sales), manager (of all of them)
 Screen: Sale document
 Steps:
 1. In **Sales**, tap the row or the "Document" action; it also opens by itself after charging, the whole
@@ -1101,8 +1120,9 @@ Steps:
    later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
    name and the rest the address. On an invoice, under "Customer", its tax ID and its address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
-   (an exempt one says its cause: "Exempt (E1)"), total, payment method, tendered and change, and the
-   footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
+   (an exempt one says its cause: "Exempt (E1)"), total, payment method (charged with several methods,
+   all of them: "Cash + Card"), tendered and change, and the footer. With **VeriFactu**, before the
+   footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
    and "Scan it to check this receipt at the AEAT" ("…this invoice…" if it is an invoice); once the AEAT
    has answered, its code ("CSV: …") instead of that sentence. While VeriFactu has no record of that
    document, the paper comes out without a QR. A receipt with its fiscal document (issued or pending)
@@ -1136,7 +1156,9 @@ If it fails: "Loading document…" and "Error loading the document" (also if the
 the paper never comes out without it). If it does not print, "Could not print"; if the installed app does
 not open its print screen, with the reason after a colon, as when printing the bill for the table. A
 refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes nothing; with no reason,
-"The documents could not be issued. Try again.".
+"The documents could not be issued. Try again.". A sale the person does not see (someone else's, for an
+employee) is not opened, reprinted or issued: the window says "Error loading the document" and the API or
+the assistant, "That sale does not exist.".
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
@@ -1157,7 +1179,8 @@ With Invoicing, the corrective invoice of the whole ticket (R5, "RECT" series) i
 (INVOICE-F07); if the ticket had been left pending, it is issued first, in the same void. If Invoicing
 still cannot, the void goes ahead and both documents are left pending, in sight (SALE-F29, "Issue now").
 Inventory puts back the stock (INVENTORY-F23) and Customers takes off the purchase (CUSTOMER-F21).
-If it fails: without a reason, "A reason is required to void a sale"; if it was charged as a full
+If it fails: without a reason, "A reason is required to void a sale"; a sale the person does not see
+(someone else's, for an employee), "That sale does not exist."; if it was charged as a full
 invoice, "This sale carries a full invoice: issue a credit note instead of voiding it."; with refunds,
 "This sale already has refunds: refund what is left instead of voiding it."; voided from another device
 at the same time, "This sale is already voided.". A refusal is read inside the window, which stays open.
@@ -1194,7 +1217,8 @@ Out: the refund document with one row per payment method, the lines that go back
 reason and who made it (announces: sale refunded, with the refunded lines and whether it is left fully
 refunded) and, with Invoicing, its corrective invoice in the same refund (R5 for a ticket, R1 for an
 invoice; by differences, or what is left if it closes the sale: INVOICE-F09, F10).
-If it fails: "Card: €20.00 is more than the €12.00 still refundable.", "Card: choose where
+If it fails: a sale the person does not see (someone else's, for an employee), "That sale does not
+exist."; "Card: €20.00 is more than the €12.00 still refundable.", "Card: choose where
 this money goes back.", "A refund needs a reason.", "There is no money left to refund on this sale.". If
 another refund takes the last of a marked line at the same time: "One of the lines marked already came
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
@@ -1450,26 +1474,26 @@ the confirmation card, which says the check, the dish and the allergens by their
 Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
 ### SALE-F42 Choose the modifiers of a dish in a menu
-Status: not done — the menu sheet does not ask yet for the modifiers of each dish, Menus does not add them to the
-amount and the kitchen order does not carry them (hub#2019)
+Status: done
 Vertical: restaurant
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. With Menus and combos and Modifiers active, open a menu in the POS (SALE-F12) and choose a dish that has modifier
+1. With Menus and combos and Modifiers active, open a menu in the POS and choose a dish that has modifier
    groups, its own or its category's, the same ones it asks for when sold on its own (the entrecôte with "Meat
    doneness"): its groups open right there, under the dish, with the rules, the extra charges with their sign, the
-   allergens and the default options of the sheet of an article on its own (SALE-F11). A dish without groups is
-   chosen as always.
+   allergens and the default options of the sheet of an article on its own. A dish without groups is chosen as
+   always.
 2. Choose the options. Removing the dish, or changing it for another in a single-choice course, removes its
    options. A choice that is repeated (two coffees) carries the same options each time.
 3. While a required group of a chosen dish is not complete, the button says what is missing ("Choose 1 in «Meat
-   doneness»") and tapping it points to that group. With everything complete, "Add · <total>" adds to the set price
+   doneness»") and tapping it points to that group. With everything complete, "Add · €16.50" adds to the set price
    the menu's extra charges and those of the chosen options.
-4. Press it: the menu goes into the check with each dish and, under it, its options.
-5. Send to the kitchen: each dish carries its options under it, on the screen and on paper, like a dish on its own
-   (COMBO-F11, MODIFIER-F08). Charge as always: the ticket names the options under their dish and the menu charges
-   what it was worth when ordered, options included, even if they change or are deleted later.
+4. Press it: the menu goes into the check with its dishes under it and, beside each dish, its options ("Entrecôte
+   (Rare, Cheese)").
+5. Send to the kitchen: each dish carries its options under it, on the screen and on paper, like a dish on its own.
+   Charge as always: the ticket names the options beside their dish, under the menu, and
+   the menu charges what it was worth when ordered, options included, even if they change or are deleted later.
 In: the groups and options of the product of each chosen dish, from Modifiers (MODIFIER-F06). Modifiers checks and
 prices the options of each dish (MODIFIER-F07) and Menus adds them to the menu's amount when the line is added and
 again when charging, with the amount ordered (COMBO-F08).
@@ -1510,6 +1534,10 @@ sale by its id or its number; a section or a quick note by its id or its name; a
 id, its name or its type ("cash", "card"). If a name matches several, it is refused saying which ones
 (409 `*_ambiguous`).
 
+What reads or touches a charged sale (the list, the sale, its document and its paper, "Issue now", voiding
+and refunding) only reaches the sales the person sees: without "See all sales", the ones they charged and
+the ones attributed to them. One they do not see does not exist for them (404 `sale.sale_not_found`).
+
 ### What it offers: queries (they read and change nothing)
 
 | What it gives | Who can | Flows | Service |
@@ -1518,10 +1546,10 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | A whole sale: header, customer with its tax ID and address (on an invoice), lines, payments, VAT breakdown and what was refunded | see sales | F29 | `sale.sale.get` |
 | The business as the paper names it: name, tax ID and lines (address and receipt header); for a sale, those of its fiscal document | see sales | F21, F29 | `sale.letterhead.get` |
 | The sale recorded with a charge attempt key | see sales | F06 | `sale.sale.by_idempotency_key` |
-| The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
-| What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
-| What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
-| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
+| The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | see sales | F28 | `sale.sale.stats` |
+| What was sold today and today's tickets | see sales | F28 | `sale.sale.today` |
+| What was sold on each of the last 7 days | see sales | F28 | `sale.sale.last_7_days` |
+| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | see sales | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
@@ -1654,7 +1682,7 @@ the quick notes and what is refundable can be followed live.
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
-| See sales, checks, POS settings, sections and quick notes | yes | yes | yes | yes | `sale.view_sale` |
+| See sales and their figures, checks, POS settings, sections and quick notes | yes | yes | yes | yes | `sale.view_sale` |
 | Build the check (open, add, change, remove, split, merge, send to the kitchen, discount up to the maximum) | yes | yes | yes | yes | `sale.add_sale` |
 | Charge | yes | yes | yes | yes | `sale.take_payment` |
 | Sell at an open price | yes | yes | yes | no | `sale.sell_open_price` |
@@ -1663,7 +1691,7 @@ the quick notes and what is refundable can be followed live.
 | Refund | yes | yes | yes | no | `sale.refund_sale` |
 | See the payment methods | yes | yes | yes | yes | `sale.view_paymentmethod` |
 | Create payment methods | yes | yes | yes | no | `sale.add_paymentmethod` |
-| See the figures | yes | yes | yes | no | `sale.view_reports` |
+| See everyone's sales (without it, only their own: the ones they charged and the ones attributed to them) and, with the business totals (`base.view_business_totals`), the whole business's figures (without both, those of their own sales) | yes | yes | yes | no | `sale.view_all_sales` |
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
@@ -1673,13 +1701,17 @@ their PIN or their badge ("An approval is needed", BASE-F84), once and for that 
 refunding a sale, voiding a line sent to the kitchen, deleting a check with something ordered, selling at
 an open price and discounts above the maximum. The approved action does everything the manager's does
 (also what Invoicing and Services move: the corrective invoice and the voucher sessions that go back) and
-stays in **Employees › Approvals** (BASE-F85). Seeing the figures, the settings and creating payment
-methods are not approved.
+stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the whole business's figures, the
+settings and creating payment methods are not approved.
+
+The accountancy firm (`hub_accountant`) only reads: "See sales, checks, POS settings, sections and quick notes",
+"See the payment methods" and "See everyone's sales". It does not build checks, charge, void or refund, nobody
+approves anything for it and it does not touch the settings.
 
 What touches a voucher's session also asks for Services' permission, because it is Services that moves
 it with the session of whoever sells: paying a line with a voucher, undoing it, removing, voiding or
-charging a line paid with a voucher, "Spend sessions" (`service.redeem_package`, all four roles have it);
+charging a line paid with a voucher, "Spend sessions" (`service.redeem_package`, every role but the accountancy firm has it);
 voiding or refunding a sale with sessions, "Give voucher sessions back" (`service.return_session`: owner,
 administrator and manager, the same who void and refund). The other way round, saying who did a session spent
-outside the checkout (SERVICE-F21) asks for "Build the check" (`sale.add_sale`, all four roles), like saying whose a
+outside the checkout (SERVICE-F21) asks for "Build the check" (`sale.add_sale`, every role but the accountancy firm), like saying whose a
 line is.

@@ -101,7 +101,7 @@ describe('PosPage: the screen', () => {
     expect(s.find('pos-loading').exists()).toBe(true);
     const appPage = s.wrapper.findComponent(AppPage);
     expect(appPage.props('title')).toBe('Sales & POS');
-    expect((appPage.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick_notes', 'departments', 'settings']);
+    expect((appPage.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick-notes', 'departments', 'settings']);
     await s.result('sale.pos_settings.get', settings());
     expect(s.find('pos-loading').exists()).toBe(false);
     expect(s.wrapper.findComponent(PosCatalog).exists()).toBe(true);
@@ -179,7 +179,7 @@ describe('PosPage: selling', () => {
     expect(s.sent().some((c) => c.path === '/api/customer/orders/customer' && c.query.order_id === 'o5')).toBe(true);
   });
 
-  it('the chosen professional seals the next lines; the chip says who', async () => {
+  it('the chosen professional opens the check and seals the next lines; the chip says who', async () => {
     const s = await setup();
     await click(s.find('pos-staff-chip').element);
     await settle();
@@ -187,7 +187,7 @@ describe('PosPage: selling', () => {
     await settle();
     expect(s.wrapper.findComponent(CartHeading).props()).toMatchObject({ staffId: 's1', staffName: 'Marta' });
     await s.addProduct();
-    expect(s.writes()[0]).toEqual(['/api/sale/orders', { lines: [{ product_id: 'p1', staff_id: 's1' }] }]);
+    expect(s.writes()[0]).toEqual(['/api/sale/orders', { staff_id: 's1', lines: [{ product_id: 'p1', staff_id: 's1' }] }]);
   });
 
   it('a customer chosen with a check open is linked to it', async () => {
@@ -916,28 +916,6 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toast).toHaveBeenCalledTimes(1);
     expect(toast).toHaveBeenCalledWith({ message: 'Comanda 1 enviada a cocina.', tone: 'success', position: 'top' });
     expect(toastSuccess).not.toHaveBeenCalled();
-  });
-
-  it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it', async () => {
-    const s = await setup({ session: WITH_KITCHEN });
-    await click(s.find('pos-staff-chip').element);
-    await settle();
-    s.wrapper.findComponent(StaffPicker).vm.$emit('choose', { id: 's1', name: 'Marta' });
-    await settle();
-    await s.addProduct();
-    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
-    s.wrapper.findComponent(PosCart).vm.$emit('send', false);
-    await settle();
-    await click(s.find('pos-staff-chip').element);
-    await settle();
-    s.wrapper.findComponent(StaffPicker).vm.$emit('choose', { id: null, name: null });
-    await settle();
-    s.wrapper.findComponent(PosCart).vm.$emit('send', true);
-    await settle();
-    expect(sends(s)).toEqual([
-      { order_id: 'o1', priority: 'normal', waiter: 'Marta' },
-      { order_id: 'o1', priority: 'rush' },
-    ]);
   });
 
   it('a round sent whose sheet did not print says so in words at the top, never the raw reason (KITCHEN-F08, hub#748)', async () => {

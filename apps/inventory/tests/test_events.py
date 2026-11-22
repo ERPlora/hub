@@ -12,7 +12,8 @@ from live.operations import NAME_RE
 
 from apps.inventory import events
 from apps.inventory.models import Product, StockMovement
-from apps.inventory.tests.test_services import TAX, import_products, outbox, row
+from apps.inventory.tests.test_services import TAX, outbox
+from apps.inventory.tests.test_services_imports import import_products, row
 from apps.tax.models import TaxCategory
 
 from .conftest import A, HUB_DB

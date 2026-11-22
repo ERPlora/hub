@@ -4,7 +4,7 @@ Who is in the business, and with which role, is erplora.com's (inviting, changin
 places): the Hub lists them — those who already entered and those the SaaS's photo names that have not yet
 — with how each one gets in (the account, and here a PIN and a badge), and lets whoever runs the business take away a
 PIN or give and take away a badge. A person removed on erplora.com and invited again comes back with what the hub kept
-of them. The roles are the four of erplora.com, with how many people and permissions each has.
+of them. The roles are erplora.com's, with how many people and permissions each has.
 """
 
 import base64
@@ -139,12 +139,30 @@ class TestWhoIsInTheBusiness:
         assert nuria["ways"] == {"account": True, "pin": False, "badge": False}
         assert row(people(client), "saas:1")["entered"] is True
 
-    def test_the_email_only_for_who_runs_the_business(self, client, olga, eva):
-        client.force_login(olga)
-        assert row(people(client), "saas:3")["email"] == "eva@example.com"
+    def test_the_owner_and_a_manager_see_everybodys_email(self, client, olga, eva, mario):
+        for viewer in (olga, mario):
+            client.force_login(viewer)
+            answer = people(client)
+            assert [row(answer, person)["email"] for person in ("saas:1", "saas:4", "saas:3")] == [
+                "olga@example.com",
+                "mario@example.com",
+                "eva@example.com",
+            ]
+
+    def test_an_employee_sees_nobodys_email_not_even_their_own(self, client, olga, eva, mario):
         client.force_login(eva)
-        assert row(people(client), "saas:1")["email"] == ""
-        assert row(people(client), "saas:3")["email"] == "eva@example.com"
+        assert [entry["email"] for entry in people(client)["people"]] == [None, None, None]
+
+    def test_an_account_without_a_name_is_named_by_what_comes_before_its_at_never_by_its_address(
+        self, client, eva, make_user
+    ):
+        # erplora.com names an account without a name by its address: the name must not carry it to an employee.
+        make_user("saas:6", host=A.key, role=Membership.Role.EMPLOYEE, first_name="nora@example.com", email="nora@example.com")
+        photo(members=[{"user_id": "7", "role": "hub_employee", "email": "pau@example.com", "name": "pau@example.com"}])
+        client.force_login(eva)
+        answer = people(client)
+        assert (row(answer, "saas:6")["name"], row(answer, "saas:7")["name"]) == ("nora", "pau")
+        assert "@" not in json.dumps(answer)
 
     def test_the_name_is_the_one_of_my_profile_in_this_business(self, client, olga, eva):
         from base.models import Profile
@@ -362,16 +380,17 @@ class TestComingBack:
 class TestTheRoles:
     """The roles of the business, who has each one and how many permissions it gives."""
 
-    def test_the_four_roles_of_erplora_com_with_their_people_and_permissions(self, client, olga, adam, eva):
+    def test_the_roles_of_erplora_com_with_their_people_and_permissions(self, client, olga, adam, eva):
         client.force_login(eva)
         response = get(client, "/roles")
         assert response.status_code == 200, response.content
         roles = {role["key"]: role for role in response.json()["roles"]}
-        assert list(roles) == ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+        assert list(roles) == ["hub_owner", "hub_admin", "hub_manager", "hub_employee", "hub_accountant"]
         assert {key: role["members"] for key, role in roles.items()} == {
-            "hub_owner": 1, "hub_admin": 1, "hub_manager": 0, "hub_employee": 1,
+            "hub_owner": 1, "hub_admin": 1, "hub_manager": 0, "hub_employee": 1, "hub_accountant": 0,
         }
-        assert roles["hub_owner"]["permissions"] == roles["hub_admin"]["permissions"]
+        # The administrator holds all the owner does but owning the business.
+        assert roles["hub_owner"]["permissions"] == roles["hub_admin"]["permissions"] + 1
         assert roles["hub_admin"]["permissions"] > roles["hub_manager"]["permissions"] > roles["hub_employee"]["permissions"] > 0
         assert all(role["origin"] == "basic" for role in roles.values())
         assert roles["hub_manager"]["label"] == "Manager"
@@ -417,6 +436,7 @@ PEOPLE_ROUTES = {
     ("POST", "/people/badge", "base.person.badge_set"),
     ("POST", "/people/badge/remove", "base.person.badge_remove"),
     ("GET", "/roles", "base.role.list"),
+    ("GET", "/access/grantors", "base.access.grantors"),
 }
 
 

@@ -1,7 +1,7 @@
 {
   "task": {
     "title": "Tareas",
-    "tabs": { "label": "Secciones de Tareas", "tasks": "Tareas", "projects": "Proyectos" },
+    "tabs": { "label": "Secciones de Tareas" },
     "views": { "label": "Qué tareas", "all": "Todas", "mine": "Mis tareas" },
     "status": { "todo": "Por hacer", "in_progress": "En curso", "blocked": "Bloqueada", "done": "Hecha", "cancelled": "Cancelada" },
     "priority": { "low": "Baja", "medium": "Media", "high": "Alta", "urgent": "Urgente" },

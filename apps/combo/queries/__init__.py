@@ -14,6 +14,7 @@ away is the menu's setting unless Ventas says how this line is sold (its order's
 """
 
 from collections import Counter, OrderedDict
+from functools import partial
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from live.operations import INTERNAL, operation
 from psycopg import sql
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
+from .dish_options import TAKEAWAY_CATEGORY, Dish, categories, options_amount, priced, takeaway_key, weights
 from apps.combo.schemas import (
     ComboDetailOut,
     ComboListIn,
@@ -99,11 +101,6 @@ BLOCK_GROUP_SHORT = _(
     "The course “%(group)s” has fewer choices on offer than it asks for."
 )
 
-#: To take away, the category of what is served on the premises becomes the one of a sale of goods: a
-#: beer drunk at the table is a hospitality service at 10 % (art. 91.Uno.2.2 LIVA), the same beer to take
-#: away a sale of goods at 21 % (art. 90). Explicit on purpose: only Taxes' factory pair is mapped; a
-#: category of the business's own is billed as it is.
-TAKEAWAY_CATEGORY = {"restaurant.alcohol": "retail.alcohol"}
 #: Ventas' channels of an order that take the food away (its ``channel``: dine_in, takeaway, delivery).
 CHANNELS_AWAY = frozenset({"takeaway", "delivery"})
 
@@ -248,11 +245,7 @@ def premises_key(product) -> str | None:
 
 def away_key(product, targets: frozenset[str]) -> str | None:
     """The category the product is billed at to take away; ``None`` when it has none."""
-    key = premises_key(product)
-    if key in TAKEAWAY_CATEGORY:
-        target = TAKEAWAY_CATEGORY[key]
-        return target if target in targets else None
-    return key
+    return takeaway_key(premises_key(product), targets)
 
 
 def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:  # noqa: PLR0911
@@ -657,14 +650,16 @@ def split_amount(total: int, weights: list[int]) -> list[int]:
     return shares
 
 
-def _picked(combo: Combo, data: ResolveIn) -> "OrderedDict[UUID, int]":
-    """Each choice picked → how many times, in the order first picked; refused when it is not this menu's."""
+def _picked(combo: Combo, data: ResolveIn) -> tuple["OrderedDict[UUID, int]", dict[UUID, list]]:
+    """Each choice picked → how many times, in the order first picked, and the options of Modifiers it carries (those of
+    every pick naming it); refused when it is not this menu's."""
     options = {
         option.id: option
         for group in combo.groups.all()
         for option in group.options.all()
     }
     picks: OrderedDict[UUID, int] = OrderedDict()
+    extras: dict[UUID, list] = {}
     for choice in data.choices:
         if choice.option_id is not None:
             if choice.option_id not in options:
@@ -673,7 +668,8 @@ def _picked(combo: Combo, data: ResolveIn) -> "OrderedDict[UUID, int]":
         else:
             option_id = _named_pick(options.values(), choice.product, choice.group)
         picks[option_id] = picks.get(option_id, 0) + choice.quantity
-    return picks
+        extras[option_id] = [*extras.get(option_id, []), *choice.options]
+    return picks, extras
 
 
 def _named_pick(options, said: str, group: str | None) -> UUID:
@@ -747,21 +743,33 @@ def _billing(combo: Combo, data: ResolveIn) -> tuple[str, bool]:
     return Combo.SupplyKind.GOODS, away
 
 
-def _component_key(option: ChoiceOption, supply: str, away: bool, targets: frozenset[str]) -> str | None:
-    """The category a dish is billed at; refused when a line billed per dish has none."""
-    product = option.product
-    key = premises_key(product)
+def _component_key(name: str, key: str | None, supply: str, away: bool, targets: frozenset[str]) -> str | None:
+    """The category a dish, or an option of a line of its own, billed at ``key`` on the premises is billed at in this
+    line; refused when a line billed per dish has none."""
     if supply == Combo.SupplyKind.SERVICE:
         return key
     if key is None:
-        raise Conflict(str(COMPONENT_UNTAXED) % {"product": product.name}, code="combo.tax_category_missing")
-    if not away:
-        return key
-    target = away_key(product, targets)
+        raise Conflict(str(COMPONENT_UNTAXED) % {"product": name}, code="combo.tax_category_missing")
+    target = takeaway_key(key, targets) if away else key
     if target is None:
-        message = str(TAKEAWAY_UNTAXED) % {"product": product.name, "category": key}
+        message = str(TAKEAWAY_UNTAXED) % {"product": name, "category": key}
         raise Conflict(message, code="combo.tax_category_takeaway")
     return target
+
+
+def _dish(option: ChoiceOption, quantity: int, extras: list, keyed) -> Dish:
+    """A dish picked ``quantity`` times in one menu with its options, as the split reads it (``keyed`` bills each)."""
+    product = option.product
+    own = [keyed(extra.name, extra.tax_category_key) if extra.own_line else None for extra in extras]
+    return Dish(keyed(product.name, premises_key(product)), product.price, quantity, extras, own)
+
+
+def _shares(amount: int, dishes: list[Dish]) -> list[int]:
+    """``amount`` split by the weights of the dishes and of their options of a line of their own."""
+    by = weights(dishes)
+    if not any(by):
+        raise Conflict(str(NO_CATALOG_PRICE), code="combo.no_catalog_price")
+    return split_amount(amount, by)
 
 
 def _check_offer(option: ChoiceOption, charging: bool) -> None:
@@ -791,7 +799,7 @@ def resolve_line(combo: Combo, data: ResolveIn, targets: frozenset[str]) -> dict
         raise Conflict(str(NOT_ON_SALE), code="combo.not_on_sale")
     if supply == Combo.SupplyKind.SERVICE and not combo.tax_category.is_active:
         raise Conflict(str(MENU_UNTAXED), code="combo.tax_category_missing")
-    picks = _picked(combo, data)
+    picks, extras = _picked(combo, data)
     if not picks:
         raise Conflict(str(NOTHING_PICKED), code="combo.nothing_picked")
     chosen = [(group, o) for group in combo.groups.all() for o in group.options.all() if o.id in picks]
@@ -801,22 +809,15 @@ def resolve_line(combo: Combo, data: ResolveIn, targets: frozenset[str]) -> dict
         _check_offer(option, charging)
     _check_groups(combo, picks)
     supplements = sum(option.price_delta * picks[option.id] for _group, option in chosen)
-    amount = data.amount if charging else combo.price + supplements
+    amount = data.amount if charging else combo.price + supplements + options_amount(picks, extras)
     if amount < 0:
         raise Conflict(str(AMOUNT_NEGATIVE), code="combo.amount_negative")
-    keys = [_component_key(option, supply, away, targets) for _group, option in chosen]
-    split = supply == Combo.SupplyKind.GOODS and len(set(keys)) > 1
-    shares: list[int | None] = [None] * len(chosen)
-    if split:
-        weights = [option.product.price * picks[option.id] for _group, option in chosen]
-        if not any(weights):
-            raise Conflict(str(NO_CATALOG_PRICE), code="combo.no_catalog_price")
-        shares = split_amount(amount, weights)
-    if supply == Combo.SupplyKind.SERVICE:
-        line_key = combo.tax_category.key
-    else:
-        line_key = None if split else keys[0]
-    categories = _first_categories([option.product_id for _group, option in chosen])
+    keyed = partial(_component_key, supply=supply, away=away, targets=targets)
+    dishes = [_dish(option, picks[option.id], extras.get(option.id, []), keyed) for _group, option in chosen]
+    split = supply == Combo.SupplyKind.GOODS and len(categories(dishes)) > 1
+    shares = _shares(amount, dishes) if split else None
+    line_key = combo.tax_category.key if supply == Combo.SupplyKind.SERVICE else (None if split else dishes[0].key)
+    first = _first_categories([option.product_id for _group, option in chosen])
     components = [
         {
             "option_id": option.id,
@@ -825,15 +826,14 @@ def resolve_line(combo: Combo, data: ResolveIn, targets: frozenset[str]) -> dict
             "product_id": option.product_id,
             "product_name": option.product.name,
             "sku": option.product.sku,
-            "category_id": categories.get(option.product_id),
+            "category_id": first.get(option.product_id),
             "is_service": option.product.product_type == "service",
             "quantity": picks[option.id],
             "price_delta": option.price_delta,
             "catalog_price": option.product.price,
-            "tax_category_key": key,
-            "amount": share,
+            **parts,
         }
-        for (group, option), key, share in zip(chosen, keys, shares, strict=True)
+        for (group, option), parts in zip(chosen, priced(dishes, shares), strict=True)
     ]
     return {
         "combo_id": combo.id,

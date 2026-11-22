@@ -5,7 +5,7 @@ import { type SessionMe, type SessionStatus, type ShellSidebar } from '@erplora/
 import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { type BaseWrapper } from '@vue/test-utils';
 import { vi } from 'vitest';
-import { type Component } from 'vue';
+import { type Component, type Ref } from 'vue';
 import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
 
 import { type ApiCall, type ApiHandler, flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
@@ -23,10 +23,17 @@ configureAssistant(HUB_ASSISTANT);
 
 export const OWNER: SessionMe = {
   user: { id: 'u1', label: 'Ana' },
-  permissions: ['base.view_home', 'base.administer_hub', 'demo.view', 'demo.manage'],
+  permissions: ['base.view_home', 'base.administer_hub', 'base.own_business', 'demo.view', 'demo.manage'],
   menu: [],
   apps: [],
   language: 'en',
+};
+
+/** Runs the business as the owner does, but does not own it: no buying, no reset, no copies (BASE-F11, BASE-F37). */
+export const ADMIN: SessionMe = {
+  ...OWNER,
+  user: { id: 'u3', label: 'Adam' },
+  permissions: OWNER.permissions.filter((permission) => permission !== 'base.own_business'),
 };
 
 export const EMPLOYEE: SessionMe = { ...OWNER, user: { id: 'u2', label: 'Leo' }, permissions: ['base.view_home', 'demo.view'] };
@@ -41,7 +48,7 @@ export const help: AppHelp = {
     { id: 'floor', title: 'Floor plan', path: '/table/floor-plan', text: 'The live room.' },
     { id: 'settings', title: 'Settings', path: '/table/settings', text: 'Room settings.' },
   ],
-  flows: [{ id: 'seat', title: 'Seat a party', screens: ['floor'], steps: '1. Tap a table.', failure: '' }],
+  flows: [{ id: 'seat', title: 'Seat a party', screens: ['floor'], steps: '1. Tap a table.', failure: '', videos: [] }],
 };
 
 export { business, POLISH } from './business';
@@ -146,8 +153,8 @@ export interface MountOptions {
   props?: Record<string, unknown>;
   path?: string;
   locale?: 'en' | 'es';
-  /** `null`: no session arrived (yet, or ever: see `status`). */
-  session?: SessionMe | null;
+  /** `null`: no session arrived (yet, or ever: see `status`); a ref: a session the test changes while the page is open. */
+  session?: SessionMe | Ref<SessionMe> | null;
   status?: SessionStatus;
   /** Paths the router knows (besides the 404 catch-all named `not-found`, as the shell's). */
   routes?: string[];

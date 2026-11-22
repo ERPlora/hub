@@ -11,7 +11,7 @@ from apps.whatsapp_inbox.models import FILE_HEADERS, Template, TemplateSample, h
 from apps.whatsapp_inbox.queries.reads import page
 from apps.whatsapp_inbox.queries.reasons import template_reason
 from apps.whatsapp_inbox.queries.template_samples import sample_out
-from apps.whatsapp_inbox.schemas import TemplateListIn, TemplateNamedOut, TemplatePage, TemplateRefIn
+from apps.whatsapp_inbox.schemas.templates import TemplateListIn, TemplateNamedOut, TemplatePage, TemplateRefIn
 
 TEMPLATE_GONE = _("That template no longer exists.")
 
@@ -159,8 +159,8 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
 
 
 # Not an assistant tool: what names a template on the card of its change, its deletion or its new hand-over to Meta
-# (``schemas.A_TEMPLATE``), as Settings lists it (also one deleted here that Meta still has); the model finds the
-# templates in their list. Whoever sends reads the templates, as their list.
+# (``schemas.fields.A_TEMPLATE``), as Settings lists it (also one deleted here that Meta still has); the model finds
+# the templates in their list. Whoever sends reads the templates, as their list.
 @operation(
     "whatsapp_inbox.template.get",
     kind="query",

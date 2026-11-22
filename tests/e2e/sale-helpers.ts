@@ -7,9 +7,10 @@
 // notes, check titles); its sales are found by their lines.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
+import { toastSaying } from './toast-helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -54,6 +55,15 @@ export async function chargeByApi(context: BrowserContext, body: Record<string, 
   const res = await api<SaleOut>(context, A, 'POST', '/sale/sales', { idempotency_key: `e2e-${stamp()}`, ...body });
   expect(res.status, `charge ${JSON.stringify(body)}`).toBe(201);
   return res.data;
+}
+
+/** The cashier (`EMPLOYEE`) signed in at Sales on a device of their own: the till where the sales they then void
+ *  or refund are charged, since an employee sees only the sales they charged (SALE-F28). */
+export async function cashiersTill(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/sale/sales', EMPLOYEE);
+  return { context, page };
 }
 
 /** The sale charged with `key`, read back (server-side evidence). */
@@ -155,6 +165,15 @@ export async function openTillCart(page: Page): Promise<void> {
     await till.locator('[data-testid=pos-cart-fab]').click();
   }
   await expect(till).toHaveClass(/pos-till--cart-open/);
+}
+
+/** The check on screen at each of `sizes` in turn (on a phone, its drawer opened), and `look` run at each. */
+export async function checkAtEachSize(page: Page, sizes: readonly { label: string; width: number; height: number }[], look: (label: string) => Promise<void>): Promise<void> {
+  for (const size of sizes) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await openTillCart(page);
+    await look(size.label);
+  }
 }
 
 /** On the till (`/sale/pos`, already open), `product` found by its SKU in the search and put in the cart, as a cashier
@@ -355,6 +374,13 @@ export async function shots(page: Page, name: string, ready: (page: Page) => Pro
     await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
   }
   await page.setViewportSize(restore);
+}
+
+/** «Current order» → «Send»: the round of the check on screen goes to the kitchen, and the till says so. */
+export async function sendRound(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
+  await shown(page).locator('[data-testid=pos-kitchen-send]').click();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
 }
 
 /** Whether two boxes on screen share any of their pixels. */

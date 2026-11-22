@@ -19,7 +19,7 @@ Para qué: conocer a los clientes habituales: sus datos, sus alergias, de qué s
 4. CUSTOMER-F01 — la ficha de Lucía.
 5. CUSTOMER-F11 — su móvil, escrito sin prefijo.
 6. CUSTOMER-F12 — al dar de alta otra vez a Lucía, aviso de duplicado.
-7. CUSTOMER-F02, CUSTOMER-F03 — Lucía, buscada y abierta.
+7. CUSTOMER-F02, CUSTOMER-F03 — Lucía, buscada por su móvil y abierta por el empleado, que ve su email y su teléfono.
 8. CUSTOMER-F04 — su cumpleaños.
 9. CUSTOMER-F05 — una nota en su ficha.
 10. CUSTOMER-F06 — el grupo «Habituales» y la etiqueta «Celíaca».
@@ -32,6 +32,6 @@ Para qué: conocer a los clientes habituales: sus datos, sus alergias, de qué s
 17. CUSTOMER-F13 — dos fichas de la misma persona, unidas.
 18. CUSTOMER-F08 — las fichas del CSV del programa anterior.
 19. CUSTOMER-F09 — todas las fichas, exportadas.
-20. CUSTOMER-F31 — las cifras de los clientes.
+20. CUSTOMER-F31 — las cifras de los clientes; el empleado las ve sin «Ingresos».
 21. CUSTOMER-F16 — un cliente pide que se borren sus datos personales.
 22. CUSTOMER-F07 — se elimina una ficha de prueba.

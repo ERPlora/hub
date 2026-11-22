@@ -248,10 +248,10 @@ node tests/e2e/database.ts --drop
 `$(…)` da los dos ids, primero el de `a`, como dos palabras (en bash y en zsh); la misma orden, ya con la BD y el puerto de
 la pila, la escribe `global-setup.ts` si la ejecución arranca sin las cuentas.
 
-## La pasada nocturna (`.github/scripts/nightly-e2e.sh`)
+## La pasada nocturna (`scripts/nightly_e2e.py`)
 
 Cada noche, en el Mac, corre todas las specs sobre el `origin/main` recién traído y mantiene **una sola issue**
-(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `e2e-report.sh`): una noche en rojo la abre o la
+(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `scripts/e2e_report.py`): una noche en rojo la abre o la
 comenta, y la primera noche en verde la cierra. No es un check: una noche roja no para ninguna PR ni ningún despliegue. Va
 en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los planes, solo `aws` usa Actions; el SaaS hace lo
 mismo con su pasada.
@@ -277,11 +277,11 @@ mismo con su pasada.
   nadie: lo hace la noche siguiente al empezar. `NIGHTLY_DIR` no puede ser una carpeta cuyo `hub/` o `saas/` sea un
   checkout: la noche borra esas dos carpetas a la fuerza, y se niega.
 - **Programarla**, una vez y desde el checkout principal del Hub (un worktree desaparece con su rama, y se niega):
-  `bash .github/scripts/nightly-e2e.sh install-launchd [--at HH:MM]`, a las 02:17 si no se dice otra hora. El agente de
+  `python3 scripts/nightly_e2e.py install-launchd [--at HH:MM]`, a las 02:17 si no se dice otra hora. El agente de
   launchd guarda el `PATH` de quien lo instala (uv, pnpm, node, docker y gh, con la sesión de GitHub abierta) y corre el
   script de ese checkout, que la flota pone al día. `uninstall-launchd` lo quita. Con el Mac dormido, launchd la lanza al
   despertar; con el Mac apagado, esa noche no hay pasada y nada lo dice.
-- **A mano**: `bash .github/scripts/nightly-e2e.sh --no-publish [--spec tests/e2e/<spec>]…` hace lo mismo sin escribir en
+- **A mano**: `python3 scripts/nightly_e2e.py --no-publish [--spec tests/e2e/<spec>]…` hace lo mismo sin escribir en
   GitHub. Su pila va en el `9770`, por debajo de los puertos que la flota da a sus workers (`10000 + 10 × issue` en el
   SaaS y `20000 + 10 × issue` en el Hub): en uno de esos, la noche pararía los servidores y borraría la BD del worker de
   esa issue. Otros puertos, con `NIGHTLY_HUB_PORT` (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy
@@ -800,7 +800,7 @@ env DB_NAME=saas_e2e_8871 uv run python manage.py seed_taxonomy
 ```
 
 Sin ella la spec cae al empezar con «no business type of the restaurant vertical». La pila de la pasada nocturna (y la
-del humo) ya la siembra en su paso «la siembra del SaaS»: con `nightly-e2e.sh` no hace falta a mano. Da de alta una cuenta por ejecución:
+del humo) ya la siembra en su paso «la siembra del SaaS»: con `nightly_e2e.py` no hace falta a mano. Da de alta una cuenta por ejecución:
 con `E2E_RELAX_LOGIN_RATE_LIMIT=True` en el SaaS (la receta) las altas no tienen tope práctico; sin la marca, el SaaS deja
 10 por hora y dirección, y tras varias ejecuciones seguidas hay que reiniciar su `runserver` (la caché local es de
 memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.artifacts/`.

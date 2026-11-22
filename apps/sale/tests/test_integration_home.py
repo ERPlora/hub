@@ -5,6 +5,7 @@ sales newest first), and a charge in hub B re-runs them on B's channel only.
 base and sale run for real: the panels come from SaleConfig through base's own query, never a stand-in module.
 """
 
+import dataclasses
 import json
 
 import psycopg
@@ -61,23 +62,23 @@ def test_a_manager_is_offered_the_four_panels_followed_live():
 
 
 @HUB_DB
-def test_an_employee_without_the_reports_permission_only_gets_the_recent_activity():
-    """The figures are the reports' (``sale.view_reports``, the manager's); the employee reads the sales."""
+def test_an_employee_is_offered_the_four_panels_too():
+    """The figures open to whoever reads the sales: an employee's count her own sales (test_queries_figures)."""
     employee = ctx_for("hub_employee")
-    assert employee.has("sale.view_sale") and not employee.has("sale.view_reports")
-    assert list(sale_panels(employee)) == ["sale.recent_activity"]
+    assert not employee.has("base.view_business_totals")
+    assert list(sale_panels(employee)) == PANELS
 
 
 @HUB_DB
-def test_an_employee_who_subscribes_to_the_figures_by_hand_is_refused_them():
-    """Hiding a panel is not the gate: the live stream runs the panel's own query as the person, so the figures'
-    queries refuse the employee themselves, and only the recent activity answers."""
-    employee = ctx_for("hub_employee")
+def test_whoever_does_not_read_the_sales_is_offered_none_and_refused_them_by_hand():
+    """Hiding a panel is not the gate: the live stream runs the panel's own query as the person, so each query
+    refuses whoever does not read the sales, even with the business totals."""
+    outsider = dataclasses.replace(ctx_for("hub_employee"), permissions=frozenset({"base.view_home", "base.view_business_totals"}))
+    assert sale_panels(outsider) == {}
     panels = sale_panels(ctx_for("hub_manager"))
-    for key in ("sale.today", "sale.tickets_today", "sale.last_7_days"):
+    for key in PANELS:
         with pytest.raises(PermissionDenied):
-            answer(panels[key], employee)
-    assert answer(panels["sale.recent_activity"], employee)["rows"] == []
+            answer(panels[key], outsider)
 
 
 @HUB_DB

@@ -31,6 +31,9 @@ class SaleDishOut(Schema):
     product_id: UUID = Field(description="The dish's product (Inventory).")
     product_name: str = Field(description="Its name.")
     quantity: int = Field(description="How many in one menu.")
+    modifiers: list[str] = Field(
+        default_factory=list, description="The options of Modifiers charged inside it, as the receipt names them."
+    )
 
 
 class SaleLineOut(Schema):
@@ -147,7 +150,9 @@ class SaleOut(Schema):
     sessions_to_return: int = Field(
         description="Lines paid with a voucher whose session has not come back yet."
     )
-    payment_method_name: str = Field(description="The main tender's method.")
+    payment_method_name: str = Field(
+        description="The methods it was paid with, once each in the order they were tendered («Cash + Card»)."
+    )
     breakdown: list[BreakdownOut] = Field(description="Base and tax by fiscal key.")
     notes: str = Field(description="Notes.")
     voided_at: datetime | None = Field(description="When it was voided.")
@@ -231,7 +236,7 @@ class SaleListIn(PageIn):
     )
     status: SaleStatus | None = Field(None, description="Only sales of this status.")
     payment_method_name: str | None = Field(
-        None, max_length=60, description="Only sales whose main tender is this method."
+        None, max_length=60, description="Only sales paid with this method, in full or in part."
     )
     customer_name: str | None = Field(
         None, max_length=200, description="Part of the customer's name."
@@ -269,7 +274,12 @@ class SaleRow(Schema):
     document_type: DocumentType = Field(description="ticket or invoice.")
     customer_id: UUID | None = Field(description="Customer's card.")
     customer_name: str = Field(description="Customer's name.")
-    payment_method_name: str = Field(description="Main tender's method.")
+    payment_method_name: str = Field(
+        description="The methods it was paid with, once each in the order they were tendered («Cash + Card»)."
+    )
+    payment_methods: list[str] = Field(
+        description="The same methods one by one, to find the sale by any of them («Cash», «Card»)."
+    )
     staff_id: UUID | None = Field(description="Who served it.")
     currency: str = Field(description="ISO 4217 currency it was charged in.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")

@@ -277,7 +277,7 @@ export interface SaleProductOut {
   product_type: ProductType;
   /** Cents, per `price_quantity` of `pricing_unit`. */
   price: number;
-  cost: number;
+  cost: number | null;
   tax_category_id: string | null;
   tax_category_key: string | null;
   needs_tax_setup: boolean;
@@ -379,8 +379,8 @@ export interface SummaryOut {
   products_out_of_stock: number;
   products_low_stock: number;
   products_without_cost: number;
-  /** Σ cost × stock of the ones in stock, in cents. */
-  stock_value: number;
+  /** Σ cost × stock of the ones in stock, in cents; null for whoever does not see the costs. */
+  stock_value: number | null;
   active_products: number;
 }
 

@@ -1,16 +1,28 @@
 [
   {
-    "path": "apps/appointment/services.py",
-    "file_name": "services.py",
+    "path": "apps/appointment/services/moving.py",
+    "file_name": "moving.py",
+    "functions": [
+      {
+        "name": "_move",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "apps/appointment/services/series.py",
+    "file_name": "series.py",
     "functions": [
       {
         "name": "_book_window",
         "complexity": 21
-      },
-      {
-        "name": "_move",
-        "complexity": 27
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/appointment/services/series_update.py",
+    "file_name": "series_update.py",
+    "functions": [
       {
         "name": "update_series",
         "complexity": 76
@@ -44,16 +56,6 @@
       {
         "name": "test_whoever_may_run_a_write_reads_the_record_its_card_names",
         "complexity": 18
-      }
-    ]
-  },
-  {
-    "path": "apps/combo/queries/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "resolve_line",
-        "complexity": 16
       }
     ]
   },
@@ -164,8 +166,8 @@
     ]
   },
   {
-    "path": "apps/kitchen/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/kitchen/queries/state.py",
+    "file_name": "state.py",
     "functions": [
       {
         "name": "effective",
@@ -174,8 +176,8 @@
     ]
   },
   {
-    "path": "apps/kitchen/services.py",
-    "file_name": "services.py",
+    "path": "apps/kitchen/services/by_hand.py",
+    "file_name": "by_hand.py",
     "functions": [
       {
         "name": "create_ticket",
@@ -256,8 +258,8 @@
     ]
   },
   {
-    "path": "apps/reservation/services.py",
-    "file_name": "services.py",
+    "path": "apps/reservation/services/reservations.py",
+    "file_name": "reservations.py",
     "functions": [
       {
         "name": "update_reservation",

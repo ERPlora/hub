@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
@@ -11,22 +12,22 @@ import es from '../locale/es.json';
 /** Every permission of the printing app (owner and admin). */
 export const PRINTING_PERMISSIONS = ['printing.view_settings', 'printing.manage_settings', 'printing.print', 'printing.manage_jobs'];
 
-export const ADMIN: SessionMe = {
+export const ADMIN: SessionMe = withMenu('printing', {
   user: { id: 'u1', label: 'Ana' },
   permissions: [...PRINTING_PERMISSIONS],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** The manager: sets printers up and prints; the queue's retry and cancel are not theirs. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('printing', {
   ...ADMIN,
   permissions: ['printing.view_settings', 'printing.manage_settings', 'printing.print'],
-};
+});
 
 /** The employee: sees printers, settings and queue, and prints (a test, a receipt). */
-export const EMPLOYEE: SessionMe = { ...ADMIN, permissions: ['printing.view_settings', 'printing.print'] };
+export const EMPLOYEE: SessionMe = withMenu('printing', { ...ADMIN, permissions: ['printing.view_settings', 'printing.print'] });
 
 export async function mountPrinting(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, {

@@ -106,8 +106,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 El menú **Mesas** tiene cinco pestañas: **Plano de sala**, **Zonas**, **Mesas**, **Sesiones** y
-**Ajustes** (esta solo a quien puede cambiarlos). Ninguna otra se esconde por permiso; los botones
-que el perfil no puede usar no salen.
+**Ajustes**. **Zonas** y **Mesas** solo salen a quien puede cambiarlas, y **Ajustes**, a quien puede
+cambiarlos; los botones que el perfil no puede usar no salen.
 
 ### Plano de sala
 Aquí ves de un vistazo cómo está la sala: cada mesa en su sitio, con su color y, si está ocupada, el
@@ -470,7 +470,8 @@ Pasos:
    escrito, con icono, forma, sillas y color: Disponible, Ocupada, Reservada o Bloqueada.
 3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y, al
    pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
-   el nombre y la hora. Quién la atiende se ve en su ventana.
+   el nombre y la hora. Quién la atiende se ve en su ventana: quien atiende su cuenta en Ventas (el chip
+   «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
    volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
    que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su
@@ -478,7 +479,7 @@ Pasos:
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
-Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F19
+Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
 Estado: hecho
@@ -1041,7 +1042,7 @@ Lo que Reservas manda al llamar (los mismos nombres que sus avisos `status_chang
   (`sale.order.set_label`), la divide (`sale.order.split`), la junta (`sale.order.merge`) y anula la
   cuenta vacía de una mesa que se cierra (`sale.order.void`), siempre llamando a sus operaciones con la
   sesión de quien está en la sala y en la misma transacción. Lee de sus modelos el estado de cada
-  cuenta, sus líneas y lo cobrado.
+  cuenta, sus líneas, quién la atiende y lo cobrado.
 - **Clientes** (requisito): el cliente de la cuenta (`customer.order.link`, su modelo `OrderLink` para
   pintarlo) y la búsqueda por nombre o teléfono (`find_customer`).
 
@@ -1080,12 +1081,12 @@ como los de cualquier app.
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Sentar, dividir y juntar piden además «Montar la cuenta» de
-Ventas (`sale.add_sale`), que tienen los cuatro papeles.
+Ventas (`sale.add_sale`), que tienen todos los papeles menos la gestoría.
 
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales),
   `tests/test_integration_relay.py` (Reservas, Clientes y Ventas reales, por el bucle del worker con el
   relay del outbox) y `tests/test_concurrency.py` (dos camareros a la vez, con hilos). Reservas → Mesas, sin

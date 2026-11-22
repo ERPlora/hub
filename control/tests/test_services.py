@@ -1,8 +1,8 @@
 """The database clusters, written through their operations.
 
-The Hub admin (``hubs.erplora.com/admin``) is where a cluster is registered, edited, closed to new hubs or deleted,
-and each of those is a ``control.cluster.*`` command (``control/admin.py`` only calls them): for the platform's admins
-(staff and superuser) or the platform itself, never for support (it only reads) nor a customer. A cluster with a
+The Hub admin (``hubs.erplora.com/admin``) is where a cluster is registered, edited, closed to new hubs or deleted, and
+each of those is a ``control.cluster.*`` command (``control/admin_clusters.py`` only calls them): for the platform's
+admins (staff and superuser) or the platform itself, never for support (it only reads) nor a customer. A cluster with a
 ``secret_name`` is saved only once its app's secret (``…/app``, the one the web may read) resolves through
 ``base.tenancy.credentials.credentials_for``; the migrator's is never asked from here. «Close to new hubs» leaves its
 hubs where they are; a cluster that holds hubs is never deleted, and its writer never changes under them (that is a

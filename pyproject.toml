@@ -84,7 +84,7 @@ max-statements = 50
 "**/conftest.py" = ["F811", "PLR0913", "PLR0917"]
 # What broke one of the rule families when it came in, one file per line: it only shrinks. Fix the code instead of
 # adding a line; tests/test_guardrails_ruff.py says when a line has to go.
-"apps/appointment/services.py" = ["B007"]
+"apps/appointment/services/series.py" = ["B007"]
 "apps/appointment/tests/test_concurrency.py" = ["E731"]
 "apps/flow/recipes.py" = ["B007"]
 "apps/flow/tests/test_apps.py" = ["F402"]
@@ -113,7 +113,7 @@ max-statements = 50
 "apps/verifactu/tests/conftest.py" = ["F401"]
 "apps/verifactu/tests/test_concurrency.py" = ["B905"]
 "apps/whatsapp_inbox/models.py" = ["DJ001"]
-"apps/whatsapp_inbox/schemas.py" = ["B905"]
+"apps/whatsapp_inbox/schemas/templates.py" = ["B905"]
 "base/access.py" = ["B905"]
 "base/auth.py" = ["F401"]
 "base/files.py" = ["B911"]

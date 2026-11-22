@@ -5,7 +5,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.whatsapp_inbox.queries.reads import page, person_name
-from apps.whatsapp_inbox.schemas import AgentListIn, AgentPage
+from apps.whatsapp_inbox.schemas.agents import AgentListIn, AgentPage
 from base.models import HubUser, Membership
 
 

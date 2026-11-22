@@ -7,12 +7,14 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.tax import events as E
 from base import activation, home
 from base.tests.shell_icons import shell_icon_registry
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 
 def tax():
@@ -51,12 +53,13 @@ def test_permissions():
     assert tax().permissions == ["tax.view", "tax.manage"]
 
 
-def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
+def test_roles_are_the_customer_roles_with_the_hub_prefix():
     assert set(tax().role_permissions) == {
         "hub_owner",
         "hub_admin",
         "hub_manager",
         "hub_employee",
+        "hub_accountant",
     }
 
 
@@ -67,10 +70,11 @@ def test_roles():
     assert permissions_for_role([config], "hub_manager") == {"tax.view", "tax.manage"}
     # The old cashier and employee roles only consulted and calculated: both are hub_employee now.
     assert permissions_for_role([config], "hub_employee") == {"tax.view"}
+    assert permissions_for_role([config], "hub_accountant") == {"tax.view"}
 
 
 def test_navigation_is_the_four_tabs_with_iconify_icons():
-    # The icons are the frontend tabbar's (apps/tax/frontend/tabs.ts) and the old menu's
+    # The icons are those of the tab bar of its pages and the old menu's
     # (`pricetags`, `receipt`, `swap-horizontal`), all registered in the shell: an unregistered one
     # paints nothing (and HubIcon throws in development).
     entries = tax().navigation
@@ -226,4 +230,22 @@ def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
 
 
 def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
-    assert tax().help == Help(videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"})
+    assert tax().help.videos == {"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("TAX-F02",), "A9nFeyCvAbQ", "nTVArJ9MhsA"),
+    (("TAX-F03", "TAX-F04"), "8_UzQyd7JiQ", "-2AM34vDWm4"),
+    (("TAX-F07",), "Xifu7kVbOe0", "zXiDlwQ1sTs"),
+    (("TAX-F05",), "cs3OCfJvPjg", "ZjucdTFQ8tM"),
+    (("TAX-F06",), "2uZNBribMXQ", "ocI95rmmhvA"),
+    (("TAX-F13", "TAX-F14"), "E5-4AOlKnyM", "obkc8TRqkf4"),
+    (("TAX-F08",), "zQgLuHvgn04", "Ly_I_Une8YI"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("tax", language) == help_videos.by_task(TASK_VIDEOS, language)

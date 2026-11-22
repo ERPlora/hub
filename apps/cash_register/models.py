@@ -4,6 +4,7 @@
 - ``Register`` is a physical drawer (never deleted: sessions name it).
 - ``Session`` is a shift of the drawer: its number of the business day, the opening float and, once
   closed, the expected cash, the counted one and their difference, frozen for good. One open at a time.
+  Who opened and closed it is kept as the screen shows them and, for a person, by their username: whose it is.
 - ``SessionCounter`` numbers the sessions of a business day (``UPDATE … RETURNING``, never a sequence).
 - ``Movement`` is a line of a session: cash brought in or taken out by hand and, once the session is
   closed, the copy of the sale lines of the shift (charges, voids and refunds of sale), each copied once.
@@ -164,6 +165,10 @@ class Session(UUIDModel):
     closed_by = models.CharField(
         _("closed by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
+    # A name changes; the username does not: these say whose the shift is (``queries/ownership.py``). Empty when no
+    # person did it (the system's auto-close, an API key).
+    opened_by_username = models.CharField(_("opener's account"), max_length=150, blank=True, default="", db_default="")
+    closed_by_username = models.CharField(_("closer's account"), max_length=150, blank=True, default="", db_default="")
     closing_balance = models.BigIntegerField(_("counted cash"), null=True, blank=True)
     expected_balance = models.BigIntegerField(_("expected cash"), null=True, blank=True)
     difference = models.BigIntegerField(_("difference"), null=True, blank=True)

@@ -487,7 +487,7 @@ def test_opening_closes_a_forgotten_session_first():
 
 
 def test_the_last_cut_off_is_today_at_its_hour_or_yesterday_before_it():
-    from apps.cash_register.queries import last_cut_off
+    from apps.cash_register.queries.auto_close import last_cut_off
 
     madrid = timezone.get_default_timezone()
     four = dt.time(4, 0)

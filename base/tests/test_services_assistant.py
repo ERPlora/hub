@@ -17,6 +17,7 @@ from ninja import Schema
 
 from base import assistant
 from base.models import Hub, Membership
+from base.sensitive import VIEW_TEAM_CONTACT
 from base.services.assistant import LAST_ROUND
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
@@ -336,9 +337,16 @@ def test_a_preview_the_person_may_not_read_shows_no_card(settle):
 def test_taking_a_pin_away_names_whose_it_is(make_user):
     """Base's own: the card of «Remove the PIN» named the person by the id the model sent («saas:3»)."""
     make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil", email="eva@example.com")
-    admin = {"base.view_home", "base.administer_hub"}
+    admin = {"base.view_home", "base.administer_hub", VIEW_TEAM_CONTACT}
     card = turn(call("base.person.pin_remove", {"person": "saas:3"}), permissions=admin)["confirm"]
     assert {field["name"]: field["value"] for field in card["preview"]} == {"name": "Eva Gil", "email": "eva@example.com"}
+
+
+def test_the_card_names_the_person_without_their_address_to_who_does_not_see_the_teams_contact(make_user):
+    make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil", email="eva@example.com")
+    without_contact = {"base.view_home", "base.administer_hub"}
+    card = turn(call("base.person.pin_remove", {"person": "saas:3"}), permissions=without_contact)["confirm"]
+    assert {field["name"]: field["value"] for field in card["preview"]} == {"name": "Eva Gil"}
 
 
 @pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable", "base.app.retry"])

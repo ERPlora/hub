@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:265a75cdfec41cba4d81752977ad0dbb9afd3b71f491efb5c67eb01fe60f5d7c -->
+<!-- generated from WORKBOOK.md sha256:f246ec4966b99741518d21feb4a645a1e176fd078337fcb07b791c0e620d4cd7 -->
 
 ## What it is for and who it is for
 
@@ -100,7 +100,7 @@ Initial setup, step by step:
 ## Screens
 
 The **Reservations** menu has three entries: **Reservations**, **Waitlist** and **Availability**. Below,
-the tabs of the three plus **Settings** (this one, only for whoever can change them). The buttons the
+the tabs of the three plus **Settings**; **Availability** and **Settings**, only for whoever can change them. The buttons the
 profile cannot use do not show.
 
 ### Reservations

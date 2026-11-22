@@ -28,31 +28,20 @@ from apps.staff.models import (
     StaffSettings,
     TimeOff,
 )
-from apps.staff.schemas import (
+from apps.staff.schemas.fields import DeletedOut, MemberRefIn
+from apps.staff.schemas.members import (
     BulkCreatedOut,
     BulkCreateIn,
-    DeletedOut,
     MemberDetailOut,
     MemberIn,
     MemberPatchIn,
-    MemberRefIn,
-    RoleIn,
-    RoleOut,
-    RolePatchIn,
-    ScheduleIn,
-    ScheduleOut,
-    ScheduleRefIn,
-    ScheduleUpdateIn,
-    SetActiveIn,
-    SettingsIn,
-    SettingsOut,
     TerminatedOut,
     TerminateIn,
-    TimeOffDetailOut,
-    TimeOffIn,
-    TimeOffRefIn,
-    TimeOffRequestIn,
 )
+from apps.staff.schemas.roles import RoleIn, RoleOut, RolePatchIn
+from apps.staff.schemas.schedules import ScheduleIn, ScheduleOut, ScheduleRefIn, ScheduleUpdateIn, SetActiveIn
+from apps.staff.schemas.settings import SettingsIn, SettingsOut
+from apps.staff.schemas.time_off import TimeOffDetailOut, TimeOffIn, TimeOffRefIn, TimeOffRequestIn
 
 from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import in_a_thread

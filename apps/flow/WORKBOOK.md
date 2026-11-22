@@ -1517,7 +1517,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   puede hacer él mismo. Cada paso corre con el contexto `flow_run:<id>` (el actor queda en el outbox de
   lo que haga), **solo con el permiso de su propia operación y los de lectura de su app**
   (`<app>.view…`, para contestar con lo que hizo), nunca con todos: los controles internos de la
-  operación siguen valiendo, sin elevar nada; en el idioma de quien la guardó, que es el de
+  operación siguen valiendo, sin elevar nada. Lleva además los permisos de dato de base (`DATA_PERMISSIONS`: el
+  teléfono de un cliente para escribirle), porque solo el propietario o un administrador guardan una automatización y
+  los tienen todos; esos permisos no abren ninguna operación; en el idioma de quien la guardó, que es el de
   lo que escriben sus pasos y el del motivo que leen los pasos siguientes (`steps.<id>.error_message`).
   Lo que una operación pide a otra app para hacer su propio trabajo lo añade esa operación solo para esa
   llamada, nunca el paso (`reservation.reservation.create` busca o crea la ficha por teléfono con
@@ -1526,8 +1528,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Una automatización y las citas «suyas»**:
   reservar, mover, confirmar y editar una cita piden «las suyas» (`appointment.add_own_appointment`,
   `appointment.change_own_appointment`), y el paso, que no es nadie del equipo, no tiene ficha. La regla vive en Citas
-  (`apps.appointment.queries.is_own`), la única app con permisos «propios», no aquí: quien no es una persona
-  (`by_person`) toma lo concedido sobre «las suyas» para todo el equipo y se juzga como la clienta. `_step_context`
+  (`apps.appointment.queries.ownership.is_own`), la única app con permisos «propios», no aquí: quien no es una persona
+  (`base.queries.ownership.me`) toma lo concedido sobre «las suyas» para todo el equipo y se juzga como la clienta. `_step_context`
   no cambia: el techo sigue siendo `grants` (sin ellos no hay cita) y nada se eleva a «todos los permisos». Vale igual
   para el paso de operación, el asistente que actúa solo y el cambio que hace tras el **Aprobar**, que corren con el
   mismo contexto (`test_services_appointment_steps.py`). Es como separa Square el permiso de comprador del de

@@ -180,6 +180,9 @@ msgstr "última compra"
 msgid "search text"
 msgstr "texto de búsqueda"
 
+msgid "search text without contact details"
+msgstr "texto de búsqueda sin datos de contacto"
+
 msgid "deleted at"
 msgstr "eliminado el"
 

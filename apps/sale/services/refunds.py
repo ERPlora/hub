@@ -15,7 +15,7 @@ from apps.sale.queries.business import actor, money_text
 from apps.sale.queries.other_apps import call_services
 from apps.sale.queries.payment_methods import held_methods, method_display_name
 from apps.sale.queries.refunds import tender_options
-from apps.sale.queries.sales import find_sale, returned_by_line, sessions_to_return
+from apps.sale.queries.sales import returned_by_line, sessions_to_return, visible_sale
 from apps.sale.schemas.refunds import RefundIn, RefundOut
 from apps.sale.services.checkout import KEY_REUSED
 from apps.sale.services.documents import _fiscal_document, _issue_waiting_document
@@ -192,7 +192,7 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
     answer = _refund_replay(data)
     if answer is not None:
         return answer
-    sale = find_sale(data.sale_id, data.sale, lock=True)
+    sale = visible_sale(ctx, data.sale_id, data.sale, lock=True)
     # The same attempt may have refunded this sale while this one waited for its lock.
     answer = _refund_replay(data)
     if answer is not None:

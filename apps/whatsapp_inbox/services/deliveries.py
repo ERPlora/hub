@@ -16,7 +16,8 @@ from apps.whatsapp_inbox.queries.reasons import (
     SEND_REFUSED_CODE,
     SEND_UNKNOWN_CODE,
 )
-from apps.whatsapp_inbox.schemas import ClaimDeliveryOut, MessageRefIn, RecordDeliveryIn, RecordOut, ResumeIn, ResumeOut
+from apps.whatsapp_inbox.schemas.deliveries import ClaimDeliveryOut, RecordDeliveryIn, RecordOut, ResumeIn, ResumeOut
+from apps.whatsapp_inbox.schemas.messages import MessageRefIn
 from base import outbound
 
 from .erasing import forget

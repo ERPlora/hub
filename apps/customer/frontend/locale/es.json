@@ -20,11 +20,7 @@
       "unavailable": "Este cliente ya no está disponible."
     },
     "tabs": {
-      "label": "Secciones de clientes",
-      "customers": "Clientes",
-      "groups": "Grupos",
-      "tags": "Etiquetas",
-      "fields": "Campos"
+      "label": "Secciones de clientes"
     },
     "stage": {
       "lead": "Contacto",
@@ -73,6 +69,7 @@
     "list": {
       "title": "Clientes",
       "search": "Buscar nombre, teléfono o email…",
+      "searchWithoutContact": "Buscar nombre, NIF o empresa…",
       "loadError": "No se pudieron cargar los clientes",
       "empty": "Sin clientes.",
       "emptyMessage": "Da de alta el primero con «Añadir» o trae los tuyos con «Importar CSV».",
@@ -279,6 +276,7 @@
     },
     "picker": {
       "search": "Buscar por nombre, teléfono, email…",
+      "searchWithoutContact": "Buscar por nombre, NIF, empresa…",
       "searchLabel": "Buscar clientes",
       "noResults": "Sin resultados.",
       "noCustomers": "No hay clientes.",
