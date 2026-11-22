@@ -181,7 +181,24 @@ export function rawUrl(path: string, inline = false): string {
   return `/api/files/raw?${query.toString()}`;
 }
 
-/** A CSV (`,`) or TSV (`\t`) as rows: quoted fields with their separators, line breaks and doubled quotes. */
+const DELIMITERS = [',', ';', '\t'] as const;
+
+/** The delimiter of the header line: the one it holds most of, outside quotes. */
+export function delimiterOf(text: string): string {
+  const firstLine = text.split(/\r?\n/, 1)[0].replace(/"[^"]*"/g, '');
+  let best: string = DELIMITERS[0];
+  let most = -1;
+  for (const delimiter of DELIMITERS) {
+    const count = firstLine.split(delimiter).length - 1;
+    if (count > most) {
+      best = delimiter;
+      most = count;
+    }
+  }
+  return best;
+}
+
+/** A CSV (`,` or `;`) or TSV (`\t`) as rows: quoted fields with their separators, line breaks and doubled quotes. */
 export function parseTable(text: string, separator: string, limit = TABLE_PREVIEW_ROWS): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];

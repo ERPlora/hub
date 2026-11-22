@@ -11,7 +11,7 @@ const CATALOGUES = appCatalogues('appointment', en, es);
 const { EN } = CATALOGUES;
 
 describe('appointment catalogues (en source + es)', () => {
-  itChecksAppCatalogues(CATALOGUES, { placeholders: 'only' });
+  itChecksAppCatalogues(CATALOGUES, { placeholders: 'and plural forms' });
 
   it('name every status, history action, repetition and weekday the server knows', () => {
     for (const status of ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']) {
