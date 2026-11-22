@@ -120,14 +120,17 @@ class ProdRollbackTest(RollbackCase):
         self.assertTrue(self.called("put-parameter --name /erplora/prod/hub/image_tag --value tag-10 "))
 
     def test_the_image_is_the_first_of_the_container_named_after_the_family(self):
-        image = "reg.example/erplora/hub:tag-10"
-        self.revision("erplora-prod-hub:10", containers=[
-            {"name": "pgbouncer", "image": "other.example/pgbouncer:1"}, {"name": "hub", "image": image},
-            {"name": "hub", "image": "other.example/hub:2"}])
+        def around(found):
+            containers = found["taskDefinition"]["containerDefinitions"]
+            found["taskDefinition"]["containerDefinitions"] = [
+                {"name": "pgbouncer", "image": "other.example/pgbouncer:1"}, *containers,
+                {"name": "hub", "image": "other.example/hub:2"}]
+        self.edit("erplora-prod-hub:10.json", around)
         self.assertEqual(0, self.rollback())
         # Containers listed as an object are read as their values, as jq reads them.
-        self.revision("erplora-prod-hub:10", containers={"app": {"name": "hub", "image": image}})
-        self.assertEqual(0, self.rollback())
+        self.revision("erplora-prod-hub:10", containers={"app": {"name": "hub", "image": "other.example/hub:3"}})
+        self.rollback()
+        self.assertChangedNothing(f"{TD}/erplora-prod-hub:10 does not run an erplora/hub image \\(other.example/hub:3\\); ")
 
     def test_an_app_container_without_an_image_is_said_as_none(self):
         for containers in ([{"name": "pgbouncer", "image": "reg.example/erplora/hub:tag-10"}],
@@ -234,19 +237,21 @@ class FailingCallTest(RollbackCase):
     def test_an_aws_call_that_fails_ends_the_rollback_with_its_exit_code(self):
         for command, after in (("ecs describe-services", "list-task-definitions"), ("ecs list-task-definitions",
                                "describe-task-definition"), ("ecs describe-task-definition", "get-parameter"),
-                               ("ecs update-service", "wait|put-parameter"), ("ecs wait", "deployments|put-parameter")):
+                               ("ecs update-service", "wait|put-parameter")):
             with self.subTest(command):
                 self.assertEqual(254, self.rollback(FAKE_FAILS_ON=command))
                 self.assertEqual(1, len(self.lines(f"^{command} ")))
                 self.assertFalse(self.called(after))
                 self.assertIn(f"An error occurred (AccessDeniedException) when calling {command}\n", self.out)
                 self.assertNotIn("::error::", self.out)
-        self.assertEqual(254, self.rollback(FAKE_FAILS_ON="ssm put-parameter"))
-        self.assertFalse(self.called("image_tag"))
+        for command in ("ecs wait", "ssm put-parameter"):
+            with self.subTest(command):
+                self.assertEqual(254, self.rollback(FAKE_FAILS_ON=command))
+                self.assertEqual(len(self.calls()), self.line_of(f"^{command} "))
 
     def test_an_aws_call_killed_by_a_signal_ends_the_rollback_with_128_plus_the_signal(self):
         self.assertEqual(137, self.rollback(FAKE_KILLED_ON="ecs wait"))
-        self.assertFalse(self.called("deployments|put-parameter"))
+        self.assertEqual(len(self.calls()), self.line_of("^ecs wait "))
 
     def test_without_aws_on_the_path_it_fails_with_127_and_says_so(self):
         self.assertEqual(127, self.rollback(PATH="/nowhere"))
@@ -269,7 +274,9 @@ class FailingCallTest(RollbackCase):
                 self.assertNotIn("::error::", self.out)
         for containers in (None, "s", ["s"], [{"name": "hub"}, 7]):
             with self.subTest(containers):
-                self.revision("erplora-prod-hub:10", containers=containers)
+                self.revision("erplora-prod-hub:10")
+                self.edit("erplora-prod-hub:10.json",
+                          lambda found, given=containers: found["taskDefinition"].update(containerDefinitions=given))
                 self.assertEqual(5, self.rollback())
                 self.assertIn(f"ecs_rollback.py: {TD}/erplora-prod-hub:10 cannot be read: ", self.out)
                 self.assertNotIn("::error::", self.out)

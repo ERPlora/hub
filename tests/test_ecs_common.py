@@ -82,7 +82,8 @@ class StopTest(unittest.TestCase):
     def test_the_work_ends_with_the_code_it_stops_with_or_0(self):
         def stop():
             raise ecs_common.Stop(254)
-        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        # The streams are reconfigured, as only a text stream over bytes can be.
+        with redirect_stdout(io.TextIOWrapper(io.BytesIO())), redirect_stderr(io.TextIOWrapper(io.BytesIO())):
             self.assertEqual((254, 0), (ecs_common.main(stop), ecs_common.main(lambda: None)))
 
 
