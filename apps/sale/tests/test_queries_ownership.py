@@ -11,7 +11,6 @@ import dataclasses
 import json
 
 import pytest
-from django.test import Client
 from live.context import system_context
 from live.errors import NotFound
 from live.meta import all_live_app_configs, permissions_for_role
@@ -38,18 +37,6 @@ def post(client, path, data):
 @pytest.fixture
 def coffee(product):
     product("Coffee", "COF", 150, "restaurant.drink")
-
-
-@pytest.fixture
-def people(make_user):
-    """Ana and Bea, two employees, and Marta, the manager: each signed in on their own device."""
-    signed_in = {}
-    for username, role in (("ana", "hub_employee"), ("bea", "hub_employee"), ("marta", "hub_manager")):
-        user = make_user(username, role=role)
-        client = Client()
-        client.force_login(user)
-        signed_in[username] = (user, client)
-    return signed_in
 
 
 def charge(client, key: str, **more) -> dict:
