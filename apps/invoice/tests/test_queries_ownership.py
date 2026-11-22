@@ -171,6 +171,37 @@ class TestTheDocumentsOfTheirSales:
         assert rectifying.number not in listed(people["bea"][1])
 
 
+class TestWhatFollowsTheirDocuments:
+    """A document follows its original, as Odoo's rectifying invoice keeps its original's salesperson: the full invoice
+    that replaced a ticket of theirs and what rectifies either are theirs, whoever issued them."""
+
+    def test_the_rectifying_invoice_of_one_they_issued_by_hand_is_theirs(self, people, invoices):
+        ana, marta, own = people["ana"][1], people["marta"][1], invoices["ana"]["manual"]
+        rectified = post(marta, "/invoice/invoices/rectify", {"number": own["number"], "reason": "Wrong customer"})
+        assert rectified.status_code == 200, rectified.content
+        link = get(ana, "/invoice/invoices/detail", invoice_id=own["id"]).json()["rectifications"][0]
+        assert get(ana, "/invoice/invoices/detail", invoice_id=link["id"]).status_code == 200
+        assert link["number"] in listed(ana)
+        assert link["number"] not in listed(people["bea"][1])
+
+    def test_a_ticket_they_issued_by_hand_brings_its_full_invoice_and_what_rectifies_it(self, people):
+        ana, marta = people["ana"][1], people["marta"][1]
+        ticket = post(ana, "/invoice/invoices", {"lines": [LINE], "series_code": "TICKET"})
+        assert ticket.status_code == 201, ticket.content
+        ticket = ticket.json()
+        full = post(marta, "/invoice/invoices/substitute", {"invoice_id": ticket["id"], **RECIPIENT}).json()["invoice"]
+        # Her own lookups that lock the document (mark paid) reach the one that replaced her ticket.
+        paid = post(ana, "/invoice/invoices/mark_paid", {"invoice_id": full["id"]})
+        assert (paid.status_code, paid.json().get("status")) == (200, "paid"), paid.content
+        rectifying = post(marta, "/invoice/invoices/rectify", {"invoice_id": full["id"], "reason": "Wrong customer"})
+        assert rectifying.status_code == 200, rectifying.content
+        rectifying = rectifying.json()["invoice"]
+        assert listed(ana) == {ticket["number"], full["number"], rectifying["number"]}
+        for document in (full, rectifying):
+            assert get(ana, "/invoice/invoices/detail", invoice_id=document["id"]).status_code == 200
+        assert listed(people["bea"][1]) == set()
+
+
 class TestWhoSeesEveryone:
     def test_the_manager_lists_opens_and_prints_everyones(self, people, invoices):
         marta = people["marta"][1]
