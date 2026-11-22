@@ -35,6 +35,11 @@ class MigrationTest(DeployCase):
         self.assertEqual(["15", "15"], self.pauses())
         self.assertFalse(self.called("update-service"))
 
+    def test_the_migration_s_clock_counts_poll_seconds(self):
+        self.assertEqual(1, self.deploy(POLL_SECONDS="5", MIGRATE_TIMEOUT_SECONDS="10", FAKE_TASK_STATUSES="RUNNING"))
+        self.assertEqual(3, len(self.lines("describe-tasks .*lastStatus")))
+        self.assertEqual(["5", "5"], self.pauses())
+
     def test_the_timeout_is_said_as_it_was_given(self):
         self.assertEqual(1, self.deploy(MIGRATE_TIMEOUT_SECONDS="030", FAKE_TASK_STATUSES="RUNNING"))
         self.assertIn("::error::hub-migrate is still RUNNING after 030s;", self.out)
