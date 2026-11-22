@@ -13,7 +13,7 @@ Para qué: la pasada por todas las pantallas de la plataforma, en el móvil, la 
 ## Recorrido
 
 1. BASE-F107 — la pasada entera, en los tres tamaños y en español e inglés.
-2. BASE-F05 — Inicio y «Mis apps».
+2. BASE-F02, BASE-F05 — Inicio y «Mis apps».
 3. BASE-F09 — la pestaña «Actividad».
 4. BASE-F14 — las pestañas de Apps.
 5. BASE-F48 — las pestañas de Ajustes.
