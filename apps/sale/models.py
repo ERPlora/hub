@@ -689,12 +689,7 @@ class SalePayment(UUIDModel):
         Sale, on_delete=models.CASCADE, related_name="payments", verbose_name=_("sale")
     )
     position = models.PositiveIntegerField(_("position"))
-    method = models.ForeignKey(
-        PaymentMethod,
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("method"),
-    )
+    method = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="+", verbose_name=_("method"))
     method_name = models.CharField(_("method name"), max_length=60)
     method_type = models.CharField(
         _("method type"), max_length=16, choices=PaymentMethod.Type.choices
@@ -703,6 +698,9 @@ class SalePayment(UUIDModel):
     tendered = models.PositiveBigIntegerField(_("tendered"))
     change = models.PositiveBigIntegerField(_("change"), default=0)
     reference = models.CharField(_("reference"), max_length=128, blank=True)
+    # What another app adds on top of the sale (a tip): charged with the tender, never part of the sale's total or tax.
+    extra = models.PositiveBigIntegerField(_("added amount"), default=0, db_default=0)
+    extra_label = models.CharField(_("added amount label"), max_length=60, blank=True, default="", db_default="")
 
     class Meta:
         verbose_name = _("sale payment")
@@ -713,7 +711,7 @@ class SalePayment(UUIDModel):
                 condition=Q(amount__gt=0), name="sale_payment_amount_positive"
             ),
             models.CheckConstraint(
-                condition=Q(change=F("tendered") - F("amount")),
+                condition=Q(change=F("tendered") - F("amount") - F("extra")),
                 name="sale_payment_change",
             ),
         ]

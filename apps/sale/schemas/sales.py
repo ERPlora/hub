@@ -95,6 +95,8 @@ class SalePaymentOut(Schema):
     tendered: int = Field(description="Handed over, in cents.")
     change: int = Field(description="Change given, in cents.")
     reference: str = Field(description="Reference.")
+    extra: int = Field(description="What another app added to this leg (a tip), in cents: never part of the sale.")
+    extra_label: str = Field(description="What that added amount is (e.g. «Tip»); empty when nothing was added.")
 
 
 class PaperOut(Schema):

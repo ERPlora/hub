@@ -24,6 +24,7 @@ from apps.sale.schemas.fields import (
     MAX_PAYMENTS,
     ONE_SOURCE,
     OPEN_LINES,
+    SAY_WHAT_IS_ADDED,
     SAY_WHICH_METHOD,
     SERVICE_LINES,
     AttemptKey,
@@ -113,6 +114,23 @@ class PaymentIn(Closed):
     reference: _text(128) = Field(
         "", description="A free reference of the leg, e.g. the card's authorisation."
     )
+    extra: Cents = Field(
+        0,
+        description="What another app adds to this leg on top of the sale (a tip), in cents: charged with it, but never "
+        "part of the sale's total or its tax.",
+    )
+    extra_label: _text(60) = Field(
+        "", validate_default=True, description="What the added amount is, as the receipt names it (e.g. «Tip»)."
+    )
+
+    @field_validator("extra_label")
+    @classmethod
+    def _added_is_named(cls, label: str, info):
+        if not info.data.get("extra"):
+            return ""
+        if not label:
+            raise ValueError(str(SAY_WHAT_IS_ADDED))
+        return label
 
     @model_validator(mode="after")
     def _named(self):
