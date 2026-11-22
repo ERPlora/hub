@@ -584,13 +584,13 @@ Pasos:
    Ventas con una devolución.».
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
 Entra: la compra y el motivo.
-Sale: el bono deja de poder gastarse y queda como rastro, con quién, cuándo y el motivo
-(`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
+Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si su cuenta no tiene,
+por lo que va antes de la @ de su correo, nunca el correo entero), cuándo y el motivo (`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
 vuelve a contar para quien la vendió, hasta que una devolución diga otra cosa (SALE-F28).
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica
 por qué se anula este bono: el motivo queda en su registro.». Si otra caja gasta una sesión a la vez,
 la anulación espera y recibe el motivo real.
-Implicados: SERVICE-F16, SALE-F28, SALE-F32
+Implicados: SERVICE-F16, SALE-F28, SALE-F32, BASE-F119
 
 ### SERVICE-F18 Regalar sesiones, alargar la caducidad o corregir el saldo
 Estado: hecho

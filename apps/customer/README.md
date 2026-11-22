@@ -39,7 +39,7 @@ las demás: Ventas, Citas, Reservas, la Bandeja de WhatsApp y otras cinco la req
 | Aprobaciones | 8 órdenes que un responsable aprueba con su PIN al empleado (`approvals`, BASE-F84): unir fichas, crear y cambiar grupos y etiquetas, y crear, cambiar y eliminar campos |
 | Eventos | 28, `customer.<entidad>.<hecho>` (`events.py`), solo con identificadores; `REACTIONS` a `sale.sale.completed`, `.voided` y `.refunded` (`customer.purchase.record`, `.void`, `.refund`), por el relay del outbox |
 | Bloques de la ficha | `apps/<id>/frontend/customer-card/<Bloque>.vue` de cada app encendida (hoy, `appointment`) |
-| Migraciones | `0001_initial`, `0002_purchase_refunds`, `0003_health_record` |
+| Migraciones | `0001_initial`, `0002_purchase_refunds`, `0003_health_record`, `0004_search_text_without_contact`, `0005_actor_without_address` (quien actuó guardado por su correo se queda con lo que va antes de la @) |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (teléfonos, búsqueda, estados de una ficha, consentimiento, compras, bloqueos y

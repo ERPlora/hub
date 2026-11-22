@@ -22,6 +22,7 @@ from . import (
     people as people,
     profile as profile,
     release_notes as release_notes,
+    roles as roles,
     sessions as sessions,
     system as system,
     usage as usage,

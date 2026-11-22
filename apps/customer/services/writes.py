@@ -13,6 +13,7 @@ from live.operations import atomic
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries import business_country
+from base.queries.people import actor_name
 
 PHONE_INVALID = _(
     "This is not a valid phone number of its country: check the digits or write it with its "
@@ -24,14 +25,8 @@ CLOCK_SKEW = timedelta(minutes=5)
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who writes, as people read it: the user's name (or email), never their account id; the
-    platform itself (``system_context``) by its own mark."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if not hasattr(actor, "get_username"):
-        return str(actor)[:128]
-    return (actor.get_full_name() or actor.email or actor.get_username())[:128]
+    """Who writes, as a colleague reads it on the card: never their e-mail address."""
+    return actor_name(ctx.actor)[:128]
 
 
 def _e164(raw: str, ctx: OperationContext, field: str = "phone") -> str:

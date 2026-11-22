@@ -126,7 +126,7 @@ Email = _text(254)
 Notes = _text(2000)
 Guests = Annotated[int, Field(ge=1, le=MAX_GUESTS)]
 Minutes = Annotated[int, Field(ge=1, le=MAX_MINUTES)]
-Weekday = Annotated[int, Field(ge=0, le=6)]
+Weekday = Annotated[int, Field(ge=0, le=6, json_schema_extra={"enum": list(range(7))})]
 
 D_GUEST_NAME = (
     "The guest's name as the staff say it at the door; empty takes the customer card's."

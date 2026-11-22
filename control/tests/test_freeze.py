@@ -28,8 +28,7 @@ from base.tenancy.context import use_control
 from control import queries, services
 from control.models import Freeze, Hub, HubDue
 from control.schemas import FreezeGetIn, FreezeIn
-from control.tests.conftest import events
-from control.tests.test_services import as_actor, person
+from control.tests.conftest import as_actor, events, person
 
 pytestmark = pytest.mark.django_db
 

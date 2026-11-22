@@ -47,12 +47,12 @@
 699 apps/pricing/schemas.py ERPlora/erplora-next#74
 1015 apps/pricing/services.py ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
-748 apps/printing/queries/__init__.py ERPlora/erplora-next#74
+742 apps/printing/queries/__init__.py ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
 1111 apps/printing/services.py ERPlora/erplora-next#74
 1115 apps/printing/tests/test_services.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
-1031 apps/reservation/queries.py ERPlora/erplora-next#74
+1030 apps/reservation/queries.py ERPlora/erplora-next#74
 891 apps/reservation/schemas.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
@@ -109,7 +109,6 @@
 849 base/ws_print.py ERPlora/erplora-next#74
 625 control/models.py ERPlora/erplora-next#74
 1017 control/services.py ERPlora/erplora-next#74
-1220 control/tests/test_services.py ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
@@ -130,4 +129,3 @@
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
 763 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
 520 tests/e2e/whatsapp-graph.ts ERPlora/erplora-next#74
-1201 tests/test_no_internal_references.py ERPlora/erplora-next#74

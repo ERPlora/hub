@@ -917,6 +917,20 @@
       "error": "No se pudo cargar el catálogo de roles.",
       "change": "Cambiar roles en erplora.com"
     },
+    "role": {
+      "title": "Qué permite",
+      "intro": "Lo que este rol deja hacer en este negocio, app por app. Se da en erplora.com y aquí no se cambia.",
+      "members": "Personas con este rol: {n}",
+      "loading": "Cargando lo que permite este rol…",
+      "error": "No se pudo cargar lo que permite este rol.",
+      "retry": "Reintentar",
+      "notFound": "Este rol no existe en este negocio.",
+      "state": {
+        "on": "Permitido",
+        "approval": "Con aprobación",
+        "off": "No"
+      }
+    },
     "person": {
       "title": "Persona",
       "loading": "Cargando…",
