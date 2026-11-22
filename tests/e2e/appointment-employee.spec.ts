@@ -5,6 +5,7 @@
 // control: he sees both. Everything is named «E2E Apt …» and removed before and after.
 import { type Browser, expect, test } from '@playwright/test';
 
+import { employeesRecord } from './appointment-helpers';
 import { pickDay } from './date-time-fields';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { pick, post } from './service-helpers';
@@ -60,18 +61,8 @@ test('an employee sees and books her own agenda only, and the API agrees', async
   const employee = await signedIn(browser, EMPLOYEE);
   const owner = await signedIn(browser);
   try {
-    // Her account (the hub user the SaaS login made) linked to a record of Staff; a colleague beside her.
-    const accounts = await api<{ rows: Array<{ user_id: string; name: string }> }>(owner.context, A, 'GET', '/staff/accounts?search=employee');
-    const account = accounts.data.rows.find((row) => row.name.toLowerCase().includes('employee'));
-    expect(account, JSON.stringify(accounts.data)).toBeDefined();
-    const linked = await api<{ rows: Array<{ id: string; full_name: string }> }>(owner.context, A, 'GET', `/staff/members?user_id=${account!.user_id}`);
-    const bea =
-      linked.data.rows[0] ??
-      (await post<{ id: string; full_name: string }>(owner.context, '/staff/members', {
-        first_name: named('Bea'),
-        last_name: 'Employee',
-        user_id: account!.user_id,
-      }));
+    // Her account linked to a record of Staff; a colleague beside her.
+    const bea = await employeesRecord(owner.context, named('Bea'));
     const ana = await post<{ id: string; full_name: string }>(owner.context, '/staff/members', { first_name: named('Ana'), last_name: 'Colleague' });
     const customer = await post<{ id: string; name: string }>(owner.context, '/customer/customers', {
       name: named('Marta'),

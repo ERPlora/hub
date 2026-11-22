@@ -1,7 +1,8 @@
 // What the e2e that book a real appointment through the apps' own APIs share (WHATSAPP_INBOX-F21, FLOW-F28): the day it
-// goes on, the salon it is booked in and how a spec takes away what it made.
-import type { BrowserContext } from '@playwright/test';
+// goes on, the salon it is booked in, the employee's own staff record and how a spec takes away what it made.
+import { type BrowserContext, expect } from '@playwright/test';
 
+import { A, api } from './helpers';
 import { post } from './service-helpers';
 
 /** A Monday five weeks ahead, and `weeks` more (inside the 90 days of advance and past any notice), as `YYYY-MM-DD`. */
@@ -56,4 +57,17 @@ export function salonCleanUp(tag: string): string[] {
     `delete from service_service where name like '${tag}%'`,
     `delete from staff_member where first_name like '${tag}%'`,
   ];
+}
+
+/** The staff record linked to the demo employee's account (the hub user her SaaS login made), what her own agenda hangs
+ *  from; without one, a record `<firstName> Employee` linked to it, which a clean-up by `firstName` takes away. */
+export async function employeesRecord(owner: BrowserContext, firstName: string): Promise<{ id: string; full_name: string }> {
+  const accounts = await api<{ rows: Array<{ user_id: string; name: string }> }>(owner, A, 'GET', '/staff/accounts?search=employee');
+  const account = accounts.data.rows.find((row) => row.name.toLowerCase().includes('employee'));
+  expect(account, JSON.stringify(accounts.data)).toBeDefined();
+  const linked = await api<{ rows: Array<{ id: string; full_name: string }> }>(owner, A, 'GET', `/staff/members?user_id=${account!.user_id}`);
+  return (
+    linked.data.rows[0] ??
+    (await post<{ id: string; full_name: string }>(owner, '/staff/members', { first_name: firstName, last_name: 'Employee', user_id: account!.user_id }))
+  );
 }
