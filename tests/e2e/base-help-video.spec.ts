@@ -11,11 +11,10 @@ import {
   turnOffTurnedOn,
   turnOnMissing,
 } from './helpers';
+import { embed, expectSixteenByNine, openTask as openHelpTask, recordYouTube, taskBody, videoBeforeSteps } from './help-video-helpers';
 import { THREE_SIZES_TALL_TABLET } from './screen';
 
 const VIDEO = 'dIppfjMEKWo';
-const embed = (video: string) =>
-  `https://www.youtube-nocookie.com/embed/${video}?autoplay=1&rel=0&playsinline=1&cc_load_policy=1&cc_lang_pref=es&hl=es`;
 const SRC = embed(VIDEO);
 /** «Dar de alta un producto», on the Products tab, and its short video in Spanish. */
 const TASK = 'help-flow-products-INVENTORY-F01';
@@ -28,7 +27,7 @@ const youtubeRequests: string[] = [];
 
 const frame = () => page.locator('iframe.youtube-embed__player');
 const player = () => page.frameLocator('iframe.youtube-embed__player');
-const task = () => page.getByTestId(TASK.replace('help-flow-', 'help-flow-content-'));
+const task = () => taskBody(page, TASK);
 
 async function playInventoryVideo(): Promise<void> {
   await page.goto(`${A}/inventory/products`);
@@ -42,23 +41,14 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
   ({ context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/inventory/products'));
-  page.on('request', (request) => {
-    const host = new URL(request.url()).hostname;
-    if (/youtube|ytimg|googlevideo/.test(host)) youtubeRequests.push(request.url());
-  });
+  recordYouTube(page, youtubeRequests);
   await turnOnMissing(context, A, ['inventory'], turnedOn);
   await saveSessionForTheSweep(context);
 });
 
-/** Opens «Dar de alta un producto» on a fresh page: what a player of an earlier test sent while unloading is not counted. */
+/** Opens «Dar de alta un producto» on a fresh page. */
 async function openTask(): Promise<void> {
-  await page.goto(`${A}/inventory/products`);
-  await expect(page.getByTestId('help-button')).toBeVisible();
-  youtubeRequests.length = 0;
-  await page.getByTestId('help-button').click();
-  await expect(page.getByTestId('help-content')).toBeVisible();
-  await page.getByTestId(TASK).click();
-  await expect(task()).toBeVisible();
+  await openHelpTask(page, `${A}/inventory/products`, TASK, youtubeRequests);
 }
 
 test.afterAll(async () => {
@@ -75,13 +65,7 @@ for (const size of THREE_SIZES_TALL_TABLET) {
     await expect(frame()).toHaveAttribute('src', SRC);
     await expect(frame()).toHaveAttribute('allowfullscreen', '');
     await expect(frame()).toHaveAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
-    const box = await frame().evaluate((element) => {
-      const own = element.getBoundingClientRect();
-      return { width: own.width, height: own.height, room: element.closest('[data-help-section="video"]')!.clientWidth };
-    });
-    expect(Math.abs(box.width - box.room)).toBeLessThanOrEqual(1);
-    expect(Math.abs(box.height - (box.width * 9) / 16)).toBeLessThanOrEqual(1);
-    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    await expectSixteenByNine(page, frame(), '[data-help-section="video"]');
 
     const { x, y, width, height } = (await frame().boundingBox())!;
     await page.mouse.move(x + width / 2, y + height / 2);
@@ -113,12 +97,7 @@ for (const size of THREE_SIZES_TALL_TABLET) {
     const poster = task().locator('.youtube-embed__poster');
     await expect(poster).toHaveCount(1);
     await expect(poster).toContainText('Dar de alta un producto');
-    const before = await task().evaluate((element) => {
-      const video = element.querySelector('.youtube-embed')!;
-      const steps = element.querySelector('.assistant-md')!;
-      return Boolean(video.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING);
-    });
-    expect(before).toBe(true);
+    expect(await videoBeforeSteps(task())).toBe(true);
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
     await poster.scrollIntoViewIfNeeded();
     await settled(page);
@@ -129,14 +108,7 @@ for (const size of THREE_SIZES_TALL_TABLET) {
     const own = task().locator('iframe.youtube-embed__player');
     await expect(own).toHaveAttribute('src', embed(TASK_VIDEO));
     await expect.poll(() => youtubeRequests.length).toBeGreaterThan(0);
-    const box = await own.evaluate((element) => ({
-      width: element.getBoundingClientRect().width,
-      height: element.getBoundingClientRect().height,
-      room: element.parentElement!.clientWidth,
-    }));
-    expect(Math.abs(box.width - box.room)).toBeLessThanOrEqual(1);
-    expect(Math.abs(box.height - (box.width * 9) / 16)).toBeLessThanOrEqual(1);
-    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    await expectSixteenByNine(page, own, '.youtube-embed');
     await page.getByTestId('help-close').click();
   });
 }
