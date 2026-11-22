@@ -10,12 +10,14 @@ that stays).
 """
 
 import pytest
+from live.context import system_context
 
 from apps.kitchen.models import Ticket
 
 from .conftest import (
     HUB_DB,
     HUB_DB_COMMITTED,
+    A,
     add_line,
     charge,
     ctx_for,
@@ -194,6 +196,16 @@ def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana, printe
     ticket = run("kitchen.ticket.send", {"order_id": str(order.id)}, ctx_for(actor=ana))
     assert ticket.waiter == "Ana García"
     assert said_by(ticket.id) == ("Ana García", "Ana García", "Ana García", ["Ana García"])
+
+
+def test_a_round_sent_naming_nobody_names_who_serves_the_check(product, ana, printers):
+    # SALE-F16: who serves the check is kept on it; the round the till sends without naming anyone goes out with their
+    # name, not with the name of whoever sends it.
+    lucia = run("staff.member.create", {"first_name": "Lucia", "last_name": "Garcia"}, system_context(A))
+    order = open_check("Table 6", staff_id=str(lucia.id))
+    add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana))
+    ticket = run("kitchen.ticket.send", {"order_id": str(order.id)}, ctx_for(actor=ana))
+    assert said_by(ticket.id) == ("Lucia Garcia", "Lucia Garcia", "Lucia Garcia", ["Lucia Garcia"])
 
 
 @HUB_DB_COMMITTED

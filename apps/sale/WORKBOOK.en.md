@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5f564e619ef9639d546bd989474786b13a3c399717eb97ed1b8a080ee5682ece -->
+<!-- generated from WORKBOOK.md sha256:752bf7e3bfeb3e32e261c3302ab075fe6a00763cd226d8b5caeaebfeb5eb6b79 -->
 
 ## What it is for and who it is for
 
@@ -720,10 +720,13 @@ Vertical: common
 Actor: employee, manager, assistant
 Screen: Sell; assistant
 Steps:
-1. In the check's header, the "Served by me" chip says who it is attributed to. Tap it.
+1. In the check's header, the "Served by me" chip says who it is attributed to. Who serves is part of the
+   check and the Hub keeps it: when you leave the check and come back to it (from the floor plan, from
+   "Open checks" or on another device), the chip still says that person. Tap it.
 2. In "Who is serving this check", choose the person from the Staff team or "Me (whoever is signed in)".
    If your account has no record in Staff, the sheet warns about it: "Your account has no record in
-   Staff: left on «Me», this sale counts for nobody."
+   Staff: left on «Me», this sale counts for nobody." With the check open it is saved on it at once;
+   with no check yet, the check is opened with that person when the first item goes in.
 3. The lines added from then on are stamped with that person. To correct a line already in, tap the
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
 4. Charge. With the chip on "Me", the sale is attributed to your Staff record; a line with its own
@@ -735,12 +738,13 @@ In: the Staff team (active records) and the record of whoever is signed in.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it.
+sends it. In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
+"Who serves the check could not be changed. It stays with whoever served it.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
 the kitchen is not reassigned. With the assistant, someone not on the team: "That staff member does not
 exist in this business."; without Staff active: "Staff is not active in this business.".
-Involved: STAFF-F21, KITCHEN-F18
+Involved: STAFF-F21, KITCHEN-F18, TABLE-F09
 
 ### SALE-F17 Park a check and retrieve it
 Status: done
