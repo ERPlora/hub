@@ -11,10 +11,10 @@ An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The pl
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
-:func:`business_currency` the currency its business charges in and :func:`business_country` the country it is in
-(``base.business.get``, read as the platform; :func:`current_business_country` for the business at work). An app
-runs another app's operation with :func:`call`, and says with :func:`allow_idle_wait` that its transaction waits for
-an answer from outside.
+:func:`business_currency` the currency its business charges in, :func:`business_country` the country it is in and
+:func:`business_name` the name it goes by (``base.business.get``, read as the platform;
+:func:`current_business_country` for the business at work). An app runs another app's operation with :func:`call`,
+and says with :func:`allow_idle_wait` that its transaction waits for an answer from outside.
 :meth:`HubContextBuilder.enter` gives a live re-run its hub's database (``use_hub``); the request's own is
 ``base.middleware.HubDatabaseMiddleware``'s.
 """
@@ -104,6 +104,14 @@ def business_currency(scope: Scope) -> str:
     silent euro. The one question every app that charges asks (BASE-F50)."""
     read = get_operation(BUSINESS)
     return read(system_context(scope), read.input()).currency
+
+
+def business_name(scope: Scope) -> str:
+    """The name ``scope``'s business goes by, as erplora.com registered it (Settings › Business): ``base.business.get``'s,
+    read as the platform as :func:`business_currency` reads the currency. ERPlora's own hub answers its issuer's legal
+    name; a demo, which has no business on erplora.com, an empty one."""
+    read = get_operation(BUSINESS)
+    return read(system_context(scope), read.input()).name
 
 
 def business_country(scope: Scope) -> str:
