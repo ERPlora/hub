@@ -21,6 +21,7 @@ import {
   OWNER,
   page,
   settle,
+  WITHOUT_CONTACT,
 } from '../__tests__/mount-online-booking';
 import CancelDialog from '../components/CancelDialog.vue';
 import BookingsPage from './BookingsPage.vue';
@@ -102,6 +103,13 @@ describe('BookingsPage', () => {
       'Mar 4, 2030 · 8:00 AM',
     ]);
     expect(s.cells(1)[1]).toBe('Deleted customer');
+  });
+
+  it('promises the phone in its search only to whoever sees the customers\' contact details', async () => {
+    const s = await setup({ session: WITHOUT_CONTACT });
+    await s.show(page([booking('b1', { customer_phone: null, customer_email: null })]));
+    expect(s.prop('searchPlaceholder')).toBe('Search no., customer, service…');
+    expect(s.wrapper.find('.ob-customer').text()).toBe('Lucía Pérez');
   });
 
   it('filters by column, a day as its first and last day, and searches and sorts on the server', async () => {

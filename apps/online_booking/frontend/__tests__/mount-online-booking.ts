@@ -22,10 +22,13 @@ const ALL = [
   'online_booking.public',
 ];
 
+// `base.view_customer_contact`: the customers' phone and email, which the four roles see (base/apps.py).
+const CONTACT = 'base.view_customer_contact';
+
 /** Owner or admin: `online_booking.*` (apps.py `role_permissions`), and the services' rights. */
 export const OWNER: SessionMe = withMenu('online_booking', {
   user: { id: '1', label: 'Ana' },
-  permissions: [...ALL, 'service.view_service', 'service.change_service', 'appointment.manage_settings'],
+  permissions: [...ALL, 'service.view_service', 'service.change_service', 'appointment.manage_settings', CONTACT],
   menu: [],
   apps: [],
   language: 'en',
@@ -34,14 +37,20 @@ export const OWNER: SessionMe = withMenu('online_booking', {
 /** A manager: the inbox, without deleting, the settings nor the preview. */
 export const MANAGER: SessionMe = withMenu('online_booking', {
   ...OWNER,
-  permissions: ['online_booking.view_booking', 'online_booking.change_booking', 'online_booking.confirm_booking'],
+  permissions: ['online_booking.view_booking', 'online_booking.change_booking', 'online_booking.confirm_booking', CONTACT],
 });
 
 /** An employee only looks. */
 export const EMPLOYEE: SessionMe = withMenu('online_booking', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
-  permissions: ['online_booking.view_booking'],
+  permissions: ['online_booking.view_booking', CONTACT],
+});
+
+/** An employee in a role the business made without the customers' contact details. */
+export const WITHOUT_CONTACT: SessionMe = withMenu('online_booking', {
+  ...EMPLOYEE,
+  permissions: EMPLOYEE.permissions.filter((p) => p !== CONTACT),
 });
 
 export async function mountOnlineBooking(component: Component, options: MountOptions = {}) {
