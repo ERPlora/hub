@@ -80,7 +80,7 @@ RUN apt-get update \
 # CA bundle of RDS: TLS verify-full of the app (DB_SSLROOTCERT) and of PgBouncer towards Aurora. A copy of
 # AWS's https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem.
 COPY --chmod=644 docker/rds-global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
-COPY --chmod=755 docker/pgbouncer-entrypoint.sh /usr/local/bin/pgbouncer-entrypoint
+COPY --chmod=755 docker/pgbouncer_entrypoint.py /usr/local/bin/pgbouncer-entrypoint
 COPY --chmod=755 docker/pgbouncer-healthcheck.sh /usr/local/bin/pgbouncer-healthcheck
 RUN useradd --system --uid 10001 --home-dir /app app
 COPY --from=build /app/.venv /app/.venv
