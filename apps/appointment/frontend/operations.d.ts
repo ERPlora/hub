@@ -74,8 +74,8 @@ export interface AppointmentRow {
 }
 
 export interface AppointmentOut extends AppointmentRow {
-  customer_phone: string;
-  customer_email: string;
+  customer_phone: string | null;
+  customer_email: string | null;
   notes: string;
   internal_notes: string;
   cancelled_at: string | null;

@@ -13,6 +13,7 @@ from live.errors import NotFound
 
 from apps.appointment.models import Appointment, History
 
+from base.sensitive import DATA_PERMISSIONS
 from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
@@ -246,7 +247,7 @@ def test_a_customers_visits_come_newest_first_with_their_notes(salon):
 
 
 # A model reading a stranger's message (a flow's step gets every
-# read of the app) composes these reads: what is the salon's (its notes, a cancellation's reason) and the
+# read of the app, and the data permissions of base) composes these reads: what is the salon's (its notes, a cancellation's reason) and the
 # customer's contact never reach a caller that is not a person. The team, and its assistant with the person's
 # own session, read them; the day's agenda carries neither, for anybody.
 @pytest.mark.parametrize("actor", ["flow_run:0190a1b2", "system", None])
@@ -263,7 +264,7 @@ def test_a_caller_who_is_not_a_person_reads_a_visit_without_the_salons_notes_nor
         cancellation_reason="Allergy",
     )
     reads = {p for p in AppointmentConfig.permissions if p.split(".", 1)[-1].startswith("view")}
-    automation = {"actor": actor, "permissions": reads}
+    automation = {"actor": actor, "permissions": reads | DATA_PERMISSIONS}
     got = run("appointment.appointment.get", {"number": booked.number}, **automation)
     assert got.number == booked.number and got.customer_name == "Lucía Pérez"
     private = ("customer_phone", "customer_email", "notes", "internal_notes", "cancellation_reason")
