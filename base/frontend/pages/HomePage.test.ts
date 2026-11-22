@@ -37,16 +37,12 @@ describe('HomePage', () => {
     expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Hoy, jueves, 22 de octubre');
   });
 
-  it('greets by the hour while the business has no name', async () => {
-    embed('');
-    vi.setSystemTime(new Date(2026, 9, 22, 21, 0));
-    const m = await home();
-    expect(m.wrapper.get('h1').text()).toBe('Good evening');
-    expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Today, Thursday, October 22');
-  });
-
   // base/spa.py embeds `hub-home` only for a person with a session: without the block at all, the Home still paints.
-  it('greets by the hour without the hub-home block at all', async () => {
+  it.each([
+    ['while the business has no name', () => embed('')],
+    ['without the hub-home block at all', () => undefined],
+  ])('greets by the hour %s', async (_case, given) => {
+    given();
     vi.setSystemTime(new Date(2026, 9, 22, 21, 0));
     const m = await home();
     expect(m.wrapper.get('h1').text()).toBe('Good evening');

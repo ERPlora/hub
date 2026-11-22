@@ -4,9 +4,9 @@
 // without a reload. «Ver sistema» opens System, whose «Tu impresora» says the same state of the printer. An employee has
 // no row and her Home never asks for it. In the three sizes, with the captures `<KEY>-<label>`. erplora.com's pushes of
 // the number run as its door does (whatsapp-helpers.ts); `a`'s photo is kept first and put back last.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, login, saveSessionForTheSweep, shown, THREE_SIZES, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, EMPLOYEE, hostPage, saveSessionForTheSweep, shown, THREE_SIZES, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { spanishContext, spanishHome } from './home-helpers';
 import { capturedFitting } from './screen';
 import { keepPhoto, pushChannel, restorePhoto } from './whatsapp-helpers';
@@ -25,14 +25,10 @@ const PRINTER_TITLES: Record<string, string> = {
 const row = (page: Page): Locator => shown(page).locator('[data-testid="home-health"]');
 const item = (page: Page, app: string): Locator => row(page).locator(`[data-testid="home-health-item"][data-app="${app}"]`);
 
-async function asTheOwner(browser: Parameters<typeof spanishContext>[0], run: (context: BrowserContext) => Promise<void>) {
-  const context = await browser.newContext({ baseURL: A });
-  try {
-    await login(await context.newPage(), A, '/');
-    await run(context);
-  } finally {
-    await context.close();
-  }
+/** Runs `step` as the owner of `a`, in a context of its own. */
+async function asTheOwner(browser: Browser, step: (context: BrowserContext) => Promise<void>): Promise<void> {
+  const { context } = await hostPage(browser, A, { next: '/' });
+  await step(context).finally(() => context.close());
 }
 
 test.beforeAll(async ({ browser }) => {

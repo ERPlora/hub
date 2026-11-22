@@ -13,6 +13,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { HEALTH_PILLS } from '../lib/home-health';
 import { useBaseI18n } from '../lib/i18n';
 import type { HomeHealthItem } from '../operations/home';
+import '../home.css';
 
 const { t } = useBaseI18n();
 const client = useLiveClient();
@@ -141,54 +142,3 @@ watch(
     </ion-button>
   </section>
 </template>
-
-<style scoped>
-.home-health {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin: 0 0 16px;
-}
-
-.home-health-items {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Without room beside its label, the action goes under it whole, never cut in two lines. */
-.home-health-item {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-}
-
-.home-health-action,
-.home-health-system {
-  margin: 0;
-  white-space: nowrap;
-}
-
-.home-health-system {
-  margin-inline-start: auto;
-}
-
-.home-health-error {
-  flex: 1 1 280px;
-  margin: 0;
-}
-
-.home-health-skeleton {
-  flex: 1 1 240px;
-  max-width: 420px;
-  height: 28px;
-  margin: 0;
-  border-radius: 999px;
-}
-</style>
