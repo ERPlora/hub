@@ -258,8 +258,8 @@
     ]
   },
   {
-    "path": "apps/reservation/services.py",
-    "file_name": "services.py",
+    "path": "apps/reservation/services/reservations.py",
+    "file_name": "reservations.py",
     "functions": [
       {
         "name": "update_reservation",

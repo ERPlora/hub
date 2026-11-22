@@ -40,8 +40,8 @@ def visible_texts() -> set[str]:
         *config_texts(config),
     ]
     lazies += module_texts(queries, services, schemas)
-    lazies += [message for message, _field in services.REFUSALS.values()]
-    lazies += list(services.TARGET_WORDS.values())
+    lazies += [message for message, _field in services.gate.REFUSALS.values()]
+    lazies += list(services.lifecycle.TARGET_WORDS.values())
     lazies += model_texts(MODELS)
     for choices in (Reservation.Status, Reservation.Source):
         lazies += list(choices.labels)
@@ -55,7 +55,7 @@ def test_every_entry_has_a_spanish_translation():
 
 #: Texts Reservas shows but Customers owns (its reason for a phone that is not a number of its country, RESERVATION-F06):
 #: they are translated once, in Customers' catalog.
-BORROWED = (services.PHONE_INVALID,)
+BORROWED = (services.guests.PHONE_INVALID,)
 CUSTOMER_LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
 
 
@@ -107,7 +107,7 @@ def test_spanish_texts_of_the_workbook():
             "WhatsApp",
             "Internet",
         ]
-        messages = {code: str(message) for code, (message, _field) in services.REFUSALS.items()}
+        messages = {code: str(message) for code, (message, _field) in services.gate.REFUSALS.items()}
         assert messages["phone_required"] == "Este negocio pide un teléfono en cada reserva."
         assert messages["date_blocked"] == (
             "Esa fecha está bloqueada (festivo o cierre): ese día no se aceptan reservas."
@@ -115,8 +115,8 @@ def test_spanish_texts_of_the_workbook():
         assert messages["outside_schedule"] == "A esa hora el negocio está cerrado."
         assert messages["no_service_day"] == "No hay servicio a esa hora: ninguna franja la cubre."
         assert messages["no_capacity"] == "Esa franja ya está completa para ese día."
-        assert str(services.NOT_EDITABLE) == "Esta reserva ya no se puede cambiar: solo sus notas."
-        assert str(services.ENTRY_CONVERTED) == "Esta entrada ya se convirtió en reserva."
+        assert str(services.reservations.NOT_EDITABLE) == "Esta reserva ya no se puede cambiar: solo sus notas."
+        assert str(services.waitlist.ENTRY_CONVERTED) == "Esta entrada ya se convirtió en reserva."
 
 
 def test_spanish_says_reservations_own_words_not_an_earlier_apps():
@@ -138,7 +138,7 @@ def test_spanish_says_reservations_own_words_not_an_earlier_apps():
 def test_a_refusal_names_the_status_in_spanish():
     with translation.override("es"):
         label = str(Reservation.Status.CONFIRMED.label).lower()
-        assert str(services.STEP_REFUSED) % {"status": label, "target": services.TARGET_WORDS["confirmed"]} == (
+        assert str(services.lifecycle.STEP_REFUSED) % {"status": label, "target": services.lifecycle.TARGET_WORDS["confirmed"]} == (
             "Esta reserva está confirmada: no se puede confirmar."
         )
 
