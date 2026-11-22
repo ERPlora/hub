@@ -10,9 +10,9 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 
 from base.registry import REGISTRY_SCOPE
 from control import services
-from control.tests.conftest import a_ready_hub, as_actor, events, person
+from control.tests.conftest import SERVICES_MARKS, a_ready_hub, as_actor, events, person
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("nothing_cached")]
+pytestmark = SERVICES_MARKS
 
 
 class TestRecover:

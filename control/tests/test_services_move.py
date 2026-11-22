@@ -8,9 +8,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from control import services
 from control.models import Cluster, Hub
 from control.schemas import ClusterIdIn
-from control.tests.conftest import a_cluster, a_ready_hub, as_actor, events, person
+from control.tests.conftest import SERVICES_MARKS, a_cluster, a_ready_hub, as_actor, events, person
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("nothing_cached")]
+pytestmark = SERVICES_MARKS
 
 
 class TestMove:

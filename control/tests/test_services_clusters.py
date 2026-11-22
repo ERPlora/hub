@@ -23,9 +23,9 @@ from base.tenancy import credentials
 from control import services
 from control.models import Cluster, Hub
 from control.schemas import ClusterIdIn, ClusterIn, ClusterUpdateIn
-from control.tests.conftest import a_cluster, as_actor, events, person
+from control.tests.conftest import SERVICES_MARKS, a_cluster, as_actor, events, person
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("nothing_cached")]
+pytestmark = SERVICES_MARKS
 
 SECRET = "erplora/prod/clusters/cluster-2"
 APP_VALUES = {"app_user": "hub_app", "app_password": "app-secret"}

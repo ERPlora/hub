@@ -14,6 +14,7 @@ from base.tenancy.tests.concurrency import hub_staff
 from control.models import Cluster, Hub
 
 __all__ = [
+    "SERVICES_MARKS",
     "a_cluster",
     "a_ready_hub",
     "admin_ctx",
@@ -24,6 +25,9 @@ __all__ = [
     "person",
     "small",
 ]
+
+#: The marks of the tests of control's services: they use the database, and no secret read before them is kept.
+SERVICES_MARKS = [pytest.mark.django_db, pytest.mark.usefixtures("nothing_cached")]
 
 
 @pytest.fixture
