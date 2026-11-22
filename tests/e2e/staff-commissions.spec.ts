@@ -14,7 +14,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
-import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
+import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, scrolledTo, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
@@ -247,13 +247,11 @@ test('STAFF-F21 (la fila propia): an employee opens Commissions and sees only he
     await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules', 'Commissions']);
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      // On a phone the row turns into a card: what was painted is painted again, so it retries.
-      await expect(async () => {
-        await rowOf(page, eva.id).scrollIntoViewIfNeeded({ timeout: 2000 });
-        await expect(rowOf(page, eva.id)).toBeInViewport({ timeout: 1000 });
-      }, `Eva at ${viewport.label}`).toPass();
+      // On a phone the row turns into a card: scrolledTo looks for it again while the list paints it again.
+      await scrolledTo(rowOf(page, eva.id));
+      await expect(rowOf(page, eva.id)).toBeInViewport();
       await expect(view.locator('[data-testid=staff-commissions-row]')).toHaveCount(1);
-      await page.screenshot({ path: shot(`staff-commissions-employee-${viewport.label}`) });
+      await capture(page, `staff-commissions-employee-${viewport.label}`);
     }
   } finally {
     await employee.context.close();
