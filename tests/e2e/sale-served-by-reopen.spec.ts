@@ -9,7 +9,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, dishForTheTill, linesOf, openTillCart, restoreDrawer, stamp, zoneWithTable } from './sale-helpers';
+import { checkAtEachSize, cleanSales, dishForTheTill, linesOf, restoreDrawer, stamp, zoneWithTable } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
@@ -122,15 +122,13 @@ test('SALE-F16 (hub#2002): a table’s check left and opened again from the plan
   await floor(page);
   await tile(page).click();
   await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`Table ${RUN}`);
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await openTillCart(page);
+  await checkAtEachSize(page, SIZES, async (label) => {
     await expect(chip(page)).toContainText(`Served by ${LUCIA} Garcia`);
     await expect(await staffOf(page, soup)).toHaveText(`${LUCIA} Garcia`);
     await expect(await staffOf(page, steak)).toHaveText(`${MARTA} Garcia`);
     await expect(shown(page).locator('[data-testid=pos-total]')).toContainText('25.00');
-    await capture(page, `APP-SALE-SALE-F16-reopened-${size.label}`);
-  }
+    await capture(page, `APP-SALE-SALE-F16-reopened-${label}`);
+  });
 
   // The round sent to the kitchen names who serves the check.
   await page.setViewportSize({ width: 1440, height: 900 });
