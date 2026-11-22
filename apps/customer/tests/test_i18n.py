@@ -152,7 +152,7 @@ def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field(
     ]
     with translation.override("es"):
         with pytest.raises(InvalidPayload) as refused:
-            run("customer.customer.update", schemas.CustomerPatchIn(id=ana.id, field_values=sent))
+            run("customer.customer.update", schemas.cards.CustomerPatchIn(id=ana.id, field_values=sent))
         fields = {key: str(text) for key, text in refused.value.fields.items()}
     assert fields == {
         f"field_values.{visits.id}": "Introduce un número.",

@@ -165,7 +165,7 @@ def test_its_words_are_translated():
     from django.utils import translation
 
     from base import registry
-    from base.models import HubIdentity
+    from base.models.identity import HubIdentity
 
     with translation.override("es"):
         assert str(apps.get_app_config("control").verbose_name) == "Control"

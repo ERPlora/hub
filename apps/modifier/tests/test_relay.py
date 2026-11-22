@@ -12,7 +12,7 @@ from live.models import OutboxEvent
 
 from apps.modifier.models import ModifierLink
 from base import relay
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import FOOD, HUB_DB_COMMITTED, A, B, ctx_for, heard, make_category, make_product, run

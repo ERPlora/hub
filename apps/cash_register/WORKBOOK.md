@@ -485,7 +485,9 @@ Pasos:
 2. Lee el resumen: quién abrió y cerró, el cajón, el fondo, las ventas por forma de pago, devoluciones,
    entradas, salidas, invitaciones aparte (son coste, no efectivo; quien no ve los costes las ve «—»),
    esperado, contado, diferencia y las notas. Las cifras son las de todo el cajón: también lo que cobró un
-   compañero mientras la sesión estaba abierta.
+   compañero mientras la sesión estaba abierta. Quien abrió, cerró, contó o apuntó un movimiento sale por su
+   nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero, también en
+   las sesiones de antes.
 3. Repasa Movimientos: cada venta se nombra por su documento («Tique …», «Factura …»), una devolución
    «Devolución de …» y una anulación «Anulación de …»; un movimiento a mano enseña su concepto. Y repasa
    Arqueos.
@@ -496,7 +498,7 @@ Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabl
 de otro empleado no existe para quien no ve las de todos: por su enlace, su número o el asistente, «Esa sesión
 de caja no existe.», como una que no existe, y lo mismo sus
 movimientos, sus arqueos y su informe.
-Implicados: SALE-F28
+Implicados: SALE-F28, BASE-F119
 
 ### CASH_REGISTER-F12 Ver la caja en los paneles del inicio
 Estado: hecho
@@ -595,9 +597,9 @@ Pasos:
    esa impresora lo saca en papel. Con la sesión abierta es el «Informe parcial (X)»; cerrada, el «Cierre de
    caja (Z)».
 3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
-   se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
-   entradas, salidas, invitaciones (solo si quien imprime ve los costes), el esperado y, en el Z, el contado y
-   el descuadre.
+   se cerró sola), nombrado como en el detalle, el fondo, el esperado y, línea a línea, las ventas por forma de
+   pago, devoluciones, entradas, salidas, invitaciones (solo si quien imprime ve los costes), el esperado y, en
+   el Z, el contado y el descuadre.
 4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
    dispositivo con el mismo informe (en la cola esperaría para siempre): el del navegador o, en la app
    instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»),
@@ -879,8 +881,12 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   su nombre en `options.label` (gh:hub#1105).
 - **Administrador de Django con CRUD completo** (PLAN §17), solo en `hubs.erplora.com`; ids
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
-- **Quién abrió o cerró** se guarda como lo lee una persona (su nombre o su correo), no como el
-  identificador interno del usuario.
+- **Quién actúa** (abre, cierra, cuenta, apunta un movimiento, da de alta un cajón o cambia los ajustes) se guarda
+  como lo lee un compañero, no como el identificador interno del usuario: `actor` (`queries/people.py`) nombra con
+  `actor_name` de `base.queries.people`, la misma pieza que Mesas, Cocina, Pagos y Carritos: el nombre de la cuenta
+  o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a quien ve el contacto
+  del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
+  `0004_actors_without_address`, en la base de datos de cada negocio.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien
   la usa: Caja está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`, hub#1087) y cada campo de

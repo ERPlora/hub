@@ -29,7 +29,8 @@ from live.outbox import record_event
 
 from base import activation, blueprint, entitlement, events, home, queries
 from base.activation import CREATING, FAILED
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.permissions import ADMINISTER_HUB
 from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.services.blueprints import _load_what_waited, _stop_waiting, _waiting_loads

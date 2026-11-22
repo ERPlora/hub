@@ -10,42 +10,18 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.service import queries, services
-from apps.service.schemas import (
-    AdjustIn,
-    AssignIn,
-    AssignmentListIn,
-    AssignmentPatchIn,
-    AssignmentRefIn,
-    ByIdIn,
-    CategoryIn,
-    CategoryListIn,
-    CategoryPatchIn,
-    CategoryRefIn,
-    EligibleIn,
-    GrantIn,
-    GrantListIn,
-    MovementListIn,
-    PackageIn,
-    PackageListIn,
-    PackagePatchIn,
-    PackageRefIn,
-    PageIn,
-    TenderOptionsIn,
-    RedeemCheckIn,
-    RedeemIn,
-    ServiceBulkIn,
-    ServiceForSaleIn,
-    ServiceImageIn,
-    ServiceImageSuggestIn,
-    ServiceImageUploadIn,
-    ServiceIn,
-    ServiceListIn,
-    ServicePatchIn,
-    ServiceRefIn,
-    SessionRefIn,
-    SettingsIn,
-    VoidIn,
-)
+from apps.service.schemas.assignments import AssignIn, AssignmentListIn, AssignmentPatchIn, AssignmentRefIn, EligibleIn
+from apps.service.schemas.catalog import ServiceBulkIn, ServiceForSaleIn, ServiceIn, ServiceListIn, ServicePatchIn
+from apps.service.schemas.categories import CategoryIn, CategoryListIn, CategoryPatchIn
+from apps.service.schemas.fields import ByIdIn, CategoryRefIn, PackageRefIn, PageIn, ServiceRefIn
+from apps.service.schemas.grant_checks import RedeemCheckIn
+from apps.service.schemas.grants import AdjustIn, GrantIn, GrantListIn, RedeemIn, VoidIn
+from apps.service.schemas.movements import MovementListIn
+from apps.service.schemas.packages import PackageIn, PackageListIn, PackagePatchIn
+from apps.service.schemas.service_images import ServiceImageIn, ServiceImageSuggestIn, ServiceImageUploadIn
+from apps.service.schemas.sessions import SessionRefIn
+from apps.service.schemas.settings import SettingsIn
+from apps.service.schemas.tender import TenderOptionsIn
 from apps.service.schemas.grant_sales import GrantSaleIn
 from apps.service.services import grant_sales
 from base.request_body import accept_body_up_to

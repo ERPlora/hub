@@ -17,7 +17,7 @@ from apps.verifactu.models import Chain, Record
 from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, manual
 from base import catalog, worker
 from base.catalog import RegisterResult
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 
 pytestmark = HUB_DB_COMMITTED
 

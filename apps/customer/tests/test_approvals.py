@@ -18,7 +18,7 @@ from django.core.cache import cache
 from django.utils import translation
 
 from apps.customer.models import Customer, CustomerGroup, CustomField, CustomerTag
-from base.models import Credential
+from base.models.access import Credential
 from base.tests.test_people import with_pin
 
 from .conftest import HOST, HUB_DB

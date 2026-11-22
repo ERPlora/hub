@@ -10,7 +10,7 @@ from live.meta import module_configs
 from live.operations import AI, operation, registry as operation_registry
 
 from base import activation, api_docs, entitlement
-from base.models import ApiKey, ApiSettings
+from base.models.api_keys import ApiKey, ApiSettings
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.api_keys import (
     ApiDocIn,

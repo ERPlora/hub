@@ -7,7 +7,8 @@ from live.context import OperationContext
 from live.errors import Unauthorized
 from live.operations import AI, operation
 
-from base.models import Hub, Membership, Profile
+from base.models import Hub, Membership
+from base.models.profile import Profile
 from base.operations import hub_id
 from base.permissions import VIEW_HOME
 from base.schemas.profile import ProfileIn, ProfileOut

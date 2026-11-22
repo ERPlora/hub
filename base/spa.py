@@ -39,7 +39,7 @@ from live.spa import render_spa, spa_path_pattern
 from base import public_home, queries
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import SessionOwner
+from base.models.sessions import SessionOwner
 from base.permissions import OPEN_MANAGEMENT
 
 SESSION_ME_ID = "session-me"

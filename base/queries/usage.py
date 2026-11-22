@@ -16,7 +16,8 @@ from live.operations import AI, INTERNAL, operation
 from base import activation, files, home, meter
 from base.people import FREE_ROLES
 from base.apps_on import active_apps
-from base.models import Hub, Membership, SessionOwner
+from base.models import Hub, Membership
+from base.models.sessions import SessionOwner
 from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
 from base.schemas.usage import PlanUsageIn, PlanUsageOut, UsageListIn, UsageListOut

@@ -10,7 +10,8 @@ from live.operations import operation
 
 from apps.service.models import Category
 from apps.service.queries.reads import _page, _resolve
-from apps.service.schemas import CategoryListIn, CategoryOut, CategoryPage, CategoryRefIn
+from apps.service.schemas.categories import CategoryListIn, CategoryOut, CategoryPage
+from apps.service.schemas.fields import CategoryRefIn
 from base.ordering import list_order_for
 
 CATEGORY_NOT_FOUND = _("That category does not exist in this business.")

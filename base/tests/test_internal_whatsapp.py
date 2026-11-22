@@ -24,7 +24,8 @@ from live.operations import get as get_operation
 
 from apps.whatsapp_inbox.models import Channel, Message
 from base import activation, apps_on, internal, internal_whatsapp
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.services import photo as photo_service
 from base.tenancy import context
 from base.tenancy.context import use_hub

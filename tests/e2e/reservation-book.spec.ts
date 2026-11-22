@@ -460,7 +460,7 @@ function workerReleases(): string[] {
     'from django.utils import timezone',
     'from live.context import Scope',
     'from base import scheduler',
-    'from base.models import TaskSchedule',
+    'from base.models.scheduler import TaskSchedule',
     'now = timezone.now()',
     'scheduler.sync(now)',
     "TaskSchedule.objects.filter(app_label='reservation', name='release_unconfirmed_reservations').update(next_run=now)",

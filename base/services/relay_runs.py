@@ -16,7 +16,8 @@ from live.operations import atomic
 from live.outbox import notify
 
 from base import events
-from base.models import EventDelivery, TaskSchedule
+from base.models.relay import EventDelivery
+from base.models.scheduler import TaskSchedule
 from base.tenancy.context import HUB_SCOPE_KIND
 
 logger = logging.getLogger(__name__)

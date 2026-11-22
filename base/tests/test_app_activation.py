@@ -22,7 +22,8 @@ from live.operations import atomic, get
 from base import activation, apps_on, events
 from base.activation import OFF, ON, Activation
 from base.entitlement import EntitlementBlocked
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import use_hub

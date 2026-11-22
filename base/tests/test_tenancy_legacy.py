@@ -7,7 +7,7 @@ from live.context import Scope
 from ninja import Schema
 
 from base import activation, outbound
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_outbound import as_system, command

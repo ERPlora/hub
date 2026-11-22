@@ -13,7 +13,7 @@ from live.models import OutboxEvent
 from apps.appointment.models import Appointment, Recurring
 from apps.sale.models import Order
 from apps.tax.models import TaxCategory
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 
 from .conftest import HUB_DB_COMMITTED, MONDAY, make_customer, make_member, make_service, run, wall
 

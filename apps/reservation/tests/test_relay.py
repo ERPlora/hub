@@ -18,7 +18,7 @@ from live.outbox import channel_for
 from apps.flow.tests.test_relay import worker_loop
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.table.models import Hold
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB_COMMITTED, TOMORROW, A, B, book, ctx_for, holds, make_table, open_week, run

@@ -127,7 +127,7 @@ class Recoveries(hubs.CopiedHubs):
         run_in(hub, "customer.customer.delete", id=ana)
         with use_hub(hub):
             from base import activation
-            from base.models import AppActivation
+            from base.models.activation import AppActivation
 
             AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
             activation.forget(hub.slug)

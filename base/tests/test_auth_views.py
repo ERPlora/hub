@@ -127,7 +127,7 @@ class TestCallback:
         # The language chosen in «My profile» is the one every entry speaks, the account's too; without one, the
         # account's language on erplora.com, never the browser's (a PIN entry, without the account, takes the
         # business's: test_access_pin).
-        from base.models import Profile
+        from base.models.profile import Profile
 
         with use_hub(hub_a):
             Profile.objects.create(username="saas:42", first_name="Ana", language=own)

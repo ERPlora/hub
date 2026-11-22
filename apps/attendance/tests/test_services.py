@@ -23,7 +23,7 @@ from apps.attendance.models import AttendanceSettings, Break, Correction, Record
 from apps.attendance.schemas import ClosedOut, RecordOut, ReviewOut, SettingsOut
 from apps.staff.models import Member
 from base import access
-from base.models import TrustedDevice
+from base.models.access import TrustedDevice
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, run, utc

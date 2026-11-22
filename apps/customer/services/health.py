@@ -10,7 +10,7 @@ from live.outbox import record_event
 from apps.customer import events
 from apps.customer.models import Activity, Consent, Customer, HealthRecord
 from apps.customer.queries import find_customer, HEALTH_PURPOSE, health_consent, load_health
-from apps.customer.schemas import HealthGrantIn, HealthIn, HealthOut, HealthWithdrawIn
+from apps.customer.schemas.health import HealthGrantIn, HealthIn, HealthOut, HealthWithdrawIn
 from apps.customer.services.writes import DATE_IN_FUTURE, _actor, _changes, _occurred_at
 from base.business import business_zone
 

@@ -16,7 +16,9 @@ from live.outbox import record_event
 
 from base import access, events, queries
 from base.session_host import session_host
-from base.models import AccessSettings, Credential, Membership, SessionOwner, TrustedDevice
+from base.models.access import AccessSettings, Credential, TrustedDevice
+from base.models import Membership
+from base.models.sessions import SessionOwner
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.devices import (
     DeviceByIdIn,

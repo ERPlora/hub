@@ -9,7 +9,8 @@ from live.outbox import record_event
 from apps.customer import events
 from apps.customer.models import CustomField, CustomFieldValue
 from apps.customer.queries import find_field
-from apps.customer.schemas import OPTIONS_MISSING, DeletedOut, FieldIn, FieldPatchIn, FieldRefIn, FieldRow
+from apps.customer.schemas.custom_fields import FieldIn, FieldPatchIn, FieldRow
+from apps.customer.schemas.fields import OPTIONS_MISSING, DeletedOut, FieldRefIn
 from apps.customer.services.writes import _patched, _save_named
 
 FIELD_HAS_VALUES = _(

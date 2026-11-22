@@ -12,7 +12,7 @@ from live.outbox import record_event
 
 from base import access, events, queries
 from base import approvals as approval_rules
-from base.models import Approval
+from base.models.approvals import Approval
 from base.permissions import VIEW_HOME
 from base.schemas.approvals import ApprovalIn, ApprovalPassOut, ApprovalSpendIn, ApprovalSpentOut
 from base.services.devices import badge_owner, too_many_message

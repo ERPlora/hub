@@ -21,7 +21,7 @@ from live.operations import get as get_operation
 
 from apps.demo.models import Item
 from base.approvals import Approved, approval_of, consequence_context
-from base.models import Approval
+from base.models.approvals import Approval
 from base.operations import call
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.test_approvals import APPROVABLE, CHANGE, SETTINGS, adam, approvable, approve, code, eva, post, with_pass

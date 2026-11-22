@@ -24,8 +24,8 @@ from pydantic import (
 )
 
 from apps.appointment.schemas import A_MEMBER, A_SERVICE, AN_APPOINTMENT
-from apps.customer.schemas import Email
 from apps.customer.schemas.contact import EMAIL, PHONE
+from apps.customer.schemas.fields import Email
 from apps.online_booking.logo import LogoFieldsOut, LogoName
 from apps.online_booking.public_page import LinkOwnerOut, PageOwnerOut, TrapIn
 

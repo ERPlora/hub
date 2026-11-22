@@ -22,7 +22,8 @@ from PIL import UnidentifiedImageError
 
 from base import events, queries
 from base.media import AVATARS_FOLDER
-from base.models import AccessSettings, Profile
+from base.models.access import AccessSettings
+from base.models.profile import Profile
 from base.operations import hub_id
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.access import AccessSettingsIn, AccessSettingsOut, AccessSettingsUpdateIn

@@ -18,7 +18,9 @@ from django.core.files.storage import storages
 from live.models import OutboxEvent
 from PIL import Image as PILImage
 
-from base.models import Credential, Hub, Membership, Profile
+from base.models.access import Credential
+from base.models import Hub, Membership
+from base.models.profile import Profile
 from base.tenancy.context import use_hub
 from base.tests.test_auth_views import A, HOST, ON_HUB_A
 

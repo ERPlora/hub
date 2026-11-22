@@ -11,7 +11,8 @@ from live.operations import AI, INTERNAL, operation
 
 from base import business
 from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import Hub, Location
+from base.models import Hub
+from base.models.locations import Location
 from base.operations import is_platform_hub
 from base.permissions import VIEW_HOME
 from base.registry import hub_answer, internal_only
