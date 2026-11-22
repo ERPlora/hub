@@ -543,7 +543,7 @@ export interface PreviewOut {
   discount_percent: string;
   /** What the ticket discount (its percent and its fixed amount) takes off this charge. */
   ticket_discount_amount: number;
-  gift_total: number;
+  gift_total: number | null;
   total: number;
   breakdown: BreakdownOut[];
   lines: PreviewLineOut[];
@@ -651,7 +651,7 @@ export interface SaleOut {
   tax_total: number;
   discount_percent: string;
   discount_amount: number;
-  gift_total: number;
+  gift_total: number | null;
   total: number;
   tendered_total: number;
   change_total: number;

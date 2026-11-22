@@ -37,6 +37,7 @@ from apps.sale.schemas.fields import (
     _text,
 )
 from apps.sale.schemas.lines import ComboLineIn, OpenLineIn, ProductLineIn, ServiceLineIn
+from base.sensitive import COSTS
 
 
 class ChargeLinesIn(Schema):
@@ -251,7 +252,9 @@ class PreviewOut(Schema):
         description="What the ticket discount (its percent and its fixed amount) takes off this charge, in cents.",
         json_schema_extra={"money": True},
     )
-    gift_total: int = Field(description="Comps at cost, in cents.", json_schema_extra={"money": True})
+    gift_total: int | None = Field(
+        description="Comps at cost, in cents (empty without the costs).", json_schema_extra={"money": True, **COSTS}
+    )
     total: int = Field(description="What would be charged, in cents.", json_schema_extra={"money": True})
     breakdown: list[BreakdownOut] = Field(description="Base and tax by fiscal key.")
     lines: list[PreviewLineOut] = Field(description="Each line valued.")
