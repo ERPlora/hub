@@ -1,17 +1,15 @@
 // Inventory's help plays its own video from YouTube, so unlike base-help.spec.ts this spec reaches the real player.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { A, capture, settled } from './helpers';
 import {
-  A,
-  capture,
-  horizontalOverflow,
-  saveSessionForTheSweep,
-  settled,
-  signedInSpanish,
-  turnOffTurnedOn,
-  turnOnMissing,
-} from './helpers';
-import { embed, expectSixteenByNine, openTask as openHelpTask, recordYouTube, taskBody, videoBeforeSteps } from './help-video-helpers';
+  embed,
+  expectSixteenByNine,
+  expectTaskVideo,
+  helpVideoPage,
+  leaveHelpVideoPage,
+  openTask as openHelpTask,
+} from './help-video-helpers';
 import { THREE_SIZES_TALL_TABLET } from './screen';
 
 const VIDEO = 'dIppfjMEKWo';
@@ -27,7 +25,6 @@ const youtubeRequests: string[] = [];
 
 const frame = () => page.locator('iframe.youtube-embed__player');
 const player = () => page.frameLocator('iframe.youtube-embed__player');
-const task = () => taskBody(page, TASK);
 
 async function playInventoryVideo(): Promise<void> {
   await page.goto(`${A}/inventory/products`);
@@ -40,23 +37,14 @@ async function playInventoryVideo(): Promise<void> {
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
-  ({ context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/inventory/products'));
-  recordYouTube(page, youtubeRequests);
-  await turnOnMissing(context, A, ['inventory'], turnedOn);
-  await saveSessionForTheSweep(context);
+  const opened = { path: '/inventory/products', apps: ['inventory'], turnedOn, requests: youtubeRequests };
+  ({ context, page } = await helpVideoPage(browser, opened));
 });
 
 /** Opens «Dar de alta un producto» on a fresh page. */
-async function openTask(): Promise<void> {
-  await openHelpTask(page, `${A}/inventory/products`, TASK, youtubeRequests);
-}
+const openTask = () => openHelpTask(page, `${A}/inventory/products`, TASK, youtubeRequests);
 
-test.afterAll(async () => {
-  if (context) {
-    await turnOffTurnedOn(context, A, turnedOn);
-    await context.close();
-  }
-});
+test.afterAll(() => leaveHelpVideoPage(context, turnedOn));
 
 for (const size of THREE_SIZES_TALL_TABLET) {
   test(`at ${size.label} px the Spanish video plays in YouTube's full player, 16:9 across the help window`, async () => {
@@ -93,33 +81,20 @@ test("the player's own YouTube link opens the video in a new tab and leaves the 
 for (const size of THREE_SIZES_TALL_TABLET) {
   test(`at ${size.label} px an opened task shows its own video before its steps, asking YouTube nothing until tapped`, async () => {
     await page.setViewportSize({ width: size.width, height: size.height });
-    await openTask();
-    const poster = task().locator('.youtube-embed__poster');
-    await expect(poster).toHaveCount(1);
-    await expect(poster).toContainText('Dar de alta un producto');
-    expect(await videoBeforeSteps(task())).toBe(true);
-    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
-    await poster.scrollIntoViewIfNeeded();
-    await settled(page);
-    await capture(page, `help-task-video-${size.label}`);
-    expect(youtubeRequests).toEqual([]);
-
-    await poster.click();
-    const own = task().locator('iframe.youtube-embed__player');
-    await expect(own).toHaveAttribute('src', embed(TASK_VIDEO));
-    await expect.poll(() => youtubeRequests.length).toBeGreaterThan(0);
-    await expectSixteenByNine(page, own, '.youtube-embed');
+    const task = await openTask();
+    const video = { title: 'Dar de alta un producto', video: TASK_VIDEO, shot: `help-task-video-${size.label}` };
+    await expectTaskVideo(page, task, video, youtubeRequests);
     await page.getByTestId('help-close').click();
   });
 }
 
 test('offline, an opened task says its video is not available and keeps its steps in view', async () => {
   await page.setViewportSize({ width: 834, height: 1194 });
-  await openTask();
+  const task = await openTask();
   await context.setOffline(true);
   try {
-    await expect(task().locator('.youtube-embed__offline')).toContainText('Sin conexión: el vídeo no está disponible');
-    await expect(task().locator('.assistant-md').first()).toBeVisible();
+    await expect(task.locator('.youtube-embed__offline')).toContainText('Sin conexión: el vídeo no está disponible');
+    await expect(task.locator('.assistant-md').first()).toBeVisible();
     await settled(page);
     await capture(page, 'help-task-video-offline-834');
   } finally {
