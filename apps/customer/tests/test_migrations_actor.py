@@ -3,8 +3,8 @@ migrator's alias, as ``migrate_hubs`` runs it. Forward, who wrote on a card (its
 saved by the address of an account without a name keeps what goes before the «@» (BASE-F119); a person's name and an
 API key's keep theirs. Back, nothing changes."""
 
-from apps.whatsapp_inbox.tests.test_migrations import database, migrate
-from base.tests.colleagues import KEPT, SAVED, written_by
+from apps.whatsapp_inbox.tests.test_migrations import database
+from base.tests.colleagues import kept_both_ways
 
 #: The fixture taken from the inbox's migration tests: a business's database cloned from the template.
 __all__ = ["database"]
@@ -15,13 +15,14 @@ AFTER = [(APP, "0005_actor_without_address")]
 WHO = [("Activity", "actor"), ("Consent", "recorded_by"), ("HealthRecord", "updated_by")]
 
 
-def test_who_wrote_on_a_card_saved_by_their_address_keeps_only_what_goes_before_it(database):
-    old = migrate(database, BEFORE)
-    for number, who in enumerate(SAVED):
-        card = old.get_model(APP, "Customer").objects.using(database.alias).create(name=f"Card {number}")
-        old.get_model(APP, "Activity").objects.using(database.alias).create(customer=card, kind="note", actor=who)
-        old.get_model(APP, "Consent").objects.using(database.alias).create(customer=card, state="granted", recorded_by=who)
-        old.get_model(APP, "HealthRecord").objects.using(database.alias).create(customer=card, updated_by=who)
+def kept_by(apps, database, number: int, who: str) -> None:
+    """A card with a line of its activity, a consent and its health data, all of them by ``who``."""
+    rows = {model: apps.get_model(APP, model).objects.using(database.alias) for model in ("Customer", *dict(WHO))}
+    card = rows["Customer"].create(name=f"Card {number}")
+    rows["Activity"].create(customer=card, kind="note", actor=who)
+    rows["Consent"].create(customer=card, state="granted", recorded_by=who)
+    rows["HealthRecord"].create(customer=card, updated_by=who)
 
-    assert written_by(migrate(database, AFTER), database, APP, WHO) == dict.fromkeys(WHO, KEPT)
-    assert written_by(migrate(database, BEFORE), database, APP, WHO) == dict.fromkeys(WHO, KEPT)
+
+def test_who_wrote_on_a_card_saved_by_their_address_keeps_only_what_goes_before_it(database):
+    kept_both_ways(database, BEFORE, AFTER, kept_by, WHO)

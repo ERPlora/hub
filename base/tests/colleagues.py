@@ -7,6 +7,7 @@ the part before the «@» (``base.queries.people.actor_name``)."""
 from django.contrib.auth import get_user_model
 from django.test import Client
 
+from apps.whatsapp_inbox.tests.test_migrations import migrate
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import A
@@ -35,8 +36,21 @@ SAVED = (ADDRESS, "Luis García", "API · orders@shop.example", "")
 KEPT = sorted([SHOWN, "Luis García", "API · orders@shop.example", ""])
 
 
-def written_by(apps, database, app: str, where) -> dict[tuple[str, str], list[str]]:
-    """Who acted, sorted, on each ``(model, field)`` of ``where`` in ``app``, as the migration state ``apps`` reads
-    ``database``."""
-    rows = {model: apps.get_model(app, model).objects.using(database.alias) for model, _ in where}
-    return {(model, field): sorted(rows[model].values_list(field, flat=True)) for model, field in where}
+def kept_both_ways(database, before, after, plant, many, one=()) -> None:
+    """Runs both ways on ``database`` the migration that takes the address out of who acted in the app of ``before``.
+
+    At ``before``, ``plant(state, database, number, who)`` writes the rows of one person for each of ``SAVED``, and the
+    model of each ``(model, field)`` of ``one`` (one row at most) gets its row with ``ADDRESS``. Once at ``after``, who
+    acted reads ``KEPT`` on each ``(model, field)`` of ``many`` and ``SHOWN`` on each of ``one``; back at ``before``,
+    nothing changes."""
+    app = before[0][0]
+    state = migrate(database, before)
+    for number, who in enumerate(SAVED):
+        plant(state, database, number, who)
+    for model, field in one:
+        state.get_model(app, model).objects.using(database.alias).create(**{field: ADDRESS})
+    expected = dict.fromkeys(many, KEPT) | dict.fromkeys(one, [SHOWN])
+    for target in (after, before):
+        state = migrate(database, target)
+        rows = {model: state.get_model(app, model).objects.using(database.alias) for model, _ in expected}
+        assert {(model, field): sorted(rows[model].values_list(field, flat=True)) for model, field in expected} == expected

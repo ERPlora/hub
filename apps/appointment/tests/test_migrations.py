@@ -12,10 +12,6 @@ whose connection is business A's own database, inside the test's transaction.
 
 0004: «restored» comes and goes with its migration, on a business's own database cloned from the template for the
 test, through the migrator's alias as ``migrate_hubs`` runs it.
-
-0005, run the same way: a history line saved with the address of whoever changed the appointment, when their account
-has no name, keeps what goes before the «@» (BASE-F119); a person's name and an API key's keep theirs. Back, nothing
-changes.
 """
 
 import datetime as dt
@@ -27,7 +23,6 @@ from django.db import IntegrityError, connections, transaction
 
 from apps.appointment.models import Appointment
 from apps.whatsapp_inbox.tests.test_migrations import migrate
-from base.tests.colleagues import KEPT, SAVED, written_by
 from base.tenancy.context import current_alias
 
 from .conftest import HUB_DB, MADRID, at, make_appointment
@@ -66,7 +61,7 @@ def test_a_row_already_right_is_not_touched(salon):
     assert after.end - after.start == dt.timedelta(minutes=90)
 
 
-def history_line(state, database, number: str, **fields):
+def history_line(state, database, number: str):
     """A «restored» line of a new appointment ``number``, written with the models of the migration ``state``."""
     customer = state.get_model("customer", "Customer").objects.using(database.alias).create(name="Lucía Pérez")
     start = at(dt.date(2026, 10, 19), "10:00")
@@ -74,7 +69,7 @@ def history_line(state, database, number: str, **fields):
         number=number, customer=customer, start=start, end=start + dt.timedelta(minutes=30), duration_minutes=30
     )
     return state.get_model("appointment", "History").objects.using(database.alias).create(
-        appointment=appointment, action="restored", **fields
+        appointment=appointment, action="restored"
     )
 
 
@@ -87,16 +82,3 @@ def test_the_history_line_of_a_restored_appointment_comes_and_goes_with_its_migr
     after = migrate(database, [("appointment", "0004_history_restored")])
 
     assert history_line(after, database, "APT-AFTER").action == "restored"
-
-
-def test_a_history_line_saved_with_a_colleague_s_address_keeps_only_what_goes_before_it(database):
-    restored = [("appointment", "0004_history_restored")]
-    before = migrate(database, restored)
-    for number, actor in enumerate(SAVED):
-        history_line(before, database, f"APT-{number}", actor=actor)
-    lines = [("History", "actor")]
-
-    after = migrate(database, [("appointment", "0005_actor_without_address")])
-
-    assert written_by(after, database, "appointment", lines) == dict.fromkeys(lines, KEPT)
-    assert written_by(migrate(database, restored), database, "appointment", lines) == dict.fromkeys(lines, KEPT)

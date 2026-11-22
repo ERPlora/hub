@@ -1,8 +1,9 @@
-# A print job and a printing device kept the address of whoever acted when their account has no name (erplora.com names
-# such an account by its address). A colleague's address only reaches whoever sees the team's contact details, so each
-# keeps what goes before the «@», as whoever acts is named from now on (``base.queries.people.actor_name``; a migration
-# never imports code that may change). Only a bare address is cut: a person's name and an API key's («API · …») keep
-# theirs. Backwards, nothing changes: the address is kept nowhere to give it back.
+# The printers, the settings, the printing devices and the print jobs kept the address of whoever acted when their
+# account has no name (erplora.com names such an account by its address). A colleague's address only reaches whoever
+# sees the team's contact details, so each keeps what goes before the «@», as whoever acts is named from now on
+# (``base.queries.people.actor_name``; a migration never imports code that may change). Only a bare address is cut: a
+# person's name and an API key's («API · …») keep theirs. Backwards, nothing changes: the address is kept nowhere to
+# give it back.
 
 from django.db import migrations
 from django.db.models import F, Func, Value
@@ -10,7 +11,12 @@ from django.db.models import F, Func, Value
 #: What was kept for an account without a name: its address, alone.
 ADDRESS = r"^[^@\s]+@[^@\s]+$"
 #: Where who acted is kept, by model.
-WHO = {"PrintJob": ["created_by", "retried_by", "cancelled_by"], "PrintDevice": ["registered_by"]}
+WHO = {
+    "Printer": ["created_by"],
+    "Settings": ["updated_by"],
+    "PrintDevice": ["registered_by", "retired_by"],
+    "PrintJob": ["created_by", "retried_by", "cancelled_by"],
+}
 
 
 def forwards(apps, schema_editor):

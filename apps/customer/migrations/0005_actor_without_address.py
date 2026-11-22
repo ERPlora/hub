@@ -1,6 +1,6 @@
 # A card's activity, a consent and the health data kept the address of whoever acted when their account has no name
-# (erplora.com names such an account by its address). A colleague's address only reaches whoever sees the team's contact
-# details, so each keeps what goes before the «@», as whoever acts is named from now on
+# (erplora.com names such an account by its address). A colleague's address only reaches whoever sees the team's
+# contact details, so each keeps what goes before the «@», as whoever acts is named from now on
 # (``base.queries.people.actor_name``; a migration never imports code that may change). Only a bare address is cut: a
 # person's name and an API key's («API · …») keep theirs. Backwards, nothing changes: the address is kept nowhere to
 # give it back.
