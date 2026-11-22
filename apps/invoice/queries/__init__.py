@@ -30,6 +30,7 @@ from apps.invoice import fiscal
 from apps.invoice.document_issuer import document_issuer, issuer_vat_number
 from . import fiscal_archive as fiscal_archive
 from . import public as public
+from .ownership import INVOICES
 from apps.invoice.models import (
     FACTORY_SERIES_NAMES,
     Invoice,
@@ -70,7 +71,7 @@ from apps.invoice.schemas.platform import (
     PlatformDocumentOut, PlatformHealthIn, PlatformHealthOut, PlatformInvoiceOut, PlatformRefIn,
 )
 from apps.sale.models import Refund
-from apps.sale.queries.sales import find_sale
+from apps.sale.queries.sales import visible_sale
 from apps.tax.queries import business_tax_kind, business_today, resolve_tax
 from base.business import money_text
 
@@ -258,17 +259,14 @@ def invoice_detail(invoice: Invoice) -> dict:
     }
 
 
-def find_invoice(invoice_id, number: str | None, *, lock: bool = False) -> Invoice:
-    """The document named by its id or its number; ``NotFound`` when there is none."""
-    invoices = Invoice.objects.select_for_update() if lock else Invoice.objects.all()
+def find_invoice(ctx: OperationContext, invoice_id, number: str | None, *, lock: bool = False) -> Invoice:
+    """The document named by its id or its number among the ones the caller sees (``INVOICES``); ``NotFound`` when
+    there is none, also for someone else's to a person who sees only theirs."""
+    invoices = INVOICES.visible(ctx).select_for_update() if lock else INVOICES.visible(ctx)
     if invoice_id is not None:
         invoice = invoices.filter(pk=invoice_id).first()
     else:
-        invoice = (
-            invoices.filter(number=(number or "").strip())
-            .order_by("-issued_at", "-id")
-            .first()
-        )
+        invoice = invoices.filter(number=(number or "").strip()).order_by("-issued_at", "-id").first()
     if invoice is None:
         raise NotFound(str(INVOICE_NOT_FOUND), code="invoice.not_found")
     return invoice
@@ -405,7 +403,7 @@ def _page(queryset, params, row) -> dict:
     },
 )
 def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
-    invoices = Invoice.objects.all()
+    invoices = INVOICES.visible(ctx)
     if params.search:
         text = params.search.strip()
         invoices = invoices.filter(
@@ -456,7 +454,7 @@ def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
     },
 )
 def get_invoice(ctx: OperationContext, params: InvoiceGetIn) -> dict:
-    return invoice_detail(find_invoice(params.invoice_id, params.number))
+    return invoice_detail(find_invoice(ctx, params.invoice_id, params.number))
 
 
 @operation(
@@ -482,7 +480,7 @@ def get_invoice(ctx: OperationContext, params: InvoiceGetIn) -> dict:
     },
 )
 def by_source(ctx: OperationContext, params: BySourceIn) -> dict:
-    sale = find_sale(params.sale_id, params.sale)
+    sale = visible_sale(ctx, params.sale_id, params.sale)
     document = document_of_sale(sale.id)
     return {
         "found": document is not None,
@@ -620,7 +618,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     },
 )
 def document(ctx: OperationContext, params: DocumentIn) -> dict:
-    invoice = find_invoice(params.invoice_id, params.number)
+    invoice = find_invoice(ctx, params.invoice_id, params.number)
     with translation.override(ctx.language):
         html = render_document(invoice, duplicate=params.duplicate)
     return {"invoice_id": invoice.id, "number": invoice.number, "html": html}
@@ -1005,7 +1003,7 @@ def rectification_figures(
 def rectification_preview(
     ctx: OperationContext, params: RectificationPreviewIn
 ) -> dict:
-    original = find_invoice(params.invoice_id, params.number)
+    original = find_invoice(ctx, params.invoice_id, params.number)
     today = business_today()
     left_over = rectifiable(original, today)
     entries, lines, whole = rectification_figures(

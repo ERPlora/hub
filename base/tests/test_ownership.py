@@ -91,6 +91,11 @@ class TestOwned:
     def test_a_person_with_nothing_of_their_own_reads_nothing(self, items):
         assert ITEMS.visible(ctx_of(person("carla"))).count() == 0
 
+    def test_theirs_are_a_persons_rows_whatever_the_caller_holds(self, items):
+        # What another model whose rows follow these reads them by: an invoice is whoever's its sale is.
+        theirs = ITEMS.theirs(Me(username="bea", records=frozenset()))
+        assert set(theirs.values_list("pk", flat=True)) == {items["bea"]}
+
     def test_sees_all_says_which_of_the_two(self):
         ana = person("ana")
         assert (ITEMS.sees_all(ctx_of(ana)), ITEMS.sees_all(ctx_of(ana, "demo.view_all_items"))) == (False, True)
