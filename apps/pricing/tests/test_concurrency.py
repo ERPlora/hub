@@ -299,7 +299,8 @@ def test_find_list_refuses_to_lock_the_rows_it_is_given(vip_list):
     # ``rows`` is what a detail shows (the group's name, the count of prices: grouped), and Postgres refuses
     # ``FOR UPDATE`` on a grouped query. A write names its list without ``rows``; both at once is a mistake
     # of the caller, told as such and not as a database error.
-    from apps.pricing.queries import _lists, find_list
+    from apps.pricing.queries.reads import find_list
+    from apps.pricing.queries.rows import _lists
 
     with atomic(), pytest.raises(TypeError, match="rows"):
         find_list(vip_list.pk, None, lock=True, rows=_lists())

@@ -57,8 +57,8 @@ class PricingConfig(LiveAppConfig):
             Recoverable(
                 label=_("Price list prices"),
                 reads_since="0001_initial",
-                read=queries.prices_in_copy,
-                missing=queries.prices_not_in_business,
+                read=queries.recovery.prices_in_copy,
+                missing=queries.recovery.prices_not_in_business,
                 create="pricing.price_item.add",
             )
         ]

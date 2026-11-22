@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9ef66bfc75213a28ec45dc938fea060000e88cd2e4328c166e461893ebc7c362 -->
+<!-- generated from WORKBOOK.md sha256:b46e51c972da22ce45b623aaf2910e983dff3f80ff937c544d1a062e0337ba45 -->
 
 ## What it is for and who it is for
 
@@ -80,7 +80,8 @@ changed a working day and why, and "Export CSV" downloads the month.
 #### Detail
 Reached from the app's menu, "Records". A table of the working days of the chosen month: Date, Person,
 Clock-in, Clock-out, Breaks (min), Worked, Status and Location, with the actions "Correct" and "History"
-on each row; on a phone, cards. An employee sees only their own (without the Person column, with
+on each row; on a phone, cards, with each value's name before it ("Clock-in 21:01",
+"Breaks (min) 0"). An employee sees only their own (without the Person column, with
 "History"); the manager sees those of the whole team with the filters "Person" (with a search box),
 "Month" and "Status", and above the table "Clocked in now": how many people have their working day open
 and who, since what time and whether they are on a break. At the top, "Export CSV". On a narrow screen,

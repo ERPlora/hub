@@ -38,7 +38,7 @@ MADRID = ZoneInfo("Europe/Madrid")
 
 
 #: The real ``business_today``: the app's fixture fixes it for every test, before any of them runs.
-ON_THE_BUSINESSS_CLOCK = queries.business_today
+ON_THE_BUSINESSS_CLOCK = queries.resolution.business_today
 
 
 def run(name, data=None, role="hub_admin"):
@@ -430,7 +430,7 @@ def test_without_a_moment_the_line_is_priced_on_the_business_s_today():
 
 
 def test_without_a_moment_a_list_that_ends_today_applies_until_the_businesss_midnight(night_elsewhere, monkeypatch):
-    monkeypatch.setattr(queries, "business_today", ON_THE_BUSINESSS_CLOCK)
+    monkeypatch.setattr(queries.resolution, "business_today", ON_THE_BUSINESSS_CLOCK)
     product = make_product("Shampoo", "SH-1", price=1250)
     make_item(make_list("ENDS", is_default=True, valid_until=dt.date(2026, 11, 2)), product, price=777)
     line = run("pricing.price.resolve", {"product_id": str(product.id)})
@@ -786,7 +786,7 @@ def test_without_services_no_service_is_named(monkeypatch):
         raise UnknownOperation(name)
 
     haircut = make_service("Haircut")
-    monkeypatch.setattr(queries, "get", missing)
+    monkeypatch.setattr(queries.other_apps, "get", missing)
     with pytest.raises(Conflict) as caught:
         run("pricing.catalog.get", {"service_id": str(haircut.id)})
     assert caught.value.code == "pricing.services_unavailable"

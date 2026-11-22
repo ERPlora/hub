@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3f77749861819f8b136977dd661232d9f699529485eebc7f0f878bef2571c602 -->
+<!-- generated from WORKBOOK.md sha256:ebb885196720dbd35c0d741b92d6e76ef982961ce6d9563908f448b292c009b0 -->
 
 ## What it is for and who it is for
 
@@ -2026,7 +2026,8 @@ Steps:
      "Close".
   2. It shows images (whole in the viewer, never larger than the original, with "Zoom in" and "Zoom out"), PDFs (the
      first 30 pages; if it is longer, "Showing the first {shown} of {total} pages. Download the file to read it
-     all."), text, logs and code, CSV and TSV as a table, audio and video. Of a very long text, "Showing the beginning
+     all."), text, logs and code, CSV and TSV as a table (a CSV in its own columns, whether separated by commas or by
+     semicolons, as Spanish Excel saves it), audio and video. Of a very long text, "Showing the beginning
      of the file. Download it to read it all."; of a table of more than 500 rows, "Showing the first {shown} rows.
      Download the file to see them all.".
   3. A data file (.json) is shown as a tree that folds and unfolds by parts, like the browsers' JSON viewer: the first
