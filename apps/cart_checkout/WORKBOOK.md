@@ -359,11 +359,13 @@ Pasos:
    por su número.
 Entra: permiso «ver carritos» (el empleado lo tiene).
 Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en la unidad
-menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales.
+menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales. Quien creó o
+cambió por última vez un carrito o un pedido sale por su nombre o, si su cuenta no tiene, por lo que va antes de
+la @ de su correo, nunca el correo entero, también en los de antes.
 Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso»; un importe de Total que no
 se puede leer, lo que diría el campo de importe («Esto no es un importe. Escribe una cifra, por ejemplo
 12,50.», o las dos lecturas de «1.250») debajo de su caja, sin filtrar.
-Implicados: ninguno
+Implicados: BASE-F119
 
 ### CART_CHECKOUT-F13 Avisar a otras apps de lo que ocurre
 Estado: hecho
@@ -476,6 +478,11 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 
 - Modelos (`models.py`, PK UUIDv7): `Cart`, `CartItem`, `Order` y `OrderCounter` (último número por
   día). Importes en céntimos (`BigIntegerField`); cantidades `Decimal` con tres decimales, como `sale` e `inventory`.
+- **Quién actúa** (`created_by` y `updated_by` de carritos, líneas y pedidos) se guarda como lo lee un compañero:
+  `_actor` (`services.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
+  el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega
+  a quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
+  `0004_actors_without_address`, en la base de datos de cada negocio.
 - **Borrar un carrito es lógico** (`deleted_at`): sus pedidos siguen apuntándole. La sesión es única
   solo entre carritos no borrados (restricción parcial de la base). Las líneas quitadas se borran de
   verdad.

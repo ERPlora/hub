@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:233bfb3a86cd422326e2dba8b6f864937f45ac3f2ea7eaf1904b05b15a19a198 -->
+<!-- generated from WORKBOOK.md sha256:59fee1e11b29718f5f166a17070bbbd875bc8e42f961f139d69171aa77b9b9e8 -->
 
 ## What it is for and who it is for
 
@@ -480,7 +480,9 @@ Steps:
 2. Read the summary: who opened and closed, the drawer, the float, the sales by payment method, refunds,
    cash in, cash out, comps apart (they are a cost, not cash; whoever does not see the costs sees them as "—"),
    expected, counted, difference and the notes. The figures are the whole drawer's: also what a colleague
-   charged while the session was open.
+   charged while the session was open. Whoever opened, closed, counted or recorded a movement shows by their
+   name or, if their account has none, by what goes before the @ of their email, never the whole email, also in
+   earlier sessions.
 3. Go over Movements: each sale is named by its document ("Ticket …", "Invoice …"), a refund "Refund of …"
    and a void "Void of …"; a movement recorded by hand shows its concept. And go over Counts.
 4. Tap "Back".
@@ -490,7 +492,7 @@ If it fails: "Could not load the session detail" or the error of each table with
 session does not exist for whoever does not see everyone's: by its link, its number or the assistant, "That cash
 session does not exist.", like one that does not exist, and the same for its
 movements, its counts and its report.
-Involved: SALE-F28
+Involved: SALE-F28, BASE-F119
 
 ### CASH_REGISTER-F12 See the cash register on the home panels
 Status: done
@@ -590,7 +592,7 @@ Steps:
    printer prints it on paper. With the session open it is the "Partial report (X)"; closed, the "Cash
    closing (Z)".
 3. The paper carries the session number with its X or its Z, who opened it (X) or closed it (Z; "Closed by
-   itself" if it closed by itself), the float, the expected cash and, line by line, the sales by payment
+   itself" if it closed by itself), named as in the detail, the float, the expected cash and, line by line, the sales by payment
    method, refunds, cash in, cash out, comps (only if whoever prints sees the costs), the expected cash and, in
    the Z, the counted cash and the discrepancy.
 4. With Printing not on or with no active receipt printer, the device's print dialog shows with the same
