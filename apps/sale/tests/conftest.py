@@ -15,6 +15,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
+from django.test import Client
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
@@ -109,6 +110,18 @@ def make_user(db):
         return user
 
     return make
+
+
+@pytest.fixture
+def people(make_user):
+    """Ana and Bea, two employees, and Marta, the manager: each signed in on their own device."""
+    signed_in = {}
+    for username, role in (("ana", "hub_employee"), ("bea", "hub_employee"), ("marta", "hub_manager")):
+        user = make_user(username, role=role)
+        client = Client()
+        client.force_login(user)
+        signed_in[username] = (user, client)
+    return signed_in
 
 
 @pytest.fixture

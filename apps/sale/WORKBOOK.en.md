@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:da71fb417b9768d0daf2954b685edaa1479bef4a1212840303fd18ef70d21a41 -->
+<!-- generated from WORKBOOK.md sha256:ad6592580d10f66f50ba65ca2743e9f200f2a9059606a1fa244ae421004cb655 -->
 
 ## What it is for and who it is for
 
@@ -1056,7 +1056,9 @@ Steps:
    territory halfway, for example), it is called "Taxes". With no sales in the period, it carries the tax
    of the territory in **Taxes → Settings**, and changes at once if the territory is changed. With "7
    days", under the figures, what was sold on each of those days, from oldest to today ("Wed 14 ·
-   €120.50").
+   €120.50"). They are the whole business's figures for the manager, the owner and the administrator,
+   who see everyone's sales and the business totals; whoever sees the figures without those two
+   permissions sees those of their own sales, the same ones the table gives them.
 3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "€5.00 left to
    refund" if part was refunded) and Total. A sale charged with several methods shows them all under
    "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
@@ -1071,10 +1073,13 @@ Steps:
    "Recent activity" (the last eight sales the person sees, the newest on top, with their number and their
    customer) are
    added with ⋮ ("Customize panel"). They update by themselves when a sale is charged, voided or refunded,
-   without reloading. Whoever lacks the reports permission can only add "Recent activity".
+   without reloading. Whoever lacks the reports permission can only add "Recent activity". The panels
+   count by the same rule as the screen's figures: the whole business or their own sales.
 In: nothing from other apps.
 Out: nothing saved. What each professional sold in the period (Staff and the assistant ask for it for the
-commission) already takes off what was refunded: what goes back, to whoever sold it; the money that goes
+commission) counts by the same rule: whoever does not see the whole business gets only the lines of their
+own sales and, of the voucher sessions spent outside the till, those of their record. It already takes off
+what was refunded: what goes back, to whoever sold it; the money that goes
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
 Each refund counts on its sale's day and is shared out to the cent: with what nobody served, it adds up
@@ -1688,7 +1693,7 @@ the quick notes and what is refundable can be followed live.
 | See the payment methods | yes | yes | yes | yes | `sale.view_paymentmethod` |
 | Create payment methods | yes | yes | yes | no | `sale.add_paymentmethod` |
 | See everyone's sales (without it, only their own: the ones they charged and the ones attributed to them) | yes | yes | yes | no | `sale.view_all_sales` |
-| See the figures | yes | yes | yes | no | `sale.view_reports` |
+| See the figures (the whole business's, with everyone's sales and the business totals, `base.view_business_totals`; without them, those of their own sales) | yes | yes | yes | no | `sale.view_reports` |
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
