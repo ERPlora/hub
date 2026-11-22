@@ -120,7 +120,7 @@ describe('AppsPage', () => {
     ]);
   });
 
-  it('a paid app without its right offers «Upgrade plan» to whoever runs the business, and only it', async () => {
+  it('a paid app without its right offers «Upgrade plan» to the owner, and only it', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
     expect(await appActionLabel(m, 'stock', 'plans')).toBe('Upgrade plan: Stock');

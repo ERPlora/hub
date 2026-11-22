@@ -201,7 +201,7 @@ describe('the switch of an app', () => {
 describe('the plan’s limit', () => {
   const LIMIT = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
 
-  it('says so, with «Upgrade plan» for whoever runs the business on the web, and the switch goes back off', async () => {
+  it('says so, with «Upgrade plan» for the owner on the web, and the switch goes back off', async () => {
     const m = await open('/apps#all', { onApi: LIMIT });
     await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
     await flip(m, 'flow', true);
@@ -264,7 +264,7 @@ describe('the plan’s limit', () => {
 });
 
 describe('a paid app without its right', () => {
-  it('cannot be switched on: «Upgrade plan» opens erplora.com’s Store in a new tab for whoever runs the business on the web', async () => {
+  it('cannot be switched on: «Upgrade plan» opens erplora.com’s Store in a new tab for the owner on the web', async () => {
     const clicked: string[][] = [];
     const opened = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       clicked.push([this.href, this.target, this.rel]);
