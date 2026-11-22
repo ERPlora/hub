@@ -3,11 +3,10 @@
 // and the check side by side (23–24.5rem on a desktop); on a phone (narrower than 821px or 500px tall or
 // less), and wherever the till itself is narrower than both need (beside the docked assistant on a tablet), the
 // check is a drawer from the right that the cart button opens (Escape, a tap outside or Android's Back closes it). The
-// page wires the pieces:
-// the till settings, the check and its writes (`useTill`), the live check and its preview (mounted
-// only while there is one), the customer (the Customers app's search; linked to the check by
-// `customer.order.link`, read back on resuming), who serves, the sheets, the pre-bill, the checkout
-// sheet and the sale's document after a whole charge. With Services on (SALE-F38) the catalogue sells its
+// page wires the pieces: the till settings, the check and its writes (`useTill`), the live check and its preview
+// (mounted only while there is one), the customer (the Customers app's search; linked to the check by
+// `customer.order.link`, read back on resuming), who serves it (kept on the check), the sheets, the pre-bill, the
+// checkout sheet and the sale's document after a whole charge. With Services on (SALE-F38) the catalogue sells its
 // services: a fixed price goes straight to the check, any other asks its amount (ServicePriceSheet).
 // With Tables on (SALE-F19) the check's bar has «Choose table» and the heading the check's table, both
 // through Tables' operations only (Sales does not require Tables).
@@ -44,6 +43,7 @@ import TablePicker from '../components/pos/TablePicker.vue';
 import { shortTime } from '../components/pos/till';
 import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useAppOn } from '../composables/pos/useAppOn';
+import { useCheckStaff } from '../composables/pos/useCheckStaff';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
 import { useStaffNames } from '../composables/pos/useStaffNames';
 import { useSystemBack } from '../composables/pos/useSystemBack';
@@ -75,7 +75,6 @@ const loadError = computed(() => {
 // ── The check ────────────────────────────────────────────────────────────────────────────────────
 const customer = shallowRef<CustomerSnapshot | null>(null);
 const choosingCustomer = shallowRef(false);
-const staff = shallowRef<{ id: string | null; name: string | null }>({ id: null, name: null });
 const marks = shallowRef<string[]>([]);
 const preview = shallowRef<PreviewOut | undefined>();
 const previewError = shallowRef<string | null>(null);
@@ -89,7 +88,9 @@ const till = useTill({
     clearScreen();
     void loadCustomer(id);
   },
+  opening: () => serving.opening(),
 });
+const { staff, ...serving } = useCheckStaff(till);
 const order = computed(() => till.order.value);
 const lines = computed(() => order.value?.lines ?? []);
 const { names: staffNames, remember: rememberName } = useStaffNames(() => lines.value);
@@ -132,7 +133,7 @@ watch(charging, (now) => {
 /** The screen starts afresh: no check, no customer, «me» serving, nothing marked. */
 function clearScreen(): void {
   customer.value = null;
-  staff.value = { id: null, name: null };
+  serving.clear();
   marks.value = [];
 }
 
@@ -380,7 +381,7 @@ function chooseStaff(choice: { id: string | null; name: string | null }): void {
   picking.value = null;
   rememberName(choice.id, choice.name);
   if (target?.mode === 'line') void till.setLineStaff(target.line, choice.id);
-  else staff.value = choice;
+  else void serving.choose(choice);
 }
 
 // ── Parking and switching checks ─────────────────────────────────────────────────────────────────
@@ -479,8 +480,7 @@ const kitchenTickets = computed(() => kitchenActive.value && session.can('kitche
 const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
 
 async function sendRound(rush: boolean): Promise<boolean> {
-  // The ticket names who attends the check («Atiende»); with «Yo», the kitchen names who sends it.
-  const sent = await till.sendToKitchen(rush, staff.value.id ? staff.value.name : null);
+  const sent = await till.sendToKitchen(rush);
   if (sent.ok) {
     // Sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
     const notPrinted = sent.printed === false;

@@ -108,11 +108,11 @@ def test_spanish_texts_are_the_old_modules():
         )
         assert str(services.DEFAULT_SCHEDULE_NAME) == "Horario habitual"
         assert (
-            str(schemas.END_BEFORE_START)
+            str(schemas.fields.END_BEFORE_START)
             == "La fecha de fin no puede ser anterior a la de inicio."
         )
         assert (
-            str(schemas.NO_DAYS)
+            str(schemas.schedules.NO_DAYS)
             == "Un horario necesita al menos un día de trabajo con horas."
         )
 

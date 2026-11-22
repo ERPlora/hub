@@ -88,6 +88,12 @@ def _bill():
     return Subquery(Order.objects.filter(pk=OuterRef("order_id")).values("provisional_total")[:1])
 
 
+def _server():
+    """Who serves a check of Sales (its «Served by» at the till), read with the check itself; empty while nobody was
+    chosen, when it is whoever seated it."""
+    return Subquery(Order.objects.filter(pk=OuterRef("order_id")).values("staff_name")[:1])
+
+
 def _bill_requested():
     """Whether the bill of a check of Sales was printed for the table, read with the check itself."""
     return Exists(Order.objects.filter(pk=OuterRef("order_id"), bill_printed_at__isnull=False))
@@ -119,7 +125,9 @@ def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
     """The rows of ``tables`` (annotated by ``tables_now``) with their live checks and their next hold."""
     ids = [table.pk for table in tables]
     checks = defaultdict(list)
-    seated_now = live_sessions().filter(table_id__in=ids).annotate(bill=_bill(), bill_requested=_bill_requested())
+    seated_now = live_sessions().filter(table_id__in=ids).annotate(
+        bill=_bill(), bill_requested=_bill_requested(), server=_server()
+    )
     for session in seated_now.order_by("opened_at", "id"):
         checks[session.table_id].append(session)
     customers = _customers([s.order_id for group in checks.values() for s in group])
@@ -169,7 +177,7 @@ def _seated_row(seated: list[TableSession], customers: dict) -> dict:
     return {
         "guests": sum(s.guests_count for s in seated),
         "since": seated[0].opened_at,
-        "waiter_name": seated[0].waiter_name,
+        "waiter_name": seated[0].server or seated[0].waiter_name,
         "checks": [_check_row(s, customers) for s in seated],
         "amount": sum(s.bill or 0 for s in seated),
         "bill_requested": any(s.bill_requested for s in seated),
@@ -183,7 +191,7 @@ def _check_row(session: TableSession, customers: dict) -> dict:
         "order_id": session.order_id,
         "guests_count": session.guests_count,
         "opened_at": session.opened_at,
-        "waiter_name": session.waiter_name,
+        "waiter_name": session.server or session.waiter_name,
         "customer_id": customer_id,
         "customer_name": customer_name,
         "split_from_id": session.split_from_id,

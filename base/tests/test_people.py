@@ -139,12 +139,30 @@ class TestWhoIsInTheBusiness:
         assert nuria["ways"] == {"account": True, "pin": False, "badge": False}
         assert row(people(client), "saas:1")["entered"] is True
 
-    def test_the_email_only_for_who_runs_the_business(self, client, olga, eva):
-        client.force_login(olga)
-        assert row(people(client), "saas:3")["email"] == "eva@example.com"
+    def test_the_owner_and_a_manager_see_everybodys_email(self, client, olga, eva, mario):
+        for viewer in (olga, mario):
+            client.force_login(viewer)
+            answer = people(client)
+            assert [row(answer, person)["email"] for person in ("saas:1", "saas:4", "saas:3")] == [
+                "olga@example.com",
+                "mario@example.com",
+                "eva@example.com",
+            ]
+
+    def test_an_employee_sees_nobodys_email_not_even_their_own(self, client, olga, eva, mario):
         client.force_login(eva)
-        assert row(people(client), "saas:1")["email"] == ""
-        assert row(people(client), "saas:3")["email"] == "eva@example.com"
+        assert [entry["email"] for entry in people(client)["people"]] == [None, None, None]
+
+    def test_an_account_without_a_name_is_named_by_what_comes_before_its_at_never_by_its_address(
+        self, client, eva, make_user
+    ):
+        # erplora.com names an account without a name by its address: the name must not carry it to an employee.
+        make_user("saas:6", host=A.key, role=Membership.Role.EMPLOYEE, first_name="nora@example.com", email="nora@example.com")
+        photo(members=[{"user_id": "7", "role": "hub_employee", "email": "pau@example.com", "name": "pau@example.com"}])
+        client.force_login(eva)
+        answer = people(client)
+        assert (row(answer, "saas:6")["name"], row(answer, "saas:7")["name"]) == ("nora", "pau")
+        assert "@" not in json.dumps(answer)
 
     def test_the_name_is_the_one_of_my_profile_in_this_business(self, client, olga, eva):
         from base.models import Profile

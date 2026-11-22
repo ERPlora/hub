@@ -16,7 +16,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
-from apps.staff.schemas import BREAK_INSIDE, TIME_ORDER
+from apps.staff.schemas.fields import TIME_ORDER
+from apps.staff.schemas.schedules import BREAK_INSIDE
 
 
 class Role(UUIDModel):
