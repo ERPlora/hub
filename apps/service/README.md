@@ -56,7 +56,7 @@ categorías, reacciones) están en «Para quien lo mantiene» del WORKBOOK; las 
 
 ```bash
 cd hub   # o tu worktree
-TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/service apps/sale/tests/test_integration_service.py \
+TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/service apps/sale/tests/test_integration_service*.py \
   apps/appointment/tests/test_integration_service.py apps/pricing/tests/test_integration_service.py
 pnpm test apps/service apps/sale/frontend/components/checkout
 pnpm e2e tests/e2e/service-flows.spec.ts tests/e2e/service-catalog.spec.ts tests/e2e/service-vouchers.spec.ts \
