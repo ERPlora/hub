@@ -82,6 +82,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
       <HelpFlowList
         :help="help"
         :current="current"
+        :icon="icon"
         @expand="emit('expand', $event)"
         @go="emit('go', $event)"
       />
