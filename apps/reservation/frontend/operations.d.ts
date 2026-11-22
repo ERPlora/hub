@@ -91,8 +91,8 @@ export interface ReservationOut {
   customer_id: string | null;
   /** Empty once the customer's data was erased («Deleted customer»). */
   guest_name: string;
-  guest_phone: string;
-  guest_email: string;
+  guest_phone: string | null;
+  guest_email: string | null;
   date: string;
   time: string;
   end_time: string;
@@ -306,8 +306,8 @@ export interface WaitlistOut {
   id: string;
   customer_id: string | null;
   guest_name: string;
-  guest_phone: string;
-  guest_email: string;
+  guest_phone: string | null;
+  guest_email: string | null;
   date: string;
   preferred_time: string;
   party_size: number;

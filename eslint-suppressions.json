@@ -280,7 +280,7 @@
   },
   "apps/reservation/frontend/components/ReservationFormModal.vue": {
     "complexity": {
-      "count": 2
+      "count": 1
     }
   },
   "apps/reservation/frontend/composables/useServerTable.ts": {
