@@ -10,7 +10,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TaskOut } from '../operations';
-import { EMPLOYEE, flush, ionValue, mountTask, type MountOptions, page } from '../__tests__/mount-task';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  EMPLOYEE,
+  flush,
+  ionValue,
+  itPaintsTheTabsItsSessionOpens,
+  type MountOptions,
+  mountTask,
+  page,
+} from '../__tests__/mount-task';
 import { itKeepsTheFiltersBehindTheFunnel } from '../__tests__/filters-funnel';
 import { task } from '../__tests__/task';
 import TaskFormModal from '../components/TaskFormModal.vue';
@@ -254,4 +263,8 @@ describe('TasksPage: the list fills the page', () => {
     expect(s.prop('testid')).toBe('task-mine');
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('TasksPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(EMPLOYEE, 1) }), [['tasks', 'Tasks']]);
 });

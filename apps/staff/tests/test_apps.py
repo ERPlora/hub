@@ -1,9 +1,6 @@
 """The staff app declares its module metadata, its menu entries, its permissions, what each role gets,
 the assistant's contract of every operation (``ai`` and described input fields), its help and its panels of the Home."""
 
-import re
-from pathlib import Path
-
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
@@ -154,15 +151,9 @@ def test_every_granted_permission_is_declared():
             )
 
 
-def tabbar() -> list[tuple[str, str]]:
-    """The id and route of each tab of the staff tab bar, Settings included, as the frontend declares them."""
-    source = (Path(staff().path) / "frontend" / "tabs.ts").read_text(encoding="utf-8")
-    return re.findall(r"\{ id: '(\w+)'.*? to: '([^']+)' \}", source)
-
-
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
-    # The help window and the menu's highlight follow these entries, so they are the tab bar's sections, each with the
-    # permission that opens it. The first one is the app's entry and its people icon the launcher's
+    # The tab bar, the help window and the menu's highlight follow these entries, each with the permission that opens
+    # it. The first one is the app's entry and its people icon the launcher's
     # (base.home.shell_icon).
     entries = staff().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
@@ -174,15 +165,16 @@ def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
         ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline", "staff.view_compensation"),
         ("settings", "Settings", "/staff/settings", "ion:settings-outline", "staff.manage_settings"),
     ]
-    assert [(entry.id, entry.path) for entry in entries] == tabbar()
     assert home.shell_icon(staff()) == "ion:people-outline"
     shell = shell_icon_registry()
     for entry in entries:
         assert f"'{entry.icon.removeprefix('ion:')}':" in shell, entry.icon
 
 
-def test_the_help_window_s_tabs_are_the_tab_bar_s():
-    assert [(tab.id, tab.path) for tab in app_help.tabs_of(staff())] == tabbar()
+def test_the_help_window_s_tabs_are_the_menu_s_entries():
+    assert [(tab.id, tab.path) for tab in app_help.tabs_of(staff())] == [
+        (entry.id, entry.path) for entry in staff().navigation
+    ]
 
 
 def test_its_help_window_is_ready_without_a_video_yet():

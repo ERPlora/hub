@@ -18,7 +18,9 @@ import { useLocale, useT } from '../composables/useT';
 import { environmentTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { DiagnosticOut } from '../operations';
-import { verifactuTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('verifactu');
 
 const session = useSession();
 const canConfigure = computed(() => session.can('verifactu.configure'));
@@ -141,7 +143,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 <template>
   <AppPage
     :title="$t('verifactu.settings.title')"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
     content-layout="detail"
   >

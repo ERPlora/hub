@@ -9,11 +9,7 @@
     "retry": "Reintentar",
     "cancelButton": "Cancelar",
     "tabs": {
-      "label": "Secciones de reservas",
-      "reservations": "Reservas",
-      "waitlist": "Lista de espera",
-      "availability": "Disponibilidad",
-      "settings": "Ajustes"
+      "label": "Secciones de reservas"
     },
     "live": {
       "reconnecting": "Reconectando…",

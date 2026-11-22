@@ -36,12 +36,8 @@ describe('table catalogues (en source + es)', () => {
     for (const status of ['open', 'closed', 'transferred', 'merged', 'parked']) expect(EN.has(`table.sessionStatus.${status}`), status).toBe(true);
   });
 
-  it('keep the old screens’ words: tabs, columns, searches, empty states, buttons', () => {
+  it('keep the old screens’ words: columns, searches, empty states, buttons', () => {
     expectWords(CATALOGUES, [
-      ['table.tabs.floor_plan', 'Floor plan', 'Plano de sala'],
-      ['table.tabs.zones', 'Zones', 'Zonas'],
-      ['table.tabs.tables', 'Tables', 'Mesas'],
-      ['table.tabs.sessions', 'Sessions', 'Sesiones'],
       ['table.floor.hint', 'Drag to position · tap a table to edit or delete it. Changes are saved instantly.', 'Arrastra para colocar · toca una mesa para editarla o borrarla. Los cambios se guardan al momento.'],
       ['table.floor.emptyZones', 'Create a zone to start placing tables.', 'Crea una zona para empezar a colocar mesas.'],
       ['table.floor.emptyTables', 'No tables in this zone. Tap “Add table”.', 'Sin mesas en esta zona. Pulsa «Añadir mesa».'],

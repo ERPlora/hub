@@ -18,10 +18,8 @@ describe('task catalogues (en source + es)', () => {
     for (const priority of ['low', 'medium', 'high', 'urgent']) expect(EN.has(`task.priority.${priority}`), priority).toBe(true);
   });
 
-  it('keep the old screens’ words: tabs, columns, searches, empty states, buttons', () => {
+  it('keep the old screens’ words: columns, searches, empty states, buttons', () => {
     expectWords(CATALOGUES, [
-      ['task.tabs.tasks', 'Tasks', 'Tareas'],
-      ['task.tabs.projects', 'Projects', 'Proyectos'],
       ['task.views.all', 'All', 'Todas'],
       ['task.views.mine', 'My tasks', 'Mis tareas'],
       ['task.columns.number', 'No.', 'Nº'],

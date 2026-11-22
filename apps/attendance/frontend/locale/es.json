@@ -2,10 +2,7 @@
   "attendance": {
     "title": "Control horario",
     "tabs": {
-      "label": "Secciones del control horario",
-      "clock": "Fichar",
-      "records": "Registros",
-      "settings": "Ajustes"
+      "label": "Secciones del control horario"
     },
     "live": {
       "reconnecting": "Reconectando…",

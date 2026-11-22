@@ -24,7 +24,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { STATUS_TONE } from '../lib/floor';
 import type { TableListIn, TableOut, TableStatus } from '../operations';
-import { tableTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('table');
 
 const STATUSES: readonly TableStatus[] = ['available', 'occupied', 'reserved', 'blocked'];
 
@@ -125,7 +127,7 @@ function onAction({ actionId, row }: { actionId: string; row: TableOut }): void 
   <AppPage
     :title="$t('table.title')"
     content-layout="fill"
-    :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('table.tabs.label')"
   >
     <PageNotices

@@ -29,7 +29,9 @@ import { formatDate } from '../lib/format';
 import { AEAT_STATES, short } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { AeatRecordListIn, AeatRecordOut } from '../operations';
-import { verifactuTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('verifactu');
 
 const HASH = /^[0-9a-fA-F]{64}$/;
 
@@ -158,7 +160,7 @@ async function continueManually(): Promise<void> {
 <template>
   <AppPage
     :title="$t('verifactu.recovery.title')"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
     content-layout="detail"
   >

@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { type BusinessMountOptions, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
@@ -19,25 +20,25 @@ export const VERIFACTU_PERMISSIONS = [
 ];
 
 /** The owner (and the admin): every permission of the app. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('verifactu', {
   user: { id: 'u1', label: 'Ana' },
   permissions: [...VERIFACTU_PERMISSIONS, 'invoice.view_invoice', 'invoice.add_invoice'],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** The manager: watches and pushes the queue; no correcting, cancelling nor configuring. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('verifactu', {
   ...OWNER,
   permissions: ['verifactu.view_record', 'verifactu.add_record', 'verifactu.transmit_record', 'invoice.view_invoice'],
-};
+});
 
 /** The employee: looks. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('verifactu', {
   ...OWNER,
   permissions: ['verifactu.view_record', 'verifactu.add_record', 'invoice.view_invoice'],
-};
+});
 
 /** What a test mounts a screen with; Records reads its total in the business's money, so a test can say how the
  *  business answers. */

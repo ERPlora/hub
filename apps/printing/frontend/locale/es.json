@@ -2,11 +2,7 @@
   "printing": {
     "title": "Impresión",
     "tabs": {
-      "label": "Secciones de Impresión",
-      "printers": "Impresoras",
-      "devices": "Dispositivos",
-      "jobs": "Cola",
-      "settings": "Ajustes"
+      "label": "Secciones de Impresión"
     },
     "usage": {
       "receipt": "Recibo",

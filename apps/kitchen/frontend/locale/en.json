@@ -16,12 +16,7 @@
       "retry": "Retry"
     },
     "tabs": {
-      "label": "Kitchen sections",
-      "display": "Display",
-      "tickets": "Tickets",
-      "stations": "Stations",
-      "history": "History",
-      "settings": "Settings"
+      "label": "Kitchen sections"
     },
     "status": {
       "pending": "To prepare",

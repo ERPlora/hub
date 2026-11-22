@@ -35,9 +35,6 @@ describe('schedule catalogues (en source + es)', () => {
   });
 
   it('keep the old screens’ words', () => {
-    expect(ES.get('schedule.tabs.hours')).toBe('Horario');
-    expect(ES.get('schedule.tabs.special_days')).toBe('Días especiales');
-    expect(ES.get('schedule.tabs.settings')).toBe('Ajustes');
     expect(ES.get('schedule.notSet')).toBe('Sin definir');
     expect(ES.get('schedule.open24h')).toBe('Abierto 24 horas');
     expect(ES.get('schedule.hours.defaultWeek.confirm')).toBe('Sí, este es mi horario');

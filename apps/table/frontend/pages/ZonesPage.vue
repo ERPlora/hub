@@ -22,7 +22,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { ZoneColor, ZoneListIn, ZoneOut } from '../operations';
-import { tableTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('table');
 
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
 
@@ -113,7 +115,7 @@ function onAction({ actionId, row }: { actionId: string; row: ZoneOut }): void {
   <AppPage
     :title="$t('table.title')"
     content-layout="fill"
-    :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('table.tabs.label')"
   >
     <PageNotices

@@ -9,11 +9,7 @@
     "retry": "Retry",
     "cancelButton": "Cancel",
     "tabs": {
-      "label": "Reservation sections",
-      "reservations": "Reservations",
-      "waitlist": "Waitlist",
-      "availability": "Availability",
-      "settings": "Settings"
+      "label": "Reservation sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

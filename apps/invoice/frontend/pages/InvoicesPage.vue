@@ -33,7 +33,9 @@ import { amountFilterErrors, formatDate, formatMoney, moneyOf, useBusinessMoney 
 import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
 import { filterQuery, filtersInUse, reversedDates, TOTAL_ENDS } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
-import { invoiceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('invoice');
 
 const session = useSession();
 const canAdd = computed(() => session.can('invoice.add_invoice'));
@@ -161,7 +163,7 @@ function onAction({ actionId, row }: { actionId: string; row: InvoiceRowOut }): 
   <AppPage
     :title="$t('invoice.title')"
     content-layout="fill"
-    :tabs="invoiceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('invoice.tabs.label')"
   >
     <PageNotices
