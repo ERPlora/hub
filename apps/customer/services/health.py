@@ -11,7 +11,7 @@ from apps.customer import events
 from apps.customer.models import Activity, Consent, Customer, HealthRecord
 from apps.customer.queries import find_customer, HEALTH_PURPOSE, health_consent, load_health
 from apps.customer.schemas import HealthGrantIn, HealthIn, HealthOut, HealthWithdrawIn
-from apps.customer.services.writes import CLOCK_SKEW, DATE_IN_FUTURE, _actor, _changes
+from apps.customer.services.writes import DATE_IN_FUTURE, _actor, _changes, _occurred_at
 from base.business import business_zone
 
 HEALTH_CONSENT_REQUIRED = _("Record their permission first to keep health data.")
@@ -26,13 +26,7 @@ def _health_fact(
     ctx: OperationContext, data, customer: Customer, state: str
 ) -> Consent:
     now = timezone.now()
-    occurred_at = getattr(data, "occurred_at", None) or now
-    if occurred_at > now + CLOCK_SKEW:
-        raise InvalidPayload(
-            DATE_IN_FUTURE,
-            code="customer.date_in_future",
-            fields={"occurred_at": DATE_IN_FUTURE},
-        )
+    occurred_at = _occurred_at(getattr(data, "occurred_at", None), now)
     granted = state == Consent.State.GRANTED
     fact = Consent.objects.create(
         customer=customer,

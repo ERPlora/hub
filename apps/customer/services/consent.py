@@ -2,7 +2,6 @@
 
 from django.utils import timezone
 from live.context import OperationContext
-from live.errors import InvalidPayload
 from live.operations import AI, operation
 from live.outbox import record_event
 
@@ -10,7 +9,7 @@ from apps.customer import events
 from apps.customer.models import Activity, Consent, Customer
 from apps.customer.queries import find_customer
 from apps.customer.schemas import ConsentGrantIn, ConsentRow, ConsentWithdrawIn
-from apps.customer.services.writes import CLOCK_SKEW, DATE_IN_FUTURE, _actor
+from apps.customer.services.writes import _actor, _occurred_at
 
 
 def _contact_point(customer: Customer, channel: str) -> str:
@@ -28,13 +27,7 @@ def _contact_point(customer: Customer, channel: str) -> str:
 def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
     customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     now = timezone.now()
-    occurred_at = data.occurred_at or now
-    if occurred_at > now + CLOCK_SKEW:
-        raise InvalidPayload(
-            DATE_IN_FUTURE,
-            code="customer.date_in_future",
-            fields={"occurred_at": DATE_IN_FUTURE},
-        )
+    occurred_at = _occurred_at(data.occurred_at, now)
     granted = state == Consent.State.GRANTED
     fact = Consent.objects.create(
         customer=customer,

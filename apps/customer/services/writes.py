@@ -1,7 +1,7 @@
-"""What every write of the customer app shares: who acts, a phone as kept, what a write changes, the locks on
-cards, groups, tags and fields, and a name already taken among the active ones."""
+"""What every write of the customer app shares: who acts, a phone as kept, what a write changes, when a consent
+fact happened, the locks on cards, groups, tags and fields, and a name already taken among the active ones."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from django.db import IntegrityError
@@ -50,6 +50,19 @@ def _changes(instance, sent: dict) -> dict:
         for field, value in sent.items()
         if getattr(instance, field) != value
     }
+
+
+def _occurred_at(sent: datetime | None, now: datetime) -> datetime:
+    """When a consent fact happened: the moment sent or, without one, ``now``; one further ahead of ``now`` than
+    ``CLOCK_SKEW`` is refused."""
+    occurred_at = sent or now
+    if occurred_at > now + CLOCK_SKEW:
+        raise InvalidPayload(
+            DATE_IN_FUTURE,
+            code="customer.date_in_future",
+            fields={"occurred_at": DATE_IN_FUTURE},
+        )
+    return occurred_at
 
 
 def _save_named(instance, message, code: str) -> None:
