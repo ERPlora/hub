@@ -99,7 +99,7 @@ describe('ResetPanel', () => {
     // Undoing an import is still theirs, and what each section has is never asked for them.
     await m.wrapper.get(`[data-testid="undo-${load().id}"]`).trigger('click');
     await settle();
-    dialog(m as Awaited<ReturnType<typeof panel>>, 'undo-confirm').vm.$emit('confirm');
+    m.wrapper.findAllComponents(ConfirmDialog).find((d) => d.props('testid') === 'undo-confirm')!.vm.$emit('confirm');
     await settle();
     expect(sent.map((call) => call.url)).toEqual(['/api/settings/data/imports/undo']);
   });

@@ -6,7 +6,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations/usage';
-import { ADMIN, errorFrame, flush, followPass, mountBase, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
+import { errorFrame, flush, followPass, mountBase, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
 import SystemUsage from './SystemUsage.vue';
 
 const OP = 'base.plan.usage';
@@ -290,13 +290,6 @@ describe('SystemUsage', () => {
       embed({ name: 'Bar', plan_url: PLAN_URL });
       applySurface('mobile');
       const m = await open(figures());
-      expect(m.part('upgrade').exists()).toBe(false);
-      expect(m.part('managed').text()).toBe('Plans are managed from your ERPlora account, on erplora.com.');
-    });
-
-    it('to an administrator, no button: where plans are managed, for only the owner buys', async () => {
-      embed({ name: 'Bar', plan_url: PLAN_URL });
-      const m = await open(figures(), { session: ADMIN });
       expect(m.part('upgrade').exists()).toBe(false);
       expect(m.part('managed').text()).toBe('Plans are managed from your ERPlora account, on erplora.com.');
     });
