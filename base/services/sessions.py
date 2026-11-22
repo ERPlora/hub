@@ -29,7 +29,7 @@ from live.outbox import notify
 from base import access, queries
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
-from base.middleware import PLATFORM_SESSION_HOST, session_host
+from base.session_host import PLATFORM_SESSION_HOST, session_host
 from base.models import Hub, HubUser, Membership, SessionOwner, TrustedDevice
 from base.registry import internal_only
 from base.schemas.sessions import HubUserSyncIn, HubUserSyncOut, SessionRevokeIn, SessionRevokeOut

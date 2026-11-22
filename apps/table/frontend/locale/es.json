@@ -70,7 +70,8 @@
       "planLabel": "Plano de mesas. Usa las flechas para desplazarlo.",
       "add": "Añadir zona o mesa",
       "editZone": "Editar zona",
-      "hint": "Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.",
+      "hint": "Arrastra para colocar · toca una mesa para editarla o borrarla. Los cambios se guardan al momento.",
+      "serviceHint": "Toca una mesa para sentarla o abrir su cuenta · mantenla pulsada (o haz clic derecho) para transferir, fusionar y más.",
       "emptyZones": "Crea una zona para empezar a colocar mesas.",
       "emptyTables": "Sin mesas en esta zona. Pulsa «Añadir mesa».",
       "emptyService": "Sin mesas en servicio en esta zona.",
@@ -264,7 +265,6 @@
       "reservation": "Reserva",
       "actions": {
         "label": "Opciones de mesa",
-        "charge": "Cobrar",
         "transfer": "Transferir",
         "merge": "Fusionar",
         "split": "Dividir cuenta",

@@ -171,6 +171,26 @@ describe('FloorCanvas', () => {
     expect(c.tile('t1').style.left).toBe(left);
   });
 
+  it('in Service a long press, a right click or the menu key asks for a table’s actions, not the browser’s menu', async () => {
+    const menu = (el: Element) => {
+      const press = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      el.dispatchEvent(press);
+      return press.defaultPrevented;
+    };
+    const asked = (c: Awaited<ReturnType<typeof canvas>>) => (c.wrapper.emitted('actions') ?? []).map(([table]) => (table as TableOut).id);
+    const c = await canvas();
+    expect(menu(c.button('t2'))).toBe(true);
+    expect(asked(c)).toEqual(['t2']);
+    expect(c.selected()).toEqual([]);
+    // Picking a destination, only a tap answers; editing the plan, the press is the browser's.
+    const picking = await canvas({ pick: () => true });
+    expect(menu(picking.button('t1'))).toBe(true);
+    expect(asked(picking)).toEqual([]);
+    const editing = await canvas({ editable: true });
+    expect(menu(editing.button('t1'))).toBe(false);
+    expect(asked(editing)).toEqual([]);
+  });
+
   it('in Edit plan a table is dragged to its place, shows there at once and says so', async () => {
     const c = await canvas({ editable: true });
     await c.pointer(c.tile('t1'), 'pointerdown', 20, 20);

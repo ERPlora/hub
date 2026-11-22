@@ -98,7 +98,7 @@
     },
     "presence": {
       "title": "Fichados ahora",
-      "count": "{n} fichados",
+      "count": "{n} fichado | {n} fichados",
       "since": "desde las {time}",
       "onBreak": "En pausa",
       "empty": "Ahora mismo no hay nadie fichado.",

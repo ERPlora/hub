@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatDay,
+  formatDayTime,
   formatHm,
   formatHms,
   formatTime,
   liveSeconds,
   localDate,
-  localDateTime,
   monthBounds,
   monthLabel,
   monthOf,
@@ -30,7 +30,7 @@ describe("the business's zone (hub#779)", () => {
     expect(formatTime(NIGHT, CANARY)).toBe('23:30');
     expect(formatTime(NIGHT, MADRID)).toBe('00:30');
     expect(localDate(NIGHT, CANARY)).toBe('2026-11-02');
-    expect(localDateTime(NIGHT, CANARY)).toBe('2026-11-02 23:30');
+    expect(formatDayTime(NIGHT, 'es', CANARY)).toBe('lun, 2 nov · 23:30');
     expect(toLocalInput(NIGHT, CANARY)).toBe('2026-11-02T23:30');
     expect(monthOf(Date.parse('2026-10-31T23:30:00Z'), CANARY)).toBe('2026-10');
     expect(monthOf(Date.parse('2026-10-31T23:30:00Z'), MADRID)).toBe('2026-11');
@@ -94,8 +94,13 @@ describe('days', () => {
     expect(timeOfDay(null, '2026-10-05', 'en', MADRID)).toBe('—');
   });
 
-  it('localDateTime is the history’s and the CSV’s form', () => {
-    expect(localDateTime('2026-10-05T07:02:41Z', MADRID)).toBe('2026-10-05 09:02');
+  it('formatDayTime is the business day and time of an instant, as the rest of the screen writes them (hub#2045)', () => {
+    expect(formatDayTime('2026-11-21T20:00:00Z', 'es', MADRID)).toBe('sáb, 21 nov · 21:00');
+    expect(formatDayTime('2026-11-21T20:00:00Z', 'en', MADRID)).toBe('Sat, Nov 21 · 21:00');
+    // 23:30 UTC on the 2nd is still the 2nd in the Canaries and already the 3rd in Madrid.
+    expect(formatDayTime('2026-11-02T23:30:00Z', 'es', CANARY)).toBe('lun, 2 nov · 23:30');
+    expect(formatDayTime('2026-11-02T23:30:00Z', 'es', MADRID)).toBe('mar, 3 nov · 00:30');
+    expect(formatDayTime(null, 'es', MADRID)).toBe('—');
   });
 
   it('toLocalInput fills a datetime-local field in business time', () => {
