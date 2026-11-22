@@ -7,11 +7,13 @@ does not see does not exist for them: the same 404 as an unknown one.
 Over HTTP, as the screens, the assistant and the API ask, with two employees and a manager of the same business.
 """
 
+import dataclasses
 import json
 
 import pytest
 from django.test import Client
 from live.context import system_context
+from live.errors import NotFound
 from live.meta import all_live_app_configs, permissions_for_role
 
 from apps.invoice.models import Invoice
@@ -129,6 +131,21 @@ class TestAnEmployeeReachesOnlyTheirOwnInvoices:
         assert not Invoice.objects.filter(substitutes_id=invoices["bea"]["ticket"]["id"]).exists()
         own = post(ana, "/invoice/invoices/substitute", {**full, "invoice_id": invoices["ana"]["ticket"]["id"]})
         assert (own.status_code, own.json()["issued"]) == (200, True), own.content
+
+    def test_a_permission_to_rectify_does_not_reach_someone_elses_either(self, people, invoices):
+        # What a role that rectifies without «See all invoices» opens is rectifying theirs, never everyone's.
+        rectifier = dataclasses.replace(
+            ctx_for("hub_employee", actor=people["ana"][0]),
+            permissions=ctx_for("hub_employee").permissions | {"invoice.rectify_invoice"},
+        )
+        theirs = {"number": invoices["bea"]["manual"]["number"], "reason": "Wrong customer"}
+        with pytest.raises(NotFound):
+            run("invoice.invoice.rectification_preview", theirs, rectifier)
+        with pytest.raises(NotFound):
+            run("invoice.invoice.rectify", theirs, rectifier)
+        assert Invoice.objects.get(pk=invoices["bea"]["manual"]["id"]).status == Invoice.Status.ISSUED
+        own = run("invoice.invoice.rectify", {**theirs, "number": invoices["ana"]["manual"]["number"]}, rectifier)
+        assert own.issued is True
 
 
 class TestTheDocumentsOfTheirSales:

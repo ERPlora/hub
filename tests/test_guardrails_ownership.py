@@ -295,6 +295,13 @@ def test_a_read_under_another_name_in_another_apps_queries_file_is_caught(tmp_pa
     assert unscoped_reads(root) == {("apps/shop/queries.py", "peek"), ("apps/sale/queries/other.py", "peek")}
 
 
+def test_a_planted_read_of_an_invoice_is_caught(tmp_path):
+    declared = "from apps.invoice.models import Invoice\nfrom base.queries.ownership import Owned\n\nINVOICES = Owned(Invoice)\n"
+    peek = "from ..models import Invoice\n\n\ndef peek():\n    return Invoice.objects.filter(status='paid')\n"
+    root = tree_with(tmp_path, {"apps/invoice/queries/ownership.py": declared, "apps/invoice/queries/peek.py": peek})
+    assert unscoped_reads(root) == {("apps/invoice/queries/peek.py", "peek")}
+
+
 def test_the_declaration_a_services_door_and_another_model_called_alike_are_not_reads(tmp_path):
     root = tree_with(
         tmp_path,
