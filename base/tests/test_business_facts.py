@@ -145,3 +145,17 @@ def test_each_business_reads_its_hours_on_its_own_clock(hub_a, hub_b):
     registered(hub_b, zone="America/Mexico_City")
     assert read_items(hub_a)["rows"][0]["updated_at"] == "2026-11-22T16:18:00+01:00"
     assert read_items(hub_b)["rows"][0]["updated_at"] == "2026-11-22T09:18:00-06:00"
+
+
+def test_what_a_write_gives_back_after_the_yes_is_on_the_business_clock_too(in_business_a):
+    registered(in_business_a, zone="America/Mexico_City")
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    drawn = turn_of(in_business_a, messages=[ASK, asked(write)], pending=[write])
+    yes = turn_of(
+        in_business_a,
+        messages=[ASK, asked(write)],
+        pending=drawn["pending"],
+        decision={"call_id": "c1", "accepted": True},
+    )
+    [result] = yes["append"]
+    assert json.loads(result["content"])["updated_at"].endswith("-06:00")
