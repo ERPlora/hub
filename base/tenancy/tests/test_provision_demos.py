@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from base import services
 from base.tenancy import connections as tenancy_connections, names, ops, provision
-from base.tenancy.tests.s3 import (
+from base.tenancy.tests.s3 import (  # noqa: F401
     aws_test_credentials,
     hub_files_bucket,
     hub_files_entry,
@@ -20,8 +20,8 @@ from base.tenancy.tests.s3 import (
 from base.tenancy.tests.test_provision import databases, fresh, nothing_checked_yet
 from control.models import Hub, HubDue
 
-#: The provisioning tests' own autouse fixture and the file store these tests ask for.
-__all__ = ["aws_test_credentials", "hub_files_bucket", "moto_s3", "nothing_checked_yet"]
+#: The provisioning tests' own autouse fixture.
+__all__ = ["nothing_checked_yet"]
 
 
 def worked_on(monkeypatch) -> list:
