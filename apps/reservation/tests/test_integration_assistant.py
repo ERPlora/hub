@@ -246,6 +246,17 @@ def test_removing_a_slot_or_unblocking_a_date_names_it_as_its_list_does(language
 
 
 @HUB_DB
+@pytest.mark.parametrize(("language", "friday", "thursday"), [("es", "Viernes", "Jueves"), ("en", "Friday", "Thursday")])
+def test_a_slot_said_by_its_weekday_names_the_day_as_the_slots_list_does(language, friday, thursday):
+    """RESERVATION-F01 asked to the assistant: «Crear en Reservas: Viernes · 13:00 · 16:00», never «4 · 13:00 · 16:00»;
+    removing one said by its weekday and start names the day too."""
+    lunch = {"day_of_week": 4, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10, "max_covers": 40}
+    assert values(card_for("reservation.time_slot.create", lunch, language))["day_of_week"] == friday
+    dinner = {"day_of_week": 3, "start_time": "20:00"}
+    assert values(card_for("reservation.time_slot.delete", dinner, language))["day_of_week"] == thursday
+
+
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "reservation", "slot", "blocked", "entry"),
     [
