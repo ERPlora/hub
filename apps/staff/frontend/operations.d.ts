@@ -147,8 +147,8 @@ export interface MemberOut {
   first_name: string;
   last_name: string;
   full_name: string;
-  email: string;
-  phone: string;
+  email: string | null; // null for whoever does not see the team's contact details
+  phone: string | null; // null for whoever does not see the team's contact details
   employee_number: string;
   role_id: string | null;
   role_name: string | null;
