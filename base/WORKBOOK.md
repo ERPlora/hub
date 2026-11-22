@@ -3970,7 +3970,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   registro, con su huso) van juntos en ese reloj, porque llegan a un registro fiscal (lo congela
   `tests/test_guardrails_fiscal_clock.py`). Solo Ajustes › Negocio del hub de plataforma dice a propósito la zona del
   despliegue.
-- **Acceso (BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
+- **Acceso (BASE-F52…F71).** Modelos de hub en el paquete `base/models/`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
   `Credential` (por `username`: `pin_hash` argon2id y `badge_digest` = HMAC-SHA256 del número con
