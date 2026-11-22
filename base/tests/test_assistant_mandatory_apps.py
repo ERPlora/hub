@@ -4,7 +4,10 @@ card of turning one on says it with the reason the Apps screen gives, and the de
 point the model at that datum, so it warns before the yes instead of saying it can be turned off later.
 """
 
+from pathlib import Path
+
 import pytest
+from django.apps import apps
 from django.utils import translation
 from live.assistant import description
 from live.operations import get
@@ -12,7 +15,9 @@ from live.operations import get
 from base import activation
 from base.business import country_name
 from base.models import Hub
+from base.services.apps import ONCE_ON
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests.po import catalogue_key, po_entries, untranslated
 from base.tests.test_services_assistant import call, run, turn
 
 __all__ = ["in_business_a"]
@@ -66,3 +71,10 @@ def test_the_descriptions_of_apps_point_the_model_at_the_datum_that_says_an_app_
     said = description(get(name))
     assert "mandatory" in said
     assert "base.app.get" in said or name == "base.app.get"
+
+
+def test_the_cards_word_for_that_reason_has_its_spanish():
+    po = Path(apps.get_app_config("base").path) / "locale" / "es" / "LC_MESSAGES" / "django.po"
+    key = catalogue_key(ONCE_ON)
+    assert key in po_entries(po)
+    assert key not in untranslated(po)
