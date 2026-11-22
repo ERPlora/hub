@@ -103,7 +103,8 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(["d", "d", 0], [ecs_common.otherwise(None, "d"), ecs_common.otherwise(False, "d"),
                                          ecs_common.otherwise(0, "d")])
         self.assertEqual(['{"ñ":[1]}', "s"], [ecs_common.text({"ñ": [1]}), ecs_common.text("s")])
-        self.assertEqual(['{\n  "ñ": [\n    1\n  ]\n}', "s"], [ecs_common.written({"ñ": [1]}), ecs_common.written("s\n")])
+        self.assertEqual(['{\n  "ñ": [\n    1\n  ]\n}', "s"],
+                         [ecs_common.written({"ñ": [1]}), ecs_common.written("s\n")])
 
     def test_a_revision_of_its_environment_has_its_tag_and_both_roles(self):
         self.assertTrue(ecs_common.of_its_environment([revision()], release()))
@@ -118,7 +119,8 @@ class ReadTest(unittest.TestCase):
         said = io.StringIO()
         with redirect_stderr(said), self.assertRaises(ecs_common.Stop):
             ecs_common.refuse_another_environment(found, "erplora-prod-hub", release(), "; nothing was changed")
-        self.assertEqual(f"::error::erplora-prod-hub is no revision of prod (Environment=pre, task role {ROLE}/erplora-pre-"
-                         f"hub-task, execution role {ROLE}/erplora-pre-hub-execution); nothing was changed\n",
+        self.assertEqual(f"::error::erplora-prod-hub is no revision of prod (Environment=pre, task role "
+                         f"{ROLE}/erplora-pre-hub-task, execution role {ROLE}/erplora-pre-hub-execution); nothing was "
+                         "changed\n",
                          said.getvalue())
         self.assertIsNone(ecs_common.refuse_another_environment([revision()], "erplora-prod-hub", release(), ""))

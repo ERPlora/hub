@@ -18,7 +18,8 @@ def changed(environment, name, **settings):
 class SettingsTest(RollbackCase):
     def test_the_settings_are_checked_before_any_service_moves(self):
         self.assertEqual(0, self.rollback())
-        self.assertLess(self.line_of("ssm get-parameter --name /erplora/prod/hub/app_env "), self.line_of("update-service"))
+        self.assertLess(self.line_of("ssm get-parameter --name /erplora/prod/hub/app_env "),
+                        self.line_of("update-service"))
         self.assertLess(self.line_of("describe-task-definition --task-definition erplora-prod-saas "),
                         self.line_of("update-service"))
 
@@ -31,7 +32,8 @@ class SettingsTest(RollbackCase):
 
     def test_revisions_that_run_other_settings_replace_the_ones_in_force(self):
         for name in ("hub", "worker"):
-            self.revision(f"erplora-prod-{name}:10", settings=changed("prod", name, VERIFACTU_ERPLORA_ROUTE_ENABLED="false"))
+            settings = changed("prod", name, VERIFACTU_ERPLORA_ROUTE_ENABLED="false")
+            self.revision(f"erplora-prod-{name}:10", settings=settings)
         self.assertEqual(0, self.rollback())
         self.assertEqual("false", self.recorded_settings()["worker"]["VERIFACTU_ERPLORA_ROUTE_ENABLED"])
 
@@ -79,6 +81,7 @@ class LockTest(RollbackCase):
         self.write("erplora_prod_hub_app_env.json", APP_ENV["prod"])
         self.saas_charging("true")
         for name in ("hub", "worker"):
-            self.revision(f"erplora-prod-{name}:10", settings=changed("prod", name, VERIFACTU_PRODUCTION_ENABLED="false"))
+            settings = changed("prod", name, VERIFACTU_PRODUCTION_ENABLED="false")
+            self.revision(f"erplora-prod-{name}:10", settings=settings)
         self.rollback(CONFIRM_PROTECTED="VERIFACTU_PRODUCTION_ENABLED=false")
         self.assertChangedNothing("prod.hub.VERIFACTU_PRODUCTION_ENABLED:")

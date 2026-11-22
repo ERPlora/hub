@@ -3,8 +3,8 @@ read what they are given and what aws answers, how they tell a revision of their
 they finish: watching the services' rollout and recording the settings and the image tag.
 
 A refusal exits 1 after its ::error:: line; an aws call or a settings' script that fails ends the run with its own exit
-code (128 + N when signal N killed it). The answers of aws are read with jq's rules, and one that cannot be read ends the
-run with jq's exit code for it, 5. Only the standard library: the workflows run them with the runner's python3.
+code (128 + N when signal N killed it). The answers of aws are read with jq's rules, and one that cannot be read ends
+the run with jq's exit code for it, 5. Only the standard library: the workflows run them with the runner's python3.
 """
 
 from __future__ import annotations

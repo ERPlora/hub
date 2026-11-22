@@ -20,8 +20,9 @@ class RefusedRevisionTest(RollbackCase):
     def test_prod_refuses_a_previous_revision_tagged_pre_naming_what_it_carries(self):
         self.revision("erplora-prod-worker:10", environment="pre")
         self.assertEqual(1, self.rollback())
-        self.assertRefused("erplora-prod-worker:10", "prod", f"Environment=pre, task role {ROLE}/erplora-prod-worker-task, "
-                                                             f"execution role {ROLE}/erplora-prod-worker-execution")
+        self.assertRefused("erplora-prod-worker:10", "prod",
+                           f"Environment=pre, task role {ROLE}/erplora-prod-worker-task, "
+                           f"execution role {ROLE}/erplora-prod-worker-execution")
         self.assertTrue(self.called("describe-task-definition --task-definition .*erplora-prod-hub:10 "))
 
     def test_prod_refuses_a_previous_revision_without_the_environment_tag(self):

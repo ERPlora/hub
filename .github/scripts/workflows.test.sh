@@ -108,10 +108,10 @@ check("a rollback takes the confirmation of a protected setting, empty by defaul
       rollback_confirm.get("type") == "string" and rollback_confirm.get("default") == ""
       and rollback_confirm.get("required") is False)
 rollback_job = (rollback.get("jobs") or {}).get("rollback", {})
-rollback_step = next((step for step in steps(rollback_job) if "ecs-rollback.sh" in str(step.get("run", ""))), {})
-check("the rollback hands the confirmation to ecs-rollback.sh in its environment, never inline in the script",
+rollback_step = next((step for step in steps(rollback_job) if "ecs_rollback.py" in str(step.get("run", ""))), {})
+check("the rollback runs python3 scripts/ecs_rollback.py with the confirmation in its environment, never inline",
       (rollback_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
-      and "inputs.confirm_protected" not in str(rollback_step.get("run", "")))
+      and str(rollback_step.get("run", "")).split() == ["python3", "scripts/ecs_rollback.py"])
 check("only build and deploy get an OIDC token",
       sorted(name for name, job in jobs.items() if (job.get("permissions") or {}).get("id-token") == "write")
       == ["build", "deploy"])

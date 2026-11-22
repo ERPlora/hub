@@ -1,8 +1,8 @@
 """Tests of scripts/ecs_rollback.py: the hub's services of one environment go back to the ACTIVE revision right before
 the one each PRIMARY deployment runs.
 
-The rollback runs as the workflow runs it, with a fake aws CLI first on the PATH (ecs_rollback_doubles). The revisions it
-refuses for being of another environment are tested in test_ecs_rollback_guards.py, the settings they run in
+The rollback runs as the workflow runs it, with a fake aws CLI first on the PATH (ecs_rollback_doubles). The revisions
+it refuses for being of another environment are tested in test_ecs_rollback_guards.py, the settings they run in
 test_ecs_rollback_settings.py and its waits in test_ecs_rollback_waits.py.
 """
 
@@ -61,7 +61,8 @@ class ProdRollbackTest(RollbackCase):
             # Not in order; the highest below 12 is 11.
             "erplora-prod-hub:11": ["erplora-prod-hub:9", "erplora-prod-hub:11", "erplora-prod-hub:10"],
             # The same family of another region is another family.
-            "erplora-prod-hub:9": [f"{TD.replace('eu-south-2', 'eu-west-1')}/erplora-prod-hub:11", "erplora-prod-hub:9"],
+            "erplora-prod-hub:9": [TD.replace("eu-south-2", "eu-west-1") + "/erplora-prod-hub:11",
+                                   "erplora-prod-hub:9"],
         }
         for previous, listed in cases.items():
             with self.subTest(previous):
@@ -81,8 +82,8 @@ class ProdRollbackTest(RollbackCase):
         self.listed("erplora-prod-hub", "erplora-prod-hub-migrate:11", "erplora-prod-hub:13", "erplora-prod-hub:12")
         self.rollback()
         self.assertChangedNothing()
-        self.assertIn(f"::error::hub runs {TD}/erplora-prod-hub:12 and erplora-prod-hub has no earlier ACTIVE revision; "
-                      "nothing was changed\n", self.out)
+        self.assertIn(f"::error::hub runs {TD}/erplora-prod-hub:12 and erplora-prod-hub has no earlier ACTIVE "
+                      "revision; nothing was changed\n", self.out)
         self.assertFalse(self.called("erplora-prod-worker"))
 
     def test_a_service_that_runs_no_revision_of_its_family_changes_nothing(self):
@@ -93,14 +94,15 @@ class ProdRollbackTest(RollbackCase):
                 self.primary = {**running_now, service: running}
                 self.rollback()
                 self.assertChangedNothing()
-                self.assertIn(f"::error::{service} has no PRIMARY deployment of erplora-prod-{service} (got '{running}'); "
-                              "nothing was changed\n", self.out)
+                self.assertIn(f"::error::{service} has no PRIMARY deployment of erplora-prod-{service} "
+                              f"(got '{running}'); nothing was changed\n", self.out)
 
     def test_previous_revisions_on_different_tags_change_nothing(self):
         self.revision("erplora-prod-worker:10", image="reg.example/erplora/hub:tag-9")
         self.rollback()
         self.assertChangedNothing()
-        self.assertIn("::error::the previous revisions run different tags (tag-10 tag-9); nothing was changed\n", self.out)
+        self.assertIn("::error::the previous revisions run different tags (tag-10 tag-9); nothing was changed\n",
+                      self.out)
 
     def test_a_previous_revision_without_the_hub_image_changes_nothing(self):
         for image in ("other.example/thing:1", "reg.example/erplora/hub-pre:tag-10", "reg.example/xerplora/hub:tag-10",
@@ -130,7 +132,8 @@ class ProdRollbackTest(RollbackCase):
         # Containers listed as an object are read as their values, as jq reads them.
         self.revision("erplora-prod-hub:10", containers={"app": {"name": "hub", "image": "other.example/hub:3"}})
         self.rollback()
-        self.assertChangedNothing(f"{TD}/erplora-prod-hub:10 does not run an erplora/hub image \\(other.example/hub:3\\); ")
+        self.assertChangedNothing(f"{TD}/erplora-prod-hub:10 does not run an erplora/hub image "
+                                  r"\(other.example/hub:3\); ")
 
     def test_an_app_container_without_an_image_is_said_as_none(self):
         for containers in ([{"name": "pgbouncer", "image": "reg.example/erplora/hub:tag-10"}],
@@ -181,7 +184,8 @@ class PreRollbackTest(RollbackCase):
     def test_a_pre_service_on_a_prod_revision_changes_nothing(self):
         self.primary["hub-pre"] = arn("erplora-prod-hub:12")
         self.rollback(ENVIRONMENT="pre")
-        self.assertChangedNothing(f"hub-pre has no PRIMARY deployment of erplora-pre-hub \\(got '{TD}/erplora-prod-hub:12'\\)")
+        self.assertChangedNothing("hub-pre has no PRIMARY deployment of erplora-pre-hub "
+                                  f"\\(got '{TD}/erplora-prod-hub:12'\\)")
 
 
 class ConfiguredTest(RollbackCase):
@@ -189,8 +193,8 @@ class ConfiguredTest(RollbackCase):
         for confirm in ("", "rollback", "ROLLBACK ", " ROLLBACK"):
             with self.subTest(confirm):
                 self.assertEqual(1, self.rollback(CONFIRM=confirm))
-                self.assertFailsBeforeAnyCall(f"::error::CONFIRM must be exactly ROLLBACK, not '{confirm}'; nothing was "
-                                              "changed\n")
+                self.assertFailsBeforeAnyCall(f"::error::CONFIRM must be exactly ROLLBACK, not '{confirm}'; nothing "
+                                              "was changed\n")
         self.assertEqual(1, self.rollback("CONFIRM"))
         self.assertFailsBeforeAnyCall("::error::CONFIRM must be exactly ROLLBACK, not ''; nothing was changed\n")
 

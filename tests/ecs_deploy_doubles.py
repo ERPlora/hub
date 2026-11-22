@@ -1,5 +1,5 @@
-"""What the tests of scripts/ecs_deploy.py deploy with: the fake aws CLI of ecs_doubles and a fake git first on the PATH,
-and fixtures for what they answer.
+"""What the tests of scripts/ecs_deploy.py deploy with: the fake aws CLI of ecs_doubles and a fake git first on the
+PATH, and fixtures for what they answer.
 
 The fake aws records every call and answers from the fixtures; the fake git answers deploy/app-env.json of the commit
 abc123 from its fixture.

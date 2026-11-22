@@ -13,8 +13,9 @@ CHANGED = "put-parameter"
 class RolloutTest(RollbackCase):
     def assertPutBack(self, service, state="COMPLETED"):
         """The error of a service the circuit breaker put back on revision 12."""
-        self.assertIn(f"::error::{service} runs {TD}/erplora-prod-{service}:12 ({state}), not {TD}/erplora-prod-{service}"
-                      ":10; rolled back by the circuit breaker? See the service events\n", self.out)
+        self.assertIn(f"::error::{service} runs {TD}/erplora-prod-{service}:12 ({state}), not "
+                      f"{TD}/erplora-prod-{service}:10; rolled back by the circuit breaker? See the service events\n",
+                      self.out)
 
     def test_in_progress_then_completed_succeeds_after_one_pause(self):
         self.assertEqual(0, self.rollback(FAKE_ROLLOUT_STATES="IN_PROGRESS COMPLETED"))
@@ -88,7 +89,8 @@ class RolloutTest(RollbackCase):
         self.assertEqual(["10", "10"], self.pauses())
 
     def test_empty_seconds_take_their_default(self):
-        self.assertEqual(1, self.rollback(POLL_SECONDS="", ROLLOUT_TIMEOUT_SECONDS="", FAKE_ROLLOUT_STATES="IN_PROGRESS"))
+        self.assertEqual(1, self.rollback(POLL_SECONDS="", ROLLOUT_TIMEOUT_SECONDS="",
+                                          FAKE_ROLLOUT_STATES="IN_PROGRESS"))
         self.assertEqual(["15"] * 40, self.pauses())
         self.assertIn("::error::rollout of hub did not complete in 600 s;", self.out)
 
@@ -97,5 +99,5 @@ class RolloutTest(RollbackCase):
             for value in ("soon", "1.5", "-1", " 1", "1\n", "١"):
                 with self.subTest(name=name, value=value):
                     self.assertEqual(1, self.rollback(**{name: value}))
-                    self.assertFailsBeforeAnyCall(f"::error::{name} must be a number of seconds, not '{value}'; nothing "
-                                                  "was changed\n")
+                    self.assertFailsBeforeAnyCall(f"::error::{name} must be a number of seconds, not '{value}'; "
+                                                  "nothing was changed\n")

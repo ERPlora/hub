@@ -17,8 +17,8 @@ def state(name):
 
 
 def describe_services():
-    # A service's PRIMARY deployment: the revision of its state, COMPLETED. After update-service, successive reads answer
-    # the next of FAKE_ROLLOUT_STATES (or the service's own in FAKE_ROLLOUT_STATES_OF, as JSON) and, if set, of
+    # A service's PRIMARY deployment: the revision of its state, COMPLETED. After update-service, successive reads
+    # answer the next of FAKE_ROLLOUT_STATES (or the service's own in FAKE_ROLLOUT_STATES_OF, as JSON) and, if set, of
     # FAKE_PRIMARY_REVISIONS (revision numbers of the family it runs).
     service = value("--services")
     primary = read(state(f"primary-{service}")).decode()
@@ -96,7 +96,8 @@ class RollbackCase(ScriptCase):
         settings = APP_ENV[environment][name] if settings is None else settings
         variables = [{"name": "DEBUG", "value": "False"}, *({"name": k, "value": v} for k, v in settings.items())]
         if containers is None:
-            containers = [{"name": name, "image": image, "environment": variables}, {"name": "pgbouncer", "image": image}]
+            containers = [{"name": name, "image": image, "environment": variables},
+                          {"name": "pgbouncer", "image": image}]
         self.write(f"{revision}.json", task_definition(family, containers, **rest))
 
     def answer(self, revision, text):
@@ -115,7 +116,8 @@ class RollbackCase(ScriptCase):
     def reads_of(self, service):
         """How many times the service's PRIMARY deployment was read after the wait."""
         waited = self.lines("^ecs wait services-stable ")
-        return len([n for n in self.lines(f"^ecs describe-services .*--services {service} ") if waited and n > waited[0]])
+        reads = self.lines(f"^ecs describe-services .*--services {service} ")
+        return len([n for n in reads if waited and n > waited[0]])
 
     def assertChangedNothing(self, error=None):
         """The rollback failed, moved no service and recorded nothing; <error>, when given, is a pattern its ::error::
