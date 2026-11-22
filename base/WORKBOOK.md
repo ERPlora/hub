@@ -3867,9 +3867,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   `tests/e2e/base-app-activation.spec.ts`, en español y en los 3 tamaños.
 
 - **Sistema (BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
-  `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
-  «Datos y copias» de Ajustes); a quien no
-  administra no se le monta ningún componente que pida lo que el Hub le negaría (gh:hub#2519).
+  `#updates`, `#events`, `#logs`; `#backups` → `/settings#data`, la pestaña «Datos y copias» de Ajustes). La pantalla
+  no tiene vista para quien no administra el negocio: la guarda le dice «Sin acceso» antes de montarla (BASE-F118).
 - Consultas (`base/queries/`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
   `shared`/`own` según `Hub.db_name`, `version` y `released_at` de `base/system.py`, que lee `APP_VERSION` y
   `APP_RELEASED_AT` del entorno del despliegue; sin ellos, `dev` y `null`), `base.event.list` (`GET /api/system/events`:
