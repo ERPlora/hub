@@ -1,8 +1,10 @@
 """``manage.py demo_expire <slug>``: end the demo ``<slug>`` now and purge it at once.
 
 Support's tool (a demo to close by hand) and the e2e's clock (a demo that ended, without waiting an hour), in every
-environment. All through operations: ``base.demo.expire`` (its host answers 410 from now on), one pass of the reaper
-(``reap_demos``, which purges it with ``base.demo.purge``), then ``base.demo.get`` to say how it was left.
+environment. All through operations: ``base.demo.expire`` (its host answers 410 from now on), its drop
+(``base.tenancy.provision.drop_now``: its database and its files, then ``base.demo.purge``), then ``base.demo.get`` to
+say how it was left. The worker may take the demo first, as soon as it ended: the command then waits for that drop
+instead of saying the step it caught it in.
 
 While the platform is frozen for a database upgrade (``control.freeze.set``) the demo ends all the same but its
 database is left where it is (a ``DROP DATABASE`` would never reach the upgrade's copy): the worker's reaper drops it on
@@ -16,7 +18,9 @@ from live.errors import NotFound
 from base.queries.demos import demo_get
 from base.registry import REGISTRY_SCOPE
 from base.schemas.demos import DemoSlugIn
-from base.services.demos import demo_expire, reap_demos
+from base.services.demos import demo_expire
+from base.services.provisioning import registry_row_by_slug
+from base.tenancy import provision
 from base.tenancy.context import use_control
 from control.queries import active_freeze
 
@@ -35,8 +39,9 @@ class Command(BaseCommand):
             raise CommandError(f"{slug!r} names no demo of this Hub. Nothing was changed.") from None
         with use_control():
             frozen = active_freeze() is not None
+            demo = registry_row_by_slug(slug)
         if not frozen:
-            reap_demos()
+            provision.drop_now(demo)
         status = demo_get(ctx, DemoSlugIn(slug=slug)).status
         if frozen:
             self.stdout.write(f"{slug}: {status} (frozen: its database is dropped once the freeze is lifted)")
