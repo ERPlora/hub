@@ -66,6 +66,7 @@ class CashRegisterConfig(LiveAppConfig):
     )
     permissions = [
         "cash_register.view_session",
+        "cash_register.view_all_sessions",
         "cash_register.add_session",
         "cash_register.close_session",
         "cash_register.view_movement",
@@ -76,12 +77,14 @@ class CashRegisterConfig(LiveAppConfig):
         "cash_register.manage_settings",
     ]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The employee is the
-    # cashier: opens, records, counts and closes. The manager also sees a blind count's expected.
+    # cashier: opens, records, counts and closes, and reads their own shifts. The manager also sees a blind count's
+    # expected and every shift.
     role_permissions = {
         "hub_owner": ["cash_register.*"],
         "hub_admin": ["cash_register.*"],
         "hub_manager": [
             "cash_register.view_session",
+            "cash_register.view_all_sessions",
             "cash_register.add_session",
             "cash_register.close_session",
             "cash_register.view_movement",

@@ -13,6 +13,7 @@ from apps.cash_register.models import Session, Settings
 from apps.cash_register.queries.auto_close import auto_close_due_at
 from apps.cash_register.queries.figures import figures
 from apps.cash_register.queries.lines import Line, session_lines
+from apps.cash_register.queries.ownership import SESSIONS
 from apps.cash_register.queries.settings import current_settings
 from apps.cash_register.queries.unassigned import (
     open_session_now,
@@ -29,6 +30,7 @@ from apps.cash_register.schemas import (
 )
 from base.business import business_zone
 from base.ordering import list_order
+from base.sensitive import VIEW_COSTS
 
 VIEW_EXPECTED = "cash_register.view_expected_totals"
 
@@ -100,18 +102,16 @@ def session_detail(ctx: OperationContext, session: Session) -> dict:
         **session_row(ctx, session, settings, now, lines),
         "opening_notes": session.opening_notes,
         "closing_notes": session.closing_notes,
-        "summary": figures(session, lines, hidden=hidden),
+        "summary": figures(session, lines, hidden=hidden, costs=ctx.has(VIEW_COSTS)),
     }
 
 
 def find_session(
-    session_id: UUID | None, number: str | None, *, lock: bool = False
+    ctx: OperationContext, session_id: UUID | None, number: str | None, *, lock: bool = False
 ) -> Session:
-    sessions = (
-        Session.objects.select_for_update()
-        if lock
-        else Session.objects.select_related("register")
-    )
+    """The session named, among those ``ctx`` sees: one it does not see is not found, like one that does not exist."""
+    visible = SESSIONS.visible(ctx)
+    sessions = visible.select_for_update() if lock else visible.select_related("register")
     session = (
         sessions.filter(pk=session_id).first()
         if session_id is not None
@@ -123,12 +123,12 @@ def find_session(
 
 
 def named_or_open(
-    session_id: UUID | None, number: str | None, *, lock: bool = False
+    ctx: OperationContext, session_id: UUID | None, number: str | None, *, lock: bool = False
 ) -> Session:
     """The session named, or the open one when none is named (``Conflict`` if there is none)."""
     if session_id is not None or number is not None:
-        return find_session(session_id, number, lock=lock)
-    sessions = Session.objects.select_for_update() if lock else Session.objects.all()
+        return find_session(ctx, session_id, number, lock=lock)
+    sessions = SESSIONS.visible(ctx).select_for_update() if lock else SESSIONS.visible(ctx)
     session = sessions.filter(status=Session.Status.OPEN).first()
     if session is None:
         raise Conflict(str(NO_OPEN_SESSION), code="cash_register.no_open_session")
@@ -136,12 +136,12 @@ def named_or_open(
 
 
 def session_to_close(
-    session_id: UUID | None, number: str | None, *, lock: bool = False
+    ctx: OperationContext, session_id: UUID | None, number: str | None, *, lock: bool = False
 ) -> Session:
     """The session named (or the open one), still open and not past its daily cut-off: what may be closed or
     written to. A forgotten session is closed as of its cut (by the next opening or the scheduled task), so
     nothing written after the cut may land in it. ``lock``: its row locked, for a write."""
-    session = named_or_open(session_id, number, lock=lock)
+    session = named_or_open(ctx, session_id, number, lock=lock)
     if not session.is_open:
         raise Conflict(str(SESSION_NOT_OPEN), code="cash_register.session_not_open")
     cut = auto_close_due_at(session, current_settings(), timezone.now())
@@ -192,7 +192,7 @@ _SESSION_SORT = {"number": ("business_day", "sequence")}
     },
 )
 def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
-    sessions = Session.objects.select_related("register")
+    sessions = SESSIONS.visible(ctx).select_related("register")
     if params.search:
         sessions = sessions.filter(number__icontains=params.search.strip())
     exact = {
@@ -254,7 +254,7 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
 )
 def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
     settings, now = current_settings(), timezone.now()
-    session = open_session_now()
+    session = open_session_now(ctx)
     count, cash = 0, 0
     # With the cash register off, nothing is out of a shift: there are no shifts to be in.
     if settings.enable_cash_register:
@@ -296,4 +296,4 @@ def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
     },
 )
 def get_session(ctx: OperationContext, params: SessionGetIn) -> dict:
-    return session_detail(ctx, find_session(params.session_id, params.session))
+    return session_detail(ctx, find_session(ctx, params.session_id, params.session))

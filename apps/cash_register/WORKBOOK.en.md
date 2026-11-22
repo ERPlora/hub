@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dd99e54bf8d08b43ddeea0fe1fa3c398ac17c516dec84d9888db913b0feab015 -->
+<!-- generated from WORKBOOK.md sha256:233bfb3a86cd422326e2dba8b6f864937f45ac3f2ea7eaf1904b05b15a19a198 -->
 
 ## What it is for and who it is for
 
@@ -17,8 +17,9 @@ same for the hair salon and for the restaurant.
 
 ### Who uses it and what each one does
 
-- The **employee** acting as cashier: opens, records, counts and closes.
-- The **manager**: the same and, besides, sees the expected cash even when the count is blind.
+- The **employee** acting as cashier: opens, records, counts and closes. They see their own shifts (the ones they
+  opened or closed) and the open one, which is the drawer of everyone who charges.
+- The **manager**: the same and, besides, sees the expected cash even when the count is blind and everyone's shifts.
 - The **owner** and the **administrator**: everything, and they also set up the cash register and add
   the drawers.
 
@@ -75,6 +76,8 @@ the settings; the others, by its address, see "No access" (BASE-F118). The butto
 ### Cash register
 Here you open and close the cash shifts and look back at the earlier ones. At the top you see the cash there should
 be in the drawer now and the latest discrepancies; below, the list of sessions, from the most recent to the oldest.
+The employee sees only their own sessions (the ones they opened or closed) and the open one; the manager, the
+administrator and the owner see everyone's.
 Tap **Open session** to start the shift with the money in the drawer. In the row of the open session you record a
 **Movement** (money that comes in or goes out by hand), do the **Count** of notes and coins and close it with
 **Close** at the end of the shift. Tapping a row opens the session's detail, with its movements, its counts and the
@@ -130,7 +133,8 @@ From **Cash register**, "Detail" or tapping a row: it opens as a page, with its 
 in two columns: Status, Drawer, Opened (when and by whom), Closed (when and by whom, or "Closed by
 itself"), Movements (how many), Opening float, Sales (all payment methods) and, below, Cash sales, Card
 sales and Sales with other payment methods (this one only if there were any), Refunds, Cash in, Cash out,
-Comps, Expected, Counted and Difference, and the opening and closing notes. With the Tips app turned on, also
+Comps, Expected, Counted and Difference, and the opening and closing notes. Comps go at their cost: whoever does not
+see the costs sees them as "—". With the Tips app turned on, also
 "Cash tips", "Card tips" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
 and Difference show "—". Below, two tables, from the most recent to the oldest, 50 per page and as cards
 on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept) and **Counts** (When,
@@ -470,16 +474,22 @@ Vertical: common
 Actor: manager, administrator, employee
 Screen: Session detail
 Steps:
-1. In Cash register, tap "Detail" or tap the row of any session, open or closed.
+1. In Cash register, tap "Detail" or tap the row of a session in the list, open or closed. The employee has in the
+   list their own sessions (the ones they opened or closed) and the open one, even if someone else opened it: it is
+   the drawer they charge into, count and close. The manager, the administrator and the owner have everyone's.
 2. Read the summary: who opened and closed, the drawer, the float, the sales by payment method, refunds,
-   cash in, cash out, comps apart (they are a cost, not cash), expected, counted, difference and the
-   notes.
+   cash in, cash out, comps apart (they are a cost, not cash; whoever does not see the costs sees them as "—"),
+   expected, counted, difference and the notes. The figures are the whole drawer's: also what a colleague
+   charged while the session was open.
 3. Go over Movements: each sale is named by its document ("Ticket …", "Invoice …"), a refund "Refund of …"
    and a void "Void of …"; a movement recorded by hand shows its concept. And go over Counts.
 4. Tap "Back".
 In: the chosen session; the number and the document of each sale, from Sales.
 Out: nothing; it is read-only.
-If it fails: "Could not load the session detail" or the error of each table with "Retry".
+If it fails: "Could not load the session detail" or the error of each table with "Retry". Another employee's
+session does not exist for whoever does not see everyone's: by its link, its number or the assistant, "That cash
+session does not exist.", like one that does not exist, and the same for its
+movements, its counts and its report.
 Involved: SALE-F28
 
 ### CASH_REGISTER-F12 See the cash register on the home panels
@@ -495,11 +505,12 @@ Steps:
    employee, who counts blind, does not.
 2. "Recent discrepancies" is added with ⋮ ("Customize panel"), where it is grouped under "Cash register":
    a line for each of the last eight closed sessions, from the one closed latest to the oldest, with its
-   number and its difference with its sign and its cents. Whoever sees the sessions has it.
+   number and its difference with its sign and its cents. Whoever sees the sessions has it, with the ones
+   they see: the employee, their own.
 3. Also, in **Cash register**, two cards show above the table. "Current session" shows the "Expected in
    the drawer" of the open session and its number, and moves by itself with every charge and every
    movement; with no open session, "No open session.".
-4. "Recent discrepancies" shows the difference of the last eight closed sessions, from the one closed
+4. "Recent discrepancies" shows the difference of the last eight closed sessions you see, from the one closed
    latest to the oldest, with its sign and its cents and a bar as long as the difference: red if short,
    green if over. A session closed by itself, with no count, shows "—".
 In: the open session, the closed sessions and the business's currency.
@@ -580,8 +591,8 @@ Steps:
    closing (Z)".
 3. The paper carries the session number with its X or its Z, who opened it (X) or closed it (Z; "Closed by
    itself" if it closed by itself), the float, the expected cash and, line by line, the sales by payment
-   method, refunds, cash in, cash out, comps, the expected cash and, in the Z, the counted cash and the
-   discrepancy.
+   method, refunds, cash in, cash out, comps (only if whoever prints sees the costs), the expected cash and, in
+   the Z, the counted cash and the discrepancy.
 4. With Printing not on or with no active receipt printer, the device's print dialog shows with the same
    report (in the queue it would wait forever): the browser's or, in the installed app, its print screen
    (the system's dialog, with the printer or "Save as PDF"), titled with the report and the session ("Cash
@@ -592,7 +603,8 @@ If it fails: "Could not print." with the reason from Printing (for example, no p
 installed app does not open its print screen, with its own ("…: this version of the ERPlora app cannot
 print; update it", "…: the device's print service did not open"…). With the blind count, whoever cannot
 see the expected cash does not see "Print" in an open session (the report carries the expected cash); in a
-closed one they do.
+closed one they do. The report of a session they do not see (another employee's) is not printed: "That cash
+session does not exist."
 Involved: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 See the sale lines in no shift
@@ -751,6 +763,7 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | View sessions, settings, drawers and currency | yes | yes | yes | yes | `cash_register.view_session` |
+| See everyone's sessions (without it, only the ones they opened or closed and the open one) | yes | yes | yes | no | `cash_register.view_all_sessions` |
 | Open a session | yes | yes | yes | yes | `cash_register.add_session` |
 | Close a session | yes | yes | yes | yes | `cash_register.close_session` |
 | View movements | yes | yes | yes | yes | `cash_register.view_movement` |
