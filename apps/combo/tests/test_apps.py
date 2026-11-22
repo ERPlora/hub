@@ -216,5 +216,5 @@ def test_the_reaction_and_the_recovery_are_run_only_by_the_platform():
     assert "combo.system" not in combo_app().permissions
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert combo_app().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert combo_app().help == Help(videos={"es": "lD2ucK9wKq8", "en": "O7MO-x7zeZA"})

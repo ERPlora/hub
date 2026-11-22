@@ -16,6 +16,7 @@ from apps.sale.models import Order, OrderLine
 from apps.sale.queries.business import actor
 from apps.sale.queries.checkout import loose_lines
 from apps.sale.queries.orders import ORDER_CHANGED, find_order, order_detail
+from apps.sale.queries.people import member_name
 from apps.sale.queries.service_lines import Booking
 from apps.sale.schemas.orders import OrderOpenIn, OrderOut
 
@@ -162,6 +163,7 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
     # An appointment has one open check at a time: a second «Charge» answers it as it is (``already``).
     if data.appointment_id is not None and (existing := _open_check_of(data.appointment_id)):
         return {**order_detail(existing), "already": True}
+    staff_name = member_name(ctx, data.staff_id)
     lines = loose_lines(
         ctx,
         data.lines,
@@ -177,6 +179,8 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
                 label=data.label,
                 notes=data.notes,
                 appointment_id=data.appointment_id,
+                staff_id=data.staff_id,
+                staff_name=staff_name,
                 created_by=actor(ctx),
             )
     except IntegrityError:

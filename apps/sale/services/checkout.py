@@ -211,7 +211,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
             {"order_id": str(order.id), "lines_count": len(lines)},
         )
 
-    served_by = _served_by(ctx, data.staff_id)
+    served_by = _served_by(ctx, data.staff_id, order.staff_id)
     sequence = _number(day)
     principal = max(legs, key=lambda leg: leg["amount"]) if legs else None
     try:

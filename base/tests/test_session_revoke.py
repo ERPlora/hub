@@ -26,7 +26,7 @@ from live.executor import BYE_FRAME, Stream, Subscription, executor
 from live.operations import get
 
 from base.auth import PLATFORM_ADMIN, RedeemedUser
-from base.middleware import PLATFORM_SESSION_HOST
+from base.session_host import PLATFORM_SESSION_HOST
 from base.models import Hub, Membership, SessionOwner
 from base.operations import HubContextBuilder
 from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
@@ -148,7 +148,7 @@ class TestTheDoor:
         assert set(SessionOwner.objects.values_list("saas_user_id", flat=True)) == {OLGA}
 
     def test_with_a_business_it_ends_too_a_session_of_that_account_that_noted_no_host(self, client, acme, beta):
-        """A session from before the sessions noted their host is valid on every host (``base.middleware``)."""
+        """A session from before the sessions noted their host is valid on every host (``base.session_host``)."""
         hostless, olga_hostless = login(ANA, beta), login(OLGA, beta)
         SessionOwner.objects.filter(session_id__in=[hostless, olga_hostless]).update(host="")
 

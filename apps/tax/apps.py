@@ -74,4 +74,4 @@ class TaxConfig(LiveAppConfig):
             refresh_on=RULE_IN_FORCE_EVENTS,
         )
     ]
-    help = Help()
+    help = Help(videos={"es": "yyBzIxP3eCg", "en": "3XtsIVMRXow"})
