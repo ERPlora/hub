@@ -127,7 +127,7 @@ def test_spanish_texts_of_the_workbook():
         assert (
             str(services.VOIDED_DISH) % {"label": "Mesa 4"} == "PLATO ANULADO · Mesa 4"
         )
-        assert str(queries.TICKET_NOT_FOUND) == "Esa comanda no existe en este negocio."
+        assert str(queries.tickets.TICKET_NOT_FOUND) == "Esa comanda no existe en este negocio."
         assert [str(label) for label in TicketStatus.labels] == [
             "Por preparar",
             "En preparación",

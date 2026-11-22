@@ -154,8 +154,8 @@
     ]
   },
   {
-    "path": "apps/kitchen/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/kitchen/queries/state.py",
+    "file_name": "state.py",
     "functions": [
       {
         "name": "effective",
