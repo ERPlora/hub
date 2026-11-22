@@ -321,7 +321,7 @@ En la pantalla Ajustes · Datos y copias:
 | Cargando | «Cargando plantillas…»; en «Exportar» y «Restablecer», las filas en gris. |
 | Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
 | Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
-| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. Un administrador, en «Restablecer», deshace importaciones y, en lugar de «Restablecer el negocio» y «Copias de los datos», lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.». |
+| Sin permiso | Quien no administra el negocio no tiene la pestaña «Datos y copias»: su dirección le abre «General» (BASE-F48), y la tarjeta de plantillas del Inicio no sale. Un administrador, en «Restablecer», deshace importaciones y, en lugar de «Restablecer el negocio» y «Copias de los datos», lee «Solo el propietario del negocio puede restablecerlo o descargar las copias de sus datos.». |
 
 En la pantalla Archivos:
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:659cc2cef114be4fe55ab922e87766d0757fcc175bdf4244183a28e8d5ddacc1 -->
+<!-- generated from WORKBOOK.md sha256:80ff30113c7d20456625d905b66730cb9da1577f7fae4e012ec28d0b19454dd6 -->
 
 ## What it is for and who it is for
 
@@ -308,7 +308,7 @@ On the Settings · Data and backups screen:
 | Loading | "Loading templates…"; in "Export" and "Reset", the rows in grey. |
 | Empty | "There are no templates for your business yet.", "No template matches your search.", "This business has no app on to export." and "There is nothing to reset: no section has data.". |
 | Error | "The templates could not be loaded right now. You can still import a file." with "Retry"; "The apps of this business could not be loaded." and "What each section has could not be worked out.", with "Retry". |
-| No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. An administrator, in "Reset", undoes imports and, instead of "Reset the business" and "Copies of the data", reads "Only the business's owner can reset it or download the copies of its data.". |
+| No permission | Whoever does not run the business has no "Data and backups" tab: its address opens "General" for them (BASE-F48), and the Home's templates card does not show. An administrator, in "Reset", undoes imports and, instead of "Reset the business" and "Copies of the data", reads "Only the business's owner can reset it or download the copies of its data.". |
 
 On the Files screen:
 
