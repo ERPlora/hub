@@ -2,15 +2,15 @@
 import { IonButton, IonInput } from '@ionic/vue';
 import { computed, shallowRef, useId } from 'vue';
 
+import { YouTubeEmbed } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 
-import type { AppHelp, HelpScreen } from '../operations-help';
 import { useBaseI18n } from '../lib/i18n';
-import { organizeFlows } from '../lib/help';
+import { type HelpViewEmits, type HelpViewProps, organizeFlows } from '../lib/help';
 import HelpMarkdown from './HelpMarkdown.vue';
 
-const props = defineProps<{ help: AppHelp; current?: HelpScreen }>();
-const emit = defineEmits<{ expand: [title: string]; go: [path: string] }>();
+const props = defineProps<HelpViewProps>();
+const emit = defineEmits<HelpViewEmits>();
 const { t } = useBaseI18n();
 const prefix = useId();
 const query = shallowRef('');
@@ -97,6 +97,15 @@ function toggle(key: string, title: string): void {
             class="help-flow-content"
             :data-testid="`help-flow-content-${group.screen.id}-${flow.id}`"
           >
+            <YouTubeEmbed
+              v-for="video in flow.videos"
+              :key="video"
+              class="help-flow-video"
+              :video-id="video"
+              :title="flow.title"
+              :icon="icon"
+              :language="help.language"
+            />
             <HelpMarkdown
               class="ep-text-muted"
               :text="flow.steps"
@@ -172,6 +181,9 @@ function toggle(key: string, title: string): void {
 .help-flow-content {
   padding: 2px 16px 16px;
   font-size: 0.8125rem;
+}
+.help-flow-video {
+  margin: 10px 0 12px;
 }
 .help-failure {
   margin-top: 12px;

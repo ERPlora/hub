@@ -21,13 +21,15 @@ class HelpScreenOut(Schema):
 
 
 class HelpFlowOut(Schema):
-    """How a task is done: its title, the tabs it happens on, its steps and what happens if it fails, in markdown."""
+    """How a task is done: its title, the tabs it happens on, its steps and what happens if it fails, in markdown;
+    ``videos``, the YouTube video ids of its short videos, none when it has no videos."""
 
     id: str
     title: str
     screens: list[str]
     steps: str
     failure: str
+    videos: list[str]
 
 
 class AppHelpOut(Schema):

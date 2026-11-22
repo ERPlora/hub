@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { YouTubeEmbed } from '@erplora/ui/components';
+
 import type { AppHelp, HelpFlow } from '../operations-help';
 import { flush, mountBase } from '../__tests__/mount-base';
 import HelpFlowList from './HelpFlowList.vue';
@@ -8,7 +10,7 @@ const floor = { id: 'floor', title: 'Floor plan', path: '/table/floor-plan', tex
 const tables = { id: 'tables', title: 'Tables', path: '/table/tables', text: 'Tables text' };
 
 function flow(id: string, title: string, screens: string[], steps = 'Open a table'): HelpFlow {
-  return { id, title, screens, steps, failure: id === 'seat' ? 'The table may have been taken.' : '' };
+  return { id, title, screens, steps, failure: id === 'seat' ? 'The table may have been taken.' : '', videos: [] };
 }
 
 const help: AppHelp = {
@@ -18,7 +20,7 @@ const help: AppHelp = {
 };
 
 async function setup(answer = help) {
-  const m = await mountBase(HelpFlowList, { props: { help: answer, current: floor } });
+  const m = await mountBase(HelpFlowList, { props: { help: answer, current: floor, icon: 'ion:grid-outline' } });
   const el = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
   async function search(value: string) {
     const input = el('help-flow-search');
@@ -76,6 +78,28 @@ describe('HelpFlowList', () => {
     const s = await setup({ ...help, flows: [] });
     expect(s.el('help-flow-empty').exists()).toBe(false);
     expect(s.wrapper.findAll('.help-flow-group')).toHaveLength(0);
+  });
+
+  it('shows the videos of an opened task before its steps, in the language of the help', async () => {
+    const seat = { ...flow('seat', 'Sentar un grupo', ['floor']), videos: ['dQw4w9WgXcQ', 'M7lc1UVf-VE'] };
+    const s = await setup({ ...help, language: 'es', flows: [seat] });
+    expect(s.wrapper.findAllComponents(YouTubeEmbed)).toHaveLength(0);
+    await s.el('help-flow-floor-seat').trigger('click');
+    const videos = s.wrapper.findAllComponents(YouTubeEmbed);
+    expect(videos.map((video) => video.props())).toEqual([
+      { videoId: 'dQw4w9WgXcQ', title: 'Sentar un grupo', icon: 'ion:grid-outline', language: 'es', duration: undefined },
+      { videoId: 'M7lc1UVf-VE', title: 'Sentar un grupo', icon: 'ion:grid-outline', language: 'es', duration: undefined },
+    ]);
+    const content = s.el('help-flow-content-floor-seat').element;
+    const steps = content.querySelector('.assistant-md')!;
+    expect(videos[1].element.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('opens a task without videos with its steps only', async () => {
+    const s = await setup();
+    await s.el('help-flow-floor-merge').trigger('click');
+    expect(s.el('help-flow-content-floor-merge').text()).toContain('Open a table');
+    expect(s.wrapper.findAllComponents(YouTubeEmbed)).toHaveLength(0);
   });
 
   it('shows an unlisted flow without a group heading when it is the only group', async () => {
