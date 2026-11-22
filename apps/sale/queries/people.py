@@ -1,5 +1,5 @@
 """How the till names a person: who serves a check, and on its papers the waiter of a kitchen ticket and the cashier of
-a receipt. Kitchen requires Sales, so both read it here."""
+a receipt. Kitchen requires Sales, so both read it here; whoever acts is named by ``base.queries.people.actor_name``."""
 
 from collections.abc import Iterable
 from uuid import UUID
@@ -8,19 +8,7 @@ from django.contrib.auth import get_user_model
 from live.context import OperationContext
 
 from apps.sale.queries.other_apps import call_app
-from base.queries.people import person_label as profile_name, without_address
-
-
-def person_label(who) -> str:
-    """A person as a colleague reads them: their name, else what goes before the «@» of their e-mail (a colleague's
-    address only reaches whoever sees the team's contact details, and erplora.com names an account without a name by
-    it); their username (the id of the session) only as the last resort; anything else (the platform, an API key) as
-    it is."""
-    if who is None:
-        return ""
-    if hasattr(who, "get_username"):
-        return without_address(who.get_full_name() or getattr(who, "email", "")) or who.get_username()
-    return str(who)
+from base.queries.people import actor_name, person_label as profile_name
 
 
 def person_names(usernames: Iterable[str]) -> dict[str, str]:
@@ -30,7 +18,7 @@ def person_names(usernames: Iterable[str]) -> dict[str, str]:
         return {}
     users = get_user_model()
     found = users.objects.filter(**{f"{users.USERNAME_FIELD}__in": wanted})
-    return {user.get_username(): person_label(user) for user in found}
+    return {user.get_username(): actor_name(user) for user in found}
 
 
 def cashier_name(username: str) -> str:

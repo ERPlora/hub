@@ -267,6 +267,17 @@ def face_name(user) -> str:
     return without_address(person_label(user))
 
 
+def actor_name(who) -> str:
+    """Whoever acts as a colleague reads them, kept on what they do (a kitchen ticket, a table's check): their account's
+    name, else what goes before the «@» of their e-mail, never the address; their username only as the last resort;
+    anything else (the platform, an API key) as it is."""
+    if who is None:
+        return ""
+    if hasattr(who, "get_username"):
+        return without_address(who.get_full_name() or getattr(who, "email", "")) or who.get_username()
+    return str(who)
+
+
 def without_address(name: str) -> str:
     """``name`` without an email address in it: erplora.com names an account without a name by its address, and a
     colleague's address only reaches whoever sees the team's contact details. Then the part before the «@»."""
