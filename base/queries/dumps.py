@@ -9,7 +9,7 @@ from live.operations import AI, INTERNAL, operation
 
 from base import blueprint
 from base.models import Hub
-from base.permissions import ADMINISTER_HUB
+from base.permissions import OWN_BUSINESS
 from base.registry import internal_only
 from base.schemas.dumps import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, InternalDumpsOut
 from base.schemas.hub_registry import HubGetIn
@@ -61,7 +61,7 @@ def gets_copies(hub: Hub) -> bool:
 @operation(
     "base.hub.dumps",
     kind="query",
-    permission=ADMINISTER_HUB,
+    permission=OWN_BUSINESS,
     input=HubDumpsIn,
     output=HubDumpsOut,
     ai=AI(
@@ -95,7 +95,7 @@ def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
 @operation(
     "base.hub.dump_link",
     kind="query",
-    permission=ADMINISTER_HUB,
+    permission=OWN_BUSINESS,
     input=HubDumpLinkIn,
     output=HubDumpLinkOut,
     ai=INTERNAL,

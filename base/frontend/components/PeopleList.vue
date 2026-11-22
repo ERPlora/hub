@@ -2,10 +2,10 @@
 // People are invited, given a role and removed on erplora.com («Members» of the business), which `hub-home` names only
 // for a session opened with the account. «Invite on erplora.com» leaves the Hub by `openExternalLink`, because the
 // installed app opens nothing on a `_blank` link and its system browser does; the Google Play copy never offers it
-// (`managementOffered`). «Upgrade plan» only shows on the web, because it sells.
+// (`managementOffered`). «Upgrade plan» sells, so only to the owner and on the web (`usePlanLink`).
 import { DataTable, type DataTableColumn, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
+import { HubIcon, openExternalLink, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -13,18 +13,18 @@ import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, roleKey } from '../lib/people';
+import { usePlanLink } from '../lib/plan-link';
 import type { Person } from '../operations/people';
 import PlanUpgradeLink from './PlanUpgradeLink.vue';
 
 const { t, locale } = useBaseI18n();
 const router = useRouter();
 const session = useSession();
-const { isWeb } = useSurface();
 
 const admin = computed(() => session.can('base.administer_hub'));
 const home = readJsonBlock<HubHome>('hub-home');
 const membersUrl = home?.members_url ?? '';
-const planUrl = home?.plan_url ?? '';
+const { planUrl, offered: planOffered } = usePlanLink();
 const offered = managementOffered();
 
 const { data, status, refresh } = useLive('base.person.list', {});
@@ -96,7 +96,7 @@ function open(row: Person): void {
     >
       {{ t('base.people.full.body') }}
       <template
-        v-if="isWeb && planUrl"
+        v-if="planOffered"
         #actions
       >
         <PlanUpgradeLink

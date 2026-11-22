@@ -9,8 +9,8 @@
 // WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
 // over again what did not get there. Between the month and the templates, «What do you use it for?» (AutoReplyCards,
-// F14–F18), only for a business with Citas or Reservas on. «Upgrade plan» sells, so only on the web (surface.ts), and goes
-// with the pass (`PlanUpgradeLink`).
+// F14–F18), only for a business with Citas or Reservas on. «Upgrade plan» sells, so only to the owner and on the web
+// (`useMayBuy`), and goes with the pass (`PlanUpgradeLink`).
 import {
   ConfirmDialog,
   type DataTableAction,
@@ -21,10 +21,11 @@ import {
   UsageMeter,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { useSession, useSurface } from '@erplora/ui/shell';
+import { useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
 import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
+import { useMayBuy } from '../../../../base/frontend/lib/plan-link';
 import AutoReplyCards from './AutoReplyCards.vue';
 import NumberConnection from './NumberConnection.vue';
 import TemplateFormModal from './TemplateFormModal.vue';
@@ -37,7 +38,7 @@ import type { TemplateListIn, TemplateOut } from '../operations';
 
 const t = useT();
 const session = useSession();
-const { isWeb } = useSurface();
+const mayBuy = useMayBuy();
 const { data: channel, error: channelError } = useLive('whatsapp_inbox.channel.get', {});
 // From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
 const left = computed(() => nearCap(channel.value));
@@ -201,7 +202,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
         </p>
       </template>
       <PlanUpgradeLink
-        v-if="isWeb && (channel.cap_reached || left) && channel.plans_url"
+        v-if="mayBuy && (channel.cap_reached || left) && channel.plans_url"
         class="wa-settings__upgrade"
         data-testid="whatsapp-inbox-settings-upgrade"
         :url="channel.plans_url"

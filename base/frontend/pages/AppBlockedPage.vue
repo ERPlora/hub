@@ -1,24 +1,24 @@
 <script setup lang="ts">
 // Mounted by the app gate (`lib/app-gate.ts`) in the address of a screen whose app cannot open. Which app it is comes
-// from the route's `meta.app`; why, from the live `base.app.list`. The Store's link shows only for whoever runs the
-// business and only on the web, because the Hub never sells, and it leaves by `openExternalLink` because the installed
+// from the route's `meta.app`; why, from the live `base.app.list`. The Store's link shows only to the owner and only on
+// the web (`useMayBuy`), because the Hub never sells, and it leaves by `openExternalLink` because the installed
 // app opens nothing on `_blank`. An app bought meanwhile opens with a full load, which brings the session (a snapshot
 // of the page load) up to date. A failed check says so; it never makes up a reason.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, openExternalLink } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useBaseI18n } from '../lib/i18n';
+import { useMayBuy } from '../lib/plan-link';
 import type { AppRow } from '../operations/apps';
 
 const { t } = useBaseI18n();
 const route = useRoute();
 const router = useRouter();
-const session = useSession();
-const { isWeb } = useSurface();
+const buyer = useMayBuy();
 
 const { data, status, refresh } = useLive('base.app.list', {});
 
@@ -28,7 +28,7 @@ const row = computed<AppRow | undefined>(() => data.value?.apps.find((app) => ap
 const storeUrl = computed(() => data.value?.store_url ?? '');
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const checking = computed(() => data.value === undefined && !failed.value);
-const mayBuy = computed(() => isWeb.value && session.can('base.administer_hub') && storeUrl.value !== '');
+const mayBuy = computed(() => buyer.value && storeUrl.value !== '');
 const title = computed(() => row.value?.name ?? t('base.appsPage.title'));
 
 function toApps(): void {

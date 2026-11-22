@@ -22,8 +22,12 @@ ADMINISTER_HUB = "base.administer_hub"
 #: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
 OPEN_MANAGEMENT = "base.open_management"
 
-#: Customer roles that run the hub: every permission of every app, whether the app lists them or not.
-FULL_ACCESS_ROLES = frozenset({Membership.Role.OWNER, Membership.Role.ADMIN})
+#: Owning the business: buying for it on erplora.com (the plan, an app of the Store), resetting it and its copies. Only
+#: its owner, as on erplora.com, where the plan, the billing and the hand-over are the owner's alone.
+OWN_BUSINESS = "base.own_business"
+#: What the owner holds and no other role does, whatever an app grants it: an administrator runs the business, it does
+#: not own it.
+OWNER_ONLY = frozenset({OWN_BUSINESS})
 
 
 def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
@@ -32,8 +36,7 @@ def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
 
     A superuser is ERPlora's staff, whose place is the Hub admin on the platform host: on a
     business's host it holds only what a ``Membership`` there gives it, like anyone (the staff copy ``saas-staff:<id>``
-    never has one). Owner and admin get every permission declared by every app; manager and employee get what each
-    app's ``role_permissions`` gives them.
+    never has one). What each role gets, ``permissions_of_role``.
     """
     if user is None or not user.is_authenticated or not user.is_active:
         return frozenset()
@@ -46,12 +49,16 @@ def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
 
 
 def permissions_of_role(role: str) -> frozenset[str]:
-    """What ``role`` (a ``Membership.Role``) gives on a host: owner and admin, every permission declared by every app;
-    manager and employee, what each app's ``role_permissions`` gives them."""
+    """What ``role`` (a ``Membership.Role``) gives on a host: the owner, every permission declared by every app; an
+    administrator, all of them but ``OWNER_ONLY``; manager and employee, what each app's ``role_permissions`` gives
+    them, never ``OWNER_ONLY``."""
     configs = all_live_app_configs()
-    if role in FULL_ACCESS_ROLES:
-        return frozenset(permission for config in configs for permission in config.permissions)
-    return permissions_for_role(configs, role)
+    declared = frozenset(permission for config in configs for permission in config.permissions)
+    if role == Membership.Role.OWNER:
+        return declared
+    if role == Membership.Role.ADMIN:
+        return declared - OWNER_ONLY
+    return permissions_for_role(configs, role) - OWNER_ONLY
 
 
 def reload_user(user: Any) -> Any:

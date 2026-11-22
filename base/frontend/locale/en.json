@@ -97,7 +97,8 @@
     },
     "plan": {
       "upgrade": "Upgrade plan",
-      "manage": "Manage on erplora.com"
+      "manage": "Manage on erplora.com",
+      "askOwner": "Ask the business's owner to upgrade the plan."
     },
     "userMenu": {
       "account": "My account",
@@ -373,6 +374,7 @@
       },
       "reset": {
         "adminOnly": "Only an administrator can undo imports or reset the business.",
+        "ownerOnly": "Only the business's owner can reset it or download the copies of its data.",
         "undoTitle": "Undo an import",
         "undoHint": "Removes only what that import brought. What you created afterwards stays.",
         "undo": "Undo",

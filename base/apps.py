@@ -57,6 +57,7 @@ class BaseConfig(LiveAppConfig):
     # Everyone sees and opens the files; whoever runs the hub uploads, renames and deletes them.
     # «Manage on erplora.com» at the menu's foot: the owner, an administrator and a manager open this business on
     # erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
+    # Owning the business is the owner's alone (base.permissions.OWNER_ONLY): no role but the owner gets it.
     permissions = [
         "base.view_home",
         "base.administer_hub",
@@ -64,6 +65,7 @@ class BaseConfig(LiveAppConfig):
         "base.upload_files",
         "base.delete_files",
         "base.open_management",
+        "base.own_business",
     ]
     role_permissions = {
         "hub_owner": ["base.*"],
