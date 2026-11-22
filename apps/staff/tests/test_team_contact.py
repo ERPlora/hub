@@ -9,6 +9,8 @@ from live.assistant.running import run_tool
 from live.operations import get as operation
 
 from apps.flow.tests.test_api import get
+from apps.staff.schemas.members import CompensationListIn
+from base.sensitive import VIEW_TEAM_CONTACT
 
 from .conftest import HUB_DB, A, ctx_for, make_member
 
@@ -73,6 +75,15 @@ def test_an_employee_s_search_does_not_look_into_the_team_s_contact(ana, as_role
     as_role("hub_employee")
     assert get(client, "/staff/members", search=text).json()["total"] == 0
     assert get(client, "/staff/members", search="Ana").json()["total"] == 1
+
+
+def test_the_pay_sheet_s_search_looks_into_the_contact_only_for_whoever_sees_it(ana):
+    def found(permissions: set[str]) -> int:
+        params = CompensationListIn(search="600 111")
+        return operation("staff.member.compensation")(ctx_for(permissions=permissions), params).total
+
+    pay = {"staff.view", "staff.view_compensation"}
+    assert (found(pay), found(pay | {VIEW_TEAM_CONTACT})) == (0, 1)
 
 
 @pytest.mark.parametrize("field", ["email", "phone"])

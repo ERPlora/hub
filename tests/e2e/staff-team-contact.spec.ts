@@ -3,7 +3,7 @@
 // column (no column of dashes) at every width, and the API gives them the contact as null and refuses to filter by it.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, shown } from './helpers';
 import { signedIn } from './flow-helpers';
 import { staffCleanUp } from './staff-helpers';
 
@@ -40,7 +40,7 @@ for (const viewport of VIEWPORTS) {
       const ownerView = shown(owner.page);
       await expect(ownerView.locator('[data-testid=staff-members-row]', { hasText: last }).first()).toBeVisible();
       if (viewport.width >= 1440) await expect(ownerView.getByText(email).first()).toBeVisible();
-      await owner.page.screenshot({ path: shot(`staff-team-contact-owner-${viewport.width}`) });
+      await capture(owner.page, `staff-team-contact-owner-${viewport.width}`);
 
       const employeeRows = (await api<Page>(employee.context, A, 'GET', query)).data.rows;
       expect(employeeRows.map((row) => [row.full_name, row.email, row.phone])).toEqual([[`${TAG} ${last}`, null, null]]);
@@ -53,7 +53,7 @@ for (const viewport of VIEWPORTS) {
       await expect(view.locator('[role=columnheader]', { hasText: 'Email' })).toHaveCount(0);
       await expect(view.getByText('@team.example')).toHaveCount(0);
       await expect(view.getByText('600 111 222')).toHaveCount(0);
-      await employee.page.screenshot({ path: shot(`staff-team-contact-employee-${viewport.width}`) });
+      await capture(employee.page, `staff-team-contact-employee-${viewport.width}`);
     } finally {
       await owner.context.close();
       await employee.context.close();
