@@ -28,7 +28,6 @@ describe('payment catalogues (en source + es)', () => {
   it('keep the old screen’s words', () => {
     expectWords(CATALOGUES, [
       ['payment.title', 'Outgoing payments', 'Pagos salientes'],
-      ['payment.tabs.payments', 'Payments', 'Pagos'],
       ['payment.payments.columns.reference', 'Reference', 'Referencia'],
       ['payment.payments.columns.date', 'Date', 'Fecha'],
       ['payment.payments.columns.beneficiary', 'Beneficiary', 'Beneficiario'],

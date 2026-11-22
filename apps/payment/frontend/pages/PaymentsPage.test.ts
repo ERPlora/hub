@@ -12,11 +12,13 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { PaymentOut, PaymentStatus } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   business,
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   type MountOptions,
   mountPayment,
@@ -358,4 +360,8 @@ describe('PaymentsPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('PaymentsPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(RECORDER, 1) }), [['payments', 'Payments']]);
 });

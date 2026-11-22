@@ -17,16 +17,16 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('verifactu.title')} · ${t('verifactu.tabs.events', { n: 2 })}`);
+          const text = computed(() => `${t('verifactu.title')} · ${t('verifactu.tabs.label')}`);
           return () => h('p', text.value);
         },
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('VeriFactu · Events');
+    expect(wrapper.text()).toBe('VeriFactu · VeriFactu sections');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toBe('VeriFactu · Eventos');
+    expect(wrapper.text()).toBe('VeriFactu · Secciones de VeriFactu');
   });
 
   it('only works inside a component, which is where the app’s translator lives', () => {

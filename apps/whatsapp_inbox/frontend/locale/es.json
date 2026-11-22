@@ -3,9 +3,7 @@
     "title": "Bandeja de WhatsApp",
     "settingsTitle": "Ajustes del canal",
     "tabs": {
-      "label": "Secciones de la Bandeja de WhatsApp",
-      "inbox": "Bandeja de entrada",
-      "settings": "Ajustes"
+      "label": "Secciones de la Bandeja de WhatsApp"
     },
     "live": {
       "reconnecting": "Reconectando…",

@@ -36,7 +36,9 @@ import { useLocale, useT } from '../composables/useT';
 import { amountFilterErrors, formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
 import { AMOUNT_FILTERS, AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, SIGNED } from '../lib/sessionFilters';
 import type { CountType, SessionRow } from '../operations';
-import { cashRegisterTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('cash_register');
 
 const session = useSession();
 const can = (permission: string) => computed(() => session.can(permission));
@@ -185,7 +187,7 @@ function onCounted(count: { type: CountType; total: number }): void {
   <AppPage
     :title="$t('cash_register.title')"
     content-layout="fill"
-    :tabs="cashRegisterTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cash_register.tabs.label')"
   >
     <header class="cash-sessions__header">

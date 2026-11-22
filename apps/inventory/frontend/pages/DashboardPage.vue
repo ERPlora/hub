@@ -10,11 +10,11 @@ import { AppPage } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import KpiTile from '../components/KpiTile.vue';
-import { useInventoryTabs } from '../composables/useInventoryTabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { formatCount, formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type LowRow = OutputOf<'inventory.product.list_low_stock'>['rows'][number];
 
@@ -22,7 +22,7 @@ const PRODUCTS = '/inventory/products';
 
 const { t, locale } = useT();
 const business = useBusinessMoney();
-const tabs = useInventoryTabs();
+const tabs = useAppTabs('inventory');
 
 const { data: summary, status: summaryStatus, error: summaryError, refresh } = useLive('inventory.stock.get_summary', {});
 

@@ -31,8 +31,6 @@ describe('cart_checkout catalogues (en source + es)', () => {
 
   it('keep the old screens’ words', () => {
     expectWords(CATALOGUES, [
-      ['cart_checkout.tabs.carts', 'Carts', 'Carritos'],
-      ['cart_checkout.tabs.orders', 'Orders', 'Pedidos'],
       ['cart_checkout.title', 'Cart & Checkout', 'Carrito y pago'],
       ['cart_checkout.carts.columns.session', 'Session', 'Sesión'],
       ['cart_checkout.carts.columns.email', 'Email', 'Email'],

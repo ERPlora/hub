@@ -115,7 +115,7 @@ class ServiceConfig(LiveAppConfig):
         )
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts).
+    # `icon =` as the module's own icon. Each entry is also a tab of the app's pages.
     # SERVICE-F25: the holds of the till nobody charged in a day are marked expired, every hour, by the
     # worker as the system (cron in UTC). Reading a balance already skips them.
     scheduled_tasks = [

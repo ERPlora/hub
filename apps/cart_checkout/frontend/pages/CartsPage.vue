@@ -38,7 +38,9 @@ import {
   useBusinessMoney,
 } from '../lib/format';
 import type { CartListIn, CartOut, CartStatus } from '../operations';
-import { cartCheckoutTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('cart_checkout');
 
 const STATUSES: readonly CartStatus[] = ['active', 'abandoned', 'converted', 'expired'];
 
@@ -199,7 +201,7 @@ function onCreated(): void {
   <AppPage
     :title="$t('cart_checkout.title')"
     content-layout="fill"
-    :tabs="cartCheckoutTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cart_checkout.tabs.label')"
   >
     <PageNotices

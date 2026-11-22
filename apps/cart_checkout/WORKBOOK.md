@@ -536,7 +536,8 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 
 ### Cómo son las páginas
 
-- `frontend/pages/CartsPage.vue` y `OrdersPage.vue`, con la barra de pestañas de `frontend/tabs.ts`.
+- `frontend/pages/CartsPage.vue` y `OrdersPage.vue`, con la barra de pestañas de `useAppTabs` (las entradas del
+  menú que la persona puede abrir).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `payment`),
   formularios en `FormModal` (`CartFormModal`, `FailOrderModal`), confirmación de borrar con
   `useConfirm`, importes y cantidades con `lib/format.ts`.

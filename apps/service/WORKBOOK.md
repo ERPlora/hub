@@ -1406,8 +1406,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `image` en cada servicio; las fotos propias viajan en el blueprint como las de Inventario.
 
 - `frontend/routes.ts`: `/service/services`, `/service/categories`, `/service/packages` y
-  `/service/settings`; la barra de pestañas (`frontend/tabs.ts`) añade «Ajustes» solo a quien puede
-  guardarlos.
+  `/service/settings`; la barra de pestañas son las entradas del menú que la persona puede abrir
+  (`useAppTabs`): «Ajustes», solo para quien puede guardarlos.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas) y `useServerTable`; filtros por columna del
   `DataTable`; escrituras con `useCommand`; los selectores de listas largas (categoría, categoría
   fiscal, servicio, profesional) son `Combo` que buscan en el servidor.

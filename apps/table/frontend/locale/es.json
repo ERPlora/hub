@@ -2,12 +2,7 @@
   "table": {
     "title": "Mesas",
     "tabs": {
-      "label": "Secciones de Mesas",
-      "floor_plan": "Plano de sala",
-      "zones": "Zonas",
-      "tables": "Mesas",
-      "sessions": "Sesiones",
-      "settings": "Ajustes"
+      "label": "Secciones de Mesas"
     },
     "loading": "Cargando…",
     "cancel": "Cancelar",

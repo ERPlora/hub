@@ -105,7 +105,7 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 El menú **Reservas** tiene tres entradas: **Reservas**, **Lista de espera** y **Disponibilidad**. Abajo,
-las pestañas de las tres más **Ajustes** (esta, solo a quien puede cambiarlos). Los botones que el
+las pestañas de las tres más **Ajustes**; **Disponibilidad** y **Ajustes**, solo para quien puede cambiarlas. Los botones que el
 perfil no puede usar no salen.
 
 ### Reservas

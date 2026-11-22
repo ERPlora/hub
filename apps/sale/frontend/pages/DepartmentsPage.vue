@@ -18,7 +18,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useTaxName } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import type { DepartmentOut } from '../operations';
-import { saleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('sale');
 
 const session = useSession();
 const canManage = computed(() => session.can('sale.manage_settings'));
@@ -103,7 +105,7 @@ const cardTitle = (row: DepartmentOut): string => row.name;
   <AppPage
     :title="$t('sale.title')"
     content-layout="fill"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <p

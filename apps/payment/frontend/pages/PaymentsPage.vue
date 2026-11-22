@@ -29,7 +29,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { filterCents, formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusinessMoney } from '../lib/format';
 import type { PaymentListIn, PaymentOut, PaymentStatus } from '../operations';
-import { paymentTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('payment');
 
 const STATUSES: readonly PaymentStatus[] = ['draft', 'approved', 'sent', 'completed', 'cancelled'];
 type Step = 'approve' | 'mark_sent' | 'mark_completed';
@@ -177,7 +179,7 @@ function onCreated(): void {
   <AppPage
     :title="$t('payment.title')"
     content-layout="fill"
-    :tabs="paymentTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('payment.tabs.label')"
   >
     <PageNotices

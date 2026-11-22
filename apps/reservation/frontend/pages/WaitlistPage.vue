@@ -27,7 +27,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
-import { reservationTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('reservation');
 
 /** Until the settings answer with the business's zone: the day a new entry starts on. */
 const FALLBACK_ZONE = 'Europe/Madrid';
@@ -212,7 +214,7 @@ async function confirmRemove(): Promise<void> {
   <AppPage
     :title="$t('reservation.title')"
     content-layout="fill"
-    :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
   >
     <PageNotices

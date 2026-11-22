@@ -17,7 +17,9 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 import type { IssuerIn, IssuerOut } from '../operations';
-import { invoiceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('invoice');
 
 const session = useSession();
 const canManage = computed(() => session.can('invoice.manage_issuer'));
@@ -93,7 +95,7 @@ async function submit(): Promise<void> {
 <template>
   <AppPage
     :title="$t('invoice.title')"
-    :tabs="invoiceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('invoice.tabs.label')"
     content-layout="detail"
   >

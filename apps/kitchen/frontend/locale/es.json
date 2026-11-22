@@ -16,12 +16,7 @@
       "retry": "Reintentar"
     },
     "tabs": {
-      "label": "Secciones de Cocina",
-      "display": "Pantalla",
-      "tickets": "Comandas",
-      "stations": "Estaciones",
-      "history": "Historial",
-      "settings": "Ajustes"
+      "label": "Secciones de Cocina"
     },
     "status": {
       "pending": "Por preparar",

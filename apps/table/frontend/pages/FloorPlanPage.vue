@@ -20,7 +20,9 @@ import { useT } from '../composables/useT';
 import { paintedStatus, type PickMode, targetable } from '../lib/floor';
 import { zoneSummary, zoneTabs } from '../lib/floor-summary';
 import type { SettingsOut, TableCheckOut, TableOut, ZoneOut } from '../operations';
-import { tableTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const sections = useAppTabs('table');
 
 type Mode = 'service' | 'edit';
 interface Pick {
@@ -224,7 +226,7 @@ function onZoneSaved(zone: ZoneOut): void {
 <template>
   <AppPage
     :title="$t('table.title')"
-    :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
+    :tabs="sections"
     :tabs-label="$t('table.tabs.label')"
     content-layout="fill"
   >

@@ -16,7 +16,9 @@ import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { searchTaxCategories } from '../lib/pickers';
 import type { SettingsOut } from '../operations';
-import { serviceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('service');
 
 const NUMBERS = ['default_duration', 'default_buffer_time'] as const;
 const SWITCHES = ['show_prices', 'show_duration', 'allow_online_booking'] as const;
@@ -66,7 +68,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('service.title')"
-    :tabs="serviceTabs($t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
     content-layout="detail"
   >

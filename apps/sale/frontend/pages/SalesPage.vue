@@ -40,7 +40,9 @@ import { amountFilterErrors, formatMoney, type Money, moneyOf, useBusinessMoney 
 import { refusal } from '../lib/refusal';
 import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES, TOTAL_ENDS } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
-import { saleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('sale');
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'sale.sales.period.today',
@@ -233,7 +235,7 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
   <AppPage
     :title="$t('sale.title')"
     content-layout="fill"
-    :tabs="saleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
     <h2

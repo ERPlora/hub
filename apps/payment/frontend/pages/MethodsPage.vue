@@ -23,7 +23,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { MethodListIn, MethodOut, MethodType } from '../operations';
-import { paymentTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('payment');
 
 const TYPES: readonly MethodType[] = ['cash', 'transfer', 'card', 'sepa', 'check', 'other'];
 
@@ -147,7 +149,7 @@ function onRowClick(row: MethodOut): void {
   <AppPage
     :title="$t('payment.title')"
     content-layout="fill"
-    :tabs="paymentTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('payment.tabs.label')"
   >
     <PageNotices

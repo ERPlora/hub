@@ -15,7 +15,9 @@ import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut } from '../operations';
-import { printingTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('printing');
 
 const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
@@ -118,7 +120,7 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
   <AppPage
     :title="$t('printing.title')"
     content-layout="fill"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
   >
     <div class="printing-devices page-fill">
