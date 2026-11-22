@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The Home: headed by the business's name (the
-// SaaS's, `hub-home`), or a greeting by the hour while it has none, and today's date. «Summary»: the templates card
+// SaaS's, `hub-home`), or a greeting by the hour while it has none, and today's date, and under it how the business
+// is working, for who runs it. «Summary»: the templates card
 // while the business is empty, «My apps» (it works with no data), «Finish setting up your business» and
 // the board of the apps' panels; each zone reads its own data and fails on its own. «Activity»: the last sales. The
 // tab lives in the address (`/#actividad`), so it can be linked and Back leaves the Home instead of walking its tabs.
@@ -10,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import BlueprintCard from '../components/BlueprintCard.vue';
 import HomeActivity from '../components/HomeActivity.vue';
+import HomeHealthRow from '../components/HomeHealthRow.vue';
 import HomeMyApps from '../components/HomeMyApps.vue';
 import SetupChecklist from '../components/SetupChecklist.vue';
 import WidgetBoard from '../components/WidgetBoard.vue';
@@ -69,6 +71,7 @@ const tab = computed<Tab>({
           {{ today }}
         </p>
       </header>
+      <HomeHealthRow />
       <BlueprintCard />
       <HomeMyApps />
       <SetupChecklist />
