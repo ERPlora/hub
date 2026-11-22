@@ -7,8 +7,8 @@
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import SettingsForm from '../components/backoffice/SettingsForm.vue';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('sale');

@@ -7,8 +7,8 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ChannelSettings from '../components/ChannelSettings.vue';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('whatsapp_inbox');

@@ -22,7 +22,6 @@ import { AppPage, openExternalLink } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -30,6 +29,7 @@ import { backwardsDays, filterParams, filtersInUse, TOTAL_ENDS } from '../lib/fi
 import { amountFilterErrors, formatDate, formatMoney, useBusinessMoney } from '../lib/format';
 import { ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES, statusTone } from '../lib/record';
 import type { RecordListIn, RecordRowOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('verifactu');
 

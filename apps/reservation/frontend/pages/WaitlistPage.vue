@@ -19,7 +19,6 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
@@ -28,6 +27,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 /** Until the settings answer with the business's zone: the day a new entry starts on. */
 const FALLBACK_ZONE = 'Europe/Madrid';

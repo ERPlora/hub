@@ -15,11 +15,11 @@ import { AppPage, HubIcon, nativeBridge, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import type { Radius, SettingsOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const RADII: readonly Radius[] = [50, 100, 250, 500, 1000];
 /** Six decimals of a degree: about 11 cm, more than any phone reads. */

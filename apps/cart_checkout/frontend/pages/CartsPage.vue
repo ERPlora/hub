@@ -21,7 +21,6 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CartFormModal from '../components/CartFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -39,6 +38,7 @@ import {
   useBusinessMoney,
 } from '../lib/format';
 import type { CartListIn, CartOut, CartStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly CartStatus[] = ['active', 'abandoned', 'converted', 'expired'];
 

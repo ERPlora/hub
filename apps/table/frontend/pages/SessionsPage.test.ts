@@ -164,6 +164,11 @@ describe('SessionsPage', () => {
     await s.show([OPEN]);
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['detail', 'close', 'restore']);
   });
+
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['floor-plan', 'Floor plan'], ['sessions', 'Sessions']],
+  );
 });
 
 // The tablet shows the list as cards: under the title, each datum is told by the icon of its column, so the
@@ -200,11 +205,4 @@ describe('SessionsPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
-});
-
-describe('SessionsPage: its tab bar', () => {
-  itPaintsTheTabsItsSessionOpens(
-    () => setup({ session: EMPLOYEE }),
-    [['floor-plan', 'Floor plan'], ['sessions', 'Sessions']],
-  );
 });

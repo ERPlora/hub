@@ -19,7 +19,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CustomerCreateModal from '../components/CustomerCreateModal.vue';
 import CustomerDeleteDialog from '../components/CustomerDeleteDialog.vue';
 import CustomerExportButton from '../components/CustomerExportButton.vue';
@@ -35,6 +34,7 @@ import { useCustomerImport } from '../lib/useCustomerImport';
 import { type SortDir, useListState } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import type { CustomerListIn, CustomerRow, CustomerSort } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const router = useRouter();
 const session = useSession();

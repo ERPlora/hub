@@ -12,7 +12,6 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, useTemplateRef } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ActivityPanel from '../components/ActivityPanel.vue';
 import ConsentPanel from '../components/ConsentPanel.vue';
 import HealthPanel from '../components/HealthPanel.vue';
@@ -28,6 +27,7 @@ import PurchaseHistory from '../components/PurchaseHistory.vue';
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { type CustomerFields, ESSENTIAL_FIELDS, fieldsFromDetail, MORE_FIELDS, patchInput } from '../lib/customerForm';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const props = defineProps<{ id: string }>();
 

@@ -24,7 +24,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import BlockedDateFormModal from '../components/BlockedDateFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import SlotFormModal from '../components/SlotFormModal.vue';
@@ -35,6 +34,7 @@ import { formatShortDate, formatTime, todayIn, weekdayOf } from '../lib/clock';
 import { spansLine } from '../lib/states';
 import { WEEKDAYS, weekdayKey } from '../lib/weekdays';
 import type { BlockedDateOut, SlotLoadOut, TimeSlotOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const FALLBACK_ZONE = 'Europe/Madrid';
 

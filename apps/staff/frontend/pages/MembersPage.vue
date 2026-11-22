@@ -22,7 +22,6 @@ import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -35,6 +34,7 @@ import { MEMBER_STATUSES, memberStatusTone } from '../lib/enums';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 import { accountSearch, roleSearch } from '../lib/pickers';
 import type { MemberListIn, MemberOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('staff');

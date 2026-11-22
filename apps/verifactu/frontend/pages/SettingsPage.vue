@@ -11,7 +11,6 @@ import { AppPage, openExternalLink, toastSuccess, useSession } from '@erplora/ui
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import DiagnosticRouteRow from '../components/DiagnosticRouteRow.vue';
 import SettingsSendingRoute from '../components/SettingsSendingRoute.vue';
@@ -19,6 +18,7 @@ import { useLocale, useT } from '../composables/useT';
 import { environmentTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { DiagnosticOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('verifactu');

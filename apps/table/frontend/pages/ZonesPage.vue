@@ -15,7 +15,6 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ZoneDeleteDialog from '../components/ZoneDeleteDialog.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
@@ -23,6 +22,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { ZoneColor, ZoneListIn, ZoneOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
 

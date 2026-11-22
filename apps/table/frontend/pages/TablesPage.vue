@@ -17,7 +17,6 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TableFormModal from '../components/TableFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -25,6 +24,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { STATUS_TONE } from '../lib/floor';
 import type { TableListIn, TableOut, TableStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly TableStatus[] = ['available', 'occupied', 'reserved', 'blocked'];
 

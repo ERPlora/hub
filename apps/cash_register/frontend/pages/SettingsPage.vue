@@ -6,9 +6,9 @@
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import RegistersCard from '../components/RegistersCard.vue';
 import SettingsCard from '../components/SettingsCard.vue';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('cash_register');

@@ -13,7 +13,6 @@ import { AppPage, HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ClosingReport from '../components/ClosingReport.vue';
 import SessionCounts from '../components/SessionCounts.vue';
 import SessionLines from '../components/SessionLines.vue';
@@ -21,6 +20,7 @@ import SessionSummary from '../components/SessionSummary.vue';
 import { useT } from '../composables/useT';
 import { printRefusal, withReason } from '../../../../base/frontend/lib/print-paper';
 import * as paper from '../lib/print';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('cash_register');
 

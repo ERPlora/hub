@@ -9,13 +9,13 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DeviceModal from '../components/DeviceModal.vue';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('printing');

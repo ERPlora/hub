@@ -14,13 +14,13 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import FieldFormModal from '../components/FieldFormModal.vue';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { type SortDir, useListState } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import type { CustomFieldType, FieldListIn, FieldRow } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('customer');

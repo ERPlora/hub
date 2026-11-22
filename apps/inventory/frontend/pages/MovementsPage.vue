@@ -10,11 +10,11 @@ import { AppPage } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { formatQuantity, formatShortDateTime, formatSignedQuantity } from '../lib/format';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type Row = OutputOf<'inventory.movement.list'>['rows'][number];
 type MovementType = Row['movement_type'];

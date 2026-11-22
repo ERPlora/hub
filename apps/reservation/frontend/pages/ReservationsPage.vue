@@ -22,7 +22,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonNote } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import DayBar from '../components/DayBar.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -34,6 +33,7 @@ import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
 import { allows, cancellationNote, type RowAction, shortNote, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 /** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';

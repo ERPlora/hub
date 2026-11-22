@@ -12,12 +12,12 @@ import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { countryOptions } from '../../../customer/frontend/components/CustomerSearch.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 import type { IssuerIn, IssuerOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('invoice');

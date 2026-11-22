@@ -22,7 +22,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import SetupNotice from '../components/SetupNotice.vue';
 import RuleCreateModal from '../components/RuleCreateModal.vue';
@@ -35,6 +34,7 @@ import { formatDate, formatPercent } from '../lib/format';
 import { categorySearch } from '../lib/pickers';
 import { OPERATION_CLASSES, ruleCardTitle, ruleCategoryText, TAX_TYPES } from '../lib/rules';
 import type { RuleListIn, RuleOut, RuleStatusFilter } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly RuleStatusFilter[] = ['active', 'inactive', 'all'];
 

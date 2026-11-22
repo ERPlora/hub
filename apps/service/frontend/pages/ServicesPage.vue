@@ -20,7 +20,6 @@ import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/s
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
@@ -29,6 +28,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { filterCents, formatMoney, useBusinessMoney } from '../lib/format';
 import type { PricingType, ServiceListIn, ServiceOut, ServiceStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const PRICING: readonly PricingType[] = ['fixed', 'hourly', 'from', 'variable', 'free'];
 const STATUSES: readonly ServiceStatus[] = ['active', 'unconfigured', 'archived'];

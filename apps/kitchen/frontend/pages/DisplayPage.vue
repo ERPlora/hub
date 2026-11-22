@@ -11,7 +11,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, effectScope, type EffectScope, onBeforeUnmount, onMounted, onScopeDispose, ref, shallowRef, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import KdsAllDayTable from '../components/KdsAllDayTable.vue';
 import KdsBoardSkeleton from '../components/KdsBoardSkeleton.vue';
 import KdsDisplayToolbar, { type DisplayView } from '../components/KdsDisplayToolbar.vue';
@@ -22,6 +21,7 @@ import { useT } from '../composables/useT';
 import { arrivals, rememberedStation, rememberStation } from '../lib/board';
 import { Chime } from '../lib/chime';
 import type { AllDayOut, Priority, SettingsOut, TicketOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const FACTORY: SettingsOut = {
   show_timer: true,

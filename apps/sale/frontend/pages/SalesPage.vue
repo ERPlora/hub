@@ -26,7 +26,6 @@ import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import { type DayBounds, type Period, PERIODS, periodBounds } from '../components/sales/period';
@@ -41,6 +40,7 @@ import { amountFilterErrors, formatMoney, type Money, moneyOf, useBusinessMoney 
 import { refusal } from '../lib/refusal';
 import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES, TOTAL_ENDS } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'sale.sales.period.today',

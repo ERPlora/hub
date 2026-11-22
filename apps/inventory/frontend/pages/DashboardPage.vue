@@ -9,12 +9,12 @@ import { type InputOf, type OutputOf, useLive } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import KpiTile from '../components/KpiTile.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { formatCount, formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type LowRow = OutputOf<'inventory.product.list_low_stock'>['rows'][number];
 

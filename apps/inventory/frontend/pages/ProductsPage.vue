@@ -23,7 +23,6 @@ import { HubIcon } from '@erplora/ui/shell';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
@@ -40,6 +39,7 @@ import { useUnits } from '../composables/useUnits';
 import { saveTextFile } from '../lib/download';
 import { amountFilterErrors, formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
 import { filterParams, filtersInUse, PRICE_ENDS, PRODUCT_STATUSES, type ProductStatus, unreadableQuantities } from '../lib/productFilters';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
 /** `?status=` of a link (the till's «N articles cannot be sold» opens «unconfigured»). */

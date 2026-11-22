@@ -24,7 +24,6 @@ import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CorrectionModal from '../components/CorrectionModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -37,6 +36,7 @@ import { useLocale, useT } from '../composables/useT';
 import { saveCsv } from '../lib/download';
 import { formatDay, formatHm, liveSeconds, monthBounds, monthLabel, monthOf, recentMonths, timeOfDay } from '../lib/time';
 import type { RecordListIn, RecordOut, RecordStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly RecordStatus[] = ['open', 'closed', 'needs_review'];
 const TONE: Record<RecordStatus, StatusPillTone> = { open: 'info', closed: 'neutral', needs_review: 'warning' };

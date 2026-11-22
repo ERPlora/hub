@@ -21,7 +21,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -30,6 +29,7 @@ import { formatDate } from '../lib/format';
 import { AEAT_STATES, short } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { AeatRecordListIn, AeatRecordOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const HASH = /^[0-9a-fA-F]{64}$/;
 

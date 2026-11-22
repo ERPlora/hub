@@ -7,7 +7,6 @@ import { type DataTableColumn, type DataTableFilters, DataTable, EmptyState } fr
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CategoryCreateModal from '../components/CategoryCreateModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import SetupNotice from '../components/SetupNotice.vue';
@@ -17,6 +16,7 @@ import { useLocale, useT } from '../composables/useT';
 import { formatPercent } from '../lib/format';
 import { categoryDisplayName, chargesNoTax } from '../lib/rules';
 import type { CategoryListIn, CategoryRowOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('tax');

@@ -21,7 +21,6 @@ import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TaskFormModal from '../components/TaskFormModal.vue';
 import TaskSheet from '../components/TaskSheet.vue';
@@ -32,6 +31,7 @@ import { useLocale, useT } from '../composables/useT';
 import { dueTone as dueToneOn, formatDay, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
 import { keepCompletedInPlace } from '../lib/mine';
 import type { TaskListIn, TaskOut, TaskPriority, TaskSort, TaskStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly TaskStatus[] = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
 const PRIORITIES: readonly TaskPriority[] = ['low', 'medium', 'high', 'urgent'];

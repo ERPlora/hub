@@ -21,7 +21,6 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
@@ -30,6 +29,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { filterCents, formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusinessMoney } from '../lib/format';
 import type { PaymentListIn, PaymentOut, PaymentStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly PaymentStatus[] = ['draft', 'approved', 'sent', 'completed', 'cancelled'];
 type Step = 'approve' | 'mark_sent' | 'mark_completed';

@@ -9,13 +9,13 @@ import { useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ListNotices, { blockingError, type ListRefusal } from '../components/backoffice/ListNotices.vue';
 import QuickNoteFormModal from '../components/backoffice/QuickNoteFormModal.vue';
 import { refusal } from '../lib/refusal';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { QuickNoteOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('sale');

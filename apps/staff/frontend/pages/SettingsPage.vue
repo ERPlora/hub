@@ -12,9 +12,9 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import type { SettingsOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const TIMES = ['default_work_start', 'default_work_end'] as const;
 const NUMBERS = ['default_break_duration'] as const;

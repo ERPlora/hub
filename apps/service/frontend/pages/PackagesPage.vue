@@ -20,7 +20,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import GrantsSheet from '../components/GrantsSheet.vue';
 import MovementsSheet from '../components/MovementsSheet.vue';
 import OrphansSheet from '../components/OrphansSheet.vue';
@@ -31,6 +30,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatPercentBp, useBusinessMoney } from '../lib/format';
 import type { PackageListIn, PackageOut, PackageStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly PackageStatus[] = ['active', 'archived', 'deleted'];
 const TONE: Record<PackageStatus, 'success' | 'neutral' | 'danger'> = { active: 'success', archived: 'neutral', deleted: 'danger' };

@@ -10,9 +10,9 @@ import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import MemberSchedules from '../components/MemberSchedules.vue';
 import { asCombo, memberSearch } from '../lib/pickers';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('staff');
 const router = useRouter();

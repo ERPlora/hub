@@ -13,11 +13,11 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney, formatPercent, useBusinessMoney } from '../lib/format';
 import type { CommissionPeriod, CommissionReportIn, CommissionReportRow } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type Choice = CommissionPeriod | 'custom';
 

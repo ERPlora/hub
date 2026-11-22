@@ -11,13 +11,13 @@ import { IonButton } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { statusTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { QueueRowOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const router = useRouter();
 const session = useSession();

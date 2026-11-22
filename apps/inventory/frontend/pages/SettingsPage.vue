@@ -7,8 +7,8 @@ import { EmptyState } from '@erplora/ui/components';
 import { AppPage, useSession, useShellConfig } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import SettingsForm from '../components/SettingsForm.vue';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('inventory');

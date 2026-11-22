@@ -7,11 +7,11 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { readAsBase64 } from '../../../../base/frontend/lib/upload';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { LogoUploadIn, SettingsOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const TEXTS = ['page_title', 'primary_color'] as const;
 const LONG_TEXTS = ['welcome_message', 'confirmation_message', 'cancellation_policy'] as const;

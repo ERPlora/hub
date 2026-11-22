@@ -17,13 +17,13 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import MethodFormModal from '../components/MethodFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { MethodListIn, MethodOut, MethodType } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const TYPES: readonly MethodType[] = ['cash', 'transfer', 'card', 'sepa', 'check', 'other'];
 

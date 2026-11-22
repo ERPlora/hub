@@ -11,10 +11,10 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const NUMBERS = ['timer_warning_minutes', 'timer_critical_minutes'] as const;
 const LABELS: Record<(typeof NUMBERS)[number], [string, string]> = {

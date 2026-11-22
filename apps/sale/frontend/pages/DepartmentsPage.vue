@@ -10,7 +10,6 @@ import { useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DepartmentFormModal from '../components/backoffice/DepartmentFormModal.vue';
 import ListNotices, { blockingError, type ListRefusal } from '../components/backoffice/ListNotices.vue';
 import { refusal } from '../lib/refusal';
@@ -19,6 +18,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useTaxName } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import type { DepartmentOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('sale');

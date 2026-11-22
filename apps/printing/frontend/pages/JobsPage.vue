@@ -19,7 +19,6 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CancelJobModal from '../components/CancelJobModal.vue';
 import { useNow } from '../composables/useNow';
 import { useServerTable } from '../composables/useServerTable';
@@ -27,6 +26,7 @@ import { useLocale, useT } from '../composables/useT';
 import { JOB_TONE, jobDetail, jobFlags, jobTitle } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { JobListIn, JobOut, JobStatus, Usage } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly JobStatus[] = ['pending', 'sent', 'done', 'failed', 'cancelled'];
 const USAGES: readonly Usage[] = ['receipt', 'kitchen', 'bar', 'label'];

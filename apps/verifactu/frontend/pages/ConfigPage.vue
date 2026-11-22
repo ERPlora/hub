@@ -16,7 +16,6 @@ import { AppPage, HubIcon, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, useTemplateRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import RepresentationGrant from '../components/RepresentationGrant.vue';
 import OwnCertificateProof from '../components/OwnCertificateProof.vue';
@@ -24,6 +23,7 @@ import OwnCertificateStatus from '../components/OwnCertificateStatus.vue';
 import { useLocale, useT } from '../composables/useT';
 import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 /** A business certificate weighs a few KB; anything over 1 MB is not one. */
 const MAX_CERTIFICATE_BYTES = 1024 * 1024;

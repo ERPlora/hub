@@ -8,13 +8,13 @@ import { useLive } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime } from '../lib/format';
 import type { LogAction, LogOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const ACTIONS: readonly LogAction[] = [
   'received',

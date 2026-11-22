@@ -9,13 +9,13 @@ import { AppPage } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { backwardsDays, filterParams, filtersInUse } from '../lib/filters';
 import { EVENT_KINDS, SEVERITIES, severityTone } from '../lib/record';
 import type { EventListIn, EventOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('verifactu');
 

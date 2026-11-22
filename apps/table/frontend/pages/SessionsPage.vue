@@ -20,7 +20,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RestoreModal from '../components/RestoreModal.vue';
 import SessionDetailModal from '../components/SessionDetailModal.vue';
@@ -30,6 +29,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { clockTime, durationMinutes, durationTone, formatMoney, recordMoney } from '../lib/format';
 import type { SessionListIn, SessionOut, SessionStatus, SettingsOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type Segment = 'open' | 'closed' | 'all';
 const SEGMENTS: readonly Segment[] = ['open', 'closed', 'all'];

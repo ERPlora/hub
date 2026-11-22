@@ -14,7 +14,6 @@ import { AppPage, HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useServerNow } from '../composables/useServerNow';
@@ -22,6 +21,7 @@ import { useLocale, useT } from '../composables/useT';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import { formatDay, formatHm, formatHms, formatTime, liveSeconds } from '../lib/time';
 import type { PositionIn, RecordOut, RecordStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('attendance');
 

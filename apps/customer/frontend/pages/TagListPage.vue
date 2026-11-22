@@ -14,7 +14,6 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import TagFormModal from '../components/TagFormModal.vue';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
@@ -22,6 +21,7 @@ import { type SortDir, useListState } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import { isThemeColor } from '../lib/colors';
 import type { TagListIn, TagRow } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('customer');

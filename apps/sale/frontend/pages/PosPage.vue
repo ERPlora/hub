@@ -21,7 +21,6 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CustomerSearch, { type CustomerSnapshot, snapshotOf } from '../../../customer/frontend/components/CustomerSearch.vue';
 import CheckoutSheet from '../components/checkout/CheckoutSheet.vue';
 import DocumentModal from '../components/document/DocumentModal.vue';
@@ -56,6 +55,7 @@ import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
 import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
 import { refusal } from '../lib/refusal';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const t = useT();
 const locale = useLocale();

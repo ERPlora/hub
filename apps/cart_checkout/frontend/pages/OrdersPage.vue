@@ -20,7 +20,6 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import FailOrderModal from '../components/FailOrderModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -28,6 +27,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { amountFilterErrors, filterCents, formatMoney, ORDER_TONE, recordMoney, TOTAL_BOUNDS, useBusinessMoney } from '../lib/format';
 import type { OrderListIn, OrderOut, OrderStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly OrderStatus[] = ['initiated', 'paid', 'failed', 'completed'];
 /** Where an order may still fail from (the server's FAILABLE). */

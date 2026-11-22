@@ -10,12 +10,12 @@ import { useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import SeriesFormModal from '../components/SeriesFormModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { SeriesOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('invoice');

@@ -11,7 +11,6 @@ import { AppPage, HubIcon, toastError, toastSuccess, useSession, useSurface } fr
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
@@ -21,6 +20,7 @@ import type { PrinterDraft } from '../lib/discovery';
 import { deviceError, printerAddress, printerPaper, printerState, STATE_TONE } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { PrinterOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('printing');

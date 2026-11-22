@@ -14,7 +14,6 @@ import {
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ProjectFormModal from '../components/ProjectFormModal.vue';
 import ProjectSheet from '../components/ProjectSheet.vue';
@@ -22,6 +21,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { ProjectListIn, ProjectOut, ProjectSort } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('task');

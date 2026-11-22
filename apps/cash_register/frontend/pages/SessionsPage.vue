@@ -25,7 +25,6 @@ import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
@@ -37,6 +36,7 @@ import { useLocale, useT } from '../composables/useT';
 import { amountFilterErrors, formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
 import { AMOUNT_FILTERS, AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, SIGNED } from '../lib/sessionFilters';
 import type { CountType, SessionRow } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('cash_register');

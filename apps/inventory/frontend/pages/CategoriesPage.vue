@@ -10,7 +10,6 @@ import { type InputOf, type OutputOf, useCommand, useLiveClient } from '@erplora
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import CategoryFormModal from '../components/CategoryFormModal.vue';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportReportModal from '../components/ImportReportModal.vue';
@@ -21,6 +20,7 @@ import { parseCsv } from '../lib/csv';
 import { saveTextFile } from '../lib/download';
 import { CATEGORY_IMPORT_ALIASES, guessMapping, mapRow } from '../lib/import-mapping';
 import { addReport, chunk, emptyReport, failRows, type ImportReport } from '../lib/import-report';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type Category = OutputOf<'inventory.category.list'>['rows'][number];
 

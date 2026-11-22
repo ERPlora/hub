@@ -12,9 +12,9 @@ import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonNote, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { useLocale, useT } from '../composables/useT';
 import { countryLabel, countryName } from '../lib/countries';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 /** The i18n key of each region with taxes of its own; a code without one reads as itself. */
 const REGION_KEYS: Readonly<Record<string, string>> = Object.freeze({

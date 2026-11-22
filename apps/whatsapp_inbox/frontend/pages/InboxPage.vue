@@ -22,7 +22,6 @@ import { AppPage, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
@@ -34,6 +33,7 @@ import { formatMessageTime } from '../lib/format';
 import { nearCap, noAllowance } from '../lib/plan';
 import { kindLabel } from '../lib/thread';
 import type { ConversationListIn, ConversationOut, ConversationStatus } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 

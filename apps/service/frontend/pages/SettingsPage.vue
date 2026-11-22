@@ -12,11 +12,11 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { searchTaxCategories } from '../lib/pickers';
 import type { SettingsOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const NUMBERS = ['default_duration', 'default_buffer_time'] as const;
 const SWITCHES = ['show_prices', 'show_duration', 'allow_online_booking'] as const;

@@ -24,7 +24,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import AwayToday from '../components/AwayToday.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
@@ -35,6 +34,7 @@ import { LEAVE_TYPES, REQUEST_STATUSES, requestStatusTone } from '../lib/enums';
 import { formatDate, formatTime } from '../lib/format';
 import { memberSearch } from '../lib/pickers';
 import type { TimeOffDetailOut, TimeOffListIn, TimeOffOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 type View = 'all' | 'mine';
 

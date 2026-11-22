@@ -23,7 +23,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RectifyModal from '../components/RectifyModal.vue';
@@ -34,6 +33,7 @@ import { amountFilterErrors, formatDate, formatMoney, moneyOf, useBusinessMoney 
 import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
 import { filterQuery, filtersInUse, reversedDates, TOTAL_ENDS } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const session = useSession();
 const tabs = useAppTabs('invoice');
