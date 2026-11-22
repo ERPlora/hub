@@ -7,7 +7,7 @@ from django.utils import timezone
 from live.errors import Conflict
 
 from apps.cash_register.models import Session
-from apps.cash_register.queries import last_cut_off
+from apps.cash_register.queries.auto_close import last_cut_off
 from apps.cash_register.tests.conftest import HUB_DB, open_session, run
 
 pytestmark = HUB_DB
