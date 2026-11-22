@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2670599e5f254bac1b4ca5aa49ac66577bcd5828a00998406cfd901c3ee35af4 -->
+<!-- generated from WORKBOOK.md sha256:3a99a903f47ae8836f0e5f6efe8ae7eba2a125bebd38ebb8c17bf7ac7849ef94 -->
 
 ## What it is for and who it is for
 
@@ -103,8 +103,8 @@ for whoever can configure; from 80 % of the month's messages, the ones left ("Yo
 of your plan left this month."); the plan's messages spent this month ("You have used all the WhatsApp messages of
 your plan this month. Messages keep arriving here, but nothing can be sent until next month or until you upgrade the
 plan.") or a plan that includes none ("Your plan does not include WhatsApp messages. Messages keep arriving here, but
-nothing can be sent until you upgrade the plan."), all three with **Upgrade plan** for whoever can configure, in the
-browser (it is not in the installed app: what sells is only on the web).
+nothing can be sent until you upgrade the plan."), all three with **Upgrade plan** for the owner, in the
+browser (it is not in the installed app: what sells is only on the web, and on erplora.com only the owner buys).
 Empty: "No conversations.", in view below the search box on the phone too; with a search or a filter: "No results";
 loading: an indicator; list error: the reason with **Retry**; panel error: the reason the Hub gives or "Could not load
 the conversation"; a photo or a voice note that does not load: "The image could not be loaded." or "The voice note
@@ -124,7 +124,7 @@ reason it cannot be done yet; connected or to be reconnected, **Disconnect**, wh
 messages sent against the plan's; from 80 %, "You have 30 of 150 messages of your plan left this month.", and at the
 cap "You have used all the messages of your plan this month."; if the plan includes none, "Your plan does not include
 WhatsApp messages."; before erplora.com speaks, "erplora.com has not reported this month’s messages yet."; from 80 %
-and at the cap, **Upgrade plan**, which opens erplora.com's plans, only in the browser); and **Meta templates**: a
+and at the cap, **Upgrade plan**, which opens erplora.com's plans, only for the owner and in the browser); and **Meta templates**: a
 table with **Name**, **Language**, **Category** (Utility, Marketing, Authentication), **Status in Meta** (Not sent to
 Meta, Approved, In review, Rejected, Paused by Meta, Disabled by Meta, Deleted in WhatsApp Manager; underneath, when
 it applies, "Sending to Meta…", "Not accepted: …", "Changes not sent: …" or "Being deleted at Meta") and **Text**,
@@ -437,16 +437,16 @@ Steps:
 1. **Settings → This month** shows the messages sent this month against the plan's; both numbers come from
    erplora.com. If the plan does not include WhatsApp messages, it says so ("Your plan does not include WhatsApp
    messages."), never that it has no limit; from 80 % of the plan's, for example, "You have 30 of 150 messages of
-   your plan left this month." with **Upgrade plan** (in the browser; it is not in the installed app); at the cap,
+   your plan left this month." with **Upgrade plan** (for the owner, in the browser; it is not in the installed app); at the cap,
    "You have used all the messages of your plan this month."; before erplora.com speaks, "erplora.com has not
    reported this month’s messages yet.".
 2. From 80 % of the month's messages, the inbox warns above the list, for example, "You have 30 of 150 WhatsApp
-   messages of your plan left this month."; whoever can configure sees, in the browser, **Upgrade plan**, which opens
+   messages of your plan left this month."; the owner sees, in the browser, **Upgrade plan**, which opens
    erplora.com's plans, already signed in with their account. Below 80 %, nothing. The count moves by itself,
    without reloading.
 3. At the cap (with a plan that includes none, from the first message), the inbox warns above the list and **Send**
    explains it instead of sending ("Your plan does not include WhatsApp messages: nothing can be sent." when the plan
-   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans,
+   includes none); the owner sees, in the browser, **Upgrade plan**, which opens erplora.com's plans,
    already signed in with their account.
 4. What the customers write is still saved.
 5. When the month changes (erplora.com's, which counts the messages in UTC: in Spain, at 1:00 or 2:00 on the 1st) the
