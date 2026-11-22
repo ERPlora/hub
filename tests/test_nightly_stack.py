@@ -156,6 +156,7 @@ def test_the_seeding_needs_exactly_the_ids_of_a_and_b(world):
 
 def test_servers_that_never_answer_are_said_in_the_log(world):
     world.night(FAKE_CURL_EXIT="7", NIGHTLY_START_SECONDS="1")
+    assert world.calls_re(r"^curl ") >= 2
     assert "the servers did not answer within 1 s" in world.night_logs()[0].read_text()
 
 
@@ -170,6 +171,19 @@ def test_a_night_that_cannot_fetch_main_is_red(world):
     assert "falló «traer origin/main»" in world.read("bodies")
     assert world.calls_re(NOTHING_RUNS) == 0
     assert "could not drop" not in world.night_logs()[0].read_text()
+
+
+def test_a_night_without_any_commit_names_it_unknown(world):
+    git("-C", str(world.hub), "remote", "set-url", "origin", str(world.root / "gone"))
+    git("-C", str(world.hub), "update-ref", "-d", "refs/remotes/origin/main")
+    assert world.night() == 1
+    assert "commit `unknown`" in world.read("bodies")
+
+
+def test_a_worktree_that_cannot_be_pruned_is_a_red_night_and_is_said(world):
+    assert world.night(FAKE_PRUNE_EXIT="1") == 1
+    assert "falló «los worktrees»" in world.read("bodies")
+    assert f"could not remove {world.nightly}/hub" in world.night_logs()[0].read_text()
 
 
 def test_a_folder_left_where_a_worktree_goes_is_replaced(world):
@@ -281,6 +295,26 @@ def test_a_night_told_to_stop_while_the_specs_run_ends_without_waiting_for_them(
     assert world.last("drop saas") > world.first("e2e hub")
     assert world.worktrees() == (1, 1)
     assert not (world.nightly / "lock").exists()
+
+
+def test_a_night_told_to_stop_during_a_command_stops_once_it_ends(world):
+    night = world.start(FAKE_DB_SECONDS="2")
+    wait_for(lambda: world.calls("database hub") > 0)
+    os.kill(int((world.nightly / "lock" / "pid").read_text()), signal.SIGTERM)
+    assert night.wait(timeout=60) == 143
+    assert world.calls("database saas") == 0
+    assert world.worktrees() == (1, 1)
+
+
+def test_a_night_told_to_stop_while_it_waits_for_the_servers_asks_them_no_more(world):
+    night = world.start(FAKE_CURL_EXIT="7", NIGHTLY_START_SECONDS="60")
+    wait_for(lambda: world.calls("curl ") > 0)
+    time.sleep(0.5)
+    os.kill(int((world.nightly / "lock" / "pid").read_text()), signal.SIGTERM)
+    assert night.wait(timeout=60) == 143
+    world.every_pid += world.pids()
+    assert world.calls("curl ") == 1
+    assert world.alive_servers() == 0
 
 
 def test_a_night_told_to_stop_during_a_step_stops_once_that_step_ends(world):

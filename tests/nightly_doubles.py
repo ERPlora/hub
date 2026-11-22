@@ -105,8 +105,8 @@ esac
 echo "pnpm unexpected $where $*" >> "$FAKE_CALLS"
 exit 2
 """
-# node: tests/e2e/database.ts [--drop] (FAKE_DB_FAILS=hub|saas fails that checkout's creation, FAKE_DROP_FAILS its
-# drop) and tests/e2e/whatsapp-graph.ts <hub port> <saas url>, which prints the SaaS's proxy variables (FAKE_GRAPH_EXIT
+# node: tests/e2e/database.ts [--drop] (FAKE_DB_FAILS=hub|saas fails that checkout's creation, FAKE_DB_SECONDS makes
+# it slow, FAKE_DROP_FAILS fails its drop) and tests/e2e/whatsapp-graph.ts <hub port> <saas url>, which prints the SaaS's proxy variables (FAKE_GRAPH_EXIT
 # makes it fail).
 FAKE_NODE = r"""#!/usr/bin/env bash
 where="$(basename "$PWD")"
@@ -117,6 +117,7 @@ case "$*" in
     exit 0 ;;
   "tests/e2e/database.ts")
     echo "database $where DB_NAME=${DB_NAME:-} E2E_SAAS_PORT=${E2E_SAAS_PORT:-}" >> "$FAKE_CALLS"
+    [ -z "${FAKE_DB_SECONDS:-}" ] || sleep "$FAKE_DB_SECONDS"
     if [ "${FAKE_DB_FAILS:-}" = "$where" ]; then echo "database.ts: could not migrate" >&2; exit 1; fi
     exit 0 ;;
   "tests/e2e/whatsapp-graph.ts "*)
@@ -157,9 +158,11 @@ FAKE_LAUNCHCTL = r"""#!/usr/bin/env bash
 echo "launchctl $*" >> "$FAKE_CALLS"
 exit "${FAKE_LAUNCHCTL_EXIT:-0}"
 """
-# gh: records its calls and the bodies it is given, answers OPEN_ISSUES to `issue list` and exits with FAKE_GH_EXIT.
+# gh: records its calls, the repository it writes to and the bodies it is given, answers OPEN_ISSUES to
+# `issue list` and exits with FAKE_GH_EXIT.
 FAKE_GH = r"""#!/usr/bin/env bash
 echo "gh $*" >> "$CALLS_LOG"
+echo "gh repo ${GH_REPO:-unset}" >> "$FAKE_CALLS"
 call="$*"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -171,12 +174,18 @@ done
 case "$call" in *"issue list"*) printf '%s\n' "${OPEN_ISSUES:-[]}" ;; esac
 exit "${FAKE_GH_EXIT:-0}"
 """
-# git: the real one, each call recorded.
+# git: the real one, each call recorded; FAKE_PRUNE_EXIT makes `worktree prune` fail.
 FAKE_GIT = r"""#!/usr/bin/env bash
 echo "git $*" >> "$FAKE_CALLS"
+if [ -n "${FAKE_PRUNE_EXIT:-}" ] && [ "${*: -2}" = "worktree prune" ]; then exit "$FAKE_PRUNE_EXIT"; fi
 exec "$REAL_GIT" "$@"
 """
-FAKES = {"git": FAKE_GIT, "uv": FAKE_UV, "pnpm": FAKE_PNPM, "node": FAKE_NODE, "docker": FAKE_DOCKER, "curl": FAKE_CURL,
+# tee: the real one, half a second late, as a log on a busy disk.
+FAKE_TEE = r"""#!/usr/bin/env bash
+sleep 0.5
+exec "$REAL_TEE" "$@"
+"""
+FAKES = {"git": FAKE_GIT, "tee": FAKE_TEE, "uv": FAKE_UV, "pnpm": FAKE_PNPM, "node": FAKE_NODE, "docker": FAKE_DOCKER, "curl": FAKE_CURL,
          "lsof": FAKE_LSOF, "launchctl": FAKE_LAUNCHCTL, "gh": FAKE_GH}
 
 RED_REPORT = {
@@ -254,7 +263,8 @@ class World:
                    ERPLORA_ROOT=str(self.erplora), GH_REPO="ERPlora/hub", NIGHTLY_START_SECONDS="5",
                    FAKE_E2E_EXIT="1", FAKE_RESULTS=str(self.root / "red.json"), FAKE_CALLS=str(self.logs["calls"]),
                    FAKE_PIDS=str(self.logs["pids"]), CALLS_LOG=str(self.logs["gh"]),
-                   BODIES_LOG=str(self.logs["bodies"]), REAL_GIT=shutil.which("git"))
+                   BODIES_LOG=str(self.logs["bodies"]), REAL_GIT=shutil.which("git"),
+                   REAL_TEE=shutil.which("tee"))
         env.update(settings)
         return env
 

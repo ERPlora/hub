@@ -34,6 +34,13 @@ def test_in_github_actions_the_night_also_writes_to_the_jobs_log(world):
 
 
 
+def test_gh_writes_to_the_hubs_repository_unless_told_another(world):
+    world.night(GH_REPO="")
+    assert world.calls_re(r"^gh repo ") == world.calls("gh repo ERPlora/hub") == 2
+    world.night(GH_REPO="someone/fork")
+    assert world.calls_re(r"^gh repo ") == world.calls("gh repo someone/fork") == 2
+
+
 def test_an_unpublished_night_calls_no_gh(world):
     assert world.night("--no-publish") == 1
     assert world.read("gh") == ""
@@ -79,6 +86,14 @@ def test_a_night_while_another_runs_stops_at_once_and_a_gone_ones_lock_is_taken_
     assert world.green() == 0
     assert f"the night of pid {holder.pid} is gone: taking its lock over" in world.out()
     assert world.calls_re(r"^e2e hub ") == 1
+    assert not (world.nightly / "lock").exists()
+
+
+def test_a_lock_left_as_a_file_is_taken_over(world):
+    world.nightly.mkdir(parents=True)
+    (world.nightly / "lock").write_text("not a folder\n")
+    assert world.green() == 0
+    assert "the night of pid ? is gone: taking its lock over" in world.out()
     assert not (world.nightly / "lock").exists()
 
 

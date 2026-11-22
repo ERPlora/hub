@@ -254,7 +254,6 @@ def one_night(night: Night, publish: bool) -> int:
     status = night.report(result, failed_step, commit, publish)
     prune_runs(f"{night.settings.nightly_dir}/runs", night.settings.keep_runs)
     say(f"night over: {result}")
-    SIGNALS.checkpoint()
     return status
 
 
