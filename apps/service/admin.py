@@ -26,7 +26,7 @@ from apps.service.models import (
     ServiceSettings,
     parent_problem,
 )
-from apps.service.services import lock_tree
+from apps.service.services.categories import lock_tree
 
 AUTOMATIC = ("id", "created_at", "updated_at")
 
