@@ -256,6 +256,7 @@ class ComboDishOut(AllergyInDishOut):
     price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.")
     tax_category_key: str | None = Field(description="Its tax category when the menu is split.")
     amount: int | None = Field(description="Its part of one menu's amount, in cents, when the menu is split.")
+    modifiers: list[str] = Field(description="The options of Modifiers chosen for it, by name, in the order chosen.")
 
 
 class ComboLineOut(Schema):

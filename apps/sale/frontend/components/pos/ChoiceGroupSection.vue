@@ -1,9 +1,15 @@
 <script lang="ts">
+import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
 import type { ChoiceGroup } from '../../lib/modifierChoice';
 
 export interface SectionGroup extends ChoiceGroup {
   readonly name: string;
   readonly options: readonly { readonly id: string; readonly label: string; readonly price_delta: number; readonly allergens: readonly string[] }[];
+}
+
+/** Modifiers' groups of a product as sections, each option labelled by its name. */
+export function modifierSections(groups: readonly TargetGroupOut[]): SectionGroup[] {
+  return groups.map((group) => ({ ...group, options: group.options.map((option) => ({ ...option, label: option.name })) }));
 }
 </script>
 

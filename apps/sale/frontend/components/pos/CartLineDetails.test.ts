@@ -16,6 +16,7 @@ const MENU_DISH = {
   price_delta: 0,
   tax_category_key: null,
   amount: null,
+  modifiers: [],
 };
 
 async function setup(over: Parameters<typeof line>[0] = {}) {
@@ -39,6 +40,14 @@ describe('CartLineDetails', () => {
     expect(await tone({ allergy: ['gluten'], allergy_in_dish: [] })).toBe('warning');
     expect(await tone({ allergy: ['gluten'], allergy_in_dish: ['gluten'] })).toBe('danger');
     expect(await tone({ product_id: null, allergy: ['milk'], allergy_in_dish: [], combo: menu })).toBe('danger');
+  });
+
+  it('names the options of each dish of a menu with the dish (SALE-F42)', async () => {
+    const steak = { ...MENU_DISH, option_id: 'steak', product_name: 'Entrecot', modifiers: ['Poco hecho', 'Queso'], allergens: [], allergy_in_dish: [] };
+    const fries = { ...MENU_DISH, option_id: 'fries', product_name: 'Patatas', allergens: [], allergy_in_dish: [] };
+    const menu = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [fries, steak] };
+    const m = await setup({ product_id: null, combo: menu });
+    expect(m.find('pos-line-l1-dishes').text()).toBe('Patatas, Entrecot (Poco hecho, Queso)');
   });
 
   it('renders neither allergen nor allergy rows for a plain line', async () => {

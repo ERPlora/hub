@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ef79f8f538d4051ac316f88fd9018a8cb70763577119d35270aa0d329213bcd7 -->
+<!-- generated from WORKBOOK.md sha256:44cc60501841943a463ca76f16148b71602f984bf00328de08b2307e892b5d4e -->
 
 ## What it is for and who it is for
 
@@ -363,8 +363,9 @@ Steps:
 4. Tap a dish to mark it ready, or tap the menu header to mark ready at once its dishes still on screen;
    the rest of the ticket does not change.
 5. On each station's paper the menu header comes out and, indented below, its dishes.
-In: from Sales, the menu as it was ordered: its dishes chosen (each one with its product and its
-category), its kitchen name, how many menus and the menu's note, which shows on each of its dishes.
+In: from Sales, the menu as it was ordered: its dishes chosen (each one with its product, its
+category and its modifiers, which show under the dish as in KITCHEN-F07: SALE-F42), its kitchen name,
+how many menus and the menu's note, which shows on each of its dishes.
 Out: one dish for each dish of the menu, each at its station, marked ready and served separately; the
 menu's amount counts only once in the ticket's total (announces: ticket received).
 If it fails: a dish of the menu that is a service is not cooked and does not come out; a menu whose dishes are
@@ -372,7 +373,7 @@ all services does not open a ticket. The till does not let you add a menu withou
 that is missing a mandatory course, so it never arrives empty or half-done. Voiding the menu at the till
 strikes through all its dishes. What was already sent does not change even if the menu
 changes afterwards.
-Involved: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
+Involved: SALE-F12, SALE-F20, SALE-F42, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
 ### KITCHEN-F07 Notes on each dish
 Status: done
