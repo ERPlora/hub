@@ -5,13 +5,12 @@ import { computed, shallowRef, useId } from 'vue';
 import { YouTubeEmbed } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 
-import type { AppHelp, HelpScreen } from '../operations-help';
 import { useBaseI18n } from '../lib/i18n';
-import { organizeFlows } from '../lib/help';
+import { type HelpViewEmits, type HelpViewProps, organizeFlows } from '../lib/help';
 import HelpMarkdown from './HelpMarkdown.vue';
 
-const props = defineProps<{ help: AppHelp; current?: HelpScreen; icon: string }>();
-const emit = defineEmits<{ expand: [title: string]; go: [path: string] }>();
+const props = defineProps<HelpViewProps>();
+const emit = defineEmits<HelpViewEmits>();
 const { t } = useBaseI18n();
 const prefix = useId();
 const query = shallowRef('');

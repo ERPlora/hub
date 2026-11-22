@@ -3,13 +3,13 @@ import { YouTubeEmbed } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
-import type { AppHelp, HelpScreen } from '../operations-help';
+import type { HelpViewEmits, HelpViewProps } from '../lib/help';
 import { useBaseI18n } from '../lib/i18n';
 import HelpFlowList from './HelpFlowList.vue';
 import HelpMarkdown from './HelpMarkdown.vue';
 
-const props = defineProps<{ help: AppHelp; current?: HelpScreen; icon: string }>();
-const emit = defineEmits<{ expand: [title: string]; go: [path: string] }>();
+const props = defineProps<HelpViewProps>();
+const emit = defineEmits<HelpViewEmits>();
 const { t } = useBaseI18n();
 const openScreen = shallowRef('');
 const otherScreens = computed(() => props.help.screens.filter((screen) => screen.id !== props.current?.id));
