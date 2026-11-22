@@ -10,8 +10,9 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.utils import translation
-from live.context import OperationContext, Scope
+from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
+from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of
@@ -98,6 +99,34 @@ def make_role(name: str = "Stylist", **fields) -> Role:
 
 def make_member(first_name: str = "Ana", last_name: str = "López", **fields) -> Member:
     return Member.objects.create(first_name=first_name, last_name=last_name, **fields)
+
+
+#: Every sale of these tests is charged by card: a cash charge would ask Cash register for an open drawer (SALE-F08).
+CARD = [{"method": "card"}]
+
+
+@pytest.fixture
+def catalog():
+    """Products made by Inventory, prices with tax included (what a line charges)."""
+    for name, sku, price in (("Cut", "CUT", 1800), ("Fringe", "FRG", 506), ("Shampoo", "SHP", 121)):
+        get("inventory.product.create")(
+            system_context(A),
+            get("inventory.product.create").input.model_validate(
+                {"name": name, "sku": sku, "price": price, "tax_category_key": "product.generic"}
+            ),
+        )
+
+
+def charge(key, *lines, staff=None):
+    """A sale an administrator charges by card: ``lines`` as (sku, member or None); ``staff`` serves the whole sale."""
+    op = get("sale.sale.complete")
+    data = {
+        "idempotency_key": key,
+        "lines": [{"product": sku, **({"staff_id": str(member.id)} if member else {})} for sku, member in lines],
+        **({"staff_id": str(staff.id)} if staff else {}),
+        "payments": CARD,
+    }
+    return op(ctx_for("hub_admin"), op.input.model_validate(data))
 
 
 def make_schedule(member: Member, days=None, name: str = "Usual", **fields) -> Schedule:

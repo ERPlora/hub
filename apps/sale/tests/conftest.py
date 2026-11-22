@@ -1,12 +1,13 @@
 """Fixtures of the sale tests: contexts per role and scope, users with a role on a host, and the real
-apps sale works with (tax's factory catalogue, inventory's products, customer's cards).
+apps sale works with (tax's factory catalogue, inventory's products, customer's cards, services' catalog and
+vouchers).
 
 Every test that uses the database sells as production does: inside the business ``A``'s own database
 (``in_business_a``), never on control's. A test of two businesses also asks for ``hub_b`` and enters it with
 ``use_hub``.
 
-The products and the customers are created through their own apps' operations, never by hand: the
-integration with ``tax``, ``inventory`` and ``customer`` is tested as it runs (no mocks).
+The products, the customers, the services and the vouchers are created through their own apps' operations, never
+by hand: the integration with ``tax``, ``inventory``, ``customer`` and ``service`` is tested as it runs (no mocks).
 """
 
 import datetime as dt
@@ -19,7 +20,8 @@ from django.test import Client
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
-from live.operations import get
+from live.models import OutboxEvent
+from live.operations import get, registry
 from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
@@ -173,3 +175,212 @@ def db_dsn(django_db_setup):
 
 
 Q = Decimal
+
+
+# ── Sale and Services together ──────────────────────────────────────────────────────────────────────
+# Services' catalog, vouchers and sessions are made by Services, and Sales reserves, releases, delivers and gives
+# back the sessions by calling Services' operations inside its own transaction. «Services off» is the app's
+# operations missing from the registry, as when it is not installed (the same path as ``app_inactive``).
+
+
+def svc(name: str, data: dict):
+    """Services' own operation, run as the platform: how the business's catalog and vouchers exist."""
+    op = get(name)
+    return op(system_context(A), op.input.model_validate(data))
+
+
+@pytest.fixture
+def haircut(db):
+    return svc(
+        "service.service.create",
+        {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
+    )
+
+
+@pytest.fixture
+def colour(db):
+    return svc(
+        "service.service.create",
+        {
+            "name": "Colour",
+            "pricing_type": "from",
+            "price": 6500,
+            "min_price": 4000,
+            "max_price": 9000,
+            "tax_category_key": "service.generic",
+        },
+    )
+
+
+@pytest.fixture
+def lucia(customer):
+    return customer("Lucía Pérez")
+
+
+def voucher(owner, service, *, name="Bono 5 cortes", uses=5, validity=None):
+    package = svc(
+        "service.package.create",
+        {
+            "name": name,
+            "max_uses": uses,
+            "validity_days": validity,
+            "items": [{"service_id": str(service.id)}],
+        },
+    )
+    return svc(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000},
+    )
+
+
+def check(*services, ctx=None):
+    """An open check with one line per service (fixed price)."""
+    return run(
+        "sale.order.open",
+        {"service_lines": [{"service_id": str(service.id)} for service in services]},
+        ctx,
+    )
+
+
+def pay_with(order, line_id, grant, ctx=None):
+    return run(
+        "sale.order.apply_voucher",
+        {"order_id": str(order.id), "line_id": str(line_id), "grant_id": str(grant.id)},
+        ctx,
+    )
+
+
+def charge(order, key="svc-charge-0001", ctx=None, **more):
+    return run(
+        "sale.sale.complete",
+        {"idempotency_key": key, "order_id": str(order.id), **more},
+        ctx,
+    )
+
+
+def last_event(name: str) -> dict:
+    return (
+        OutboxEvent.objects.filter(name=name)
+        .order_by("-created_at", "-id")
+        .first()
+        .payload
+    )
+
+
+def charged_with_voucher(haircut, lucia, product=None, key="svc-charge-0001", ctx=None):
+    grant = voucher(lucia, haircut)
+    lines = {"service_lines": [{"service_id": str(haircut.id)}]}
+    if product is not None:
+        lines["lines"] = [{"product": "SHA"}]
+    order = run("sale.order.open", lines, ctx)
+    cut = next(line for line in order.lines if line.service_id)
+    order = pay_with(order, cut.id, grant, ctx)
+    payments = [{"method": "card"}] if product is not None else []
+    sale = charge(order, key=key, ctx=ctx, customer_id=str(lucia.id), payments=payments)
+    return grant, sale, next(line for line in sale.lines if line.paid_by_voucher)
+
+
+def refund(sale, *, lines=(), allocations=(), key=None, ctx=None):
+    return run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(sale.id),
+            "reason": "did not come",
+            "allocations": list(allocations),
+            "lines": [{"line_id": str(line.id)} for line in lines],
+            **({"idempotency_key": key} if key else {}),
+        },
+        ctx,
+    )
+
+
+@pytest.fixture
+def services_off(monkeypatch):
+    def turn_off():
+        for name in [name for name in registry if name.startswith("service.")]:
+            monkeypatch.delitem(registry, name)
+
+    return turn_off
+
+
+def charged_open(key, *lines, staff=None, ctx=None):
+    """A sale charged by card with one open-price line per ``(name, price, professional or None)``: how a voucher is
+    charged at the till today (SERVICE-F14)."""
+    return run(
+        "sale.sale.complete",
+        {
+            "idempotency_key": key,
+            "open_lines": [
+                {
+                    "name": name,
+                    "unit_price": price,
+                    "tax_category_key": "service.generic",
+                    **({"staff_id": str(member)} if member else {}),
+                }
+                for name, price, member in lines
+            ],
+            "payments": [{"method": "card"}],
+            **({"staff_id": str(staff)} if staff else {}),
+        },
+        ctx,
+    )
+
+
+def grant_for(owner, service, *, name="Bono de 100", uses=3, amount=10000, **more):
+    package = svc(
+        "service.package.create",
+        {"name": name, "max_uses": uses, "items": [{"service_id": str(service.id)}]},
+    )
+    return svc(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(owner.id), "amount": amount, **more},
+    )
+
+
+def voucher_of_100(owner, service, *, uses=3, name="Bono de 100", seller=None, key="sold-0001"):
+    """A voucher of ``uses`` sessions, charged at the till for 100.00 (by ``seller``) and granted saying that sale."""
+    sold = charged_open(key, (name, 10000, seller))
+    return grant_for(owner, service, name=name, uses=uses, sale_id=str(sold.id))
+
+
+def spend_session(grant, service, owner, key, *, staff=None, sale_staff=None, ctx=None):
+    """One session of ``grant`` pays a check of one line of ``service`` that ``staff`` does, charged."""
+    order = run(
+        "sale.order.open",
+        {
+            "service_lines": [
+                {"service_id": str(service.id), **({"staff_id": str(staff)} if staff else {})}
+            ]
+        },
+        ctx,
+    )
+    order = pay_with(order, order.lines[0].id, grant, ctx)
+    return charge(
+        order,
+        key=key,
+        customer_id=str(owner.id),
+        ctx=ctx,
+        **({"staff_id": str(sale_staff)} if sale_staff else {}),
+    )
+
+
+def by_staff(**params):
+    return {row.staff_id: row for row in run("sale.sale.by_staff", params).rows}
+
+
+def professional(first_name: str, ctx=None):
+    """A member of Staff's team: Services only takes a professional who is on it."""
+    return run("staff.member.create", {"first_name": first_name, "last_name": "López"}, ctx).id
+
+
+def redeem(grant, *, member=None, service=None, ctx=None):
+    """One session of ``grant`` spent outside the till (the assistant, the API), saying who did it."""
+    return run(
+        "service.grant.redeem",
+        {
+            "id": str(grant.id),
+            **({"member_id": str(member)} if member else {}),
+            **({"service_id": str(service.id)} if service else {}),
+        },
+        ctx,
+    )

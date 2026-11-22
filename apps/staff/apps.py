@@ -79,8 +79,8 @@ class StaffConfig(LiveAppConfig):
         ],
         "hub_employee": ["staff.view", "staff.view_time_off", "staff.request_time_off"],
     }
-    # The sections of its tab bar, each opening with its permission: Commissions to whoever sees the
-    # pay, Roles and Settings to whoever may save the settings.
+    # The sections of its tab bar, each opening with its permission: Commissions to whoever reads the team
+    # (each person their own line; the team's with the pay), Roles and Settings to whoever may save the settings.
     navigation = [
         Nav(
             id="staff",
@@ -112,7 +112,7 @@ class StaffConfig(LiveAppConfig):
             label=_("Commissions"),
             icon="ion:wallet-outline",
             path="/staff/commissions",
-            permission="staff.view_compensation",
+            permission="staff.view",
         ),
         Nav("settings", _("Settings"), "ion:settings-outline", "/staff/settings", permission="staff.manage_settings"),
     ]

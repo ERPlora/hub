@@ -18,6 +18,7 @@ from apps.sale.models import Order
 from apps.table.models import ACTOR_MAX_LENGTH, Hold, SessionMove, Table, TableSession
 from apps.table.queries import check_label, find_session, find_table, order_is_open, seatable
 from apps.table.queries.floor import ended_orders, reserving_holds
+from base.queries.people import actor_name
 
 S = TableSession.Status
 #: The checks still alive: seated (open) or parked; Sales ending their check ends them.
@@ -42,15 +43,8 @@ SALE_UNAVAILABLE = _(
 
 
 def actor_label(ctx: OperationContext) -> str:
-    """Who acts, as a person reads it: a user's name (or e-mail, or username); the system's own label."""
-    who = ctx.actor
-    if who is None:
-        return ""
-    if hasattr(who, "get_username"):
-        label = who.get_full_name() or getattr(who, "email", "") or who.get_username()
-    else:
-        label = str(who)
-    return label[:ACTOR_MAX_LENGTH]
+    """Who acts, as a colleague reads them (never by their address); the system's own label."""
+    return actor_name(ctx.actor)[:ACTOR_MAX_LENGTH]
 
 
 def actor_id(ctx: OperationContext) -> str:

@@ -29,6 +29,10 @@ cancela dentro de la política del negocio.
 - El **responsable** ve todas las reservas online y las confirma, completa, marca como no presentadas o
   cancela.
 - El **propietario** y el **administrador**: además las borran y configuran la página de reservas.
+- El **teléfono y el email de la clienta** de una reserva solo los ve quien tiene el permiso de dato «Ver el
+  contacto de los clientes» (BASE-F119), que hoy tienen los cuatro roles. Quien no lo tiene ve la reserva y el
+  nombre de la clienta, sin su teléfono ni su email, en ninguna pantalla, API, bandeja en vivo ni respuesta del
+  asistente, y no encuentra una reserva por ellos. La página de reservas de la clienta no cambia.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «confirma la reserva
   de Ana de mañana», «¿qué reservas online hay pendientes?», «cancela la reserva APT-20261016-0003».
   Antes de una acción pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombra la
@@ -71,10 +75,11 @@ y, desde su fila, confírmala, complétala, márcala como no-show, cancélala o 
 de tu agenda.
 
 #### Detalle
-Tabla de 50 filas por página con buscador («Buscar nº, cliente, teléfono, servicio…») y filtros por columna
+Tabla de 50 filas por página con buscador («Buscar nº, cliente, teléfono, servicio…»; a quien no ve el contacto
+de los clientes, «Buscar nº, cliente, servicio…», que no mira el teléfono ni el email) y filtros por columna
 detrás del botón de filtros de la barra: Nº, Cliente, Servicio, Profesional, Fecha
 (un día) y Estado. Columnas: **Nº** (`APT-…`), **Cliente** (con su
-teléfono), **Servicio**, **Profesional**, **Fecha**, **Hora**, **Estado** y **Reservada** (cuándo la pidió).
+teléfono, si quien mira ve el contacto de los clientes), **Servicio**, **Profesional**, **Fecha**, **Hora**, **Estado** y **Reservada** (cuándo la pidió).
 Las más recientes primero; se ordena por columna. Lista o tarjetas.
 
 Por fila: **Confirmar**, **Completar**, **No-show**, **Cancelar** y **Borrar** (Borrar solo para quien puede
@@ -300,12 +305,14 @@ Pantalla: Reservas
 Pasos:
 1. Abre **Reservas**: las citas con origen «Reserva online», las más recientes primero.
 2. Busca por número, nombre, teléfono, email, servicio o profesional; filtra por columna desde el botón de
-   filtros de la barra; ordena. Un nombre largo acaba en «…» dentro de su columna.
-3. Una reserva concreta la da el asistente o la API por su número, o por la clienta y el día.
+   filtros de la barra; ordena. Un nombre largo acaba en «…» dentro de su columna. Quien no ve el contacto de
+   los clientes busca y filtra sin el teléfono ni el email: no le encuentran a nadie.
+3. Una reserva concreta la da el asistente o la API por su número, o por la clienta y el día (por su teléfono
+   o su email, solo a quien ve el contacto de los clientes).
 Entra: las citas de Citas con origen «Reserva online» que la persona puede ver.
 Sale: nada se escribe. La fila no abre nada por sí sola: lo que se hace con una reserva son sus acciones.
 Si falla: «No se pudieron cargar las reservas» con **Reintentar**.
-Implicados: APPOINTMENT-F27
+Implicados: APPOINTMENT-F27, BASE-F119
 
 ### ONLINE_BOOKING-F09 Seguir a la clienta cuando se fusionan dos fichas
 Estado: hecho (lo hace Citas; la bandeja lo refleja)
@@ -371,7 +378,8 @@ Implicados: APPOINTMENT-F24, CUSTOMER-F16
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien habla) y la
 API, con las mismas reglas y permisos. Una reserva se nombra por su id, su número (`APT-…`) o **como lo dice
-una persona**: la clienta (nombre, teléfono o email) y el día («la de Ana de mañana»); sin día, su próxima
+una persona**: la clienta (nombre, teléfono o email; el teléfono y el email, solo quien ve el contacto de los
+clientes) y el día («la de Ana de mañana»); sin día, su próxima
 reserva online. Si vale para varias, se dicen cuáles y se pide el número. Por voz, las de la página se piden
 como «la reserva de internet de Olga» o «lo que tengo en la bandeja».
 
@@ -380,7 +388,7 @@ como «la reserva de internet de Olga» o «lo que tengo en la bandeja».
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las reservas online, con búsqueda, filtros y orden, en páginas (hasta 100) | ver reservas | F08 | `online_booking.booking.list` |
-| Una reserva | ver reservas | F08 | `online_booking.booking.get` |
+| Una reserva (el teléfono y el email de la clienta, solo a quien ve el contacto de los clientes) | ver reservas | F08 | `online_booking.booking.get` |
 | La configuración de la página y las reglas de reserva | ver reservas | F07 | `online_booking.settings.get` |
 | Página, servicios, horas libres y reserva por enlace (públicas) | `online_booking.public` | F01, F10 | `online_booking.public.page`, `.services`, `.slots`, `.booking` |
 
@@ -426,12 +434,21 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 | Borrar reservas | sí | sí | no | no | `online_booking.delete_booking` |
 | Configurar la página | sí | sí | no | no | `online_booking.manage_settings` |
 | Probar la página pública (vista previa) | sí | sí | no | no | `online_booking.public` |
+| Ver el teléfono y el email de la clienta (permiso de dato de la plataforma, BASE-F119) | sí | sí | sí | sí | `base.view_customer_contact` |
 
 La página de reservas no pide sesión: quien la abre tiene `online_booking.public` y nada más, también si es alguien
 del equipo con su sesión abierta.
 
 ## Para quien lo mantiene
 
+- **El contacto de la clienta** (BASE-F119): `customer_phone` y `customer_email` de `BookingRow` (y de `BookingOut`,
+  que la hereda) son los campos `PHONE` y `EMAIL` de `apps/customer/schemas/contact.py`, con la marca
+  `CUSTOMER_CONTACT`: live los da nulos a quien no tiene `base.view_customer_contact`, en todas las puertas. La cita
+  los sigue guardando. La búsqueda de la bandeja, su filtro por clienta y la clienta de `BookingRefIn` (las seis
+  órdenes y lecturas que nombran una reserva) miran el teléfono, el email y el texto de búsqueda de la ficha con
+  contacto solo si quien llama ve el contacto (`sees_contact` de Clientes); si no, el nombre de la cita y el texto
+  de la ficha sin contacto. Las operaciones públicas buscan la ficha por el ORM y no responden contacto: no
+  cambian. Tests: `tests/test_queries_contact.py`, por la ruta real y con una persona de verdad.
 - **Decisión de diseño** (ver «Decisiones de mercado»): Reservas online **no guarda reservas propias**. Una
   reserva online es una cita de Citas con `source = "online"`; esta app es la configuración de la página, la
   bandeja sobre esas citas, las operaciones públicas y el enlace de la clienta. Nada duplicado: estados,

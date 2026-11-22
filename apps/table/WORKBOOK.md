@@ -471,7 +471,8 @@ Pasos:
 3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y, al
    pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
    el nombre y la hora. Quién la atiende se ve en su ventana: quien atiende su cuenta en Ventas (el chip
-   «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó.
+   «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó, por su nombre o, si su cuenta no tiene,
+   por lo que va antes de la @ de su correo, nunca el correo entero.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
    volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
    que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su
@@ -479,7 +480,7 @@ Pasos:
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
-Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19
+Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19, BASE-F119
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
 Estado: hecho
@@ -494,7 +495,8 @@ Pasos:
 3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta. En una Reservada, si no
    eliges ninguna, la cuenta lleva el cliente de la reserva.
 4. La mesa pasa a Ocupada y en Ventas nace su cuenta abierta con el título «Mesa N» (la ve **Cuentas
-   abiertas** del TPV). Quien sienta es el camarero de la cuenta.
+   abiertas** del TPV). Quien sienta es el camarero de la cuenta: su nombre o, si su cuenta no tiene, lo que
+   va antes de la @ de su correo, nunca el correo entero.
 5. Con el asistente: «sienta a tres en la mesa 4» (con su zona si el número se repite).
 Entra: la mesa y los comensales; en una Reservada, los comensales y el cliente de la reserva.
 Sale: la cuenta de mesa abierta con sus comensales, la hora y el camarero (avisa:
@@ -505,7 +507,7 @@ Si falla: si otro dispositivo la acaba de ocupar, «Otro dispositivo acaba de oc
 actualizado el plano.» y la mesa no se sienta. **Dos camareros que sientan la misma mesa a la vez
 dejan una sola cuenta**: el segundo recibe ese mismo aviso. Una mesa bloqueada, desactivada o borrada
 no se sienta. Sentar se hace en la sala, con el grupo delante: una automatización no puede hacerlo.
-Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
+Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12, BASE-F119
 
 ### TABLE-F11 Volver a una mesa ocupada para pedir más o cobrarla
 Estado: hecho
@@ -715,13 +717,15 @@ Pasos:
 1. Abre **Mesas → Sesiones**: arranca en «Abiertas», las más recientes primero.
 2. «Cerradas» enseña las cerradas con «Cobrado» (en la moneda en que se cobró: la del negocio) y
    «Cierre»; «Todas», también las trasladadas, fusionadas y aparcadas.
-3. Filtra por zona, camarero o estado, o busca por número de mesa.
+3. Filtra por zona, camarero o estado, o busca por número de mesa. El camarero sale por su nombre o, si su
+   cuenta no tiene, por lo que va antes de la @ de su correo, también en las cuentas de antes, y no se le
+   busca por su correo.
 4. «Detalle» enseña zona, camarero, estado, comensales, apertura, cierre, tiempo, cobrado y notas.
 Entra: las cuentas de mesa y lo cobrado en Ventas.
 Sale: nada.
 Si falla: si la lista no carga, sale un aviso con «Reintentar». Las devoluciones no restan del
 «Cobrado».
-Implicados: TABLE-F18, TABLE-F19, TABLE-F23
+Implicados: TABLE-F18, TABLE-F19, TABLE-F23, BASE-F119
 
 ### TABLE-F23 Borrar una cuenta cerrada del historial
 Estado: hecho
@@ -1102,6 +1106,12 @@ Ventas (`sale.add_sale`), que tienen todos los papeles menos la gestoría.
   cada cuenta por las mesas: un tramo vivo por cuenta, con el motivo de inicio y el de fin), `Hold` (la
   retención: única por `(source, source_ref)`, con `held_from` y `held_until` con zona) y
   `TableSettings` (una fila). Borrados lógicos (`is_deleted`) en zonas, mesas y cuentas.
+- **Quién sienta una mesa** (BASE-F119): la cuenta de mesa guarda su camarero (`waiter_name`) con `actor_label`
+  (`services/writes.py`), que nombra con `actor_name` de `base.queries.people`, la misma pieza que Ventas y Cocina: el
+  nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a
+  quien ve el contacto del equipo. Las cuentas guardadas antes con un correo las limpió una vez la migración `0003`, en
+  la base de datos de cada negocio: así el plano, el detalle, el filtro por camarero (su nombre, su búsqueda y su
+  orden), lo vivo y el asistente leen el nombre sin tapar nada al leer.
 - **El estado de una mesa no se guarda: se calcula al leer** — Ocupada si tiene una cuenta viva
   (abierta y con su cuenta de Ventas abierta, o sin cuenta de Ventas); si no, Bloqueada si lo está;
   si no, Reservada si tiene una retención viva que ya entró en su ventana (60 minutos antes de

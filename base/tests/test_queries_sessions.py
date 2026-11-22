@@ -49,7 +49,7 @@ def test_an_employee_s_menu_has_only_the_screens_of_its_work(make_user):
     assert menu["table"] == ["/table/floor-plan", "/table/sessions"]
     assert menu["customer"] == ["/customer/customers"]
     assert menu["reservation"] == ["/reservation/reservations", "/reservation/waitlist"]
-    assert menu["staff"] == ["/staff/members", "/staff/time-off", "/staff/schedules"]
+    assert menu["staff"] == ["/staff/members", "/staff/time-off", "/staff/schedules", "/staff/commissions"]
     assert menu["flow"] == ["/flow/automations"]
     assert menu["online_booking"] == ["/online_booking/bookings"]
     assert menu["whatsapp_inbox"] == ["/whatsapp_inbox/inbox"]

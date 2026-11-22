@@ -28,7 +28,8 @@ Para qué: que la agenda sepa quién trabaja, cuándo y qué cobra cada profesio
 13. STAFF-F18 — se aprueba; otra petición se rechaza.
 14. STAFF-F19 — una ausencia, cancelada.
 15. STAFF-F08 — Ana ve su ficha y sus ausencias.
-16. STAFF-F20 — quién falta hoy.
-17. STAFF-F23 — las cifras de la plantilla y por rol.
-18. STAFF-F05 — un profesional, desactivado.
-19. STAFF-F06 — otro, dado de baja.
+16. STAFF-F21 — Ana, desde su sesión, abre Comisiones: solo su propia fila.
+17. STAFF-F20 — quién falta hoy.
+18. STAFF-F23 — las cifras de la plantilla y por rol.
+19. STAFF-F05 — un profesional, desactivado.
+20. STAFF-F06 — otro, dado de baja.

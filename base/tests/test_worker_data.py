@@ -191,13 +191,13 @@ def test_without_a_bucket_in_the_worker_nothing_is_emptied(hub_a, dumps_bucket, 
 
 def test_an_emptying_that_fails_keeps_the_copy_and_empties_nothing(hub_a, dumps_bucket, monkeypatch):
     owner = loaded_and_asked(ready(hub_a), ["table"])
-    real = blueprint.reset
+    real = blueprint.removal.reset
 
     def breaks_after_the_first_rows(ctx, chosen):
         assert real(ctx, chosen)["apps"][0]["removed"] == 12
         raise RuntimeError("the database went away")
 
-    monkeypatch.setattr(blueprint, "reset", breaks_after_the_first_rows)
+    monkeypatch.setattr(blueprint.removal, "reset", breaks_after_the_first_rows)
 
     run_pass()
 
