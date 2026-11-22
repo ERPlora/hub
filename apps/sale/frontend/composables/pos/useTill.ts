@@ -167,7 +167,7 @@ export function useTill(options: TillOptions): Till {
   }
 
   const staffOf = (staffId: string | null) => (staffId ? { staff_id: staffId } : {});
-  const openWith = () => ({ ...(pendingLabel.value ? { label: pendingLabel.value } : {}), ...options.opening?.() });
+  const labelOf = () => ({ ...(pendingLabel.value ? { label: pendingLabel.value } : {}), ...options.opening?.() });
 
   async function opened(write: () => Promise<OrderOut>): Promise<void> {
     const created = await write();
@@ -184,7 +184,7 @@ export function useTill(options: TillOptions): Till {
       try {
         const id = order.value?.id ?? check.id.value;
         if (!id) {
-          await opened(() => open.run({ ...openWith(), lines: [{ product_id: product.id, ...staffOf(staffId), ...options }] }));
+          await opened(() => open.run({ ...labelOf(), lines: [{ product_id: product.id, ...staffOf(staffId), ...options }] }));
           return { ok: true } as const;
         }
         // A line with options is a dish of its own: it never raises another, nor is raised.
@@ -210,11 +210,11 @@ export function useTill(options: TillOptions): Till {
         const id = order.value?.id ?? check.id.value;
         const typed = { ...line, ...staffOf(staffId) };
         if (!id && session.can('sale.sell_open_price')) {
-          await opened(() => open.run({ ...openWith(), open_lines: [typed] }));
+          await opened(() => open.run({ ...labelOf(), open_lines: [typed] }));
           return { ok: true };
         }
         // Whoever may not sell at an open price opens the check empty and the line waits for a manager's approval.
-        if (!id) await opened(() => open.run({ ...openWith() }));
+        if (!id) await opened(() => open.run({ ...labelOf() }));
         const orderId = (order.value?.id ?? check.id.value) as string;
         accept(await withApproval(() => addOpen.run({ order_id: orderId, ...typed })));
         return { ok: true };
@@ -230,7 +230,7 @@ export function useTill(options: TillOptions): Till {
       try {
         const id = order.value?.id ?? check.id.value;
         if (!id) {
-          await opened(() => open.run({ ...openWith(), service_lines: [{ service_id: service.id, ...priced, ...staffOf(staffId) }] }));
+          await opened(() => open.run({ ...labelOf(), service_lines: [{ service_id: service.id, ...priced, ...staffOf(staffId) }] }));
           return { ok: true };
         }
         const merge = unitPrice === undefined && order.value ? mergeableServiceLine(order.value.lines, service.id, staffId) : undefined;
@@ -254,7 +254,7 @@ export function useTill(options: TillOptions): Till {
       try {
         const id = order.value?.id ?? check.id.value;
         if (!id) {
-          await opened(() => open.run({ ...openWith(), combo_lines: [menu] }));
+          await opened(() => open.run({ ...labelOf(), combo_lines: [menu] }));
           return { ok: true };
         }
         accept(await addCombo.run({ order_id: id, ...menu }));
