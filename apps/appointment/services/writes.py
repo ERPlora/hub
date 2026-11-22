@@ -38,6 +38,7 @@ from apps.customer.queries import find_customer
 from apps.service.models import Service
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from base.queries.people import actor_name
 
 #: Run only by the platform (events.py): outside ``appointment.*``, so no role and no API key holds it.
 SYSTEM = "system.appointment"
@@ -69,13 +70,8 @@ CHANGE_OWN_ONLY = _("You may only change your own appointments.")
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it: an account's full name, else its email, else its username."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        return (actor.get_full_name() or actor.email or actor.get_username())[:128]
-    return str(actor)[:128]
+    """Who acted, as a colleague reads it in the appointment's history: never their e-mail address."""
+    return actor_name(ctx.actor)[:128]
 
 
 def _wall_text(moment: dt.datetime) -> str:
