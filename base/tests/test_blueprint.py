@@ -21,6 +21,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from live import operations
 from live.context import OperationContext
+from live.errors import InvalidPayload
 from live.operations import get
 
 from base import blueprint, catalog
@@ -389,6 +390,14 @@ def test_a_refused_row_is_named_as_the_person_knows_it_by_its_name_and_by_its_co
     assert products["problems"][1].startswith("«BAD-01»:")
 
 
+def test_a_refusal_says_what_its_app_said_about_the_field_once():
+    with_detail = InvalidPayload("The row could not be saved.", code="invalid_field", fields={"sku": "That code is taken."})
+    repeated = InvalidPayload("That code is taken.", code="invalid_field", fields={"sku": "That code is taken."})
+
+    assert blueprint.calls._reason(with_detail) == "The row could not be saved. That code is taken."
+    assert blueprint.calls._reason(repeated) == "That code is taken."
+
+
 def test_a_product_whose_category_is_not_there_is_created_and_the_missing_link_is_told(ctx):
     bundle = restaurant_bundle(
         **{
@@ -456,6 +465,15 @@ def test_a_backup_brings_the_customers_back(ctx):
     [row] = call(ctx, "customer.customer.list", limit=10).rows
     assert (row.name, row.email) == ("Lucía Pérez", "lucia@example.com")
     assert result.created["customer.customer"] == [str(row.id)]
+
+
+def test_a_backup_keeps_a_customers_cell_that_starts_like_a_formula_as_it_was_typed(ctx):
+    """The customers' export quotes a cell a spreadsheet would run as a formula; the backup carries it unquoted."""
+    call(ctx, "customer.customer.create", name="Lucía Pérez", phone="+34600111222")
+
+    [row] = blueprint.export.export_data(ctx, {"customer": ["customer.customer"]}, purpose="backup")["customer.customer"]
+
+    assert row["phone"] == "+34600111222"
 
 
 # ── Exporting: the same datasets, read by each app's list ─────────────────────────────────────────────────────────
