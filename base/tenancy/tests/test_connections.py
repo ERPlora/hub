@@ -24,7 +24,7 @@ def pgbouncer_safe(settings: dict) -> bool:
     """What PgBouncer in transaction mode needs of an alias (``tests/test_guardrails.py``, ``database_problems``).
 
     ``prepare_threshold`` must be there and ``None``: Django does not set it and psycopg 3 prepares a statement on
-    its fifth run, which PgBouncer with ``max_prepared_statements=0`` (docker/pgbouncer-entrypoint.sh) then loses
+    its fifth run, which PgBouncer with ``max_prepared_statements=0`` (docker/pgbouncer_entrypoint.py) then loses
     («prepared statement _pg3_N does not exist»)."""
     return (
         settings["CONN_MAX_AGE"] == 0

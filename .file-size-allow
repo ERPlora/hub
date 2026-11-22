@@ -124,7 +124,6 @@
 625 control/models.py ERPlora/erplora-next#74
 1017 control/services.py ERPlora/erplora-next#74
 1220 control/tests/test_services.py ERPlora/erplora-next#74
-109 docker/pgbouncer-entrypoint.sh ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
