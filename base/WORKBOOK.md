@@ -2584,7 +2584,10 @@ Pasos:
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
      fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); los permisos que se conceden a una
      automatización, por la acción de cada uno como la nombra su Historial («Permisos: Crear una tarea, Crear un
-     cliente»), y las apps que carga una plantilla, por su nombre («Apps que se cargan: Ventas / TPV, Facturación»);
+     cliente»); una plantilla del catálogo, por su nombre y su idioma, como en Importar («Plantilla: Restaurante
+     (español)»), nunca por su código, y las apps que carga, por su nombre («Apps que se cargan: Ventas / TPV,
+     Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
+     y 17 más»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
