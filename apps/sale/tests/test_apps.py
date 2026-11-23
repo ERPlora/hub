@@ -154,11 +154,12 @@ def test_every_operation_is_described_for_the_assistant():
     for name, op in ops.items():
         if name in internal:
             continue
-        assert isinstance(op.ai, AI) and op.ai.description.strip(), name
+        tool = op.ai_spec()  # a write with its own card declares a dict, read as the tool it describes
+        assert isinstance(tool, AI) and tool.description.strip(), name
         if op.kind == "command":
-            assert op.ai.risk in {"normal", "high"}, name
+            assert tool.risk in {"normal", "high"}, name
         else:
-            assert op.ai.risk == "normal", name
+            assert tool.risk == "normal", name
 
 
 def test_the_money_and_fiscal_writes_are_high_risk():

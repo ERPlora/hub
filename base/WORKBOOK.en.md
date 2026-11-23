@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:44e47aa5ff847a21690b43b8aea0e40c76a5a45aae2426a3281aed85bcc3bf16 -->
+<!-- generated from WORKBOOK.md sha256:2bb981d99b9e23d4671a0e0503f451fbb6eb431514b76da46750b17bb6635f25 -->
 
 ## What it is for and who it is for
 
@@ -2620,7 +2620,13 @@ Steps:
      person's language and an amount as money ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
      Colour · 3"; when a line cannot be named, the list says how many it carries: it would read as a bare figure); and
      any other, such as a line with two records (the employee and the product of a sale), one with a text of its own or
-     a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
+     **Charge** sheet: the total, as the POS works it out for whoever asks ("Total: €12.50"), and each payment method
+     with what it pays ("Payments: Cash · €12.50"; the one without an amount pays what the others leave and, when none
+     is said, all of it in cash, as the action charges), never "1 item" nor the check's version, which only the
+     **Charge** sheet uses; payments that do not add up to the total show as they were said, beside the total, and
+     when the total cannot be worked out (the check is no longer there or whoever asks cannot see it) it is not made
+     up: in both cases the action refuses it when it runs; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front

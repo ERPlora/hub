@@ -2637,7 +2637,13 @@ Pasos:
      cifras, la cantidad como se escribe en el idioma de la persona y un importe como dinero («Productos: Vino tinto · 6;
      Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; si una línea no se puede nombrar, la lista dice
      cuántas lleva: se leería como una cifra suelta); y cualquier otra, como una línea con dos registros (el empleado y
-     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; y un dato
+     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; un cobro,
+     por su total y cómo se paga, como el botón de la hoja **Cobro**: el total, tal como lo calcula el TPV para quien
+     pregunta («Total: 12,50 €»), y cada forma de pago con lo que paga («Pagos: Efectivo · 12,50 €»; la que va sin
+     importe paga lo que dejan las otras y, si no se dice ninguna, todo en efectivo, como cobra la acción), nunca
+     «1 elemento» ni la versión de la cuenta, que solo usa la hoja **Cobro**; unos pagos que no suman el total salen
+     tal como se dijeron, junto al total, y si el total no se puede calcular (la cuenta ya no está o quien pregunta no
+     puede verla) no se inventa: en los dos casos la acción lo rechaza al ejecutarse; y un dato
      que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
