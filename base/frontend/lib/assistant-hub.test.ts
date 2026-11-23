@@ -302,6 +302,9 @@ describe("the verb of a write (base's catalogue)", () => {
     expect(verb('cash_register.movement.add')).toEqual(['Registrar movimiento', 'Register movement']);
     // Adding a line to a cart is adding: its action's verb.
     expect(verb('cart_checkout.item.add')).toEqual(['Añadir', 'Add']);
+    // VeriFactu's live test, as the buttons of its Settings say it, never «Ejecutar» or «Crear» (hub#2183).
+    expect(verb('verifactu.diagnostic.run')).toEqual(['Probar la conexión', 'Test the connection']);
+    expect(verb('verifactu.test_invoice.create')).toEqual(['Crear factura de prueba', 'Create test invoice']);
   });
 
   it('an operation the catalogue does not name goes by its action, a word of JavaScript’s included', () => {

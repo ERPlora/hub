@@ -2641,7 +2641,10 @@ Pasos:
      factura dice «Rectificar en Facturación». Dos acciones que se llaman igual en dos apps dicen cada una lo que
      hace: vaciar un carrito dice «Vaciar en Carrito y pago», quitar una de sus líneas «Quitar en Carrito y pago» y
      quitar la ruta de un producto en la cocina «Quitar en Cocina»; un arqueo dice «Registrar arqueo en Caja» y una
-     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir».
+     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir»; y la prueba en
+     vivo de VeriFactu, como sus botones, «Probar la conexión en VeriFactu» y «Crear factura de prueba en VeriFactu»,
+     nunca «Ejecutar» ni «Crear». Una acción que no lleva ningún dato que enseñar dice solo su acción y su app, acabada
+     en punto y sin dos puntos vacíos detrás: «Probar la conexión en VeriFactu.».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice. Tras
      «Ejecutar», el asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó
