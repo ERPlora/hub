@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c063cc15c8abc652ea32e9b2ca056cec9876ffe30418a383fadd431417abddc6 -->
+<!-- generated from WORKBOOK.md sha256:906b5d68ed65465f927ea5b2be3b09d22140d17b514d2f3803c385450d33d955 -->
 
 ## What it is for and who it is for
 
@@ -219,7 +219,7 @@ Steps:
    like the switch: "Change in Menus and combos" with the menu and how "On sale" is left, and "Run it" confirms it,
    with nothing to type.
    Changing the name, the price, the way of selling, the VAT category or the order, alone or together with "On sale",
-   asks to type CONFIRM, because it may change how it is charged (BASE-F98).
+   asks to type CONFIRM, because it may change how it is charged.
 In: the same fields as when creating; only what is sent changes (through the assistant or the API, what
 is not named stays as it was).
 Out: the changed menu (announces: menu changed). What is already charged does not change: each sale line

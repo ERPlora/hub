@@ -225,7 +225,7 @@ Pasos:
    solo toque, como el interruptor: «Cambiar en Menús y combos» con el menú y cómo queda «A la venta», y se confirma
    con «Ejecutar», sin escribir nada.
    Cambiar el nombre, el precio, la forma de venta, el tipo de IVA o el orden, solo o junto a «A la venta», pide
-   escribir CONFIRMAR, porque puede cambiar cómo se cobra (BASE-F98).
+   escribir CONFIRMAR, porque puede cambiar cómo se cobra.
 Entra: los mismos campos que el alta; solo cambia lo que se envía (por el asistente o la API, lo que no
 se nombra se queda como estaba).
 Sale: el menú cambiado (avisa: menú cambiado). Lo ya cobrado no cambia: cada línea de venta lleva su
