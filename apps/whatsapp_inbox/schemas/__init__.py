@@ -14,6 +14,7 @@ from . import (
     deliveries as deliveries,
     erasing as erasing,
     fields as fields,
+    health as health,
     messages as messages,
     notes as notes,
     received as received,

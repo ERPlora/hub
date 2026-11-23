@@ -8,6 +8,7 @@ from . import (
     agents as agents,
     channel as channel,
     conversations as conversations,
+    health as health,
     messages as messages,
     notes as notes,
     reads as reads,

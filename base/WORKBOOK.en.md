@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6f5ac04eb1146e35a82110e7ffde50294fb6a4110e34dec15d5aa4209d9d358a -->
+<!-- generated from WORKBOOK.md sha256:1b0b3041e476a50330e74175d99a868fcb7aa2c11d0714a858fbb479dc49630d -->
 
 ## What it is for and who it is for
 
@@ -58,6 +58,8 @@ against what the plan includes and, like Google Workspace, the yellow notice at 
 On top, the business's name and "Today" with the long date; while the business has no name, a greeting
 by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this order:
 
+- **How the business is working**, only for who administers it: a coloured label for each app on that says how it is
+  doing (the receipt printer, the WhatsApp number), with what fixes it, and "View system".
 - **"Start with a business like yours"**, only for who administers the business and while the business has
   nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
 - **"My apps"**: one tile per app the person can open, with its icon and its name; the ones opened most in this
@@ -284,9 +286,9 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 
 | State | What the person sees |
 |---|---|
-| Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
+| Loading | The row of how the business is working in grey, grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
-| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". In the app on a computer, "Could not change the start on login setting." (BASE-F120). |
+| Error | Each zone fails on its own: "We couldn't check how your business is working." with "Retry", "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". In the app on a computer, "Could not change the start on login setting." (BASE-F120). |
 | No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks."), except "Start on login", which belongs to the computer and not to the business, and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
@@ -339,7 +341,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | partial |
+| BASE-F02 | See the business at a glance on coming in | done |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -496,32 +498,36 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
-Status: partial — the health row of step 5 is not painted on the Home yet, although the hub already knows what to
-say about the receipt printer; and the WhatsApp Inbox does not say yet how its number is doing (hub#573)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
   1. After coming in, the Home opens (also from "Home" in the side menu).
   2. On top, the business's name (the one on erplora.com) and "Today" with the long date in the app's
      language; while the business has no name, "Good morning", "Good afternoon" or "Good evening".
-  3. Below, in this order: "Start with a business like yours" (only while the business is empty and for
+  3. For who administers the business, under the greeting, a row with how what the business needs to work is
+     doing and "View system", which leads to System. Each app on that the person can see says its own in a coloured
+     label: green what works, amber what needs fixing and grey what could not be checked. With Printing, "Printer
+     ready" if the device that prints the receipts gave signs in the last minute and a half, "Printer not connected"
+     if it is set up but does not answer, or "Printer not set up" if there is none; the last two with "Set up
+     printing", which opens Printing. With the WhatsApp Inbox, "WhatsApp connected", "WhatsApp needs reconnecting" if
+     WhatsApp asks for it, or "WhatsApp not connected" if no number is connected; the last two with "Connect
+     WhatsApp", which opens the Inbox's settings. The row is checked again each time the person comes back to the
+     Home. With no app on that says how it is doing, there is no row. Whoever does not administer the business does
+     not see it.
+  4. Below, in this order: "Start with a business like yours" (only while the business is empty and for
      who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
      panels.
-  4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
+  5. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
      without reloading or reopening the application.
-  5. For who administers the business, at the foot of "Summary", a row with how what the business needs to work
-     is doing and "See system", which leads to System. Each app on that the person can see says its own: with
-     Printing, "Printer ready" if the device that prints the receipts gave signs in the last minute and a half,
-     "Printer not connected" if it is set up but does not answer, or "Printer not set up" if there is none; the
-     last two with "Set up printing", which opens Printing. Whoever does not administer the business does not see
-     the row.
   6. At the bottom, two tabs: "Summary" (the above) and "Activity".
 In: the business's name, the device's date and what each app on says about itself.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
 the zones stack and "My apps" folds. What could not be checked shows as neutral, never as ready and without a
-button, because it is not the viewer's task: "We couldn't check the printer".
-Involved: PRINTING-F21
+button, because it is not the viewer's task: "We couldn't check the printer", "We couldn't check WhatsApp". If the
+whole row cannot be read: "We couldn't check how your business is working." with "Retry".
+Involved: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
 Status: done
