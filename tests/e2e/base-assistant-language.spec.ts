@@ -26,12 +26,15 @@ async function inLanguage(page: Page, language: 'en' | 'es'): Promise<void> {
   await expect(shown(page).getByTestId('home-my-apps').locator('h2')).toHaveText(WORDS[language].myApps);
 }
 
-/** Asks the assistant, speaking `from`, for the app in `to`, and says yes to its card. */
+/** Asks the assistant, speaking `from`, for the app in `to`, and says yes to its card; the Home's health row, which
+ *  the server writes in the session's language, is asked again. */
 async function askedFor(page: Page, from: 'en' | 'es', to: 'en' | 'es'): Promise<void> {
   const wanted: Preferences = { language: to, theme_mode: '', palette: '', ui_scale: 100 };
   await askForACard(page, `E2E-ASK base__profile__preferences_set ${JSON.stringify(wanted)}`);
   await expect(card(page)).toContainText(WORDS[from].run);
+  const health = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/home/health');
   await decide(page, 'submit');
+  expect((await health).status()).toBe(200);
 }
 
 test('BASE-F64 — the language asked of the assistant applies at once and after reloading, in both directions', async ({
