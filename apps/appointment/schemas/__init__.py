@@ -545,7 +545,7 @@ class CheckIn(ServicesByScalar):
 class LineOut(Schema):
     service_id: UUID
     name: str = Field(description="The service's name when it was booked.")
-    price: int = Field(description="Its price when it was booked, in cents.")
+    price: int = Field(description="Its price when it was booked, in cents.", json_schema_extra={"money": True})
     duration_minutes: int
 
 

@@ -85,9 +85,9 @@ class TenderOption(Schema):
     method_id: UUID = Field(description="Its method.")
     method_name: str = Field(description="Its method's name.")
     method_type: MethodType = Field(description="Its method's type.")
-    charged: int = Field(description="Charged in cents.")
-    refunded: int = Field(description="Already refunded on it, in cents.")
-    remaining: int = Field(description="Still refundable on it, in cents.")
+    charged: int = Field(description="Charged in cents.", json_schema_extra={"money": True})
+    refunded: int = Field(description="Already refunded on it, in cents.", json_schema_extra={"money": True})
+    remaining: int = Field(description="Still refundable on it, in cents.", json_schema_extra={"money": True})
     refundable: bool = Field(
         description="Whether it can go back through its own method."
     )
@@ -103,7 +103,7 @@ class LineOption(Schema):
     quantity: Decimal = Field(description="Units sold.")
     returned: Decimal = Field(description="Units already back.")
     left: Decimal = Field(description="Units that can still come back.")
-    line_total: int = Field(description="What the line charged, in cents.")
+    line_total: int = Field(description="What the line charged, in cents.", json_schema_extra={"money": True})
     is_gift: bool = Field(description="A comp.")
     paid_by_voucher: bool = Field(
         description="A voucher session paid it: returning it gives the session back."

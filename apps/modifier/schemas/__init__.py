@@ -588,7 +588,7 @@ class TargetOptionOut(AllergensOut):
         description="Name on the kitchen ticket; empty = the name."
     )
     price_delta: int = Field(
-        description="Supplement in cents; negative = a discount; 0 = free."
+        description="Supplement in cents; negative = a discount; 0 = free.", json_schema_extra={"money": True}
     )
     tax_category_key: str | None = Field(
         description="Key of its own tax category; null = the dish's."
@@ -617,7 +617,7 @@ class PickOut(AllergensOut):
     kitchen_name: str = Field(
         description="What the kitchen reads: its kitchen name, or its name."
     )
-    price_delta: int = Field(description="Its supplement in cents, from the catalog.")
+    price_delta: int = Field(description="Its supplement in cents, from the catalog.", json_schema_extra={"money": True})
     tax_category_key: str | None = Field(
         description="Key of its own tax category; null = the dish's."
     )
@@ -632,7 +632,7 @@ class OwnLineOut(Schema):
     name: str = Field(description="Its name, as the customer reads it (the receipt).")
     kitchen_name: str = Field(description="What the kitchen reads: its kitchen name, or its name.")
     tax_category_key: str = Field(description="Key of its own tax category: the line's.")
-    price_delta: int = Field(description="Its unit price in cents, from the catalog (always more than zero).")
+    price_delta: int = Field(description="Its unit price in cents, from the catalog (always more than zero).", json_schema_extra={"money": True})
     quantity: int = Field(
         description="How many per unit of the dish: an option chosen twice is one line of 2; Sales multiplies "
         "it by the dish line's quantity."

@@ -232,7 +232,7 @@ class ModifierPickOut(Schema):
     group_name: str = Field(description="Its group's name, when it was ordered.")
     name: str = Field(description="Its name, as the receipt prints it.")
     kitchen_name: str = Field(description="What the kitchen reads.")
-    price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.")
+    price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.", json_schema_extra={"money": True})
     tax_category_key: str | None = Field(description="Its own tax category; null = the dish's.")
     own_line: bool = Field(description="True: charged on a child line of its own (another tax category).")
 
@@ -241,7 +241,7 @@ class ModifierLineOut(Schema):
     option_id: UUID = Field(description="The option charged on a line of its own.")
     name: str = Field(description="Its name.")
     tax_category_key: str = Field(description="Its tax category: the child line's.")
-    unit_price: int = Field(description="Its price in cents, frozen when it was ordered.")
+    unit_price: int = Field(description="Its price in cents, frozen when it was ordered.", json_schema_extra={"money": True})
     quantity: int = Field(description="How many per unit of the dish.")
 
 
@@ -253,9 +253,9 @@ class ComboDishOut(AllergyInDishOut):
     category_id: UUID | None = Field(description="Its product's first category (the kitchen's routing).")
     is_service: bool = Field(description="A service product never moves stock.")
     quantity: int = Field(description="Picks of it in one menu.")
-    price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.")
+    price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.", json_schema_extra={"money": True})
     tax_category_key: str | None = Field(description="Its tax category when the menu is split.")
-    amount: int | None = Field(description="Its part of one menu's amount, in cents, when the menu is split.")
+    amount: int | None = Field(description="Its part of one menu's amount, in cents, when the menu is split.", json_schema_extra={"money": True})
     modifiers: list[str] = Field(description="The options of Modifiers chosen for it, by name, in the order chosen.")
 
 
@@ -282,7 +282,7 @@ class OrderLineOut(AllergyOut):
     unit: str = Field(description="Unit of the quantity.")
     quantity: Decimal = Field(description="Quantity.")
     unit_price: int = Field(
-        description="Frozen price in cents, per price_quantity of pricing_unit."
+        description="Frozen price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
     price_quantity: Decimal = Field(description="Quantity the price refers to.")
     pricing_unit: str = Field(description="Unit the price refers to.")
@@ -311,7 +311,7 @@ class OrderLineOut(AllergyOut):
         description="Until when the session stays held for the line (one day)."
     )
     line_total: int = Field(
-        description="Provisional amount in cents, before the ticket discount."
+        description="Provisional amount in cents, before the ticket discount.", json_schema_extra={"money": True}
     )
     round_no: int = Field(description="Kitchen round it was sent in; 0 = pending.")
     fired_at: datetime | None = Field(description="When it was sent to the kitchen.")
