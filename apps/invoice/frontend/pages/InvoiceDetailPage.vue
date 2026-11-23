@@ -7,7 +7,7 @@
 // the reader's language); the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full
 // invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» asks the
 // printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
-// it; not queued (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
+// it; refused (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
 // browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why), and a document of a
 // sale is a copy: its original was the till's paper. With VeriFactu on and its records
 // readable, it follows the invoice's record too (`verifactu.record.by_invoice`, VERIFACTU-F19, by name: Invoicing
@@ -148,11 +148,10 @@ async function print(): Promise<void> {
 async function queued(): Promise<boolean> {
   try {
     const sent = await queue.run({ invoice_id: props.id, duplicate: duplicate.value });
-    if (!sent.queued) return false;
-    toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
+    toastSuccess(t('invoice.detail.queued', { printer: sent.printer }));
     return true;
   } catch {
-    // The queue could not be asked: the screen's paper still prints.
+    // No printer took it, or the queue could not be asked: the screen's paper still prints.
     return false;
   }
 }
