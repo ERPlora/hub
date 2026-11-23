@@ -53,6 +53,8 @@ for (const size of SIZES) {
       /The categories could not be loaded|No se pudieron cargar las categorías/,
     );
     await expect(form.locator('[data-testid=inventory-product-tax-unconfigured]')).toHaveCount(0);
+    // Both notices on screen for the capture: the panel scrolls, and they sit below the amounts.
+    await form.locator('[data-testid=inventory-product-tax-error]').evaluate((notice) => notice.scrollIntoView({ block: 'center' }));
     const png = await capture(page, `INVENTORY-F02-failed-reads-${label}`);
     writeFileSync(test.info().outputPath(`INVENTORY-F02-failed-reads-${label}.png`), png);
 
@@ -62,5 +64,7 @@ for (const size of SIZES) {
     });
     await expect(form.locator('[data-testid=inventory-product-tax-error]')).toHaveCount(0);
     await expect(form.locator('[data-testid=inventory-product-categories-error]')).toHaveCount(0);
+    const back = await capture(page, `INVENTORY-F02-reads-back-${label}`);
+    writeFileSync(test.info().outputPath(`INVENTORY-F02-reads-back-${label}.png`), back);
   });
 }
