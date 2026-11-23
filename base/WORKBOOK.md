@@ -1942,13 +1942,23 @@ Pasos:
      sesión», y debajo qué pasa («Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad:
      la siguiente venta lleva el nombre de la siguiente persona.»).
   4. Cada cambio se guarda al momento, sin botón, y la tarjeta enseña lo que el negocio confirma.
+  5. Por el asistente («quiero que en la caja cada uno tenga que meter su PIN para saber quién vende»), el
+     asistente lee cómo está y lo dice con los nombres de esta tarjeta: con el pinpad encendido y «Hasta cerrar
+     sesión», cada persona ya entra con su PIN y cada venta lleva su nombre. Para que vuelva a preguntar tras
+     inactividad, antes le pregunta cuántos minutos (1, 5, 10, 15 o 30): nunca los pone él ni se quedan sin verse
+     los que hubiera guardados. La tarjeta, con cada dato en su línea (BASE-F98), dice cada control que cambia con
+     su nombre y el valor que tendrá aquí: «Mostrar pinpad: Sí» y «Volver a preguntar tras inactividad: 10 min»;
+     «Hasta cerrar sesión», «Mostrar pinpad: No» o «Dígitos del PIN: 6 dígitos» según el cambio. Si solo cambian
+     los minutos y el negocio pregunta «Hasta cerrar sesión», dice «Volver a preguntar tras inactividad: Hasta
+     cerrar sesión», que es lo que seguirá diciendo aquí (BASE-F97).
 Entra: cómo pide el PIN el negocio.
 Sale: si se pide y cuándo se vuelve a pedir, para todas las cajas del negocio. Apagarlo y volver a encenderlo
 vuelve a pedirlo por turno.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.». Si no se puede leer: «No se pudo
 cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.». Quien no administra ve los
-controles apagados y «Solo un administrador puede cambiar si se pregunta.».
-Implicados: BASE-F55, BASE-F59
+controles apagados y «Solo un administrador puede cambiar si se pregunta.». Por el asistente, «tras
+inactividad» sin sus minutos no llega a la tarjeta: vuelve al asistente, que pregunta cuántos.
+Implicados: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 Ver los dispositivos en los que se ha entrado
 Estado: hecho
