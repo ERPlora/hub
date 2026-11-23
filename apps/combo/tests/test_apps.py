@@ -22,9 +22,12 @@ QUERIES = {
     # What names a dish (hub#561) and a course (hub#669) on the assistant's card: the model reads them with their menu.
     "combo.option.get",
     "combo.group.get",
+    # What a new choice names, checked before its card (hub#2213).
+    "combo.option.check",
+    "combo.option.bulk_check",
 }
 #: The reads that are no assistant tool.
-INTERNAL_READS = {"combo.option.get", "combo.group.get"}
+INTERNAL_READS = {"combo.option.get", "combo.group.get", "combo.option.check", "combo.option.bulk_check"}
 COMMANDS = {
     "combo.combo.create",
     "combo.combo.update",
@@ -73,11 +76,14 @@ CHECKED_BY_THE_MENU = {
 #: each one checks it with that record's own read (hub#1231) — the menu's would read a course's id as a menu's.
 CHECKED_BY_THE_COURSE = {"combo.group.delete", "combo.group.update"}
 CHECKED_BY_THE_CHOICE = {"combo.option.delete", "combo.option.update"}
-#: The read each write checks its record with before its card.
+#: The read each write checks its record with before its card; a write that adds choices, the course and the products
+#: it names (hub#2213).
 CHECKS = {
     **dict.fromkeys(CHECKED_BY_THE_MENU, "combo.combo.get"),
     **dict.fromkeys(CHECKED_BY_THE_COURSE, "combo.group.get"),
     **dict.fromkeys(CHECKED_BY_THE_CHOICE, "combo.option.get"),
+    "combo.option.create": "combo.option.check",
+    "combo.option.bulk_create": "combo.option.bulk_check",
 }
 
 
