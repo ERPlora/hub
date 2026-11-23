@@ -1638,6 +1638,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
+| Cuenta con título nuevo | Cambiar el título de una cuenta abierta, también al pasarla a otra mesa o volver a sentarla | La cuenta | `sale.order.relabeled` |
 | Línea quitada | Quitar o anular una línea | La cuenta y la línea | `sale.order.line_removed` |
 | Línea anulada | Anular una línea enviada | La cuenta, la línea y el motivo | `sale.order.line_voided` |
 | Medio de pago, ajustes, sección, nota rápida | Crearlos o cambiarlos | Cuál | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |

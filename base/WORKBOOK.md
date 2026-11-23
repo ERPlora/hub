@@ -2637,7 +2637,13 @@ Pasos:
      cifras, la cantidad como se escribe en el idioma de la persona y un importe como dinero («Productos: Vino tinto · 6;
      Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; si una línea no se puede nombrar, la lista dice
      cuántas lleva: se leería como una cifra suelta); y cualquier otra, como una línea con dos registros (el empleado y
-     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; y un dato
+     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; un cobro,
+     por su total y cómo se paga, como el botón de la hoja **Cobro**: el total, tal como lo calcula el TPV para quien
+     pregunta («Total: 12,50 €»), y cada forma de pago con lo que paga («Pagos: Efectivo · 12,50 €»; la que va sin
+     importe paga lo que dejan las otras y, si no se dice ninguna, todo en efectivo, como cobra la acción), nunca
+     «1 elemento» ni la versión de la cuenta, que solo usa la hoja **Cobro**; unos pagos que no suman el total salen
+     tal como se dijeron, junto al total, y si el total no se puede calcular (la cuenta ya no está o quien pregunta no
+     puede verla) no se inventa: en los dos casos la acción lo rechaza al ejecutarse; y un dato
      que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
@@ -4275,7 +4281,7 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
-  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras y como mucho `MAX_TOOLS` = 20 por turno, la última la búsqueda `base.assistant.find_tools`, por las
   palabras de la petición que sigue abierta: lo que la persona escribió desde que el modelo pidió su última escritura,
   con sus respuestas a las preguntas del asistente, y nunca menos de sus dos últimos mensajes; `base.setup.status` y
   `base.business.get` siempre; `ranking` lo ordena con las palabras propias del Hub: las de la plataforma, `SYNONYMS`

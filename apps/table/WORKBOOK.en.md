@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cfbe7bf2c7dc3380b74484517f22b5b662b6c2257f092c84913d3c6dee9d72ff -->
+<!-- generated from WORKBOOK.md sha256:5aa05709589510c0e397182bfa6b48d8a3f6ecf460e27fcce98e106c3b4e6399 -->
 
 ## What it is for and who it is for
 
@@ -606,7 +606,7 @@ Out: the origin check "Transferred" and a new table check at the destination wit
 (announces: `table.session.transferred`).
 If it fails: "Another device has just taken that table. The floor plan has been refreshed." if the
 destination is no longer free; "That check is not open…" if someone else already moved it.
-Involved: TABLE-F28, SALE-F25
+Involved: TABLE-F28, SALE-F25, KITCHEN-F05
 
 ### TABLE-F16 Join the checks of two occupied tables (merge)
 Status: done
@@ -628,7 +628,7 @@ Out: a single open check at the table that stays (announces: `table.session.merg
 `sale.order.merged`).
 If it fails: "That table has no other open check to merge with." if the destination is free or is the
 same table without another check.
-Involved: TABLE-F17, SALE-F24
+Involved: TABLE-F17, SALE-F24, KITCHEN-F05
 
 ### TABLE-F17 Split the check of a table
 Status: done
@@ -761,7 +761,7 @@ Out: the seated table check (announces: `table.session.restored`).
 If it fails: "That check is not parked: it does not exist in this business, or it is already seated at
 a table."; the table has to be free, as when seating a party, and the same notices show. Seating it
 again is done with the party in front: an automation cannot do it.
-Involved: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
+Involved: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12, KITCHEN-F05
 
 ### TABLE-F25 Hold the table of a confirmed booking
 Status: done
