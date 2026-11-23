@@ -1,18 +1,28 @@
 """The Home's health row's route (``base/api_home_health.py``): ``GET /api/home/health`` calls ``base.health.list``."""
 
+from pathlib import Path
+
 from base import api_home_health
+from base.schemas.health import HealthItemOut
 from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
 from base.tests.routes import bound_routes, published_routes, spa_routes
+from base.tests.typed_operations import ts_fields
 
 __all__ = ["in_business_a"]
 
 #: base/tests/test_api.py's map of the SPA's routes takes these too.
 HEALTH_ROUTES = {("GET", "/home/health", "base.health.list")}
+#: The SPA's hand-written type of an item, which the Home's row paints.
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations" / "home.ts"
 
 
 def test_its_one_route_calls_the_operation_and_the_spa_knows_it():
     assert bound_routes(api_home_health.router) == HEALTH_ROUTES
     assert spa_routes("base.health.") == HEALTH_ROUTES
+
+
+def test_the_spa_s_item_has_the_schema_s_fields():
+    assert ts_fields("HomeHealthItem", OPERATIONS_TS) == set(HealthItemOut.model_fields)
 
 
 @HUB_DB

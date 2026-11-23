@@ -69,3 +69,19 @@
 .settings-card__actions ion-button {
   margin: 0;
 }
+
+/* A state said with its pill and a sentence beside it, which goes under it when there is no room («Your printer»). */
+.settings-card__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.settings-card__status-loading {
+  width: min(320px, 100%);
+  height: 24px;
+  margin: 0;
+}
