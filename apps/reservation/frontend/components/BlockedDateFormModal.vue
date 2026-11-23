@@ -2,7 +2,7 @@
 // RESERVATION-F02: «Add blocked date» — the Date (the day on screen first), the Reason and «Whole day»
 // (on); off, From and Until (both included), the old API's window that now has a screen. «Block date».
 // A date already blocked at that time goes on top and under the date.
-import { FormModal } from '@erplora/ui/components';
+import { DateField, FormModal, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -56,7 +56,6 @@ async function save(): Promise<void> {
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
 <template>
@@ -76,18 +75,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       <div
         class="reservation-blocked-form"
       >
-        <ion-input
-          data-testid="reservation-blocked-form-date"
+        <DateField
+          v-model="date"
+          testid="reservation-blocked-form-date"
           name="date"
-          type="date"
-          :value="date"
           :label="$t('reservation.availability.blockedForm.date')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
+          required
           :error-text="fieldErrors.date"
-          :class="invalid(fieldErrors.date)"
-          @ion-input="date = text($event.detail.value)"
         />
         <ion-input
           data-testid="reservation-blocked-form-reason"
@@ -112,31 +106,21 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           v-if="!wholeDay"
           class="reservation-blocked-form__pair"
         >
-          <ion-input
-            data-testid="reservation-blocked-form-blocked_from"
+          <TimeField
+            v-model="from"
+            testid="reservation-blocked-form-blocked_from"
             name="blocked_from"
-            type="time"
-            :value="from"
             :label="$t('reservation.availability.blockedForm.from')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.blocked_from"
-            :class="invalid(fieldErrors.blocked_from)"
-            @ion-input="from = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="reservation-blocked-form-blocked_until"
+          <TimeField
+            v-model="until"
+            testid="reservation-blocked-form-blocked_until"
             name="blocked_until"
-            type="time"
-            :value="until"
             :label="$t('reservation.availability.blockedForm.to')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.blocked_until"
-            :class="invalid(fieldErrors.blocked_until)"
-            @ion-input="until = text($event.detail.value)"
           />
         </div>
       </div>

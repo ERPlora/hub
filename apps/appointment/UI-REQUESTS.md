@@ -17,10 +17,6 @@ F28) ya están hechos y salen de esta lista.
 Los dos están registrados en `packages/ui/src/shell/icons.ts` desde ui#27. Al usarlos, cambiar a la vez
 `frontend/components/AppointmentList.vue` (`ICONS`) y su test.
 
-- `DateField` y `TimeField` — el día y la hora de **Nueva cita periódica** (`frontend/components/SeriesFormModal.vue`),
-  en el idioma y los colores de la app. Hoy: `ion-input type="date"` y `type="time"`. La barra de la agenda y
-  «Nueva cita» / «Editar la cita» ya los usan; al cambiar este, conservar sus `data-testid`.
-
 ## Icono que falta (`appointment:ui-icons`; registrarlo en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
 - `ion:repeat-outline` — segmento **Periódicas**. Hoy: `ion:sync-outline`.

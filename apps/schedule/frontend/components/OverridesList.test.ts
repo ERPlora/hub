@@ -6,6 +6,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { OverrideOut } from '../operations';
 import { flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
 import { itNamesTheListThatDoesNotLoad, itOnlyReadsForAnEmployee } from '../__tests__/list-checks';
@@ -91,7 +92,7 @@ describe('OverridesList', () => {
     const panel = s.find('schedule-overrides-filters-panel');
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="schedule-overrides-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
-    set('end_to', 'ionChange', '2026-09-30');
+    await pick(panel.get('[data-testid="schedule-overrides-filter-end_to"]').element, '2026-09-30');
     set('reason', 'ionInput', 'sum');
     set('is_closed', 'ionChange', 'true');
     await flush();

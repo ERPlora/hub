@@ -6,13 +6,14 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { click, ionChecked, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import PriceListFormModal from './PriceListFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; checked?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; checked?: boolean; readonly?: boolean; required?: boolean };
 
 /** The dialog open, with the hub's business answered (`null`: it has not answered yet). */
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', owner: Business | null = business()) {
@@ -42,6 +43,8 @@ describe('PriceListFormModal', () => {
       'General list',
     ]);
     expect([s.field('currency').value, s.field('tax').value]).toEqual(['EUR', 'business']);
+    // The days are the app's own calendar (never the device's), and either can be emptied.
+    expect(['valid_from', 'valid_until'].map((name) => [s.field(name).readonly, s.field(name).required])).toEqual([[true, false], [true, false]]);
     expect(s.group().props('label')).toBe('Customer group');
     expect(s.save().textContent).toContain('Create');
     expect(s.save().disabled).toBe(true);
@@ -59,8 +62,9 @@ describe('PriceListFormModal', () => {
     await ionValue(s.field('tax'), 'included');
     s.group().vm.$emit('update:modelValue', { id: 'g1', label: 'VIP' });
     await settle();
-    await ionValue(s.field('valid_from'), '2026-07-01', 'ionInput');
-    await ionValue(s.field('valid_until'), '2026-08-31', 'ionInput');
+    await pick(s.field('valid_from'), '2026-07-01');
+    await pick(s.field('valid_until'), '2026-08-31');
+    expect([s.field('valid_from').value, s.field('valid_until').value]).toEqual(['07/01/2026', '08/31/2026']);
     await click(s.save());
     expect(s.sent()).toEqual([
       {
@@ -164,14 +168,14 @@ describe('PriceListFormModal', () => {
     const s = await setup({ priceList: priceList({ tax_included: false, valid_from: '2026-07-01' }) });
     expect(s.inDoc('pricing-list-form')?.getAttribute('aria-label')).toBe('Editing price list — VIP members');
     expect(s.inDoc('pricing-list-form-is_default')).toBeNull();
-    expect([s.field('code').value, s.field('tax').value, s.field('valid_from').value]).toEqual(['VIP', 'excluded', '2026-07-01']);
+    expect([s.field('code').value, s.field('tax').value, picked(s.field('valid_from'))]).toEqual(['VIP', 'excluded', '2026-07-01']);
     expect(s.group().props('modelValue')).toEqual({ id: 'g1', label: 'VIP' });
     expect(s.save().textContent).toContain('Save');
     s.answer(200, priceList());
     await ionValue(s.field('name'), 'VIP club', 'ionInput');
     s.group().vm.$emit('update:modelValue', null);
     await settle();
-    await ionValue(s.field('valid_from'), '', 'ionInput');
+    await pick(s.field('valid_from'), '');
     await click(s.save());
     expect(s.sent()).toEqual([
       {

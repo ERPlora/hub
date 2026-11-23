@@ -7,6 +7,7 @@
 // flow: TASK-F01 TASK-F02 TASK-F04 TASK-F05 TASK-F06 TASK-F09 TASK-F10 TASK-F12 TASK-F13 TASK-F14
 import { expect, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { api, A, capture, horizontalOverflow, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanUp, named, pick, post, rowOf, signedIn, TAG, VIEWPORTS } from './task-helpers';
@@ -14,6 +15,9 @@ import { toastSaying } from './toast-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
+
+/** A due day already past: the task is overdue. */
+const A_WEEK_AGO = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 
 test('a task for a person of Staff, from its project to done, live', async ({ browser }) => {
   const stamp = Date.now().toString(36);
@@ -35,14 +39,14 @@ test('a task for a person of Staff, from its project to done, live', async ({ br
     await expect(page.locator('ion-modal[data-testid=task-project-form]')).toBeHidden();
     await expect(rowOf(page, 'task-projects', projectName)).toContainText('Yes');
 
-    // TASK-F01: a task for Ana, in the project, due long ago.
+    // TASK-F01: a task for Ana, in the project, already overdue.
     const title = named('Clean the store room');
     await page.goto(`${A}/task/tasks`);
     await shown(page).locator('[data-testid=task-tasks-empty], [data-testid=task-tasks-row]').first().waitFor({ state: 'visible' });
     await shown(page).locator('[data-testid=task-tasks-add]').click();
     await expect(page.locator('ion-modal[data-testid=task-form] ion-title')).toHaveText('New task');
     await page.locator('[data-testid=task-form-title] input').fill(title);
-    await page.locator('[data-testid=task-form-due_date] input').fill('2020-01-01');
+    await pickDay(page, page.locator('[data-testid=task-form-due_date]'), A_WEEK_AGO);
     await pick(page, 'task-form-assignee', `Lopez${stamp}`, `Lopez${stamp}`);
     await pick(page, 'task-form-project', projectName, projectName);
     await page.locator('[data-testid=task-form-submit]').click();

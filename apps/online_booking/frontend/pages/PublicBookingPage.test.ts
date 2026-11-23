@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import appointmentEn from '../../../appointment/frontend/locale/en.json';
 import appointmentEs from '../../../appointment/frontend/locale/es.json';
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { click, ionChecked, ionValue, mountInShell, page, settle } from '../__tests__/mount-online-booking';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -240,7 +241,7 @@ describe('PublicBookingPage', () => {
 
   async function fillBooking(s: Awaited<ReturnType<typeof open>>): Promise<void> {
     await ionChecked(s.el('service-v1'), true);
-    await ionValue(s.el('day'), '2030-03-05', 'ionChange');
+    await pick(s.el('day'), '2030-03-05');
     await settle();
     await click(s.el('time-10:00'));
     await ionValue(s.el('name'), 'Marta Gil', 'ionInput');

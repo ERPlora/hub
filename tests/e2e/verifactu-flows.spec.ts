@@ -19,6 +19,7 @@
 // behind them is the Python suite's (`apps/verifactu/tests`). What the run makes is removed after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, login, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, issuedIds, snapshotSeries } from './invoice-helpers';
@@ -271,7 +272,7 @@ test('VERIFACTU-F26–F29: Recovery validates the chain, asks the AEAT and asks 
   // F29: continuing from another application's fingerprint asks first; with records waiting to go out it is refused.
   await view.locator('[data-testid=verifactu-recovery-hash] input').fill('A'.repeat(64));
   await view.locator('[data-testid=verifactu-recovery-invoice] input').fill('OLD-2026-000099');
-  await view.locator('[data-testid=verifactu-recovery-date] input').fill('2026-10-01');
+  await pickDay(page, view.locator('[data-testid=verifactu-recovery-date]'), '2026-10-01');
   await view.locator('[data-testid=verifactu-recovery-manual]').click();
   const manual = confirmation(page, 'Continue the chain from an external fingerprint');
   await expect(manual).toBeVisible();
