@@ -22,6 +22,7 @@ from live.outbox import record_event
 
 from apps.combo import events
 from apps.combo.models import ACTOR_MAX_LENGTH, ChoiceGroup, ChoiceOption, Combo
+from apps.combo.queries.new_choices import field_refusal, product_said
 from apps.combo.queries import (
     find_combo,
     find_group,
@@ -61,7 +62,7 @@ from apps.combo.schemas import (
 )
 from apps.inventory import queries as inventory
 from apps.inventory.models import Product, Unit
-from apps.inventory.queries.reads import find_product, held
+from apps.inventory.queries.reads import held
 from apps.tax.models import TaxCategory
 from base import images
 from . import on_sale as on_sale  # registers combo.combo.set_active
@@ -99,13 +100,6 @@ SYSTEM = "combo.system"
 
 def _actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:ACTOR_MAX_LENGTH]
-
-
-def _field_refusal(error: NotFound, field: str) -> InvalidPayload:
-    """A reference of a write that does not exist is a 422 on its field, not a 404 of the write."""
-    return InvalidPayload(
-        error.message, code="invalid_field", fields={field: error.message}
-    )
 
 
 def _tax_category(key: str) -> TaxCategory:
@@ -152,15 +146,12 @@ def _option_event(
 def _sellable_product(product_id: UUID | None, said: str | None, field: str) -> Product:
     """A product that may become a choice: live, active and sold by units, held for the write that offers
     it (see ``held``)."""
-    try:
-        found = find_product(product_id, said)
-    except NotFound as error:
-        raise _field_refusal(error, field) from None
+    found = product_said(product_id, said, field)
     live = Product.objects.filter(pk=found.pk, is_deleted=False)
     product = next(iter(held(live[:1])), None)
     if product is None:
         # Deleted between the two reads: Inventory's own refusal, as for one deleted before.
-        raise _field_refusal(NotFound(str(inventory.reads.PRODUCT_NOT_FOUND)), field)
+        raise field_refusal(NotFound(str(inventory.reads.PRODUCT_NOT_FOUND)), field)
     if not product.is_active:
         message = str(PRODUCT_INACTIVE) % {"product": product.name}
         raise Conflict(message, code="combo.product_inactive", fields={field: message})
@@ -677,6 +668,7 @@ def _product_free(
         "description": "Offer a product as a choice of a course («put the lentils in Starters of the menu of the "
         "day», «hake in Mains with 2 euros supplement»): it goes last. The supplement adds to the closed price.",
         "risk": "normal",
+        "check": "combo.option.check",
         "asks": {
             "en": (
                 "add the salad as a starter in the vegan menu",
@@ -722,6 +714,7 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
         "description": "Offer several products at once in a course, without supplement, in the order given; all "
         "or nothing.",
         "risk": "normal",
+        "check": "combo.option.bulk_check",
         "asks": {
             "en": (
                 "add soup, salad and gazpacho as starters all at once",

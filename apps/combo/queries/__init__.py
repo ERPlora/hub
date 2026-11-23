@@ -27,6 +27,7 @@ from psycopg import sql
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from .dish_options import TAKEAWAY_CATEGORY, Dish, categories, options_amount, priced, takeaway_key, weights
+from . import new_choices as new_choices  # registers the checks of a new choice
 from apps.combo.schemas import (
     ComboDetailOut,
     ComboListIn,
@@ -132,9 +133,7 @@ def find_combo(
     found, never a row that vanished between two reads."""
     combos = Combo.objects.order_by("name", "id")
     if combo_id is None:
-        candidates = _first_match(
-            combos, (Q(name__iexact=said), Q(name__icontains=said))
-        )
+        candidates = _first_match(combos, (Q(name__iexact=said), Q(name__icontains=said)))
         if len(candidates) > 1:
             names = _names(candidates, lambda combo: combo.name)
             raise Conflict(
