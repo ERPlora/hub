@@ -79,7 +79,10 @@ def _save_station(station: Station, **save) -> None:
             ),
         },
         "description": "Create a kitchen station (grill, bar, desserts) with its colour, whether it goes to the "
-        "screen, to paper or both, and its printer (the kitchen or bar function, or a printer by its name).",
+        "screen, to paper or both, and its printer (the kitchen or bar function, or a printer by its name). A new "
+        "station gets nothing until products or categories are routed to it: whatever has no route goes to «No "
+        "station». So after creating one, say that nothing goes to it yet and offer to route the products or "
+        "categories it should get.",
         "risk": "normal",
     },
 )
