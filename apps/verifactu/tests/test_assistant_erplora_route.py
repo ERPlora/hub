@@ -43,7 +43,9 @@ def test_the_authorisation_is_offered_only_where_erplora_files_for_businesses():
     told = told_of_model()
 
     assert refused == "ERPlora does not file on behalf of businesses for now: file with your own certificate."
+    assert "Only on a server where ERPlora files on behalf of businesses" in told
     assert f"«{refused}»" in told
+    assert "the authorisation is not offered" in told
     assert f"«{step}» (base.setup.status)" in told
     assert "erplora_route_available" in told
     assert f"«{screen_label('verifactu.config.own')}»" in told
