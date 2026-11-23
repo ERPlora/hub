@@ -786,6 +786,10 @@ Pasos:
    «Inscrito en el ROI (operaciones intracomunitarias)»; el NIF se sigue escribiendo sin prefijo.
 4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso desaparece de la campana y el paso del Inicio queda «Hecho»,
    sin recargar y también en los demás dispositivos.
+5. También se le puede pedir al asistente («pon los datos fiscales de la empresa en las facturas: Bar Lema SL,
+   B12345674, Calle Mayor 10, 28013 Madrid»). Antes de guardar, su tarjeta enseña cada dato con el nombre de su
+   campo y el país por su nombre en el idioma de quien lo pide, como el selector de Emisor («País: España»,
+   «Country: Spain»), nunca su código. Al escribir «CONFIRMAR», se guarda igual que con «Guardar».
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`. Con «Inscrito en el ROI» encendido, la factura en pantalla, su A4 (PDF), el tique
@@ -795,7 +799,7 @@ el QR siguen siempre con el NIF sin prefijo.
 Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
 es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
 también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento.
-Implicados: INVOICE-F18, SALE-F21, SALE-F29
+Implicados: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 Estado: hecho
