@@ -321,15 +321,9 @@ export interface ProductImageSuggestOut {
   rows: CatalogImage[];
 }
 
-export interface LowStockOut {
-  id: string;
-  name: string;
-  sku: string;
-  stock: string;
-  low_stock_threshold: string;
-  unit: UnitCode;
-  price_quantity: string;
-  pricing_unit: UnitCode;
+export interface LowStockOut
+  extends Pick<ProductOut, 'id' | 'name' | 'sku' | 'stock' | 'low_stock_threshold' | 'unit' | 'price_quantity' | 'pricing_unit'> {
+  is_sold_out: boolean;
 }
 
 export interface ProductCategoryOut {
