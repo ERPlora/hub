@@ -22,6 +22,7 @@ from apps.sale.schemas.fields import (
     SortDir,
     _text,
 )
+from apps.tax.schemas import A_TAX_CATEGORY
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────────────────────────
@@ -210,7 +211,7 @@ class DepartmentIn(Closed):
         description="The name the cashier reads, e.g. Fruit and veg."
     )
     tax_category_key: _text(80, 1) = Field(
-        description="The tax category it charges at: its key, its name or an alias."
+        description="The tax category it charges at: its key, its name or an alias.", json_schema_extra=A_TAX_CATEGORY
     )
     sort_order: int = Field(
         0, ge=0, le=100_000, description="Position in the open-price sheet."
@@ -235,7 +236,7 @@ class DepartmentRefIn(Closed):
 class DepartmentUpdateIn(DepartmentRefIn):
     name: _text(60, 1) | None = Field(None, description="New name.")
     tax_category_key: _text(80, 1) | None = Field(
-        None, description="New tax category: its key, its name or an alias."
+        None, description="New tax category: its key, its name or an alias.", json_schema_extra=A_TAX_CATEGORY
     )
     sort_order: int | None = Field(None, ge=0, le=100_000, description="New position.")
 
