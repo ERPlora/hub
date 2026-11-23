@@ -48,24 +48,24 @@ const requested = (name: string) => ({ role: 'assistant', content: '', tool_call
 const NOT_CONFIRMED = { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed", "message": "Not confirmed."}}' };
 const SUMMARY = {
   number: 'S-1',
-  closing_balance: 25000,
-  expected_balance: 23000,
-  difference: 2000,
+  closing_balance: '250.00 EUR',
+  expected_balance: '230.00 EUR',
+  difference: '20.00 EUR',
   expected_hidden: false,
   pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
 };
 const PREVIEW = {
-  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
+  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: '121.00 EUR', remaining: '121.00 EUR' },
   invoice_type: 'R1',
   reason: 'el precio estaba mal',
   series_code: 'RECT',
   next_number: 'RECT-2026-000001',
   issue_date: '2026-10-27',
   whole: true,
-  base_amount: -10000,
-  tax_amount: -2100,
-  total_amount: -12100,
-  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: -12100 }],
+  base_amount: '-100.00 EUR',
+  tax_amount: '-21.00 EUR',
+  total_amount: '-121.00 EUR',
+  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: '-121.00 EUR' }],
 };
 
 describe('answerTo', () => {
@@ -162,9 +162,9 @@ describe('answerTo', () => {
     });
     const summary = {
       number: 'S-261024-0001',
-      closing_balance: 25000,
-      expected_balance: 23000,
-      difference: 2000,
+      closing_balance: '250.00 EUR',
+      expected_balance: '230.00 EUR',
+      difference: '20.00 EUR',
       expected_hidden: false,
       pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
     };
@@ -191,11 +191,11 @@ describe('answerTo', () => {
   });
 
   it('the close summary as the model says it in Spanish: the expected and the difference only when they came, and what is pending', () => {
-    const base = { number: 'S-1', closing_balance: 25000, pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
-    expect(closeCashSummary({ ...base, expected_balance: 23000, difference: 2000, expected_hidden: false }, 'es')).toBe(
+    const base = { number: 'S-1', closing_balance: '250.00 EUR', pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
+    expect(closeCashSummary({ ...base, expected_balance: '230.00 EUR', difference: '20.00 EUR', expected_hidden: false }, 'es')).toBe(
       'Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Esperado: 230.00 €\n- Diferencia: +20.00 €',
     );
-    expect(closeCashSummary({ ...base, expected_balance: 23000, difference: -500, expected_hidden: false }, 'es')).toContain('- Diferencia: -5.00 €');
+    expect(closeCashSummary({ ...base, expected_balance: '230.00 EUR', difference: '-5.00 EUR', expected_hidden: false }, 'es')).toContain('- Diferencia: -5.00 €');
     const blind = closeCashSummary({ ...base, expected_balance: null, difference: null, expected_hidden: true }, 'es');
     expect(blind).toBe('Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Arqueo ciego: el cierre lo comparará al confirmar.');
     const pending = closeCashSummary(
@@ -263,7 +263,7 @@ describe('answerTo', () => {
         '- Total: -121.00 €',
       ].join('\n'),
     );
-    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: 11100 }, total_amount: -11100 }, 'es');
+    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: '111.00 EUR' }, total_amount: '-111.00 EUR' }, 'es');
     expect(left).toContain('Vas a rectificar la factura **F-1** del 26/10/2026 con esta rectificativa:');
     expect(left).toContain('- Tipo: R5');
     expect(left).toContain('- Rectifica lo que queda: 111.00 € de 121.00 €');
@@ -356,7 +356,7 @@ describe('answerTo — in the language of the request (hub#1025)', () => {
         '- Total: -121.00 €',
       ].join('\n'),
     );
-    const left = rectifyPreview({ ...PREVIEW, whole: false, original: { ...PREVIEW.original, customer_name: '', remaining: 11100 } }, 'en');
+    const left = rectifyPreview({ ...PREVIEW, whole: false, original: { ...PREVIEW.original, customer_name: '', remaining: '111.00 EUR' } }, 'en');
     expect(left).toContain('You are about to rectify invoice **F-1** of 26/10/2026 with this rectifying invoice:');
     expect(left).toContain('- Rectifies what is left: 111.00 € of 121.00 €');
   });

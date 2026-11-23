@@ -85,9 +85,9 @@ class TenderOption(Schema):
     method_id: UUID = Field(description="Its method.")
     method_name: str = Field(description="Its method's name.")
     method_type: MethodType = Field(description="Its method's type.")
-    charged: int = Field(description="Charged in cents.")
-    refunded: int = Field(description="Already refunded on it, in cents.")
-    remaining: int = Field(description="Still refundable on it, in cents.")
+    charged: int = Field(description="Charged in cents.", json_schema_extra={"money": True})
+    refunded: int = Field(description="Already refunded on it, in cents.", json_schema_extra={"money": True})
+    remaining: int = Field(description="Still refundable on it, in cents.", json_schema_extra={"money": True})
     refundable: bool = Field(
         description="Whether it can go back through its own method."
     )
@@ -103,7 +103,7 @@ class LineOption(Schema):
     quantity: Decimal = Field(description="Units sold.")
     returned: Decimal = Field(description="Units already back.")
     left: Decimal = Field(description="Units that can still come back.")
-    line_total: int = Field(description="What the line charged, in cents.")
+    line_total: int = Field(description="What the line charged, in cents.", json_schema_extra={"money": True})
     is_gift: bool = Field(description="A comp.")
     paid_by_voucher: bool = Field(
         description="A voucher session paid it: returning it gives the session back."
@@ -117,9 +117,9 @@ class RefundOptionsOut(Schema):
     status: SaleStatus = Field(description="Its status.")
     currency: str = Field(description="ISO 4217 currency it was charged in: what goes back goes in it.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
-    total: int = Field(description="Its total.", json_schema_extra={"money": True})
-    refunded_total: int = Field(description="Refunded so far.", json_schema_extra={"money": True})
-    refundable_total: int = Field(description="Still refundable.", json_schema_extra={"money": True})
+    total: int = Field(description="Its total, in minor units.", json_schema_extra={"money": True})
+    refunded_total: int = Field(description="Refunded so far, in minor units.", json_schema_extra={"money": True})
+    refundable_total: int = Field(description="Still refundable, in minor units.", json_schema_extra={"money": True})
     tenders: list[TenderOption] = Field(description="One row per tender, always.")
     lines: list[LineOption] = Field(description="Its lines and what is left of each.")
 

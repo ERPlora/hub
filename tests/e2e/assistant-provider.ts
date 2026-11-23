@@ -94,12 +94,12 @@ export interface Seen {
   body: Record<string, unknown> | null;
 }
 
-/** The close's summary as the Hub's `cash_register.session.closing_summary` answers it (the fields the model says). */
+/** The close's summary as the model reads `cash_register.session.closing_summary` (its amounts: «250.00 EUR»). */
 export interface CloseCashSummary {
   number: string;
-  closing_balance: number | null;
-  expected_balance: number | null;
-  difference: number | null;
+  closing_balance: string | null;
+  expected_balance: string | null;
+  difference: string | null;
   expected_hidden: boolean;
   pending: {
     open_checks: number;
@@ -138,7 +138,7 @@ const CLOSE_WORDS = {
   },
 } as const;
 
-const euros = (cents: number, signed = false) => `${signed && cents > 0 ? '+' : ''}${(cents / 100).toFixed(2)} €`;
+const euros = (told: string, signed = false) => `${signed && Number(told.split(' ')[0]) > 0 ? '+' : ''}${told.split(' ')[0]} €`;
 const named = (count: number, labels: string[]) => (labels.length ? `${count} (${labels.join(' · ')})` : String(count));
 
 /** What the model says of the close's summary before its card, in `language`: only what the summary carries (never an
@@ -161,19 +161,19 @@ export function closeCashSummary(summary: CloseCashSummary, language: Language):
   return lines.join('\n');
 }
 
-/** The rectification's preview as the Hub's `invoice.invoice.rectification_preview` answers it (what the model says). */
+/** The rectification's preview as the model reads `invoice.invoice.rectification_preview` (amounts: «-121.00 EUR»). */
 export interface RectificationPreview {
-  original: { number: string; issue_date: string; customer_name: string; total_amount: number; remaining: number };
+  original: { number: string; issue_date: string; customer_name: string; total_amount: string; remaining: string };
   invoice_type: string;
   reason: string;
   series_code: string;
   next_number: string;
   issue_date: string;
   whole: boolean;
-  base_amount: number;
-  tax_amount: number;
-  total_amount: number;
-  lines: { description: string; quantity: string; total_amount: number }[];
+  base_amount: string;
+  tax_amount: string;
+  total_amount: string;
+  lines: { description: string; quantity: string; total_amount: string }[];
 }
 
 const day = (iso: string) => iso.split('-').reverse().join('/');

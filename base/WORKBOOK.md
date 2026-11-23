@@ -2517,7 +2517,9 @@ Pasos:
   10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
      hora de ese momento, su sector, las apps que tiene encendidas y, a quien lo administra, su plan y cuántas apps le
      cuenta (solo las que eligió el negocio, como dice Apps); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
-     pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18.
+     pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
+     importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
+     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -2622,7 +2624,10 @@ Pasos:
      cliente»); una plantilla del catálogo, por su nombre y su idioma, como en Importar («Plantilla: Restaurante
      (español)»), nunca por su código, y las apps que carga, por su nombre («Apps que se cargan: Ventas / TPV,
      Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
-     y 17 más»);
+     y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
+     como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
+     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una y por su nombre
+     («Categoría fiscal: Restauración — comida»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
@@ -4328,13 +4333,16 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `test_a_name_in_cents_alone_makes_no_amount_its_mark_does` y, en Automatizaciones,
   `test_each_datum_of_the_change_comes_as_the_chat_card_says_it`), `signed` exige la marca (`base.E005`, también a un
   `…_cents` sin ella: `test_a_preview_marks_signed_only_an_amount`) y las instrucciones del turno
-  dicen al modelo que un dato marcado `"money": true` va en la unidad menor; lo comprueban
+  dicen al modelo que un dato marcado `"money": true` va en la unidad menor y que un importe de un resultado llega ya
+  en su moneda y lo dice tal cual; lo comprueban
   `test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth`,
   `test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says`,
   `test_no_amount_the_card_painted_as_money_stops_being_one` y el trinquete
   `test_every_amount_the_assistant_shows_or_fills_is_marked_but_the_known_ones` (`UNMARKED_AMOUNTS`, que solo baja:
-  detecta un entero con nombre en `_cents` o cuya descripción habla de «cents», «minor unit» o «céntimos», sin la
-  marca, en la entrada de cada herramienta y en los datos de su vista previa; hoy vacío), con
+  detecta un entero llamado `amount`, `price` (o acabado en `_amount`, `_price` o `_cents`) o `price_delta`, o cuya
+  descripción habla de «cents», «minor unit» o «céntimos», sin la marca y salvo los decimales de una moneda, en la
+  entrada de cada herramienta y en los datos de su vista previa; hoy vacío), el de lo que responde cada herramienta
+  (`test_every_amount_a_tool_answers_is_marked`, con la misma detección; hoy vacío), con
   `test_an_amount_is_marked_only_on_a_whole_number`; la moneda de esos importes, la que nombra el dato de su
   escritura que su esquema marca `json_schema_extra={"currency": True}` (`CURRENCY`, siempre sobre un texto; vale
   para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`) o, sobre
@@ -4403,9 +4411,12 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
   zona y hora de allí, sector, apps encendidas y, con `base.administer_hub`, el plan de la foto con las apps que cuenta,
   `activation.chosen_on` contra `plan.max_apps`; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
-  el modelo lee de una herramienta sale de `run_tool` de `live` con `zone=business_zone()`, así que sus horas van en
-  la zona del negocio y no en UTC: lo comprueba `base/tests/test_business_facts.py`, también con dos negocios en zonas
-  distintas), `base.assistant.usage` (query), `base.assistant.report`,
+  el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
+  `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
+  como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
+  sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
+  `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
+  `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

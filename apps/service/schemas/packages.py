@@ -153,7 +153,7 @@ class PackageItemOut(Schema):
     id: UUID
     service_id: UUID
     service_name: str
-    service_price: int
+    service_price: int = Field(json_schema_extra={"money": True})
     sessions: int
     sort_order: int
 

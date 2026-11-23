@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4941dcc5d81bf65012011e9d070d5cc302470cc31ea5d210e73f6071ce9c5dc7 -->
+<!-- generated from WORKBOOK.md sha256:492f4ad981192a9d903895fea47b2b979f65bb5dc8681556f1580d5ff3830381 -->
 
 ## What it is for and who it is for
 
@@ -2500,7 +2500,9 @@ Steps:
      with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
      many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
      question. Every date and time it says is in the business's time, the one the
-     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
+     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
+     amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
+     it tells as €3.60, never as €360.00.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
@@ -2606,7 +2608,10 @@ Steps:
      Create a task, Create a customer"); a template of the catalogue, by its name and its language, as in Import
      ("Template: Restaurant (English)"), never by its code, and the apps it loads, by their name ("Apps to load: Sales &
      POS, Invoicing"), also when none is chosen and it loads all of its own ("Time clock, Cash register, Menus and
-     combos and 17 more"); a list of lines that carry only their record, such as the services of an appointment, the same
+     combos and 17 more"); the rows of a file being imported (products, categories or customers), by the name of each,
+     as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
+     another of its cells) and, in Inventory, the tax categories they take, once each and by their name ("Tax category:
+     Restaurant — food"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
