@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1afe4104f9ab0b1a5446e1a3cf1e5fdac0d12c60f76e16ba3d6471d7c3ccacb5 -->
+<!-- generated from WORKBOOK.md sha256:3909e2bf6b509d721c4e2c60eb9cc9f6eacd4e2191027fd10869f61365f135d5 -->
 
 ## What it is for and who it is for
 
@@ -2605,7 +2605,9 @@ Steps:
      in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
      never "Add".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
-     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
+     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so. After "Run it",
+     the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
+     offer to undo it unless asked to.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
