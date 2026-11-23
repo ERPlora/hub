@@ -268,7 +268,7 @@ def test_after_the_yes_the_step_still_runs_with_only_its_own_permission(gateway,
     # Never every permission (FLOW-F12): Appointments takes «its own» as the whole team's, nothing more is lent.
     seen = []
     made = shared.run_tool
-    monkeypatch.setattr(shared, "run_tool", lambda ctx, op, arguments: seen.append(ctx) or made(ctx, op, arguments))
+    monkeypatch.setattr(shared, "run_tool", lambda ctx, op, arguments, **told: seen.append(ctx) or made(ctx, op, arguments, **told))
     ran = assistant_cancels(worker, gateway, beas)
     question = Question.objects.get(run_id=ran.id)
     worker.request("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for(permissions=MAY_CANCEL, actor="marta"))

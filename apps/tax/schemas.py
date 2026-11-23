@@ -648,8 +648,8 @@ class ComponentOut(Schema):
     label: str = Field(description="Its label, or its tax type.")
     tax_type: str = Field(description=TAX_TYPE)
     rate_pct: Decimal = Field(description="Its rate in %.")
-    base: int = Field(description="The base, in cents.")
-    tax: int = Field(description="Its quota, in cents.")
+    base: int = Field(description="The base, in cents.", json_schema_extra={"money": True})
+    tax: int = Field(description="Its quota, in cents.", json_schema_extra={"money": True})
 
 
 class CalculationOut(Schema):

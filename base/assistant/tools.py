@@ -2,17 +2,20 @@
 right and its switch) that this person may run, by their ``ai=`` (``live.assistant.is_tool``: an ``AI``; ``INTERNAL``,
 a «Not an assistant tool»/«System only» dictionary or one on what only the platform runs never), never the
 assistant's own nor what is never done from the chat (``NOT_FROM_CHAT``: emptying the business, a file to download). A
-write a manager may approve is theirs too (``approvals``).
+write a manager may approve is theirs too (``approvals``). A tool runs for the model with ``run``.
 """
 
 from collections.abc import Collection
 
 from live import assistant as shared
 from live.context import OperationContext, Scope
+from live.errors import NotFound
 from live.meta import LiveAppConfig, all_live_app_configs
 from live.operations import Operation
 
 from base import activation, approvals, entitlement
+from base.business import DEFAULT_CURRENCY, business_zone, currency_decimals
+from base.operations import business_currency
 
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
 NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
@@ -42,3 +45,18 @@ def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = No
         approvable=lambda op: approvals.label_of(op) is not None,
     )
     return {name: op for name, op in tools.items() if is_tool(op)}
+
+
+def run(ctx: OperationContext, op: Operation, arguments: str) -> shared.ToolOutcome:
+    """``op`` run for ``ctx`` with the model's ``arguments`` (``live.assistant.run_tool``), its result told as the screens
+    write it: its hours on the business's clock and each amount in the currency of the record that names one, else in
+    the business's, with its decimals."""
+    try:
+        business = business_currency(ctx.scope)
+    except NotFound:
+        business = DEFAULT_CURRENCY
+    return shared.run_tool(ctx, op, arguments, zone=business_zone(), money=lambda named: _with_decimals(named or business))
+
+
+def _with_decimals(currency: str) -> tuple[str, int]:
+    return currency, currency_decimals(currency)

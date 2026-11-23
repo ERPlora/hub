@@ -18,7 +18,6 @@ from pydantic import ValidationError
 
 from base import approvals as approval_rules
 from base import assistant, queries
-from base.business import business_zone
 from base.models import Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.assistant import (
@@ -156,8 +155,8 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOut
 
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
     """Run one pending ``call`` (a read alone; a write with the person's yes, ``_assistant_write``) → ``(outcome,
-    card, shown)``. What it gives the model tells its hours on the business's clock (``business_zone``), the one the
-    instructions name, never in UTC."""
+    card, shown)``. What it gives the model tells its hours on the business's clock, the one the instructions name,
+    never in UTC, and its amounts in their currency (``assistant.tools.run``)."""
     op = shared.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None, ""
@@ -168,7 +167,7 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
     except ValueError:
         arguments = None
     if not isinstance(arguments, dict):
-        return shared.run_tool(ctx, op, call.arguments, zone=business_zone()), None, ""
+        return assistant.tools.run(ctx, op, call.arguments), None, ""
     return _assistant_write(ctx, op, call, arguments, decision)
 
 
@@ -198,7 +197,7 @@ def _assistant_write(ctx, op, call, arguments: dict, decision):
     shown = assistant.cards.fingerprint(drawn, found)
     if not answered or call.shown != shown:
         return None, drawn, shown
-    return shared.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments, zone=business_zone()), None, ""
+    return assistant.tools.run(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None, ""
 
 
 def _assistant_declined(card: dict, decision) -> "shared.ToolOutcome | None":

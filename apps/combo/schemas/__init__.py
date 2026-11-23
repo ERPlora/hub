@@ -670,7 +670,7 @@ class SaleOptionOut(Schema):
     product_id: UUID
     product_name: str
     sku: str
-    price_delta: int
+    price_delta: int = Field(json_schema_extra={"money": True})
 
 
 class SaleGroupOut(Schema):
@@ -710,10 +710,10 @@ class ComponentOut(Schema):
     category_id: UUID | None = Field(description="The product's first category, for the kitchen's routing.")
     is_service: bool = Field(description="A service product never moves stock.")
     quantity: int = Field(description="Picks of it in one menu.")
-    price_delta: int = Field(description="Supplement of one pick, in cents.")
-    catalog_price: int = Field(description="The product's catalogue price, in cents: the weight of the split.")
+    price_delta: int = Field(description="Supplement of one pick, in cents.", json_schema_extra={"money": True})
+    catalog_price: int = Field(description="The product's catalogue price, in cents: the weight of the split.", json_schema_extra={"money": True})
     tax_category_key: str | None
-    amount: int | None = Field(description="Its part of the menu's amount, in cents, when the menu is split.")
+    amount: int | None = Field(description="Its part of the menu's amount, in cents, when the menu is split.", json_schema_extra={"money": True})
     options: list[DishOptionOut] = Field(description="The options of Modifiers chosen for it, in the order chosen.")
 
 
