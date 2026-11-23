@@ -91,15 +91,16 @@ def test_the_instructions_keep_the_persons_tu_or_usted_to_the_end():
     [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
 )
 def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
-    """A tool's result gives its amounts with their
-    currency (``currency`` and ``currency_decimals``: an invoice keeps the one it was issued in) and the card paints them
-    in it, but the model was told to say every amount in the business's, with two decimals: its text and the card
-    disagreed. An amount goes in the minor unit of its currency (no cents in yen), said in the currency its result
-    gives, else in the business's."""
+    """A tool's result tells each amount in its own currency, as the screens write it (an invoice keeps the one it was
+    issued in), and the model says it as it comes: a result in cents read as euros said 360 as «360,00 €». What the
+    model sends still goes in the minor unit of its currency (no cents in yen); an amount of its own, in the
+    business's."""
     text = assistant.prompt.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
     assert example in text
-    assert "`currency`" in text and "`currency_decimals`" in text
-    assert "two decimals" not in text
+    said = example.split(" → ")[0]
+    assert f'as the screens write it (`"{said}"`): say it as it comes' in text
+    assert f"in {currency} with {decimals} decimals" in text
+    assert "`currency_decimals`" not in text and "two decimals" not in text
 
 
 # ── Who asks: their role and what it may do (hub#585, BASE-F100) ─────────────────────────────────────────────────

@@ -280,7 +280,7 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
                 _park_on_question(ctx, run, flow, _propose(run, step, op, data.text, now))
                 return {"go_on": False}
             else:
-                outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
+                outcome = hub_assistant.tools.run(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
                 _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
                 content = outcome.content
             messages.append({"role": "tool", "tool_call_id": call.call_id, "content": content})
@@ -346,12 +346,13 @@ def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     return True
 
 
-def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
+def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, answered: dict, now: dt.datetime) -> None:
     """A yes to the assistant's change: it is made now, by its own operation, as the automation (what it was granted
     now, not when it was proposed), and the step goes back to the assistant with what happened — the change's result
     (or its refusal) and, for the calls of that answer behind it, that they were not made —, so it can say it or ask
     for the next change. The run goes on with what it answers then (``record_assistant``); a change no longer
     granted stops the step."""
+    step = _step_of(ctx, run, flow)
     turn = run.outputs.get(TURN) or {}
     proposal = turn.get("proposal") or {}
     name = str(proposal.get("operation") or "")
@@ -370,7 +371,7 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
         _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
     else:
         arguments = _with_pinned(str(proposal.get("arguments") or "{}"), fixed)
-        outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, arguments)
+        outcome = hub_assistant.tools.run(_step_context(ctx, run, flow, op), op, arguments)
         _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
         content = outcome.content
     told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": content}]
