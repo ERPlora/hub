@@ -64,6 +64,22 @@ describe('LanguageFollower', () => {
     expect(sessionChanged).toHaveBeenCalledTimes(3);
   });
 
+  it('a language chosen before the first answer came (the page still loading) and not the session’s reads it again', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.profile.get', profile('es'));
+    expect(sessionChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('a first answer the session already speaks, or the business’s language, reads nothing again', async () => {
+    for (const language of ['en', ''] as const) {
+      vi.mocked(sessionChanged).mockClear();
+      const m = await open();
+      await m.result(m.call, 'base.profile.get', profile(language));
+      expect(sessionChanged).not.toHaveBeenCalled();
+      m.wrapper.unmount();
+    }
+  });
+
   it('another change of the profile (a name, the appearance) reads nothing again', async () => {
     const m = await open();
     await m.result(m.call, 'base.profile.get', profile('en'));
