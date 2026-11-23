@@ -54,6 +54,7 @@ from live.slugs import validate_hub_slug
 
 from base import access, auth, queries, services
 from base.services import demos, sessions
+from base.chosen_language import supported_language, with_language_cookie
 from base.models.sessions import SessionOwner
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
@@ -216,26 +217,11 @@ def _hub_slug(value: str) -> str | None:
 
 def _with_language(response: HttpResponse, locale: str) -> HttpResponse:
     """``response`` with the language cookie of ``locale`` when the Hub has that language."""
-    language = _supported_language(locale)
+    language = supported_language(locale)
     if language is not None:
         translation.activate(language)
         with_language_cookie(response, language)
     return response
-
-
-def with_language_cookie(response: HttpResponse, language: str) -> None:
-    """Leave Django's language cookie of ``language`` on ``response`` (the login's, «My profile»'s preferences)."""
-    if _supported_language(language) is not None:
-        response.set_cookie(
-            settings.LANGUAGE_COOKIE_NAME,
-            language,
-            max_age=settings.LANGUAGE_COOKIE_AGE,
-            path=settings.LANGUAGE_COOKIE_PATH,
-            domain=settings.LANGUAGE_COOKIE_DOMAIN,
-            secure=settings.LANGUAGE_COOKIE_SECURE,
-            httponly=settings.LANGUAGE_COOKIE_HTTPONLY,
-            samesite=settings.LANGUAGE_COOKIE_SAMESITE,
-        )
 
 
 @require_POST
@@ -266,13 +252,6 @@ def safe_next(value: str | None) -> str:
     if isinstance(value, str) and value.startswith("/") and url_has_allowed_host_and_scheme(value, allowed_hosts=None):
         return value
     return "/"
-
-
-def _supported_language(locale: str) -> str | None:
-    try:
-        return translation.get_supported_language_variant(locale) if locale else None
-    except LookupError:
-        return None
 
 
 # ── The way in on a device of the hub: the PIN and the badge ──────────────────────────────────────────────────────

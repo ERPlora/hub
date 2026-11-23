@@ -10,19 +10,14 @@ import { useSession } from '@erplora/ui/shell';
 import { watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { sessionChanged } from '../lib/access';
 import { gateAgain, gateVerdict } from '../lib/app-gate';
+import { readSessionAgainOnChange } from '../lib/session-follow';
 
 const router = useRouter();
 const session = useSession();
 const { data } = useLive('base.session.access', {});
 
-watch(
-  () => data.value?.key,
-  (next, previous) => {
-    if (next !== undefined && previous !== undefined) sessionChanged();
-  },
-);
+readSessionAgainOnChange(() => data.value?.key);
 
 /** Whether `me` closes the screen in front to this person, judged on the app's own route as the gate judges it. */
 function closedBy(me: typeof session.me.value): boolean {
