@@ -344,7 +344,10 @@ Pasos:
    otra tarifa o el de la ficha.».
 Entra: el precio, por su fila; el asistente, por la tarifa, el artículo y la cantidad mínima (1 si no la
 dice).
-Sale: `pricing.price_item.updated` o `pricing.price_item.removed`.
+Sale: `pricing.price_item.updated` o `pricing.price_item.removed`. Al quitar uno, el asistente dice lo que
+cuesta ahora el artículo en esa tarifa desde esa cantidad, leído después de quitarlo: el precio de la tarifa
+para menos cantidad, en la tarifa de un grupo de clientes el de la general, o si no el de la ficha; nunca el
+que acaba de quitar.
 Si falla: «Ese artículo ya tiene precio en esta tarifa desde esa cantidad.», «Ese precio ya no
 existe.». Los precios de una tarifa **desactivada** no se cambian (como no se añaden: «Esa tarifa no
 está disponible…»): el detalle no ofrece **+** ni **Editar**, solo **Quitar**.

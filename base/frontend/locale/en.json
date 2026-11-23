@@ -1511,6 +1511,14 @@
             "movement": {
               "add": "Register movement"
             }
+          },
+          "verifactu": {
+            "diagnostic": {
+              "run": "Test the connection"
+            },
+            "test_invoice": {
+              "create": "Create test invoice"
+            }
           }
         }
       },

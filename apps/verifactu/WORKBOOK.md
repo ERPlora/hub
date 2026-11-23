@@ -585,12 +585,15 @@ Pasos:
 3. Debajo sale el resultado, línea a línea, y «Este negocio puede enviar.» o «Todavía no puede enviar:» con los
    motivos.
 4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Probar la conexión» va deshabilitado.
+5. Pedido al asistente («comprueba si ya conecta bien con Hacienda, sin mandar nada»), su tarjeta lo nombra como el
+   botón: «Probar la conexión en VeriFactu.», y tras «Ejecutar» el recibo dice «Hecho: Probar la conexión en
+   VeriFactu».
 Entra: la configuración del Hub; la respuesta de la sonda de la pasarela.
 Sale: el resultado como evento «Prueba de conexión» (avisa `verifactu.diagnostic.run`), sin crear ningún
 registro ni tocar la cadena.
 Si falla: lo que falta, dicho en el resultado. Nunca presenta un registro de muestra: un registro remitido no
 se puede deshacer.
-Implicados: VERIFACTU-F15
+Implicados: VERIFACTU-F15, BASE-F97
 
 ### VERIFACTU-F11 Crear una factura de prueba
 Estado: hecho
@@ -603,10 +606,13 @@ Pasos:
    la serie TICKET, como una factura hecha a mano.
 3. Sale, por ejemplo, «Factura de prueba TICKET-2026-000001 creada: su registro está en Registros.».
 4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Crear factura de prueba» va deshabilitado.
+5. Pedida al asistente, su tarjeta dice «Crear factura de prueba en VeriFactu. Revisa cada dato antes de seguir.» y,
+   debajo, lo que va a emitir: «Serie: TICKET», «Precio: 1,00 €» e «IVA: 21 %»; se emite solo tras escribir
+   «CONFIRMAR».
 Entra: nada que escribir.
 Sale: una factura real de Facturación en pruebas y su registro, que sale como cualquier otro.
 Si falla: el rechazo de Facturación (sin emisor, sin permiso de emitir).
-Implicados: INVOICE-F03
+Implicados: INVOICE-F03, BASE-F97
 
 ### VERIFACTU-F12 Consultar la declaración responsable
 Estado: hecho
