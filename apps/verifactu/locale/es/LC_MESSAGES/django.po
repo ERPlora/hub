@@ -944,15 +944,15 @@ msgctxt "assistant card"
 msgid "VAT"
 msgstr "IVA"
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid "Going live is not open on this server yet: ERPlora opens it when the real submission is ready."
 msgstr "El paso a producción todavía no está abierto en este servidor: ERPlora lo abre cuando la remisión real esté lista."
 
-#: apps/verifactu/services/writes.py
+#: apps/verifactu/queries/route.py
 msgid "Set up the issuer first in Invoicing → Issuer."
 msgstr "Configura antes el emisor en Facturación → Emisor."
 
@@ -1089,7 +1089,7 @@ msgstr "tu cuenta de ERPlora tiene un pago pendiente o está suspendida"
 msgid "ERPlora has not linked this business to its account on this server yet"
 msgstr "ERPlora todavía no ha vinculado este negocio con su cuenta en este servidor"
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
 msgstr "Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción."
 
@@ -1101,11 +1101,11 @@ msgstr "No se ha emitido nada: este negocio presenta en real a la AEAT y ahora n
 msgid "this is a demo business: it always files in the AEAT's test environment"
 msgstr "es un negocio de demostración: siempre presenta en el entorno de pruebas de la AEAT"
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid "A demo business cannot go live: it always files in the AEAT's test environment."
 msgstr "Un negocio de demostración no puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT."
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid ""
 "ERPlora's own business files in the AEAT environment of its server: its "
 "environment cannot be switched."
@@ -1201,7 +1201,7 @@ msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
 msgid "ERPlora has not opened real filing with the AEAT on this server yet"
 msgstr "ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor"
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid ""
 "Your own certificate cannot be opened on this server: upload it again in "
 "VeriFactu → Configuration → My certificate."
@@ -1209,7 +1209,7 @@ msgstr ""
 "Tu certificado propio no se puede abrir en este servidor: vuelve a subirlo en "
 "VeriFactu → Configuración → Mi certificado."
 
-#: apps/verifactu/services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid ""
 "ERPlora's sending gateway is not configured on this server: nothing could "
 "reach the AEAT."
@@ -1376,7 +1376,7 @@ msgid ""
 msgstr ""
 "La AEAT de pruebas ha rechazado el certificado propio de %(holder)s (%(holder_tax_id)s) (%(detail)s): sube otro."
 
-#: services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid ""
 "The AEAT's test environment has not accepted your own certificate yet: it is tried with the next record that goes "
 "out in testing. Issue a sale or an invoice and go live once it is accepted."
@@ -1384,7 +1384,7 @@ msgstr ""
 "La AEAT de pruebas aún no ha aceptado tu certificado propio: se prueba con el próximo registro que salga en pruebas. "
 "Haz una venta o una factura y pasa a producción cuando lo acepte."
 
-#: services/config.py
+#: apps/verifactu/queries/going_live.py
 msgid ""
 "The AEAT's test environment refused your own certificate: upload another one in VeriFactu → Configuration → My "
 "certificate."
