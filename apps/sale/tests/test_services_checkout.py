@@ -284,9 +284,10 @@ def test_an_added_amount_is_refused_while_no_app_adds_a_step_to_the_charge(catal
         {"method": "cash", "tendered": 2500, "extra": 200, "extra_label": "Tip"},
         {"method": "card", "extra": 300, "extra_label": "Tip"},
     )
-    for leg in legs:
+    split = [{"method": "card", "amount": 1000}, {**legs[0], "tendered": 1000}]
+    for payments in ([legs[0]], [legs[1]], split):
         with pytest.raises(Conflict) as refusal:
-            complete(lines=[{"product": "STK"}], payments=[leg])
+            complete(lines=[{"product": "STK"}], payments=payments)
         assert refusal.value.code == "sale.added_amount_not_accepted"
     assert Sale.objects.count() == 0 and not SaleCounter.objects.filter(last__gt=0).exists()
     with translation.override("es"), pytest.raises(Conflict) as refusal:
