@@ -151,9 +151,12 @@ def _anchor(  # noqa: PLR0913
     input=RecoverManualIn,
     output=RecoveryOut,
     ai={
-        "description": "Continue the VeriFactu chain of another application (a migration): the next record chains to "
-        "the given last fingerprint (64 hex), invoice number and issue date. Only during a migration, and only with no "
-        "pending records.",
+        "description": "Continue the VeriFactu chain of another application (a migration): in the chain of the "
+        "environment it is in now (testing or production; the other is not touched), the next record chains to that "
+        "application's last invoice, by its fingerprint (64 hex), number and issue date as the person gives them (that "
+        "invoice is not in Invoicing: there is nothing to look up), instead of to the chain's last record; the records "
+        "already sealed here stay as they are. With those three said, call it: its card shows them and the person "
+        "confirms there. It refuses by itself while records of the chain wait to go out.",
         "risk": "high",
         "asks": {
             "en": (
