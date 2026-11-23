@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:266bec8ebd7fe48389c5c7062b50931180670b6298b963179f7c723043132f99 -->
+<!-- generated from WORKBOOK.md sha256:595d38efe10f8dc9056e1256bf4b85e4e94acf57688c85801d5fe7993cecc91a -->
 
 ## What it is for and who it is for
 
@@ -786,6 +786,10 @@ Steps:
    "Registered in the ROI (intra-EU operations)"; the tax ID is still typed without the prefix.
 4. Tap "Save": "Issuer saved." comes, the notice disappears from the bell and the Home step becomes "Done",
    without reloading and on the other devices too.
+5. It can also be asked of the assistant ("put our company details on the invoices: Bar Lema SL, B12345674,
+   Calle Mayor 10, 28013 Madrid"). Before saving, its card shows each detail by the name of its field and the
+   country by its name in the language of whoever asks, as the Issuer picker does ("Country: Spain", "País:
+   España"), never its code. Typing "CONFIRM" saves it just as "Save" does.
 In: what the person types.
 Out: the issuer, which is copied into every document issued from now on (those already issued do not
 change); announces `invoice.issuer.updated`. With "Registered in the ROI" on, the invoice on screen, its A4 (PDF),
@@ -795,7 +799,7 @@ always keep the tax ID without the prefix.
 If it fails: without legal name, tax ID or address, under its field; a Spanish tax ID that is not valid,
 "That tax ID is not valid.". A field's reason goes as soon as that field is corrected and comes back if the
 next try is refused too; a refusal that names no field shows above the form and stays until the next try.
-Involved: INVOICE-F18, SALE-F21, SALE-F29
+Involved: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
 Status: done
