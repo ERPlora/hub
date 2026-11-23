@@ -273,7 +273,9 @@ Pasos:
 3. Pulsa «Crear estación»: el panel se cierra y la estación sale en la tabla, «Activa: Sí», «En
    curso: 0».
 Entra: lo que escribe quien la crea.
-Sale: la estación (avisa: estación creada).
+Sale: la estación (avisa: estación creada). Una estación nueva no recibe nada hasta que se le enrutan
+productos o categorías (KITCHEN-F04): lo que se envía sin enrutar sale en «Sin estación». Pedida al
+asistente, al crearla dice que aún no le llega nada y se ofrece a enrutarle los productos o las categorías.
 Si falla: el rechazo sale dentro del panel; el motivo de un campo, debajo de él, y se quita en cuanto se
 corrige ese campo, aunque otro diga lo mismo. Un nombre que ya tiene otra estación viva se rechaza
 («Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
