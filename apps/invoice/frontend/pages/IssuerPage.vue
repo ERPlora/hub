@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Invoicing → Issuer (INVOICE-F21, F22): the business's tax identity that every new invoice carries as its
 // issuer — Legal name, Tax ID (a Spanish NIF or CIF is checked by the server), Address, Postal code, City,
-// Province and Country —, followed live: «Without the issuer no invoice can be issued.» until it is
+// Province, Country and whether it is registered for intra-EU operations (ROI), which makes its documents print
+// its EU VAT number (the server composes it) —, followed live: «Without the issuer no invoice can be issued.» until it is
 // complete, and «Received from your ERPlora account on <date>.» when the SaaS sent it. The owner and the
 // admin save it (`invoice.issuer.update`) and are told so; a refusal goes under its field until that field
 // is changed; anyone else only looks. What is typed is never overwritten by a new result while it differs
@@ -9,7 +10,7 @@
 import { formatDateTime, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
+import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { countryOptions } from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -40,7 +41,8 @@ const FIELDS: readonly { key: Field; hook: string; label: string; max: number }[
   { key: 'province', hook: 'province', label: 'invoice.issuer.fields.province', max: 100 },
 ];
 
-const blank = (): IssuerIn & Record<Field, string> => ({ legal_name: '', tax_id: '', address: '', postal_code: '', city: '', province: '', country: 'ES' });
+type Form = IssuerIn & Record<Field, string> & { intra_eu_operator: boolean };
+const blank = (): Form => ({ legal_name: '', tax_id: '', address: '', postal_code: '', city: '', province: '', country: 'ES', intra_eu_operator: false });
 const form = ref(blank());
 /** What the form started from: a new result replaces the form only while nothing differs from it. */
 const synced = ref<string>(JSON.stringify(blank()));
@@ -54,6 +56,7 @@ function take(saved: IssuerOut): void {
     city: saved.city,
     province: saved.province,
     country: saved.country || 'ES',
+    intra_eu_operator: saved.intra_eu_operator,
   };
   form.value = next;
   synced.value = JSON.stringify(next);
@@ -78,9 +81,14 @@ function set(field: Field, value: unknown): void {
   changed(field);
 }
 
+function setRegistered(checked: boolean): void {
+  form.value = { ...form.value, intra_eu_operator: checked };
+  changed('intra_eu_operator');
+}
+
 async function submit(): Promise<void> {
   if (!canManage.value || save.pending.value) return;
-  const values = Object.fromEntries(Object.entries(form.value).map(([key, value]) => [key, String(value).trim()])) as unknown as IssuerIn;
+  const values = Object.fromEntries(Object.entries(form.value).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])) as unknown as IssuerIn;
   let saved;
   try {
     saved = await save.run(values);
@@ -187,6 +195,16 @@ async function submit(): Promise<void> {
             {{ country.label }}
           </ion-select-option>
         </ion-select>
+        <ion-toggle
+          data-testid="invoice-issuer-intra-eu-operator"
+          justify="space-between"
+          :checked="form.intra_eu_operator"
+          :disabled="!canManage"
+          :helper-text="$t('invoice.issuer.fields.intraEuOperatorHelp')"
+          @ion-change="setRegistered(!!$event.detail.checked)"
+        >
+          {{ $t('invoice.issuer.fields.intraEuOperator') }}
+        </ion-toggle>
         <ion-button
           v-if="canManage"
           class="invoice-issuer__save"
