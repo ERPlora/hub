@@ -515,8 +515,10 @@ Pasos:
 Entra: las categorías del negocio.
 Sale: el enlace entre producto y categoría, guardado junto con el producto; Inventario avisa de
 cada categoría añadida o quitada. Un producto puede estar en varias. Ventas filtra la rejilla del
-TPV con estos enlaces (solo de productos activos) y Cocina los usa para su reparto. El TPV ordena
-productos y categorías por nombre.
+TPV con estos enlaces (solo de productos activos) y Cocina los usa para su reparto. El TPV enseña
+las categorías en la posición que les dio el negocio (por el asistente o la API, y la que trae la
+plantilla del sector) y, a igual posición, por nombre; las que nadie ha colocado van por nombre. Los
+productos, por nombre.
 Si falla: los rechazos del formulario; si algo falla no se guarda ni el producto ni sus
 categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
@@ -1596,7 +1598,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 | Categoría fiscal obligatoria y existente al guardar | sí | F01, F02 |
 | Activar y desactivar sin borrar | sí | F03 |
 | Borrado que conserva el historial y libera el código | sí | F04 |
-| Categorías con orden, color e icono para la carta | parcial: se guardan por el asistente o la API; el TPV ordena por nombre (duda 6) | F06, F08 |
+| Categorías con orden, color e icono para la carta | parcial: se guardan por el asistente o la API; el TPV las enseña por su posición, sin color ni icono (duda 6) | F06, F08 |
 | Borrar una categoría desvincula | sí | F07 |
 | Importar CSV con mapeo, ensayo e informe | sí | F09, F10 |
 | CSV con punto y coma (el de Excel en español) | sí | F09, F10 |
@@ -1718,7 +1720,7 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
 5. El «Umbral de stock bajo» de Ajustes solo lo hereda un producto creado por el asistente o la API
    sin umbral (F19): ¿debe el formulario dejar el campo vacío para heredarlo, y debe un cambio del
    ajuste alcanzar a los productos que lo heredaron?
-6. ¿Entran el orden, el color, el icono y la imagen de las categorías en el TPV (F06, F08)?
+6. ¿Entran el color, el icono y la imagen de las categorías en el TPV (F06)? El orden ya entra (F08).
 7. ¿Debe la etiqueta llevar el EAN-13 cuando lo hay, y el TPV buscar por código de barras (F25,
    F27)?
 8. ¿Debe un artículo poder volver a «Sigue el ajuste del hub» después de haber decidido (F20)?

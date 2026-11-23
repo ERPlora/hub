@@ -305,8 +305,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 
 ### TABLE-F01 Crear y ordenar las zonas del local
 Estado: hecho
-Actor: responsable, administrador
-Pantalla: Zonas
+Actor: responsable, administrador, asistente
+Pantalla: Zonas; asistente
 Pasos:
 1. En **Mesas → Zonas** pulsa «+».
 2. Escribe el Nombre (Salón, Terraza, Barra…), elige el Color y el Orden (viene puesto el siguiente).
@@ -314,6 +314,9 @@ Pasos:
 4. La zona sale en la lista con 0 mesas y, en ese orden, como pestaña del **Plano de sala**. También se
    crea desde el «+» del plano en «Editar plano» (campo Zona y «Añadir zona»): se pone la última y
    queda elegida.
+5. Con el asistente: «quiero otra zona, Barra, para los que comen en la barra, y que vaya la primera». La
+   tarjeta lleva solo lo que se ha pedido, el nombre y el orden («Crear en Mesas: Barra · 0»): para qué es la
+   zona no se guarda como su descripción. La descripción solo va si se pide («con la descripción…»).
 Entra: el nombre, la descripción, el color y el orden.
 Sale: la zona (avisa: `table.zone.created`).
 Si falla: sin nombre, el botón no se activa. Un nombre que ya tiene otra zona: «Ya hay una zona con

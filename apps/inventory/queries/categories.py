@@ -15,6 +15,9 @@ from apps.inventory.schemas.fields import CategoryRefIn
 from apps.inventory.schemas.product_categories import ProductCategoryListIn, ProductCategoryPage
 from base.ordering import list_order_for
 
+# The till shows the categories in the position the business gave them; the ones it never placed share 0.
+CATEGORY_SORT_COLUMNS = {"order": ("order", "name")}
+
 
 def load_category(category_id: UUID) -> dict | None:
     category = _categories().filter(pk=category_id).first()
@@ -125,7 +128,7 @@ def _filter_categories(categories, params: CategoryFiltersIn):
             product_count__lte=params.product_count_max,
         )
     )
-    return categories.order_by(*list_order_for(params.sort))
+    return categories.order_by(*list_order_for(params.sort, columns=CATEGORY_SORT_COLUMNS))
 
 
 def _categories():
