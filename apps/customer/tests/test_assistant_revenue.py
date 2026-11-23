@@ -21,17 +21,25 @@ pytestmark = HUB_DB
 ASK = "¿Cuántos clientes tengo ya apuntados, cuántos son VIP y cuánto nos han dejado entre todos?"
 
 
-def told(name: str, **arguments) -> dict:
-    """What the model reads of the tool ``name`` run in a turn of the owner, as the chat runs it."""
+def turn(messages: list, pending: list, decision: dict | None = None) -> dict:
+    operation = get("base.assistant.turn")
+    data = {"messages": messages, "pending": pending, "decision": decision}
+    return operation(ctx_for("hub_owner", language="es"), operation.input.model_validate(data)).model_dump(mode="json")
+
+
+def told(name: str, *, yes: bool = False, **arguments) -> dict:
+    """What the model reads of the tool ``name`` run in a turn of the owner, as the chat runs it; a write, once the
+    owner says yes to its card (``yes``)."""
     call = {"call_id": "c1", "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
     asked = {
         "role": "assistant",
         "content": "",
         "tool_calls": [{"id": "c1", "type": "function", "function": {"name": call["name"], "arguments": call["arguments"]}}],
     }
-    turn = get("base.assistant.turn")
-    data = {"messages": [{"role": "user", "content": ASK}, asked], "pending": [call]}
-    plan = turn(ctx_for("hub_owner", language="es"), turn.input.model_validate(data)).model_dump(mode="json")
+    messages = [{"role": "user", "content": ASK}, asked]
+    plan = turn(messages, [call])
+    if yes:
+        plan = turn(messages, plan["pending"], {"call_id": "c1", "accepted": True})
     [result] = plan["append"]
     return json.loads(result["content"])
 
@@ -50,3 +58,9 @@ def test_the_customers_revenue_reaches_the_model_as_the_screen_shows_it(lucia, c
     assert told("customer.customer.stats") == {"total": 4, "active": 4, "vip": 0, "total_revenue": said}
     [card] = [row for row in told("customer.customer.list")["rows"] if row["name"] == "Lucía QA"]
     assert (card["total_purchases"], card["total_spent"]) == (1, said)
+
+
+def test_a_change_the_owner_said_yes_to_tells_the_model_its_amounts_as_the_screen_shows_them(lucia):
+    Hub.objects.update_or_create(slug=A.key, defaults={"name": "Bar A", "country": "ES"})
+    card = Customer.objects.get(name="Lucía QA")
+    assert told("customer.customer.update", yes=True, id=str(card.id), company_name="QA")["total_spent"] == "3.60 EUR"
