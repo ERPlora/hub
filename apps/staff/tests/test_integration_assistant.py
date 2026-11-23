@@ -60,6 +60,15 @@ def test_the_card_names_a_schedules_week_as_its_form_does():
         assert labels(assistant.cards.card(get(name), {"days": week}, "en")) == ["Week"]
 
 
+@pytest.mark.parametrize(("language", "friday"), [("es", "Viernes"), ("en", "Friday")])
+def test_the_card_names_each_working_day_of_a_schedule_never_its_number(language, friday):
+    """A schedule's week asked to the assistant says each working day as the schedule form does («Viernes»), never «4»."""
+    week = [{"weekday": 4, "start_time": "09:00", "end_time": "14:00"}]
+    for name in ("staff.schedule.create", "staff.schedule.update"):
+        (days,) = assistant.cards.card(get(name), {"days": week}, language)["fields"]
+        assert [day["weekday"] for day in days["value"]] == [friday], name
+
+
 def test_the_card_names_the_people_of_a_batch_as_the_directory_does():
     batch = assistant.cards.card(get("staff.member.bulk_create"), {"members": [{"first_name": "Ana", "last_name": "Gil"}]}, "es")
     assert labels(batch) == ["Miembros del personal"]
