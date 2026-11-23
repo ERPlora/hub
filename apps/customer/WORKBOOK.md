@@ -1184,9 +1184,10 @@ asistente.
   `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) declaran
   `ai=INTERNAL` y no `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD
   art. 9, minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
-  Los textos libres de la ficha que escribe el asistente (`customer.note.add` y el dato `notes` del alta y
-  de la edición) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí y a qué
-  bloque mandar; lo fija `tests/test_assistant_health_data.py` (hub#2278).
+  Los textos libres de la ficha que escribe el asistente (`customer.note.add`, el dato `notes` del alta y
+  de la edición, los valores de los campos propios, `field_values`, y el texto de una entrada de
+  `customer.activity.add`) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí
+  y a qué bloque mandar; lo fija `tests/test_assistant_health_data.py` (hub#2278).
 - Toda operación declara `ai`: `AI(…)` con su descripción para el asistente, su `risk` en las escrituras y sus `asks`
   (2–4 frases en `en` y `es`, como las diría quien la usa); las de salud y las tres de compras que solo lanza la venta
   (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta

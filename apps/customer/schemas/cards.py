@@ -188,7 +188,8 @@ class CustomerPatchIn(CustomerRefIn):
         None,
         max_length=200,
         title=gettext_noop("Custom fields"),
-        description="The custom fields' values. When sent, every required field must end up with a value.",
+        description="The custom fields' values. When sent, every required field must end up with a value. "
+        + NOT_FOR_HEALTH_DATA,
     )
 
 

@@ -30,12 +30,15 @@ HEADING = json.loads((FRONTEND / "en.json").read_text())["customer"]["health"]["
 #: A screen of the Hub, named by its path.
 SCREEN = re.compile(r"\(\s*(/[a-z_/-]+)\s*\)")
 HEALTH_OPERATIONS = ("customer.health.detail", "customer.health.grant", "customer.health.update", "customer.health.withdraw")
-#: Every free text a person writes on a card, by the tool's description or by the datum of it that takes the text (the
-#: entries other apps record in its activity are theirs, with their own keys and data).
+#: Every free text of a card the assistant may fill, by the tool's description or by the datum of it that takes the text.
+#: The entries of other apps say it on their text, not on the tool: there it moved the tool up for any question about a
+#: card's data.
 FREE_TEXTS = [
     ("customer.note.add", None),
     ("customer.customer.create", "notes"),
     ("customer.customer.update", "notes"),
+    ("customer.customer.update", "field_values"),
+    ("customer.activity.add", "text"),
 ]
 
 
