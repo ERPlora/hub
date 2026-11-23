@@ -12,7 +12,7 @@ from apps.sale.tests.conftest import HUB_DB, run
 from apps.sale.tests.test_integration_invoice import RECIPIENT, issuer
 from apps.verifactu.models import Record
 
-pytestmark = HUB_DB
+pytestmark = [HUB_DB, pytest.mark.usefixtures("a_step_at_the_charge")]
 
 #: The issuer fixture of the invoice integration tests: the business's tax identity, as the owner sets it.
 __all__ = ["issuer"]

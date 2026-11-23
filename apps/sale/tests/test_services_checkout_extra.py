@@ -1,6 +1,8 @@
 """Charging with what another app adds to a tender (SALE-F39, the tip of Tips): ``sale.sale.complete`` keeps it on
 each payment, apart from the sale. The sale's base, tax and total, the payments' amounts and the figures of Sales stay
-the ones of the same sale without it; what is handed over covers both, and the change takes both out.
+the ones of the same sale without it; what is handed over covers both, and the change takes both out. Every test here charges
+with an app that adds a step to the charge (``a_step_at_the_charge``); without one, the charge refuses what is added
+(``test_services_checkout.py``).
 
 The amounts are tax's real calculation over the factory catalogue (Spain): restaurant.food at 10 %.
 """
@@ -15,7 +17,7 @@ from apps.sale.tests.conftest import HUB_DB, B, ctx_for, run
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
-pytestmark = HUB_DB
+pytestmark = [HUB_DB, pytest.mark.usefixtures("a_step_at_the_charge")]
 
 KEY = "pos-extra-0001"
 TIP = "Tip"

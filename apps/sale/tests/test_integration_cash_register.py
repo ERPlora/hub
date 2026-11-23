@@ -109,7 +109,7 @@ def test_the_refusal_is_said_in_spanish():
     )
 
 
-def test_what_another_app_adds_in_cash_is_not_counted_by_the_till_in_the_drawer():
+def test_what_another_app_adds_in_cash_is_not_counted_by_the_till_in_the_drawer(a_step_at_the_charge):
     # The drawer expects the sale's cash: what another app adds (a tip), that app records there itself, never twice (CASH_REGISTER-F18).
     run("cash_register.session.open", {"opening_balance": 10000})
     sale = charge(

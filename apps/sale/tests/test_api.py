@@ -196,7 +196,24 @@ def test_a_bad_payload_is_a_422_by_field(admin_client):
 
 
 @HUB_DB
-def test_a_charge_takes_what_another_app_adds_to_a_tender_over_http(employee_client, product):
+def test_an_added_amount_without_an_app_that_takes_it_is_a_409_over_http(employee_client, product):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    refused = post(
+        employee_client,
+        "/sale/sales",
+        {
+            "idempotency_key": "http-extra-0003",
+            "lines": [{"product": "COF"}],
+            "payments": [{"method": "card", "extra": 100, "extra_label": "Tip"}],
+        },
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "sale.added_amount_not_accepted"
+    assert get(employee_client, "/sale/sales").json()["total"] == 0
+
+
+@HUB_DB
+def test_a_charge_takes_what_another_app_adds_to_a_tender_over_http(employee_client, product, a_step_at_the_charge):
     product("Coffee", "COF", 150, "restaurant.drink")
     tipped = {"method": "cash", "tendered": 500, "extra": 100, "extra_label": "Tip"}
     charged = post(
