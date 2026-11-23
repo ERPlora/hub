@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d2a15b0413790d503adb007aa67f15046121ab4f1d0742b6a687544eb6003629 -->
+<!-- generated from WORKBOOK.md sha256:f59d7b89498646bbd8b62f9fccdf350e0b6dd8bf1f8cc8c47f503a730ed0cb94 -->
 
 ## What it is for and who it is for
 
@@ -494,7 +494,8 @@ Steps:
    up to 2 MB).
 2. Tap "Save": the menu keeps its photo. "Remove photo" leaves it with its initials.
 3. Through the assistant: "put a photo on the menu of the day". The assistant proposes up to five
-   images of the library by their title and asks which one; it never sets one on its own.
+   images of the library by their title alone, without their internal code, and asks which one; it never
+   sets one on its own.
 In: the menu and the image chosen or the photo uploaded.
 Out: the menu with its photo (announces: menu changed); the till shows it on its tile without
 reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the

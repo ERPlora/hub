@@ -795,7 +795,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   y es el cajón en el que se cobra (Ventas la pide con la sesión de quien cobra, F04), se cuenta y se cierra. Quien no
   tiene `cash_register.view_all_sessions` lee y escribe solo en esas (`find_session`, `named_or_open`,
   `session_to_close`, la lista y la sesión actual, con el mismo 404 `cash_register.session_not_found` que una que no
-  existe); quien no es una persona (una llave, una automatización, la plataforma) alcanza las que le abre su permiso.
+  existe); una llave de API lee como quien la creó (BASE-F125), y quien no tiene a nadie detrás (una automatización,
+  la plataforma) alcanza las que le abre su permiso.
   Lo que suma una sesión es todo el cajón: `lines.sale_lines` lee las ventas de todos los que cobraron en ella, y
   `unassigned_window` y `unassigned_totals` miran la última sesión cerrada y cuentan lo de fuera de turno sin mirar de
   quién es; las tres están en la lista cerrada de `tests/test_guardrails_ownership.py` con su motivo.

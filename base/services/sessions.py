@@ -31,6 +31,7 @@ from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.session_host import PLATFORM_SESSION_HOST, session_host
 from base.models import Hub, HubUser, Membership
+from base.models.api_keys import ApiKey
 from base.models.sessions import SessionOwner
 from base.models.access import TrustedDevice
 from base.registry import internal_only
@@ -327,7 +328,16 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
     gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
         username__in=listed
     )
+    _keys_without_a_maker_to_the_owner(data.members)
     return {"made": made, "updated": updated, "left": gone.update(is_active=False)}
+
+
+def _keys_without_a_maker_to_the_owner(members: list) -> None:
+    """The API keys made before a key recorded its maker go to the owner the photo names, the only one who says who
+    that is. They were the owner's or an administrator's, who held everything, so what they may do does not change."""
+    owner = next((member for member in members if member.role == Membership.Role.OWNER), None)
+    if owner is not None:
+        ApiKey.objects.filter(owner=None).update(owner=HubUser.objects.get(username=username_for(str(owner.user_id))))
 
 
 def _sync_hub_users(hub: Hub, members: list, left: list[str]) -> None:
