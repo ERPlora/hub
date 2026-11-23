@@ -6,6 +6,9 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { askForACard, card, decide, openPanelAtTheDesk, shots } from './assistant-panel';
 import { A, api, login, shown } from './helpers';
+import { panelSpec } from './provider-helpers';
+
+panelSpec();
 
 type Preferences = { language: '' | 'es' | 'en'; theme_mode: string; palette: string; ui_scale: number };
 
