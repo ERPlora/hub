@@ -1094,6 +1094,7 @@ diría de quién es. Contesta eligiendo la conversación. Ordenar por el teléfo
 | `whatsapp_inbox.note.get` | Una nota interna por su id, con su texto: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | F36 |
 | `whatsapp_inbox.template.get` | Una plantilla del negocio por su id con su nombre y su idioma («recordatorio (es)»), también una borrada aquí que Meta aún tiene: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | F30, F31 |
 | `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes | F01, F02, F13 |
+| `whatsapp_inbox.channel.health` | Si el número está conectado (`ok`), WhatsApp pide volver a conectarlo (`no_signal`) o no hay número (`not_configured`): lo que lee la fila de cómo está funcionando el negocio del Inicio, con «Conectar WhatsApp» hacia los ajustes (`WhatsappInboxConfig.health`); no es herramienta del asistente ni tiene ruta en la API | BASE-F02 |
 | `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación | F07 |
 
 ### Lo que ofrece: acciones (cambian datos)

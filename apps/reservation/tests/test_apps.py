@@ -153,6 +153,8 @@ def test_navigation_is_the_three_sections_of_the_old_module_and_the_settings_wit
 #: Done at the door by whoever receives the party (``ai.in_person``): never granted to an automation (FLOW-F12), and
 #: still of normal risk, so the assistant seats by voice without a confirmation card.
 IN_PERSON = {"reservation.reservation.seat"}
+#: The writes whose card says their data in an order of their own (``ai["summary"]``): for whom, the day and the time.
+SUMMARISED = {"reservation.reservation.create"}
 
 
 def test_seating_is_done_in_person_and_of_normal_risk():
@@ -187,6 +189,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
             expected = expected | {"asks"}
         if op.name in IN_PERSON:
             expected = expected | {"in_person"}
+        if op.name in SUMMARISED:
+            expected = expected | {"summary"}
         assert set(op.ai) == expected, op.name
         assert op.ai.get("in_person", False) is (op.name in IN_PERSON), op.name
         if op.kind == "command":
