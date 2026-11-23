@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ee8de251ee4f7fffde148423164b4f6b94eb40cfbc08c406404bcd301bce7138 -->
+<!-- generated from WORKBOOK.md sha256:8fc1f7fb057812e46b28f9610c5ed1d6e9858aaeb7acfb393f7277d486126f1c -->
 
 ## What it is for and who it is for
 
@@ -1040,7 +1040,8 @@ Steps:
 4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
    "Discard changes?" first and, with "Discard changes", discards it.
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
-   shows up to five candidate images by their title and asks which one; it never sets one on its own.
+   shows up to five candidate images by their title alone, without their internal code, and asks which
+   one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
 In: the item and ERPlora's image library, the same for every business, with each image's title and
 synonyms in Spanish and in English.

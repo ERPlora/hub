@@ -18,6 +18,22 @@ from base.schemas.catalog_images import CatalogImageOut, CatalogImagePage, Catal
 
 LIBRARY_UNAVAILABLE = gettext_lazy("The image library could not be loaded.")
 
+# A reference reads like words («catalog:hospitality/paella_mixta»), so the rule against writing ids in an answer does
+# not stop the model from listing it beside each title.
+BY_TITLE_ALONE = (
+    "Name each image by its title alone and ask which one; its reference (catalog:<folder>/<name>) only goes "
+    "to the tool that sets it, never in the answer, not in a table either."
+)
+
+
+def image_suggestion(set_image: str) -> str:
+    """The end of what the model reads of a read that proposes images for a record's photo: what it brings, that it
+    sets none and that ``set_image`` sets the one the person picks."""
+    return (
+        "the best matches for its name first, each with its title and its reference. It never sets one: set the one "
+        f"the person picks with {set_image}. {BY_TITLE_ALONE}"
+    )
+
 
 def image_library(ctx: OperationContext) -> image_catalog.Library:
     """The shared image library, or the 503 ``base.image_library_unavailable`` in ``ctx``'s language when its manifest
@@ -49,8 +65,8 @@ def business_language(ctx: OperationContext) -> str:
         description=(
             "Finds an image for a product, a service or a set menu in ERPlora's shared image library by what it is "
             "called, in Spanish or English («café con leche», «women's haircut»), the best match first, each with its "
-            "title and the reference (catalog:<folder>/<name>) that sets it as the image of a product, a service or a "
-            "set menu. Empty: the whole library by title."
+            "title and the reference that sets it as the image of a product, a service or a set menu. Empty: the whole "
+            f"library by title. {BY_TITLE_ALONE}"
         ),
         asks={
             "en": (
