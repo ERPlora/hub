@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.models import UUIDModel
 
+from apps.customer.annual_dates import AnnualDateField
 from apps.customer.search import searchable
 
 #: The fields ``search_text`` is built from, in this order; ``search_text_without_contact`` leaves out the contact ones.
@@ -113,8 +114,8 @@ class Customer(UUIDModel):
     country = models.CharField(_("country"), max_length=2, blank=True)
     # The picture's address (a URL), as the product keeps it.
     avatar = models.CharField(_("avatar"), max_length=500, blank=True)
-    birthday = models.DateField(_("birthday"), null=True, blank=True)
-    anniversary = models.DateField(_("anniversary"), null=True, blank=True)
+    birthday = AnnualDateField(_("birthday"), null=True, blank=True)
+    anniversary = AnnualDateField(_("anniversary"), null=True, blank=True)
     source = models.CharField(
         _("source"), max_length=16, choices=Source.choices, default=Source.WALK_IN
     )
