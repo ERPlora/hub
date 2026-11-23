@@ -312,7 +312,6 @@ class _OptionFields(_Input):
         description="Its name on the kitchen ticket (e.g. «+CHEESE»); empty = the name.",
     )
     price_delta: Delta = Field(
-        0,
         description="Its supplement in cents: positive charges more, negative is a discount, 0 is free.",
     )
     tax_category_key: TaxKey = Field(

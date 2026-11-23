@@ -45,6 +45,24 @@ def test_no_datum_of_a_write_of_modifier_reaches_a_spanish_card_by_its_technical
     assert technical_names(writes) == {}
 
 
+def test_the_assistant_asks_the_supplement_of_a_new_option_as_it_asks_the_price_of_a_new_product():
+    """The assistant asks for a datum its tool requires and the person has not said: an «Extra de queso» named without
+    its price is asked how much it charges, never made free."""
+    def required(name: str) -> list[str]:
+        return shared.tool_spec(get(name))["parameters"]["required"]
+
+    assert "price" in required("inventory.product.create")
+    assert "price_delta" in required("modifier.option.create")
+
+
+def test_a_new_option_called_without_its_supplement_draws_no_card_and_the_model_hears_which_datum_is_missing():
+    create = get("modifier.option.create")
+    refused = shared.invalid_arguments(create, {"group": "Extras", "name": "Extra de queso"})
+    assert (refused.outcome, refused.code) == ("error", "invalid_payload")
+    assert set(json.loads(refused.content)["error"]["fields"]) == {"price_delta"}
+    assert shared.invalid_arguments(create, {"group": "Extras", "name": "Sin cebolla", "price_delta": 0}) is None
+
+
 def test_the_card_names_the_option_said_by_its_name_as_the_group_sheet_does():
     """Changing or deleting an option the person names («Sin cebolla»): «Opción», as «Borrar opción» says it."""
     for name in ("modifier.option.update", "modifier.option.delete"):
@@ -140,7 +158,7 @@ def a_menu(hub) -> dict:
     )
     category = run("inventory.category.create", {"name": "Entrantes"}, ctx=admin)
     group = run("modifier.group.create", {"name": "Salsas"}, ctx=admin)
-    option = run("modifier.option.create", {"group_id": str(group.id), "name": "Ali oli"}, ctx=admin)
+    option = run("modifier.option.create", {"group_id": str(group.id), "name": "Ali oli", "price_delta": 0}, ctx=admin)
     link = run("modifier.link.attach", {"group_id": str(group.id), "product_id": str(product.id)}, ctx=admin)
     return {"group": group.id, "option": option.id, "link": link.id, "product": product.id, "category": category.id}
 
@@ -247,8 +265,8 @@ def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a):
         admin = in_hub(hub_a)
         drinks = run("modifier.group.create", {"name": "Bebidas"}, ctx=admin)
         chips = run("modifier.group.create", {"name": "Patatas"}, ctx=admin)
-        of_drinks = run("modifier.option.create", {"group_id": str(drinks.id), "name": "Grande"}, ctx=admin)
-        of_chips = run("modifier.option.create", {"group_id": str(chips.id), "name": "Grande"}, ctx=admin)
+        of_drinks = run("modifier.option.create", {"group_id": str(drinks.id), "name": "Grande", "price_delta": 0}, ctx=admin)
+        of_chips = run("modifier.option.create", {"group_id": str(chips.id), "name": "Grande", "price_delta": 0}, ctx=admin)
         said = [
             values(assistant.cards.card(get("modifier.option.delete"), {"id": str(option.id)}, "es", admin))["id"]
             for option in (of_drinks, of_chips)

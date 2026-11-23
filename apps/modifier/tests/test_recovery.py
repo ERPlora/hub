@@ -289,7 +289,7 @@ def test_the_copy_gives_each_group_with_its_options_as_its_recover_takes_them():
         "name": "Sauces", "kitchen_name": "SAU", "min_choices": 1, "max_choices": 2, "allow_repeat": True,
         "sort_order": 3,
     })
-    run_here("modifier.option.create", {"group_id": str(sauces.id), "name": "Ketchup", "is_default": True})
+    run_here("modifier.option.create", {"group_id": str(sauces.id), "name": "Ketchup", "is_default": True, "price_delta": 0})
     run_here("modifier.option.create", {
         "group_id": str(sauces.id), "name": "BBQ", "kitchen_name": "+BBQ", "price_delta": 50,
         "tax_category_key": GENERIC, "sort_order": 4,
@@ -749,7 +749,7 @@ class TestGroupsComeBack:
 
     def with_options(self, hub, group) -> None:
         """``group`` with two options, the first chosen by default."""
-        run_in(hub, "modifier.option.create", group_id=group, name="Ketchup", is_default=True)
+        run_in(hub, "modifier.option.create", price_delta=0, group_id=group, name="Ketchup", is_default=True)
         run_in(hub, "modifier.option.create", group_id=group, name="BBQ", kitchen_name="+BBQ", price_delta=50,
                sort_order=1)
 
@@ -790,7 +790,7 @@ class TestGroupsComeBack:
         run_in(hub, "modifier.group.delete", id=groups["Sauces"])
         # Made again by hand with its name, with an option of its own and hung from nothing.
         mine = run_in(hub, "modifier.group.create", name="SAUCES").id
-        run_in(hub, "modifier.option.create", group_id=mine, name="Mayo")
+        run_in(hub, "modifier.option.create", price_delta=0, group_id=mine, name="Mayo")
         row = recoveries.ask(copy, "inventory", "modifier")
 
         assert run() == 1
@@ -818,7 +818,7 @@ class TestGroupsComeBack:
             own = TaxCategory.objects.filter(is_active=True).exclude(key=a_tax_key(hub)).order_by("key").first()
         run_in(hub, "modifier.option.create", group_id=groups["Sauces"], name="Wine sauce", price_delta=200,
                tax_category_key=own.key)
-        run_in(hub, "modifier.option.create", group_id=groups["Sauces"], name="Ketchup", sort_order=1)
+        run_in(hub, "modifier.option.create", price_delta=0, group_id=groups["Sauces"], name="Ketchup", sort_order=1)
         copy = recoveries.copy_of(hub)
         run_in(hub, "modifier.group.delete", id=groups["Sauces"])
         # Taxes turned its tax category off since: the option sheet no longer takes it.
