@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8fc257320ff46bf0c377488d0a22e84262f946f1fe2b3e10b7c4768f12b6f5b1 -->
+<!-- generated from WORKBOOK.md sha256:2bb981d99b9e23d4671a0e0503f451fbb6eb431514b76da46750b17bb6635f25 -->
 
 ## What it is for and who it is for
 
@@ -2500,7 +2500,9 @@ Steps:
      with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
      many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
      question. Every date and time it says is in the business's time, the one the
-     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
+     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
+     amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
+     it tells as €3.60, never as €360.00.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.

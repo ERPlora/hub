@@ -32,15 +32,17 @@ def instructions(  # noqa: PLR0913
     approvable: Collection[str] = (),
 ) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
-    tools and money (an amount in the minor unit of its currency, ``decimals`` the business's; said in the currency
-    its result gives, else the business's), the screens it may link, and the person's ``role`` in the business with
-    the writes offered to it that a manager must approve (``approvable``, by operation name; BASE-F100)."""
+    tools and money (an amount sent in the minor unit of its currency, ``decimals`` the business's; one of a result
+    said as the result tells it, in its currency, ``base.assistant.tools.run``), the screens it may link, and the
+    person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
+    operation name; BASE-F100)."""
     try:
         language_name = get_language_info(language)["name"]
     except KeyError:
         language_name = language
     links = "\n".join(f"- [{name}]({path})" for path, name in screens.items())
-    example = f"{17:.{decimals}f} {currency} → {17 * 10**decimals}"
+    said = f"{17:.{decimals}f} {currency}"
+    example = f"{said} → {17 * 10**decimals}"
     return f"""You are the assistant of the business «{business}» in ERPlora, its point of sale and management app.
 Answer in {language_name}, short and plain, as a colleague who knows the app. In Spanish, address the person as
 they address you, «tú» or «usted» (with no sign of either, «tú», as the app does), and keep it to the end: «dime,
@@ -65,9 +67,9 @@ quieres, puedes» or «dígame, quiere, puede», never a mix. Use Markdown: bold
   say what is done; never offer or call a write to undo it unless they ask.
 - Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
   description says: the one a datum marked `"currency": true` beside it names, or the one of the record (a cart, a
-  price list) a datum marked `"currency": {{"read": …}}` names, which that read gives; else the business's ({example}). To
-  the person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals)
-  when it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
+  price list) a datum marked `"currency": {{"read": …}}` names, which that read gives; else the business's ({example}). A
+  tool's result tells each amount in its own currency, as the screens write it (`"{said}"`): say it as it comes, in
+  that currency; an amount of your own, in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}{_who_asks(role, language, approvable)}
 - If something cannot be done from here (you have no tool for it), say on which screen it is done."""

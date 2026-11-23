@@ -33,11 +33,11 @@ class DishOptionOut(Schema):
     option_id: UUID
     name: str
     kitchen_name: str
-    price_delta: int = Field(description="Its price in cents, per pick of the dish.")
+    price_delta: int = Field(description="Its price in cents, per pick of the dish.", json_schema_extra={"money": True})
     tax_category_key: str | None = Field(description="Its own tax category, as Modifiers gave it.")
     own_line: bool
     allergens: list[str]
     line_tax_category_key: str | None = Field(
         description="The tax category of its own line when the menu is split; null when it goes inside its dish."
     )
-    amount: int | None = Field(description="Its part of one menu's amount, in cents, when it has a line of its own.")
+    amount: int | None = Field(description="Its part of one menu's amount, in cents, when it has a line of its own.", json_schema_extra={"money": True})

@@ -217,8 +217,8 @@ class BreakdownOut(Schema):
         description="subject, subject_reverse, exempt, not_subject or not_subject_location.",
     )
     exempt_reason: str = Field("", description="The exemption cause (E1–E8) of an exempt key.")
-    base: int = Field(description="Taxable base of the key, in cents.")
-    tax: int = Field(description="Tax of this component of the key, in cents.")
+    base: int = Field(description="Taxable base of the key, in cents.", json_schema_extra={"money": True})
+    tax: int = Field(description="Tax of this component of the key, in cents.", json_schema_extra={"money": True})
 
 
 class PreviewLineOut(Schema):
@@ -226,7 +226,7 @@ class PreviewLineOut(Schema):
     name: str = Field(description="Name.")
     quantity: Decimal = Field(description="Quantity.")
     unit: str = Field(description="Unit.")
-    unit_price: int = Field(description="Frozen price in cents.")
+    unit_price: int = Field(description="Frozen price in cents.", json_schema_extra={"money": True})
     discount_percent: Decimal = Field(description="Line discount in %.")
     is_gift: bool = Field(description="A comp.")
     service_id: UUID | None = Field(description="Services' service, if it is one.")
@@ -237,9 +237,9 @@ class PreviewLineOut(Schema):
     )
     tax_category_key: str = Field(description="Tax category.")
     tax_rate: Decimal = Field(description="Rate applied.")
-    net_amount: int = Field(description="Base in cents.")
-    tax_amount: int = Field(description="Tax in cents.")
-    line_total: int = Field(description="Total in cents.")
+    net_amount: int = Field(description="Base in cents.", json_schema_extra={"money": True})
+    tax_amount: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
+    line_total: int = Field(description="Total in cents.", json_schema_extra={"money": True})
     modifiers: list[str] = Field(description="The options charged inside the line.")
     is_child: bool = Field(
         description="An option of another tax category, charged on a line of its own under its dish."
