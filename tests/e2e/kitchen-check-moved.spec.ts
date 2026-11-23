@@ -1,11 +1,14 @@
 // KITCHEN-F05 and TABLE-F15 on the screen, against the real API: a round sent from table 4 is on Kitchen → Display as
 // «Table 4»; the check is moved to table 9 and, without reloading, the same card says «Table 9», captured at the three
-// sizes. What a run creates (its zone, its tables, their check, its product and its kitchen ticket) is deleted after it.
+// sizes. The move is made once the display's live stream has answered (live-streams.ts, hub#814), and the new table comes
+// over that same stream. What a run creates (its zone, its tables, their check, its product and its kitchen ticket) is
+// deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shown } from './helpers';
+import { saveSessionForTheSweep, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { capture } from './kitchen-helpers';
+import { liveStreamsSettled, watchLiveStreams } from './live-streams';
 import { cleanRoom, cleanSales, stamp } from './sale-helpers';
 import { ownerPage, post } from './service-helpers';
 
@@ -61,13 +64,18 @@ test('KITCHEN-F05: a round already sent says the new table once its check is mov
   expect(ticket.label).toBe('Table 4');
   const { context, page } = await ownerPage(browser, '/kitchen/display');
   try {
+    await saveSessionForTheSweep(context);
     await page.evaluate(() => localStorage.removeItem('kitchen.display.station'));
+    const streams = await watchLiveStreams(page);
     await page.reload();
     await expect(label(page)).toHaveText('Table 4');
+    await liveStreamsSettled(streams);
+    const open = streams.length;
 
     await post(context, '/table/sessions/transfer', { id: seated.id, to_table_id: nine }, 200);
 
     await expect(label(page)).toHaveText('Table 9');
+    expect(streams.length, 'the new table reached the display without a new /api/live').toBe(open);
     await capture(page, 'F05-moved-check', async () => {
       await label(page).scrollIntoViewIfNeeded();
       await expect(label(page)).toBeInViewport();
