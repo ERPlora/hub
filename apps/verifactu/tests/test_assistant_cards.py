@@ -11,6 +11,7 @@ from django.conf import settings
 from live.operations import get
 
 from apps.invoice.models import Invoice
+from apps.verifactu.models import Event, Record
 from apps.verifactu.tests.conftest import HUB_DB, ctx_for, run
 from base import assistant
 from base.tests.test_assistant import named_actions, verb
@@ -69,6 +70,13 @@ def test_the_test_invoice_card_says_its_series_price_and_vat(language):
     """hub#2183: «Create in VeriFactu. Check each datum before going on.» had no datum under it."""
     card = assistant.cards.card(get(TEST_INVOICE), {}, language, ctx_for(language=language))
     assert (card["risk"], card["fields"]) == ("high", TEST_INVOICE_FIELDS[language])
+
+
+@pytest.mark.parametrize("write", [CONNECTION_TEST, TEST_INVOICE])
+def test_saying_a_card_runs_nothing(issuer, write):
+    """The card is drawn before the person answers: no connection test is kept, and no invoice or record is made."""
+    assistant.cards.card(get(write), {}, "en", ctx_for())
+    assert (Event.objects.count(), Invoice.objects.count(), Record.objects.count()) == (0, 0, 0)
 
 
 def test_the_test_invoice_card_says_what_the_write_issues(issuer):
