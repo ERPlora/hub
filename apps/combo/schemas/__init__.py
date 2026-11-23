@@ -140,7 +140,7 @@ D_GROUP = (
     "The course's name inside the menu («Starters», «Drink»), when its id is not known."
 )
 D_PRODUCT_ID = "Id of the product (Inventory app)."
-D_PRODUCT = "The product's SKU or name («Lentils»), when its id is not known."
+D_PRODUCT = "The product's SKU or name («Lentils»), without its id: in the person's own words, never translated."
 D_PRICE = "The closed price in cents: what the customer pays for the whole menu, whatever they pick."
 D_DELTA = "Supplement in cents added to the closed price when this choice is picked; negative makes it cheaper."
 D_SUPPLY = (
@@ -303,7 +303,7 @@ class OptionRefIn(_ComboOfIn):
     )
     product: Reference | None = Field(
         None,
-        description="The SKU or name of the choice's product, when its id is not known.",
+        description="The choice's product SKU or name, without its id: in the person's own words, never translated.",
         json_schema_extra=assistant.unless_given(A_CHOICE_BY_NAME, "id"),
     )
 
@@ -526,7 +526,7 @@ class ChoiceIn(In):
     option_id: UUID | None = Field(None, description="Id of the choice picked.")
     product: Reference | None = Field(
         None,
-        description="SKU or name of the product picked, when the choice's id is not known.",
+        description="SKU or name of the product picked, without the choice's id: in the person's own words, never translated.",
     )
     group: Reference | None = Field(
         None, description="The course it is picked in, when the product is in several."
