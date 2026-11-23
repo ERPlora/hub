@@ -30,6 +30,7 @@ from apps.customer.schemas.fields import (
     Stage,
     _text,
 )
+from apps.customer.schemas.health import NOT_FOR_HEALTH_DATA
 from base.sensitive import BUSINESS_TOTALS, CUSTOMER_CONTACT
 
 CustomerSort = Literal[
@@ -144,7 +145,7 @@ class CustomerIn(Schema):
     source: Source = Field("walk_in", description=SOURCE)
     lifecycle_stage: Stage = Field("lead", description=STAGE)
     preferred_channel: PreferredChannel = Field("none", description=CHANNEL)
-    notes: _text(10000) = Field("", description="Internal notes about the customer.")
+    notes: _text(10000) = Field("", description=f"Internal notes about the customer. {NOT_FOR_HEALTH_DATA}")
 
 
 class FieldValueIn(Schema):
@@ -179,7 +180,7 @@ class CustomerPatchIn(CustomerRefIn):
     source: Source | None = Field(None, description=SOURCE)
     lifecycle_stage: Stage | None = Field(None, description=STAGE)
     preferred_channel: PreferredChannel | None = Field(None, description=CHANNEL)
-    notes: _text(10000) | None = Field(None, description="The new internal notes.")
+    notes: _text(10000) | None = Field(None, description=f"The new internal notes. {NOT_FOR_HEALTH_DATA}")
     is_active: bool | None = Field(
         None, description="Whether the customer counts as active."
     )

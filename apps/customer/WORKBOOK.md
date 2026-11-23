@@ -320,13 +320,15 @@ Pasos:
 2. Pulsa **Añadir**. Sale «Nota añadida» y la nota aparece arriba de la «Actividad», con quién la
    escribió y cuándo.
 Entra: el texto (hasta 5.000 caracteres) y, si lo pone quien la escribe por otra vía (una
-automatización), un título propio y el nombre del autor.
+automatización), un título propio y el nombre del autor. Una alergia, una prueba de sensibilidad u otro
+dato de salud no va en una nota ni en las notas internas de la ficha: si se le pide al asistente, dice que
+eso no lo apunta él y que se hace en «Salud y alergias» de la ficha, con su permiso (CUSTOMER-F32).
 Sale: la nota, que ES su entrada de la actividad (una sola fila: no puede haber nota sin actividad),
 y el aviso de nota añadida (`customer.note.added`). Las notas no se editan ni se borran. Una
 automatización puede escribir notas por el mismo servicio.
 Si falla: una nota vacía sale debajo del campo; «Este cliente ya no está disponible.» si la ficha ya
 no existe.
-Implicados: ninguno
+Implicados: CUSTOMER-F32
 
 ### CUSTOMER-F06 Poner grupos y etiquetas a una ficha
 Estado: hecho
@@ -903,14 +905,15 @@ Sale: el permiso, como un hecho más del libro de consentimientos (finalidad «d
 entrada en la «Actividad» y su aviso `customer.health.consent_granted` o
 `customer.health.consent_withdrawn`), y los datos de salud, con «Datos de salud actualizados» en la
 actividad (sin su contenido) y el aviso `customer.health.updated`. Los avisos solo llevan
-identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso.
+identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso. El asistente no lee ni
+apunta datos de salud: si se le pide una alergia, manda a este bloque (CUSTOMER-F05).
 Si falla: sin el permiso en vigor no se guarda nada: «Registra antes su permiso para guardar datos de
 salud.». Una prueba con fecha futura: «Esta fecha está en el futuro.»; un resultado sin fecha: «Pon la
 fecha de la prueba.», cada uno debajo de su campo: se quita en cuanto se corrige ese campo y vuelve si el
 siguiente intento también se rechaza; lo que no es de un campo sale en el bloque y se queda hasta el siguiente
 intento. «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
 fichas ve el bloque sin botones.
-Implicados: CUSTOMER-F13, CUSTOMER-F16
+Implicados: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
 
 ### CUSTOMER-F33 Recuperar una ficha eliminada
 Estado: hecho
@@ -1181,6 +1184,9 @@ asistente.
   `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) declaran
   `ai=INTERNAL` y no `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD
   art. 9, minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
+  Los textos libres de la ficha que escribe el asistente (`customer.note.add` y el dato `notes` del alta y
+  de la edición) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí y a qué
+  bloque mandar; lo fija `tests/test_assistant_health_data.py` (hub#2278).
 - Toda operación declara `ai`: `AI(…)` con su descripción para el asistente, su `risk` en las escrituras y sus `asks`
   (2–4 frases en `en` y `es`, como las diría quien la usa); las de salud y las tres de compras que solo lanza la venta
   (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta
