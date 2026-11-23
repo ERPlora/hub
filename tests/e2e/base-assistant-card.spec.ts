@@ -66,7 +66,7 @@ test('a dangerous write lists its data and runs only after typing the word', asy
   const item = await api<{ id: string }>(context, A, 'POST', '/demo/items', { name: `Para borrar ${Date.now().toString(36)}` });
   await openPanelAtTheDesk(page);
   await askForACard(page, `E2E-DELETE ${item.data.id}`);
-  await expect(card(page)).toContainText('Delete in Demo. Check each datum before going on.');
+  await expect(card(page)).toContainText('Delete in Demo. Check each detail before you continue.');
   // A record is never shown by its id; Demo marks no read that names it.
   await expect(card(page)).not.toContainText(item.data.id);
   // The native button inside `ion-button` (its host carries no role for `aria-disabled` to count).

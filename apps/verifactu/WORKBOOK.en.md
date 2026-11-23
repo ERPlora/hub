@@ -602,7 +602,7 @@ Steps:
 3. For example, "Test invoice TICKET-2026-000001 created: its record is in Records." shows.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and "Create test
    invoice" is disabled.
-5. Asked of the assistant, its card says "Create test invoice in VeriFactu. Check each datum before going on." and,
+5. Asked of the assistant, its card says "Create test invoice in VeriFactu. Check each detail before you continue." and,
    below, what it will issue: "Series: TICKET", "Price: €1.00" and "VAT: 21%"; it is issued only after typing
    "CONFIRM".
 In: nothing to type.
