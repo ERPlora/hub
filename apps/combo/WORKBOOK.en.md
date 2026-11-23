@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac35ae2f653baa1db7228937121ee99b33f0df8b49987c23b15529a4339db838 -->
+<!-- generated from WORKBOOK.md sha256:2cde63daec657c60a591cee175403f19038e052b54292204b393c99389017e23 -->
 
 ## What it is for and who it is for
 
@@ -594,7 +594,8 @@ Homemade desserts" when "desserts" was said, "Choice: House flan" when "flan" wa
 courses and choices, and with an Inventory product said by its name, the card also shows the menu, the course and the
 product it found, and the "yes" counts only for them: if, before confirming, someone creates one that fits better what
 was said, nothing is touched and the new card comes up; if what was said fits several, the card shows it as it was said
-and the action asks which one (hub#1245). If the menu, the course or the choice comes by its identifier beside a name
+and the action asks which one (hub#1245); when adding choices, instead, no card comes up and the assistant asks which
+one (hub#2213). If the menu, the course or the choice comes by its identifier beside a name
 the action does not use (another menu's, another course's or another product's), the card neither reads nor shows that
 name: it says the record of the identifier, as when it comes alone (hub#1250). The same with the identifier of another
 menu or another course that comes beside the course's or the choice's, or beside that of the course a choice is added
@@ -608,6 +609,8 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
 | A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06, F07 | `combo.option.get` |
 | A course of a menu with its choices, by its id or by its name within the menu: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view | F05, F06 | `combo.group.get` |
+| What a new choice names, before the assistant's card that adds it: the course, with its menu, and the Inventory product; if one does not exist or fits several, no card comes up (BASE-F97); it is not an assistant tool and has no API route | view | F06 | `combo.option.check` |
+| The same with several choices at once: the course and each product, before the card that adds them (BASE-F97); it is not an assistant tool and has no API route | view | F06 | `combo.option.bulk_check` |
 | The till's menu catalogue: the ones that can be sold, with their courses and their available choices (live) | view | F07 | `combo.combo.for_sale` |
 | The line of a menu with what was chosen: amount, components and tax split | view | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |

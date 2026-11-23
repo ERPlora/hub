@@ -13,13 +13,18 @@ from apps.inventory.models import Product
 from apps.inventory.queries.reads import find_product
 
 
+def field_refusal(error: NotFound, field: str) -> InvalidPayload:
+    """A reference of a write that does not exist is a 422 on its field, not a 404 of the write."""
+    return InvalidPayload(error.message, code="invalid_field", fields={field: error.message})
+
+
 def product_said(product_id: UUID | None, said: str | None, field: str) -> Product:
     """The live product a new choice names, by its id or as the person says it; one that is not there is a 422 on
     ``field``, never a 404 of the write."""
     try:
         return find_product(product_id, said)
     except NotFound as error:
-        raise InvalidPayload(error.message, code="invalid_field", fields={field: error.message}) from None
+        raise field_refusal(error, field) from None
 
 
 def _course(ctx: OperationContext, data: OptionIn | OptionBulkIn) -> GroupOut:

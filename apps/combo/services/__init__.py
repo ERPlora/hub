@@ -22,7 +22,7 @@ from live.outbox import record_event
 
 from apps.combo import events
 from apps.combo.models import ACTOR_MAX_LENGTH, ChoiceGroup, ChoiceOption, Combo
-from apps.combo.queries.new_choices import product_said
+from apps.combo.queries.new_choices import field_refusal, product_said
 from apps.combo.queries import (
     find_combo,
     find_group,
@@ -102,13 +102,6 @@ def _actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:ACTOR_MAX_LENGTH]
 
 
-def _field_refusal(error: NotFound, field: str) -> InvalidPayload:
-    """A reference of a write that does not exist is a 422 on its field, not a 404 of the write."""
-    return InvalidPayload(
-        error.message, code="invalid_field", fields={field: error.message}
-    )
-
-
 def _tax_category(key: str) -> TaxCategory:
     """The active tax category of ``key``, held for the write that names it (see ``held``)."""
     category = next(iter(held(TaxCategory.objects.filter(key=key, is_active=True)[:1])), None)
@@ -158,7 +151,7 @@ def _sellable_product(product_id: UUID | None, said: str | None, field: str) -> 
     product = next(iter(held(live[:1])), None)
     if product is None:
         # Deleted between the two reads: Inventory's own refusal, as for one deleted before.
-        raise _field_refusal(NotFound(str(inventory.reads.PRODUCT_NOT_FOUND)), field)
+        raise field_refusal(NotFound(str(inventory.reads.PRODUCT_NOT_FOUND)), field)
     if not product.is_active:
         message = str(PRODUCT_INACTIVE) % {"product": product.name}
         raise Conflict(message, code="combo.product_inactive", fields={field: message})
