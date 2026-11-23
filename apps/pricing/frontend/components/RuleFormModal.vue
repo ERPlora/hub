@@ -9,7 +9,7 @@
 // the business's currency (its country's; a dash until it answers, and then an untouched amount takes its
 // decimals). «Create» and «Save» wait in grey until the business has answered its money (the amount is read in it;
 // hub#921); if that read fails, the dialog says so with «Retry» (hub#938).
-import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -531,31 +531,21 @@ const canDismiss = useUnsavedFormOnOpen(
           />
         </div>
         <div class="pricing-form__row">
-          <ion-input
-            data-testid="pricing-rule-form-valid_from"
+          <DateField
+            testid="pricing-rule-form-valid_from"
             name="valid_from"
-            type="date"
-            :value="form.validFrom"
+            :model-value="form.validFrom"
             :label="$t('pricing.rules.form.validFrom')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.valid_from"
-            :class="invalid(fieldErrors.valid_from)"
-            @ion-input="form = { ...form, validFrom: text($event.detail.value) }"
+            @update:model-value="form = { ...form, validFrom: $event }"
           />
-          <ion-input
-            data-testid="pricing-rule-form-valid_until"
+          <DateField
+            testid="pricing-rule-form-valid_until"
             name="valid_until"
-            type="date"
-            :value="form.validUntil"
+            :model-value="form.validUntil"
             :label="$t('pricing.rules.form.validUntil')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.valid_until"
-            :class="invalid(fieldErrors.valid_until)"
-            @ion-input="form = { ...form, validUntil: text($event.detail.value) }"
+            @update:model-value="form = { ...form, validUntil: $event }"
           />
         </div>
       </div>

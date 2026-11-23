@@ -636,10 +636,14 @@ Pasos:
    «Hecho» sin recargar, y sigue hecho los años siguientes (la serie de un año nuevo hereda la del anterior).
 4. El asistente o la API preguntan además si la numeración del año está preparada: la respuesta dice el año
    del negocio y cuántas series ordinarias (F1, F2, F3), de rectificativas (R1–R5) y predeterminadas tiene ese
-   año, cuántas tiene en total, y si está preparada (al menos una ordinaria y una de rectificativas).
+   año, cuántas tiene en total, y si ese año ya tiene al menos una ordinaria y una de rectificativas. Sin
+   series no falta nada: el asistente contesta lo mismo que **Series**, que se crean solas con la primera
+   venta y que solo hace falta crear una para cambiar el prefijo o el formato, o para seguir la numeración
+   de otro sistema.
 Entra: las series del negocio.
 Sale: nada; solo se lee (ni el Inicio ni la pregunta crean ninguna serie).
-Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente y responde que no está preparada.
+Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente (recomendado) y, preguntado, el
+asistente dice que aún no hay series y que se crearán solas con la primera venta.
 Implicados: ninguno
 
 ### INVOICE-F15 Comprobar que la numeración no tiene huecos

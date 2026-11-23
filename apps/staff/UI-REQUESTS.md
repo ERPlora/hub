@@ -5,9 +5,11 @@ del Hub está en 07b4392):
 
 - **`SearchSelect`** ha llegado como `Combo` (ya está en 07b4392, el puntero del Hub) y Personal lo usa en sus
   cuatro selectores; su copia propia se ha borrado (CLOSE-STAFF, segunda vuelta).
-- **Fecha y hora** y la **tarjeta de cifra** siguen abiertas: ninguna ha llegado a `ui`. Sus sustitutos funcionan y
-  ningún flujo está roto; van propuestas para `## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`
-  como `staff:ui-time-date-fields` (la misma petición que `schedule:ui-time-date-fields`) y `staff:ui-kpi-card`.
+- Los campos de **fecha y hora** han llegado como `DateField` y `TimeField`, y Personal los usa en todos sus
+  formularios y en las fechas a medida de Comisiones.
+- El **formateador de días** y la **tarjeta de cifra** siguen abiertos: no han llegado a `ui`. Sus sustitutos
+  funcionan y ningún flujo está roto; la tarjeta va propuesta para `## 6` de `archive/migration/MIGRATION.md` de
+  `ERPlora/erplora-next` como `staff:ui-kpi-card`.
 
 ## Iconos
 
@@ -33,17 +35,11 @@ Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`
   «Miembro» es obligatorio y tampoco lo lleva. Los filtros «Rol», «Usuario del Hub» y «Miembro» son el
   `lookup` del embudo de `DataTable`, con las mismas búsquedas.
 
-### Fecha y hora en el orden del idioma del negocio
+### `formatDate` — un día de calendario en el idioma del negocio
 
-- **Para qué:** el módulo viejo pintaba y leía las fechas (`dd/mm/aaaa` en español) y las horas (24 h)
-  con campos de texto propios (staff#86, staff#87), porque `<input type="date|time">` usa el orden del
-  sistema operativo y no el del Hub. Mientras no exista, staff usa `ion-input type="date|time"`, como
-  tax: en un Chrome en inglés con el Hub en español, el campo enseña `mm/dd/yyyy`.
-- **API propuesta:** `DateField` / `TimeField` con `v-model` en ISO (`YYYY-MM-DD`, `HH:MM`), `label`,
-  `errorText`, y lectura de lo tecleado en el orden de `<html lang>` (también `05102026` y la ISO).
-- **Y un formateador** `formatDate(iso, locale)` en `@erplora/ui/components/format` para los días de
-  calendario (en UTC, sin desplazar un día), junto a `formatDateTime`; staff lo tiene en
-  `frontend/lib/format.ts`.
+- **Para qué:** enseñar un día de calendario (`AAAA-MM-DD`) en el orden del idioma de la app, en UTC para no
+  desplazarlo un día, junto a `formatDateTime`. Staff lo tiene en `frontend/lib/format.ts`.
+- **API propuesta:** `formatDate(iso, locale)` en `@erplora/ui/components/format`.
 
 ### Tarjeta de cifra (el `ok-kpi` del producto actual)
 

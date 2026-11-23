@@ -3,7 +3,8 @@
 // with what is left, «Full», «No more service today», «No service this day» or «Closed this day».
 import { describe, expect, it } from 'vitest';
 
-import { click, ionValue, mountReservation } from '../__tests__/mount-reservation';
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
+import { click, mountReservation } from '../__tests__/mount-reservation';
 import { dayOut, slotLoad } from '../__tests__/rows';
 import DayBar from './DayBar.vue';
 
@@ -40,14 +41,22 @@ describe('DayBar', () => {
     expect((await setup({ figures: dayOut({ closed: true }) })).text('next-slot')).toContain('Closed this day');
   });
 
-  it('steps the day, takes a typed date and comes back to today', async () => {
+  it('steps the day, takes a picked date and comes back to today', async () => {
     const s = await setup({ day: '2026-10-16' });
     await click(s.find('reservation-day-prev').element);
     await click(s.find('reservation-day-next').element);
     await click(s.find('reservation-day-today').element);
-    await ionValue(s.find('reservation-day-input').element, '2026-12-24');
-    await ionValue(s.find('reservation-day-input').element, '');
+    await pick(s.find('reservation-day-input').element, '2026-12-24');
+    await pick(s.find('reservation-day-input').element, '');
     expect(s.wrapper.emitted('update:day')).toEqual([['2026-10-15'], ['2026-10-17'], ['2026-10-15'], ['2026-12-24']]);
+  });
+
+  // The app's own calendar, in the app's language and colours, never the device's date picker; the book always
+  // shows a day, so it has no «Clear».
+  it('the date is a date field of the app, named and shown as read', async () => {
+    const s = await setup({ day: '2026-10-16' });
+    const field = s.find('reservation-day-input').element as HTMLElement & { label?: string; value?: string; readonly?: boolean; required?: boolean };
+    expect([picked(field), field.value, field.label, field.readonly, field.required]).toEqual(['2026-10-16', '10/16/2026', 'Date', true, true]);
   });
 
   it('greys the figures while they load and says why when they fail', async () => {
@@ -62,5 +71,7 @@ describe('DayBar', () => {
     expect(s.text('covers')).toBe('11 cubiertos');
     expect(s.text('next-slot')).toBe('13:00–16:00 9 libres próxima franja');
     expect(s.text('today')).toBe('Hoy');
+    const field = s.find('reservation-day-input').element as HTMLElement & { label?: string; value?: string };
+    expect([field.label, field.value]).toEqual(['Fecha', '16/10/2026']);
   });
 });

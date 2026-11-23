@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The till's catalogue column (WORKBOOK «Vender»; SALE-F01 step 1, F07): the category strip with the magnifier, the
 // «Speak» key (the assistant by voice) and the ⋮ screen menu, the notices, and the grid. Everything comes from
-// Inventory's own operations: the categories by name, the count of «All», and the articles of the category in use in
+// Inventory's own operations: the categories in the position the business gave them, the count of «All», and the articles of the category in use in
 // windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too. The grid and the
 // search show what is sold out in Inventory too, greyed (SALE-F07), and the counts count what the grid shows
 // (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the grid and in a toast,
@@ -90,7 +90,7 @@ const tapNotice = shallowRef<TapNotice | null>(null);
 /** The toast of a refused tap, named so it goes with the notice once what it says stops being true. */
 const TAP_TOAST = 'sale-pos-tap-notice';
 
-const categories = useLiveWindows<'inventory.category.list', CategoryOut>('inventory.category.list', () => ({ sort: 'name' }), 100);
+const categories = useLiveWindows<'inventory.category.list', CategoryOut>('inventory.category.list', () => ({ sort: 'order' }), 100);
 const allCount = useLive('inventory.product.list', { is_active: true, include_sold_out: true, limit: 1, offset: 0 });
 const products = useLiveWindows<'inventory.product.list', ProductOut>(
   'inventory.product.list',

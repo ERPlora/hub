@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a2b91486e1e0a2a039768fcba359af42c812d641f2543023e049e8575b18a5e1 -->
+<!-- generated from WORKBOOK.md sha256:595d38efe10f8dc9056e1256bf4b85e4e94acf57688c85801d5fe7993cecc91a -->
 
 ## What it is for and who it is for
 
@@ -634,12 +634,14 @@ Steps:
    the previous one's).
 4. The assistant or the API also ask whether the year's numbering is ready: the answer says the
    business's year and how many ordinary series (F1, F2, F3), rectifying series (R1–R5) and default series
-   it has that year, how many it has in total, and whether it is ready (at least one ordinary and one
-   rectifying).
+   it has that year, how many it has in total, and whether that year already has at least one ordinary and
+   one rectifying. With no series nothing is missing: the assistant answers what **Series** says, that they
+   are created on their own with the first sale and that one only has to be created to change the prefix or
+   the format, or to continue another system's numbering.
 In: the business's series.
 Out: nothing; it only reads (neither Home nor the question creates any series).
-If it fails: nothing to fail; a newly created business has the step pending and answers that it is not
-ready.
+If it fails: nothing to fail; a newly created business has the step pending (recommended) and, when asked,
+the assistant says there are no series yet and that they will be created on their own with the first sale.
 Involved: none
 
 ### INVOICE-F15 Check that the numbering has no gaps

@@ -2,8 +2,10 @@
 // only): the customer's flow with the same public operations the page of base will call — pick services, a
 // professional or «No preference», a day and a free time, leave name and mobile, book; then see the booking
 // and cancel it with the personal link. Refusals are said where they happen, under their field.
+import { DateField } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { BookedOut, PageOut, PublicBookingOut, PublicServiceOut, PublicSlotsOut } from '../operations';
 import { business, click, ionChecked, ionValue, type MountOptions, mountOnlineBooking, page, POLISH, settle } from '../__tests__/mount-online-booking';
 import PreviewPage from './PreviewPage.vue';
@@ -97,7 +99,7 @@ async function setup(options: MountOptions = {}, routes = ROUTES) {
 
 async function chooseUpToATime(s: Awaited<ReturnType<typeof setup>>) {
   await ionChecked(s.el('service-v1'), true);
-  await ionValue(s.el('day'), '2030-03-05', 'ionChange');
+  await pick(s.el('day'), '2030-03-05');
   await settle();
   await click(s.el('time-10:00'));
 }
@@ -159,7 +161,7 @@ describe('PreviewPage', () => {
       'Bea Ruiz',
     ]);
     await ionValue(s.el('staff'), 'm2', 'ionChange');
-    await ionValue(s.el('day'), '2030-03-05', 'ionChange');
+    await pick(s.el('day'), '2030-03-05');
     await settle();
     const asked = new URL(s.net.api.at(-1)!.url, 'http://a.localhost');
     expect(asked.pathname).toBe('/api/online_booking/public/slots');
@@ -170,6 +172,16 @@ describe('PreviewPage', () => {
     ]);
     expect(s.el('time-10:00')?.textContent).toContain('10:00 AM');
     expect(s.el('time-10:30')).not.toBeNull();
+  });
+
+  it('the day is the app’s own calendar, shown in the page’s language; cleared, its free times go', async () => {
+    const s = await setup();
+    await chooseUpToATime(s);
+    const day = s.el('day') as HTMLElement & { value?: string; readonly?: boolean };
+    expect([picked(day), day.value, day.readonly]).toEqual(['2030-03-05', '03/05/2030', true]);
+    expect(s.wrapper.getComponent(DateField).props('required')).toBeFalsy();
+    await pick(day, '');
+    expect([s.el('time-10:00'), (s.el('book') as (HTMLElement & { disabled?: boolean }) | null)?.disabled]).toEqual([null, true]);
   });
 
   it('books with the time, the name and the mobile, and shows the number, the message and the link', async () => {
@@ -250,7 +262,7 @@ describe('PreviewPage', () => {
     it.each([
       ['another service', (s: Awaited<ReturnType<typeof refused>>) => ionChecked(s.el('service-v2'), true)],
       ['another professional', (s: Awaited<ReturnType<typeof refused>>) => ionValue(s.el('staff'), 'm1', 'ionChange')],
-      ['another day', (s: Awaited<ReturnType<typeof refused>>) => ionValue(s.el('day'), '2030-03-06', 'ionChange')],
+      ['another day', (s: Awaited<ReturnType<typeof refused>>) => pick(s.el('day'), '2030-03-06')],
     ])('%s is a change too: the notice goes, and no field’s message', async (_, change) => {
       const s = await refused();
       await change(s);

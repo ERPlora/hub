@@ -8,10 +8,10 @@
 // period and no longer works here (or was deactivated) is marked. Whoever reads the team follows it, and the
 // server answers someone without the team's pay only their own line; without Sales in the business there is
 // nothing to work a commission out from, and the page says so.
-import { type DataTableColumn, DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import { type DataTableColumn, DataTable, DateField, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type LiveStatus, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -33,7 +33,7 @@ const canReadTeam = computed(() => session.can('staff.view'));
 
 // ── The period ─────────────────────────────────────────────────────────────────────────────────
 const choice = ref<Choice>('today');
-/** The two days of «Custom», as typed (`YYYY-MM-DD`). */
+/** The two days of «Custom», as picked (`YYYY-MM-DD`). */
 const from = ref('');
 const to = ref('');
 
@@ -52,14 +52,12 @@ function pick(event: CustomEvent<{ value?: unknown }>): void {
   const value = String(event.detail.value ?? '') as Choice;
   if (!CHOICES.includes(value) || value === choice.value) return;
   if (value === 'custom') {
-    // «Custom» starts from the days on screen, so the list never goes blank while they are typed.
+    // «Custom» starts from the days on screen, so the list never goes blank while they are picked.
     from.value = data.value?.date_from ?? '';
     to.value = data.value?.date_to ?? '';
   }
   choice.value = value;
 }
-
-const typed = (event: CustomEvent<{ value?: string | null }>): string => event.detail.value ?? '';
 
 /** What the server refused of the custom days, by field (its 422): said under the field, not as a failure of the list. */
 const fieldErrors = computed<Readonly<Record<string, string>>>(() => error.value?.fields ?? {});
@@ -192,29 +190,17 @@ const blocked = computed(() => blockingError(error.value));
           v-if="choice === 'custom'"
           class="staff-commissions__range"
         >
-          <ion-input
-            data-testid="staff-commissions-from"
-            type="date"
-            :value="from"
+          <DateField
+            v-model="from"
+            testid="staff-commissions-from"
             :label="$t('staff.commissions.from')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.date_from"
-            :class="{ 'ion-invalid': !!fieldErrors.date_from, 'ion-touched': !!fieldErrors.date_from }"
-            @ion-input="from = typed($event)"
           />
-          <ion-input
-            data-testid="staff-commissions-to"
-            type="date"
-            :value="to"
+          <DateField
+            v-model="to"
+            testid="staff-commissions-to"
             :label="$t('staff.commissions.to')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.date_to"
-            :class="{ 'ion-invalid': !!fieldErrors.date_to, 'ion-touched': !!fieldErrors.date_to }"
-            @ion-input="to = typed($event)"
           />
         </div>
         <p

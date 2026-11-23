@@ -55,9 +55,9 @@ async function leavingTheTillDropsTheNotice(s: Awaited<ReturnType<typeof setup>>
 }
 
 describe('PosCatalog: what it asks', () => {
-  it('follows the categories by name, the count of «All» and the first 100 articles of every category', async () => {
+  it('follows the categories by the position the business gave them, the count of «All» and the first 100 articles of every category', async () => {
     const s = await setup();
-    expect(s.params(CATEGORIES)).toEqual([{ sort: 'name', limit: 100, offset: 0 }]);
+    expect(s.params(CATEGORIES)).toEqual([{ sort: 'order', limit: 100, offset: 0 }]);
     expect(s.params(PRODUCTS)).toEqual(
       expect.arrayContaining([
         { is_active: true, include_sold_out: true, limit: 1, offset: 0 },
