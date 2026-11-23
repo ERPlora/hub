@@ -192,8 +192,8 @@
     ]
   },
   {
-    "path": "apps/pricing/schemas.py",
-    "file_name": "schemas.py",
+    "path": "apps/pricing/schemas/__init__.py",
+    "file_name": "__init__.py",
     "functions": [
       {
         "name": "rule_problems",

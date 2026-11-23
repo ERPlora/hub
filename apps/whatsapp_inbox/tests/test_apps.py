@@ -141,6 +141,8 @@ NOT_FOR_API_KEYS = {
 #: What names a note or a template on the card of a write (hub#571): only the card reads them, the model finds those
 #: records in their lists; no tool, no door of the API.
 CARD_ONLY = {"whatsapp_inbox.note.get", "whatsapp_inbox.template.get"}
+#: What only the Home's health row reads (BASE-F02): whatsapp_inbox.channel.get already tells the assistant and the API.
+HOME_ONLY = {"whatsapp_inbox.channel.health"}
 
 
 def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
@@ -153,10 +155,10 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
     # and the device's notices; WHATSAPP_INBOX-F29 template_sample.upload, the file of a header; WHATSAPP_INBOX-F20 and
     # F21 message.get and conversation.flag, what the automatic answers read and mark; template_sample.detail, the read
     # the assistant's card names a header's file by; note.get and template.get, what it names a note and a template by
-    # (hub#571).
-    assert len(ops) == 50
+    # (hub#571); channel.health, the number's state in the Home's health row.
+    assert len(ops) == 51
     for name, op in ops.items():
-        if name in CARD_ONLY:
+        if name in CARD_ONLY | HOME_ONLY:
             assert op.ai is INTERNAL and op.expose_api is False, name
             continue
         assert isinstance(op.ai, dict) and len(str(op.ai.get("description", ""))) > 20, name

@@ -85,9 +85,15 @@ def saas_unreachable() -> OperationError:
     output=RepresentationModelOut,
     ai={
         "description": "The official model of the representation authorisation (Anexo I of the AEAT's Convenio "
-        "17) with the business's legal name, tax ID and address from Invoicing already written in, a PDF the "
-        "business prints and signs by hand, or signs with AutoFirma, before sending it for ERPlora to file on its "
-        "behalf.",
+        "17) for ERPlora to file on the business's behalf, with its legal name, tax ID and address from Invoicing "
+        "already written in: a PDF the business signs by hand, or with AutoFirma, then attaches with a copy of the "
+        "signer's identity document on VeriFactu › Configuration, tab «ERPlora files for you», and sends with «Send "
+        "for review»; a person at ERPlora reviews it. Only on a server where ERPlora files on behalf of businesses: "
+        "there the Home's step «Set up VeriFactu» (base.setup.status) offers signing it and verifactu.config.get "
+        "says erplora_route_available. Where that step asks only for the business certificate, this is refused "
+        "with «ERPlora does not file on behalf of businesses for now: file with your own certificate.»: that is "
+        "the answer, the business files with its own certificate (VeriFactu › Configuration, tab «My "
+        "certificate»), and the authorisation is not offered.",
         "asks": {
             "en": (
                 "download the representation form filled in with our details",

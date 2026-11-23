@@ -287,6 +287,24 @@
         "windows": "Windows",
         "linux": "Linux",
         "android": "Android"
+      },
+      "state": {
+        "ok": {
+          "title": "Printer ready",
+          "text": "Receipts print by themselves when you charge."
+        },
+        "no_signal": {
+          "title": "Printer not connected",
+          "text": "The device that prints the receipts does not answer: turn it on and open the ERPlora app on it."
+        },
+        "not_configured": {
+          "title": "Printer not set up",
+          "text": "No device set up here prints the receipts yet."
+        },
+        "unknown": {
+          "title": "We couldn't check the printer",
+          "text": "We don't know whether it is connected; nothing else is affected."
+        }
       }
     }
   }
