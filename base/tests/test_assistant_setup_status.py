@@ -19,9 +19,11 @@ def test_a_step_text_is_what_it_asks_for_never_what_the_business_has():
 
 
 def test_a_done_step_that_asks_for_at_least_one_is_done_because_there_are_some():
-    assert "done because there are some, not because there is one" in setup_read()
+    said = setup_read()
+    assert "done only says it is met" in said
+    assert "done because there are some, not because there is one" in said
 
 
 def test_a_count_or_a_setting_comes_from_a_tool_of_the_step_app():
     said = setup_read().partition("never give a count, a name or a setting from those texts")[2]
-    assert "read it with a tool of the step's app" in said
+    assert said.startswith("; read it with a tool of the step's app")
