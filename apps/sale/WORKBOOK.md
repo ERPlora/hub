@@ -1390,9 +1390,9 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la venta ya guarda aparte, en cada cobro, lo que añade otra app (por la API), pero la hoja
-Cobro todavía no pinta los pasos de otras apps ni el Documento de venta enseña lo añadido (hub#1497, hub#1500,
-hub#1502)
+Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, pero hoy lo rechaza siempre:
+ninguna app puede declarar todavía su paso en el cobro, la hoja Cobro no pinta esos pasos y el Documento de venta no
+enseña lo añadido (hub#1497, hub#1500, hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
@@ -1413,7 +1413,9 @@ lleva IVA (ver «Por qué la propina no entra en el tique» en el manual de Prop
 cobro, lo cobrado de más y su nombre, para cuadrar lo entregado y el cambio y para el papel, y el aviso de venta
 cobrada lo lleva aparte; las cifras de **Ventas** (SALE-F28) no lo suman. Lo suyo lo guarda la app del paso
 (TIP-F02).
-Si falla: si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
+Si falla: sin ninguna app encendida que añada un paso al cobro, un cobro que trae un importe añadido (por la API o
+el asistente) no cobra: «Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la
+venta.». Si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
 cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
 «Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06), y esa misma
 clave con otro importe añadido es otro cobro: «Esa clave de intento ya se usó para otro cobro. Vuelve a abrir el

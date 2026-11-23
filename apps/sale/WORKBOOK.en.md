@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5723492ec1b1b0b4a13d818e43869c422b4908b4764a6dc684e5088716dcbdea -->
+<!-- generated from WORKBOOK.md sha256:cdef6bc87c7eadbc2611525fb3c19bf6ec9e24181ebcc9bb3ed9835b6ccd1927 -->
 
 ## What it is for and who it is for
 
@@ -1388,9 +1388,9 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-Status: not done — the sale already keeps apart, in each payment, what another app adds (through the API), but the
-Charge sheet does not paint other apps' steps yet, nor does the Sale document show what was added
-(hub#1497, hub#1500, hub#1502)
+Status: not done — the sale knows how to keep apart, in each payment, what another app adds, but today it always
+refuses it: no app can declare its step at the charge yet, the Charge sheet does not paint those steps and the Sale
+document does not show what was added (hub#1497, hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager
 Screen: Charge, Sale document
@@ -1411,7 +1411,10 @@ VAT (see "Why the tip is not on the ticket" in the Tips manual). The sale keeps 
 charged on top and its name, to square the amount tendered and the change and for the paper, and the sale
 charged notice carries it apart; the **Sales** figures (SALE-F28) do not add it. The step's app keeps its own
 (TIP-F02).
-If it fails: if the step's app is turned off with the sheet open, the row goes away and it charges without it.
+If it fails: with no app turned on that adds a step to the charge, a charge that brings an added amount (through
+the API or the assistant) does not charge: "This business has no app that adds anything to a charge, such as a tip:
+charge the sale alone.". If the step's app is turned off with the sheet open, the row goes away and it charges without
+it.
 If the sale is charged and the step cannot save its own, the sale stays charged and the sheet says the step's
 notice with "Retry" (TIP-F02); the retry uses the same attempt key and never charges twice (SALE-F06), and that
 same key with another added amount is another charge: "That attempt key was already used for another charge. Open it

@@ -37,6 +37,9 @@ ID_TYPE_REQUIRED = _(
 CASH_REGISTER_CLOSED = _(
     "The cash register is closed: open a cash session to charge in cash."
 )
+ADDED_AMOUNT_NOT_ACCEPTED = _(
+    "This business has no app that adds anything to a charge, such as a tip: charge the sale alone."
+)
 
 
 def _customer_details(ctx: OperationContext, data: CompleteIn) -> tuple:
@@ -133,6 +136,7 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
     """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
     no cash at all when the whole ``operation`` reaches the cash limit. What another app adds to a tender (a tip)
     is charged with it, on top of its amount, but never counts as the sale's."""
+    _refuse_added_amounts(data.payments)
     if total == 0:
         if any(leg.amount or leg.extra for leg in data.payments):
             raise Conflict(
@@ -145,6 +149,14 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
         _settle(leg)
     _check_cash_limit(legs, operation)
     return legs
+
+
+def _refuse_added_amounts(payments: list[PaymentIn]) -> None:
+    """An amount added to a tender is only taken when an active app adds a step to the charge, which records it in
+    its own app too (SALE-F39): otherwise the drawer, the card total and the receipt would hold money nobody accounts
+    for. No app can declare such a step yet, so every added amount is refused."""
+    if any(leg.extra for leg in payments):
+        raise Conflict(str(ADDED_AMOUNT_NOT_ACCEPTED), code="sale.added_amount_not_accepted")
 
 
 def _resolved(sent: list[PaymentIn], settings: Settings) -> list[dict]:

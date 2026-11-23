@@ -116,11 +116,11 @@ class PaymentIn(Closed):
     )
     extra: Cents = Field(
         0,
-        description="What another app adds to this leg on top of the sale (a tip), in cents: charged with it, but never "
-        "part of the sale's total or its tax. That app's own step at the charge sends it, and records it in that app too.",
+        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks. "
+        "A charge that brings it is refused while no active app adds such a step.",
     )
     extra_label: _text(60) = Field(
-        "", validate_default=True, description="What the added amount is, as the receipt names it (e.g. «Tip»)."
+        "", validate_default=True, description="Leave it out: the name of that app's added amount, filled by its step."
     )
 
     @field_validator("extra_label")
