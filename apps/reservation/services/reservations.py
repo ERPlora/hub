@@ -31,6 +31,8 @@ STAFF_ONLY = _(
 #: What only the restaurant sets on a booking, never a channel acting for the guest, booking a full slot anyway
 #: included.
 STAFF_ONLY_FIELDS = ("table_id", "table", "zone", "no_table", "internal_notes", "overbook")
+#: The data that say for whom a booking is: the customer card, by its id or as said, else the guest's name.
+FOR_WHOM = ("customer_id", "customer", "guest_name")
 
 
 def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
@@ -38,6 +40,16 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
     return reservation_out(
         ctx, Reservation.objects.select_related("table__zone").get(pk=reservation.pk)
     )
+
+
+def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """For whom, the day and the time first, as the book lists a reservation: the card's line says only its first
+    three data, so a guest's name said as well goes after them."""
+    whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
+    if whom is None:
+        return fields
+    rest = [field for field in fields if field is not whom]
+    return [whom, *sorted(rest, key=lambda field: field["name"] not in ("date", "time"))]
 
 
 @operation(
@@ -66,6 +78,7 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
         "when the book confirms by itself, which holds its table. Somebody already on the waitlist is booked with "
         "reservation.waitlist.convert, which marks their entry converted.",
         "risk": "normal",
+        "summary": _booking_summary,
     },
 )
 def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
