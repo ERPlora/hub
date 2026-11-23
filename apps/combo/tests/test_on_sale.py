@@ -86,3 +86,11 @@ def test_the_owners_request_offers_the_switch_ahead_of_the_menus_change(catalog_
     place = place_of_no_ask(tools, SET_ACTIVE, phrase, language)
     assert place is not None and place <= TOP, place
     assert "combo.combo.update" not in offered_to(tools, phrase, language)[: place - 1]
+
+
+def test_the_menus_change_sends_the_model_to_the_switch_instead_of_offering_it():
+    """The model picks a tool by what it says it does: were the menu's change to offer the switch too, the model could
+    take it and the card would ask for the word again."""
+    description = get("combo.combo.update").ai_spec().description
+    assert SET_ACTIVE in description
+    assert "on sale /" not in description
