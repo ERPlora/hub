@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c27c403a8796aa121c549811591b8a8f9a240d6d4253e1335c7b2c37814871d4 -->
+<!-- generated from WORKBOOK.md sha256:11670c4d843feac0f8d792ce1064bad8046cb3baad5c8f20892197f424c3f7fe -->
 
 ## What it is for and who it is for
 
@@ -950,8 +950,8 @@ Steps:
 3. Tap **Create service** or **Save changes**: the photo stays on the service. Closing the form without
    saving discards it.
 4. Through the assistant: "put a photo on the women's haircut". The assistant shows up to five
-   candidate images by their title and asks which one; it never sets one on its own. When one is
-   chosen, it asks for the confirmation card and sets it.
+   candidate images by their title alone, without their internal code, and asks which one; it never
+   sets one on its own. When one is chosen, it asks for the confirmation card and sets it.
 In: the service and the ERPlora image library, the same one Inventory uses (INVENTORY-F30).
 Out: the service with its image from the library; the business keeps no copy, only which one it is, and
 it uses none of its plan's space. Services announces the change (`service.service.updated`). The service's

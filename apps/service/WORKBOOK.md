@@ -944,8 +944,8 @@ Pasos:
 3. Pulsa **Crear servicio** o **Guardar cambios**: la foto queda en el servicio. Cerrar el formulario
    sin guardar la descarta.
 4. Por el asistente: «ponle foto al corte de mujer». El asistente enseña hasta cinco imágenes
-   candidatas por su título y pregunta cuál; nunca pone una por su cuenta. Al elegir una, pide la
-   tarjeta de confirmación y la pone.
+   candidatas solo por su título, sin su código interno, y pregunta cuál; nunca pone una por su cuenta.
+   Al elegir una, pide la tarjeta de confirmación y la pone.
 Entra: el servicio y la librería de imágenes de ERPlora, la misma que usa Inventario (INVENTORY-F30).
 Sale: el servicio con su imagen de la librería; el negocio no guarda una copia, solo cuál es, y no gasta
 espacio de su plan. Servicios avisa del cambio (`service.service.updated`). La baldosa del servicio en el
