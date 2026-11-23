@@ -2662,8 +2662,12 @@ Pasos:
      hecho y no propone deshacerlo salvo que se lo pidan.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
-     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
-     persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
+     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». El de
+     un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su pantalla («No se hizo, falló:
+     Quitar en Empleados. Esa persona no está en este negocio.»); si lo que no valía eran los datos que envió el
+     asistente, cuáles, con el nombre que les da la tarjeta («El asistente envió datos que no valen: Productos.»). Si
+     la persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app; el
+     motivo, que se dijo en el otro idioma, ya no sale.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
 que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio; y,
 si su app la declara, la comprobación que hace antes de la tarjeta, como la persona: si rechaza los datos (dar de alta a

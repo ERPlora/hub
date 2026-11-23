@@ -120,6 +120,10 @@ class AssistantExecutedOut(Schema):
     kind: Literal["query", "command", ""]
     outcome: Literal["ok", "error", "refused", "cancelled"]
     code: str
+    reason: dict[str, str] = Field(
+        default_factory=dict,
+        description="Why it failed, for its receipt, keyed by the language it is said in («es»); empty unless it failed.",
+    )
 
 
 class AssistantMoneyOut(Schema):

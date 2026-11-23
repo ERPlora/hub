@@ -137,7 +137,7 @@ def _assistant_searched(still_open: list[dict]) -> list[str]:
 
 def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome") -> dict:
     """What ran, or was refused, by its name: a write this person was not offered is named too. Named as its card
-    names it: an app by its name, the platform by its screen."""
+    names it: an app by its name, the platform by its screen; a failure says why."""
     op = shared.operation_of(call.name, tools) or shared.named(call.name)
     if op is None:
         named = {"name": call.name, "app": "", "app_name": "", "screen": "", "kind": ""}
@@ -146,7 +146,8 @@ def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.To
             app_name = assistant.cards.app_name(op)
         screen = assistant.cards.screen(op)
         named = {"name": op.name, "app": op.app_label, "app_name": app_name, "screen": screen, "kind": op.kind}
-    return {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code}
+    reason = assistant.failure_reason.reason(op, outcome, ctx.language)
+    return {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code, "reason": reason}
 
 
 def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOutcome":

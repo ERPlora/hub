@@ -121,11 +121,13 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
   }
   await cancelAtComputerSize(page);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, cancelado: Quitar en Empleados');
-  // A person this business does not have: the preview cannot be read, so no card; the receipt says it failed.
+  // A person this business does not have: the preview cannot be read, so no card; the receipt says it failed and why.
   await ask(page, 'E2E-ASK base__person__pin_remove {"person":"saas:0"}');
   await expect(card(page)).toBeHidden();
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, falló: Quitar en Empleados');
+  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText(
+    'No se hizo, falló: Quitar en Empleados. Esa persona no está en este negocio.',
+  );
   await context.close();
 });
 
