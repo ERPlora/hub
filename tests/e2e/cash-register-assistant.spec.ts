@@ -211,7 +211,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await expect(summary).toContainText(`Expected: ${euros(expected)}`);
   await expect(summary).toContainText(`Difference: +${euros(25000 - expected)}`);
   // The summary was the Hub's own reading, sent to the model as it is: never a figure the model made up.
-  expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: expected });
+  expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: '250.00 EUR', expected_balance: `${(expected / 100).toFixed(2)} EUR` });
   // The read never says it closed anything; the card is the dangerous one, naming the session and the count.
   await expect(receipts(page).filter({ hasText: 'Close in Cash register' })).toHaveCount(0);
   await expect(card(page)).toContainText('Close in Cash register. Check each detail before you continue.');
@@ -333,8 +333,8 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await expect(summary).not.toContainText('Difference');
   // Not even the model got them: the summary sent to it carries neither.
   const told = toldSummary();
-  expect(told.summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: null, difference: null, expected_hidden: true });
-  expect(told.raw).not.toContain(String(expected));
+  expect(told.summary).toMatchObject({ number: shift.number, closing_balance: '250.00 EUR', expected_balance: null, difference: null, expected_hidden: true });
+  expect([told.raw.includes(String(expected)), told.raw.includes((expected / 100).toFixed(2))]).toEqual([false, false]);
   await expect(card(page)).toContainText('Counted cash: €250.00');
   // Nor does the card: what will happen names the session and its drawer, never the expected nor the difference.
   await expect(previewBlock(page).locator('li')).toHaveText([`Session: ${shift.number}`, `Drawer: ${DRAWER}`]);
