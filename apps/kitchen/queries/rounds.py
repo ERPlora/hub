@@ -204,6 +204,7 @@ def round_view(rnd: Round, day: dt.date, sequence: int, route: Routing) -> Ticke
             line.order_id,
             rnd.order.status,
             rnd.order.closed_at,
+            rnd.order.label,
         )
         if menu_dishes(line):
             items.extend(dishes_of_menu(line, len(items) + 1, route, facts))

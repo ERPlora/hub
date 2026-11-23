@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f4cc4358dc201907c8bf5369774a1750d5e1b10cdd70418f6440efeea469ce0c -->
+<!-- generated from WORKBOOK.md sha256:38706797bd8155569aa75d838db3750a1ffbffdbc932effa6cba0ab446e101a0 -->
 
 ## What it is for and who it is for
 
@@ -74,6 +74,12 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) lets you choose
     the fields of the ticket.
   - It is what the till itself promises in "Who is serving this check".
+- **The ticket says the table its check is at today**: the KDS names the ticket by its check's table
+  ([Toast — what the ticket shows on the KDS](https://doc.toasttab.com/doc/platformguide/adminUnderstandingOrderInfoAppearsKDSTickets.html))
+  and moving the check to another table changes the table of the whole check
+  ([Toast — transferring checks](https://support.toasttab.com/en/article/Transferring-Items-Checks-and-Payments)).
+  So the ticket under way of a check moved to another table, merged into another or seated again says the
+  new table; a Served or Cancelled one keeps the one it had, which is where it went.
 
 ## Before you start
 
@@ -344,15 +350,22 @@ Steps:
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.
 4. The ticket appears on the display as "To prepare", rings (KITCHEN-F16), comes out on paper
    (KITCHEN-F08) and the installed app shows its system notice, which opens Kitchen on a tap.
+5. If its check is later moved to another table (TABLE-F15), merged into another (TABLE-F16) or seated
+   again (TABLE-F24), the ticket under way says the check's new title ("Table 9") on the display, in
+   "Tickets" and to the assistant ("mark table 9's order urgent"), without reloading. A Served or
+   Cancelled ticket keeps the title it had.
 In: from Sales, the check's sent lines (their round, their sending time, their product, their quantity,
-their note, their modifiers, their category and, if it is a menu, its dishes) and, when Kitchen does the
-sending, the priority, the channel and who sends.
+their note, their modifiers, their category and, if it is a menu, its dishes), its check's title and,
+when Kitchen does the sending, the priority, the channel and who sends.
 Out: the ticket "To prepare" with its dishes and "Received" in the History, at the time of sending
 (announces: ticket received).
 If it fails: a round of services only does not open a ticket. What was sent before Kitchen existed in the
 business does not appear. The same round never opens two tickets, even if it arrives twice. No failure
-here blocks the waiter.
-Involved: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119
+here blocks the waiter. If the check has no title, the ticket keeps what the sending said ("Pickup Ana");
+if its dishes ended up on two checks with different titles (a split check and one of the two moved to
+another table), it keeps its own.
+Involved: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119,
+TABLE-F15, TABLE-F16, TABLE-F24
 
 ### KITCHEN-F06 A menu of the day on the ticket
 Status: done
@@ -775,8 +788,8 @@ Steps:
    History as cancelled. If the round came out on paper, the slip "CANCELLED · Table 4" comes out with
    what was left to cook (KITCHEN-F22).
 2. Two checks are joined: the rounds sent from the absorbed one move to the one that stays, like their
-   dishes, in the same state and with their label; on charging the one that stays they close like its
-   own.
+   dishes, in the same state and with the title of the one that stays (KITCHEN-F05); on charging the one
+   that stays they close like its own.
 In: from Sales, the voided check or the lines that changed check.
 Out: rounds cancelled (announces: ticket cancelled) or of another check.
 If it fails: a round already Served or Cancelled is not touched. A check without rounds under way changes

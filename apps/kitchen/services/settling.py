@@ -193,6 +193,13 @@ def _persist(
     return True
 
 
+def _retitle(ctx: OperationContext, ticket: Ticket, label: str) -> None:
+    """The title of its check now, saved: the History and the search of a served ticket say where it went."""
+    ticket.label = label[:120]
+    ticket.save(update_fields=["label", "updated_at"])
+    _ticket_event(ctx, events.TICKET_UPDATED, ticket)
+
+
 def settle(ctx: OperationContext, settings: KitchenSettings) -> tuple[int, int]:
     """Save the rounds not saved yet (in the order of their numbers) and what Sales did to the tickets on
     the line. Returns ``(rounds saved, tickets changed)``."""
@@ -202,10 +209,12 @@ def settle(ctx: OperationContext, settings: KitchenSettings) -> tuple[int, int]:
         for rnd in rounds:
             save_round(ctx, rnd, route)
     changed = 0
-    on_the_line = Ticket.objects.filter(
-        is_deleted=False, status__in=IN_FLIGHT
-    ).prefetch_related("items")
-    for view in saved_views(on_the_line):
+    on_the_line = list(
+        Ticket.objects.filter(is_deleted=False, status__in=IN_FLIGHT).prefetch_related("items")
+    )
+    for ticket, view in zip(on_the_line, saved_views(on_the_line), strict=True):
+        if view.label != ticket.label:
+            _retitle(ctx, ticket, view.label)
         after, changes = effective(view, settings)
         if changes and _persist(ctx, view, after, changes, settings):
             changed += 1

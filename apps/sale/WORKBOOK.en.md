@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4c7721e734b517e50e26983609ef215d0005a8e7e4bc2a1944fb6025ac3d206e -->
+<!-- generated from WORKBOOK.md sha256:65ad1460978a70d42b40f3a3ef467bcb9e7f83b5c218e118b2a5f6205dc2df2f -->
 
 ## What it is for and who it is for
 
@@ -1640,6 +1640,7 @@ the quick notes and what is refundable can be followed live.
 | Check closed | Charge the last of a check | The check | `sale.order.completed` |
 | Check voided | Void an open check | The check | `sale.order.voided` |
 | Checks merged | Merge | The absorbed one and the one that stays | `sale.order.merged` |
+| Check with a new title | Change the title of an open check, also when moving it to another table or seating it again | The check | `sale.order.relabeled` |
 | Line removed | Remove or void a line | The check and the line | `sale.order.line_removed` |
 | Line voided | Void a sent line | The check, the line and the reason | `sale.order.line_voided` |
 | Payment method, settings, section, quick note | Creating or changing them | Which one | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |

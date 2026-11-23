@@ -31,6 +31,7 @@ ORDER_FIRED = "sale.order.fired"
 ORDER_COMPLETED = "sale.order.completed"
 ORDER_VOIDED = "sale.order.voided"
 ORDER_MERGED = "sale.order.merged"
+ORDER_RELABELED = "sale.order.relabeled"
 ORDER_LINE_REMOVED = "sale.order.line_removed"
 ORDER_LINE_VOIDED = "sale.order.line_voided"
 PAYMENT_METHOD_CREATED = "sale.payment_method.created"
@@ -57,6 +58,7 @@ ALL = [
     ORDER_COMPLETED,
     ORDER_VOIDED,
     ORDER_MERGED,
+    ORDER_RELABELED,
     ORDER_LINE_REMOVED,
     ORDER_LINE_VOIDED,
     PAYMENT_METHOD_CREATED,
