@@ -42,6 +42,8 @@ LAST_ROUND = (
     "This request has used all its steps: no more tools. Answer the person now: say what was done and what is left, "
     "for them to ask for it in another message."
 )
+#: What the model hears of a tool it asked for anyway after that round.
+OUT_OF_STEPS = f"Nothing was done. {LAST_ROUND}"
 
 
 def _assistant_screens(ctx: OperationContext, apps: dict) -> dict[str, str]:
@@ -246,16 +248,17 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
     and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
     read again, in ``setup``). The round that reaches ``shared.MAX_ROUNDS`` offers no tool, so the model answers with
-    what was done and what is left; past it, the turn goes no further (``stop``)."""
+    what was done and what is left; a tool it asks for anyway runs nothing (``_assistant_late``), and if it still asks
+    for one after hearing so, the turn goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.tools.catalog(ctx)
     # The assistant's own search of the person's tools runs as one of them, but never ranks among them.
     runs = {**tools, assistant.relevance.FIND_TOOLS: get_operation(assistant.relevance.FIND_TOOLS)}
-    pending = list(data.pending)
+    append = _assistant_late(data.messages, data.pending)
+    pending = [] if append else list(data.pending)
     decision = data.decision
     stopped = False
-    append: list[dict] = []
     executed: list[dict] = []
     card = None
     while pending:
@@ -278,13 +281,13 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    rounds = _assistant_rounds(messages, card, stopped)
-    last = rounds == shared.MAX_ROUNDS
+    rounds = shared.rounds(messages)
+    last = rounds >= shared.MAX_ROUNDS
     offered = [] if last else assistant.relevance.relevant(
         tools, _assistant_asked(still_open), ctx.language, searched=_assistant_searched(still_open)
     )
     text = _assistant_instructions(ctx, business, offered, setup=data.setup, last=last)
-    stop = "assistant.too_many_steps" if rounds > shared.MAX_ROUNDS else ""
+    stop = "assistant.too_many_steps" if rounds > shared.MAX_ROUNDS + 1 else ""
     return {
         "messages": messages,
         "append": append,
@@ -298,10 +301,14 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     }
 
 
-def _assistant_rounds(messages: list[dict], card: dict | None, stopped: bool) -> int:
-    """The rounds of tools of the request that count against ``shared.MAX_ROUNDS``: none while a write's card waits
-    for its answer, nor once the person stopped the request, which the model still has to hear."""
-    return 0 if card is not None or stopped else shared.rounds(messages)
+def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
+    """What the model hears of the tools it asked for past the request's last round, the one that offered it none: they
+    run nothing and show no card, nor a receipt (the person saw nothing), so it answers with what was done and what is
+    left. None within the request's rounds."""
+    if shared.rounds(messages) <= shared.MAX_ROUNDS:
+        return []
+    told = _assistant_refusal("refused", "base.assistant_out_of_steps", OUT_OF_STEPS).content
+    return [{"role": "tool", "tool_call_id": call.call_id, "content": told} for call in pending]
 
 
 def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:
