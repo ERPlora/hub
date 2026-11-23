@@ -1992,12 +1992,15 @@ Pasos:
      usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.».
   3. Confirma con «Quitar este dispositivo» (o «Dejarlo»). La fila desaparece y su sesión se cierra al momento. Si
      era el suyo, sale del negocio.
+  4. Desde el asistente («quita el móvil que perdí esta tarde»), la tarjeta pide escribir CONFIRMAR (BASE-F98) y, bajo
+     «Lo que va a pasar», dice cuándo se usó por última vez («Último uso: 22 nov 2026, 16:18»): dos dispositivos sin
+     nombre se llaman igual («Chrome · Linux») y solo su último uso los distingue.
 Entra: el dispositivo.
 Sale: el dispositivo olvidado y sus sesiones cerradas: se corta el dispositivo, no la persona, que puede volver a
 entrar en él con su cuenta.
 Si falla: «No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.» o «Ese dispositivo ya
 no está registrado aquí. Actualiza la lista.»; nunca queda como hecho lo que se rechazó.
-Implicados: BASE-F58, BASE-F68
+Implicados: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Quitar de golpe los dispositivos que nadie usa
 Estado: hecho
@@ -2010,10 +2013,15 @@ Pasos:
      usa desde hace 30 días?») con «Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en
      él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.».
   3. Confirma con «Quitar».
+  4. Desde el asistente («quita los dispositivos viejos que ya no usa nadie»), la tarjeta pide escribir CONFIRMAR
+     (BASE-F98) y, bajo «Lo que va a pasar», dice cuántos va a quitar y cuáles, por su nombre, el último usado primero
+     («Dispositivos que se quitan: 2» y «Cuáles: Chrome · Linux, Barra»); el que se está usando nunca está entre ellos.
+     Si ninguno lleva 30 días sin usarse, no sale tarjeta y el asistente lo dice: «Ningún dispositivo lleva 30 días sin
+     usarse, así que no hay nada que quitar.».
 Entra: qué dispositivos lleva 30 días sin usar nadie.
 Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
-Implicados: BASE-F70
+Implicados: BASE-F70, BASE-F98
 
 ### BASE-F72 Ver los archivos del negocio
 Estado: hecho

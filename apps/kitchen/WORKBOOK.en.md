@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e80a81f32fbcdb19b87972f089416ebef2eae1296ddb9132df52da17ca5eac85 -->
+<!-- generated from WORKBOOK.md sha256:f4cc4358dc201907c8bf5369774a1750d5e1b10cdd70418f6440efeea469ce0c -->
 
 ## What it is for and who it is for
 
@@ -263,7 +263,10 @@ Steps:
 3. Press "Create station": the panel closes and the station shows in the table, "Active: Yes", "In
    progress: 0".
 In: what whoever creates it writes.
-Out: the station (announces: station created).
+Out: the station (announces: station created). A new station receives nothing until products or
+categories are routed to it (KITCHEN-F04): what is sent without a route shows under "No station". Asked of
+the assistant, on creating it it says nothing reaches it yet and offers to route the products or categories
+to it.
 If it fails: the rejection shows inside the panel; the reason of a field, under it, and it goes away as soon
 as that field is corrected, even if another one says the same. A name that another live station
 already has is rejected
