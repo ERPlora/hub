@@ -114,7 +114,7 @@ def test_merged_rounds_charge_with_the_check_that_stays(clock, product):
     absorbed = send(first.id)
     second = open_check("Table 6")
     add_line(second.id, product("Soup"))
-    send(second.id)
+    staying = send(second.id)
     run(
         "sale.order.merge",
         {"from_order_id": str(first.id), "to_order_id": str(second.id)},
@@ -123,8 +123,8 @@ def test_merged_rounds_charge_with_the_check_that_stays(clock, product):
     clock.advance(minutes=1)
     charge(second.id, key="merged")
     run("kitchen.ticket.sync", {}, ctx_for(permissions={"*"}))
-    statuses = {ticket.label: ticket.status for ticket in Ticket.objects.all()}
-    assert statuses == {"Table 5": "served", "Table 6": "pending"}
+    statuses = {ticket.id: (ticket.label, ticket.status) for ticket in Ticket.objects.all()}
+    assert statuses == {absorbed.id: ("Table 6", "served"), staying.id: ("Table 6", "pending")}
 
 
 def test_a_split_check_closes_a_round_only_when_every_check_of_it_is_charged(
