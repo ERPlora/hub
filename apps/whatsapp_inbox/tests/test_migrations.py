@@ -53,10 +53,13 @@ def database(hub_databases, django_db_blocker):
 
 
 def migrate(database, targets):
+    """Migrates ``database`` to ``targets`` and gives its models as its tables are now: every app at the migrations the
+    database has applied, so a row a test writes in another app's table (the customer a booking needs) fits it."""
     executor = MigrationExecutor(database)
     executor.loader.build_graph()
     executor.migrate(targets)
-    return MigrationExecutor(database).loader.project_state(targets).apps
+    loader = MigrationExecutor(database).loader
+    return loader.project_state([key for key in loader.applied_migrations if key in loader.graph.nodes]).apps
 
 
 def columns(database, table: str) -> set[str]:
