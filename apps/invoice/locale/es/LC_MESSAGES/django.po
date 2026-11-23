@@ -347,6 +347,14 @@ msgstr "domicilio del emisor"
 msgid "issuer country"
 msgstr "país del emisor"
 
+#: models.py
+msgid "issuer registered for intra-EU operations"
+msgstr "emisor inscrito en el ROI (operaciones intracomunitarias)"
+
+#: models.py
+msgid "registered for intra-EU operations"
+msgstr "inscrito en el ROI (operaciones intracomunitarias)"
+
 #: models.py:250
 msgid "customer"
 msgstr "cliente"

@@ -6,6 +6,7 @@
 // flow: TASK-F01 TASK-F02 TASK-F03 TASK-F04 TASK-F05 TASK-F06 TASK-F07 TASK-F08 TASK-F09 TASK-F10 TASK-F11 TASK-F12 TASK-F13 TASK-F14
 import { expect, test } from '@playwright/test';
 
+import { clearPick, pickDay } from './date-time-fields';
 import { A, api, OWNER, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { recordOf } from './staff-helpers';
@@ -16,6 +17,9 @@ test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
 type Row = { id: string; number: string; title: string; status: string; project_id: string | null; assigned_to_id: string | null };
+
+/** A due day already past: the task is overdue. */
+const A_WEEK_AGO = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 
 for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
   test(`TASK-F01 to TASK-F14, every screen of Tasks at ${width} wide`, async ({ browser }) => {
@@ -57,7 +61,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await form.locator('[data-testid=task-form-title] input').fill(title);
         await form.locator('[data-testid=task-form-description] textarea').fill('Shelves and floor.');
         await choose(page, form.locator('[data-testid=task-form-priority]'), 'High');
-        await form.locator('[data-testid=task-form-due_date] input').fill('2020-01-01');
+        await pickDay(page, form.locator('[data-testid=task-form-due_date]'), A_WEEK_AGO);
         await pick(page, 'task-form-assignee', `Lopez${stamp}`, `Lopez${stamp}`);
         await pick(page, 'task-form-project', projectName, projectName);
         await form.locator('[data-testid=task-form-tags] input').fill('cleaning, weekly');
@@ -179,7 +183,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(form.locator('[data-testid=task-form-title] input')).toHaveValue(title);
         await form.locator('[data-testid=task-form-title] input').fill(renamed);
         await choose(page, form.locator('[data-testid=task-form-priority]'), 'Urgent');
-        await form.locator('[data-testid=task-form-due_date] input').fill('');
+        await clearPick(page, form.locator('[data-testid=task-form-due_date]'), 'date');
         await snap(page, 'TASK-F08', width);
         await form.locator('[data-testid=task-form-submit]').click();
         await expect(form).toBeHidden();

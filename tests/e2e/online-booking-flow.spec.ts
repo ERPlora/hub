@@ -13,6 +13,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
+import { pickDay } from './date-time-fields';
 import { A, api, psql, shot, shown } from './helpers';
 import { type Cast, cast, keepTheBusiness, uploadBookingLogo } from './online-booking-helpers';
 import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, rowAction, settled } from './service-helpers';
@@ -167,9 +168,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       view = shown(page);
       await expect(view.locator('[data-testid=ob-preview-title]')).toHaveText(named(`Salon ${vp.label}`));
       await view.locator(`[data-testid=ob-preview-service-${who.service.id}]`).click();
-      const dayInput = view.locator('[data-testid=ob-preview-day] input');
-      await dayInput.fill(day);
-      await dayInput.press('Tab');
+      await pickDay(page, view.locator('[data-testid=ob-preview-day]'), day);
       const ten = view.locator('[data-testid="ob-preview-time-10:00"]');
       await expect(ten).toBeVisible();
       await ten.click();

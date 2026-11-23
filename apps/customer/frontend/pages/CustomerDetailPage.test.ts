@@ -284,18 +284,19 @@ describe('CustomerDetailPage: «Edit» (F04)', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('a date the browser cannot read is told under its field and nothing is sent; readable, «Save» goes', async () => {
+  it('a number the browser cannot read is told under its field and nothing is sent; readable, «Save» goes', async () => {
     const s = await setup();
-    await s.show(DETAIL);
+    const visits = { field_id: 'f4', name: 'Visits', field_type: 'number', options: [], is_required: false, sort_order: 3, value: '' } as const;
+    await s.show({ ...DETAIL, custom_fields: [...DETAIL.custom_fields, visits] });
     await s.click('customer-detail-edit');
-    // What a browser does with 31/02 typed in a date input: the page reads "" and the input says it could not.
-    const host = document.querySelector('ion-input[data-testid="customer-form-birthday"]')!;
+    // What a browser does with «tres» typed in a number input: the page reads "" and the input says it could not.
+    const host = document.querySelector('ion-input[data-testid="customer-form-field-f4"]')!;
     const native = host.querySelector('input') ?? host.appendChild(document.createElement('input'));
     Object.defineProperty(native, 'validity', { value: { badInput: true }, configurable: true });
     await s.wrapper.get('[data-testid="customer-edit-form"]').trigger('submit');
     await flush();
     expect(s.net.api).toHaveLength(0);
-    expect((host as HTMLElement & { errorText?: string }).errorText).toBe('Enter a valid date.');
+    expect((host as HTMLElement & { errorText?: string }).errorText).toBe('Enter a number.');
     expect(s.wrapper.findComponent(CustomerForm).exists()).toBe(true);
     expect(toastSuccess).not.toHaveBeenCalled();
     Object.defineProperty(native, 'validity', { value: { badInput: false } });

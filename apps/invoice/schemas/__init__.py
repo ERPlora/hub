@@ -39,7 +39,7 @@ from apps.invoice.models import (
     Invoice,
     InvoiceType,
 )
-from apps.invoice.schemas.document_issuer import DocumentIssuerOut
+from apps.invoice.schemas.document_issuer import DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut
 from base.schemas.assistant import names
 
 T = TypeVar("T")
@@ -689,7 +689,7 @@ class IssuerGetIn(Schema):
     """The business's tax identity."""
 
 
-class IssuerIn(Schema):
+class IssuerIn(IntraEuOperatorIn):
     legal_name: _text(NAME_MAX, min_length=1) = Field(
         description="Legal name of the business."
     )
@@ -1004,7 +1004,7 @@ class AllocationOut(Schema):
     issued_at: dt.datetime
 
 
-class IssuerOut(Schema):
+class IssuerOut(IntraEuOperatorOut):
     configured: bool
     legal_name: str
     tax_id: str

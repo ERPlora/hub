@@ -4,7 +4,8 @@
 // how many covers and bookings it has, and the slot to watch with what is left (`lib/states.ts nextSlot`).
 // It sits outside the table, so it stays on screen when the day is empty. The figures are the live
 // `reservation.availability.day` the page follows; while they load they are grey, and a failure says so.
-import { IonButton, IonIcon, IonInput, IonSkeletonText } from '@ionic/vue';
+import { DateField } from '@erplora/ui/components';
+import { IonButton, IonIcon, IonSkeletonText } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
@@ -67,15 +68,13 @@ function go(day: string): void {
           aria-hidden="true"
         />
       </ion-button>
-      <ion-input
+      <DateField
         class="reservation-day__input"
-        data-testid="reservation-day-input"
-        type="date"
-        :value="day"
-        :aria-label="$t('reservation.day.date')"
-        fill="outline"
-        mode="md"
-        @ion-change="go(String($event.detail.value ?? ''))"
+        testid="reservation-day-input"
+        :model-value="day"
+        :label="$t('reservation.day.date')"
+        required
+        @update:model-value="go"
       />
       <ion-button
         class="reservation-day__step"

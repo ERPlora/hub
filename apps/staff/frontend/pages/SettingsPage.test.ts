@@ -6,12 +6,13 @@
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { between, pressEnter, refusalMarks } from '../../../../base/frontend/__tests__/settings-form';
 import type { SettingsOut } from '../operations';
 import { click, EMPLOYEE, errorFrame, flush, ionValue, type MountOptions, mountStaff, settle } from '../__tests__/mount-staff';
 import SettingsPage from './SettingsPage.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; type?: string; helperText?: string; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; type?: string; readonly?: boolean; required?: boolean; helperText?: string; errorText?: string; disabled?: boolean };
 
 const PROPOSED: SettingsOut = {
   default_work_start: '09:00',
@@ -48,11 +49,18 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.find('staff-settings-workday-intro').text()).toBe(
       'A new schedule proposes this working day from Monday to Friday, with the break in the middle of the day.',
     );
-    const fields = ['default_work_start', 'default_work_end', 'default_break_duration'];
-    expect(fields.map((name) => [s.field(name).label, s.field(name).value, s.field(name).type, s.field(name).helperText])).toEqual([
-      ['Working day starts (HH:MM)', '09:00', 'time', 'When each working day of a new schedule starts.'],
-      ['Working day ends (HH:MM)', '18:00', 'time', 'After the start: a schedule’s day does not cross midnight.'],
-      ['Break duration (minutes)', '60', 'number', 'From 0 (no break) to 480 minutes, shorter than the working day.'],
+    // The hours are picked in the app's time wheel, and always hold one: no Clear.
+    const hours = ['default_work_start', 'default_work_end'];
+    expect(hours.map((name) => [s.field(name).label, picked(s.field(name)), s.field(name).readonly, s.field(name).required, s.field(name).helperText])).toEqual([
+      ['Working day starts (HH:MM)', '09:00', true, true, 'When each working day of a new schedule starts.'],
+      ['Working day ends (HH:MM)', '18:00', true, true, 'After the start: a schedule’s day does not cross midnight.'],
+    ]);
+    const pause = s.field('default_break_duration');
+    expect([pause.label, pause.value, pause.type, pause.helperText]).toEqual([
+      'Break duration (minutes)',
+      '60',
+      'number',
+      'From 0 (no break) to 480 minutes, shorter than the working day.',
     ]);
     for (const name of RETIRED) expect(s.find(`staff-settings-${name}`).exists(), name).toBe(false);
     expect(s.save().disabled).toBe(true);
@@ -64,7 +72,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
     s.answer(200, { ...PROPOSED, default_work_end: '20:00', default_break_duration: 30 });
-    await ionValue(s.field('default_work_end'), '20:00', 'ionInput');
+    await pick(s.field('default_work_end'), '20:00');
     await ionValue(s.field('default_break_duration'), '30', 'ionInput');
     expect(s.save().disabled).toBe(false);
     await click(s.save());
@@ -73,7 +81,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     ]);
     expect(s.find('staff-settings-saved').text()).toContain('Settings saved');
     expect(between(s.field('default_break_duration'), s.find('staff-settings-saved').element, s.save())).toBe(true);
-    await ionValue(s.field('default_work_start'), '08:00', 'ionInput');
+    await pick(s.field('default_work_start'), '08:00');
     await pressEnter(s.find('staff-settings-form').element);
     expect(s.sent().at(-1)?.body).toEqual({ default_work_start: '08:00' });
   });
@@ -99,10 +107,10 @@ describe('SettingsPage (STAFF-F22)', () => {
     s.answer(422, {
       error: { code: 'invalid_payload', message: 'The start time must be before the end time.', fields: { default_work_end: 'The start time must be before the end time.' } },
     });
-    await ionValue(s.field('default_work_end'), '06:00', 'ionInput');
+    await pick(s.field('default_work_end'), '06:00');
     await click(s.save());
     expect(s.field('default_work_end').errorText).toBe('The start time must be before the end time.');
-    expect(s.field('default_work_end').value).toBe('06:00');
+    expect(picked(s.field('default_work_end'))).toBe('06:00');
     expect(s.find('staff-settings-save-error').text()).toContain('The start time must be before the end time.');
     expect(between(s.field('default_break_duration'), s.find('staff-settings-save-error').element, s.save())).toBe(true);
   });
@@ -124,7 +132,7 @@ describe('SettingsPage (STAFF-F22)', () => {
       const s = await setup();
       await s.result('staff.settings.get', PROPOSED);
       s.answer(422, REFUSAL);
-      await ionValue(s.field('default_work_end'), '06:00', 'ionInput');
+      await pick(s.field('default_work_end'), '06:00');
       await ionValue(s.field('default_break_duration'), '600', 'ionInput');
       await click(s.save());
       return { ...s, ...refusalMarks(s.field, () => s.find('staff-settings-save-error').exists()) };
@@ -137,7 +145,7 @@ describe('SettingsPage (STAFF-F22)', () => {
         'The start time must be before the end time.',
         'Ensure this value is less than or equal to 480.',
       ]);
-      await ionValue(s.field('default_work_end'), '19:00', 'ionInput');
+      await pick(s.field('default_work_end'), '19:00');
       expect(s.notice()).toBe(false);
       expect([s.says('default_work_end'), s.marked('default_work_end')]).toEqual(['', false]);
       expect([s.says('default_break_duration'), s.marked('default_break_duration')]).toEqual(['Ensure this value is less than or equal to 480.', true]);
@@ -157,7 +165,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     await ionValue(s.field('default_break_duration'), '30', 'ionInput');
     // Someone else saves another setting meanwhile.
     await s.result('staff.settings.get', { ...PROPOSED, default_work_end: '17:00' }, {}, 2);
-    expect([s.field('default_work_end').value, s.field('default_break_duration').value]).toEqual(['17:00', '30']);
+    expect([picked(s.field('default_work_end')), s.field('default_break_duration').value]).toEqual(['17:00', '30']);
     s.answer(200, { ...PROPOSED, default_work_end: '17:00', default_break_duration: 30 });
     await click(s.save());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/staff/settings', query: {}, body: { default_break_duration: 30 } }]);

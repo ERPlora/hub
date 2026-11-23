@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e739ce4475a5fb0a1d5963c2c40dcc893034b65d6325c21d31eea2da4882a66 -->
+<!-- generated from WORKBOOK.md sha256:88b506773c7056827cb488ce42f0a0ab3a7fc4af9ac6c9626f1eb69a685c9347 -->
 
 ## What it is for and who it is for
 
@@ -252,9 +252,9 @@ Actor: owner, administrator, manager, assistant
 Screen: Special days
 Steps:
 1. In **Special days**, tap **+** (New special day).
-2. Type the **Date** and the **Name** (both required).
-3. Leave **Closed** (what it comes with) or choose "Open (with hours)" and type one or more intervals, as
-   when editing a day in **Hours**.
+2. Pick the **Date** in the calendar and type the **Name** (both required).
+3. Leave **Closed** (what it comes with) or choose "Open (with hours)" and pick the times of one or more
+   intervals, as when editing a day in **Hours**.
 4. Tick **Repeats every year** if it falls on the same day and month every year (Christmas); if you want,
    **Notes**.
 5. Tap **Add day**: the form closes and the day shows in the list.
@@ -274,9 +274,9 @@ Actor: owner, administrator, manager, assistant
 Screen: Special days
 Steps:
 1. In the "Overrides" table, tap **+** (New override).
-2. Type **From**, **To** and **Reason** (all three required).
-3. Leave **Closed** (the business's holidays) or choose "Open (with hours)" and type the intervals that
-   apply on those dates (summer hours).
+2. Pick **From** and **To** in the calendar and type the **Reason** (all three required).
+3. Leave **Closed** (the business's holidays) or choose "Open (with hours)" and pick the times of the
+   intervals that apply on those dates (summer hours).
 4. Tap **Add override**.
 In: the two dates (both included), the reason (up to 200) and closed or intervals: the change applies to
 every day of the range with the same hours.

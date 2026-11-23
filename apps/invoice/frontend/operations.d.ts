@@ -5,7 +5,7 @@
 // negative); decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO
 // `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
-import type { DocumentIssuerOut } from './document-issuer';
+import type { DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut } from './document-issuer';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -406,7 +406,7 @@ export interface AllocationOut {
 
 export type IssuerGetIn = Record<string, never>;
 
-export interface IssuerIn {
+export interface IssuerIn extends IntraEuOperatorIn {
   legal_name: string;
   country?: string;
   tax_id: string;
@@ -416,7 +416,7 @@ export interface IssuerIn {
   province?: string;
 }
 
-export interface IssuerOut {
+export interface IssuerOut extends IntraEuOperatorOut {
   configured: boolean;
   legal_name: string;
   tax_id: string;
