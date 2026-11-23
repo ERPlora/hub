@@ -15,14 +15,14 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 
 from apps.inventory import events as inventory_events
+from apps.modifier.tests.burger import dress
 from apps.sale.models import OrderLine, SaleLine
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB
 
-#: Taxes' factory catalogue: restaurant food (10 %) and the general rate (21 %).
+#: Taxes' factory catalogue: restaurant food (10 %).
 FOOD = "restaurant.food"
-GENERIC = "product.generic"
 
 
 def setup(name: str, data: dict):
@@ -31,30 +31,9 @@ def setup(name: str, data: dict):
 
 @pytest.fixture
 def burger(product):
-    """A burger of 8,00 € with its «Extras»: cheese (+1,00 €), no onion (free) and a soda that taxes at
-    21 % (+2,00 €, a line of its own); and «Doneness», required, one of two."""
+    """A burger of 8,00 € with its «Extras» and its «Doneness» (``apps.modifier.tests.burger``)."""
     dish = product("Burger", "BUR", 800, FOOD, initial_stock="10")
-    setup("modifier.group.create", {"name": "Extras", "max_choices": 4, "allow_repeat": True})
-    setup("modifier.group.create", {"name": "Doneness", "min_choices": 1, "max_choices": 1})
-    options = {
-        "cheese": setup(
-            "modifier.option.create",
-            {"group": "Extras", "name": "Cheese", "kitchen_name": "+CHEESE", "price_delta": 100},
-        ),
-        "onion": setup(
-            "modifier.option.create",
-            {"group": "Extras", "name": "No onion", "kitchen_name": "-ONION", "price_delta": 0},
-        ),
-        "soda": setup(
-            "modifier.option.create",
-            {"group": "Extras", "name": "Soda", "price_delta": 200, "tax_category_key": GENERIC},
-        ),
-        "rare": setup("modifier.option.create", {"group": "Doneness", "name": "Rare"}),
-        "done": setup("modifier.option.create", {"group": "Doneness", "name": "Well done"}),
-    }
-    for group in ("Extras", "Doneness"):
-        setup("modifier.link.attach", {"group": group, "product_id": str(dish.id)})
-    return dish, {key: str(option.id) for key, option in options.items()}
+    return dish, dress(setup, dish)
 
 
 def open_check() -> str:

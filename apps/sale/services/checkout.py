@@ -3,7 +3,7 @@
 import datetime as dt
 
 from django.db import IntegrityError
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -43,7 +43,7 @@ from apps.sale.services.charge_validation import (
 from apps.sale.services.documents import RECIPIENT_KEYS, _fiscal_document, _issue_waiting_document
 from apps.sale.services.orders import _recount, _save_lines
 from apps.sale.services.printouts import _print_sale
-from apps.sale.services.sale_lines import _completed_payload, _sale_lines
+from apps.sale.services.sale_lines import _completed_payload, _sale_lines, _sale_payments
 from base.business import business_zone
 
 CUSTOMER_REQUIRED = _("This business requires a customer on every sale.")
@@ -80,13 +80,19 @@ def _replay(ctx: OperationContext, data: CompleteIn) -> dict | None:
         same = sale.order_id == data.order_id and (
             not data.line_ids or set(sale.order_lines.values_list("id", flat=True)) == set(data.line_ids)
         )
-    if not same:
+    if not same or not _same_additions(sale, data):
         raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
     # The same attempt again is the till's retry: a document that waited is asked for once more (no relay issues it on
     # its own); still refused, it keeps waiting, in sight.
     _issue_waiting_document(ctx, sale)
     with translation.override(ctx.language):
         return sale_detail(sale, already=True)
+
+
+def _same_additions(sale: Sale, data: CompleteIn) -> bool:
+    """Whether the attempt adds to its tenders what the sale it charged added: another amount is another charge."""
+    charged = sale.payments.aggregate(added=Sum("extra"))["added"] or 0
+    return charged == sum(leg.extra for leg in data.payments)
 
 
 def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
@@ -275,22 +281,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     sale_lines = SaleLine.objects.bulk_create(
         _sale_lines(sale, parts, valuation, session_values)
     )
-    payments = SalePayment.objects.bulk_create(
-        [
-            SalePayment(
-                sale=sale,
-                position=position,
-                method=leg["method"],
-                method_name=leg["method"].name,
-                method_type=leg["method"].type,
-                amount=leg["amount"],
-                tendered=leg["tendered"],
-                change=leg["change"],
-                reference=leg["reference"],
-            )
-            for position, leg in enumerate(legs, start=1)
-        ]
-    )
+    payments = SalePayment.objects.bulk_create(_sale_payments(sale, legs))
     OrderLine.objects.filter(pk__in=[line.id for line in lines]).update(sale=sale)
     if closes:
         order.status = Order.Status.COMPLETED

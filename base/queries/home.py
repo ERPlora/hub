@@ -40,7 +40,11 @@ from .usage import _plan_motives
             "Reads the checklist «Finish setting up your business» of this hub, as this person may see it: each step "
             "with its state (done, pending, or not available — ours, never something to ask the person to do), its "
             "level (needed to invoice, important, recommended), whether the person can set it up (otherwise an "
-            "administrator must) and the screen that completes it; with how many are pending."
+            "administrator must) and the screen that completes it; with how many are pending. A step's title and "
+            "description are its line on the list, what the step asks for, never what the business has now: done only "
+            "says it is met (a step asking for at least one of something is done because there are some, not because "
+            "there is one), so never give a count, a name or a setting from those texts; read it with a tool of the "
+            "step's app."
         ),
         asks={
             "en": ("what's left to set up?", "am I ready to invoice yet?", "what's still pending on the checklist?"),

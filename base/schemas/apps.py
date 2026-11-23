@@ -79,12 +79,14 @@ class AppRefIn(Schema):
 
 
 class AppRefOut(Schema):
-    """Which app a name names: its id, its name in the reader's language and its state, as the Apps screen says it
-    (``AppOut.state``: ``creating`` and ``failed`` while a hub's own database gets its tables)."""
+    """Which app a name names: its id, its name in the reader's language, its state and whether the business's country
+    requires it, as the Apps screen says them (``AppOut.state``: ``creating`` and ``failed`` while a hub's own database
+    gets its tables; ``AppOut.mandatory``)."""
 
     id: str
     name: str
     state: Literal["on", "off", "blocked", "creating", "failed"]
+    mandatory: bool
 
 
 class AppChangeIn(Schema):

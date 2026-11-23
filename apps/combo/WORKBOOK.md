@@ -221,13 +221,18 @@ Pasos:
 2. Cambia lo que haga falta: nombre, precio, forma de venta, tipo de IVA, orden o «A la venta».
 3. Pulsa «Guardar». La lista muestra el cambio al momento.
 4. Un menú con «A la venta» desmarcada sigue en la lista, pero el TPV deja de ofrecerlo.
+5. Por el asistente, «quita el menú del día de la venta» o «vuelve a ponerlo a la venta» sale en una tarjeta de un
+   solo toque, como el interruptor: «Cambiar en Menús y combos» con el menú y cómo queda «A la venta», y se confirma
+   con «Ejecutar», sin escribir nada.
+   Cambiar el nombre, el precio, la forma de venta, el tipo de IVA o el orden, solo o junto a «A la venta», pide
+   escribir CONFIRMAR, porque puede cambiar cómo se cobra.
 Entra: los mismos campos que el alta; solo cambia lo que se envía (por el asistente o la API, lo que no
 se nombra se queda como estaba).
 Sale: el menú cambiado (avisa: menú cambiado). Lo ya cobrado no cambia: cada línea de venta lleva su
 copia del menú. Una cuenta abierta cobra el importe con que se pidió, aunque el menú suba de precio o
 se quite de la venta; la forma de venta y el tipo de IVA se leen al cobrar (COMBO-F08, F09).
 Si falla: los mismos avisos que el alta. Pasar a «en el local» sin tipo de IVA se rechaza.
-Implicados: SALE-F12
+Implicados: SALE-F12, BASE-F98
 
 ### COMBO-F04 Retirar un menú
 Estado: hecho
@@ -574,7 +579,7 @@ nombre («Menú: Menú del día»), el plato por su nombre («Plato: Primeros»)
 («Elección: Lentejas»), el producto por su nombre («Producto nuevo: Sopa») y, al ordenar platos o elecciones o al
 añadir varios productos, cada uno por su nombre y en el orden enviado («Platos: Segundos, Primeros»). Lo que quien
 pregunta no puede ver, o lo que ya no existe, no sale; lo que se dijo con palabras y no se puede leer sale tal como se
-dijo. Un menú dicho por su nombre al cambiarlo, retirarlo, ponerle foto
+dijo. Un menú dicho por su nombre al cambiarlo, ponerlo o quitarlo de la venta, retirarlo, ponerle foto
 u ordenar sus platos se busca como lo buscará la acción (el mismo nombre antes que uno que lo contenga), y la tarjeta
 enseña el menú que se va a tocar, con su nombre entero («Menú: Menú vegano» cuando se dijo «vegano»). Si lo dicho vale
 para varios menús o para ninguno, no sale ninguna tarjeta: el asistente oye «Hay varios menús que se llaman
@@ -614,6 +619,7 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 |---|---|---|---|
 | Crea un menú | gestionar | F02 | `combo.combo.create` |
 | Cambia un menú (solo lo enviado) | gestionar | F03 | `combo.combo.update` |
+| Pone un menú a la venta o lo quita del TPV, sin cambiar nada más | gestionar | F03 | `combo.combo.set_active` |
 | Retira un menú con sus platos y elecciones | gestionar | F04 | `combo.combo.delete` |
 | Añade un plato (al final) | gestionar | F05 | `combo.group.create` |
 | Cambia un plato (solo lo enviado) | gestionar | F05 | `combo.group.update` |
@@ -717,8 +723,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - **Orden de la lista de menús** (`base.ordering.list_order`): la columna elegida,
   después el nombre y al final el `id`, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
   empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
+  `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
   `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
   reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y
@@ -779,10 +785,13 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   enteros en céntimos.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` en las acciones; `high` al retirar
   un menú, un plato o una elección, y al cambiar un menú, porque puede cambiar cómo se factura: el riesgo
-  es por operación, no por campo) y todo campo de entrada lleva `description`. Salvo dos lecturas internas
+  es por operación, no por campo; ponerlo a la venta o quitarlo del TPV es su propia acción, `combo.combo.set_active`,
+  de riesgo normal, un toque como el interruptor del formulario, `inventory.product.set_sold_out` y
+  `staff.schedule.set_active`: reutiliza `combo.combo.update` con ese dato solo, así que sus reglas y su aviso son los
+  mismos) y todo campo de entrada lleva `description`. Salvo dos lecturas internas
   (`ai=INTERNAL`, sin API) que solo nombran un registro en la tarjeta del asistente: `combo.option.get` (hub#561) y
   `combo.group.get` (hub#669); el modelo lee los platos y las elecciones con su menú.
-- **Asks del asistente** (hub#1091): las 18 herramientas dicen lo que una persona escribe para pedir cada una, en `en`
+- **Asks del asistente** (hub#1091): las 19 herramientas dicen lo que una persona escribe para pedir cada una, en `en`
   y `es` (`combo` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase
   traiga su herramienta entre las diez primeras, por rol). Sin ellos, «ordena las opciones de…» ofrecía antes cambiar el
   menú, la elección o una impresora que reordenar, y el modelo borraba las elecciones y las creaba de nuevo.

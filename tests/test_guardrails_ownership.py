@@ -129,45 +129,45 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "The online booking the caller has just confirmed, completed, marked as not shown or cancelled, answered back "
         "to them.",
     ),
-    ("apps/invoice/queries/__init__.py", "with_links"): (
+    ("apps/invoice/queries/rows.py", "with_links"): (
         NO_ROW_READ,
         "Whether each document of a list the caller sees was replaced by a full invoice.",
     ),
-    ("apps/invoice/queries/__init__.py", "_loaded"): (
+    ("apps/invoice/queries/rows.py", "_loaded"): (
         REACHED_THROUGH,
         "The document the caller opened, read again with the documents it rectifies, replaces or is rectified by, "
         "which its detail names as links.",
     ),
-    ("apps/invoice/queries/__init__.py", "invoice_detail"): (
+    ("apps/invoice/queries/rows.py", "invoice_detail"): (
         REACHED_THROUGH,
         "The full invoice that replaced the ticket the caller opened, which its detail names as a link.",
     ),
-    ("apps/invoice/queries/__init__.py", "document_of_sale"): (
+    ("apps/invoice/queries/rows.py", "document_of_sale"): (
         REACHED_THROUGH,
         "The document of a sale the caller reached through its declaration (by_source looks it up with "
         "visible_sale), and the one Sales' void and refund rectify.",
     ),
-    ("apps/invoice/queries/__init__.py", "series_started"): (
+    ("apps/invoice/queries/series.py", "series_started"): (
         NO_ROW_READ,
         "Whether a series numbered any document, which freezes its prefix, format and next number.",
     ),
-    ("apps/invoice/queries/__init__.py", "list_series"): (
+    ("apps/invoice/queries/series.py", "list_series"): (
         NO_ROW_READ,
         "Whether each listed series numbered any document.",
     ),
-    ("apps/invoice/queries/__init__.py", "rectifiable"): (
+    ("apps/invoice/queries/rectifying.py", "rectifiable"): (
         NO_ROW_READ,
         "Whether a ticket was already replaced by a full invoice, which is then the one to rectify.",
     ),
-    ("apps/invoice/queries/__init__.py", "numbering_gaps"): (
+    ("apps/invoice/queries/numbering.py", "numbering_gaps"): (
         WHOLE_SERIES,
         "The gaps of a series' numbering, which only the whole series can tell.",
     ),
-    ("apps/invoice/queries/__init__.py", "allocations"): (
+    ("apps/invoice/queries/numbering.py", "allocations"): (
         WHOLE_SERIES,
         "The book of numbers handed out in a series, with the type and date of each document.",
     ),
-    ("apps/invoice/queries/__init__.py", "find_platform_invoice"): (
+    ("apps/invoice/queries/platform_invoices.py", "find_platform_invoice"): (
         ONLY_THE_SYSTEM,
         "ERPlora's own invoices on its platform hub, which the SaaS issues and asks about by their reference.",
     ),

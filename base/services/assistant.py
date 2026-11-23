@@ -7,7 +7,7 @@ import dataclasses
 import json
 
 from django.conf import settings
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext, pgettext
 from live import assistant as shared
 from live.context import OperationContext
@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from base import approvals as approval_rules
 from base import assistant, queries
+from base.business import business_zone
 from base.models import Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.assistant import (
@@ -45,8 +46,8 @@ LAST_ROUND = (
 OUT_OF_STEPS = f"Nothing was done. {LAST_ROUND}"
 
 
-def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
-    """The screens the assistant may link: the platform's and the menus of the apps on, by name."""
+def _assistant_screens(ctx: OperationContext, apps: dict) -> dict[str, str]:
+    """The screens the assistant may link: the platform's and the menus of the apps on (``apps``), by name."""
     with translation.override(ctx.language):
         screens = {
             "/": pgettext("base", "Home"),
@@ -60,7 +61,7 @@ def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
             screens["/system"] = pgettext("base", "System")
         if ctx.has(queries.files.VIEW_FILES):
             screens["/files"] = pgettext("base", "Files")
-        for config in assistant.tools.active_apps(ctx.scope).values():
+        for config in apps.values():
             for nav in getattr(config, "navigation", []) or []:
                 screens.setdefault(nav.path, f"{config.verbose_name} › {nav.label}")
     return screens
@@ -153,41 +154,43 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOut
     return shared.ToolOutcome(outcome, code, shared.error_content(code, message))
 
 
-def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):  # noqa: C901, PLR0911
-    """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card, shown)``: the card
-    when the write still waits for its answer, with what it will do when its app declares a preview (BASE-F98), and
-    the fingerprint of what it shows (``shown``, ``assistant.cards.fingerprint``); one that cannot be read is the write's
-    outcome, and no card is shown. Neither is one for data the write would refuse: the model hears which
-    (``invalid_payload``) and asks again with them corrected. The yes is for the card it answers (hub#1208): drawn
-    again, a card that no longer shows what ``call.shown`` says — a record found by its name is another, a name or what
-    it will do changed — runs nothing and is shown anew; a «no» or a word typed wrong never needs it."""
+def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
+    """Run one pending ``call`` (a read alone; a write with the person's yes, ``_assistant_write``) → ``(outcome,
+    card, shown)``. What it gives the model tells its hours on the business's clock (``business_zone``), the one the
+    instructions name, never in UTC."""
     op = shared.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None, ""
     if stopped:
         return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
-    if op.kind == "query":
-        return shared.run_tool(ctx, op, call.arguments), None, ""
     try:
-        arguments = json.loads(call.arguments or "{}")
+        arguments = None if op.kind == "query" else json.loads(call.arguments or "{}")
     except ValueError:
         arguments = None
     if not isinstance(arguments, dict):
-        return shared.run_tool(ctx, op, call.arguments), None, ""
+        return shared.run_tool(ctx, op, call.arguments, zone=business_zone()), None, ""
+    return _assistant_write(ctx, op, call, arguments, decision)
+
+
+def _assistant_write(ctx, op, call, arguments: dict, decision):
+    """A write's ``(outcome, card, shown)``: the card when it still waits for its answer, with what it will do when its
+    app declares a preview (BASE-F98), and the fingerprint of what it shows (``shown``, ``assistant.cards.fingerprint``);
+    one that cannot be read is the write's outcome, and no card is shown. Neither is one for data the write would
+    refuse: the model hears which (``invalid_payload``) and asks again with them corrected. The yes is for the card it
+    answers (hub#1208): drawn again, a card that no longer shows what ``call.shown`` says — a record found by its name is
+    another, a name or what it will do changed — runs nothing and is shown anew; a «no» or a word typed wrong never
+    needs it."""
     refused = shared.invalid_arguments(op, arguments)
     if refused is not None:
         return refused, None, ""
     found: list = []
     card = assistant.cards.card(op, arguments, ctx.language, ctx, found=found)
     answered = decision is not None and decision.call_id == call.call_id
-    if card["blocked"]:
-        if not answered:
-            return None, card, ""
-        return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT), None, ""
-    if answered and decision.stop:
-        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
-    if answered and (not decision.accepted or not shared.confirmed(card, decision.typed)):
-        return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None, ""
+    if card["blocked"] and not answered:
+        return None, card, ""
+    declined = _assistant_declined(card, decision) if answered else None
+    if declined is not None:
+        return declined, None, ""
     failure, preview = assistant.cards.preview(ctx, op, arguments, found=found)
     if failure is not None:
         return failure, None, ""
@@ -195,7 +198,19 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):  # noqa: C9
     shown = assistant.cards.fingerprint(drawn, found)
     if not answered or call.shown != shown:
         return None, drawn, shown
-    return shared.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None, ""
+    return shared.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments, zone=business_zone()), None, ""
+
+
+def _assistant_declined(card: dict, decision) -> "shared.ToolOutcome | None":
+    """What the person's answer to ``card`` leaves undone: a card that names no record, «Cancel all», a «no» or a
+    word typed wrong; ``None`` when it is a yes to run."""
+    if card["blocked"]:
+        return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT)
+    if decision.stop:
+        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED)
+    if not decision.accepted or not shared.confirmed(card, decision.typed):
+        return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED)
+    return None
 
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
@@ -297,18 +312,20 @@ def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
 
 
 def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:
-    """The model's instructions for this round: with the checklist, read again, in ``setup``, and with ``LAST_ROUND``
-    on the last round of the request."""
+    """The model's instructions for this round, with what it knows of the business (``assistant.business_facts``):
+    with the checklist, read again, in ``setup``, and with ``LAST_ROUND`` on the last round of the request."""
+    apps = assistant.tools.active_apps(ctx.scope)
     text = assistant.prompt.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
         decimals=business.get("currency_decimals", 2),
         business=business.get("name") or "",
-        screens=_assistant_screens(ctx),
+        screens=_assistant_screens(ctx, apps),
         role=_assistant_role(ctx),
         # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
         approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
+    text += "\n\n" + assistant.business_facts.block(ctx, business, apps, now=timezone.now())
     if setup:
         text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
     if last:

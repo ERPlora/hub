@@ -89,6 +89,18 @@ def test_a_table_booking_says_its_day_its_time_and_through_what(language, expect
 
 
 @HUB_DB
+@pytest.mark.parametrize(
+    ("language", "expected"), [("es", ("14 de marzo", "1 jun 2015")), ("en", ("March 14", "Jun 1, 2015"))]
+)
+def test_a_day_without_its_year_is_said_by_its_day_and_its_month(language, expected):
+    """A birthday is often known without its year (``--03-14``, as vCard writes it): the card says the day and the
+    month, and a day with its year as any other."""
+    days = {"customer": "Lucía", "birthday": "--03-14", "anniversary": "2015-06-01"}
+    shown = values(assistant.cards.card(get("customer.customer.update"), days, language))
+    assert (shown["birthday"], shown["anniversary"]) == expected
+
+
+@HUB_DB
 def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock_one_as_it_is():
     """Outside a hub, the deployment's zone (Europe/Madrid). An instant of another zone is said at the business's hour;
     the wall-clock time the model sent (the app books it at the business's hour) as it is, summer or winter."""
@@ -528,7 +540,7 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
-    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_image", "update")},
+    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_active", "set_image", "update")},
     **{f"combo.group.{action}:id": "Plato" for action in ("delete", "update")},
     "combo.group.reorder:id": "Menú",
     **{f"combo.option.{action}:id": "Elección" for action in ("delete", "update")},

@@ -2550,3 +2550,7 @@ msgstr "Dígitos del PIN"
 msgctxt "pin pad"
 msgid "%(n)s digits"
 msgstr "%(n)s dígitos"
+
+msgctxt "base"
+msgid "Once on"
+msgstr "Una vez activada"

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:08d84cfdcbb8eb3e6d60514a97f5eaa82cc901b689eff491e0f8e915cf00c148 -->
+<!-- generated from WORKBOOK.md sha256:820c3602ba6706442ed6d0ebca56fced78ce245dab835d7ef0a391fdfa9fbc14 -->
 
 ## What it is for and who it is for
 
@@ -753,10 +753,14 @@ Steps:
   1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list.
+  3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
+     says what the step asks for and not what the business has: "Your catalog" is done because there are already
+     products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
+     Inventory).
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: BASE-F103
+Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
 Status: done
@@ -1005,6 +1009,9 @@ Steps:
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
      already the assistant says so ("Customers was on already") instead of "turned on".
+  5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
+     longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
+     businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
@@ -2488,6 +2495,11 @@ Steps:
      changes something with the confirmation of BASE-F97. If the one it needs is not among those it has at hand for
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
      it say on which screen it is done.
+  10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
+     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
+     many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
+     question. Every date and time it says is in the business's time, the one the
+     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.

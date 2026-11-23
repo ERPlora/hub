@@ -56,8 +56,8 @@ def test_two_groups_with_the_same_name_at_once_one_wins():
 def test_two_options_with_the_same_name_in_a_group_at_once_one_wins():
     run("modifier.group.create", {"name": "Sauces"})
     results = at_once(
-        lambda: run("modifier.option.create", {"group": "Sauces", "name": "Mayo"}),
-        lambda: run("modifier.option.create", {"group": "Sauces", "name": "mayo"}),
+        lambda: run("modifier.option.create", {"group": "Sauces", "name": "Mayo", "price_delta": 0}),
+        lambda: run("modifier.option.create", {"group": "Sauces", "name": "mayo", "price_delta": 0}),
     )
     assert codes(results) == ["modifier.option_name_taken", "ok"]
     assert ModifierOption.objects.count() == 1
@@ -80,8 +80,8 @@ def test_two_defaults_at_once_in_a_group_of_one_leave_only_one():
         "modifier.group.create",
         {"name": "Doneness", "min_choices": 1, "max_choices": 1},
     )
-    rare = run("modifier.option.create", {"group": "Doneness", "name": "Rare"})
-    medium = run("modifier.option.create", {"group": "Doneness", "name": "Medium"})
+    rare = run("modifier.option.create", {"group": "Doneness", "name": "Rare", "price_delta": 0})
+    medium = run("modifier.option.create", {"group": "Doneness", "name": "Medium", "price_delta": 0})
     results = at_once(
         lambda: run("modifier.option.update", {"id": str(rare.id), "is_default": True}),
         lambda: run(
@@ -96,16 +96,16 @@ def test_two_defaults_at_once_never_pass_the_maximum():
     run("modifier.group.create", {"name": "Sauces", "max_choices": 2})
     run(
         "modifier.option.create",
-        {"group": "Sauces", "name": "Ketchup", "is_default": True},
+        {"group": "Sauces", "name": "Ketchup", "is_default": True, "price_delta": 0},
     )
     results = at_once(
         lambda: run(
             "modifier.option.create",
-            {"group": "Sauces", "name": "Mayo", "is_default": True},
+            {"group": "Sauces", "name": "Mayo", "is_default": True, "price_delta": 0},
         ),
         lambda: run(
             "modifier.option.create",
-            {"group": "Sauces", "name": "Mustard", "is_default": True},
+            {"group": "Sauces", "name": "Mustard", "is_default": True, "price_delta": 0},
         ),
     )
     assert codes(results) == ["modifier.too_many_defaults", "ok"]
@@ -149,7 +149,7 @@ def test_a_group_deleted_while_its_detail_is_read_is_never_a_server_error():
     # hub#34: the detail found the group and then loaded it by its id in a second read; a deletion
     # committed between the two raised DoesNotExist (a 500). In one read it is the group as it was read.
     sauces = run("modifier.group.create", {"name": "Sauces"})
-    run("modifier.option.create", {"group": "Sauces", "name": "Mayo"})
+    run("modifier.option.create", {"group": "Sauces", "name": "Mayo", "price_delta": 0})
     with deleted_after_the_first_read_of("Sauces") as deletions:
         detail = run("modifier.group.get", {"id": str(sauces.id)})
     assert codes(deletions) == ["ok"]
@@ -272,7 +272,7 @@ def reading(table: str):
 
 def test_a_default_the_business_chooses_while_an_option_comes_back_is_never_taken_from_it():
     sauces = run("modifier.group.create", {"name": "Sauces", "max_choices": 1})
-    ketchup = run("modifier.option.create", {"group": "Sauces", "name": "Ketchup"})
+    ketchup = run("modifier.option.create", {"group": "Sauces", "name": "Ketchup", "price_delta": 0})
     recovery = actor_of(uuid.uuid7())
     choose = lambda: run("modifier.option.update", {"id": str(ketchup.id), "is_default": True})  # noqa: E731
 
@@ -280,7 +280,7 @@ def test_a_default_the_business_chooses_while_an_option_comes_back_is_never_take
     with meanwhile(reading(ModifierOption._meta.db_table), choose) as chosen:
         run(
             "modifier.option.recover",
-            {"group_id": str(sauces.id), "name": "Alioli", "is_default": True},
+            {"group_id": str(sauces.id), "name": "Alioli", "price_delta": 0, "is_default": True},
             ctx=ctx_with("*", actor=recovery),
         )
 

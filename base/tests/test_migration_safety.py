@@ -147,6 +147,10 @@ ACCEPTED = {
     # the same business made during the deploy itself, which a business must never have.
     ("website", "0006_one_site_per_database", "AddConstraint", "site.website_site_single_row"),
     ("website", "0006_one_site_per_database", "AddConstraint", "site.website_site_singleton"),
+    # A sale's tender gains what another app adds to it: the change's check is dropped and added again in one
+    # migration taking ``extra`` out too. The code of before never names ``extra``, which its database default (0)
+    # fills, so every tender it writes keeps passing it: change = tendered - amount, as before.
+    ("sale", "0022_salepayment_extra", "AddConstraint", "salepayment.sale_payment_change"),
     # The contract of the move to base.HubUser, a later deploy's, once no code from before the move runs (written here,
     # not applied): the old columns to control's users, which the move took out of the state and nobody writes any
     # more, leave the database through

@@ -943,6 +943,7 @@
       "combo__combo__get": "Read a set menu",
       "combo__combo__list": "Look for set menus",
       "combo__combo__resolve": "Work out a set menu's price",
+      "combo__combo__set_active": "Put a set menu on sale or take it off sale",
       "combo__combo__set_image": "Choose a set menu's photo",
       "combo__combo__suggest_image": "Suggest photos for a set menu",
       "combo__combo__upload_image": "Upload a set menu's photo",

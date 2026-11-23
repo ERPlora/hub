@@ -33,6 +33,7 @@ WRITES = {
     "combo.combo.update",
     "combo.combo.delete",
     "combo.combo.set_image",
+    "combo.combo.set_active",
     "combo.group.create",
     "combo.group.update",
     "combo.group.delete",
@@ -73,6 +74,7 @@ OWN_WORDS = [
     ("combo.combo.update", "rebájame el infantil a 8,50"),
     ("combo.combo.delete", "el de Navidad no vuelve, quítalo del todo"),
     ("combo.combo.set_image", "para el de invierno quiero el dibujo del cocido"),
+    ("combo.combo.set_active", "el menú de verano, que no se venda más por ahora"),
     ("combo.group.create", "al infantil le hace falta un plato más: el postre"),
     ("combo.group.update", "deja que elijan dos entrantes"),
     ("combo.group.delete", "el vegano se queda sin postre"),
@@ -96,12 +98,12 @@ def test_menus_and_combos_is_listed_so_layer_1_sweeps_every_ask_of_it():
     assert "combo" in settings.LIVE_ASSISTANT_ASKS_REQUIRED
 
 
-def test_combo_offers_its_eighteen_tools():
-    """Menus and combos' tools are its eighteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails.
+def test_combo_offers_its_nineteen_tools():
+    """Menus and combos' tools are its nineteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails.
     The upload of a photo of its own (the form's file) and the reaction to Inventory's deletion are none."""
     tools = {name for name, op in registry.items() if op.app_label == "combo" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
-    assert len(tools) == 18
+    assert len(tools) == 19
     assert WRITES < tools
     assert not {"combo.combo.upload_image", "combo.option.drop_product"} & tools
 
@@ -161,6 +163,7 @@ OWN_WORDS_EN = [
     ("combo.combo.list", "go over the ones we have and what each costs"),
     ("combo.combo.resolve", "how much would the tasting one come to with steak?"),
     ("combo.combo.set_image", "for the summer one use the paella drawing"),
+    ("combo.combo.set_active", "stop selling the summer one for now"),
     ("combo.combo.suggest_image", "what would suit the summer one?"),
     ("combo.combo.update", "bring the kids' one down to 8.50"),
     ("combo.group.create", "the kids' one needs one more: dessert"),

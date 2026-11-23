@@ -758,16 +758,6 @@
     ]
   },
   {
-    "path": "apps/sale/services/charge_validation.py",
-    "file_name": "charge_validation.py",
-    "functions": [
-      {
-        "name": "_legs",
-        "complexity": 33
-      }
-    ]
-  },
-  {
     "path": "apps/sale/services/checkout.py",
     "file_name": "checkout.py",
     "functions": [
@@ -824,16 +814,6 @@
       {
         "name": "_enable",
         "complexity": 18
-      }
-    ]
-  },
-  {
-    "path": "base/services/assistant.py",
-    "file_name": "assistant.py",
-    "functions": [
-      {
-        "name": "_assistant_answer",
-        "complexity": 19
       }
     ]
   },

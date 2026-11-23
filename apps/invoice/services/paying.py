@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.invoice import events
 from apps.invoice.models import Invoice
-from apps.invoice.queries import find_invoice
+from apps.invoice.queries.rows import find_invoice
 from apps.invoice.schemas import InvoiceOut, MarkPaidIn
 from apps.invoice.services.writes import _detail, _now
 

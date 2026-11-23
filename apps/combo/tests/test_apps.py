@@ -41,6 +41,8 @@ COMMANDS = {
     "combo.option.drop_product",
     "combo.combo.set_image",
     "combo.combo.upload_image",
+    # On sale or off the till, one tap on the assistant's card (hub#2216).
+    "combo.combo.set_active",
     # A menu, and a course, made again from a separate copy (BASE-F114, COMBO-F15).
     "combo.combo.recover",
     "combo.group.recover",
@@ -62,6 +64,7 @@ HIGH_RISK = {
 #: menu's read before its card (hub#1217), so a name two menus fit or none has draws no card.
 CHECKED_BY_THE_MENU = {
     "combo.combo.delete",
+    "combo.combo.set_active",
     "combo.combo.set_image",
     "combo.combo.update",
     "combo.group.reorder",

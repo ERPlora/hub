@@ -7,6 +7,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 
 from apps.service.schemas.fields import Buffer, Code, In, Minutes
+from apps.tax.schemas import A_TAX_CATEGORY
 
 
 class SettingsIn(In):
@@ -22,6 +23,7 @@ class SettingsIn(In):
         None,
         title=gettext_noop("Default tax category"),
         description="Key of the tax category a new service takes; null or empty removes it.",
+        json_schema_extra=A_TAX_CATEGORY,
     )
     show_prices: bool | None = Field(
         None, description="Whether the public booking page shows prices."

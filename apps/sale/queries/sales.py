@@ -187,6 +187,8 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
                 "tendered": payment.tendered,
                 "change": payment.change,
                 "reference": payment.reference,
+                "extra": payment.extra,
+                "extra_label": payment.extra_label,
             }
             for payment in sale.payments.order_by("position", "id")
         ],

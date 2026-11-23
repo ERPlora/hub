@@ -16,7 +16,7 @@ Then, end to end on real databases (``hubs.CopiedHubs``): the business's own and
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 from django.apps import apps
@@ -52,8 +52,8 @@ def test_the_copy_gives_each_live_card_with_what_its_create_takes():
         postal_code="28001",
         country="ES",
         avatar="https://example.com/ana.png",
-        birthday=date(1990, 1, 2),
-        anniversary=date(2015, 6, 7),
+        birthday="1990-01-02",
+        anniversary="--06-07",
         source="referral",
         lifecycle_stage="active",
         preferred_channel="email",
@@ -78,8 +78,8 @@ def test_the_copy_gives_each_live_card_with_what_its_create_takes():
         "postal_code": "28001",
         "country": "ES",
         "avatar": "https://example.com/ana.png",
-        "birthday": date(1990, 1, 2),
-        "anniversary": date(2015, 6, 7),
+        "birthday": "1990-01-02",
+        "anniversary": "--06-07",
         "source": "referral",
         "lifecycle_stage": "active",
         "preferred_channel": "email",

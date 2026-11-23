@@ -1,8 +1,7 @@
-"""What a charge writes: the fiscal copy of each part it charged and what ``sale.sale.completed`` carries."""
+"""What a charge writes: the fiscal copy of each part it charged, its tenders and what ``sale.sale.completed``
+carries."""
 
-
-
-from apps.sale.models import OrderLine, Sale, SaleLine
+from apps.sale.models import OrderLine, Sale, SaleLine, SalePayment
 from apps.sale.queries.line_parts import combo_name, dishes_of, folded_names, is_child
 
 
@@ -80,6 +79,26 @@ def _sale_lines(
     return rows
 
 
+def _sale_payments(sale: Sale, legs: list[dict]) -> list[SalePayment]:
+    """Each tender of the charge, in the order taken, with what another app added to it kept apart."""
+    return [
+        SalePayment(
+            sale=sale,
+            position=position,
+            method=leg["method"],
+            method_name=leg["method"].name,
+            method_type=leg["method"].type,
+            amount=leg["amount"],
+            tendered=leg["tendered"],
+            change=leg["change"],
+            reference=leg["reference"],
+            extra=leg["extra"],
+            extra_label=leg["extra_label"],
+        )
+        for position, leg in enumerate(legs, start=1)
+    ]
+
+
 def _completed_payload(  # noqa: PLR0913, PLR0917
     sale, lines, payments, tax_id, address, country, id_type
 ) -> dict:
@@ -116,6 +135,8 @@ def _completed_payload(  # noqa: PLR0913, PLR0917
                 "tendered": payment.tendered,
                 "change": payment.change,
                 "reference": payment.reference,
+                "extra": payment.extra,
+                "extra_label": payment.extra_label,
             }
             for payment in payments
         ],

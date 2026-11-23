@@ -211,7 +211,7 @@ def test_the_full_card_keeps_every_value_and_the_phone_in_e164():
         "+34600111222",
         "ACME",
         "ES",
-        date(1990, 5, 4),
+        "1990-05-04",
     )
     assert (
         detail.lifecycle_stage,
@@ -253,7 +253,7 @@ def test_update_changes_only_what_was_sent_and_announces_it():
 
 
 def test_update_by_the_customers_name_and_null_leaves_a_field_but_clears_a_date():
-    ana = card("Ana", birthday=date(1990, 1, 1), city="Madrid")
+    ana = card("Ana", birthday="1990-01-01", city="Madrid")
     detail = run(
         "customer.customer.update",
         CustomerPatchIn(customer="ana", city=None, birthday=None, is_active=False),
@@ -513,7 +513,7 @@ def test_import_creates_the_good_rows_and_skips_the_bad_ones_with_their_reason()
     assert (eva.source, eva.lifecycle_stage, eva.birthday) == (
         "referral",
         "vip",
-        date(1990, 5, 4),
+        "1990-05-04",
     )
     # One notice per created card, as a creation by hand: WhatsApp links their conversations.
     assert outbox() == [
@@ -1275,8 +1275,8 @@ def erasable(db):
         country="ES",
         avatar="https://example.com/a.png",
         notes="Allergic",
-        birthday=date(1990, 5, 4),
-        anniversary=date(2015, 6, 1),
+        birthday="1990-05-04",
+        anniversary="2015-06-01",
         preferred_channel="whatsapp",
         lifecycle_stage="vip",
         source="whatsapp",

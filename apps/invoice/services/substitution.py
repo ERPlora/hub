@@ -9,7 +9,8 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
-from apps.invoice.queries import FULL, find_invoice
+from apps.invoice.queries.rows import find_invoice
+from apps.invoice.queries.series import FULL
 from apps.invoice.schemas import IssueOut, SubstituteIn
 from apps.invoice.services.issuer import _configured_issuer, _issuer_of
 from apps.invoice.services.issuing import VERBATIM, _issue
