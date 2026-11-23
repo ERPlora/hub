@@ -222,7 +222,8 @@ Pasos:
 3. Pulsa «Guardar». La lista muestra el cambio al momento.
 4. Un menú con «A la venta» desmarcada sigue en la lista, pero el TPV deja de ofrecerlo.
 5. Por el asistente, «quita el menú del día de la venta» o «vuelve a ponerlo a la venta» sale en una tarjeta de un
-   solo toque, como el interruptor: «Cambiar en Menús y combos», «Menú: Menú del día», «A la venta: No» y «Ejecutar».
+   solo toque, como el interruptor: «Cambiar en Menús y combos» con el menú y cómo queda «A la venta», y se confirma
+   con «Ejecutar», sin escribir nada.
    Cambiar el nombre, el precio, la forma de venta, el tipo de IVA o el orden, solo o junto a «A la venta», pide
    escribir CONFIRMAR, porque puede cambiar cómo se cobra (BASE-F98).
 Entra: los mismos campos que el alta; solo cambia lo que se envía (por el asistente o la API, lo que no

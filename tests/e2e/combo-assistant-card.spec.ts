@@ -121,7 +121,8 @@ for (const language of ['es', 'en'] as const) {
     await cancel(page);
 
     // «Quita el menú del día de la venta»: one tap, like the menu form's switch: no word to type and «Run» ready at once,
-    // in every size. Run, the menu is off the till.
+    // in every size. Run, the menu is off the till. How the one line of a normal write says its yes or no is the card's
+    // own (`@erplora/ui`), not this write's.
     const offSale = await fieldsOf(page, 'combo__combo__set_active', { id: menu.id, is_active: false });
     expect(offSale.map((field) => [field.name, field.label, field.value])).toEqual([
       ['id', words.menu, menu.name],
@@ -129,8 +130,7 @@ for (const language of ['es', 'en'] as const) {
     ]);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await expect(card(page)).toContainText(`${words.menu}: ${menu.name}`);
-      await expect(card(page)).toContainText(`${words.onSale}: No`);
+      await expect(card(page)).toContainText(menu.name);
       await expect(card(page).locator('[data-testid="assistant-confirm-input"]')).toHaveCount(0);
       await expect(card(page).locator('[data-testid="assistant-confirm-submit"] button')).toBeEnabled();
       await untilStill(page);

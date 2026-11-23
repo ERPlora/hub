@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3af176c2dec0a0f374c5ae1c4c7f45929e22b6de9342ad08f895e177d43c4879 -->
+<!-- generated from WORKBOOK.md sha256:3c89187be5c26f8a663fe9d9c693af55242e1d66cc5970305847023e9de602d6 -->
 
 ## What it is for and who it is for
 
@@ -216,7 +216,8 @@ Steps:
 3. Tap "Save". The list shows the change at once.
 4. A menu with "On sale" unticked stays in the list, but the till stops offering it.
 5. Through the assistant, "take the menu of the day off sale" or "put it back on sale" comes up on a one-tap card,
-   like the switch: "Change in Menus and combos", "Menu: Menu of the day", "On sale: No" and "Run it".
+   like the switch: "Change in Menus and combos" with the menu and how "On sale" is left, and "Run it" confirms it,
+   with nothing to type.
    Changing the name, the price, the way of selling, the VAT category or the order, alone or together with "On sale",
    asks to type CONFIRM, because it may change how it is charged (BASE-F98).
 In: the same fields as when creating; only what is sent changes (through the assistant or the API, what
