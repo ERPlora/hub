@@ -2535,22 +2535,31 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
-  1. Para adjuntar, pulsa «Adjuntar archivo» y elige uno o varios: imágenes, PDF, Word, Excel, texto o CSV. Cada uno
-     sale sobre el cuadro con su nombre y su × «Quitar adjunto».
+  1. Para adjuntar, pulsa «Adjuntar archivo» y elige uno o varios: imágenes, PDF, Word, Excel, texto o CSV, o la
+     copia de un negocio (un .blueprint.zip, la misma que admite Ajustes · Datos y copias › Importar, BASE-F30). Cada
+     uno sale sobre el cuadro con su nombre y su × «Quitar adjunto».
   2. Se envían con el siguiente mensaje, con texto o sin él, y en la burbuja de la persona quedan con su nombre.
-     Viajan una sola vez, con esa pregunta: después la conversación solo recuerda cómo se llamaban.
-  3. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador (en la app
+     Viajan con la conversación mientras la página sigue abierta; al recargarla, la conversación solo recuerda cómo
+     se llamaban.
+  3. La copia de un negocio no la lee el asistente: si la persona le pide cargarla, el asistente la carga con su
+     tarjeta, como Importar (BASE-F31, BASE-F97). Si la página se recargó antes de decir «sí», no carga nada y pide
+     adjuntarla otra vez.
+  4. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador (en la app
      instalada, el dispositivo) pide permiso para el micrófono; mientras lo pide, otra pulsación no abre una segunda
      grabación. Mientras graba, el botón se pone rojo y se llama «Detener la grabación»; a los dos minutos para solo.
-  4. Al parar sale «Transcribiendo…» y el texto cae en el cuadro, detrás de lo que hubiera escrito. **No se envía
+  5. Al parar sale «Transcribiendo…» y el texto cae en el cuadro, detrás de lo que hubiera escrito. **No se envía
      solo**: la persona lo revisa y pulsa «Enviar», y lo que pida pasa por su tarjeta como cualquier otra petición
      (BASE-F97).
-Entra: los archivos (8 MB cada uno y 20 MB entre todos los de una pregunta) o la grabación.
-Sale: el archivo viaja con la pregunta a erplora.com, que lo lee; la grabación pasa por el negocio a la
-transcripción de erplora.com. El navegador nunca habla directamente con erplora.com.
+Entra: los archivos (8 MB cada uno; la copia de un negocio, 20 MB como en Importar; y 20 MB entre todos los de una
+pregunta) o la grabación.
+Sale: el archivo viaja con la pregunta a erplora.com, que lo lee; la copia de un negocio se queda en el negocio:
+erplora.com solo recibe su nombre. La grabación pasa por el negocio a la transcripción de erplora.com. El navegador
+nunca habla directamente con erplora.com.
 Si falla: en una línea sobre el cuadro, y el archivo no se adjunta: «menu.pdf es demasiado grande: 8 MB como mucho
-por archivo.», «Los archivos de una pregunta suman 20 MB como mucho.», «menu.zip no se puede adjuntar: imágenes,
-PDF, Word, Excel, texto o CSV.» o «No se ha podido leer menu.pdf.». Con el micrófono denegado, «El acceso al
+por archivo.», «No se pudo leer el fichero: el fichero pasa de 20 MB.» (la copia de un negocio, como Importar), «Los
+archivos de una pregunta suman 20 MB como mucho.», «menu.rar no se puede adjuntar: imágenes, PDF, Word, Excel, texto
+o CSV.» o «No se ha podido leer menu.pdf.». Una copia que ya no está en la conversación no se carga: «No hay ningún
+archivo «copia.blueprint.zip» adjunto en esta conversación: vuelve a adjuntarlo.». Con el micrófono denegado, «El acceso al
 micrófono está denegado. Permítelo en tu navegador para dictar.» y, en la app instalada (Android o Windows), donde
 no hay navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para dictar.»; una
 grabación demasiado larga, «La grabación es demasiado larga: dicta un mensaje más corto.»; sin voz, «No se ha oído
@@ -4807,7 +4816,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.app.disable` | F23, F25 |
 | `base.blueprint.list` | F29, F38 |
 | `base.blueprint.inspect` | F30, F31 |
-| `base.blueprint.import` | F31, F33, F38 |
+| `base.blueprint.import` | F31, F33, F38, F94 |
 | `base.import.list` | F32, F33, F34, F38 |
 | `base.import.detail` | F33, F34, F97 |
 | `base.import.undo` | F34 |

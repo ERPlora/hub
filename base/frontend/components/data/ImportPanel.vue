@@ -89,7 +89,7 @@ async function onFile(event: Event): Promise<void> {
   input.value = '';
   if (!file) return;
   if (file.size > MAX_FILE_BYTES) {
-    readError.value = t('base.data.import.readError', { reason: t('base.data.import.tooBig') });
+    readError.value = t('base.data.import.fileTooBig');
     return;
   }
   reading.value = 'file';

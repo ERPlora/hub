@@ -160,7 +160,8 @@ describe('ImportPanel', () => {
     Object.defineProperty(input, 'files', { value: [big], configurable: true });
     input.dispatchEvent(new Event('change'));
     await settle();
-    expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain('the file is larger than 20 MB.');
+    // The same words as the assistant's panel when a copy attached there is larger (base.data.import.fileTooBig).
+    expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain('The file could not be read: the file is larger than 20 MB.');
     expect(m.calls).toEqual([]);
     const small = new File([new Uint8Array([80, 75, 3, 4])], 'mine.blueprint.zip');
     Object.defineProperty(input, 'files', { value: [small], configurable: true });
