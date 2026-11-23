@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:abaeea16391acfec34e99e22a5d9e178cd4749ab6f777a717ab6586cf6d32bb6 -->
+<!-- generated from WORKBOOK.md sha256:46d7c36872068cbeb98284fe937e2a2c828d0d10b5aa904a00a85130b835b97b -->
 
 ## What it is for and who it is for
 
@@ -2587,7 +2587,9 @@ Steps:
      in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
-     no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
+     no sign when it balances); a yes or a no, as "Yes" or "No", with the name of its datum in front, also on a normal action's line,
+     because alone it says nothing of what changes ("Require an opening float: Yes · Require a count to close: Yes",
+     never "Yes · Yes"); a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
