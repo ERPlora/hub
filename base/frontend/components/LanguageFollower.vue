@@ -5,17 +5,12 @@
 // (`sessionChanged`, frontend/main.ts) and the shell follows its language, as «My profile»'s own selector does. It
 // paints nothing.
 import { useLive } from '@erplora/ui/sdk';
-import { computed, watch } from 'vue';
 
-import { sessionChanged } from '../lib/access';
+import { readSessionAgainOnChange } from '../lib/session-follow';
 
 const { data } = useLive('base.profile.get', {});
 
-const language = computed(() => data.value?.language);
-
-watch(language, (next, previous) => {
-  if (next !== undefined && previous !== undefined) sessionChanged();
-});
+readSessionAgainOnChange(() => data.value?.language);
 </script>
 
 <template>
