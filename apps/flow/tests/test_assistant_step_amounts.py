@@ -8,21 +8,13 @@ from apps.flow.models import Flow, Question
 from base.models import Hub
 from base.tests.fake_gateway import gateway
 
-from .conftest import CHAT, HUB_DB, NOON, QUOTA, A, make_flow
+from .conftest import CHAT, HUB_DB, NOON, A, make_flow
+from .test_services_assistant_step import said, wants
 
 __all__ = ["gateway"]
 pytestmark = HUB_DB
 
 GRANTS = ["customer.customer.stats", "customer.customer.update"]
-
-
-def wants(name: str, arguments: dict) -> dict:
-    call = {"type": "function_call", "call_id": "call_1", "name": name, "arguments": json.dumps(arguments)}
-    return {"output": [call], "continuation": "token-1", "quota": QUOTA}
-
-
-def said(text: str) -> dict:
-    return {"output": [{"type": "message", "content": [{"type": "output_text", "text": text}]}], "continuation": None, "quota": QUOTA}
 
 
 def told(sent) -> dict:
