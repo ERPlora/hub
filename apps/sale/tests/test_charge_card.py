@@ -108,12 +108,14 @@ def test_a_tender_by_its_id_is_said_by_its_name(espresso):
 
 
 def test_tenders_that_do_not_add_up_are_said_as_sent_and_the_charge_refuses_them(check):
-    """Two tenders without an amount, or amounts over the total: the card says what was sent, each by its method,
-    beside the total, so the person sees it does not add up; the charge refuses it on its own."""
+    """Two tenders without an amount, or the others paying it all or more: the card says what was sent, each by its
+    method, beside the total, so the person sees it does not add up; the charge refuses it on its own."""
     two_open = card_fields({"order_id": str(check.id), "payments": [{"method": "card"}, {"method": "cash"}]})
     assert two_open["payments"]["value"] == [{"method": "Tarjeta"}, {"method": "Efectivo"}]
     over = card_fields({"order_id": str(check.id), "payments": [{"method": "card", "amount": 900}, {"method": "cash"}]})
     assert over["payments"]["value"] == [{"method": "Tarjeta", "amount": money(900)}, {"method": "Efectivo"}]
+    paid = card_fields({"order_id": str(check.id), "payments": [{"method": "card", "amount": 400}, {"method": "cash"}]})
+    assert paid["payments"]["value"] == [{"method": "Tarjeta", "amount": money(400)}, {"method": "Efectivo"}]
 
 
 def test_a_method_the_business_does_not_have_is_said_as_said(espresso):

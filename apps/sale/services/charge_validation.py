@@ -192,11 +192,10 @@ def tender_amounts(sent: list[int | None], total: int) -> list[int] | None:
     """What each tender pays: the one without an amount, what the others leave; ``None`` when they cannot add up to
     the sale's ``total`` (more than one without an amount, or the others already reach it)."""
     given = sum(amount for amount in sent if amount is not None)
-    open_legs = sent.count(None)
-    if open_legs > 1 or (open_legs and given >= total):
-        return None
     amounts = [total - given if amount is None else amount for amount in sent]
-    return amounts if sum(amounts) == total else None
+    if (None in sent and given >= total) or sum(amounts) != total:
+        return None
+    return amounts
 
 
 def _fill_the_rest(legs: list[dict], total: int) -> None:
