@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a2bd39969ba5241115d725de9e06440307f895965cff145adea6c2a311784df8 -->
+<!-- generated from WORKBOOK.md sha256:8dc24343e1a35e273cc58c335f23f867c3ff8f8766a29b8c1e34cb99c7988c50 -->
 
 ## What it is for and who it is for
 
@@ -747,10 +747,14 @@ Steps:
   1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list.
+  3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
+     says what the step asks for and not what the business has: "Your catalog" is done because there are already
+     products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
+     Inventory).
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: BASE-F103
+Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
 Status: done

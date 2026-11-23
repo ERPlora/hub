@@ -752,10 +752,13 @@ Pasos:
   1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
      dónde se hace; cada paso sigue teniendo su «Configurar» en la lista.
+  3. De un paso hecho dice que está hecho, sin sacar una cifra, un nombre ni un ajuste de su texto, que dice lo que
+     pide el paso y no lo que tiene el negocio: «Tu catálogo» está hecho porque ya hay productos, nunca «tienes uno».
+     Si se le pregunta cuántos o cuál, lo lee en la app del paso (los productos activos, en Inventario).
 Entra: la lista de lo que falta, con los permisos de quien pregunta.
 Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
-Implicados: BASE-F103
+Implicados: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 Cambiar de rol o salir del negocio con el hub abierto
 Estado: hecho

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c590635851edbee4e9258f039215ebb16551b6d7717d1836083e5669d8207bcb -->
+<!-- generated from WORKBOOK.md sha256:1fa802aaeda1d1a87233644b77b2c3de4f1cfef39412569983a3b0d6f9e5e302 -->
 
 ## What it is for and who it is for
 
@@ -988,11 +988,13 @@ Steps:
 2. "Set up" leads to **Inventory → Products**.
 3. As soon as there is an active product (physical or of the service type), the step shows as done,
    without reloading.
+4. Asked about this step, the assistant says it is done because there are already products or, asked how
+   many, the active products there are, read in Inventory; never a figure taken from the step's text.
 In: the number of active products.
 Out: the step done or pending. It is seen by whoever can create products.
 If it fails: if all the products are turned off or deleted, the step goes back to pending, also without
 reloading.
-Involved: none
+Involved: BASE-F12
 
 ### INVENTORY-F29 Mark an item as sold out
 Status: done
