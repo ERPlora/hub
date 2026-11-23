@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:15409a734377dfe557900b2cd63bdecab3dac72e53905ad7a2ee5ce354a77176 -->
+<!-- generated from WORKBOOK.md sha256:a9ddb3c5c90c914e155a8d83f4e3070bcd0c4762409607e984cbfeb0ecaff7ee -->
 
 ## What it is for and who it is for
 
@@ -1145,7 +1145,8 @@ Steps:
    its results, not even in part (FLOW-F39). It does have today's date and time and the exchange rate between
    currencies, as in the chat.
 3. What the assistant looks up is done on the spot and nobody is asked; the history says "The assistant used
-   "…".".
+   "…".". What it looks up or changes reaches it as in the chat: times in the business's time and amounts in their
+   currency, as the screens show them (BASE-F93).
 4. What it wants to change:
    - with "Ask me first", it is not done: it waits in **Waiting for your answer** as "The assistant wants to
      change something in "…"", with what it wants to do right below ("Cancel a reservation"), what it said and
