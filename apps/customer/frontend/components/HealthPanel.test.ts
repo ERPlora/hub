@@ -2,12 +2,13 @@
 // with the person's explicit permission (GDPR art. 9). Without it the block asks for it with the exact
 // words to read out; «They said yes» stores THOSE words. With it, the data shows (allergies as a
 // warning) and «Edit» saves them; «Withdraw permission» asks first, because it erases the data.
-import { formatDateTime } from '@erplora/ui/components';
+import { DateField, formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonTextarea } from '@ionic/vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
 import { formatDay } from '../lib/dates';
 import type { HealthOut } from '../operations';
@@ -160,7 +161,7 @@ describe('HealthPanel: editing the data', () => {
     const s = await setup(KEPT);
     await s.click('customer-health-edit');
     expect(s.wrapper.findComponent(IonTextarea).props('modelValue')).toBe('PPD (hair dye)');
-    expect(s.wrapper.findComponent(IonInput).props('modelValue')).toBe('2026-10-10');
+    expect(picked(s.wrapper.findComponent(IonInput).element)).toBe('2026-10-10');
     s.net.onApi(() => json(KEPT));
     await s.submit();
     expect(sent(s.net.api[0])).toMatchObject({
@@ -169,6 +170,17 @@ describe('HealthPanel: editing the data', () => {
     });
     expect(toastSuccess).toHaveBeenCalledWith('Health data saved.');
     expect(s.has('customer-health-form')).toBe(false);
+  });
+
+  it('the date is the app’s own calendar, shown in the app’s language; cleared, it travels as no date', async () => {
+    const s = await setup(KEPT);
+    await s.click('customer-health-edit');
+    const date = s.wrapper.get('[data-testid="customer-health-date-input"]').element as HTMLElement & { value?: string; readonly?: boolean };
+    expect([date.value, date.readonly, s.wrapper.getComponent(DateField).props('required')]).toEqual(['10/10/2026', true, false]);
+    await pick(date, '');
+    s.net.onApi(() => json(KEPT));
+    await s.submit();
+    expect((sent(s.net.api[0]).body as Record<string, unknown>).sensitivity_test_on).toBeNull();
   });
 
   it('an empty date travels as no date', async () => {
@@ -231,7 +243,7 @@ describe('HealthPanel: editing the data', () => {
       const s = await refused();
       expect(s.has('customer-health-failure')).toBe(false);
       expect([s.says('allergies'), s.says('sensitivity_test_on'), s.marked('sensitivity_test_result')]).toEqual([ALLERGIES, DATE, true]);
-      await s.field('sensitivity_test_on').setValue('2026-10-12');
+      await pick(s.field('sensitivity_test_on').element, '2026-10-12');
       expect([s.says('sensitivity_test_on'), s.marked('sensitivity_test_on')]).toEqual(['', false]);
       await s.field('sensitivity_test_result').setValue('negative');
       expect(s.marked('sensitivity_test_result')).toBe(false);
@@ -241,7 +253,7 @@ describe('HealthPanel: editing the data', () => {
     it('the next refusal says it all again', async () => {
       const s = await refused();
       await s.field('allergies').setValue('Latex, PPD');
-      await s.field('sensitivity_test_on').setValue('2026-10-12');
+      await pick(s.field('sensitivity_test_on').element, '2026-10-12');
       expect([s.says('allergies'), s.says('sensitivity_test_on')]).toEqual(['', '']);
       await s.submit();
       expect([s.says('allergies'), s.says('sensitivity_test_on'), s.marked('sensitivity_test_result')]).toEqual([ALLERGIES, DATE, true]);

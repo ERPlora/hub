@@ -5,6 +5,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { EventOut } from '../operations';
@@ -94,8 +95,8 @@ describe('EventsPage: the filters behind the table funnel', () => {
     const panel = s.find('verifactu-events-filters-panel');
     const set = (name: string, value: string) =>
       panel.get(`[data-testid="verifactu-events-filter-${name}"]`).element.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
-    set('date_from', '2026-10-01');
-    set('date_to', '2026-10-14');
+    await pick(panel.get('[data-testid="verifactu-events-filter-date_from"]').element, '2026-10-01');
+    await pick(panel.get('[data-testid="verifactu-events-filter-date_to"]').element, '2026-10-14');
     set('severity', 'critical');
     set('kind', 'chain_broken');
     await flush();

@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
 import { clockIn } from './attendance-helpers';
+import { pickDayTime } from './date-time-fields';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown, testid } from './helpers';
 import { offersRowAction, rowAction } from './service-helpers';
 
@@ -151,7 +152,7 @@ test('a manager sees who is in, corrects a day with its reason, reads its histor
     })
       .format(new Date(Date.now() - 10 * 60_000))
       .replace(' ', 'T');
-    await dialog.locator('[data-testid=attendance-correct-clock_in] input').fill(earlier);
+    await pickDayTime(page, dialog.locator('[data-testid=attendance-correct-clock_in]'), earlier);
     await dialog.locator('[data-testid=attendance-correct-reason] textarea').fill('Arrived earlier, forgot to clock in');
     await dialog.locator('[data-testid=attendance-correct-submit]').click();
     await expect(view.locator('[data-testid=attendance-records-corrected]')).toContainText('Working day corrected.');

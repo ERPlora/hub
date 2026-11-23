@@ -4,11 +4,12 @@
 // overlap) stays in the dialog under the date, with the server's words.
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { RuleOut } from '../operations';
-import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
+import { click, mountTax, settle } from '../__tests__/mount-tax';
 import RuleEndModal from './RuleEndModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; type?: string; fill?: string; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; readonly?: boolean; required?: boolean; fill?: string; errorText?: string; disabled?: boolean };
 
 const RULE: RuleOut = {
   id: 'r1',
@@ -44,8 +45,10 @@ describe('RuleEndModal (TAX-F07)', () => {
     const s = await setup();
     expect(s.inDoc('tax-rule-end')?.getAttribute('aria-label')).toBe('End this tax rule');
     expect(s.inDoc('tax-rule-end-message')?.textContent).toContain('end it the day before the new rate starts');
-    expect([s.date().type, s.date().label, s.date().value, s.date().fill, s.date().getAttribute('mode')]).toEqual([
-      'date',
+    // The app's own calendar, never the device's; the day is needed, so it has no Clear.
+    expect([s.date().readonly, s.date().required, s.date().label, s.date().value, s.date().fill, s.date().getAttribute('mode')]).toEqual([
+      true,
+      true,
       'Last day it applies',
       '',
       'outline',
@@ -56,13 +59,13 @@ describe('RuleEndModal (TAX-F07)', () => {
 
   it('starts from the end the rule already has', async () => {
     const s = await setup({ ...RULE, valid_to: '2026-12-31' });
-    expect(s.date().value).toBe('2026-12-31');
+    expect([picked(s.date()), s.date().value]).toEqual(['2026-12-31', '12/31/2026']);
   });
 
   it('sends tax.rule.end for that rule with the day, then closes', async () => {
     const s = await setup();
     s.answer(200, { ...RULE, valid_to: '2026-12-31' });
-    await ionValue(s.date(), '2026-12-31', 'ionInput');
+    await pick(s.date(), '2026-12-31');
     await click(s.save());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/tax/rules/end', query: {}, body: { id: 'r1', valid_to: '2026-12-31' } }]);
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
@@ -72,7 +75,7 @@ describe('RuleEndModal (TAX-F07)', () => {
     const s = await setup();
     const message = 'That rule cannot end before the day it starts.';
     s.answer(409, { error: { code: 'tax.rule_end_invalid', message, fields: { valid_to: message } } });
-    await ionValue(s.date(), '2000-01-01', 'ionInput');
+    await pick(s.date(), '2000-01-01');
     await click(s.save());
     expect(s.date().errorText).toBe(message);
     expect(s.date().classList.contains('ion-invalid')).toBe(true);
@@ -90,12 +93,12 @@ describe('RuleEndModal (TAX-F07)', () => {
 
 describe('RuleEndModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
-    const s = await setup();
+    const s = await setup({ ...RULE, valid_to: '2026-12-31' });
     const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
     await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('tax-rule-end'),
-      change: () => ionValue(s.date(), '2026-12-31', 'ionInput'),
-      restore: () => ionValue(s.date(), '', 'ionInput'),
+      change: () => pick(s.date(), '2027-01-31'),
+      restore: () => pick(s.date(), '2026-12-31'),
     });
   });
 });

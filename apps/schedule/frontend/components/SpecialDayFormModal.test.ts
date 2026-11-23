@@ -3,13 +3,15 @@
 // year» and Notes — and «Add day» (the old words); a row opens «Edit · {name}» with «Save». «Add day»
 // waits for a date and a name. The server's refusal goes under its field (the 409 of a taken date under
 // Date) and what was typed stays.
+import { DateField } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { SpecialDayOut } from '../operations';
 import { click, ionChecked, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; errorText?: string; type?: string; placeholder?: string };
+type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; errorText?: string; readonly?: boolean; placeholder?: string };
 
 const EVE: SpecialDayOut = {
   id: 'sd1',
@@ -35,7 +37,9 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
   it('«New special day»: Date, Name, Status closed, Repeats every year, Notes and «Add day»', async () => {
     const s = await setup();
     expect(s.inDoc('schedule-special-day-form')?.getAttribute('aria-label')).toBe('New special day');
-    expect([s.field('date').type, s.field('date').label]).toEqual(['date', 'Date']);
+    expect([s.field('date').readonly, s.field('date').label]).toEqual([true, 'Date']);
+    // The app's own calendar; «Add day» needs the date, so it has no «Clear».
+    expect(s.wrapper.getComponent(DateField).props('required')).toBe(true);
     expect([s.field('name').label, s.field('name').placeholder]).toEqual(['Name', 'Name (e.g. Christmas)']);
     expect([s.field('status').label, s.field('status').value]).toEqual(['Status', 'closed']);
     expect(s.inDoc('schedule-special-day-form-intervals-open-0')).toBeNull();
@@ -47,7 +51,7 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
   it('«Add day» waits for a date and a name', async () => {
     const s = await setup();
     expect(s.submit().disabled).toBe(true);
-    await ionValue(s.field('date'), '2026-12-25', 'ionInput');
+    await pick(s.field('date'), '2026-12-25');
     expect(s.submit().disabled).toBe(true);
     await ionValue(s.field('name'), '   ', 'ionInput');
     expect(s.submit().disabled).toBe(true);
@@ -58,7 +62,7 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
   it('a closed day sends schedule.special_day.create, then closes', async () => {
     const s = await setup();
     s.answer(201, SAVED);
-    await ionValue(s.field('date'), '2026-12-25', 'ionInput');
+    await pick(s.field('date'), '2026-12-25');
     await ionValue(s.field('name'), ' Christmas ', 'ionInput');
     await ionChecked(s.field('recurring'), true);
     await click(s.submit());
@@ -76,18 +80,18 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
   it('«Open (with hours)» shows the intervals and sends them', async () => {
     const s = await setup();
     s.answer(201, SAVED);
-    await ionValue(s.field('date'), '2026-12-24', 'ionInput');
+    await pick(s.field('date'), '2026-12-24');
     await ionValue(s.field('name'), 'Eve', 'ionInput');
     await ionValue(s.field('status'), 'open');
-    await ionValue(s.inDoc('schedule-special-day-form-intervals-open-0'), '10:00', 'ionInput');
-    await ionValue(s.inDoc('schedule-special-day-form-intervals-close-0'), '13:00', 'ionInput');
+    await pick(s.inDoc('schedule-special-day-form-intervals-open-0'), '10:00');
+    await pick(s.inDoc('schedule-special-day-form-intervals-close-0'), '13:00');
     await click(s.submit());
     expect(s.sent()[0].body).toMatchObject({ is_closed: false, intervals: [{ open_time: '10:00', close_time: '13:00' }] });
   });
 
   it('an open day with a line half filled is said in the form and nothing is sent', async () => {
     const s = await setup();
-    await ionValue(s.field('date'), '2026-12-24', 'ionInput');
+    await pick(s.field('date'), '2026-12-24');
     await ionValue(s.field('name'), 'Eve', 'ionInput');
     await ionValue(s.field('status'), 'open');
     await click(s.submit());
@@ -99,7 +103,7 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
     const s = await setup();
     const taken = 'There is already a special day on that date.';
     s.answer(409, { error: { code: 'schedule.special_day_exists', message: taken, fields: { date: taken } } });
-    await ionValue(s.field('date'), '2026-12-25', 'ionInput');
+    await pick(s.field('date'), '2026-12-25');
     await ionValue(s.field('name'), 'Again', 'ionInput');
     await click(s.submit());
     expect(s.field('date').errorText).toBe(taken);
@@ -111,14 +115,14 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
   it('a row opens «Edit · {name}» with what it has, and «Save» sends schedule.special_day.update', async () => {
     const s = await setup(EVE);
     expect(s.inDoc('schedule-special-day-form')?.getAttribute('aria-label')).toBe('Edit · Christmas Eve');
-    expect([s.field('date').value, s.field('name').value, s.field('status').value, s.field('recurring').checked, s.field('notes').value]).toEqual([
+    expect([picked(s.field('date')), s.field('name').value, s.field('status').value, s.field('recurring').checked, s.field('notes').value]).toEqual([
       '2026-12-24',
       'Christmas Eve',
       'open',
       true,
       'half day',
     ]);
-    expect((s.inDoc('schedule-special-day-form-intervals-close-0') as Control).value).toBe('14:00');
+    expect([s.field('date').value, picked(s.inDoc('schedule-special-day-form-intervals-close-0'))]).toEqual(['12/24/2026', '14:00']);
     expect(s.submit().textContent?.trim()).toBe('Save');
     s.answer(200, EVE);
     await ionValue(s.field('notes'), 'Family', 'ionInput');
