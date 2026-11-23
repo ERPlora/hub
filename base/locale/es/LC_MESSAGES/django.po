@@ -2501,6 +2501,18 @@ msgstr "Datos sensibles"
 msgid "This role does not exist in this business."
 msgstr "Este rol no existe en este negocio."
 
+msgid "Last used"
+msgstr "Último uso"
+
+msgid "Devices to remove"
+msgstr "Dispositivos que se quitan"
+
+msgid "Which"
+msgstr "Cuáles"
+
+msgid "No device has gone 30 days without being used, so there is nothing to remove."
+msgstr "Ningún dispositivo lleva 30 días sin usarse, así que no hay nada que quitar."
+
 msgctxt "base"
 msgid "Once on"
 msgstr "Una vez activada"
