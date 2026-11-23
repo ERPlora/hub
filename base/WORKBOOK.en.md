@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6bcc97e7c63b2dd9be8bf74a30ac979ed52e9ccddab0d193f320a314067809f6 -->
+<!-- generated from WORKBOOK.md sha256:4e6a6af953146a157b7090c7cff38dec8c7b1b29cbc0cf969336770ecca2c0e1 -->
 
 ## What it is for and who it is for
 
@@ -2349,10 +2349,11 @@ Steps:
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
 In: the name, the pace and what it may do.
-Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
+Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
+(BASE-F125). Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
 app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
-Involved: BASE-F89, BASE-F90, BASE-F119
+Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
 Status: done
@@ -3471,8 +3472,8 @@ Steps:
      what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
-  5. An API key sees the data whoever makes it sees: only the owner and the administrator make one, and they see all
-     of it, so an integration reads and writes a product's cost as before.
+  5. An API key sees the data whoever made it sees today (BASE-F125): a key of the owner or of an administrator, who
+     see all of it, reads and writes a product's cost as before.
   6. The business totals are the figures of the whole business, beyond what each one does: with everyone's sales,
      the figures of **Sales** and its Home panels are the whole business's; without them, those of the person's own
      sales. In **Customers**, "Revenue" only shows to whoever sees them.
@@ -3481,7 +3482,36 @@ Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
-Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
+
+### BASE-F125 A key stops working when whoever made it no longer may
+Status: done
+Actor: API (another program), owner, administrator
+Screen: none (it shows in what the API answers the other program)
+Steps:
+  1. Each key remembers who made it. A key made before that was kept goes to the business's owner's name with the
+     next photo from erplora.com, which arrives every night at the latest; until then it may do the same as the
+     owner, as before.
+  2. A key never does more than whoever made it, with what that person may do today in the business: it opens an
+     operation only if its maker has its permission; it receives a piece of sensitive data (costs, contact details,
+     the business totals) only if its maker sees it, and otherwise gets it empty (BASE-F119); and in what has an
+     owner (sales, tills, invoices, appointments, commissions) it reads everything only if its maker sees
+     everything, and otherwise only its maker's. When booking an appointment or serving a customer, the key stays on
+     the customer's side, as until today.
+  3. If whoever made it has their role changed in erplora.com and loses a permission, the key loses it at the same
+     time, without touching it: what needs it answers 403 `permission_denied`, and the data they no longer see comes
+     empty.
+  4. If whoever made it leaves the business, the key stops opening anything: every request answers 403
+     `base.api_key_owner_gone`, "Whoever made this API key is no longer in the business. Make a new one.". The key
+     stays in **Employees › API keys**: whoever runs the business revokes it (BASE-F88) and makes another
+     (BASE-F86).
+In: the key the other program calls with and the role today of whoever made it, from the last photo from
+erplora.com.
+Out: nothing saved.
+If it fails: the 403 says whether whoever made it lacks the permission (`permission_denied`) or is no longer in the
+business (`base.api_key_owner_gone`); the rest of what refuses a key does not change: what the key itself may not
+do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_rate_limited`.
+Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
 Status: done

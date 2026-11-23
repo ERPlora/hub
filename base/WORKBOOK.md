@@ -2359,10 +2359,11 @@ Pasos:
      muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
      dice «Copiado»). «Hecho» la cierra.
 Entra: el nombre, el ritmo y lo que puede hacer.
-Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
+Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla, y quién la creó, que pone su techo
+(BASE-F125). Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
 publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
-Implicados: BASE-F89, BASE-F90, BASE-F119
+Implicados: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotar una llave de API
 Estado: hecho
@@ -3484,8 +3485,8 @@ Pasos:
      va antes de la @.
   4. Un panel de Inicio cuya cifra es un dato que la persona no ve no le sale en el tablero ni entre los que puede
      añadir.
-  5. Una llave de API ve los datos que ve quien la crea: solo la crean el propietario y el administrador, que los ven
-     todos, así que una integración lee y escribe el coste de un producto como antes.
+  5. Una llave de API ve los datos que ve hoy quien la creó (BASE-F125): una llave del propietario o de un
+     administrador, que los ven todos, lee y escribe el coste de un producto como antes.
   6. Los totales del negocio son las cifras de todo el negocio, más allá de lo que hace cada uno: con las ventas de
      todos, las cifras de **Ventas** y sus paneles de Inicio son las del negocio entero; sin ellos, las de las ventas
      de la persona. En **Clientes**, «Ingresos» solo sale a quien los ve.
@@ -3493,7 +3494,32 @@ Entra: el rol de la persona en este negocio.
 Sale: nada guardado.
 Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
-Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
+
+### BASE-F125 Una llave deja de servir si su creador ya no puede
+Estado: hecho
+Actor: API (otro programa), propietario, administrador
+Pantalla: ninguna (se ve en lo que la API contesta al otro programa)
+Pasos:
+  1. Cada llave recuerda quién la creó. Una llave creada antes de que se guardara pasa a nombre del propietario del
+     negocio con la siguiente foto de erplora.com, que llega como mucho cada noche; hasta entonces puede lo mismo que
+     el propietario, como antes.
+  2. Una llave nunca hace más que quien la creó, con lo que esa persona puede hoy en el negocio: abre una operación
+     solo si su creador tiene su permiso; recibe un dato delicado (los costes, el contacto, los totales del negocio)
+     solo si su creador lo ve, y si no le llega vacío (BASE-F119); y en lo que tiene dueño (las ventas, las cajas,
+     las facturas, las citas, las comisiones) lee todo solo si su creador lo ve todo, y si no, solo lo de su creador.
+     Al dar una cita o atender a una clienta, la llave sigue del lado de la clienta, como hasta hoy.
+  3. Si a quien la creó le cambian el rol en erplora.com y pierde un permiso, la llave lo pierde a la vez, sin
+     tocarla: lo que lo necesita contesta 403 `permission_denied`, y el dato que ya no ve llega vacío.
+  4. Si quien la creó deja el negocio, la llave deja de abrir nada: cada petición contesta 403
+     `base.api_key_owner_gone`, «Quien creó esta API key ya no está en el negocio. Crea una nueva.». La llave sigue
+     en **Empleados › API keys**: quien lleva el negocio la revoca (BASE-F88) y crea otra (BASE-F86).
+Entra: la llave con la que llama el otro programa y el rol de hoy de quien la creó, de la última foto de erplora.com.
+Sale: nada guardado.
+Si falla: el 403 dice si a quien la creó le falta el permiso (`permission_denied`) o si ya no está en el negocio
+(`base.api_key_owner_gone`); lo demás que rechaza una llave no cambia: lo que la propia llave no puede hacer, 403
+`base.api_key_scope`, y pasada de sus peticiones por minuto, 429 `base.api_key_rate_limited`.
+Implicados: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Arrancar ERPlora al iniciar sesión en el ordenador
 Estado: hecho
