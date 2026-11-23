@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:264d916bc1f2ffd4277244c2a80fd580f138d3005f892d0ad5c94c65c807c970 -->
+<!-- generated from WORKBOOK.md sha256:8fc1f7fb057812e46b28f9610c5ed1d6e9858aaeb7acfb393f7277d486126f1c -->
 
 ## What it is for and who it is for
 
@@ -738,6 +738,9 @@ Steps:
    cost)" and "Lowest-stock products" (the five with the least, the first the one with the least) show
    by default; "Products in stock" is added with ⋮ ("Customize panel"), where they are grouped under
    "Inventory". The value shows in the business's currency.
+4. To the assistant ("what is running low?"), the same list, and for each product whether it is marked
+   sold out. Reaching 0 or below does not take it off the till, which still offers it: only what is
+   marked with "Mark sold out" stops being offered, and the assistant says so.
 In: the active, physical products with stock control. The value is the sum of cost times balance of
 those with a positive balance; a negative balance does not subtract.
 Out: nothing.
@@ -1037,7 +1040,8 @@ Steps:
 4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
    "Discard changes?" first and, with "Discard changes", discards it.
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
-   shows up to five candidate images by their title and asks which one; it never sets one on its own.
+   shows up to five candidate images by their title alone, without their internal code, and asks which
+   one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
 In: the item and ERPlora's image library, the same for every business, with each image's title and
 synonyms in Spanish and in English.

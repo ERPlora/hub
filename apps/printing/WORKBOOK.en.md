@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:353463f19b22828af22fc188815300eb0ee26c3216d32f03a6d28b3eb56bba29 -->
+<!-- generated from WORKBOOK.md sha256:8f5216ea2deb93b2823f619d2ae43697f621318f8abcccf510817570cf99afd7 -->
 
 ## What it is for and who it is for
 
@@ -227,7 +227,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F18 | Take the paper out: the device picks up and confirms the jobs | common | done |
 | PRINTING-F19 | See the state of a printer | common | done |
 | PRINTING-F20 | How long the hub keeps the print jobs | common | done |
-| PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | partial — the card does not say yet whether the printer answers right now (hub#573) |
+| PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | done |
 | PRINTING-F22 | Print the receipt and open the drawer at the till that charges | common | done |
 
 ### PRINTING-F01 See how printing is going
@@ -677,9 +677,7 @@ time.
 Involved: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 See in System who prints and where to get the ERPlora app
-Status: partial — the card does not say yet whether the printer answers right now ("Printer ready", "Printer not
-connected" or "We couldn't check the printer"): Printing already has that read, the same one it gives the Home's
-health row, but the card does not use it yet (hub#573)
+Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
@@ -687,19 +685,25 @@ Steps:
    **Your printer**: "Receipts, kitchen orders and labels are printed by the ERPlora app on the device next to the
    printer.". Whoever opens System sees it, the owner and the administrator (BASE-F39). With Printing off
    there is no card: a business that does not print sees none of this.
-2. "Set up printing" opens **Printing → Printers** (PRINTING-F01).
-3. In a browser, below, "Download the ERPlora app" with "The ERPlora app is what talks to your printers, the cash
+2. Below, whether the receipt printer answers right now, with the same read and the same colours as the Home's row
+   (BASE-F02): "Printer ready — Receipts print by themselves when you charge.", in green; "Printer not connected —
+   The device that prints the receipts does not answer: turn it on and open the ERPlora app on it." or "Printer not
+   set up — No device set up here prints the receipts yet.", in amber. While it checks, a grey line.
+3. "Set up printing" opens **Printing → Printers** (PRINTING-F01).
+4. In a browser, below, "Download the ERPlora app" with "The ERPlora app is what talks to your printers, the cash
    drawer and the scanners. Choose your system to continue." and one button per system: **Windows** (the one that
    stands out), **Linux** and **Android**. There is no macOS: erplora.com publishes none.
-4. Each button opens, outside the hub, the download erplora.com serves at that moment: the store if its listing is
+5. Each button opens, outside the hub, the download erplora.com serves at that moment: the store if its listing is
    published or the latest installer; Android, always Google Play (erplora.com's PUBLIC-F24).
-5. With the app installed, they set it up to print from that device (PRINTING-F18). Inside the app there is no
+6. With the app installed, they set it up to print from that device (PRINTING-F18). Inside the app there is no
    download block: it would be the app offering itself.
-In: whether Printing is on in the business, the person's permissions and erplora.com's addresses.
+In: whether Printing is on in the business, the person's permissions, whether the receipt station gave signs and
+erplora.com's addresses.
 Out: nothing saved.
 If it fails: if which cards apply cannot be read, none shows (never that of an app that is off) and the rest of the
-tab says its own; without erplora.com's addresses the download buttons do not show (never a button that leads
-nowhere).
+tab says its own; if the printer cannot be checked, "We couldn't check the printer — We don't know whether it is
+connected; nothing else is affected.", in grey and never as ready; without erplora.com's addresses the download
+buttons do not show (never a button that leads nowhere).
 Involved: BASE-F02, BASE-F39, PRINTING-F18
 
 ### PRINTING-F22 Print the receipt and open the drawer at the till that charges

@@ -516,14 +516,7 @@ def test_low_stock_lists_tracked_physical_active_articles_at_or_under_their_thre
         ("E", Decimal("5.000")),
     ]
     assert list(page.rows[0].model_dump()) == [
-        "id",
-        "name",
-        "sku",
-        "stock",
-        "low_stock_threshold",
-        "unit",
-        "price_quantity",
-        "pricing_unit",
+        "id", "name", "sku", "stock", "low_stock_threshold", "is_sold_out", "unit", "price_quantity", "pricing_unit",
     ]
     assert names(
         run("inventory.product.list_low_stock", LowStockListIn(search="c"))

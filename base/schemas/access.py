@@ -2,8 +2,12 @@
 
 from typing import Literal
 
+from django.utils.translation import gettext_lazy as _
 from ninja import Schema
-from pydantic import Field
+from pydantic import Field, ValidationInfo, field_validator
+
+#: Settings offers asking again after inactivity only with its minutes: none are made up nor the stored ones applied.
+SAY_THE_MINUTES = _("Say after how many minutes without use it asks again: 1, 5, 10, 15 or 30.")
 
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
@@ -43,6 +47,17 @@ class AccessSettingsUpdateIn(Schema):
     """Only the fields sent change (each control saves on its own); at least one."""
 
     pin_policy: Literal["always", "per_shift", "never"] | None = None
-    pin_inactivity_minutes: Literal[1, 5, 10, 15, 30] | None = None
+    pin_inactivity_minutes: Literal[1, 5, 10, 15, 30] | None = Field(
+        None,
+        validate_default=True,
+        description="Minutes without use before it asks again; needed with pin_policy always, and only used with it.",
+    )
     pin_length: Literal[4, 6] | None = None
+
+    @field_validator("pin_inactivity_minutes")
+    @classmethod
+    def _minutes_with_always(cls, minutes: int | None, info: ValidationInfo) -> int | None:
+        if minutes is None and info.data.get("pin_policy") == "always":
+            raise ValueError(str(SAY_THE_MINUTES))
+        return minutes
 

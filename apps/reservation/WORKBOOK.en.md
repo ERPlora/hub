@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3d28110da61adcd3fa0b6ab097701783e5de1da05831d245269e147dbe9bf78c -->
+<!-- generated from WORKBOOK.md sha256:6f48d4655ca204dbb967ef1ced447a8cee99154466913bb8bbea299b40e474a7 -->
 
 ## What it is for and who it is for
 
@@ -324,9 +324,10 @@ Steps:
    duration, where it was booked through and the notes. "Reserve".
 3. The reservation is born Pending (or Confirmed, if they confirm themselves: then it holds its table).
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
-   assistant's card says who it is for, by the name of their card, the day and the time ("Create in
-   Reservations: Ana García · 15 Oct 2026 · 21:00"), and carries the table with its zone, as Tables names it
-   ("5 (Terrace)": the number repeats across zones), never by a code.
+   assistant's card first says who it is for, by the name of their card (also when it was named by its phone)
+   or, without a card, by the name that was said, and only once; then the day and the time, before the phone
+   ("Create in Reservations: Ana García · Oct 15, 2026 · 9:00 PM"). It carries the table with its zone, as
+   Tables names it ("5 (Terrace)": the number repeats across zones), never by a code.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
 one typed with the card already chosen; one written with another country's prefix keeps its own. It is

@@ -503,7 +503,7 @@ Pasos:
    de hasta 2 MB).
 2. Pulsa «Guardar»: el menú queda con su foto. «Quitar foto» lo deja con sus iniciales.
 3. Por el asistente: «ponle foto al menú del día». El asistente propone hasta cinco imágenes de la
-   librería por su título y pregunta cuál; nunca pone una por su cuenta.
+   librería solo por su título, sin su código interno, y pregunta cuál; nunca pone una por su cuenta.
 Entra: el menú y la imagen elegida o la foto subida.
 Sale: el menú con su foto (avisa: menú cambiado); el TPV la enseña en su baldosa sin recargar
 (INVENTORY-F32), y la lista de menús, en su fila. La foto propia se guarda en la carpeta del negocio,

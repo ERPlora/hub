@@ -2500,3 +2500,44 @@ msgstr "Datos sensibles"
 
 msgid "This role does not exist in this business."
 msgstr "Este rol no existe en este negocio."
+
+msgid "Last used"
+msgstr "Último uso"
+
+msgid "Devices to remove"
+msgstr "Dispositivos que se quitan"
+
+msgid "Which"
+msgstr "Cuáles"
+
+msgid "No device has gone 30 days without being used, so there is nothing to remove."
+msgstr "Ningún dispositivo lleva 30 días sin usarse, así que no hay nada que quitar."
+
+msgid "Say after how many minutes without use it asks again: 1, 5, 10, 15 or 30."
+msgstr "Di tras cuántos minutos sin usar vuelve a preguntar: 1, 5, 10, 15 o 30."
+
+msgctxt "pin pad"
+msgid "Show PIN pad"
+msgstr "Mostrar pinpad"
+
+msgctxt "pin pad"
+msgid "Ask again after inactivity"
+msgstr "Volver a preguntar tras inactividad"
+
+msgctxt "pin pad"
+msgid "Until signing out"
+msgstr "Hasta cerrar sesión"
+
+#, python-format
+msgctxt "pin pad"
+msgid "%(n)s min"
+msgstr "%(n)s min"
+
+msgctxt "pin pad"
+msgid "PIN digits"
+msgstr "Dígitos del PIN"
+
+#, python-format
+msgctxt "pin pad"
+msgid "%(n)s digits"
+msgstr "%(n)s dígitos"

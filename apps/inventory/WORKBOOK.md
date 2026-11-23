@@ -751,6 +751,9 @@ Pasos:
    tienen, el primero el que menos) salen de serie; «Productos en stock» se añade con ⋮
    («Personalizar panel»), donde van agrupados bajo «Inventario». El valor sale en la moneda del
    negocio.
+4. Al asistente («¿qué me queda poco?»), la misma lista, y de cada producto si está marcado como
+   agotado. Quedarse a 0 o por debajo no lo quita del TPV, que lo sigue ofreciendo: solo deja de
+   ofrecer lo marcado con «Marcar agotado», y así lo dice el asistente.
 Entra: los productos activos, físicos y con control de stock. El valor es la suma de coste por
 saldo de los que tienen saldo positivo; un saldo negativo no resta.
 Sale: nada.
@@ -1056,7 +1059,8 @@ Pasos:
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
    panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta.
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
-   enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
+   enseña hasta cinco imágenes candidatas solo por su título, sin su código interno, y pregunta cuál;
+   nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
 Entra: el artículo y la librería de imágenes de ERPlora, la misma para todos los negocios, con el título
 y los sinónimos de cada imagen en español y en inglés.
