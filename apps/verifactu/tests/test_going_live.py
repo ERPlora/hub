@@ -10,8 +10,6 @@ Nothing here reaches the AEAT or the gateway: going live only changes the config
 fails any connection a test would open.
 """
 
-import json
-
 import pytest
 from django.utils import translation
 from live.context import system_context
@@ -28,7 +26,7 @@ from apps.verifactu.tests.conftest import (
     make_p12,
     run,
 )
-from base.tests.test_assistant_yes_for_its_card import turn_as
+from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, the_model_hears, turn_as
 from base.tests.test_services_assistant import call
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("offline")]
@@ -67,14 +65,6 @@ def ask_to_go_live(language: str = "en") -> dict:
         return turn_as(ctx_for("hub_admin", language=language), call(GO_LIVE, {}))
 
 
-def no_card_but_the_model_hears(plan: dict, code: str) -> dict:
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
-    said = json.loads(plan["append"][0]["content"])["error"]
-    assert said["code"] == code
-    return said
-
-
 def refusal_of_the_write(language: str) -> Conflict:
     """What the write answers when it is run anyway, as the API and the screen's button run it."""
     with translation.override(language), pytest.raises(Conflict) as refused:
@@ -106,10 +96,12 @@ def test_the_model_hears_what_the_write_answers_in_the_persons_language(issuer, 
     """One path: the assistant hears the refusal the API and the screen's button get, in the person's language."""
     write = refusal_of_the_write(language)
 
-    said = no_card_but_the_model_hears(ask_to_go_live(language), write.code)
+    plan = ask_to_go_live(language)
 
-    assert said["message"] == str(write)
-    assert (said["message"] != str(refusal_of_the_write("en"))) == (language == "es")
+    no_card_but_the_model_hears(plan, write.code)
+    said = the_model_hears(plan)["message"]
+    assert said == str(write)
+    assert (said != str(refusal_of_the_write("en"))) == (language == "es")
 
 
 def _untested(settings):
