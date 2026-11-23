@@ -19,7 +19,7 @@
 301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
 1060 apps/combo/queries/__init__.py ERPlora/erplora-next#74
 737 apps/combo/schemas/__init__.py ERPlora/erplora-next#74
-923 apps/combo/services.py ERPlora/erplora-next#74
+923 apps/combo/services/__init__.py ERPlora/erplora-next#74
 542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 1087 apps/customer/queries/__init__.py ERPlora/erplora-next#74
