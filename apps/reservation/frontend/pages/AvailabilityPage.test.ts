@@ -6,7 +6,8 @@ import { ConfirmDialog, DataTable } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
+import { EMPLOYEE, flush, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { blockedRow, dayOut, slotLoad, slotRow } from '../__tests__/rows';
 import BlockedDateFormModal from '../components/BlockedDateFormModal.vue';
 import SlotFormModal from '../components/SlotFormModal.vue';
@@ -74,11 +75,15 @@ describe('AvailabilityPage', () => {
     expect(s.find('reservation-availability-hours').text()).toBe('The business is closed this day (Schedules).');
   });
 
-  it('moves the occupancy to another date', async () => {
+  // The date is the app's own calendar, never the device's; the occupancy is always of a day, so it has no «Clear».
+  it('moves the occupancy to a date picked in the app’s calendar', async () => {
     const s = await setup();
     await s.show();
-    await ionValue(s.find('reservation-availability-date').element, '2026-10-17');
+    const field = s.find('reservation-availability-date').element as HTMLElement & { label?: string; value?: string; readonly?: boolean; required?: boolean };
+    expect([picked(field), field.value, field.label, field.readonly, field.required]).toEqual(['2026-10-15', '10/15/2026', 'Date', true, true]);
+    await pick(field, '2026-10-17');
     expect(s.params('reservation.availability.day')).toEqual([{ date: '2026-10-17' }]);
+    expect(field.value).toBe('10/17/2026');
   });
 
   it('lists the slots with their day, and adds and removes them', async () => {

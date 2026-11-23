@@ -58,6 +58,8 @@ export interface IssuerOut {
   province: string;
   country: string;
   source: string;
+  intra_eu_operator: boolean;
+  vat_number: string;
 }
 
 /** The hub's issuer now (server-side evidence, and what a spec that edits it gives back after). */
@@ -74,8 +76,8 @@ export async function restoreIssuer(context: BrowserContext, original: IssuerOut
     setUpIssuer = true;
     return;
   }
-  const { legal_name, tax_id, address, postal_code, city, province, country } = original;
-  const res = await api(context, A, 'POST', '/invoice/issuer', { legal_name, tax_id, address, postal_code, city, province, country });
+  const { legal_name, tax_id, address, postal_code, city, province, country, intra_eu_operator } = original;
+  const res = await api(context, A, 'POST', '/invoice/issuer', { legal_name, tax_id, address, postal_code, city, province, country, intra_eu_operator });
   expect(res.status, 'the issuer back as it was').toBe(200);
 }
 
@@ -150,6 +152,19 @@ export async function deliver(context: BrowserContext, name: keyof typeof REACTI
   expect(res.data.invoice, `${name} issued a document`).not.toBeNull();
   issuedIds.add(res.data.invoice!.id);
   return res.data.invoice!;
+}
+
+/** A manual invoice issued through the API (INVOICE-F03), recorded for `cleanInvoices()`. */
+export async function issueManualInvoice(context: BrowserContext, customerName = 'e2e Talleres Pérez SL'): Promise<InvoiceOut> {
+  const created = await api<InvoiceOut>(context, A, 'POST', '/invoice/invoices', {
+    customer_name: customerName,
+    customer_tax_id: '12345678Z',
+    customer_address: 'Calle Sol 5, Madrid',
+    lines: [{ description: 'e2e Course', quantity: '1', unit_price: 1000, tax_rate: '21' }],
+  });
+  expect(created.status, JSON.stringify(created.data)).toBe(201);
+  issuedIds.add(created.data.id);
+  return created.data;
 }
 
 /** A document read back (server-side evidence). */

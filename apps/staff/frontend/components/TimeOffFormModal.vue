@@ -4,9 +4,9 @@
 // The old form: Type (Vacation to begin with), From, To, Full day and, when off, the hours, and
 // Reason. The server judges (an overlap is its 409; a bad range, its 422 under the field); the dialog
 // keeps what was typed. The new request comes back through the stream, Pending.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField, FormModal, TimeField } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
-import { IonInput, IonSelect, IonSelectOption, IonTextarea, IonToggle } from '@ionic/vue';
+import { IonSelect, IonSelectOption, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
@@ -149,31 +149,23 @@ async function save(): Promise<void> {
           </ion-select-option>
         </ion-select>
         <div class="staff-time-off-form__pair">
-          <ion-input
-            data-testid="staff-time-off-form-start_date"
+          <DateField
+            testid="staff-time-off-form-start_date"
             name="start_date"
-            type="date"
-            :value="form.start_date"
+            :model-value="form.start_date"
             :label="$t('staff.timeOff.form.startDate')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.start_date"
-            :class="invalid(fieldErrors.start_date)"
-            @ion-input="set('start_date', text($event.detail.value))"
+            @update:model-value="set('start_date', $event)"
           />
-          <ion-input
-            data-testid="staff-time-off-form-end_date"
+          <DateField
+            testid="staff-time-off-form-end_date"
             name="end_date"
-            type="date"
-            :value="form.end_date"
+            :model-value="form.end_date"
             :label="$t('staff.timeOff.form.endDate')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.end_date"
-            :class="invalid(fieldErrors.end_date)"
-            @ion-input="set('end_date', text($event.detail.value))"
+            @update:model-value="set('end_date', $event)"
           />
         </div>
         <ion-toggle
@@ -189,31 +181,23 @@ async function save(): Promise<void> {
           v-if="!form.is_full_day"
           class="staff-time-off-form__pair"
         >
-          <ion-input
-            data-testid="staff-time-off-form-start_time"
+          <TimeField
+            testid="staff-time-off-form-start_time"
             name="start_time"
-            type="time"
-            :value="form.start_time"
+            :model-value="form.start_time"
             :label="$t('staff.timeOff.form.startTime')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.start_time"
-            :class="invalid(fieldErrors.start_time)"
-            @ion-input="set('start_time', text($event.detail.value))"
+            @update:model-value="set('start_time', $event)"
           />
-          <ion-input
-            data-testid="staff-time-off-form-end_time"
+          <TimeField
+            testid="staff-time-off-form-end_time"
             name="end_time"
-            type="time"
-            :value="form.end_time"
+            :model-value="form.end_time"
             :label="$t('staff.timeOff.form.endTime')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.end_time"
-            :class="invalid(fieldErrors.end_time)"
-            @ion-input="set('end_time', text($event.detail.value))"
+            @update:model-value="set('end_time', $event)"
           />
         </div>
         <ion-textarea

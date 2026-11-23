@@ -9,6 +9,7 @@
 import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { expectAmountLeftWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -17,7 +18,7 @@ import type { MethodOut, PaymentOut } from '../operations';
 import { business, click, errorFrame, ionValue, JAPANESE, mountPayment, page, POLISH, RECORDER, settle } from '../__tests__/mount-payment';
 import PaymentFormModal from './PaymentFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; placeholder?: string };
+type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; placeholder?: string; readonly?: boolean; required?: boolean };
 
 const METHODS = 'payment.method.list';
 const method = (id: string, name: string): MethodOut => ({
@@ -67,7 +68,8 @@ describe('PaymentFormModal', () => {
       'Beneficiary IBAN',
       'Supplier invoice',
     ]);
-    expect(s.field('date').value).toBe(localDay());
+    // The day is the app's own calendar (never the device's), and a payment always has one.
+    expect([picked(s.field('date')), s.field('date').readonly, s.field('date').required]).toEqual([localDay(), true, true]);
     expect(s.field('method').placeholder).toBe('Method…');
     expect([...s.field('method').querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toEqual([
       'BBVA account',
@@ -82,7 +84,8 @@ describe('PaymentFormModal', () => {
     await s.result(METHODS, page([BANK, CASH]));
     s.answer(201, CREATED);
     await s.fill();
-    await ionValue(s.field('date'), '2026-10-10', 'ionInput');
+    await pick(s.field('date'), '2026-10-10');
+    expect(s.field('date').value).toBe('10/10/2026');
     await ionValue(s.field('concept'), 'Tintes', 'ionInput');
     await ionValue(s.field('invoice'), 'F-118', 'ionInput');
     await click(s.save());

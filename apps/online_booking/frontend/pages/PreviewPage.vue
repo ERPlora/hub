@@ -5,7 +5,7 @@
 // paints it. It is the public booking page itself when that page gives it base's public door (`PUBLIC_DOOR`: the
 // calls, the money and the customer's words); without it, the team's preview on the dev server (routes.ts; WORKBOOK
 // «Vista previa de la reserva»), through the session.
-import { EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
+import { DateField, EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
@@ -289,15 +289,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
               </ion-select-option>
             </ion-select>
 
-            <ion-input
-              data-testid="ob-preview-day"
-              type="date"
-              :value="day"
+            <DateField
+              v-model="day"
+              testid="ob-preview-day"
               :label="$t('online_booking.preview.day')"
-              label-placement="floating"
-              fill="outline"
-              mode="md"
-              @ion-change="day = text($event.detail.value); changed('start')"
+              @update:model-value="changed('start')"
             />
 
             <template v-if="chosen.length && day">

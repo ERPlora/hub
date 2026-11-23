@@ -232,8 +232,7 @@ que ya tenía ese número.
 Si falla: el motivo sale debajo de su campo y lo tecleado se conserva. Un email mal formado: «Escribe
 un email válido.». Un teléfono que no es un número de su país: «No es un teléfono válido de su país:
 revisa las cifras o escríbelo con su prefijo internacional (+44…).». Un país que no existe: «Elige
-un país de la lista.». Una fecha que no existe en «Cumpleaños» o «Aniversario» (un 31/02): «Introduce
-una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
+un país de la lista.». No se guarda nada. Los campos personalizados no se piden en el alta.
 Implicados: WHATSAPP_INBOX-F04, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las fichas que se perdieron, cada una por esta misma alta, con sus grupos y etiquetas, CUSTOMER-F06, y sus campos propios, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Buscar y filtrar fichas
@@ -303,9 +302,8 @@ Sale: la ficha y sus campos guardados en una sola escritura, y el aviso de ficha
 corregido. Guardar sin cambiar nada no avisa a nadie. El consentimiento queda anotado con la
 dirección para la que se dio: cambiar el teléfono o el email no lo traslada (CUSTOMER-F14).
 Si falla: un campo obligatorio vacío («Este campo es obligatorio.»), un valor que no encaja con su
-tipo («Introduce un número.» si se escribe «tres» en un número, «Introduce una fecha válida.» si la
-fecha no existe, como un 31/02, también en «Cumpleaños» y «Aniversario», «Elige una de las
-opciones.»), un campo que ya no existe o un teléfono que no es de su país rechazan TODO el guardado:
+tipo («Introduce un número.» si se escribe «tres» en un número, «Elige una de las opciones.»), un
+campo que ya no existe o un teléfono que no es de su país rechazan TODO el guardado:
 el motivo sale junto a su campo y la ficha conserva lo que tenía guardado. La casilla «Activo»
 desmarcada solo cambia la cifra «Activos»: la ficha sigue saliendo en búsquedas, en el TPV y en
 WhatsApp.
