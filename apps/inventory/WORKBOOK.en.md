@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0fb3cd5cb1aaf8aa07647f4d89411213468646fb8f32e5346114dd5ee83f7ac9 -->
+<!-- generated from WORKBOOK.md sha256:67aaffa7b3e69eb7f9cf38a6e26034ea9dcccc6c761bb70c2ff08b7c6690aaea -->
 
 ## What it is for and who it is for
 
@@ -385,6 +385,9 @@ The tax category cannot be emptied: the field has no empty option. The unit of a
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.". Changing the cost belongs to whoever sees the costs: it is refused to someone who does not see
 them as an operation they may not run, and the rest of a change without a cost is saved.
+If, when the panel opens, the business's currency, the tax categories or the categories cannot be read, each field
+says so with the reason, also while the connection recovers by itself; the currency also with "Retry". What the product
+has saved is not lost: saving sends only what was changed.
 Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119
 
 ### INVENTORY-F03 Turn a product on and off

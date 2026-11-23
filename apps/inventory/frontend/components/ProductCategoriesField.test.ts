@@ -162,6 +162,28 @@ describe('ProductCategoriesField', () => {
     expect(error.text()).toContain('msg permission_denied');
   });
 
+  it('says so while the stream tries again after a failure heard before the first page arrived', async () => {
+    const m = await mountInventory(ProductCategoriesField, { props: { modelValue: ['c1'], testid: 'cat' } });
+    await m.cannotOpen();
+    expect(m.client.stream.status()).toBe('reconnecting');
+    expect(m.wrapper.find('[data-testid="cat-error"]').text()).toContain('The categories could not be loaded');
+  });
+
+  it('keeps its chips without a word while the stream tries again over a first page it already has', async () => {
+    const s = await setup(['c1']);
+    await s.falls(s.call);
+    expect([s.client.stream.status(), s.net.opened.length > 1]).toEqual(['reconnecting', true]);
+    expect(s.chips()).toEqual(['Drinks']);
+    expect(s.wrapper.find('[data-testid="cat-error"]').exists()).toBe(false);
+  });
+
+  it('a business without categories stays without the field and without a word while the stream tries again', async () => {
+    const s = await setup([], { first: page([], 0, 100) });
+    await s.falls(s.call);
+    expect([s.client.stream.status(), s.net.opened.length > 1]).toEqual(['reconnecting', true]);
+    expect([s.combo().exists(), s.wrapper.find('[data-testid="cat-error"]').exists()]).toEqual([false, false]);
+  });
+
   it('paints the error the server gave the field', async () => {
     const s = await setup();
     await s.wrapper.setProps({ errorText: 'That category does not exist.' });
