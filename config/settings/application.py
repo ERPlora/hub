@@ -57,9 +57,9 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
     # The language a person chose in this request (base.profile.preferences_set, from any door) leaves its cookie.
     "base.chosen_language.ChosenLanguageMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     # A business's own domain (HUBS-F17) answers here, before the Host is refused: only its website, by no other gate.
     "base.middleware.CustomDomainMiddleware",
     "django.middleware.common.CommonMiddleware",
