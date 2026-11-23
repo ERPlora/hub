@@ -931,8 +931,9 @@ agenda tuya que enseñar.».
   una clienta, los avisos, la campana, los carriles, las series y Reservas online leen por `APPOINTMENTS.visible(ctx)`
   o `SERIES.visible(ctx)`, y las órdenes buscan la cita o la serie igual (`find_appointment`, `find_series`): la de
   otro profesional da el mismo 404 (`appointment.appointment_not_found`, `appointment.recurring_not_found`) que una
-  que no existe. Quien no es una persona no tiene «suyas»: lee todas las que abre su permiso (una llave de API
-  abierta sobre la lista de citas antes leía la agenda vacía). Que una hora está ocupada no abre ninguna cita: a quien
+  que no existe. Una llave de API lee como quien la creó (BASE-F125). Quien no tiene a nadie detrás (una
+  automatización, la plataforma) no tiene «suyas»: lee todas las que abre su permiso. Que una hora está ocupada no
+  abre ninguna cita: a quien
   comprueba una hora se le dice de quién es solo si ve esa agenda, la suya o con `view_appointment`, y a quien no es
   una persona, solo con `view_appointment` (`sees_whose`). `tests/test_guardrails_ownership.py` prohíbe
   `Appointment.objects` y `Recurring.objects` en los paquetes `queries` fuera de su lista cerrada, cada una con su
