@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3b55c34ad79ead9c0f5abc6f9f41ae744dce374d390eeb8f486329b36c459322 -->
+<!-- generated from WORKBOOK.md sha256:3466d0d5987ad8f9ecdbfc41989c0583f7e284d5c7ef5e265feefa5d98323961 -->
 
 ## What it is for and who it is for
 
@@ -260,8 +260,9 @@ Steps:
 1. From **Customers**, tap the row.
 2. The card shows all its details (also internal notes, birthday, anniversary and custom fields), its
    groups and tags, its consent per channel, the
-   activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
-   name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   activity (newest first, 50 per page; each entry says when and who: the person by their name or, if their
+   account has none, by what goes before the @ of their email, never the whole email; the API key by its
+   own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
    email, the phone and the address each consent was given for, only to whoever sees the customers' contact
    details.
@@ -271,7 +272,7 @@ Out: nothing; read only. If another person changes it while it is open, the chan
 reloading.
 If it fails: "This customer is no longer available." if it was deleted, merged into another or its data
 was erased.
-Involved: CUSTOMER-F24
+Involved: CUSTOMER-F24, BASE-F119
 
 ### CUSTOMER-F04 Edit the card and its custom fields
 Status: done

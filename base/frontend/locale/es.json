@@ -795,7 +795,10 @@
       "adminOnly": "Solo un administrador puede cambiar cómo entra la gente en este dispositivo.",
       "unknown": "Este navegador todavía no es un dispositivo del negocio: entra una vez aquí con tu cuenta y podrás elegir.",
       "failed": "No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
-      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo."
+      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
+      "autostart": "Arrancar al iniciar sesión",
+      "autostartHelp": "Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre tengan dónde imprimirse.",
+      "autostartFailed": "No se pudo cambiar el ajuste de arranque al iniciar sesión."
     },
     "pinPolicy": {
       "title": "Pinpad",
@@ -916,6 +919,20 @@
       "empty": "Este negocio no tiene roles.",
       "error": "No se pudo cargar el catálogo de roles.",
       "change": "Cambiar roles en erplora.com"
+    },
+    "role": {
+      "title": "Qué permite",
+      "intro": "Lo que este rol deja hacer en este negocio, app por app. Se da en erplora.com y aquí no se cambia.",
+      "members": "Personas con este rol: {n}",
+      "loading": "Cargando lo que permite este rol…",
+      "error": "No se pudo cargar lo que permite este rol.",
+      "retry": "Reintentar",
+      "notFound": "Este rol no existe en este negocio.",
+      "state": {
+        "on": "Permitido",
+        "approval": "Con aprobación",
+        "off": "No"
+      }
     },
     "person": {
       "title": "Persona",

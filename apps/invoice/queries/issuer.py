@@ -3,13 +3,13 @@
 from live.context import OperationContext
 from live.operations import operation
 
+from apps.invoice.document_issuer import printed_issuer
 from apps.invoice.models import Issuer
 from apps.invoice.schemas import IssuerGetIn, IssuerOut
 
 
 def issuer_row(issuer: Issuer | None) -> dict:
-    """An ``IssuerOut``; an empty one while nothing is set up."""
-    updated = issuer.updated_at if issuer is not None else None
+    """An ``IssuerOut``; an empty one while nothing is set up (never saved: no ``updated_at``)."""
     issuer = issuer or Issuer(legal_name="", tax_id="", address="")
     return {
         "configured": issuer.configured,
@@ -24,7 +24,8 @@ def issuer_row(issuer: Issuer | None) -> dict:
         "source": issuer.source,
         "synced_version": issuer.synced_version,
         "synced_at": issuer.synced_at,
-        "updated_at": updated,
+        "updated_at": issuer.updated_at,
+        **printed_issuer(issuer),
     }
 
 

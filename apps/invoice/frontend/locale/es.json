@@ -308,7 +308,9 @@
         "postalCode": "Código postal",
         "city": "Ciudad",
         "province": "Provincia",
-        "country": "País"
+        "country": "País",
+        "intraEuOperator": "Inscrito en el ROI (operaciones intracomunitarias)",
+        "intraEuOperatorHelp": "Tus facturas y tiques imprimirán tu NIF con el prefijo de tu país (ES…). VeriFactu lo sigue recibiendo sin prefijo."
       },
       "save": "Guardar",
       "saved": "Emisor guardado.",

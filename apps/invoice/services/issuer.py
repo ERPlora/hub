@@ -36,6 +36,7 @@ def _save_issuer(ctx: OperationContext, data: IssuerIn, **extra) -> Issuer:
         "city": data.city,
         "province": data.province,
         "country": data.country,
+        "intra_eu_operator": data.intra_eu_operator,
         "updated_by": actor(ctx),
         **extra,
     }
@@ -65,7 +66,8 @@ def _save_issuer(ctx: OperationContext, data: IssuerIn, **extra) -> Issuer:
             ),
         },
         "description": "Set the issuer of the invoices: the business's legal name, tax ID (a Spanish NIF or CIF is "
-        "checked) and address. Every document issued from now on carries it; the ones issued keep theirs.",
+        "checked), address and whether it is registered for intra-EU operations (ROI), which makes its documents "
+        "print its EU VAT number. Every document issued from now on carries it; the ones issued keep theirs.",
         "risk": "high",
     },
 )
@@ -110,6 +112,7 @@ def _issuer_copy(issuer: Issuer) -> dict:
         "issuer_tax_id": issuer.tax_id,
         "issuer_address": issuer.address_line,
         "issuer_country": issuer.country,
+        "issuer_intra_eu_operator": issuer.intra_eu_operator,
     }
 
 
@@ -119,4 +122,5 @@ def _issuer_of(invoice: Invoice) -> dict:
         "issuer_tax_id": invoice.issuer_tax_id,
         "issuer_address": invoice.issuer_address,
         "issuer_country": invoice.issuer_country,
+        "issuer_intra_eu_operator": invoice.issuer_intra_eu_operator,
     }

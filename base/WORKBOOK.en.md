@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7aeb7ef27c16129dbf89bad4589aa123ca8432a0d4a452d516438772c0466ec5 -->
+<!-- generated from WORKBOOK.md sha256:2f0d3f81fab33e5504b94cecb3bc0e9a47a514add07ca66e5d04a3df8fc91007 -->
 
 ## What it is for and who it is for
 
@@ -214,8 +214,9 @@ photo), "Preferences" (language and appearance: palette, theme and interface siz
 "PIN".
 
 ### Settings · General
-What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad",
-for whoever runs the business "Devices" and, at the end, "API documentation".
+What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device" (in the
+ERPlora app on a computer, also "Start on login"), "PIN pad", for whoever runs the business "Devices" and, at the
+end, "API documentation".
 
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
@@ -241,7 +242,11 @@ Employees.
 
 ### Employees · Roles
 The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
-give.
+give. Tapping one opens "What it allows".
+
+### Employees · Roles · What it allows
+A basic role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
+and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
 The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
@@ -281,8 +286,8 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 |---|---|
 | Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
-| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
-| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
+| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". In the app on a computer, "Could not change the start on login setting." (BASE-F120). |
+| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks."), except "Start on login", which belongs to the computer and not to the business, and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
 
@@ -324,9 +329,9 @@ On the Employees screens and the API documentation:
 
 | State | What the person sees |
 |---|---|
-| Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; the faces in grey in "An approval is needed"; "Loading the documentation…". |
+| Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; "Loading what this role allows…" in "What it allows"; the faces in grey in "An approval is needed"; "Loading the documentation…". |
 | Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "Nobody has had to approve anything in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
-| Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
+| Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load what this role allows.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
@@ -413,7 +418,7 @@ On the Employees screens and the API documentation:
 | BASE-F79 | Give a person a badge or take it away | done |
 | BASE-F80 | Bring back a person who left the business | done |
 | BASE-F81 | Understand how each person gets in | done |
-| BASE-F82 | See the business's roles | done |
+| BASE-F82 | See the business's roles and what each one allows | done |
 | BASE-F83 | Give a person a role | done |
 | BASE-F84 | Approve with a manager's PIN | done |
 | BASE-F85 | Look up who approved what | done |
@@ -451,6 +456,7 @@ On the Employees screens and the API documentation:
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
+| BASE-F120 | Start ERPlora on signing in to the computer | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2204,25 +2210,34 @@ Out: nothing saved. It updates by itself when somebody chooses or loses their PI
 If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
-### BASE-F82 See the business's roles
+### BASE-F82 See the business's roles and what each one allows
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
-Screen: Employees · Roles
+Screen: Employees · Roles; Employees · Roles · What it allows
 Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
   2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
-     available", how many people have it and how many permissions it gives. It is always these five, erplora.com's:
-     no app adds roles of its own; each app says what each of them can do in it.
+     available", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
+     each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
+     features call for it.
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
      change any setting, and it takes no place of the plan (BASE-F77).
-  4. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
-In: the roles and the people of the business.
+  4. Tapping a role opens "What it allows", with the role's name at the top, "What this role lets a person do in this
+     business, app by app. It is given on erplora.com and is not changed here." and "People with this role: 2".
+     Below, a panel per app: "The business" first, then each app that is on by its name and "Sensitive data" last.
+     In each panel, the phrase of each permission and its state: "Allowed", "With approval" (the person does it if a
+     manager approves it with their PIN there and then, BASE-F84) or "No". For example, the employee sees in "Sales
+     & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
+     changed here.
+  5. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
+In: the roles, the people of the business, the apps that are on and what each app gives each role.
 Out: nothing saved.
-If it fails: "The roles could not be loaded." with "Retry".
-Involved: BASE-F83
+If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
+allows." with "Retry", and a role that is not one of the five, "This role does not exist in this business.".
+Involved: BASE-F83, BASE-F84
 
 ### BASE-F83 Give a person a role
 Status: done
@@ -3437,3 +3452,20 @@ If it fails: a request through the API or to the assistant that filters or sorts
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
 Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+
+### BASE-F120 Start ERPlora on signing in to the computer
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Settings · General
+Steps:
+  1. In the ERPlora app on a computer, **Settings › General** carries under "This device" the switch "Start on
+     login" ("Open ERPlora when you sign in to this computer, so tickets always have somewhere to print."), off
+     from the factory. In a browser and in the Android app it does not show.
+  2. When it is moved, the Hub asks the app, which records it in the system and reads back what the system says
+     (HUB_APP-F27); meanwhile the switch waits.
+  3. The switch stays where the system says, not where it was moved.
+In: the switch, on the computer itself.
+Out: the system's start-up of this computer, not of the business. Nothing is saved in the Hub.
+If it fails: below it, "Could not change the start on login setting.", and the switch goes back to what the
+system says. An app older than this command does not show it.
+Involved: HUB_APP-F27 (ERPlora/app), BASE-F62

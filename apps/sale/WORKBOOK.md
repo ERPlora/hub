@@ -883,7 +883,7 @@ Impresión.». Una línea ya enviada no se puede quitar: «Esa línea ya no se p
 (anúlala con un motivo), ya está cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Por el asistente: su tarjeta de confirmación dice la cuenta (por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97).
+Por el asistente: su tarjeta de confirmación dice la cuenta (la de una mesa, por la mesa como la dice Mesas y en el idioma de quien lee, «4 (Comedor)»; otra, o sin poder ver Mesas, por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97). Un producto pedido con palabras sale como el que se va a añadir: «dos cafés» con «Espresso» y «White coffee» en la carta dice «2 · White coffee · 4 (Comedor)»; si las palabras valen para varios productos o para ninguno, salen tal como se dijeron y al confirmar no se añade nada: el asistente pregunta cuál.
 Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
@@ -893,7 +893,8 @@ Actor: empleado, responsable
 Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
-2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con la «Cabecera del recibo»
+2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con el prefijo de su país si está
+   inscrito en el ROI, y con la «Cabecera del recibo»
    debajo; sin emisor, la cabecera del recibo hace de nombre y domicilio), las líneas, notas,
    descuentos, el desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tique
    fiscal se entrega al cobrar.». Con descuento en la cuenta, la fila «Descuento» dice lo que quita (el
@@ -912,7 +913,7 @@ el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; s
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09, TABLE-F34
+Implicados: PRINTING-F09, TABLE-F34, INVOICE-F21
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho
@@ -1117,7 +1118,8 @@ Pasos:
 1. En **Ventas**, toca la fila o la acción «Documento»; también se abre solo tras cobrar, la cuenta
    entera o una parte.
 2. Se ve el tique («Tique», o «Factura» si se cobró como factura). Arriba, el negocio: nombre, domicilio
-   y NIF del emisor (un duplicado dice lo mismo que el original, aunque el emisor cambie después), con la
+   y NIF del emisor, con el prefijo de su país si está inscrito en el ROI (un duplicado dice lo mismo que
+   el original, aunque el emisor cambie después), con la
    «Cabecera del recibo» debajo. Sin emisor configurado, la primera línea de la cabecera es el nombre y el
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
@@ -1160,7 +1162,7 @@ abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir 
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.». Una venta que la persona no ve (la
 de otro, para un empleado) no se abre, no se reimprime ni se emite: la ventana dice «Error cargando el
 documento» y la API o el asistente, «Esa venta no existe.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho
@@ -1665,7 +1667,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Mesas** (opcional): «Elegir mesa» del TPV (F19) habla con Mesas solo por el nombre de sus
   operaciones, desde la pantalla y con la sesión de quien atiende: `table.table.list` y
   `table.floor.status` (las mesas), `table.session.by_order` (la mesa de la cuenta), `table.session.open`
-  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón.
+  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón. La tarjeta del asistente
+  dice la cuenta de una mesa por su mesa con `table.session.by_order`, como quien pregunta; sin Mesas, o sin
+  permiso de ver sus cuentas, por su título.
 - **Citas** (opcional): la cita de una cuenta y lo que reservó, para cobrar su precio reservado
   (`appointment.appointment.get`).
 

@@ -9,7 +9,7 @@ from django.utils.formats import date_format
 from django.utils.translation import gettext, pgettext_lazy
 from django.utils.translation import gettext_lazy as _
 
-from apps.invoice.document_issuer import issuer_vat_number
+from apps.invoice.document_issuer import document_issuer
 from apps.invoice.models import Invoice
 from apps.invoice.queries.rows import _loaded
 from base.business import money_text
@@ -99,7 +99,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     discounted = any(line.discount_amount for line in lines)
     context = {
         "invoice": invoice,
-        "issuer_vat_number": issuer_vat_number(invoice.issuer_tax_id, invoice.issuer_country),
+        "issuer_vat_number": document_issuer(invoice)["issuer_vat_number"],
         "language": language,
         "title": title,
         "duplicate": duplicate,

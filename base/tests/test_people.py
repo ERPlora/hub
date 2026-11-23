@@ -437,6 +437,7 @@ PEOPLE_ROUTES = {
     ("POST", "/people/badge", "base.person.badge_set"),
     ("POST", "/people/badge/remove", "base.person.badge_remove"),
     ("GET", "/roles", "base.role.list"),
+    ("GET", "/roles/detail", "base.role.detail"),
     ("GET", "/access/grantors", "base.access.grantors"),
 }
 

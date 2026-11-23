@@ -199,13 +199,15 @@ la numeración de otro sistema.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
 ### Emisor
-Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo. Sin ellos no se
-emite ningún tique ni factura. Solo el propietario y el administrador ven esta pestaña y
+Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo, y si está
+inscrito en el ROI. Sin ellos no se emite ningún tique ni factura. Solo el propietario y el administrador ven esta pestaña y
 los cambian.
 
 #### Detalle
 Menú **Facturación → Emisor**. «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad»,
-«Provincia» y «País», y «Guardar». Arriba, si aún no está completo, «Sin el emisor no se puede emitir
+«Provincia» y «País»; la casilla «Inscrito en el ROI (operaciones intracomunitarias)», apagada de entrada, con
+«Tus facturas y tiques imprimirán tu NIF con el prefijo de tu país (ES…). VeriFactu lo sigue recibiendo sin
+prefijo.» debajo; y «Guardar». Arriba, si aún no está completo, «Sin el emisor no se puede emitir
 ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu cuenta de ERPlora el
 {fecha}.». Solo lo cambian el propietario y el administrador; el resto lo ve sin poder editar.
 
@@ -717,7 +719,7 @@ Pasos:
    instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
    trabajo llamado, por ejemplo, «Factura FACT-2026-000003») con la factura en A4 (con VeriFactu, arriba el QR del registro con
    «QR tributario:» y
-   «VERI*FACTU»; emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
+   «VERI*FACTU»; emisor, con su NIF-IVA si está inscrito en el ROI, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
    nunca sale sin su QR.
 4. Siempre en el idioma de quien imprime. Un documento de una venta sale como «Copia» (el original fue
@@ -729,7 +731,7 @@ factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su p
 aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
 «…: el servicio de impresión del dispositivo no se abrió»…). La de otro, para un empleado, ni se imprime ni
 se descarga: la API y el asistente dicen «Factura no encontrada.».
-Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF)
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F21
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
@@ -780,16 +782,20 @@ Pasos:
    aviso «Todavía no puedes facturar» de la campana, que sale en cualquier pantalla mientras no hay emisor (a quien
    no puede cambiar el emisor, el aviso le dice «Esto lo tiene que configurar un administrador.», sin botón).
 3. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
-   (España de entrada).
+   (España de entrada). Si el negocio está inscrito en el Registro de Operadores Intracomunitarios, enciende
+   «Inscrito en el ROI (operaciones intracomunitarias)»; el NIF se sigue escribiendo sin prefijo.
 4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso desaparece de la campana y el paso del Inicio queda «Hecho»,
    sin recargar y también en los demás dispositivos.
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
-avisa `invoice.issuer.updated`.
+avisa `invoice.issuer.updated`. Con «Inscrito en el ROI» encendido, la factura en pantalla, su A4 (PDF), el tique
+y la cuenta imprimen el NIF con el prefijo del país del emisor («NIF: ESB12345674»), también en las ventas
+nacionales; apagado, el NIF tal cual. Un documento ya emitido se reimprime como salió. El registro de VeriFactu y
+el QR siguen siempre con el NIF sin prefijo.
 Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
 es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
 también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento.
-Implicados: ninguno
+Implicados: INVOICE-F18, SALE-F21, SALE-F29
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 Estado: hecho
@@ -1151,10 +1157,14 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   rechaza), `issuer_vat_number`, el que imprimen el A4 y la pantalla. Un emisor inscrito en el ROI imprime su
   NIF-IVA con el prefijo de su país (`ESB27593136`; Grecia, `EL`; un NIF que ya lo trae no lo duplica) en todas
   sus facturas, también las nacionales; cualquier otro, su NIF tal cual. La composición es una sola,
-  `vat_number` de `apps/customer/tax_ids.py`, la misma que escribe el NIF-IVA de un destinatario. El Hub no
-  guarda la inscripción en el ROI de ningún negocio: solo sabe la de ERPlora, que está inscrita, por el NIF del
-  emisor de plataforma (`PLATFORM_ISSUER_TAX_ID`). La etiqueta sigue siendo «NIF» («Tax ID»). Que un negocio
-  diga que está en el ROI, y que su tique lo imprima también, es hub#1723.
+  `vat_number` de `apps/customer/tax_ids.py`, la misma que escribe el NIF-IVA de un destinatario. Un negocio dice
+  que está inscrito con la casilla del emisor (`Issuer.intra_eu_operator`, INVOICE-F21) y cada documento guarda la
+  marca con su copia del emisor (`Invoice.issuer_intra_eu_operator`; una rectificativa, la de su original), así que
+  una copia se imprime como se emitió. ERPlora lo está siempre: se reconoce por el NIF del emisor de plataforma
+  (`PLATFORM_ISSUER_TAX_ID`). `IssuerOut` lleva la marca y `vat_number`, el NIF tal como lo imprimen los
+  documentos; el tique y la cuenta de Ventas (`sale.letterhead.get`) leen ese o el `issuer_vat_number` de su
+  documento. La etiqueta sigue siendo «NIF» («Tax ID»). Se marca en el Hub y no llega de la cuenta de erplora.com
+  porque los datos fiscales del negocio viven en el Hub y la cuenta solo guarda a quien paga ERPlora.
 - **Contrato con VeriFactu** (`apps/verifactu`, `requires=["invoice"]`; su WORKBOOK, «Contrato con
   Facturación»): `_issue`, tras escribir el documento y su aviso y **dentro de la misma transacción**, llama
   por nombre a `verifactu.record.create` con `{"invoice_id": …}` y la misma sesión, en su savepoint. La

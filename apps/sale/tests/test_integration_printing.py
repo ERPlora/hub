@@ -260,6 +260,18 @@ def test_a_role_that_sells_without_reading_invoicing_still_prints_who_the_busine
     assert (job.document["business_name"], job.document["vat_number"]) == (ISSUER["legal_name"], ISSUER["tax_id"])
 
 
+def test_the_ticket_of_a_business_in_the_roi_prints_its_eu_vat_number_and_its_reprint_too(bar, till):
+    """INVOICE-F21: with the issuer registered for intra-EU operations the printed ticket says «ESB12345674»; its QR
+    keeps the bare tax ID, and a copy printed after the mark is taken off says what the original said."""
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": True})
+    out = charge("sale-print-roi")
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": False})
+    run("sale.sale.print", {"sale_id": str(out.id), "duplicate": True})
+    original, copy = jobs()
+    assert [original.document["vat_number"], copy.document["vat_number"]] == ["ESB12345674", "ESB12345674"]
+    assert "nif=B12345674&" in original.document["qr_data"]
+
+
 def test_a_reprint_says_what_its_document_says_whatever_the_issuer_becomes(bar, till):
     """hub#458: a copy names the issuer of the original, as on screen."""
     out = charge("sale-print-reprint")

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bad5ad64910700ead4654fd2a2d45631515788a22a45390de3abb575f65d2349 -->
+<!-- generated from WORKBOOK.md sha256:ccc2b0ff32c776299e7691fe7faf498ff88865fa203e4b3aab379f6223559342 -->
 
 ## What it is for and who it is for
 
@@ -119,15 +119,15 @@ professional**, also **Day · Week**.
 - **Add appointment** button → **New appointment**: Customer (search "Search by name, phone, email…"; if they
   are not there, **+ New customer** creates them with name and phone without leaving), Services (one or
   more, in order), Professional (only those who perform all those services), Day, Time (with the **Free
-  times** as buttons), Min. (the sum of the durations, changeable), Notes for the customer and Internal
-  notes. Min. and the **Total** come with the professional's own duration and price for each service
-  (Services, "Professionals who perform it"), or the catalogue's if they have none; it is what the
+  times** as buttons), "Duration (min)" (the sum of the durations, changeable), Notes for the customer and
+  Internal notes. "Duration (min)" and the **Total** come with the professional's own duration and price for
+  each service (Services, "Professionals who perform it"), or the catalogue's if they have none; it is what the
   appointment books. Amounts are in the business's currency, its country's, with its decimals (BASE-F50:
   "65,00 zł" in a business in Poland; "—" while the business has not answered, never in euros or with guessed
   decimals) and are grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
   Notices: "This appointment starts in the past. It will be saved at that time." and the professional who
   does not perform a service.
-- **Edit** → **Edit appointment**: Day, Time, Min., Services, Professional, the notes and **Save
+- **Edit** → **Edit appointment**: Day, Time, "Duration (min)", Services, Professional, the notes and **Save
   changes**; below, the history. The customer is not changed.
 - Dialogs: **Overlapping appointment** (**Book anyway** / **Pick another time**), **Edit repeating
   appointment** (**This appointment only** / **This and all following appointments**), **Cancel the
@@ -138,7 +138,7 @@ Third segment of the Agenda. Table: Customer, Service, Professional, Repeats (fo
 week · Monday · 11:00"), Starts, Ends ("No end", "After {n} appointments" or the date) and **Active**
 (switch). On each row: **Edit series**, **Book appointments** and **Delete** (asks for confirmation). The
 add button opens **New repeating appointment** (Customer, Services, Professional, Repeats, Day of the
-week, Starts on, Time, Min., "Ends on (optional)", "Number of appointments (optional)") with **Create
+week, Starts on, Time, "Duration (min)", "Ends on (optional)", "Number of appointments (optional)") with **Create
 repeating appointment**; editing opens **Edit repeating appointment** with "From" and **Save from this
 occurrence on**; the search is "Search customer or service…". After booking, only what happened shows: "{n}
 appointments booked" and, if any did not fit, "{n} could not be booked" with each date and its reason (if
@@ -238,7 +238,7 @@ Steps:
 2. Pick the customer (searched by name, phone or email, and by phone or email only by whoever sees the customers'
    contact details; if they are not there, **+ New customer** creates them with name and phone), one or more services and the professional. With services picked, only the
    professionals who are **Active and Bookable and perform all of them** show; if a service has nobody
-   assigned, for that service the whole bookable team counts. "Min." is filled in with the sum of the
+   assigned, for that service the whole bookable team counts. "Duration (min)" is filled in with the sum of the
    durations (the professional's own if they have one, otherwise the catalogue's).
 3. Type the day and tap one of the **Free times** (or type another time).
 4. Tap **Add appointment**. If the business allows overlaps and that time clashes with another appointment
@@ -313,7 +313,7 @@ Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
 1. Tap **Edit** (or tap the appointment in "By professional"): "Edit appointment" opens.
-2. Change Day, Time, Min., Services or Professional and tap **Save changes**. If the appointment belongs
+2. Change Day, Time, "Duration (min)", Services or Professional and tap **Save changes**. If the appointment belongs
    to a series, choose **This appointment only** or **This and all following appointments**.
    From the front desk it can be taken to a time already past (to note down what
    already happened).
@@ -417,16 +417,17 @@ Actor: employee (their own), manager
 Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
-2. Each change with its time on the business clock, who made it ("Requested by the customer" if it was
-   them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate copy;
-   an API key, by its name) and what changed (from which professional or service to which, and the new time). A
+2. Each change with its time on the business clock, who made it (a team member, by their name or, if their
+   account has none, by what goes before the @ of their email, never the whole email; "Requested by the customer"
+   if it was them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate
+   copy; an API key, by its name) and what changed (from which professional or service to which, and the new time). A
    deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
    and "Restored".
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).
 If it fails: "The appointment history could not be loaded."
-Involved: APPOINTMENT-F11, BASE-F114
+Involved: APPOINTMENT-F11, BASE-F114, BASE-F119
 
 ### APPOINTMENT-F11 Delete an appointment
 Status: done

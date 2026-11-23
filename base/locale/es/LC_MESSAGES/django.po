@@ -2491,3 +2491,12 @@ msgstr "Ver los totales del negocio"
 
 msgid "Reset the business, download its backups and upgrade the plan"
 msgstr "Restablecer el negocio, descargar sus copias y mejorar el plan"
+
+msgid "The business"
+msgstr "El negocio"
+
+msgid "Sensitive data"
+msgstr "Datos sensibles"
+
+msgid "This role does not exist in this business."
+msgstr "Este rol no existe en este negocio."

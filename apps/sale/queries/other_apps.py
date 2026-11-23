@@ -2,7 +2,8 @@
 
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict
+from live.errors import AppInactive, Conflict, PermissionDenied
+from live.operations import UnknownOperation
 
 from base.operations import call
 
@@ -49,6 +50,15 @@ def call_app(ctx: OperationContext, name: str, data: dict, unavailable_code: str
     command a manager approved, a command of another app goes with it, by the platform's rule. The app off or absent →
     409 ``unavailable_code``, said as this app says it."""
     return call(ctx, name, data, unavailable=Conflict(str(UNAVAILABLE[unavailable_code]), code=unavailable_code))
+
+
+def answer_if_on(ctx: OperationContext, name: str, data: dict):
+    """The answer of the read ``name`` of an app Sales does not require, for the caller (``call_app``), or ``None`` when
+    that app is absent, off or not theirs to read: for what only adds to what Sales says on its own."""
+    try:
+        return call(ctx, name, data)
+    except (UnknownOperation, AppInactive, PermissionDenied):
+        return None
 
 
 def call_services(ctx: OperationContext, name: str, data: dict):
