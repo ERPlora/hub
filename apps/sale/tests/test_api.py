@@ -196,6 +196,51 @@ def test_a_bad_payload_is_a_422_by_field(admin_client):
 
 
 @HUB_DB
+def test_an_added_amount_without_an_app_that_takes_it_is_a_409_over_http(employee_client, product):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    refused = post(
+        employee_client,
+        "/sale/sales",
+        {
+            "idempotency_key": "http-extra-0003",
+            "lines": [{"product": "COF"}],
+            "payments": [{"method": "card", "extra": 100, "extra_label": "Tip"}],
+        },
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "sale.added_amount_not_accepted"
+    assert get(employee_client, "/sale/sales").json()["total"] == 0
+
+
+@HUB_DB
+def test_a_charge_takes_what_another_app_adds_to_a_tender_over_http(employee_client, product, a_step_at_the_charge):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    tipped = {"method": "cash", "tendered": 500, "extra": 100, "extra_label": "Tip"}
+    charged = post(
+        employee_client,
+        "/sale/sales",
+        {"idempotency_key": "http-extra-0001", "lines": [{"product": "COF"}], "payments": [tipped]},
+    )
+    assert charged.status_code == 201, charged.json()
+    sale = charged.json()
+    assert (sale["total"], sale["tendered_total"], sale["change_total"]) == (150, 500, 250)
+    assert [(p["amount"], p["extra"], p["extra_label"], p["change"]) for p in sale["payments"]] == [
+        (150, 100, "Tip", 250)
+    ]
+    unnamed = post(
+        employee_client,
+        "/sale/sales",
+        {
+            "idempotency_key": "http-extra-0002",
+            "lines": [{"product": "COF"}],
+            "payments": [{"method": "cash", "extra": 100}],
+        },
+    )
+    assert unnamed.status_code == 422
+    assert "payments.0.extra_label" in unnamed.json()["error"]["fields"]
+
+
+@HUB_DB
 def test_a_refusal_is_the_error_envelope(admin_client, product):
     product("Gold", "GLD", 120000, "product.generic")
     response = post(
