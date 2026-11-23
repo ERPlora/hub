@@ -177,8 +177,8 @@ export interface CustomerDetailOut extends CustomerRow {
   postal_code: string;
   country: string;
   avatar: string;
-  birthday: string | null;
-  anniversary: string | null;
+  birthday: string; // YYYY-MM-DD, or --MM-DD without its year; '' when unknown
+  anniversary: string;
   preferred_channel: PreferredChannel;
   notes: string;
   created_at: string;

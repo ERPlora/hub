@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pycountry
-from babel.dates import format_date, format_time, get_datetime_format
+from babel.dates import format_date, format_skeleton, format_time, get_datetime_format
 from django.utils import translation
 from django.utils.translation import pgettext_lazy
 from live import assistant as shared
@@ -158,6 +158,9 @@ def _moment(value: str, kind: str, words: _Words) -> str | None:
     business's hour, a wall-clock time as it is (the app books it at the business's hour). ``None``: it is none."""
     locale = babel_locale(words.language)
     try:
+        if kind == "date" and value.startswith("--"):
+            # A day without its year (a birthday, as vCard writes it): its day and its month.
+            return format_skeleton("MMMMd", dt.date.fromisoformat(f"2000{value[1:]}"), locale=locale)
         if kind == "date":
             return format_date(dt.date.fromisoformat(value), "medium", locale=locale)
         if kind == "time":

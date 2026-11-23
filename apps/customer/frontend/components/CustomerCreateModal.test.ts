@@ -6,7 +6,6 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
-import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerCreateModal from './CustomerCreateModal.vue';
 
@@ -66,7 +65,7 @@ describe('CustomerCreateModal', () => {
     expect(s.net.api).toHaveLength(1);
     const call = sent(s.net.api[0]);
     expect([s.net.api[0].init.method, call.path]).toEqual(['POST', '/api/customer/customers']);
-    expect(call.body).toMatchObject({ name: 'Ana', phone: '600 111 222', source: 'walk_in', lifecycle_stage: 'lead', birthday: null });
+    expect(call.body).toMatchObject({ name: 'Ana', phone: '600 111 222', source: 'walk_in', lifecycle_stage: 'lead', birthday: '' });
     expect(s.open.value).toBe(false);
     expect(s.created).toEqual([{ id: 'c9', name: 'Ana' }]);
     expect(toastSuccess).toHaveBeenCalledWith('Customer Ana created');
@@ -87,15 +86,15 @@ describe('CustomerCreateModal', () => {
     expect(s.created).toEqual([]);
   });
 
-  it('the birthday and the anniversary picked in the app’s calendar travel as their ISO day', async () => {
+  it('a birthday typed without its year and a whole anniversary travel as the card keeps them', async () => {
     const s = await setup('es');
     s.net.onApi(() => json({ id: 'c9', name: 'Ana' }, 201));
     await s.type('customer-form-name', 'Ana');
-    await pick(s.el('customer-form-birthday'), '1990-02-03');
-    await pick(s.el('customer-form-anniversary'), '2010-05-06');
-    expect(s.el('customer-form-birthday')!.value).toBe('03/02/1990');
+    await s.type('customer-form-birthday-day', '12');
+    await s.type('customer-form-birthday-month', '3');
+    for (const [part, value] of [['day', '6'], ['month', '5'], ['year', '2010']]) await s.type(`customer-form-anniversary-${part}`, value);
     await s.save();
-    expect(sent(s.net.api[0]).body).toMatchObject({ name: 'Ana', birthday: '1990-02-03', anniversary: '2010-05-06' });
+    expect(sent(s.net.api[0]).body).toMatchObject({ name: 'Ana', birthday: '--03-12', anniversary: '2010-05-06' });
   });
 
   it('a refusal that names no field shown is told on top of the form', async () => {

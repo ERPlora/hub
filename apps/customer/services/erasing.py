@@ -70,7 +70,6 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
         for field in (*MERGE_FILLED, "notes"):
             setattr(customer, field, "")
         customer.name = ERASED_NAME
-        customer.birthday = customer.anniversary = None
         customer.preferred_channel = Customer.PreferredChannel.NONE
         customer.is_active = False
         customer.deleted_at = customer.deleted_at or now

@@ -24,7 +24,6 @@ import {
   searchList,
   spanishMobile,
 } from './customer-helpers';
-import { dayAsShown, pickDay } from './date-time-fields';
 import { A, api, login, psql, shot, shown } from './helpers';
 import { toastSaying, toasts } from './toast-helpers';
 
@@ -82,22 +81,6 @@ test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is tol
   await expect(dialog).toBeHidden();
   await searchList(page, 'customer-list', name);
   await expect(rowNamed(page, 'customer-list', name)).toBeVisible();
-});
-
-// flow: CUSTOMER-F01 — the birthday is picked in the app's calendar, never typed, and the card keeps that day
-test('CUSTOMER-F01: a birthday picked in the app’s calendar is the one the new card keeps', async ({ page }) => {
-  const dialog = await openNewCard(page);
-  const name = e2eName('F01 Birthday');
-  await inputOf(dialog, 'customer-form-name').fill(name);
-  await dialog.locator('[data-testid=customer-form-more] summary').click();
-  const birthday = dialog.locator('ion-input[data-testid=customer-form-birthday]');
-  // Within the calendar's reach of today: last year's 14 March.
-  const day = `${new Date().getFullYear() - 1}-03-14`;
-  await pickDay(page, birthday, day);
-  await expect(birthday.locator('input')).toHaveValue(dayAsShown(day));
-  await dialog.locator('[data-testid=customer-create-submit]').click();
-  await expect(dialog).toBeHidden();
-  expect(psql(`select birthday from customer_customer where name = '${name}'`)).toBe(day);
 });
 
 // flow: CUSTOMER-F02 — on a phone the card names the row once

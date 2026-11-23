@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2b95b327431d3ebeb22b2915520fa438df06c2404db01451502549ef14777bf8 -->
+<!-- generated from WORKBOOK.md sha256:715363cb3050e1b2149bc5ab7cdbb9e811044640a256df92e1dff129fd27be9e -->
 
 ## What it is for and who it is for
 
@@ -212,14 +212,18 @@ Steps:
 4. Tap **Save**: the panel closes and the card appears in the list; the figures are recalculated.
 In: what is typed. The country is stored with its two-letter code (`ES`, `FR`). The phone is stored in
 the international format (`+34` and the digits together, CUSTOMER-F11); the email and the tax ID, without
-the spaces at the ends.
+the spaces at the ends. "Birthday" and "Anniversary" are typed in three boxes, "Day", "Month" and "Year" (in the
+order the language writes a date), and the year only if it is known: "12" and "3" without a year save the 12th of
+March.
 Out: the new card, active and with no consent of any kind (CUSTOMER-F14), and the card-created notice
 (`customer.customer.created`), which WhatsApp listens to so as to join to the card the conversations
 that number already had.
 If it fails: the reason shows under its field and what was typed is kept. A malformed email: "Enter a
 valid email.". A phone that is not a number of its country: "This is not a valid phone number of its
 country: check the digits or write it with its international prefix (+44…).". A country that does not
-exist: "Choose a country from the list.". Nothing is saved. Custom fields are not asked for when adding.
+exist: "Choose a country from the list.". A day that does not exist in "Birthday" or "Anniversary" (a 31st of
+February), or one missing its day or its month: "Enter a valid date.". Nothing is saved. Custom fields are not
+asked for when adding.
 Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation, with its groups and tags, CUSTOMER-F06, and its custom fields, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Search and filter cards
@@ -257,8 +261,8 @@ Actor: everyone
 Screen: Customer card
 Steps:
 1. From **Customers**, tap the row.
-2. The card shows all its details (also internal notes, birthday, anniversary and custom fields), its
-   groups and tags, its consent per channel, the
+2. The card shows all its details (also internal notes, birthday, anniversary and custom fields; a birthday
+   without its year, as "March 12"), its groups and tags, its consent per channel, the
    activity (newest first, 50 per page; each entry says when and who: the person by their name or, if their
    account has none, by what goes before the @ of their email, never the whole email; the API key by its
    own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
@@ -374,7 +378,9 @@ In: the file, which the screen sends in blocks of 50 rows. Headers it understand
 `email`/"Email"/"correo", `phone`/"Teléfono"/"tel", `tax_id`/"NIF"/"CIF", `company_name`/"Empresa",
 `address`/"Dirección", `city`/"Ciudad", `postal_code`/"CP"/"Código postal", `country`/"País",
 `lifecycle_stage`/"Etapa" and `notes`/"Notas" (the same columns the export gives, CUSTOMER-F09), and also
-`source`, `preferred_channel`, `birthday`, `anniversary` and `avatar`.
+`source`, `preferred_channel`, `birthday`, `anniversary` and `avatar`. A birthday or an anniversary goes as
+`YYYY-MM-DD`, or as `--MM-DD` when the year is not known (`--03-12`, the 12th of March); anything else skips the row
+with "Enter a valid date.".
 Out: the cards created, with source "Import", the phone in the international format and without consent
 (even if the file brings a consent column), and a card-created notice for each one, so WhatsApp joins
 their conversations as with adding by hand. A row without stage comes in as "Active" (it is a customer

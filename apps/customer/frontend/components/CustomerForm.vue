@@ -6,14 +6,16 @@
 // (`v-model`, `v-model:field-values`) and the submit; the server validates and its 422 comes back in
 // `errors`, painted under its field («More details» opens when the field is in there). A number the
 // browser cannot read («tres») reaches the page as "", so saving would empty the field: `readable()`
-// tells it under its field, worded as the server's refusal, and the parent does not save. The dates
-// (birthday, anniversary and the custom date fields) are picked in the app's calendar.
+// tells it under its field, worded as the server's refusal, and the parent does not save. The birthday and the
+// anniversary are typed as a day and a month, the year only if known (AnnualDateField); the custom date fields are
+// picked in the app's calendar.
 // The country is the shared Combo (the product's `ok-combo`): typing its name, or its code, filters
 // the ~250 countries; the card keeps the ISO code, and clearing the field leaves it without one.
 import { Combo, type ComboOption, DateField } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 
+import AnnualDateField from './AnnualDateField.vue';
 import { countryName, countryOptions } from '../lib/countries';
 import {
   CHANNELS,
@@ -84,15 +86,15 @@ const INPUT_TYPES: Partial<Record<CustomerField, InputType>> = {
   avatar: 'url',
 };
 
-type Kind = 'input' | 'select' | 'country' | 'textarea' | 'date';
+type Kind = 'input' | 'select' | 'country' | 'textarea' | 'annual';
 const KINDS: Partial<Record<CustomerField, Kind>> = {
   country: 'country',
   notes: 'textarea',
   source: 'select',
   lifecycle_stage: 'select',
   preferred_channel: 'select',
-  birthday: 'date',
-  anniversary: 'date',
+  birthday: 'annual',
+  anniversary: 'annual',
 };
 const kindOf = (field: CustomerField): Kind => KINDS[field] ?? 'input';
 
@@ -249,11 +251,12 @@ defineExpose({ readable });
             :class="invalid('notes')"
             @update:model-value="set('notes', $event)"
           />
-          <DateField
-            v-else-if="kindOf(field) === 'date'"
+          <AnnualDateField
+            v-else-if="kindOf(field) === 'annual'"
             :testid="`customer-form-${field}`"
             :data-field="field"
-            :model-value="form[field]"
+            :class="{ 'customer-form__double': mode === 'edit' }"
+            :model-value="String(form[field])"
             :label="t(LABELS[field])"
             :error-text="shown[field]"
             @update:model-value="set(field, $event)"
@@ -405,6 +408,15 @@ defineExpose({ readable });
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: 0.75rem;
+  container-type: inline-size;
+}
+
+/* Once two columns fit (2 × 13rem and the gap), a birthday or an anniversary takes both: its day, month and year
+   would cut their labels in one. */
+@container (min-width: 26.75rem) {
+  .customer-form__double {
+    grid-column: span 2;
+  }
 }
 
 .customer-form--edit .customer-form__wide {

@@ -21,7 +21,7 @@ export const DETAIL: CustomerDetailOut = {
   country: 'ES',
   avatar: '',
   birthday: '1990-02-03',
-  anniversary: null,
+  anniversary: '',
   preferred_channel: 'email',
   notes: 'Likes tea',
   created_at: '2026-01-01T10:00:00Z',
