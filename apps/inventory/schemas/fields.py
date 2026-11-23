@@ -53,8 +53,9 @@ Said = _text(200, 1)
 #: A product has one name, in the language it was written in: the model looks it up with what the person said.
 IN_THEIR_WORDS = "in the person's own words, never translated"
 PRODUCT_SAID = (
-    f"The product's SKU or name, when its id is not known (e.g. said aloud), {IN_THEIR_WORDS}: a product has one "
-    "name, in the language it was written in; if none matches, ask."
+    f"The product's SKU or name, when its id is not known (e.g. said aloud), first {IN_THEIR_WORDS}: a product has "
+    "one name, in the language it was written in. Only if none matches may it be written in another language "
+    "(«Draught beer» for «caña»): then say which one you took."
 )
 ProductSearch = Annotated[
     str | None, Field(max_length=200, description=f"Part of the name or the SKU, {IN_THEIR_WORDS}.")
