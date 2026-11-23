@@ -929,6 +929,21 @@ msgstr "La AEAT no tiene registros de ese emisor este mes: no hay nada que recup
 msgid "The test invoice is only for the test environment."
 msgstr "La factura de prueba es solo para el entorno de pruebas."
 
+#: apps/verifactu/services/diagnostics.py
+msgctxt "assistant card"
+msgid "Series"
+msgstr "Serie"
+
+#: apps/verifactu/services/diagnostics.py
+msgctxt "assistant card"
+msgid "Price"
+msgstr "Precio"
+
+#: apps/verifactu/services/diagnostics.py
+msgctxt "assistant card"
+msgid "VAT"
+msgstr "IVA"
+
 #: apps/verifactu/services/config.py
 msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."
