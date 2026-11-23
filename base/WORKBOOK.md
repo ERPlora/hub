@@ -2515,8 +2515,10 @@ Pasos:
      hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
      pantalla se hace.
   10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
-     hora de ese momento, su sector, las apps que tiene encendidas y, a quien lo administra, su plan y cuántas apps le
-     cuenta (solo las que eligió el negocio, como dice Apps); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
+     hora de ese momento, el idioma del negocio y el que la persona eligió en «Mi perfil», su sector, las apps que
+     tiene encendidas, a quien lo administra su plan y cuántas apps le cuenta (solo las que eligió el negocio, como
+     dice Apps) y, a quien puede verlos, los ajustes de Ventas / TPV, Caja y Reservas cuando están encendidas (cómo se
+     cobra, cómo se abre y se cierra la caja, si cada reserva pide teléfono); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
      pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
      importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
      «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
@@ -4415,8 +4417,11 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
   instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
-  zona y hora de allí, sector, apps encendidas y, con `base.administer_hub`, el plan de la foto con las apps que cuenta,
-  `activation.chosen_on` contra `plan.max_apps`; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
+  zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
+  encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
+  `plan.max_apps`, y los ajustes de cada app encendida que los declara en `assistant_settings` de su `LiveAppConfig`
+  (Ventas, Caja y Reservas), tal como los contesta esa lectura por `base.assistant.tools.run` y solo si la persona
+  puede correrla; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
   el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
   `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
   como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con

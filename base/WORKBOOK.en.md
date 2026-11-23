@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:57c276242761f8203fc3a5b0c5c8f585addb677ec2d2d2b9a349487a234e3cd2 -->
+<!-- generated from WORKBOOK.md sha256:22d71478c98b3cd33cd0a02d8f2952ef5637bab59b52b0b591cdd634e021560a -->
 
 ## What it is for and who it is for
 
@@ -2497,9 +2497,11 @@ Steps:
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
      it say on which screen it is done.
   10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
-     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
-     many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
-     question. Every date and time it says is in the business's time, the one the
+     with the date and time at that moment, the business's language and the one the person chose in "My profile", its
+     sector, the apps it has on, to whoever runs it its plan and how many apps it counts (only those the business
+     chose, as Apps says) and, to whoever may see them, the settings of Sales & POS, Cash register and Reservations
+     when they are on (how it charges, how the drawer opens and closes, whether each reservation needs a phone); it
+     does not have to look them up for each question. Every date and time it says is in the business's time, the one the
      screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
      amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
      it tells as €3.60, never as €360.00.
