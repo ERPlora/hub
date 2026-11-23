@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c590635851edbee4e9258f039215ebb16551b6d7717d1836083e5669d8207bcb -->
+<!-- generated from WORKBOOK.md sha256:264d916bc1f2ffd4277244c2a80fd580f138d3005f892d0ad5c94c65c807c970 -->
 
 ## What it is for and who it is for
 
@@ -501,8 +501,9 @@ Steps:
 In: the business's categories.
 Out: the link between product and category, saved together with the product; Inventory tells of each
 category added or removed. A product can be in several. Sales filters the till's grid with these links
-(only of active products) and Kitchen uses them for its routing. The till sorts products and
-categories by name.
+(only of active products) and Kitchen uses them for its routing. The till shows the categories in the
+position the business gave them (through the assistant or the API, and the one the sector's template
+brings) and, at equal position, by name; the ones nobody placed go by name. The products, by name.
 If it fails: the form's refusals; if something fails neither the product nor its categories are saved.
 A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
