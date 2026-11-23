@@ -22,19 +22,19 @@ from apps.tax.queries import business_today
     ai={
         "asks": {
             "en": (
-                "is this year's invoice numbering ready?",
-                "is the numbering set up for this year's invoices?",
-                "are the numbers ready for the new year?",
-                "is the numbering ready for January?",
+                "is this year's invoice numbering ready?", "is the numbering set up for this year's invoices?",
+                "are the numbers ready for the new year?", "is the numbering ready for January?",
             ),
             "es": (
-                "¿tenemos lista la numeración de este año?",
-                "¿hay series de este año para empezar a facturar?",
+                "¿tenemos lista la numeración de este año?", "¿hay series de este año para empezar a facturar?",
                 "¿falta preparar algo en la numeración del año nuevo?",
             ),
         },
         "description": "Whether this year's invoice numbering is set up: how many ordinary series (F1, F2, F3), "
-        "rectifying series (R1–R5) and default series the business year has, and how many series in all."
+        "rectifying series (R1–R5) and default series the business year has, and how many series in all. Nothing has "
+        "to be done for the numbering to work: the series are created on their own with the first sale, so configured "
+        "false does not mean something is left to do. A series is created by hand only to change the prefix or the "
+        "format, or to continue another system's numbering, on /invoice/series before the first sale."
     },
 )
 def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
