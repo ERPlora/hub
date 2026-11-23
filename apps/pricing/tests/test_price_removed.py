@@ -1,7 +1,6 @@
 """«Take the soft drink off the Terraza list» (PRICING-F08): after removing a price from a price list, what the model
 hears back is what the article costs on that list now, read after the removal: a lower quantity of that list, on a
-customer group's list the general list's, or else the catalog's. Never the price just removed, which the model had
-nothing else to go on before (hub#2235: «3.00 EUR» said for a soft drink that now costs 2.50 €).
+customer group's list the general list's, or else the catalog's. Never the price just removed.
 
 The model only receives the tool's description and the JSON text of its result (``live.assistant.run_tool``).
 """
@@ -80,6 +79,32 @@ def test_off_a_customer_group_s_list_its_customers_pay_the_general_list_s_price(
     assert charged(answer) == (220, "General", "EUR")
 
 
+def test_off_a_customer_group_s_list_its_own_price_for_a_lower_quantity_still_competes():
+    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id)
+    general = make_list("GEN", "General", is_default=True)
+    beer = make_product("Beer", "BEER", price=250)
+    make_item(partners, beer, price=180)
+    make_item(partners, beer, price=150, min_quantity="10")
+    make_item(general, beer, price=220)
+
+    answer = heard({"price_list": "Socios", "product": "Beer", "min_quantity": "10"})
+
+    assert charged(answer) == (180, "Socios", "EUR")
+
+
+def test_off_a_group_s_list_that_follows_the_business_a_general_list_with_tax_steps_in():
+    """A till sells with tax: a list that follows the business competes with the lists that carry it."""
+    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id)
+    general = make_list("GEN", "General", is_default=True, tax_included=True)
+    beer = make_product("Beer", "BEER", price=250)
+    make_item(partners, beer, price=180)
+    make_item(general, beer, price=220)
+
+    answer = heard({"price_list": "Socios", "product": "Beer"})
+
+    assert charged(answer) == (220, "General", "EUR")
+
+
 def test_off_a_group_s_list_without_tax_a_general_list_with_tax_does_not_step_in():
     """Prices with and without tax are never compared (PRICING-F13): the group buys without it."""
     partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id, tax_included=False)
@@ -137,6 +162,9 @@ def test_the_description_names_the_price_it_answers_and_never_the_removed_one():
     answered = set(get(REMOVE).output.model_fields)
 
     assert {"price_now", "price_now_list"} <= answered
-    assert "price_now" in text and "price_now_list" in text
-    assert "never the price just removed" in text
+    assert (
+        "It answers what the article costs on that list now, read after removing it: price_now in cents, from the "
+        "list price_now_list or, when that is null, the catalog's (price_now null: not known). Tell that price, never "
+        "the price just removed."
+    ) in text
     assert "another list's price or the catalog's" not in text
