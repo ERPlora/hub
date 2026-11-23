@@ -7,6 +7,7 @@ import { defineComponent, h, ref } from 'vue';
 
 import { flush, mountCustomer } from '../__tests__/mount-customer';
 import AnnualDateField from './AnnualDateField.vue';
+import source from './AnnualDateField.vue?raw';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -85,5 +86,13 @@ describe('AnnualDateField', () => {
     expect(s.wrapper.findComponent(InlineFeedback).props()).toMatchObject({ tone: 'danger', role: 'alert' });
     expect(s.wrapper.findComponent(InlineFeedback).text()).toBe('Enter a valid date.');
     expect(s.inputs().every((input) => input.classes().includes('ion-invalid'))).toBe(true);
+  });
+
+  it('each of the three fields is outlined, in the mode that paints the outline', async () => {
+    const s = await setup();
+    expect(s.inputs().map((c) => c.props('fill'))).toEqual(['outline', 'outline', 'outline']);
+    // Ionic reads the mode from the tag, not from a prop: the shell runs in iOS mode, where an outline is not painted.
+    const tags = [...source.matchAll(/<ion-input\b[^>]*>/g)].map((match) => match[0]);
+    expect(tags.map((tag) => tag.includes('mode="md"'))).toEqual([true]);
   });
 });

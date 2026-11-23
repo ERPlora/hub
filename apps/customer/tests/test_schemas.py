@@ -210,6 +210,12 @@ def test_the_assistant_is_told_a_day_may_go_without_its_year():
         assert not re.fullmatch(yearless["pattern"], "1990-03-14")
 
 
+def test_an_imported_row_is_told_a_day_may_go_without_its_year():
+    days = ImportIn.model_json_schema()["$defs"]["ImportRowIn"]["properties"]
+    for field in ("birthday", "anniversary"):
+        assert "--MM-DD" in days[field]["description"]
+
+
 def test_a_patch_carries_only_what_was_sent():
     patch = CustomerPatchIn(id=ID, notes="", birthday=None)
     assert patch.model_dump(exclude_unset=True) == {
