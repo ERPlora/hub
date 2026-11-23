@@ -102,6 +102,15 @@ def test_the_apps_that_come_along_are_named_in_the_order_of_their_names_as_the_s
     assert card("base.app.enable", "reservation") == [("app", "Reservas"), ("along", along)]
 
 
+def test_turning_on_an_app_the_country_requires_names_what_comes_along_and_then_that_it_never_goes_off():
+    Hub.objects.filter(slug=A.key).update(country="ES")
+    set_rows(tax="on*", sale="on*", customer="on*")
+    fields = card("base.app.enable", "verifactu")
+    along = screen_says("base.appsPage.confirmOn.message", 1, app="VeriFactu", apps="Facturación")
+    assert [name for name, _ in fields] == ["app", "along", "mandatory"]
+    assert fields[:2] == [("app", "VeriFactu"), ("along", along)]
+
+
 def test_turning_on_an_app_whose_needs_are_on_only_names_it():
     the_rest_reservations_needs_chosen(reservation="off", table="on", schedule="on")
     assert card("base.app.enable", "reservation") == [("app", "Reservas")]
