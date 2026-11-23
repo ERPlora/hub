@@ -2493,7 +2493,8 @@ Pasos:
      pantalla táctil, Intro salta de línea y se envía con «Enviar». «Enviar» no se activa con el cuadro vacío y sin
      adjuntos.
   3. Su mensaje sale a la derecha tal cual lo escribió. Debajo, la burbuja del asistente, con tres puntos que se
-     mueven hasta que llega el primer texto.
+     mueven hasta que llega el primer texto. En español, el asistente le trata de tú o de usted como ella le escribe
+     (si no se nota, de tú, como las pantallas) y lo mantiene hasta el final de la respuesta, sin mezclarlos.
   4. Mientras responde, «Enviar» se convierte en «Detener», «Adjuntar archivo» y «Dictar por voz» se apagan y la
      respuesta va apareciendo; la conversación baja sola hasta el final. Se puede ir escribiendo la siguiente
      pregunta, pero no se envía hasta que acaba esta.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e066cc63c71185027eebdd9bc8a7132ac23bfbb54c6e46a32bebb2f8daacf1b5 -->
+<!-- generated from WORKBOOK.md sha256:922b319eedf56f27c862e40120f7edcc597cfb820a827d55b064f7a52340974b -->
 
 ## What it is for and who it is for
 
@@ -2475,7 +2475,8 @@ Steps:
   2. They write in "Write a message…" and press Enter or "Send". With a keyboard, Shift+Enter starts a new line; on a
      touch screen, Enter starts a new line and "Send" sends. "Send" is off with the box empty and no attachments.
   3. Their message shows on the right just as they wrote it. Below, the assistant's bubble, with three dots that move
-     until the first text arrives.
+     until the first text arrives. In Spanish, the assistant addresses them with «tú» or «usted» as they write to it
+     (when it does not show, «tú», as the screens do) and keeps it to the end of the answer, never mixing the two.
   4. While it answers, "Send" becomes "Stop", "Attach a file" and "Dictate by voice" turn off and the answer keeps
      appearing; the conversation scrolls down by itself. They can already write the next question, but it is not
      sent until this one ends.
@@ -2671,7 +2672,7 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
 Steps:
   1. An action its app marks as dangerous is not confirmed with one click: the card says, for example, "Delete in
-     Services. Check each datum before going on.", puts each datum on its own line with its name in the person's
+     Services. Check each detail before you continue.", puts each datum on its own line with its name in the person's
      language and asks "To confirm, type CONFIRM:".
   2. If its app declares it, the card first says, under "What will happen", what the action is going to do, as its
      app works it out for the person who asks and with their permissions. For example, when taking someone's PIN

@@ -75,6 +75,17 @@ def test_the_instructions_set_the_language_the_money_and_the_screens():
     assert "Bar Pepe" in text
 
 
+def test_the_instructions_keep_the_persons_tu_or_usted_to_the_end():
+    """hub#2210: asked «Si no, créame "Punto de la carne"…», the assistant began with «tú» and ended with «Dígame…» and
+    «luego los vincula»; nothing in its instructions said how to address the person, so it switched in the middle of an
+    answer. It answers as it is addressed, with no sign of either the «tú» of the app's own screens, and never mixes."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert (
+        "In Spanish, address the person as they address you, «tú» or «usted» (with no sign of either, «tú», as the "
+        "app does), and keep it to the end: «dime, quieres, puedes» or «dígame, quiere, puede», never a mix."
+    ) in text
+
+
 @pytest.mark.parametrize(
     ("currency", "decimals", "example"),
     [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],

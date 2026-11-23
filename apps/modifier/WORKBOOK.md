@@ -177,7 +177,7 @@ Implicados: ninguno
 
 ### MODIFIER-F02 Crear un grupo
 Estado: hecho
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos
 Pasos:
 1. Pulsa «Nuevo grupo».
@@ -187,7 +187,9 @@ Pasos:
 4. Pon el Mínimo (1 o más lo hace obligatorio; 0, opcional), el Máximo (0 es sin techo; si no es 0, no
    puede ser menor que el mínimo), si una opción se puede repetir y el Orden en que sale en el TPV.
 5. Pulsa «Crear»: el formulario se cierra y el grupo sale en la tabla. Todavía no sale en el TPV:
-   faltan sus opciones y dónde se aplica, que se ponen en su hoja.
+   faltan sus opciones y dónde se aplica, que se ponen en su hoja. Si lo crea el asistente, lo dice así y
+   se ofrece a añadirle las opciones y a aplicarlo él a los platos o las categorías; en pantalla, las dos
+   cosas se hacen en la hoja del grupo, en Suplementos, nunca en la ficha de un producto de Inventario.
 Entra: lo que escribe la persona.
 Sale: el grupo (avisa: grupo creado). No crea opciones ni enganches.
 Si falla: un nombre vacío o de más de 255 caracteres, un mínimo o máximo fuera de 0–50 o un máximo por
