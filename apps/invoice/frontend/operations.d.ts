@@ -159,11 +159,10 @@ export interface DocumentOut {
   html: string;
 }
 
-/** The A4 page asked of Printing: queued for the system printer, or not (the device prints the screen's paper). */
+/** The A4 page Printing queued for the system printer; one no printer takes fails (`invoice.no_printer`). */
 export interface PaperOut {
-  queued: boolean;
-  job_id: string | null;
-  printer: string | null;
+  job_id: string;
+  printer: string;
 }
 
 /** What a line of a manual invoice starts with when its rate is typed (INVOICE-F03, TAX-F11). */
