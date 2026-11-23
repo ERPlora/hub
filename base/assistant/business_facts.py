@@ -83,7 +83,7 @@ def _settings(ctx: OperationContext, apps: Mapping[str, LiveAppConfig]) -> list[
     language, as each read answers them now: on the business's clock and in its currency."""
     lines = []
     with translation.override(ctx.language):
-        for config in sorted(apps.values(), key=lambda config: str(config.verbose_name).casefold()):
+        for config in apps.values():
             for name in getattr(config, SETTINGS_HOOK, ()):
                 told = tools.run(ctx, get(name), "{}")
                 if told.outcome == "ok":

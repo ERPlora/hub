@@ -224,6 +224,14 @@ def test_a_person_who_chose_no_language_sees_the_business_s(in_business_a, make_
     assert "- Language of the business: Spanish (es). This person's own, in My profile: none, so the business's." in text
 
 
+def test_a_business_that_could_not_be_read_has_no_language_told(in_business_a):
+    """``base.business.get`` failed: the turn goes on with nothing of it, never a guess."""
+    ctx = OperationContext(scope=Scope("host", in_business_a.slug), actor="ana", permissions=RUNS_IT, language="en")
+    with use_hub(in_business_a):
+        text = assistant.business_facts.block(ctx, {}, assistant.tools.active_apps(ctx.scope), now=WINTER)
+    assert "Language" not in text
+
+
 def test_with_no_person_behind_only_the_business_s_language_is_told(in_business_a):
     """An API key or an automation's step has no «My profile»."""
     registered(in_business_a, language="es")
