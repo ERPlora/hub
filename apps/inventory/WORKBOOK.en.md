@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f287e83481f78a600666a5fae70a892ea74e8f0dbaa7b4af798d806d16c8b728 -->
+<!-- generated from WORKBOOK.md sha256:8fc1f7fb057812e46b28f9610c5ed1d6e9858aaeb7acfb393f7277d486126f1c -->
 
 ## What it is for and who it is for
 
@@ -738,6 +738,9 @@ Steps:
    cost)" and "Lowest-stock products" (the five with the least, the first the one with the least) show
    by default; "Products in stock" is added with ⋮ ("Customize panel"), where they are grouped under
    "Inventory". The value shows in the business's currency.
+4. To the assistant ("what is running low?"), the same list, and for each product whether it is marked
+   sold out. Reaching 0 or below does not take it off the till, which still offers it: only what is
+   marked with "Mark sold out" stops being offered, and the assistant says so.
 In: the active, physical products with stock control. The value is the sum of cost times balance of
 those with a positive balance; a negative balance does not subtract.
 Out: nothing.

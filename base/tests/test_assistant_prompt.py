@@ -50,6 +50,20 @@ def test_the_instructions_ask_for_a_missing_datum_and_leave_the_yes_to_the_card(
     assert "If the request fits several records, ask which one." in text
 
 
+def test_the_instructions_say_a_write_that_ran_is_what_the_person_confirmed():
+    """hub#2209: asked to keep stock only for the bottled drinks, the assistant turned it off for the cheesecake, as
+    asked; the person confirmed its card; then it said «I made a mistake, I'll fix it» and drew a card to turn it back
+    on. The instructions told it how to read a write that was not confirmed or failed, never one that ran, and the
+    model took its own confirmed change for something it had done unasked. A write that comes back with its result ran
+    because the person said yes to its card: it is done as they asked, and undoing it is theirs to ask."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert (
+        "If it comes back with its result, the person said yes to its card and it ran: it is what they asked, never "
+        "a mistake of yours. Check that result against their request and say what is done; never offer or call a "
+        "write to undo it unless they ask."
+    ) in text
+
+
 def test_the_instructions_set_the_language_the_money_and_the_screens():
     text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
     # Off-topic questions (films, cinemas) would spend the business's allowance.

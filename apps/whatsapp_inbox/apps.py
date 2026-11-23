@@ -119,6 +119,19 @@ class WhatsappInboxConfig(LiveAppConfig):
         "measured": "synced_at",
         "label": _("WhatsApp"),
     }
+    # The Home's health row, for who runs the business (base.E021 checks it at start): whether the number is connected.
+    health = {
+        "operation": "whatsapp_inbox.channel.health",
+        "permission": "whatsapp_inbox.configure",
+        "route": "/whatsapp_inbox/settings",
+        "action": _("Connect WhatsApp"),
+        "titles": {
+            "ok": _("WhatsApp connected"),
+            "no_signal": _("WhatsApp needs reconnecting"),
+            "not_configured": _("WhatsApp not connected"),
+            "unknown": _("We couldn't check WhatsApp"),
+        },
+    }
     # The installed app tells the device of each message of a customer left waiting for an answer, with who and what she
     # wrote; a tap opens that conversation in the inbox.
     notices = [
