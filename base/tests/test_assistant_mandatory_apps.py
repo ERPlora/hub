@@ -47,6 +47,12 @@ def test_the_card_of_turning_on_an_app_the_country_requires_says_it_never_goes_o
     assert card_of_turning_on("verifactu") == [("app", "VeriFactu"), ("mandatory", never_off("VeriFactu", "ES"))]
 
 
+def test_the_card_calls_that_reason_by_its_word_in_the_persons_language():
+    in_country("ES")
+    plan = turn(call("base.app.enable", {"app": "verifactu"}), permissions=ADMIN)
+    assert [field["label"] for field in plan["confirm"]["fields"] if field["name"] == "mandatory"] == ["Una vez activada"]
+
+
 def test_a_business_without_a_country_is_in_spain_and_its_card_says_it_too():
     in_country("")
     assert card_of_turning_on("verifactu") == [("app", "VeriFactu"), ("mandatory", never_off("VeriFactu", "ES"))]
