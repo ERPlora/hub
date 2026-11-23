@@ -14,7 +14,6 @@ from decimal import Decimal
 from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
-import pycountry
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from ninja import Field, Schema
@@ -40,6 +39,7 @@ from apps.invoice.models import (
     InvoiceType,
 )
 from apps.invoice.schemas.document_issuer import DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut
+from apps.tax.choices import COUNTRY_CODES
 from apps.tax.schemas import A_TAX_CATEGORY
 from base.schemas.assistant import names
 
@@ -47,9 +47,6 @@ T = TypeVar("T")
 
 #: The business's own country while the platform has no setting for it (WORKBOOK «Antes de empezar»).
 HOME_COUNTRY = "ES"
-COUNTRY_CODES: tuple[str, ...] = tuple(
-    sorted(country.alpha_2 for country in pycountry.countries)
-)
 #: What VeriFactu's record holds (SuministroInformacion.xsd): NombreRazon is TextMax120Type and the ID of a
 #: foreign recipient (IDOtro) TextMax20Type; a Spanish NIF is 9.
 NAME_MAX = 120
@@ -693,9 +690,11 @@ class IssuerIn(IntraEuOperatorIn):
     legal_name: _text(NAME_MAX, min_length=1) = Field(
         description="Legal name of the business."
     )
+    # Tax's closed list of countries, so the card says the country by its name («España»), never its code.
     country: str = Field(
         HOME_COUNTRY,
         description="Country of the business, ISO 3166-1 alpha-2; default ES.",
+        json_schema_extra={"enum": list(COUNTRY_CODES), "choices_of": "tax.country_code"},
     )
     tax_id: _text(TAX_ID_MAX, min_length=1) = Field(
         description="Tax ID of the business (a Spanish NIF or CIF, checked)."

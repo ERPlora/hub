@@ -147,7 +147,7 @@ class DiscountRule(_Audited):
     amount = models.PositiveBigIntegerField(_("amount per unit"), null=True, blank=True)
     buy_quantity = models.PositiveIntegerField(_("buy"), null=True, blank=True)
     get_quantity = models.PositiveIntegerField(_("free"), null=True, blank=True)
-    # ``[{"min_quantity": "3", "percent": "10"}]`` by rising quantity (tiered); validated by schemas.py.
+    # ``[{"min_quantity": "3", "percent": "10"}]`` by rising quantity (tiered); validated by schemas/.
     tiers = models.JSONField(_("tiers"), default=list, blank=True)
     applies_to = models.CharField(_("applies to"), max_length=16, choices=Scope.choices, default=Scope.ALL)
     category = models.ForeignKey(
