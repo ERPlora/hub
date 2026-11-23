@@ -1,4 +1,4 @@
-"""Read operations of the combo app (``READ ONLY``), and the finders and rows services.py reuses.
+"""Read operations of the combo app (``READ ONLY``), and the finders and rows the writes (``services``) reuse.
 
 A menu is named by its id or its name; a course by its id, or its name inside its menu; a choice by its
 id, or by its product (SKU or name) inside its menu or course: exact first, else the only one that
