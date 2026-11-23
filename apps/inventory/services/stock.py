@@ -2,13 +2,14 @@
 
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
+from live.errors import Conflict
 from live.operations import operation
 
 from apps.inventory.models import Product, StockMovement
 from apps.inventory.queries.products import load_product, tracks_stock
 from apps.inventory.queries.reads import find_product
 from apps.inventory.queries.settings import current_settings
+from apps.inventory.queries.write_checks import line_product_unknown, line_products
 from apps.inventory.schemas.products import ProductOut, ProductsOut
 from apps.inventory.schemas.stock import CountIn, ReceiveIn, WriteOffIn
 from apps.inventory.services.movements import _crossing, _locked, _move
@@ -16,7 +17,6 @@ from apps.inventory.services.writes import _check_grid, _service_has_no_stock
 
 STOCK_NOT_TRACKED = _("This article does not track its stock: there is nothing to write off.")
 INSUFFICIENT_STOCK = _("There is not enough stock to complete the operation.")
-LINE_PRODUCT_UNKNOWN = _("This product does not exist in this hub.")
 
 
 @operation(
@@ -31,6 +31,7 @@ LINE_PRODUCT_UNKNOWN = _("This product does not exist in this hub.")
         "description": "Record goods received: raises the stock of one or more products (by id, SKU or name), "
         "with the unit cost and the delivery note's number.",
         "risk": "normal",
+        "check": "inventory.product.bulk_check",
         "asks": {
             "en": (
                 "I just received 20 coffees, delivery note A-123",
@@ -47,19 +48,13 @@ LINE_PRODUCT_UNKNOWN = _("This product does not exist in this hub.")
 )
 def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
     """All lines or none: a line without a product, with a service or off its unit's step refuses the whole."""
-    named = []
-    for index, line in enumerate(data.items):
-        field = f"items.{index}.product_id" if line.product_id is not None else f"items.{index}.product"
-        try:
-            named.append((index, field, find_product(line.product_id, line.product).id, line))
-        except NotFound as exc:
-            raise _line_product_unknown(field) from exc
+    named = line_products(data.items)
     products = _locked({product_id for _, _, product_id, _ in named})
     lines = []
     for index, field, product_id, line in named:
         product = products.get(product_id)
         if product is None:  # deleted meanwhile
-            raise _line_product_unknown(field)
+            raise line_product_unknown(field)
         if product.product_type == Product.Type.SERVICE:
             raise _service_has_no_stock(field)
         _check_grid(line.qty, product.unit, f"items.{index}.qty")
@@ -88,6 +83,7 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
         "description": "Apply a stock count: the product's balance becomes the ABSOLUTE value counted, with a "
         "mandatory reason; the ledger records the difference. Not for breakage, waste or own consumption: a write-off.",
         "risk": "normal",
+        "check": "inventory.product.check",
         "asks": {
             "en": (
                 "I counted 12 croissants, fix the stock",
@@ -128,6 +124,7 @@ def count_stock(ctx: OperationContext, data: CountIn) -> dict:
         "description": "Write off stock without a sale (waste, breakage, own consumption) with its reason; a "
         "service or an article without stock control is refused (there is no stock to lower).",
         "risk": "normal",
+        "check": "inventory.product.check",
         "asks": {
             "en": (
                 "write off 2 coffees, they broke",
@@ -157,8 +154,3 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
     _move(ctx, product, StockMovement.Type.WRITE_OFF, -data.qty, reason=data.reason)
     _crossing(ctx, product, settings, previous, StockMovement.Type.WRITE_OFF, "")
     return load_product(product.id, ctx.scope)
-
-
-def _line_product_unknown(field: str) -> InvalidPayload:
-    message = str(LINE_PRODUCT_UNKNOWN)
-    return InvalidPayload(message, code="invalid_field", fields={field: message})
