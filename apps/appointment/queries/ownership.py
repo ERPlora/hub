@@ -1,6 +1,7 @@
 """Whose an appointment or a repeating appointment is (APPOINTMENT-F27): the professional's it is booked with. Without
-«See the whole agenda» a person reads and touches only those of their own staff record; a caller that is not a person
-has none of its own, so what its permission opens is the whole team's."""
+«See the whole agenda» a person reads and touches only those of their own staff record, and an API key reads those of
+whoever made it; a caller with no one behind (an automation, the platform) has none of its own, so what its permission
+opens is the whole team's."""
 
 from uuid import UUID
 

@@ -1467,6 +1467,11 @@ msgctxt "api key"
 msgid "created by"
 msgstr "creada por"
 
+#: models/api_keys.py
+msgctxt "api key"
+msgid "maker"
+msgstr "quién la creó"
+
 #: models.py:423
 msgctxt "api key"
 msgid "created at"
@@ -1708,6 +1713,10 @@ msgstr "Demasiadas keys probadas desde aquí."
 #: services.py:2147
 msgid "This API key may not do that on this app."
 msgstr "Esta API key no puede hacer eso en esta app."
+
+#: services/api_keys.py
+msgid "Whoever made this API key is no longer in the business. Make a new one."
+msgstr "Quien creó esta API key ya no está en el negocio. Crea una nueva."
 
 #: services.py:2151
 msgid "This API key went past its requests a minute: wait a moment."

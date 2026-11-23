@@ -2086,8 +2086,9 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `base.queries.ownership.Owned`. Es de la persona si la cobró (`created_by` es su usuario) o si se atribuyó a su ficha
   de Personal (`staff_id`; la ficha la dice Personal por su `own_records`, sin que Ventas la requiera). Quien no
   tiene `sale.view_all_sales` lee y toca solo esas (`SALES.visible(ctx)` y `visible_sale`, con el mismo 404
-  `sale.sale_not_found` que una venta que no existe). Quien no es una persona (una llave de API, una automatización,
-  la plataforma) no tiene «suyas»: alcanza las que le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
+  `sale.sale_not_found` que una venta que no existe). Una llave de API lee como quien la creó
+  (BASE-F125). Quien no tiene a nadie detrás (una automatización, la plataforma) no tiene «suyas»: alcanza las que
+  le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
   el periodo, hoy, los 7 días y lo de cada profesional) suman `SALES.counted(ctx)`: el negocio entero solo con
   `sale.view_all_sales` y `base.view_business_totals`, y si no, las suyas, aunque abra las de todos una a una. Lo de
   cada profesional lee `SaleLine`, que no es de nadie: filtra sus líneas con `sale__in` sobre esas ventas, y las
