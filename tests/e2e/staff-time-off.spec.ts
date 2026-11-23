@@ -7,6 +7,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { pickDay } from './date-time-fields';
 import { staffCleanUp } from './staff-helpers';
 import { offersRowAction, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -36,8 +37,8 @@ async function requestDays(page: Page, from: string, to: string, reason: string)
   await shown(page).locator('[data-testid=staff-time-off-add]').click();
   await expect(page.locator('ion-modal[data-testid=staff-time-off-form] ion-title')).toHaveText('Request time off');
   await expect(page.locator('[data-testid=staff-time-off-form-member_id]')).toHaveCount(0);
-  await page.locator('[data-testid=staff-time-off-form-start_date] input').fill(from);
-  await page.locator('[data-testid=staff-time-off-form-end_date] input').fill(to);
+  await pickDay(page, page.locator('[data-testid=staff-time-off-form-start_date]'), from);
+  await pickDay(page, page.locator('[data-testid=staff-time-off-form-end_date]'), to);
   await page.locator('[data-testid=staff-time-off-form-reason] textarea').fill(reason);
   await page.locator('[data-testid=staff-time-off-form-submit]').click();
 }

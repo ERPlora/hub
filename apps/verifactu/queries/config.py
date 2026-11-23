@@ -111,10 +111,12 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     input=NoInput,
     output=ConfigOut,
     ai={
-        "description": "VeriFactu's configuration: the environment (testing or production), the sending route (ERPlora "
-        "files for the business, or its own certificate), the own certificate uploaded here (holder and expiry, never "
-        "its material), the signed authorisation's state as the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
-        "records from leaving now.",
+        "description": "VeriFactu's configuration, on its two screens. On Configuration (/verifactu/config): the own "
+        "certificate uploaded here (holder and expiry, never its material) and the signed authorisation's state as the "
+        "ERPlora account says. On Settings (/verifactu/settings): the environment (testing or production), the sending "
+        "route (ERPlora files for the business, or its own certificate), what keeps records from leaving now, the "
+        "software producer's details and the responsible declaration, which ERPlora signs as the software's producer, "
+        "not the business.",
         "asks": {
             "en": (
                 "which route files our invoices with the AEAT, and are we still in testing?",

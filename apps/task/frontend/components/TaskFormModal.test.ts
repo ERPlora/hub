@@ -6,12 +6,13 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { TaskOut } from '../operations';
 import { click, ionValue, mountTask, settle } from '../__tests__/mount-task';
 import TaskFormModal from './TaskFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean; required?: boolean };
 
 export const TASK: TaskOut = {
   id: 't1',
@@ -63,6 +64,8 @@ describe('TaskFormModal: New task', () => {
       'Tags',
     ]);
     expect(s.field('priority').value).toBe('medium');
+    // The due day is the app's own calendar (never the device's), and a task may have none.
+    expect([s.field('due_date').readonly, s.field('due_date').required]).toEqual([true, false]);
     expect([s.combo('task-form-assignee')?.props('label'), s.combo('task-form-assignee')?.props('placeholder')]).toEqual([
       'Assigned to',
       'Unassigned',
@@ -81,7 +84,8 @@ describe('TaskFormModal: New task', () => {
     await ionValue(s.field('title'), ' Clean the store room ', 'ionInput');
     await ionValue(s.field('description'), 'Shelves too', 'ionInput');
     await ionValue(s.field('priority'), 'urgent', 'ionChange');
-    await ionValue(s.field('due_date'), '2026-10-20', 'ionInput');
+    await pick(s.field('due_date'), '2026-10-20');
+    expect(s.field('due_date').value).toBe('10/20/2026');
     await ionValue(s.field('tags'), 'stock, opening', 'ionInput');
     s.combo('task-form-assignee')!.vm.$emit('update:modelValue', { id: 'm1', label: 'Ana López' });
     s.combo('task-form-project')!.vm.$emit('update:modelValue', { id: 'p1', label: 'Opening' });
@@ -124,7 +128,7 @@ describe('TaskFormModal: Editing task — {number}', () => {
   it('is named after the task, loaded, has no assignee field, and saves only what changed', async () => {
     const s = await setup(TASK);
     expect(s.inDoc('task-form')?.getAttribute('aria-label')).toBe('Editing task — TSK-20261015-0001');
-    expect([s.field('title').value, s.field('priority').value, s.field('due_date').value, s.field('tags').value]).toEqual([
+    expect([s.field('title').value, s.field('priority').value, picked(s.field('due_date')), s.field('tags').value]).toEqual([
       'Clean the store room',
       'high',
       '2026-10-20',
@@ -134,7 +138,7 @@ describe('TaskFormModal: Editing task — {number}', () => {
     expect(s.combo('task-form-project')?.props('modelValue')).toEqual({ id: 'p1', label: 'Opening' });
     expect(s.save().textContent).toContain('Save');
     s.answer(200, TASK);
-    await ionValue(s.field('due_date'), '', 'ionInput');
+    await pick(s.field('due_date'), '');
     s.combo('task-form-project')!.vm.$emit('update:modelValue', null);
     await settle();
     await click(s.save());

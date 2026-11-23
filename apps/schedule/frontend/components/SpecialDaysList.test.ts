@@ -9,6 +9,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { SpecialDayOut } from '../operations';
 import { errorFrame, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
 import { itNamesTheListThatDoesNotLoad, itOnlyReadsForAnEmployee } from '../__tests__/list-checks';
@@ -101,7 +102,7 @@ describe('SpecialDaysList', () => {
     const panel = s.find('schedule-special-days-filters-panel');
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="schedule-special-days-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
-    set('date_from', 'ionChange', '2026-12-01');
+    await pick(panel.get('[data-testid="schedule-special-days-filter-date_from"]').element, '2026-12-01');
     set('name', 'ionInput', 'eve');
     set('recurring_yearly', 'ionChange', 'false');
     await flush();

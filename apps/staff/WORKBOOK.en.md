@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a28afc2fcae49df6c8fa9e1b4830720e584c6783792ffcb16473ade01aaaf65b -->
+<!-- generated from WORKBOOK.md sha256:e0b2588ffd05f74d0eb6a8b13824c8156b4e2fc38f3755c8b24474780c0cd50b -->
 
 ## What it is for and who it is for
 
@@ -394,9 +394,9 @@ must be before the end time.", "The break needs a start and an end, or neither."
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
 accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
-as soon as any day changes (ticked, unticked, or an hour typed), without saving again. A day's
+as soon as any day changes (ticked, unticked, or an hour picked), without saving again. A day's
 reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
-typed), without saving again; the other days' reasons stay until those days change.
+picked), without saving again; the other days' reasons stay until those days change.
 Involved: none
 
 ### STAFF-F14 Edit a schedule
@@ -555,8 +555,8 @@ Screen: Settings
 Steps:
 1. Open **Settings**: the saved default working day shows or, if it was never saved, the proposed one (from
    09:00 to 18:00 with a 60-minute break).
-2. Change the start and the end in HH:MM (the end, after the start: a schedule's day does not cross
-   midnight) and the break, from 0 (no break) to 480 minutes and shorter than the working day.
+2. Pick the start and the end times (the end, after the start: a schedule's day does not cross
+   midnight) and change the break, from 0 (no break) to 480 minutes and shorter than the working day.
 3. Tap **Save**.
    What is changed while it is saving is not lost: it stays on screen, still to save.
 In: what was sent; the rest stays as it was.

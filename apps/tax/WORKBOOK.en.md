@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:627c5864767b36932b006d96bf7cacce22baac974720c665ac2433ed986b7d51 -->
+<!-- generated from WORKBOOK.md sha256:b0430818ff96c837575d3e93b920229db3e726820186f8bff564ce9a2a8ab3e8 -->
 
 ## What it is for and who it is for
 
@@ -314,7 +314,7 @@ Actor: owner, administrator, manager
 Screen: Rules
 Steps:
 1. In the row of the rule in force tap "Set end date".
-2. Type the last day it applies (the day before the new rate starts) and tap "Save end date".
+2. Pick the last day it applies (the day before the new rate starts) and tap "Save end date".
 3. Create the new rule with **+** and "Valid from" the next day.
 4. The table shows both with their dates; from the day of the change new sales use the new one.
 In: the end date (included) and the data of the new rule.

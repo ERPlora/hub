@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ccc2b0ff32c776299e7691fe7faf498ff88865fa203e4b3aab379f6223559342 -->
+<!-- generated from WORKBOOK.md sha256:640b9ee7377450c313bea49984b51a242bf325614c24dd1ec1ea2f264dae671a -->
 
 ## What it is for and who it is for
 
@@ -240,7 +240,7 @@ Steps:
    professionals who are **Active and Bookable and perform all of them** show; if a service has nobody
    assigned, for that service the whole bookable team counts. "Duration (min)" is filled in with the sum of the
    durations (the professional's own if they have one, otherwise the catalogue's).
-3. Type the day and tap one of the **Free times** (or type another time).
+3. Pick the day and tap one of the **Free times** (or pick another time).
 4. Tap **Add appointment**. If the business allows overlaps and that time clashes with another appointment
    of the professional, answer "Overlapping appointment".
 5. The appointment shows as **Confirmed** with its number (for example, APT-20261116-0001).
@@ -284,9 +284,9 @@ Steps:
 In: the business's opening hours, the shift and the time off, the blocks, the appointments and the
 settings.
 Out: the list of times; it saves nothing.
-If it fails: "The free times could not be loaded. You can still type a time." with
-**Retry**; the typed time is judged when saving. With no times: "No free times that day for this
-professional. You can still type a time.".
+If it fails: "The free times could not be loaded. You can still pick a time." with
+**Retry**; the picked time is judged when saving. With no times: "No free times that day for this
+professional. You can still pick a time.".
 Involved: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirm a pending appointment

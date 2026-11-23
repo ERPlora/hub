@@ -301,7 +301,7 @@
       "monthDay": "Día del mes",
       "monthDayHint": "Un mes sin ese día se salta.",
       "time": "Hora",
-      "at": "Fecha y hora",
+      "at": "Fecha",
       "weekdays": [
         "lunes",
         "martes",

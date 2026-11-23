@@ -15,13 +15,13 @@ import {
   type DataTableAction,
   type DataTableColumn,
   type DataTableFilters,
+  DateField,
   EmptyState,
   InlineFeedback,
   StatusPill,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
 import BlockedDateFormModal from '../components/BlockedDateFormModal.vue';
@@ -263,16 +263,13 @@ const isBlocked = computed(() => blockingError(noticeError.value));
       <section class="reservation-availability__section">
         <h3>{{ $t('reservation.availability.occupancy') }}</h3>
         <div class="reservation-availability__bar">
-          <ion-input
+          <DateField
             class="reservation-availability__date"
-            data-testid="reservation-availability-date"
-            type="date"
-            :value="day"
+            testid="reservation-availability-date"
+            :model-value="day"
             :label="$t('reservation.availability.date')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            @ion-change="setDay(String($event.detail.value ?? ''))"
+            required
+            @update:model-value="setDay"
           />
           <div class="reservation-availability__notes">
             <p
