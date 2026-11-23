@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:88042c6028b65830c2770a8b15405592b3f13ac75abce018b342b9228c9a8011 -->
+<!-- generated from WORKBOOK.md sha256:22d71478c98b3cd33cd0a02d8f2952ef5637bab59b52b0b591cdd634e021560a -->
 
 ## What it is for and who it is for
 
@@ -2497,10 +2497,14 @@ Steps:
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
      it say on which screen it is done.
   10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
-     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
-     many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
-     question. Every date and time it says is in the business's time, the one the
-     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
+     with the date and time at that moment, the business's language and the one the person chose in "My profile", its
+     sector, the apps it has on, to whoever runs it its plan and how many apps it counts (only those the business
+     chose, as Apps says) and, to whoever may see them, the settings of Sales & POS, Cash register and Reservations
+     when they are on (how it charges, how the drawer opens and closes, whether each reservation needs a phone); it
+     does not have to look them up for each question. Every date and time it says is in the business's time, the one the
+     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
+     amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
+     it tells as €3.60, never as €360.00.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
@@ -2606,7 +2610,10 @@ Steps:
      Create a task, Create a customer"); a template of the catalogue, by its name and its language, as in Import
      ("Template: Restaurant (English)"), never by its code, and the apps it loads, by their name ("Apps to load: Sales &
      POS, Invoicing"), also when none is chosen and it loads all of its own ("Time clock, Cash register, Menus and
-     combos and 17 more"); a list of lines that carry only their record, such as the services of an appointment, the same
+     combos and 17 more"); the rows of a file being imported (products, categories or customers), by the name of each,
+     as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
+     another of its cells) and, in Inventory, the tax categories they take, once each and by their name ("Tax category:
+     Restaurant — food"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
@@ -2615,7 +2622,13 @@ Steps:
      person's language and an amount as money ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
      Colour · 3"; when a line cannot be named, the list says how many it carries: it would read as a bare figure); and
      any other, such as a line with two records (the employee and the product of a sale), one with a text of its own or
-     a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
+     **Charge** sheet: the total, as the POS works it out for whoever asks ("Total: €12.50"), and each payment method
+     with what it pays ("Payments: Cash · €12.50"; the one without an amount pays what the others leave and, when none
+     is said, all of it in cash, as the action charges), never "1 item" nor the check's version, which only the
+     **Charge** sheet uses; payments that do not add up to the total show as they were said, beside the total, and
+     when the total cannot be worked out (the check is no longer there or whoever asks cannot see it) it is not made
+     up: in both cases the action refuses it when it runs; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
@@ -2645,8 +2658,12 @@ Steps:
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
-     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
-     person changes language, the earlier receipts show entirely in the new one, the app's name too.
+     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". The one
+     of a failure says the reason in one sentence: if its app refuses it, the same one its screen would give ("Not
+     done, it failed: Remove in Employees. That person is not in this business."); if what did not fit was the data
+     the assistant sent, which, with the name the card gives them ("The assistant sent data that does not fit:
+     Products."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
+     too; the reason, said in the other language, no longer shows.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
 done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
 app declares it, the check it makes before the card, as the person: if it refuses the data (adding someone with a role

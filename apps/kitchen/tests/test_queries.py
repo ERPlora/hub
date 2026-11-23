@@ -419,7 +419,7 @@ def test_merging_two_checks_brings_the_rounds_along(clock, product):
         {"from_order_id": str(first.id), "to_order_id": str(second.id)},
     )
     tickets = run("kitchen.ticket.by_order", {"order_id": str(second.id)}).tickets
-    assert sorted(t.label for t in tickets) == ["Table 5", "Table 6"]
+    assert [t.label for t in tickets] == ["Table 6", "Table 6"]
     assert [t.status for t in board().cooking] == ["pending", "pending"]
     assert run("kitchen.ticket.by_order", {"order_id": str(first.id)}).tickets == []
 
@@ -427,7 +427,7 @@ def test_merging_two_checks_brings_the_rounds_along(clock, product):
 def test_a_round_not_saved_yet_reads_the_title_of_the_check_it_is_on_now(
     clock, product
 ):
-    # Sales keeps no trace of the check a line was fired from; once saved, the label stays.
+    # Sales keeps no trace of the check a line was fired from: the round says the check it is on now, as a saved one does.
     first, _ = fired_round(product, "Burger", label="Table 5")
     clock.advance(seconds=1)
     second, _ = fired_round(product, "Soup", label="Table 6")

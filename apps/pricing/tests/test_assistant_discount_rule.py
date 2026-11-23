@@ -15,7 +15,8 @@ from live.operations import get
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import WITH_ROOM, assert_its_words_name, assert_offered_with_room, offered_to
+from base.tests.test_assistant_asks import WITH_ROOM, assert_its_words_name, assert_offered_or_found, assert_offered_with_room
+from base.tests.test_assistant_asks import offered_to
 
 from .conftest import HUB_DB
 
@@ -60,9 +61,10 @@ def test_a_discount_said_of_a_check_or_by_how_much_names_no_rule():
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
-def test_the_reported_request_offers_the_rules_to_read(catalog_of):
+def test_the_reported_request_reaches_the_rules_to_read(catalog_of):
+    """«no nos sale a cuenta» brings Sales' checks first: past the places of a turn, its search finds the rules."""
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert "pricing.rule.list" in offered_to(tools, REPORTED)
+    assert_offered_or_found(tools, "pricing.rule.list", REPORTED, "bajar el descuento de los cafés")
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)

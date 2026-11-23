@@ -23,7 +23,7 @@ from apps.invoice.tests.conftest import (
 )
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, comparable, offered_to, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 
@@ -194,12 +194,18 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     assert {probe["tool"] for probe in PROBES} == TOOLS  # positive control: one probe per tool, all read
 
 
+#: The task the model searches for when a reported request brings the read that finds its record past the places of a
+#: turn.
+SEARCHED = {"flow.flow.detail": "ver una automatización"}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert place_of_no_ask(tools, name, phrase) is not None
-    assert FINDS.get(name, name) in offered_to(tools, phrase)
+    finds = FINDS.get(name, name)
+    assert_offered_or_found(tools, finds, phrase, SEARCHED.get(finds))
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)

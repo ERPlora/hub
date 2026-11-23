@@ -4,7 +4,7 @@ import pydantic
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.ninja import FIELD_MESSAGES
-from live.operations import AI, operation
+from live.operations import operation
 from live.outbox import record_event
 
 from apps.customer import events
@@ -15,6 +15,7 @@ from apps.customer.queries import business_country, has_live_twin
 from apps.customer.schemas.cards import CustomerIn
 from apps.customer.schemas.importing import ImportIn, ImportOut, ImportRowIn
 from apps.customer.services.writes import PHONE_INVALID
+from base.assistant import file_rows
 
 COUNTRY_IMPORTED_EMPTY = _(
     "Country not recognised: imported without country, check it on the card."
@@ -89,15 +90,17 @@ def _import_row(
     permission="customer.manage",
     input=ImportIn,
     output=ImportOut,
-    ai=AI(
-        "Creates customers in bulk from up to 50 rows of a CSV file: each row is checked on its own, the bad ones "
-        "are skipped with their reason and the rest are created without consent.",
-        risk="high",
-        asks={
+    # A dict, not AI(...): AI carries no card summary (base.assistant.cards.card).
+    ai={
+        "description": "Creates customers in bulk from up to 50 rows of a CSV file: each row is checked on its own, "
+        "the bad ones are skipped with their reason and the rest are created without consent.",
+        "risk": "high",
+        "asks": {
             "en": ("import my customers from this file", "bring in my clients from this CSV"),
             "es": ("súbeme los clientes de este fichero", "carga los clientes de este CSV"),
         },
-    ),
+        "summary": file_rows.by_name,
+    },
 )
 def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     rows = []

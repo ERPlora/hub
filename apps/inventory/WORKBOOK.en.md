@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:67aaffa7b3e69eb7f9cf38a6e26034ea9dcccc6c761bb70c2ff08b7c6690aaea -->
+<!-- generated from WORKBOOK.md sha256:d5c5cbae8d9e202a4f8077aad53add602780fbc969a585e49e4ac1381f38ffe2 -->
 
 ## What it is for and who it is for
 
@@ -381,6 +381,8 @@ Out: the product changed, with its categories, in a single step. Inventory tells
 each category added or removed. The new price is for what is added to a bill from now on: an open
 bill keeps the price from when it was ordered (Sales decides it).
 If it fails: the same refusals as creating, inside the panel, and nothing is saved.
+Asked of the assistant, a product the business does not have, or a name that fits several, draws no card: the
+assistant says which one is not there or asks which one it is (as in every action of Inventory, see "Services").
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.". Changing the cost belongs to whoever sees the costs: it is refused to someone who does not see
@@ -1245,7 +1247,9 @@ its card (BASE-F97), which names each record as the screens name it, never by it
 ("Product: Red wine"), the category by its name ("Category: Drinks"), a product's categories one by one ("Categories:
 Drinks, Wines") and each line of a goods receipt with its product and its quantity ("Receive in Inventory: Red wine ·
 6, Beer · 2.5"). What the person asking cannot see,
-or what no longer exists, is left out.
+or what no longer exists, is left out. An action that names a product or a category the business does not have, or a
+name that matches several, draws no card: before asking for the yes, Inventory looks it up as the action will, and the
+assistant says which one is not there (in a goods receipt, on which line) or asks which one it is.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -1258,6 +1262,9 @@ or what no longer exists, is left out.
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |
 | One category by its id or its name: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view categories | F06, F07, F08 | `inventory.category.get` |
+| The product a stock count or a write-off names, as the action will find it: what the assistant checks before its card; it is not an assistant tool and has no API route | view products | F14, F15 | `inventory.product.check` |
+| The products of each line of a goods receipt, all of them or none: what the assistant checks before its card; it is not an assistant tool and has no API route | view products | F13 | `inventory.product.bulk_check` |
+| The product and the category that putting a product in a category or taking it out names: what the assistant checks before its card; it is not an assistant tool and has no API route | view products | F08 | `inventory.product_category.check` |
 | The ledger of movements: date, product, type, quantity, balance, reason, reference and who made it | view stock | F16 | `inventory.movement.list` |
 | The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost (empty for whoever does not see the costs) and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
 | The units of measure with their step | view products | F26 | `inventory.unit.list` |

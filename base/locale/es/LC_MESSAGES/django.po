@@ -2554,3 +2554,9 @@ msgstr "%(n)s dígitos"
 msgctxt "base"
 msgid "Once on"
 msgstr "Una vez activada"
+
+msgid "The assistant sent data that does not fit."
+msgstr "El asistente envió datos que no valen."
+
+msgid "The assistant sent data that does not fit: {names}."
+msgstr "El asistente envió datos que no valen: {names}."

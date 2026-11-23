@@ -319,5 +319,5 @@ def test_a_line_added_to_a_cart_in_another_currency_is_priced_in_it(currency, mo
         cart = run(ctx, "cart_checkout.cart.create", {"session_token": "sess_ana", "customer_name": "Ana García", "currency": currency})
         which = {"cart_id": str(cart.id), "session_token": "sess_ana", "customer": "Ana García"}[datum]
         card = assistant.cards.card(get("cart_checkout.item.add"), {datum: which, **BESIDES["cart_checkout.item.add"]}, "es", ctx)
-    [price] = [field for field in card["fields"] if field["name"] == "unit_price"]
-    assert {key: price[key] for key in ("kind", "value", "money") if key in price} == {"kind": "money", "value": 900, "money": money}
+    [line] = [field for field in card["fields"] if field["name"] == "item"]
+    assert line["value"]["unit_price"] == {"kind": "money", "value": 900, "money": money}

@@ -171,7 +171,7 @@ def test_a_charge_says_the_payment_method_in_the_persons_language(shampoo, langu
         {"idempotency_key": KEY, "lines": [{"product_id": str(shampoo.id)}], "payments": [{"method_id": str(cash.id)}]},
         language,
     )
-    assert said["payments"] == [{"method_id": method}]
+    assert said["payments"] == [{"method": method, "amount": {"kind": "money", "value": 1210}}]
 
 
 @HUB_DB

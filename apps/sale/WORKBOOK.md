@@ -350,7 +350,9 @@ Pasos:
    efectivo, se abre el cajón): se lee «Enviado a Barra.» y el papel en pantalla es ya una copia.
    Sin Impresión encendida, sin impresora de tiques o con el documento fiscal pendiente, el tique se
    imprime desde el Documento de venta. Un fallo de la impresora nunca deshace el cobro.
-Entra: los artículos y precios de Inventario; los tipos de IVA de Impuestos; los ajustes del TPV.
+Entra: los artículos y precios de Inventario; los tipos de IVA de Impuestos; los ajustes del TPV; el
+cliente de la cuenta, de Clientes: una cuenta cobrada sin decir el cliente (por el asistente o la API)
+sale a nombre del que tiene la cuenta (CUSTOMER-F19), como en el TPV al recuperarla.
 Sale: la venta cobrada e inmutable, con número `AAAAMMDD-NNNN` del día del negocio, sus líneas, su
 pago y su desglose de IVA (una fila por clave fiscal, cerrada una sola vez: lo mismo que declara la
 factura), y la cuenta cerrada. Con Facturación, su tique (F2) numerado en la serie del año en el mismo
@@ -372,7 +374,7 @@ cobrar se lee en la hoja con su frase (p. ej. «Un producto del tique ya no est�
 vuelve a añadirla.») y la cuenta sigue intacta. Si otro dispositivo cambia la cuenta mientras cobras, no se cobra
 nada y la hoja dice «La cuenta ha cambiado mientras se cobraba…»: revisa las líneas y vuelve a pulsar «Cobrar»,
 que cobra lo que hay.
-Implicados: INVENTORY-F21, CUSTOMER-F20, TAX-F18
+Implicados: INVENTORY-F21, CUSTOMER-F19, CUSTOMER-F20, TAX-F18
 
 ### SALE-F02 Cobrar con tarjeta u otro medio sin cambio
 Estado: hecho
@@ -1638,6 +1640,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
+| Cuenta con título nuevo | Cambiar el título de una cuenta abierta, también al pasarla a otra mesa o volver a sentarla | La cuenta | `sale.order.relabeled` |
 | Línea quitada | Quitar o anular una línea | La cuenta y la línea | `sale.order.line_removed` |
 | Línea anulada | Anular una línea enviada | La cuenta, la línea y el motivo | `sale.order.line_voided` |
 | Medio de pago, ajustes, sección, nota rápida | Crearlos o cambiarlos | Cuál | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |

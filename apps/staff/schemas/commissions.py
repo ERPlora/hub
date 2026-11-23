@@ -99,5 +99,5 @@ class CommissionReportOut(Schema):
         description="Everyone who can earn a commission (active or on leave), also without sales, and whoever "
         "sold in the period though inactive or terminated, by name."
     )
-    total_sold: int = Field(description="What the rows sold, in cents.")
-    total_commission: int = Field(description="The rows' commissions added up, in cents.")
+    total_sold: int = Field(description="What the rows sold, in cents.", json_schema_extra={"money": True})
+    total_commission: int = Field(description="The rows' commissions added up, in cents.", json_schema_extra={"money": True})

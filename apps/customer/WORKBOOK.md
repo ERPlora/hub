@@ -641,10 +641,11 @@ Pasos:
    enlace sin cliente y el enlace se quita.
 Entra: el pedido y el cliente (o ninguno), con el permiso de quien está en la caja.
 Sale: el enlace cliente ↔ pedido y su aviso (`customer.order.linked` o `customer.order.unlinked`).
-Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17).
+Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17) y, al cobrar una cuenta sin decir el
+cliente (por el asistente o la API), para que la venta sea suya (SALE-F01).
 Si falla: la venta sigue; Venta avisa «No se ha podido unir el cliente a la cuenta. Vuelve a
 elegirlo.» (o con el motivo que dé Clientes). Un cliente que ya no está disponible no se enlaza.
-Implicados: SALE-F17
+Implicados: SALE-F01, SALE-F17
 
 ### CUSTOMER-F20 Sumar la compra a la ficha al cobrar
 Estado: hecho

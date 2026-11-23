@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:88b506773c7056827cb488ce42f0a0ab3a7fc4af9ac6c9626f1eb69a685c9347 -->
+<!-- generated from WORKBOOK.md sha256:9845920fe4cf14ba309b1f5525cf23af0736d16d9131785712e80e8449ee4d41 -->
 
 ## What it is for and who it is for
 
@@ -228,10 +228,9 @@ Actor: owner, administrator, manager, assistant
 Screen: Home, Hours
 Steps:
 1. On the **Home**, while the week is the default one, "Finish setting up your business" brings "Confirm
-   your opening hours" ("We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches
-   your business, confirm it in one tap; if not, edit the days that differ — bookings outside your
-   opening hours are refused."), "Recommended", to whoever may change the hours. "Set up" leads to
-   **Hours**.
+   your opening hours" ("Check that the week's hours are your business's: if they are, confirm them in
+   one tap; if not, edit the days that differ — bookings outside your opening hours are refused."),
+   "Recommended", to whoever may change the hours. "Set up" leads to **Hours**.
 2. With the yellow notice "These are default opening hours…" in sight, check that the days are your
    business's.
 3. Tap **Yes, these are my hours**; the button is disabled while it works.
@@ -241,10 +240,12 @@ Out: the week marked as confirmed, without changing a single hour, and a notice 
 then on the week also governs table reservations (SCHEDULE-F12). Confirming twice changes nothing and
 announces nothing. "Confirm your opening hours" is "Done" on the Home without a reload; also if, instead
 of confirming, a day is saved (SCHEDULE-F02), even as closed. Changing "Week starts", a special day or
-a temporary change does not confirm the week.
+a temporary change does not confirm the week. The done step stays on the list with the same line, which
+names no day and no hour: the assistant says it is done and, asked which hours there are, reads them in
+Schedules (SCHEDULE-F01), never from the step (BASE-F12).
 If it fails: above the table: "There are no weekly opening hours to confirm." if no day is saved (it cannot be
 reached from the screen: the notice only shows when there is a week).
-Involved: BASE-F01
+Involved: BASE-F01, BASE-F12
 
 ### SCHEDULE-F04 Add a special day
 Status: done (server and screen)

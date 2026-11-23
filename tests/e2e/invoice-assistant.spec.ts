@@ -125,10 +125,10 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await expect(preview).toContainText(`Total: ${euros(-12100)}`);
   // The preview was the Hub's own reading, sent to the model as it is: never a figure the model made up.
   expect(toldPreview()).toMatchObject({
-    original: { number: invoice.number, total_amount: 12100, remaining: 12100 },
+    original: { number: invoice.number, total_amount: '121.00 EUR', remaining: '121.00 EUR' },
     invoice_type: 'R1',
     next_number: expected.next_number,
-    total_amount: -12100,
+    total_amount: '-121.00 EUR',
   });
   // Reading it issued nothing; the card is the dangerous one, naming the invoice and the reason.
   expect((await invoiceOf(context, invoice.id)).status).toBe('issued');

@@ -2515,9 +2515,13 @@ Pasos:
      hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
      pantalla se hace.
   10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
-     hora de ese momento, su sector, las apps que tiene encendidas y, a quien lo administra, su plan y cuántas apps le
-     cuenta (solo las que eligió el negocio, como dice Apps); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
-     pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18.
+     hora de ese momento, el idioma del negocio y el que la persona eligió en «Mi perfil», su sector, las apps que
+     tiene encendidas, a quien lo administra su plan y cuántas apps le cuenta (solo las que eligió el negocio, como
+     dice Apps) y, a quien puede verlos, los ajustes de Ventas / TPV, Caja y Reservas cuando están encendidas (cómo se
+     cobra, cómo se abre y se cierra la caja, si cada reserva pide teléfono); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
+     pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
+     importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
+     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -2622,7 +2626,10 @@ Pasos:
      cliente»); una plantilla del catálogo, por su nombre y su idioma, como en Importar («Plantilla: Restaurante
      (español)»), nunca por su código, y las apps que carga, por su nombre («Apps que se cargan: Ventas / TPV,
      Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
-     y 17 más»);
+     y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
+     como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
+     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una y por su nombre
+     («Categoría fiscal: Restauración — comida»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
@@ -2632,7 +2639,13 @@ Pasos:
      cifras, la cantidad como se escribe en el idioma de la persona y un importe como dinero («Productos: Vino tinto · 6;
      Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; si una línea no se puede nombrar, la lista dice
      cuántas lleva: se leería como una cifra suelta); y cualquier otra, como una línea con dos registros (el empleado y
-     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; y un dato
+     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; un cobro,
+     por su total y cómo se paga, como el botón de la hoja **Cobro**: el total, tal como lo calcula el TPV para quien
+     pregunta («Total: 12,50 €»), y cada forma de pago con lo que paga («Pagos: Efectivo · 12,50 €»; la que va sin
+     importe paga lo que dejan las otras y, si no se dice ninguna, todo en efectivo, como cobra la acción), nunca
+     «1 elemento» ni la versión de la cuenta, que solo usa la hoja **Cobro**; unos pagos que no suman el total salen
+     tal como se dijeron, junto al total, y si el total no se puede calcular (la cuenta ya no está o quien pregunta no
+     puede verla) no se inventa: en los dos casos la acción lo rechaza al ejecutarse; y un dato
      que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
@@ -2662,8 +2675,12 @@ Pasos:
      hecho y no propone deshacerlo salvo que se lo pidan.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
-     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
-     persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
+     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». El de
+     un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su pantalla («No se hizo, falló:
+     Quitar en Empleados. Esa persona no está en este negocio.»); si lo que no valía eran los datos que envió el
+     asistente, cuáles, con el nombre que les da la tarjeta («El asistente envió datos que no valen: Productos.»). Si
+     la persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app; el
+     motivo, que se dijo en el otro idioma, ya no sale.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
 que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio; y,
 si su app la declara, la comprobación que hace antes de la tarjeta, como la persona: si rechaza los datos (dar de alta a
@@ -4266,7 +4283,7 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
-  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras y como mucho `MAX_TOOLS` = 20 por turno, la última la búsqueda `base.assistant.find_tools`, por las
   palabras de la petición que sigue abierta: lo que la persona escribió desde que el modelo pidió su última escritura,
   con sus respuestas a las preguntas del asistente, y nunca menos de sus dos últimos mensajes; `base.setup.status` y
   `base.business.get` siempre; `ranking` lo ordena con las palabras propias del Hub: las de la plataforma, `SYNONYMS`
@@ -4324,13 +4341,16 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `test_a_name_in_cents_alone_makes_no_amount_its_mark_does` y, en Automatizaciones,
   `test_each_datum_of_the_change_comes_as_the_chat_card_says_it`), `signed` exige la marca (`base.E005`, también a un
   `…_cents` sin ella: `test_a_preview_marks_signed_only_an_amount`) y las instrucciones del turno
-  dicen al modelo que un dato marcado `"money": true` va en la unidad menor; lo comprueban
+  dicen al modelo que un dato marcado `"money": true` va en la unidad menor y que un importe de un resultado llega ya
+  en su moneda y lo dice tal cual; lo comprueban
   `test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth`,
   `test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says`,
   `test_no_amount_the_card_painted_as_money_stops_being_one` y el trinquete
   `test_every_amount_the_assistant_shows_or_fills_is_marked_but_the_known_ones` (`UNMARKED_AMOUNTS`, que solo baja:
-  detecta un entero con nombre en `_cents` o cuya descripción habla de «cents», «minor unit» o «céntimos», sin la
-  marca, en la entrada de cada herramienta y en los datos de su vista previa; hoy vacío), con
+  detecta un entero llamado `amount`, `price` (o acabado en `_amount`, `_price` o `_cents`) o `price_delta`, o cuya
+  descripción habla de «cents», «minor unit» o «céntimos», sin la marca y salvo los decimales de una moneda, en la
+  entrada de cada herramienta y en los datos de su vista previa; hoy vacío), el de lo que responde cada herramienta
+  (`test_every_amount_a_tool_answers_is_marked`, con la misma detección; hoy vacío), con
   `test_an_amount_is_marked_only_on_a_whole_number`; la moneda de esos importes, la que nombra el dato de su
   escritura que su esquema marca `json_schema_extra={"currency": True}` (`CURRENCY`, siempre sobre un texto; vale
   para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`) o, sobre
@@ -4397,11 +4417,17 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
   instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
-  zona y hora de allí, sector, apps encendidas y, con `base.administer_hub`, el plan de la foto con las apps que cuenta,
-  `activation.chosen_on` contra `plan.max_apps`; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
-  el modelo lee de una herramienta sale de `run_tool` de `live` con `zone=business_zone()`, así que sus horas van en
-  la zona del negocio y no en UTC: lo comprueba `base/tests/test_business_facts.py`, también con dos negocios en zonas
-  distintas), `base.assistant.usage` (query), `base.assistant.report`,
+  zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
+  encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
+  `plan.max_apps`, y los ajustes de cada app encendida que los declara en `assistant_settings` de su `LiveAppConfig`
+  (Ventas, Caja y Reservas), tal como los contesta esa lectura por `base.assistant.tools.run` y solo si la persona
+  puede correrla; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
+  el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
+  `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
+  como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
+  sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
+  `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
+  `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

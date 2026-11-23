@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8a71f45ffd8e03945c3ec716c5ba0bcb0908320fba6b2c5f062b0424419bef9e -->
+<!-- generated from WORKBOOK.md sha256:f45912919f46a68ff94eb35c88acb62a3e24c55e92f5b4e0a0959df800b7557e -->
 
 ## What it is for and who it is for
 
@@ -172,7 +172,10 @@ Steps:
 1. Ask the assistant to add a product to a cart, saying the cart (its session, or the customer's email or
    name), the product's reference and name, the quantity and the unit price.
 2. Confirm the assistant's card, which says the cart by its session (for example, sess_a1b2c3) or by the
-   customer said, never by its internal code.
+   customer said, never by its internal code; then the line (the product, the quantity as the person's
+   language writes it and the unit price in the cart's currency) and the reference («Pedro · Bravas
+   (portion) · 4 · €6.00 · BRAVAS»). If the cart is not found or what was said fits several, the card gives
+   the price in no currency: the action refuses it on confirming.
 3. The line is saved and the cart's totals (items and amount) are recalculated.
 In: the cart; the product's reference and name (free text: they are not checked against the
 catalogue), optional SKU and variant attributes (size, colour…), a quantity greater than zero and at most

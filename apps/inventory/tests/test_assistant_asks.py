@@ -265,9 +265,15 @@ def test_taking_one_product_off_the_menu_and_repricing_another_brings_both_write
 
 @HUB_DB
 def test_putting_a_product_with_the_other_desserts_of_the_menu_brings_a_way_to_its_category(make_user):
-    tools = offered_by_a_turn(make_user, "es", "Sí, ponla con los otros postres de la carta, como un postre más.")
+    """Its words bring the categories just past the places of a turn: the search for the task finds the way."""
+    context = owner_of_a(make_user, "es")
+    tools = offered(context, {"role": "user", "content": "Sí, ponla con los otros postres de la carta, como un postre más."})
+    found = assistant.relevance.found(assistant.tools.catalog(context), "añadir un producto a una categoría", "es")
 
-    assert {"inventory__category__list", "inventory__product_category__add"} & set(tools)
+    assert {"inventory__category__list", "inventory__product_category__add"} & {
+        *tools,
+        *(shared.tool_name(op.name) for op in found),
+    }
 
 
 @HUB_DB

@@ -69,7 +69,8 @@ class ScheduleConfig(LiveAppConfig):
     ]
     # The Home's step «Confirm your opening hours», order 101 and recommended, done once a person confirmed the
     # default week or saved a day of it (the settings' ``hours_confirmed``), for whoever changes the hours, leading to
-    # the week. Refreshed on the only event that sets it.
+    # the week. Refreshed on the only event that sets it. Its texts name no day or hour: they stay on the list once the
+    # week is the business's own, and the assistant read the default week in them as the week the business has.
     setup = [
         SetupStep(
             key="hours",
@@ -77,9 +78,8 @@ class ScheduleConfig(LiveAppConfig):
             configured_when=[SetupCheck(field="hours_confirmed", truthy=True)],
             title=_("Confirm your opening hours"),
             description=_(
-                "We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches your business, "
-                "confirm it in one tap; if not, edit the days that differ — bookings outside your opening hours are "
-                "refused."
+                "Check that the week's hours are your business's: if they are, confirm them in one tap; if not, edit "
+                "the days that differ — bookings outside your opening hours are refused."
             ),
             icon="ion:time-outline",
             route="/schedule/hours",

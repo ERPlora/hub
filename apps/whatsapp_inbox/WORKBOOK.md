@@ -1404,8 +1404,8 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - **Las 32 herramientas del asistente dicen sus `asks`** en `en` y `es` (hub#1108): `whatsapp_inbox` está en
   `LIVE_ASSISTANT_ASKS_REQUIRED`, y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta entre
   las diez primeras, rol a rol. `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
-  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las 20
-  primeras de las 40 que se ofrecen. Además, cada herramienta tiene una frase propia (`OWN_WORDS`, ni ask ni sonda) que
+  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las 19
+  que ofrece un turno antes de la búsqueda. Además, cada herramienta tiene una frase propia (`OWN_WORDS`, ni ask ni sonda) que
   solo entra entre las diez primeras con sus `asks`: neutralizarlos en una sola herramienta hace caer su caso, y los
   asks que esta app obligó a reescribir (las plantillas de negocio de `base` y la carga de Personal) guardan dos puestos
   de margen. Su `assistant_synonyms` (en `apps.py`) lleva «plantilla» = template y «mensaje» = message (en inglés ya se leían así):

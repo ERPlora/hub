@@ -7,6 +7,7 @@ payload.
 
 import re
 
+from live.models import OutboxEvent
 from live.operations import NAME_RE
 
 from apps.sale import events
@@ -40,6 +41,7 @@ def test_the_events_of_the_workbook():
         "ORDER_COMPLETED": "sale.order.completed",
         "ORDER_VOIDED": "sale.order.voided",
         "ORDER_MERGED": "sale.order.merged",
+        "ORDER_RELABELED": "sale.order.relabeled",
         "ORDER_LINE_REMOVED": "sale.order.line_removed",
         "ORDER_LINE_VOIDED": "sale.order.line_voided",
         "PAYMENT_METHOD_CREATED": "sale.payment_method.created",
@@ -74,6 +76,18 @@ def test_it_reacts_to_two_customer_cards_merged_and_to_a_document_issued():
 
 def test_an_event_it_does_not_follow_is_ignored():
     assert events.react(A, "customer.customer.created", {"id": "x"}) is None
+
+
+@HUB_DB
+def test_a_check_given_a_new_title_says_so_by_its_id_alone():
+    # A title may be a person's name («Ana — terrace»): the event carries only the check, as every event does.
+    order = run("sale.order.open", {"label": "Table 4"})
+    OutboxEvent.objects.all().delete()
+    run("sale.order.set_label", {"order_id": str(order.id), "label": "Ana — terrace"})
+    assert [(e.name, e.payload) for e in OutboxEvent.objects.order_by("id")] == [
+        ("sale.order.changed", {"order_id": str(order.id)}),
+        ("sale.order.relabeled", {"order_id": str(order.id)}),
+    ]
 
 
 @HUB_DB

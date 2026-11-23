@@ -277,6 +277,19 @@ def test_payments_must_add_up_to_the_total(catalog):
     assert refusal.value.code == "sale.payments_do_not_match_total"
 
 
+@pytest.mark.parametrize(
+    "payments",
+    [
+        [{"method": "card"}, {"method": "cash"}],
+        [{"method": "card", "amount": 1800}, {"method": "cash"}],
+    ],
+)
+def test_only_one_tender_pays_what_the_others_leave_and_never_nothing(catalog, payments):
+    with pytest.raises(Conflict) as refusal:
+        complete(lines=[{"product": "STK"}], payments=payments)
+    assert refusal.value.code == "sale.payments_do_not_match_total"
+
+
 def test_an_added_amount_is_refused_while_no_app_adds_a_step_to_the_charge(catalog):
     # What another app adds to a tender (a tip) is only taken when an active app adds a step to the charge, which
     # records it too (SALE-F39): else the drawer and the receipt would hold money nobody accounts for.

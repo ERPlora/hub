@@ -73,15 +73,15 @@ SALE_ORDER_FIRED = "sale.order.fired"
 SALE_ORDER_COMPLETED = "sale.order.completed"
 SALE_ORDER_VOIDED = "sale.order.voided"
 SALE_ORDER_LINE_VOIDED = "sale.order.line_voided"
-#: What Sales does that changes the board: a round fired, a check charged, voided or merged, a line voided.
-#: A line added or a check retitled in any till does not re-run every display (Sales has no event of its
-#: own for a new title yet: asked to Sales, WORKBOOK «Lo que pide a otras apps»).
+#: What Sales does that changes the board: a round fired, a check charged, voided, merged or given a new title (moved to
+#: another table), a line voided. A line added in any till does not re-run every display.
 SALE_EVENTS = [
     SALE_ORDER_FIRED,
     SALE_ORDER_COMPLETED,
     SALE_ORDER_VOIDED,
     SALE_ORDER_LINE_VOIDED,
     "sale.order.merged",
+    "sale.order.relabeled",
 ]
 #: A split moves lines to a new check (opened) and changes the old one: only a check's own tickets care.
 SALE_CHECK_MOVES = ["sale.order.opened", "sale.order.changed"]

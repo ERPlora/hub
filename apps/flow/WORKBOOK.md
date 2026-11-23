@@ -1159,7 +1159,8 @@ Pasos:
    el historial, y los términos del buscador no dejan guardar sus resultados, ni en parte (FLOW-F39). Sí tiene la
    fecha y la hora de hoy y el tipo de cambio entre monedas, como en el chat.
 3. Lo que el asistente consulta se hace en el acto y no se le pregunta a nadie; el historial dice «El asistente
-   ha usado «…».».
+   ha usado «…».». Lo que consulta o cambia le llega como en el chat: las horas en la del negocio y los importes en
+   su moneda, como los enseñan las pantallas (BASE-F93).
 4. Lo que quiere cambiar:
    - con «Que me lo pregunte», no se hace: espera en **Esperan tu respuesta** como «El asistente quiere cambiar
      algo en «…»», con lo que quiere hacer justo debajo («Anular una reserva»), lo que dijo y los datos que
