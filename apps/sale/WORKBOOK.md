@@ -135,7 +135,8 @@ completa» / «Salir de pantalla completa» (la del navegador, cuando el disposi
 cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
 
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos, agotados incluidos
-  («Todos» primero y, con Servicios, «Servicios» detrás), la lupa que abre el buscador («Buscar
+  («Todos» primero y, con Servicios, «Servicios» detrás; las demás, en la posición que les dio el negocio
+  y, a igual posición, por nombre: INVENTORY-F08), la lupa que abre el buscador («Buscar
   producto…», por nombre o SKU; con Servicios busca también sus servicios), la tecla «Hablar» y la
   rejilla: artículos con sus iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al
   final la baldosa «Precio libre». En «Servicios», cada servicio con sus iniciales, su duración y su
