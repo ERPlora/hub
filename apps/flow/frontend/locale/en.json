@@ -1358,6 +1358,7 @@
       "verifactu__aeat_record__list": "Look for the records at the tax agency",
       "verifactu__chain__status": "Read the state of the record chain",
       "verifactu__chain__validate": "Check the record chain",
+      "verifactu__config__check_go_live": "Check whether VeriFactu can go live",
       "verifactu__config__get": "Read the VeriFactu settings",
       "verifactu__contingency__list": "Look for the records held back",
       "verifactu__diagnostic__last": "Read the last VeriFactu check",

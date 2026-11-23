@@ -15,6 +15,7 @@ from . import (
     country as country,
     diagnostics as diagnostics,
     events as events,
+    going_live as going_live,
     reads as reads,
     records as records,
     route as route,
