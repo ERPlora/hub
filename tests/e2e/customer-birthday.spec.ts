@@ -4,7 +4,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, horizontalOverflow, inputOf } from './customer-helpers';
-import { A, login, psql, shot, shown } from './helpers';
+import { A, capture, login, psql, scrolledTo, shown } from './helpers';
 import { toastSaying } from './toast-helpers';
 
 test.afterAll(() => cleanUp());
@@ -26,12 +26,10 @@ async function typeDay(scope: Locator, testid: string, parts: { day: string; mon
 async function threeShots(page: Page, key: string, target: Locator): Promise<void> {
   for (const vp of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(async () => {
-      await target.scrollIntoViewIfNeeded({ timeout: 2000 });
-      await expect(target).toBeInViewport({ timeout: 1000 });
-    }, `${key} at ${vp.label}`).toPass();
+    await scrolledTo(target);
+    await expect(target, `${key} at ${vp.label}`).toBeInViewport();
     await expect.poll(() => horizontalOverflow(page), `sideways scroll at ${vp.label}`).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: shot(`${key}-${vp.label}`) });
+    await capture(page, `${key}-${vp.label}`);
   }
 }
 
