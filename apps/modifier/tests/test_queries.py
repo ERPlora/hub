@@ -18,7 +18,7 @@ def group(name, **fields):
 
 
 def option(group_name, name, **fields):
-    return run("modifier.option.create", {"group": group_name, "name": name, **fields})
+    return run("modifier.option.create", {"group": group_name, "name": name, "price_delta": 0, **fields})
 
 
 def link(group_name, **target):

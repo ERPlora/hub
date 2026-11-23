@@ -277,8 +277,8 @@ def test_a_dish_of_a_menu_carries_its_options_on_the_board_and_on_paper(relay, m
     options, products, _ = menu
     setup("modifier.group.create", {"name": "Doneness", "min_choices": 1, "max_choices": 1})
     setup("modifier.group.create", {"name": "Extras", "max_choices": 2})
-    rare = setup("modifier.option.create", {"group": "Doneness", "name": "Rare", "kitchen_name": "RARE"})
-    cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "kitchen_name": "+CHEESE"})
+    rare = setup("modifier.option.create", {"group": "Doneness", "name": "Rare", "kitchen_name": "RARE", "price_delta": 0})
+    cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "kitchen_name": "+CHEESE", "price_delta": 0})
     for group in ("Doneness", "Extras"):
         setup("modifier.link.attach", {"group": group, "product_id": str(products["STK"].id)})
     order = open_check("Table 4")

@@ -223,7 +223,9 @@ Pasos:
 1. Abre el grupo y, en Opciones, pulsa «Añadir opción».
 2. Escribe el Nombre (único dentro del grupo) y, si hace falta, el nombre de comanda.
 3. Escribe el Suplemento en la moneda del negocio, la de su país, con sus decimales (el yen no tiene):
-   positivo cobra de más, negativo descuenta, vacío o 0 es gratis.
+   positivo cobra de más, negativo descuenta, vacío o 0 es gratis. Por el asistente, una opción pedida sin
+   decir su suplemento («en Extras quiero un Extra de queso») no saca la tarjeta: antes pregunta cuánto se
+   cobra, y solo es gratis si la persona lo dice.
 4. Solo si la opción tributa distinto del plato, elige su categoría fiscal propia; vacía, hereda la del
    plato.
 5. Marca «Elegida por defecto» si el TPV debe traerla ya marcada. En un grupo de máximo 1, marcar otra
