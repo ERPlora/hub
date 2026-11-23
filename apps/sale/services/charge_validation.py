@@ -188,16 +188,23 @@ def _resolved(sent: list[PaymentIn], settings: Settings) -> list[dict]:
     return legs
 
 
+def tender_amounts(sent: list[int | None], total: int) -> list[int] | None:
+    """What each tender pays: the one without an amount, what the others leave; ``None`` when they cannot add up to
+    the sale's ``total`` (more than one without an amount, or the others already reach it)."""
+    given = sum(amount for amount in sent if amount is not None)
+    open_legs = sent.count(None)
+    if open_legs > 1 or (open_legs and given >= total):
+        return None
+    amounts = [total - given if amount is None else amount for amount in sent]
+    return amounts if sum(amounts) == total else None
+
+
 def _fill_the_rest(legs: list[dict], total: int) -> None:
-    """The one tender without an amount pays what the others leave, and the amounts add up to the sale's total."""
-    open_legs = [leg for leg in legs if leg["amount"] is None]
-    given = sum(leg["amount"] for leg in legs if leg["amount"] is not None)
-    if len(open_legs) > 1 or (open_legs and given >= total):
+    amounts = tender_amounts([leg["amount"] for leg in legs], total)
+    if amounts is None:
         raise Conflict(str(PAYMENTS_MISMATCH), code="sale.payments_do_not_match_total")
-    if open_legs:
-        open_legs[0]["amount"] = total - given
-    if sum(leg["amount"] for leg in legs) != total:
-        raise Conflict(str(PAYMENTS_MISMATCH), code="sale.payments_do_not_match_total")
+    for leg, amount in zip(legs, amounts, strict=True):
+        leg["amount"] = amount
 
 
 def _settle(leg: dict) -> None:

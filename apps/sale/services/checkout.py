@@ -8,7 +8,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict
-from live.operations import AI, atomic, operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
@@ -31,6 +31,7 @@ from apps.sale.queries.service_lines import Booking
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.checkout import CompleteIn
 from apps.sale.schemas.sales import SaleOut
+from apps.sale.services import charge_card
 from apps.sale.services.charge_validation import (
     _check_discounts,
     _check_drawer,
@@ -347,15 +348,16 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     input=CompleteIn,
     output=SaleOut,
     expose_api=True,
-    ai=AI(
-        description="Charge a sale: an open check (all its lines, or some for a partial charge) or loose lines (products by "
+    # A dict, not AI(...): AI has no ``summary``, the card's own words (base.assistant.cards.card).
+    ai={
+        "description": "Charge a sale: an open check (all its lines, or some for a partial charge) or loose lines (products by "
         "SKU or name, services by name, open prices by department). The sessions of the lines paid with a voucher are "
         "spent with it (the sale must be charged to the voucher's owner). Payments: cash with what was handed over (change), card or other "
         "methods for the exact amount, or split. The server prices, taxes and numbers it; a ticket up to 3,000 €, above "
         "or on request an invoice with the customer's name, tax ID and address (ask for them). Send the same "
         "idempotency_key on a retry: it never charges twice.",
-        risk="high",
-        asks={
+        "risk": "high",
+        "asks": {
             "en": (
                 "charge table 4",
                 "she paid cash with a 20",
@@ -369,7 +371,8 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 "la mitad en efectivo y el resto con tarjeta",
             ),
         },
-    ),
+        "summary": charge_card.summary,
+    },
 )
 def complete(ctx: OperationContext, data: CompleteIn) -> dict:
     return _complete(ctx, data, over_limit=False)
@@ -381,13 +384,13 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
     permission="sale.discount_over_limit",
     input=CompleteIn,
     output=SaleOut,
-    ai=AI(
-        description="The manager's door to the very same charge as sale.sale.complete, for a discount bigger than the "
+    ai={
+        "description": "The manager's door to the very same charge as sale.sale.complete, for a discount bigger than the "
         "business's cap. For a named open check, resolve it with sale.order.list(search=...) and charge it directly; "
         "do not stop at sale.order.set_discount_over_limit or ask the person for order_id. Never use it to dodge the "
         "cap when the discount fits under it.",
-        risk="high",
-        asks={
+        "risk": "high",
+        "asks": {
             "en": (
                 "charge it with 50% off, I'm authorising the discount",
                 "ring it up with a discount above the cap",
@@ -397,7 +400,8 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
                 "cobra con el descuento aunque pase del máximo",
             ),
         },
-    ),
+        "summary": charge_card.summary,
+    },
 )
 def complete_over_limit(ctx: OperationContext, data: CompleteIn) -> dict:
     return _complete(ctx, data, over_limit=True)
