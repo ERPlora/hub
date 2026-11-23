@@ -10,6 +10,15 @@ from apps.customer.schemas.fields import ConsentSource, CustomerOfIn, _text
 
 HealthTestResult = Literal["", "negative", "positive"]
 
+#: What the assistant reads on every free text of a card it may write: with no tool for health data, a note, the card's
+#: notes, a custom field or an entry of its activity is where it would put an allergy, out of the block and of the
+#: permission it needs.
+NOT_FOR_HEALTH_DATA = (
+    "Never for allergies, sensitivity tests or other health data: those go only in the «Health and allergies» block of "
+    "the customer's card in Customers (/customer/customers), with the customer's own explicit permission, which only "
+    "that screen records. You have no tool for them: tell the person to do it there."
+)
+
 
 class HealthDetailIn(CustomerOfIn):
     pass

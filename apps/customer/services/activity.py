@@ -8,6 +8,7 @@ from apps.customer import events
 from apps.customer.models import Activity
 from apps.customer.queries import find_customer
 from apps.customer.schemas.activity import ActivityIn, ActivityRow, NoteIn
+from apps.customer.schemas.health import NOT_FOR_HEALTH_DATA
 from apps.customer.services.writes import _actor
 
 
@@ -20,7 +21,7 @@ from apps.customer.services.writes import _actor
     output=ActivityRow,
     ai=AI(
         "Adds a note to a customer's card, by its id or exact name, phone or email; the note shows at the top of its "
-        "activity with who wrote it and when.",
+        f"activity with who wrote it and when. {NOT_FOR_HEALTH_DATA}",
         asks={
             "en": (
                 "add a note to Luis",

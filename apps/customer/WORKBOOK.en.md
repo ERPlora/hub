@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:49821b38817589885f63e11050fefcbd216e7ced36018f2b82a6815d7a889791 -->
+<!-- generated from WORKBOOK.md sha256:aa0e6587bbb73c948bc5a01707dd02950bcb23677265338a2f938666889e08b3 -->
 
 ## What it is for and who it is for
 
@@ -311,13 +311,15 @@ Steps:
 2. Tap **Add**. "Note added" shows and the note appears at the top of the "Activity", with who wrote it
    and when.
 In: the text (up to 5,000 characters) and, if whoever writes it puts them in by another way (an
-automation), a title of its own and the author's name.
+automation), a title of its own and the author's name. An allergy, a sensitivity test or other health data
+does not go in a note nor in the card's internal notes: asked to the assistant, it says it does not note
+that itself and that it is done in "Health and allergies" on the card, with their permission (CUSTOMER-F32).
 Out: the note, which IS its entry in the activity (a single row: there can be no note without activity),
 and the note-added notice (`customer.note.added`). Notes are neither edited nor deleted. An automation can
 write notes through the same service.
 If it fails: an empty note shows under the field; "This customer is no longer available." if the card no
 longer exists.
-Involved: none
+Involved: CUSTOMER-F32
 
 ### CUSTOMER-F06 Put groups and tags on a card
 Status: done
@@ -901,14 +903,15 @@ Out: the permission, as one more fact of the consent book (purpose "health data"
 "Activity" and its notice `customer.health.consent_granted` or `customer.health.consent_withdrawn`), and
 the health data, with "Health data updated" in the activity (without its content) and the
 `customer.health.updated` notice. The notices carry only identifiers. Withdrawing the permission ERASES
-the health data in the same step.
+the health data in the same step. The assistant neither reads nor notes health data: asked for an allergy,
+it sends to this block (CUSTOMER-F05).
 If it fails: without the permission in force nothing is saved: "Record their permission first to keep
 health data.". A test with a future date: "This date is in the future."; a result without a date: "Enter
 the date of the test.", each under its field: it goes as soon as that field is corrected and comes back if
 the next try is refused too; what is not of a field shows in the block and stays until the next try.
 "This customer is no longer available." if the card is no longer there. Whoever
 does not manage cards sees the block without buttons.
-Involved: CUSTOMER-F13, CUSTOMER-F16
+Involved: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
 
 ### CUSTOMER-F33 Recover a deleted card
 Status: done
