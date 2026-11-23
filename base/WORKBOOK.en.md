@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a2bd39969ba5241115d725de9e06440307f895965cff145adea6c2a311784df8 -->
+<!-- generated from WORKBOOK.md sha256:e6ee03e9193760b54ef15f4c756af1de886fdfc830ed05553911fab740644ea1 -->
 
 ## What it is for and who it is for
 
@@ -58,6 +58,8 @@ against what the plan includes and, like Google Workspace, the yellow notice at 
 On top, the business's name and "Today" with the long date; while the business has no name, a greeting
 by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this order:
 
+- **How the business is working**, only for who administers it: a coloured label for each app on that says how it is
+  doing (the receipt printer, the WhatsApp number), with what fixes it, and "View system".
 - **"Start with a business like yours"**, only for who administers the business and while the business has
   nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
 - **"My apps"**: one tile per app the person can open, with its icon and its name; the ones opened most in this
@@ -284,9 +286,9 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 
 | State | What the person sees |
 |---|---|
-| Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
+| Loading | The row of how the business is working in grey, grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
-| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". In the app on a computer, "Could not change the start on login setting." (BASE-F120). |
+| Error | Each zone fails on its own: "We couldn't check how your business is working." with "Retry", "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". In the app on a computer, "Could not change the start on login setting." (BASE-F120). |
 | No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks."), except "Start on login", which belongs to the computer and not to the business, and, instead of the list, "Only an administrator can see and remove the devices.". A screen their role does not open, of an app or of the platform (such as "System"), opened by its address: "No access" (BASE-F118). |
 
 On the Settings · Business screen:
@@ -339,7 +341,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | partial |
+| BASE-F02 | See the business at a glance on coming in | done |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -496,32 +498,36 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
-Status: partial — the health row of step 5 is not painted on the Home yet, although the hub already knows what to
-say about the receipt printer; and the WhatsApp Inbox does not say yet how its number is doing (hub#573)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
   1. After coming in, the Home opens (also from "Home" in the side menu).
   2. On top, the business's name (the one on erplora.com) and "Today" with the long date in the app's
      language; while the business has no name, "Good morning", "Good afternoon" or "Good evening".
-  3. Below, in this order: "Start with a business like yours" (only while the business is empty and for
+  3. For who administers the business, under the greeting, a row with how what the business needs to work is
+     doing and "View system", which leads to System. Each app on that the person can see says its own in a coloured
+     label: green what works, amber what needs fixing and grey what could not be checked. With Printing, "Printer
+     ready" if the device that prints the receipts gave signs in the last minute and a half, "Printer not connected"
+     if it is set up but does not answer, or "Printer not set up" if there is none; the last two with "Set up
+     printing", which opens Printing. With the WhatsApp Inbox, "WhatsApp connected", "WhatsApp needs reconnecting" if
+     WhatsApp asks for it, or "WhatsApp not connected" if no number is connected; the last two with "Connect
+     WhatsApp", which opens the Inbox's settings. The row is checked again each time the person comes back to the
+     Home. With no app on that says how it is doing, there is no row. Whoever does not administer the business does
+     not see it.
+  4. Below, in this order: "Start with a business like yours" (only while the business is empty and for
      who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
      panels.
-  4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
+  5. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
      without reloading or reopening the application.
-  5. For who administers the business, at the foot of "Summary", a row with how what the business needs to work
-     is doing and "See system", which leads to System. Each app on that the person can see says its own: with
-     Printing, "Printer ready" if the device that prints the receipts gave signs in the last minute and a half,
-     "Printer not connected" if it is set up but does not answer, or "Printer not set up" if there is none; the
-     last two with "Set up printing", which opens Printing. Whoever does not administer the business does not see
-     the row.
   6. At the bottom, two tabs: "Summary" (the above) and "Activity".
 In: the business's name, the device's date and what each app on says about itself.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
 the zones stack and "My apps" folds. What could not be checked shows as neutral, never as ready and without a
-button, because it is not the viewer's task: "We couldn't check the printer".
-Involved: PRINTING-F21
+button, because it is not the viewer's task: "We couldn't check the printer", "We couldn't check WhatsApp". If the
+whole row cannot be read: "We couldn't check how your business is working." with "Retry".
+Involved: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
 Status: done
@@ -747,10 +753,14 @@ Steps:
   1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list.
+  3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
+     says what the step asks for and not what the business has: "Your catalog" is done because there are already
+     products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
+     Inventory).
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: BASE-F103
+Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
 Status: done
@@ -1925,13 +1935,23 @@ Steps:
      below what happens ("A till nobody touches for {n} minutes closes the session and shows the PIN pad: the
      next sale carries the name of the next person.").
   4. Each change is saved at once, with no button, and the card shows what the business confirms.
+  5. Through the assistant ("I want everyone to have to type their PIN at the till so we know who sells"), the
+     assistant reads how it is and says it by the names of this card: with the PIN pad on and "Until signing
+     out", each person already enters with their PIN and every sale carries their name. To ask again after
+     inactivity, it first asks how many minutes (1, 5, 10, 15 or 30): it never makes them up, nor do the stored
+     ones apply unseen. The card, with each datum on its own line (BASE-F98), says each control it changes by its
+     name and the value it will have here: "Show PIN pad: Yes" and "Ask again after inactivity: 10 min"; "Until
+     signing out", "Show PIN pad: No" or "PIN digits: 6 digits" depending on the change. If only the minutes
+     change and the business asks "Until signing out", it says "Ask again after inactivity: Until signing out",
+     which is what it will still say here (BASE-F97).
 In: how the business asks for the PIN.
 Out: whether it asks and when it asks again, for every till of the business. Turning it off and on again goes
 back to asking per shift.
 If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
 how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
-the controls off and "Only an administrator can change whether it asks.".
-Involved: BASE-F55, BASE-F59
+the controls off and "Only an administrator can change whether it asks.". Through the assistant, "after
+inactivity" without its minutes does not reach the card: it goes back to the assistant, which asks how many.
+Involved: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 See the devices someone has entered on
 Status: done
@@ -1977,12 +1997,15 @@ Steps:
      using: removing it will close your session and you will have to enter again.".
   3. They confirm with "Remove this device" (or "Leave it"). The row disappears and its session closes at once.
      If it was theirs, they leave the business.
+  4. From the assistant ("remove the phone I lost this afternoon"), the card asks to type CONFIRM (BASE-F98) and,
+     under "What will happen", says when it was last used ("Last used: Nov 22, 2026, 4:18 PM"): two devices
+     without a name are called the same ("Chrome · Linux") and only their last use tells them apart.
 In: the device.
 Out: the device forgotten and its sessions ended: the device is cut off, not the person, who can enter on it
 again with their account.
 If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
 registered here. Refresh the list."; what was refused never stays as done.
-Involved: BASE-F58, BASE-F68
+Involved: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Remove at once the devices nobody uses
 Status: done
@@ -1995,10 +2018,15 @@ Steps:
      30 days?") with "They stop showing here and, to use one again, someone will have to enter on it with their
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
+  4. From the assistant ("clear out the old devices nobody uses any more"), the card asks to type CONFIRM
+     (BASE-F98) and, under "What will happen", says how many it will remove and which, by their name, the last used
+     first ("Devices to remove: 2" and "Which: Chrome · Linux, Bar"); the one in use is never among them. If none
+     has gone 30 days without being used, no card shows and the assistant says so: "No device has gone 30 days
+     without being used, so there is nothing to remove.".
 In: which devices nobody has used for 30 days.
 Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
-Involved: BASE-F70
+Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
 Status: done
@@ -2325,10 +2353,11 @@ Steps:
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
 In: the name, the pace and what it may do.
-Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
+Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
+(BASE-F125). Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
 app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
-Involved: BASE-F89, BASE-F90, BASE-F119
+Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
 Status: done
@@ -2559,7 +2588,9 @@ Steps:
      in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
-     no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
+     no sign when it balances); a yes or a no, as "Yes" or "No", with the name of its datum in front, also on a normal action's line,
+     because alone it says nothing of what changes ("Require an opening float: Yes · Require a count to close: Yes",
+     never "Yes · Yes"); a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
@@ -2595,9 +2626,13 @@ Steps:
      say what they do: emptying a cart says "Clear in Cart & Checkout", removing one of its lines "Remove in Cart &
      Checkout" and taking a product's route away in the kitchen "Clear in Kitchen"; a cash count says "Register count
      in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
-     never "Add".
+     never "Add"; and VeriFactu's live test, as its buttons do, "Test the connection in VeriFactu" and "Create test
+     invoice in VeriFactu", never "Run" or "Create". An action that carries no datum to show says only its action and
+     its app, ending in a full stop and with no empty colon after it: "Test the connection in VeriFactu.".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
-     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
+     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so. After "Run it",
+     the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
+     offer to undo it unless asked to.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
@@ -3443,8 +3478,8 @@ Steps:
      what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
-  5. An API key sees the data whoever makes it sees: only the owner and the administrator make one, and they see all
-     of it, so an integration reads and writes a product's cost as before.
+  5. An API key sees the data whoever made it sees today (BASE-F125): a key of the owner or of an administrator, who
+     see all of it, reads and writes a product's cost as before.
   6. The business totals are the figures of the whole business, beyond what each one does: with everyone's sales,
      the figures of **Sales** and its Home panels are the whole business's; without them, those of the person's own
      sales. In **Customers**, "Revenue" only shows to whoever sees them.
@@ -3453,7 +3488,36 @@ Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
-Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
+
+### BASE-F125 A key stops working when whoever made it no longer may
+Status: done
+Actor: API (another program), owner, administrator
+Screen: none (it shows in what the API answers the other program)
+Steps:
+  1. Each key remembers who made it. A key made before that was kept goes to the business's owner's name with the
+     next photo from erplora.com, which arrives every night at the latest; until then it may do the same as the
+     owner, as before.
+  2. A key never does more than whoever made it, with what that person may do today in the business: it opens an
+     operation only if its maker has its permission; it receives a piece of sensitive data (costs, contact details,
+     the business totals) only if its maker sees it, and otherwise gets it empty (BASE-F119); and in what has an
+     owner (sales, tills, invoices, appointments, commissions) it reads everything only if its maker sees
+     everything, and otherwise only its maker's. When booking an appointment or serving a customer, the key stays on
+     the customer's side, as until today.
+  3. If whoever made it has their role changed in erplora.com and loses a permission, the key loses it at the same
+     time, without touching it: what needs it answers 403 `permission_denied`, and the data they no longer see comes
+     empty.
+  4. If whoever made it leaves the business, the key stops opening anything: every request answers 403
+     `base.api_key_owner_gone`, "Whoever made this API key is no longer in the business. Make a new one.". The key
+     stays in **Employees › API keys**: whoever runs the business revokes it (BASE-F88) and makes another
+     (BASE-F86).
+In: the key the other program calls with and the role today of whoever made it, from the last photo from
+erplora.com.
+Out: nothing saved.
+If it fails: the 403 says whether whoever made it lacks the permission (`permission_denied`) or is no longer in the
+business (`base.api_key_owner_gone`); the rest of what refuses a key does not change: what the key itself may not
+do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_rate_limited`.
+Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
 Status: done

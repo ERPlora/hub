@@ -91,7 +91,7 @@ def test_an_employee_reads_but_does_not_write(employee_client):
         assert get(employee_client, path).status_code == 200, path
     for path, body in (
         ("/modifier/groups", {"name": "Sauces"}),
-        ("/modifier/options", {"group": "Sauces", "name": "Mayo"}),
+        ("/modifier/options", {"group": "Sauces", "name": "Mayo", "price_delta": 0}),
         ("/modifier/links/attach", {"group": "Sauces", "product": "BUR"}),
     ):
         response = post(employee_client, path, body)
@@ -190,6 +190,7 @@ def test_round_trip(admin_client):
             "group": "Doneness",
             "name": "Rare",
             "kitchen_name": "RARE",
+            "price_delta": 0,
             "is_default": True,
         },
     )

@@ -16,12 +16,13 @@ from live.context import system_context
 
 from apps.kitchen.models import TicketItem
 
+from apps.modifier.tests.burger import dress
+
 from .conftest import A, HUB_DB, HUB_DB_COMMITTED, add_line, fire, open_check, run
 
 pytestmark = HUB_DB
 
 FOOD = "restaurant.food"
-GENERIC = "product.generic"
 
 
 def setup(name: str, data: dict):
@@ -30,29 +31,9 @@ def setup(name: str, data: dict):
 
 @pytest.fixture
 def burger(product):
-    """A burger with its «Extras» (cheese «+CHEESE», no onion «-ONION», a soda charged on a line of its
-    own) and its «Doneness» (rare, well done; no kitchen name: the cook reads its name)."""
+    """A burger with its «Extras» and its «Doneness» (``apps.modifier.tests.burger``)."""
     dish = product("Burger", "BUR", 800, FOOD)
-    setup("modifier.group.create", {"name": "Extras", "max_choices": 4})
-    setup("modifier.group.create", {"name": "Doneness", "min_choices": 1, "max_choices": 1})
-    options = {
-        "cheese": setup(
-            "modifier.option.create",
-            {"group": "Extras", "name": "Cheese", "kitchen_name": "+CHEESE", "price_delta": 100},
-        ),
-        "onion": setup(
-            "modifier.option.create",
-            {"group": "Extras", "name": "No onion", "kitchen_name": "-ONION"},
-        ),
-        "soda": setup(
-            "modifier.option.create",
-            {"group": "Extras", "name": "Soda", "price_delta": 200, "tax_category_key": GENERIC},
-        ),
-        "rare": setup("modifier.option.create", {"group": "Doneness", "name": "Rare"}),
-    }
-    for group in ("Extras", "Doneness"):
-        setup("modifier.link.attach", {"group": group, "product_id": str(dish.id)})
-    return dish, {key: str(option.id) for key, option in options.items()}
+    return dish, dress(setup, dish)
 
 
 def kitchen_sheets():

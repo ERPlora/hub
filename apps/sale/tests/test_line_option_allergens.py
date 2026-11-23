@@ -34,7 +34,7 @@ def extras(product):
         "bun": {"name": "Brioche bun", "price_delta": 50, "allergens": ["gluten", "egg"]},
         "wine": {"name": "Wine", "price_delta": 300, "tax_category_key": GENERIC, "allergens": ["sulphites"]},
     }
-    ids = {key: str(setup("modifier.option.create", {"group": "Extras", **one}).id) for key, one in options.items()}
+    ids = {key: str(setup("modifier.option.create", {"group": "Extras", "price_delta": 0, **one}).id) for key, one in options.items()}
     dishes = (("Burger", "BUR", ["gluten"]), ("Bowl", "BOW", ["sesame", "milk"]), ("Salad", "SAL", []))
     for name, sku, allergens in dishes:
         dish = product(name, sku, 800, FOOD, allergens=allergens)

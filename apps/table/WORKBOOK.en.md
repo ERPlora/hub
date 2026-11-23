@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3199ef5356927e2c07bbbb7ebd06414135962e1490a8f4a05b2b728e7998779a -->
+<!-- generated from WORKBOOK.md sha256:cfbe7bf2c7dc3380b74484517f22b5b662b6c2257f092c84913d3c6dee9d72ff -->
 
 ## What it is for and who it is for
 
@@ -299,8 +299,8 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 
 ### TABLE-F01 Create and order the zones of the room
 Status: done
-Actor: manager, administrator
-Screen: Zones
+Actor: manager, administrator, assistant
+Screen: Zones; assistant
 Steps:
 1. In **Tables → Zones** tap "+".
 2. Type the Name (Dining room, Terrace, Bar…), choose the Colour and the Order (the next one comes filled in).
@@ -308,6 +308,10 @@ Steps:
 4. The zone shows in the list with 0 tables and, in that order, as a tab of the **Floor plan**. It is
    also created from the "+" of the plan in "Edit plan" (Zone field and "Add zone"): it goes last and
    stays chosen.
+5. With the assistant: "I want another zone, Bar, for people eating at the counter, and it should come
+   first". The card carries only what was asked for, the name and the order ("Create in Tables: Bar · 0"):
+   what the zone is for is not kept as its description. The description goes in only if it is asked for
+   ("with the description…").
 In: the name, the description, the colour and the order.
 Out: the zone (announces: `table.zone.created`).
 If it fails: without a name, the button does not turn on. A name another zone already has: "There is

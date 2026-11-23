@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c590635851edbee4e9258f039215ebb16551b6d7717d1836083e5669d8207bcb -->
+<!-- generated from WORKBOOK.md sha256:0fb3cd5cb1aaf8aa07647f4d89411213468646fb8f32e5346114dd5ee83f7ac9 -->
 
 ## What it is for and who it is for
 
@@ -501,8 +501,9 @@ Steps:
 In: the business's categories.
 Out: the link between product and category, saved together with the product; Inventory tells of each
 category added or removed. A product can be in several. Sales filters the till's grid with these links
-(only of active products) and Kitchen uses them for its routing. The till sorts products and
-categories by name.
+(only of active products) and Kitchen uses them for its routing. The till shows the categories in the
+position the business gave them (through the assistant or the API, and the one the sector's template
+brings) and, at equal position, by name; the ones nobody placed go by name. The products, by name.
 If it fails: the form's refusals; if something fails neither the product nor its categories are saved.
 A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
@@ -737,6 +738,9 @@ Steps:
    cost)" and "Lowest-stock products" (the five with the least, the first the one with the least) show
    by default; "Products in stock" is added with ⋮ ("Customize panel"), where they are grouped under
    "Inventory". The value shows in the business's currency.
+4. To the assistant ("what is running low?"), the same list, and for each product whether it is marked
+   sold out. Reaching 0 or below does not take it off the till, which still offers it: only what is
+   marked with "Mark sold out" stops being offered, and the assistant says so.
 In: the active, physical products with stock control. The value is the sum of cost times balance of
 those with a positive balance; a negative balance does not subtract.
 Out: nothing.
@@ -988,11 +992,13 @@ Steps:
 2. "Set up" leads to **Inventory → Products**.
 3. As soon as there is an active product (physical or of the service type), the step shows as done,
    without reloading.
+4. Asked about this step, the assistant says it is done because there are already products or, asked how
+   many, the active products there are, read in Inventory; never a figure taken from the step's text.
 In: the number of active products.
 Out: the step done or pending. It is seen by whoever can create products.
 If it fails: if all the products are turned off or deleted, the step goes back to pending, also without
 reloading.
-Involved: none
+Involved: BASE-F12
 
 ### INVENTORY-F29 Mark an item as sold out
 Status: done
@@ -1036,7 +1042,8 @@ Steps:
 4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
    "Discard changes?" first and, with "Discard changes", discards it.
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
-   shows up to five candidate images by their title and asks which one; it never sets one on its own.
+   shows up to five candidate images by their title alone, without their internal code, and asks which
+   one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
 In: the item and ERPlora's image library, the same for every business, with each image's title and
 synonyms in Spanish and in English.

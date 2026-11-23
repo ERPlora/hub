@@ -515,8 +515,10 @@ Pasos:
 Entra: las categorías del negocio.
 Sale: el enlace entre producto y categoría, guardado junto con el producto; Inventario avisa de
 cada categoría añadida o quitada. Un producto puede estar en varias. Ventas filtra la rejilla del
-TPV con estos enlaces (solo de productos activos) y Cocina los usa para su reparto. El TPV ordena
-productos y categorías por nombre.
+TPV con estos enlaces (solo de productos activos) y Cocina los usa para su reparto. El TPV enseña
+las categorías en la posición que les dio el negocio (por el asistente o la API, y la que trae la
+plantilla del sector) y, a igual posición, por nombre; las que nadie ha colocado van por nombre. Los
+productos, por nombre.
 Si falla: los rechazos del formulario; si algo falla no se guarda ni el producto ni sus
 categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
@@ -749,6 +751,9 @@ Pasos:
    tienen, el primero el que menos) salen de serie; «Productos en stock» se añade con ⋮
    («Personalizar panel»), donde van agrupados bajo «Inventario». El valor sale en la moneda del
    negocio.
+4. Al asistente («¿qué me queda poco?»), la misma lista, y de cada producto si está marcado como
+   agotado. Quedarse a 0 o por debajo no lo quita del TPV, que lo sigue ofreciendo: solo deja de
+   ofrecer lo marcado con «Marcar agotado», y así lo dice el asistente.
 Entra: los productos activos, físicos y con control de stock. El valor es la suma de coste por
 saldo de los que tienen saldo positivo; un saldo negativo no resta.
 Sale: nada.
@@ -1004,11 +1009,13 @@ Pasos:
    menos un producto para que haya algo que vender.»), marcado «Importante».
 2. «Configurar» lleva a **Inventario → Productos**.
 3. En cuanto hay un producto activo (físico o de tipo servicio), el paso sale hecho, sin recargar.
+4. Preguntado por este paso, el asistente dice que está hecho porque ya hay productos o, si se le pregunta
+   cuántos, los productos activos que hay, leídos en Inventario; nunca una cifra sacada del texto del paso.
 Entra: el número de productos activos.
 Sale: el paso hecho o pendiente. Lo ve quien puede dar de alta productos.
 Si falla: si se desactivan o eliminan todos los productos, el paso vuelve a pendiente, también sin
 recargar.
-Implicados: ninguno
+Implicados: BASE-F12
 
 ### INVENTORY-F29 Marcar un artículo como agotado
 Estado: hecho
@@ -1054,7 +1061,8 @@ Pasos:
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
    panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta.
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
-   enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
+   enseña hasta cinco imágenes candidatas solo por su título, sin su código interno, y pregunta cuál;
+   nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
 Entra: el artículo y la librería de imágenes de ERPlora, la misma para todos los negocios, con el título
 y los sinónimos de cada imagen en español y en inglés.
@@ -1596,7 +1604,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 | Categoría fiscal obligatoria y existente al guardar | sí | F01, F02 |
 | Activar y desactivar sin borrar | sí | F03 |
 | Borrado que conserva el historial y libera el código | sí | F04 |
-| Categorías con orden, color e icono para la carta | parcial: se guardan por el asistente o la API; el TPV ordena por nombre (duda 6) | F06, F08 |
+| Categorías con orden, color e icono para la carta | parcial: se guardan por el asistente o la API; el TPV las enseña por su posición, sin color ni icono (duda 6) | F06, F08 |
 | Borrar una categoría desvincula | sí | F07 |
 | Importar CSV con mapeo, ensayo e informe | sí | F09, F10 |
 | CSV con punto y coma (el de Excel en español) | sí | F09, F10 |
@@ -1718,7 +1726,7 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
 5. El «Umbral de stock bajo» de Ajustes solo lo hereda un producto creado por el asistente o la API
    sin umbral (F19): ¿debe el formulario dejar el campo vacío para heredarlo, y debe un cambio del
    ajuste alcanzar a los productos que lo heredaron?
-6. ¿Entran el orden, el color, el icono y la imagen de las categorías en el TPV (F06, F08)?
+6. ¿Entran el color, el icono y la imagen de las categorías en el TPV (F06)? El orden ya entra (F08).
 7. ¿Debe la etiqueta llevar el EAN-13 cuando lo hay, y el TPV buscar por código de barras (F25,
    F27)?
 8. ¿Debe un artículo poder volver a «Sigue el ajuste del hub» después de haber decidido (F20)?

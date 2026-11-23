@@ -192,8 +192,8 @@
     ]
   },
   {
-    "path": "apps/pricing/schemas.py",
-    "file_name": "schemas.py",
+    "path": "apps/pricing/schemas/__init__.py",
+    "file_name": "__init__.py",
     "functions": [
       {
         "name": "rule_problems",
@@ -754,16 +754,6 @@
       {
         "name": "app_list",
         "complexity": 21
-      }
-    ]
-  },
-  {
-    "path": "apps/sale/services/charge_validation.py",
-    "file_name": "charge_validation.py",
-    "functions": [
-      {
-        "name": "_legs",
-        "complexity": 33
       }
     ]
   },

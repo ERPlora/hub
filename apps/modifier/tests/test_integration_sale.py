@@ -41,7 +41,7 @@ def sell(name: str, data: dict, role: str = "hub_admin"):
 
 
 def option(group: str, name: str, **fields) -> str:
-    return str(run("modifier.option.create", {"group": group, "name": name, **fields}).id)
+    return str(run("modifier.option.create", {"group": group, "name": name, "price_delta": 0, **fields}).id)
 
 
 def open_check(role: str = "hub_admin") -> str:

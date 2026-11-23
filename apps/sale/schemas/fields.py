@@ -31,6 +31,7 @@ SAY_WHICH_DEPARTMENT = _(
 )
 SAY_WHICH_SALE = _("Say which sale: its id or its number.")
 SAY_WHICH_METHOD = _("Say which payment method: its id, its name or its type.")
+SAY_WHAT_IS_ADDED = _("Say what the amount added to this payment is (a tip, for instance).")
 SAY_WHICH_DEPARTMENT_ROW = _("Say which section: its id or its name.")
 SAY_WHICH_QUICK_NOTE = _("Say which quick note: its id or its text.")
 ONE_SOURCE = _(
