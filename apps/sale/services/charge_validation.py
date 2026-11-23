@@ -12,6 +12,7 @@ from live.errors import AppInactive, Conflict, InvalidPayload, OperationError
 from live.operations import UnknownOperation, get
 
 from apps.customer.queries import find_customer
+from apps.customer.queries.orders import linked_customer_id
 from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, normalize_country, normalize_tax_id
 from apps.sale import pricing
 from apps.sale.models import OrderLine, PaymentMethod, Settings
@@ -42,15 +43,22 @@ ADDED_AMOUNT_NOT_ACCEPTED = _(
 )
 
 
+def _card(ctx: OperationContext, data: CompleteIn):
+    """The card the charge names or, naming none, the one its check is for in Customers, as the till puts it back on a
+    check picked up again. It is locked before the check, as Customers' writes and the Hub admin's «Delete» of a card
+    take it: a deletion under way is waited for and the card is gone (404), and one that comes after waits for the
+    charge and finds the sale that protects the card."""
+    if data.customer_id is not None or data.customer:
+        return find_customer(ctx, data.customer_id, data.customer, lock=True)
+    linked = linked_customer_id(data.order_id) if data.order_id is not None else None
+    return find_customer(ctx, linked, None, lock=True) if linked else None
+
+
 def _customer_details(ctx: OperationContext, data: CompleteIn) -> tuple:
     """``(card, name, tax id, address, country)`` of the sale's customer: what was sent, else the card's.
     The name is the fiscal one, as Invoicing reads a card: its company when it has one (the NombreRazon
-    that goes with the company's tax ID), else the person. The card is locked before the check, as Customers'
-    writes and the Hub admin's «Delete» of a card take it: a deletion under way is waited for and the card is
-    gone (404), and one that comes after waits for the charge and finds the sale that protects the card."""
-    card = None
-    if data.customer_id is not None or data.customer:
-        card = find_customer(ctx, data.customer_id, data.customer, lock=True)
+    that goes with the company's tax ID), else the person."""
+    card = _card(ctx, data)
     name = data.customer_name or ((card.company_name or card.name) if card else "")
     tax_id = data.customer_tax_id or (card.tax_id if card else "")
     if data.customer_address:

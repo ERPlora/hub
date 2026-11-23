@@ -58,7 +58,7 @@ from base.business import currency_decimals
 from base.exports import visible_columns
 from base.ordering import list_order
 
-from . import contact
+from . import contact, orders
 
 CUSTOMER_UNAVAILABLE = _("This customer is no longer available.")
 NO_CUSTOMER_MATCHES = _("No customer matches “%(reference)s”.")
@@ -800,13 +800,7 @@ def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
     ),
 )
 def order_customer(ctx: OperationContext, data: OrderIn) -> dict:
-    link = OrderLink.objects.filter(
-        order_id=data.order_id, customer__deleted_at__isnull=True
-    ).first()
-    return {
-        "order_id": data.order_id,
-        "customer_id": link.customer_id if link else None,
-    }
+    return {"order_id": data.order_id, "customer_id": orders.linked_customer_id(data.order_id)}
 
 
 @operation(
