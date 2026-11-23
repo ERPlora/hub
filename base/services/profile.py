@@ -12,7 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.core.validators import validate_email
 from django.db import IntegrityError
-from django.utils.translation import gettext
+from django.utils.translation import gettext, pgettext_lazy
 from live.context import OperationContext
 from live.errors import InvalidPayload
 from live.operations import AI, atomic, operation
@@ -20,7 +20,7 @@ from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from base import events, queries
+from base import access, events, queries
 from base.media import AVATARS_FOLDER
 from base.models.access import AccessSettings
 from base.models.profile import Profile
@@ -41,6 +41,39 @@ from base.services.devices import _actor_label
 from base.storage import hub_prefix
 
 
+# The controls of the «PIN pad» card of Settings › General, by its words.
+SHOW_PIN_PAD = pgettext_lazy("pin pad", "Show PIN pad")
+ASK_AGAIN = pgettext_lazy("pin pad", "Ask again after inactivity")
+UNTIL_SIGNING_OUT = pgettext_lazy("pin pad", "Until signing out")
+MINUTES = pgettext_lazy("pin pad", "%(n)s min")
+PIN_DIGITS = pgettext_lazy("pin pad", "PIN digits")
+DIGITS = pgettext_lazy("pin pad", "%(n)s digits")
+
+
+def _pin_pad_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The card as the «PIN pad» card of Settings › General would read after the change: each of its controls that the
+    change sets, with the value it will show. The minutes only show when it asks again after inactivity."""
+    sent = {name: value for name, value in arguments.items() if value is not None}
+    now = queries.access.access_settings()
+    policy = sent.get("pin_policy", now.pin_policy)
+    lines = []
+    if "pin_policy" in sent:
+        lines.append(_pin_pad_line("pin_pad", SHOW_PIN_PAD, policy != access.NEVER))
+    if sent.keys() & {"pin_policy", "pin_inactivity_minutes"} and policy != access.NEVER:
+        minutes = sent.get("pin_inactivity_minutes", now.pin_inactivity_minutes)
+        again = MINUTES % {"n": minutes} if policy == access.ALWAYS else UNTIL_SIGNING_OUT
+        lines.append(_pin_pad_line("ask_again", ASK_AGAIN, again))
+    if "pin_length" in sent:
+        lines.append(_pin_pad_line("pin_length", PIN_DIGITS, DIGITS % {"n": sent["pin_length"]}))
+    return lines or fields
+
+
+def _pin_pad_line(name: str, label, value) -> dict:
+    if isinstance(value, bool):
+        return {"name": name, "label": str(label), "kind": "bool", "value": value}
+    return {"name": name, "label": str(label), "kind": "text", "value": str(value)}
+
+
 @operation(
     "base.access.settings_update",
     kind="command",
@@ -48,13 +81,18 @@ from base.storage import hub_prefix
     permission=ADMINISTER_HUB,
     input=AccessSettingsUpdateIn,
     output=AccessSettingsOut,
-    ai=AI(
-        description=(
-            "Changes how the business asks who is at the till: show the PIN pad or not, ask again after 1, 5, 10, 15 "
-            "or 30 minutes without use or once per shift, and PINs of 4 or 6 digits."
+    ai={
+        "description": (
+            "Changes how the business asks who is at the till, as the «PIN pad» card of Settings › General: «Show "
+            "PIN pad» on or off (off is pin_policy never) and «Ask again after inactivity»: 1, 5, 10, 15 or 30 min "
+            "(pin_policy always with those pin_inactivity_minutes) or «Until signing out» (pin_policy per_shift); and "
+            "PINs of 4 or 6 digits. With the PIN pad on, each person enters with their own PIN and every sale carries "
+            "their name. Read access.settings first and say how it is now by those names; to ask again after "
+            "inactivity, ask the person how many minutes when they have not said it."
         ),
-        risk="high",
-        asks={
+        "risk": "high",
+        "summary": _pin_pad_summary,
+        "asks": {
             "en": (
                 "ask for the PIN again after 5 minutes",
                 "make the PINs 6 digits",
@@ -68,7 +106,7 @@ from base.storage import hub_prefix
                 "que solo pida el PIN una vez por turno",
             ),
         },
-    ),
+    },
 )
 def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) -> dict:
     """The «PIN pad» card: only the fields sent change. The PINs of the other length keep working
