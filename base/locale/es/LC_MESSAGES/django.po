@@ -2555,6 +2555,24 @@ msgctxt "base"
 msgid "Once on"
 msgstr "Una vez activada"
 
+msgctxt "base"
+msgid "Other apps"
+msgstr "Otras apps"
+
+#, python-format
+msgid "%(app)s needs %(apps)s: it turns on with it."
+msgid_plural "%(app)s needs %(apps)s: they turn on with it."
+msgstr[0] "%(app)s necesita %(apps)s: se activa con ella."
+msgstr[1] "%(app)s necesita %(apps)s: se activan con ella."
+msgstr[2] "%(app)s necesita %(apps)s: se activan con ella."
+
+#, python-format
+msgid "%(apps)s turns off with it: only %(app)s needed it."
+msgid_plural "%(apps)s turn off with it: only %(app)s needed them."
+msgstr[0] "%(apps)s se desactiva con ella: solo la necesitaba %(app)s."
+msgstr[1] "%(apps)s se desactivan con ella: solo las necesitaba %(app)s."
+msgstr[2] "%(apps)s se desactivan con ella: solo las necesitaba %(app)s."
+
 msgid "The assistant sent data that does not fit."
 msgstr "El asistente envió datos que no valen."
 
