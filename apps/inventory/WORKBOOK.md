@@ -397,6 +397,9 @@ Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
 un producto con stock. Cuenta su stock a cero y cámbiala después.». Cambiar el coste es de quien ve los costes: a
 quien no los ve se le rechaza como una operación sin permiso, y el resto de un cambio sin coste se guarda.
+Si al abrir el panel no se pueden leer la moneda del negocio, las categorías fiscales o las categorías, cada campo lo
+dice con el motivo, también mientras la conexión se recupera sola; la moneda, además, con «Reintentar». Lo guardado del
+producto no se pierde: al guardar solo se envía lo que se ha cambiado.
 Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119
 
 ### INVENTORY-F03 Activar y desactivar un producto
