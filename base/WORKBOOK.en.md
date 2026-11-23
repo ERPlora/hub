@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a2bd39969ba5241115d725de9e06440307f895965cff145adea6c2a311784df8 -->
+<!-- generated from WORKBOOK.md sha256:b71d3ea1f65d6b3d6d4f627a02fb6835618a863b4f8b68dbf956e8dde19088fd -->
 
 ## What it is for and who it is for
 
@@ -2716,9 +2716,11 @@ Steps:
      does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
      those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows six rounds at most: it is a brake against loops, not an allowance. On the sixth the assistant
-     can do nothing more and answers with what it has done and what is left, to ask for it in another message. If it
-     still tries to go on, "I stopped: this needed too many steps. Ask for it in parts.".
+  5. A request allows twenty rounds at most, and each action is one: it is a brake against loops, not an allowance,
+     and a read and a change for each day of the week fit easily. On the twentieth the assistant can do nothing more
+     and answers with what it has done and what is left, to ask for it in another message; if it still asks for an
+     action, it is not done and its card does not appear, and it is told to answer. If it keeps trying, "I stopped:
+     this needed too many steps. Ask for it in parts.".
 In: the request; the result of each action, which goes back to the assistant.
 Out: as many actions as cards accepted, each in its app and with its receipt.
 If it fails: if an action fails half way, the assistant gets it and tells it; the earlier ones are not undone. With
