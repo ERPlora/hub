@@ -49,6 +49,8 @@ def test_creating_a_station_tells_the_model_to_offer_the_routing_rather_than_sen
     told = told_of("kitchen.station.create")["description"]
 
     assert "say that nothing goes to it yet and offer to route the products or categories it should get" in told
+    # A screen is named to the model as «App › Screen» (base/services/assistant.py): none is pointed to here.
+    assert "›" not in told
 
 
 @pytest.mark.parametrize("name", ["kitchen.station.create", "kitchen.station.update"])
