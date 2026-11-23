@@ -24,8 +24,10 @@ LOW_STOCK = "inventory.product.list_low_stock"
 
 def test_the_low_stock_read_says_a_balance_at_zero_does_not_take_a_product_off_the_till():
     said = description(get(LOW_STOCK))
-    assert "the till still offers it" in said
-    assert "only one marked sold out (is_sold_out)" in said
+    assert (
+        "A balance at zero or below does not take an article off the till: the till still offers it, and only one "
+        "marked sold out (is_sold_out) is not offered."
+    ) in said
 
 
 def test_each_low_stock_row_the_model_reads_says_whether_the_product_is_marked_sold_out():
