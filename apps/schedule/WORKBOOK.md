@@ -238,10 +238,9 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Inicio, Horario
 Pasos:
 1. En el **Inicio**, mientras la semana sea la de por defecto, «Termina de configurar tu negocio» trae
-   «Confirma tu horario» («Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a
-   18:00). Si coincide con el de tu negocio, confírmalo de un toque; si no, edita los días que cambien:
-   las reservas fuera de tu horario se rechazan.»), «Recomendado», a quien puede cambiar el horario.
-   «Configurar» lleva a **Horario**.
+   «Confirma tu horario» («Revisa que el horario de la semana es el de tu negocio: si lo es, confírmalo
+   de un toque; si no, edita los días que cambien: las reservas fuera de tu horario se rechazan.»),
+   «Recomendado», a quien puede cambiar el horario. «Configurar» lleva a **Horario**.
 2. Con el aviso amarillo «Este es un horario por defecto…» a la vista, comprueba que los días son los de
    tu negocio.
 3. Pulsa **Sí, este es mi horario**; el botón se desactiva mientras trabaja.
@@ -252,10 +251,12 @@ Sale: la semana marcada como confirmada, sin cambiar ni una hora, y un aviso `sc
 entonces la semana rige también las reservas de mesa (SCHEDULE-F12). Confirmar dos veces no cambia nada ni
 avisa. «Confirma tu horario» queda «Hecho» en el Inicio sin recargar; también si en vez de confirmar se
 guarda un día (SCHEDULE-F02), aunque sea como cerrado. Cambiar «Semana empieza», un día especial o un
-cambio temporal no confirma la semana.
+cambio temporal no confirma la semana. El paso hecho sigue en la lista con la misma línea, que no nombra
+ningún día ni ninguna hora: el asistente dice que está hecho y, si se le pregunta qué horario hay, lo lee
+en Horarios (SCHEDULE-F01), nunca del paso (BASE-F12).
 Si falla: arriba de la tabla: «No hay horario semanal que confirmar.» si no hay ningún día guardado (no se llega
 desde la pantalla: el aviso solo sale cuando hay semana).
-Implicados: BASE-F01
+Implicados: BASE-F01, BASE-F12
 
 ### SCHEDULE-F04 Añadir un día especial
 Estado: hecho (servidor y pantalla)
