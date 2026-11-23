@@ -40,11 +40,16 @@ def turn_as(person: OperationContext, *calls, decision: dict | None = None) -> d
     return op(person, op.input.model_validate(data)).model_dump(mode="json")
 
 
+def the_model_hears(plan: dict) -> dict:
+    """The refusal the model hears of the call ``plan`` answered first."""
+    return json.loads(plan["append"][0]["content"])["error"]
+
+
 def no_card_but_the_model_hears(plan: dict, code: str) -> None:
     """No card that would act on anything: the model hears ``code`` and asks the person which one."""
     assert (plan["confirm"], plan["pending"]) == (None, [])
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
+    assert the_model_hears(plan)["code"] == code
 
 
 def yes_to_its_card(person: OperationContext, write: str, arguments: dict, meanwhile=lambda: None) -> dict:

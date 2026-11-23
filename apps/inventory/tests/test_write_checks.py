@@ -7,15 +7,13 @@ category checks it before its card, as the writes of Menus do: one the business 
 draws no card, and the model hears which one to look it up or ask (INVENTORY-F02, BASE-F97).
 """
 
-import json
-
 import pytest
 from live.operations import INTERNAL, registry
 
 from apps.inventory.models import Category, Product, ProductCategory, StockMovement
 from apps.inventory.tests.conftest import HUB_DB, ctx_for
 from base import assistant
-from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, turn_as
+from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, the_model_hears, turn_as
 from base.tests.test_services_assistant import call
 
 pytestmark = HUB_DB
@@ -56,10 +54,6 @@ def catalogue():
 
 def as_owner(*calls) -> dict:
     return turn_as(ctx_for("hub_admin"), *calls)
-
-
-def the_model_hears(plan: dict) -> dict:
-    return json.loads(plan["append"][0]["content"])["error"]
 
 
 def test_changing_a_product_the_business_does_not_have_draws_no_card(catalogue):
