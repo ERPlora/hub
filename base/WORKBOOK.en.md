@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:820c3602ba6706442ed6d0ebca56fced78ce245dab835d7ef0a391fdfa9fbc14 -->
+<!-- generated from WORKBOOK.md sha256:88042c6028b65830c2770a8b15405592b3f13ac75abce018b342b9228c9a8011 -->
 
 ## What it is for and who it is for
 
@@ -2475,7 +2475,8 @@ Steps:
   2. They write in "Write a message…" and press Enter or "Send". With a keyboard, Shift+Enter starts a new line; on a
      touch screen, Enter starts a new line and "Send" sends. "Send" is off with the box empty and no attachments.
   3. Their message shows on the right just as they wrote it. Below, the assistant's bubble, with three dots that move
-     until the first text arrives.
+     until the first text arrives. In Spanish, the assistant addresses them with «tú» or «usted» as they write to it
+     (when it does not show, «tú», as the screens do) and keeps it to the end of the answer, never mixing the two.
   4. While it answers, "Send" becomes "Stop", "Attach a file" and "Dictate by voice" turn off and the answer keeps
      appearing; the conversation scrolls down by itself. They can already write the next question, but it is not
      sent until this one ends.
