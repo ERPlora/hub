@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6cd82f5b1dbbf4790b233767c6206e8062fc7a1876062dceb96b0611430d2ae6 -->
+<!-- generated from WORKBOOK.md sha256:8afaf5c31de3c77dc6b212c3d4a2e9327180531df5a0d3d3a3226ec9d6d7e67f -->
 
 ## What it is for and who it is for
 
@@ -468,6 +468,9 @@ Steps:
    (with the reason) or "Revoked".
 7. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
    the tab shows neither the authorisation nor the procedure.
+8. To whoever asks the assistant for ERPlora to file on the business's behalf, the assistant explains these steps.
+   Where ERPlora does not file on behalf of businesses, it does not offer them: it says "ERPlora does not file on
+   behalf of businesses for now: file with your own certificate." and explains how to upload it in the "My certificate" tab.
 In: Invoicing's issuer (the taxpayer), the representative, the document type and the PDFs in base64
 (`verifactu.representation.submit`); the form, from `verifactu.representation.model`, which passes the issuer's
 details to the SaaS.

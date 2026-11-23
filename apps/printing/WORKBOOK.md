@@ -239,7 +239,7 @@ cierra sin preguntar (BASE-F05).
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | hecho |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
-| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — la tarjeta aún no dice si la impresora responde ahora (hub#573) |
+| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | hecho |
 | PRINTING-F22 | Sacar el tique y abrir el cajón en la caja que cobra | común | hecho |
 
 ### PRINTING-F01 Ver cómo va la impresión
@@ -689,9 +689,7 @@ plazo.
 Implicados: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 Ver en Sistema quién imprime y dónde bajar la app de ERPlora
-Estado: parcial — la tarjeta aún no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar»
-o «No hemos podido comprobar la impresora»): Impresión ya tiene esa lectura, la misma que da a la fila de salud del
-Inicio, pero la tarjeta todavía no la usa (hub#573)
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
 Pasos:
@@ -699,19 +697,26 @@ Pasos:
    tarjeta **Tu impresora**: «Los tiques, las comandas y las etiquetas los imprime la app de ERPlora del dispositivo
    que está junto a la impresora.». La ve quien abre Sistema, el propietario y el administrador (BASE-F39).
    Con Impresión apagada no hay tarjeta: un negocio que no imprime no ve nada de esto.
-2. «Configurar la impresión» abre **Impresión → Impresoras** (PRINTING-F01).
-3. En un navegador, debajo, «Descargar la app de ERPlora» con «La app de ERPlora es la que habla con tus impresoras,
+2. Debajo, si la impresora de tiques responde ahora, con la misma lectura y los mismos colores que la fila del Inicio
+   (BASE-F02): «Impresora lista — Los tiques salen solos al cobrar.», en verde; «Impresora sin conectar — El
+   dispositivo que imprime los tiques no responde: enciéndelo y abre en él la app de ERPlora.» o «Impresora sin
+   configurar — Todavía no hay ningún dispositivo dado de alta que imprima los tiques.», en ámbar. Mientras lo
+   comprueba, una línea gris.
+3. «Configurar la impresión» abre **Impresión → Impresoras** (PRINTING-F01).
+4. En un navegador, debajo, «Descargar la app de ERPlora» con «La app de ERPlora es la que habla con tus impresoras,
    el cajón y los escáneres. Elige tu sistema para continuar.» y un botón por sistema: **Windows** (el destacado),
    **Linux** y **Android**. No hay macOS: erplora.com no publica ninguno.
-4. Cada botón abre, fuera del hub, la descarga que sirve erplora.com en ese momento: la tienda si su ficha está
+5. Cada botón abre, fuera del hub, la descarga que sirve erplora.com en ese momento: la tienda si su ficha está
    publicada o el último instalador; Android, siempre Google Play (PUBLIC-F24 de erplora.com).
-5. Con la app instalada, la da de alta para imprimir desde ese dispositivo (PRINTING-F18). Dentro de la app no hay
+6. Con la app instalada, la da de alta para imprimir desde ese dispositivo (PRINTING-F18). Dentro de la app no hay
    bloque de descarga: sería la app ofreciéndose a sí misma.
-Entra: si Impresión está encendida en el negocio, los permisos de la persona y las direcciones de erplora.com.
+Entra: si Impresión está encendida en el negocio, los permisos de la persona, si la estación de tiques ha dado señales
+y las direcciones de erplora.com.
 Sale: nada guardado.
 Si falla: si no se puede leer qué tarjetas tocan, no sale ninguna (nunca la de una app apagada) y el resto de la
-pestaña dice lo suyo; sin las direcciones de erplora.com no salen los botones de descarga (nunca un botón que no
-lleva a ningún sitio).
+pestaña dice lo suyo; si no se puede comprobar la impresora, «No hemos podido comprobar la impresora — No sabemos si
+está conectada; no afecta a nada más.», en gris y nunca como lista; sin las direcciones de erplora.com no salen los
+botones de descarga (nunca un botón que no lleva a ningún sitio).
 Implicados: BASE-F02, BASE-F39, PRINTING-F18
 
 ### PRINTING-F22 Sacar el tique y abrir el cajón en la caja que cobra
@@ -964,10 +969,11 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 
 **La tarjeta de Sistema** (hub#683, PRINTING-F21). `PrintingConfig.system_cards` declara «printer», que pinta
 `frontend/components/SystemPrinterCard.vue`, con `printing.view_settings` (`base.E015`); `base.system.cards` la lista
-solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». No lee nada de Impresión: las
+solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». Las
 descargas salen de `hub-home.app_downloads` (`base/spa.py`) por `useAppDownloads` de `base`, solo en un navegador, y
-cada botón sale por `openExternalLink`. La lectura de si la estación de tiques responde ya existe
-(`printing.device.health`, abajo); la tarjeta aún no la enseña (hub#573). Tests: `tests/test_apps.py`,
+cada botón sale por `openExternalLink`. La tarjeta pide una vez, al montarse, `printing.device.health` de los tiques
+(abajo) y pinta su estado con `HEALTH_PILLS` de `base/frontend/lib/home-health.ts`, la misma tabla de colores que la
+fila del Inicio; si la lectura falla, `unknown`. Tests: `tests/test_apps.py`,
 `tests/test_integration_home.py` y `frontend/components/SystemPrinterCard.test.ts`.
 
 **La fila de salud del Inicio** (hub#573, BASE-F02). `printing.device.health` (`queries/health.py`, con su esquema en

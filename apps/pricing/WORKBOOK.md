@@ -629,7 +629,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
   Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
@@ -703,7 +703,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   tarifa o una regla sale antes que `base.app.enable`: live lee «activar» también como la acción `activate`
   (ERPlora/live#70).
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id
-  con las marcas `refers` de `schemas.py` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
+  con las marcas `refers` de `schemas/` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
   `A_GROUP`), leídas como quien pregunta: la tarifa y la regla por su nombre, el precio por su `label` («Champú ·
   Mayoristas · desde 10»), el producto con `inventory.product.get` y el servicio, la categoría o el grupo con
   `pricing.catalog.get` (Servicios no es requisito: su nombre, por `call_service`; apagada o ausente, la tarjeta lo
