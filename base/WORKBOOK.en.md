@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1b0b3041e476a50330e74175d99a868fcb7aa2c11d0714a858fbb479dc49630d -->
+<!-- generated from WORKBOOK.md sha256:a2788cd20b7f4bfc83ebcff6388de3ad64bfe9dc6cee61da7b85530709058d35 -->
 
 ## What it is for and who it is for
 
@@ -1931,13 +1931,23 @@ Steps:
      below what happens ("A till nobody touches for {n} minutes closes the session and shows the PIN pad: the
      next sale carries the name of the next person.").
   4. Each change is saved at once, with no button, and the card shows what the business confirms.
+  5. Through the assistant ("I want everyone to have to type their PIN at the till so we know who sells"), the
+     assistant reads how it is and says it by the names of this card: with the PIN pad on and "Until signing
+     out", each person already enters with their PIN and every sale carries their name. To ask again after
+     inactivity, it first asks how many minutes (1, 5, 10, 15 or 30): it never makes them up, nor do the stored
+     ones apply unseen. The card, with each datum on its own line (BASE-F98), says each control it changes by its
+     name and the value it will have here: "Show PIN pad: Yes" and "Ask again after inactivity: 10 min"; "Until
+     signing out", "Show PIN pad: No" or "PIN digits: 6 digits" depending on the change. If only the minutes
+     change and the business asks "Until signing out", it says "Ask again after inactivity: Until signing out",
+     which is what it will still say here (BASE-F97).
 In: how the business asks for the PIN.
 Out: whether it asks and when it asks again, for every till of the business. Turning it off and on again goes
 back to asking per shift.
 If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
 how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
-the controls off and "Only an administrator can change whether it asks.".
-Involved: BASE-F55, BASE-F59
+the controls off and "Only an administrator can change whether it asks.". Through the assistant, "after
+inactivity" without its minutes does not reach the card: it goes back to the assistant, which asks how many.
+Involved: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 See the devices someone has entered on
 Status: done
@@ -1983,12 +1993,15 @@ Steps:
      using: removing it will close your session and you will have to enter again.".
   3. They confirm with "Remove this device" (or "Leave it"). The row disappears and its session closes at once.
      If it was theirs, they leave the business.
+  4. From the assistant ("remove the phone I lost this afternoon"), the card asks to type CONFIRM (BASE-F98) and,
+     under "What will happen", says when it was last used ("Last used: Nov 22, 2026, 4:18 PM"): two devices
+     without a name are called the same ("Chrome · Linux") and only their last use tells them apart.
 In: the device.
 Out: the device forgotten and its sessions ended: the device is cut off, not the person, who can enter on it
 again with their account.
 If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
 registered here. Refresh the list."; what was refused never stays as done.
-Involved: BASE-F58, BASE-F68
+Involved: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Remove at once the devices nobody uses
 Status: done
@@ -2001,10 +2014,15 @@ Steps:
      30 days?") with "They stop showing here and, to use one again, someone will have to enter on it with their
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
+  4. From the assistant ("clear out the old devices nobody uses any more"), the card asks to type CONFIRM
+     (BASE-F98) and, under "What will happen", says how many it will remove and which, by their name, the last used
+     first ("Devices to remove: 2" and "Which: Chrome · Linux, Bar"); the one in use is never among them. If none
+     has gone 30 days without being used, no card shows and the assistant says so: "No device has gone 30 days
+     without being used, so there is nothing to remove.".
 In: which devices nobody has used for 30 days.
 Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
-Involved: BASE-F70
+Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
 Status: done

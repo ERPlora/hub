@@ -1939,13 +1939,23 @@ Pasos:
      sesión», y debajo qué pasa («Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad:
      la siguiente venta lleva el nombre de la siguiente persona.»).
   4. Cada cambio se guarda al momento, sin botón, y la tarjeta enseña lo que el negocio confirma.
+  5. Por el asistente («quiero que en la caja cada uno tenga que meter su PIN para saber quién vende»), el
+     asistente lee cómo está y lo dice con los nombres de esta tarjeta: con el pinpad encendido y «Hasta cerrar
+     sesión», cada persona ya entra con su PIN y cada venta lleva su nombre. Para que vuelva a preguntar tras
+     inactividad, antes le pregunta cuántos minutos (1, 5, 10, 15 o 30): nunca los pone él ni se quedan sin verse
+     los que hubiera guardados. La tarjeta, con cada dato en su línea (BASE-F98), dice cada control que cambia con
+     su nombre y el valor que tendrá aquí: «Mostrar pinpad: Sí» y «Volver a preguntar tras inactividad: 10 min»;
+     «Hasta cerrar sesión», «Mostrar pinpad: No» o «Dígitos del PIN: 6 dígitos» según el cambio. Si solo cambian
+     los minutos y el negocio pregunta «Hasta cerrar sesión», dice «Volver a preguntar tras inactividad: Hasta
+     cerrar sesión», que es lo que seguirá diciendo aquí (BASE-F97).
 Entra: cómo pide el PIN el negocio.
 Sale: si se pide y cuándo se vuelve a pedir, para todas las cajas del negocio. Apagarlo y volver a encenderlo
 vuelve a pedirlo por turno.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.». Si no se puede leer: «No se pudo
 cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.». Quien no administra ve los
-controles apagados y «Solo un administrador puede cambiar si se pregunta.».
-Implicados: BASE-F55, BASE-F59
+controles apagados y «Solo un administrador puede cambiar si se pregunta.». Por el asistente, «tras
+inactividad» sin sus minutos no llega a la tarjeta: vuelve al asistente, que pregunta cuántos.
+Implicados: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 Ver los dispositivos en los que se ha entrado
 Estado: hecho
@@ -1992,12 +2002,15 @@ Pasos:
      usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.».
   3. Confirma con «Quitar este dispositivo» (o «Dejarlo»). La fila desaparece y su sesión se cierra al momento. Si
      era el suyo, sale del negocio.
+  4. Desde el asistente («quita el móvil que perdí esta tarde»), la tarjeta pide escribir CONFIRMAR (BASE-F98) y, bajo
+     «Lo que va a pasar», dice cuándo se usó por última vez («Último uso: 22 nov 2026, 16:18»): dos dispositivos sin
+     nombre se llaman igual («Chrome · Linux») y solo su último uso los distingue.
 Entra: el dispositivo.
 Sale: el dispositivo olvidado y sus sesiones cerradas: se corta el dispositivo, no la persona, que puede volver a
 entrar en él con su cuenta.
 Si falla: «No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.» o «Ese dispositivo ya
 no está registrado aquí. Actualiza la lista.»; nunca queda como hecho lo que se rechazó.
-Implicados: BASE-F58, BASE-F68
+Implicados: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Quitar de golpe los dispositivos que nadie usa
 Estado: hecho
@@ -2010,10 +2023,15 @@ Pasos:
      usa desde hace 30 días?») con «Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en
      él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.».
   3. Confirma con «Quitar».
+  4. Desde el asistente («quita los dispositivos viejos que ya no usa nadie»), la tarjeta pide escribir CONFIRMAR
+     (BASE-F98) y, bajo «Lo que va a pasar», dice cuántos va a quitar y cuáles, por su nombre, el último usado primero
+     («Dispositivos que se quitan: 2» y «Cuáles: Chrome · Linux, Barra»); el que se está usando nunca está entre ellos.
+     Si ninguno lleva 30 días sin usarse, no sale tarjeta y el asistente lo dice: «Ningún dispositivo lleva 30 días sin
+     usarse, así que no hay nada que quitar.».
 Entra: qué dispositivos lleva 30 días sin usar nadie.
 Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
-Implicados: BASE-F70
+Implicados: BASE-F70, BASE-F98
 
 ### BASE-F72 Ver los archivos del negocio
 Estado: hecho

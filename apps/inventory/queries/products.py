@@ -198,7 +198,9 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
     output=LowStockPage,
     expose_api=True,
     ai={
-        "description": "List the active articles with stock control at or under their low-stock threshold, the one with less first.",
+        "description": "List the active articles with stock control at or under their low-stock threshold, the one with "
+        "less first. A balance at zero or below does not take an article off the till: the till still offers it, and "
+        "only one marked sold out (is_sold_out) is not offered.",
         "asks": {
             "en": (
                 "what is running low?",
@@ -234,6 +236,7 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
         "sku",
         "stock",
         "low_stock_threshold",
+        "is_sold_out",
         "unit",
         "price_quantity",
         "pricing_unit",
