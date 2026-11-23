@@ -86,6 +86,13 @@ def test_the_moment_is_told_on_the_business_clock_with_its_weekday(in_business_a
     assert "Now there: Wednesday 2026-07-01 12:00 (UTC+02:00)." in facts(in_business_a, now=summer)
 
 
+def test_today_is_the_business_s_day_when_utc_is_still_on_the_one_before(in_business_a):
+    """At 00:48 in Madrid «desde hoy» made a tax rule start on the day before, the one UTC was still on."""
+    registered(in_business_a)
+    past_midnight = dt.datetime(2026, 11, 22, 23, 48, tzinfo=dt.UTC)
+    assert "Now there: Monday 2026-11-23 00:48 (UTC+01:00)." in facts(in_business_a, now=past_midnight)
+
+
 def test_the_moment_of_a_turn_is_now_on_the_business_clock(in_business_a):
     registered(in_business_a, zone="America/Mexico_City")
     before = timezone.localtime(timezone.now(), MEXICO)
