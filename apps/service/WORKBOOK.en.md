@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:11670c4d843feac0f8d792ce1064bad8046cb3baad5c8f20892197f424c3f7fe -->
+<!-- generated from WORKBOOK.md sha256:74feac64e5a1698417d4cc807884771e1d8b96110c712890050b1d1101a30c1d -->
 
 ## What it is for and who it is for
 
@@ -169,7 +169,7 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   Empty: "Nobody has bought this voucher yet.".
   - **Spend a session** opens its dialog: "Mark one session of <customer>'s "<voucher>" voucher as delivered,
     outside the till.", the balance "{n} sessions left · {after} after this one" ("1 session left · 0 after this
-    one"; "No session limit" on one without a limit), **Service** ("Choose the service", only those the voucher
+    one"; "No session limit" on one without a limit), **Service** (only those the voucher
     covers; with a single one, already chosen), **Professional** (Staff's team; "Who did it: what the session is
     worth counts in their production in Sales. Optional."), **Note** and the **Cancel** and **Spend session**
     buttons. While it checks the voucher, "Checking the voucher…".

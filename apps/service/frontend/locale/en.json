@@ -256,7 +256,6 @@
       "title": "Spend a session",
       "message": "Mark one session of {customer}'s «{package}» voucher as delivered, outside the till.",
       "service": "Service",
-      "servicePlaceholder": "Choose the service",
       "member": "Professional",
       "memberHelp": "Who did it: what the session is worth counts in their production in Sales. Optional.",
       "note": "Note",

@@ -25,7 +25,7 @@ const TWO_SERVICES = pkg({
 });
 const ok = (over: Partial<RedeemCheckOut> = {}): RedeemCheckOut => ({ id: 'g1', redeemable: true, reason: '', remaining: 3, ...over });
 /** An Ionic field or button as the tests read it: its label, value and whether it is off. */
-type Control = HTMLElement & { label?: string; disabled?: boolean; value?: unknown };
+type Control = HTMLElement & { label?: string; labelPlacement?: string; placeholder?: string; disabled?: boolean; value?: unknown };
 
 interface Setup {
   grant?: Partial<GrantOut>;
@@ -97,6 +97,14 @@ describe('GrantRedeemModal', () => {
     await settle();
     expect(s.checks().map((call) => call.query)).toEqual([{ id: 'g1' }, { id: 'g1', service_id: 's2' }]);
     expect(s.el('service-grant-redeem-submit').disabled).toBe(false);
+  });
+
+  // Ionic shows a floating select's placeholder as soon as it has focus, but lifts the label only once there is a
+  // value: focused and empty, the two would be painted on the same line.
+  it('the service picker floats its label and has no placeholder', async () => {
+    const s = await setup({ pkg: TWO_SERVICES });
+    const picker = s.el('service-grant-redeem-service');
+    expect([picker.value, picker.labelPlacement, picker.placeholder]).toEqual(['', 'floating', undefined]);
   });
 
   it.each([
