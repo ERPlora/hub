@@ -214,7 +214,7 @@ test('a date range fits the 360px filter panel at 1440 and 834 (Staff «Hire dat
       const panel = view.locator(`[data-testid=${target.table}-filters-panel]`);
       await expect(panel).toBeVisible();
       const ends = target.ends.map((name) => `${target.table}-filter-${name}`) as [string, string];
-      for (const id of ends) await expect(panel.locator(`[data-testid=${id}] input[type=date]`)).toBeVisible();
+      for (const id of ends) await expect(panel.locator(`[data-testid=${id}] input`)).toBeVisible();
       await page.waitForTimeout(400);
       const measured = await rangeOverflow(panel, ends);
       results[`${target.table}-${vp.label}`] = measured;

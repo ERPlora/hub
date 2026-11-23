@@ -18,6 +18,7 @@ from live.models import UUIDModel
 
 from apps.staff.schemas.fields import TIME_ORDER
 from apps.staff.schemas.schedules import BREAK_INSIDE
+from base.weekdays import weekdays
 
 
 class Role(UUIDModel):
@@ -181,7 +182,7 @@ class ScheduleDay(UUIDModel):
         related_name="days",
         verbose_name=_("schedule"),
     )
-    weekday = models.PositiveSmallIntegerField(_("weekday"))
+    weekday = models.PositiveSmallIntegerField(_("weekday"), choices=weekdays)
     start_time = models.TimeField(_("start"))
     end_time = models.TimeField(_("end"))
     break_start = models.TimeField(_("break start"), null=True, blank=True)

@@ -163,14 +163,11 @@ def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field(
 
 @pytest.mark.parametrize(
     ("key", "message"),
-    [
-        ("invalidNumber", services.field_values.FIELD_INVALID_NUMBER),
-        ("invalidDate", services.field_values.FIELD_INVALID_DATE),
-    ],
+    [("invalidNumber", services.field_values.FIELD_INVALID_NUMBER)],
 )
 def test_what_the_card_cannot_read_is_worded_as_the_server_refuses_it(key, message):
-    """A number or a date the browser cannot read is told by the form itself (it never reaches the server): in
-    each language it says what the server says for the same value."""
+    """A number the browser cannot read is told by the form itself (it never reaches the server): in each
+    language it says what the server says for the same value."""
     frontend = Path(apps.get_app_config("customer").path) / "frontend" / "locale"
     for language in ("en", "es"):
         texts = json.loads((frontend / f"{language}.json").read_text(encoding="utf-8"))

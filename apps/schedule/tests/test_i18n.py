@@ -8,7 +8,7 @@ from pathlib import Path
 from django.apps import apps
 from django.utils import translation
 
-from apps.schedule import models, queries, schemas, services
+from apps.schedule import queries, schemas, services
 from apps.schedule.models import (
     Override,
     OverrideInterval,
@@ -45,14 +45,13 @@ MODELS = (
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, messages, day names) and the titles
-    of its schemas."""
+    """The English source of every lazy text the app shows (menu, store, admin, messages) and the titles of its
+    schemas. The day names are CLDR's (``base.weekdays``), not the catalogue's."""
     config = apps.get_app_config("schedule")
     lazies = [
         *config_texts(config),
         # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
-        *models.WEEKDAY_NAMES,
         *module_texts(queries, services, schemas),
     ]
     lazies += model_texts(MODELS)
@@ -67,7 +66,7 @@ def test_every_entry_has_a_spanish_translation():
 def test_every_visible_text_is_in_the_catalog():
     """Each text of Horarios by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
     back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
-    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=40, with_context=6) == set()
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=40, with_context=2) == set()
 
 
 def test_the_compiled_catalog_is_current():
@@ -97,7 +96,7 @@ def test_spanish_texts_are_the_old_modules():
             "Días especiales",
             "Ajustes",
         ]
-        assert [str(name) for name in models.WEEKDAY_NAMES] == [
+        assert [str(WeekDay(weekday=day)) for day in range(7)] == [
             "Lunes",
             "Martes",
             "Miércoles",

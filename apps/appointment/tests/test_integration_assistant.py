@@ -230,3 +230,12 @@ def test_the_card_names_a_datum_no_model_names_by_its_title_in_the_persons_langu
     spanish = own_catalogue().gettext(title)
     assert spanish != title  # Citas's catalogue says it in Spanish
     assert said == {"es": [spanish], "en": [title]}
+
+
+@pytest.mark.parametrize(("language", "friday"), [("es", "Viernes"), ("en", "Friday")])
+@pytest.mark.parametrize("write", ["appointment.recurring.create", "appointment.recurring.update"])
+def test_the_card_names_the_weekday_of_a_series_never_its_number(write, language, friday):
+    """APPOINTMENT-F12 asked to the assistant: a weekly series on Fridays says «Viernes», never «4»; and so does moving a
+    series to another weekday."""
+    card = assistant.cards.card(get(write), {"frequency": "weekly", "day_of_week": 4}, language)
+    assert {field["name"]: field["value"] for field in card["fields"]}["day_of_week"] == friday

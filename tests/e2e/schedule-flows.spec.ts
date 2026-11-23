@@ -6,6 +6,7 @@
 // override (F05) and deletes both after confirming (F06). What the hub had is put back after the file.
 import { expect, test } from '@playwright/test';
 
+import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { A, api, login, psql, shot, shown } from './helpers';
 import {
   cleanupExceptions,
@@ -21,6 +22,11 @@ import {
   weekReady,
 } from './schedule-helpers';
 import { rowAction } from './service-helpers';
+
+/** Next year: no real day of the business, and still within the calendar's reach of today. */
+const YEAR = new Date().getFullYear() + 1;
+const CHRISTMAS = `${YEAR}-12-25`;
+const SUMMER = [`${YEAR}-08-01`, `${YEAR}-08-15`];
 
 let saved: string[] = [];
 
@@ -63,8 +69,8 @@ for (const vp of VIEWPORTS) {
     const dialog = page.locator('ion-modal[data-testid=schedule-day-form]');
     await expect(dialog.locator('ion-title')).toHaveText('Edit hours — Saturday');
     await page.locator('[data-testid=schedule-day-form-closed]').click();
-    await page.locator('[data-testid=schedule-day-form-intervals-open-0] input').fill('10:00');
-    await page.locator('[data-testid=schedule-day-form-intervals-close-0] input').fill('14:00');
+    await pickTime(page, page.locator('[data-testid=schedule-day-form-intervals-open-0]'), '10:00');
+    await pickTime(page, page.locator('[data-testid=schedule-day-form-intervals-close-0]'), '14:00');
     await expect(page.locator('[data-testid=schedule-day-form-submit]')).toBeInViewport({ ratio: 1 });
     await settled(page);
     await page.screenshot({ path: shot(`APP-SCHEDULE-SCHEDULE-F02-${vp.label}`) });
@@ -106,7 +112,7 @@ for (const vp of VIEWPORTS) {
 
     // F04: «+» → Date and Name, closed by default → «Add day».
     await view.locator('[data-testid=schedule-special-days-add]').click();
-    await page.locator('[data-testid=schedule-special-day-form-date] input').fill('2099-12-25');
+    await pickDay(page, page.locator('[data-testid=schedule-special-day-form-date]'), CHRISTMAS);
     await page.locator('[data-testid=schedule-special-day-form-name] input').fill(name);
     await expect(page.locator('[data-testid=schedule-special-day-form-submit]')).toBeInViewport({ ratio: 1 });
     await settled(page);
@@ -114,7 +120,7 @@ for (const vp of VIEWPORTS) {
     await page.locator('[data-testid=schedule-special-day-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=schedule-special-day-form]')).toBeHidden();
     const day = view.locator('[data-testid=schedule-special-days-row]', { hasText: name });
-    await expect(day).toContainText('12/25/2099');
+    await expect(day).toContainText(dayAsShown(CHRISTMAS));
     await expect(day).toContainText('Closed');
 
     // F13: the row opens it with what it has; open 10:00–13:00 and «Save».
@@ -123,20 +129,20 @@ for (const vp of VIEWPORTS) {
     await page.locator('[data-testid=schedule-special-day-form-status]').click();
     await page.locator('ion-popover ion-radio', { hasText: 'Open (with hours)' }).click();
     await expect(page.locator('ion-popover.select-popover')).toHaveCount(0);
-    await page.locator('[data-testid=schedule-special-day-form-intervals-open-0] input').fill('10:00');
-    await page.locator('[data-testid=schedule-special-day-form-intervals-close-0] input').fill('13:00');
+    await pickTime(page, page.locator('[data-testid=schedule-special-day-form-intervals-open-0]'), '10:00');
+    await pickTime(page, page.locator('[data-testid=schedule-special-day-form-intervals-close-0]'), '13:00');
     await expect(page.locator('[data-testid=schedule-special-day-form-submit]')).toBeInViewport({ ratio: 1 });
     await settled(page);
     await page.screenshot({ path: shot(`APP-SCHEDULE-SCHEDULE-F13-${vp.label}`) });
     await page.locator('[data-testid=schedule-special-day-form-submit]').click();
     await expect(day).toContainText('10:00 AM–01:00 PM');
-    const open = await api<{ is_open: boolean; source: string }>(context, A, 'GET', '/schedule/is_open?when=2099-12-25T12:00');
+    const open = await api<{ is_open: boolean; source: string }>(context, A, 'GET', `/schedule/is_open?when=${CHRISTMAS}T12:00`);
     expect([open.data.is_open, open.data.source]).toEqual([true, 'special_day']);
 
     // F05: «+» on Overrides → From, To and Reason, closed → «Add override».
     await view.locator('[data-testid=schedule-overrides-add]').click();
-    await page.locator('[data-testid=schedule-override-form-start_date] input').fill('2099-08-01');
-    await page.locator('[data-testid=schedule-override-form-end_date] input').fill('2099-08-15');
+    await pickDay(page, page.locator('[data-testid=schedule-override-form-start_date]'), SUMMER[0]);
+    await pickDay(page, page.locator('[data-testid=schedule-override-form-end_date]'), SUMMER[1]);
     await page.locator('[data-testid=schedule-override-form-reason] input').fill(reason);
     await expect(page.locator('[data-testid=schedule-override-form-submit]')).toBeInViewport({ ratio: 1 });
     await settled(page);
@@ -144,7 +150,7 @@ for (const vp of VIEWPORTS) {
     await page.locator('[data-testid=schedule-override-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=schedule-override-form]')).toBeHidden();
     const change = view.locator('[data-testid=schedule-overrides-row]', { hasText: reason });
-    await expect(change).toContainText('08/01/2099');
+    await expect(change).toContainText(dayAsShown(SUMMER[0]));
 
     // F06: «Delete» asks first, then the row goes; the date is free again.
     const dayId = psql(`select id from schedule_specialday where name = '${name}'`);
@@ -162,6 +168,6 @@ for (const vp of VIEWPORTS) {
     await page.locator('[data-testid=schedule-override-delete-submit]').click();
     await expect(page.locator('ion-modal[data-testid=schedule-override-delete]')).toBeHidden();
     await expect(change).toHaveCount(0);
-    expect(psql(`select count(*) from schedule_specialday where date = '2099-12-25'`)).toBe('0');
+    expect(psql(`select count(*) from schedule_specialday where date = '${CHRISTMAS}'`)).toBe('0');
   });
 }

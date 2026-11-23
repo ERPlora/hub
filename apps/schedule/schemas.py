@@ -31,6 +31,7 @@ from apps.schedule.engine import (
     normalize,
     parse_when,
 )
+from base import weekdays
 from base.schemas.assistant import names
 
 T = TypeVar("T")
@@ -118,9 +119,7 @@ _WEEKDAY_NAMES = {
     5: ("saturday", "sat", "sabado", "sab"),
     6: ("sunday", "sun", "domingo", "dom"),
 }
-_BY_NAME = {
-    name: weekday for weekday, names in _WEEKDAY_NAMES.items() for name in names
-}
+_BY_NAME = {name: weekday for weekday, names in _WEEKDAY_NAMES.items() for name in names}
 
 
 def _plain(text: str) -> str:
@@ -142,7 +141,7 @@ def _weekday(value: Any) -> Any:
     return _BY_NAME.get(name.strip(), value)
 
 
-Weekday = Annotated[int, BeforeValidator(_weekday), Field(ge=0, le=6)]
+Weekday = Annotated[weekdays.Weekday, BeforeValidator(_weekday)]
 Name = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
 ]

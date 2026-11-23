@@ -2,12 +2,14 @@
 // interval» — plus «+ Add interval» and the hint about split shifts and past-midnight intervals; the
 // weekly day, the special day and the override share it, as in the old screen. The server's refusal of
 // the intervals goes under them.
+import { TimeField } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
-import { click, ionValue, mountSchedule } from '../__tests__/mount-schedule';
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
+import { click, mountSchedule } from '../__tests__/mount-schedule';
 import IntervalsEditor from './IntervalsEditor.vue';
 
-type Field = HTMLElement & { value?: unknown; type?: string; label?: string; disabled?: boolean };
+type Field = HTMLElement & { value?: unknown; readonly?: boolean; label?: string; disabled?: boolean };
 
 async function setup(modelValue = [{ open_time: '10:00', close_time: '14:00' }], props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountSchedule(IntervalsEditor, { props: { modelValue, testid: 'day', ...props }, locale });
@@ -18,25 +20,28 @@ async function setup(modelValue = [{ open_time: '10:00', close_time: '14:00' }],
 }
 
 describe('IntervalsEditor', () => {
-  it('paints one line per interval with its two time fields', async () => {
+  it('paints one line per interval with its two time fields, the app’s own pickers', async () => {
     const s = await setup([
       { open_time: '10:00', close_time: '14:00' },
       { open_time: '17:00', close_time: '20:00' },
     ]);
     expect(s.wrapper.findAll('[data-testid^="day-interval-"]')).toHaveLength(2);
-    expect([s.field('day-open-1').value, s.field('day-close-1').value]).toEqual(['17:00', '20:00']);
-    expect([s.field('day-open-0').type, s.field('day-open-0').label, s.field('day-close-0').label]).toEqual(['time', 'Opens', 'Closes']);
+    expect([picked(s.field('day-open-1')), picked(s.field('day-close-1'))]).toEqual(['17:00', '20:00']);
+    expect(s.field('day-close-1').value).toMatch(/^08:00\sPM$/);
+    expect([s.field('day-open-0').readonly, s.field('day-open-0').label, s.field('day-close-0').label]).toEqual([true, 'Opens', 'Closes']);
+    // An open line needs both times (a half-filled one is not sent): no «Clear», a line goes with «Remove interval».
+    expect(s.wrapper.findAllComponents(TimeField).map((field) => field.props('required'))).toEqual([true, true, true, true]);
     expect(s.find('day-hint').text()).toBe(
       'Split shifts: one line per interval (10:00–14:00 and 17:00–20:00). A closing time earlier than the opening one runs past midnight (22:00–02:00).',
     );
   });
 
-  it('a typed time changes that line only', async () => {
+  it('a picked time changes that line only', async () => {
     const s = await setup([
       { open_time: '10:00', close_time: '14:00' },
       { open_time: '17:00', close_time: '20:00' },
     ]);
-    await ionValue(s.field('day-close-1'), '21:00', 'ionInput');
+    await pick(s.field('day-close-1'), '21:00');
     expect(s.emitted().at(-1)).toEqual([
       { open_time: '10:00', close_time: '14:00' },
       { open_time: '17:00', close_time: '21:00' },

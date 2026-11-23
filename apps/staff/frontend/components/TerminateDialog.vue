@@ -3,9 +3,9 @@
 // (today if empty)» and «Reason (optional)» — as a consequential dialog (alertdialog, red action). It
 // sends `staff.member.terminate`; the day only when given (the server takes today in the business's
 // calendar). The termination is final; the person disappears from the list through the stream.
-import { FormModal } from '@erplora/ui/components';
+import { DateField, FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
-import { IonInput, IonTextarea } from '@ionic/vue';
+import { IonTextarea } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
@@ -74,18 +74,12 @@ async function terminate(): Promise<void> {
         >
           {{ $t('staff.members.terminate.message', { name: member?.full_name ?? '' }) }}
         </p>
-        <ion-input
-          data-testid="staff-member-terminate-termination_date"
+        <DateField
+          v-model="lastDay"
+          testid="staff-member-terminate-termination_date"
           name="termination_date"
-          type="date"
-          :value="lastDay"
           :label="$t('staff.members.terminate.date')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           :error-text="fieldErrors.termination_date"
-          :class="invalid(fieldErrors.termination_date)"
-          @ion-input="lastDay = text($event.detail.value)"
         />
         <ion-textarea
           data-testid="staff-member-terminate-reason"

@@ -5,8 +5,8 @@
 # fits its cap, and no path or higher number is ever added.
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
-1634 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
-1126 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
+1633 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
+1122 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 880 apps/attendance/queries.py ERPlora/erplora-next#74
 711 apps/attendance/services.py ERPlora/erplora-next#74
@@ -63,13 +63,13 @@
 587 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 866 apps/sale/models.py ERPlora/erplora-next#74
 562 apps/schedule/queries.py ERPlora/erplora-next#74
-668 apps/schedule/schemas.py ERPlora/erplora-next#74
+667 apps/schedule/schemas.py ERPlora/erplora-next#74
 609 apps/schedule/services.py ERPlora/erplora-next#74
 686 apps/service/frontend/operations.d.ts ERPlora/erplora-next#74
 622 apps/service/models.py ERPlora/erplora-next#74
 1222 apps/service/tests/test_queries.py ERPlora/erplora-next#74
 1090 apps/service/tests/test_services.py ERPlora/erplora-next#74
-612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
+600 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 1158 apps/staff/queries/__init__.py ERPlora/erplora-next#74
 1065 apps/staff/services.py ERPlora/erplora-next#74
@@ -117,8 +117,7 @@
 624 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/cash-register-flows.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/combo-menus.spec.ts ERPlora/erplora-next#74
-513 tests/e2e/customer-flows.spec.ts ERPlora/erplora-next#74
-654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
+648 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74
 1071 tests/e2e/helpers.ts ERPlora/erplora-next#74

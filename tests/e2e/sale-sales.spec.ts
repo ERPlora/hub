@@ -9,6 +9,7 @@
 // What this file creates is deleted after it (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, capture, login, saveSessionForTheSweep, shot, shown, signedInSpanish, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
@@ -243,8 +244,8 @@ test('Sales filter by total in euros and by payment behind the funnel, with its 
   await panel.locator('[data-testid=sales-table-filters-clear]').click();
 
   // From the 14th to the 1st: said under «to», the funnel turns red, nothing is filtered and the period rules.
-  await panel.locator('[data-testid=sales-table-filter-date_from] input').fill('2026-10-14');
-  await panel.locator('[data-testid=sales-table-filter-date_to] input').fill('2026-10-01');
+  await pickDay(page, panel.locator('[data-testid=sales-table-filter-date_from]'), '2026-10-14');
+  await pickDay(page, panel.locator('[data-testid=sales-table-filter-date_to]'), '2026-10-01');
   await panel.locator('[data-testid=sales-table-filters-apply]').click();
   await expect(toggle).toHaveAttribute('data-invalid', 'true');
   await expect(row(page, cash)).toBeVisible();

@@ -7,6 +7,7 @@
 // flow: FLOW-F29 SCHEDULE-F09 ATTENDANCE-F01 ATTENDANCE-F07 ATTENDANCE-F08 ATTENDANCE-F10 TASK-F04 WHATSAPP_INBOX-F05
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
+import { dayAsShown, pickDayTime, timeAsShown } from './date-time-fields';
 import { manualFlow, signedIn } from './flow-helpers';
 import { A, api, login, psql, shown } from './helpers';
 import { rowAction } from './service-helpers';
@@ -148,13 +149,15 @@ test("a correction is shown and read on the business's clock, and the CSV says i
     await page.goto('/attendance/records');
     await rowAction(page, 'attendance-records', day.id, 'correct');
     const dialog = page.locator('ion-modal[data-testid=attendance-correct]');
-    const clockIn = dialog.locator('[data-testid=attendance-correct-clock_in] input');
-    await expect(clockIn).toHaveValue(wall(day.clock_in_at, 'T'));
+    const clockIn = dialog.locator('[data-testid=attendance-correct-clock_in]');
+    const shownIn = wall(day.clock_in_at, 'T');
+    await expect(clockIn.locator('[data-testid=attendance-correct-clock_in-date] input')).toHaveValue(dayAsShown(shownIn.slice(0, 10)));
+    await expect(clockIn.locator('[data-testid=attendance-correct-clock_in-time] input')).toHaveValue(timeAsShown(shownIn.slice(11)));
 
-    // Ten minutes earlier, typed on the business's clock: the same instant comes back, whatever the device's or the
+    // Ten minutes earlier, picked on the business's clock: the same instant comes back, whatever the device's or the
     // deployment's is.
     const earlier = new Date(Date.parse(day.clock_in_at) - 10 * 60_000).toISOString();
-    await clockIn.fill(wall(earlier, 'T'));
+    await pickDayTime(page, clockIn, wall(earlier, 'T'));
     await dialog.locator('[data-testid=attendance-correct-reason] textarea').fill('Arrived earlier, forgot to clock in');
     await dialog.locator('[data-testid=attendance-correct-submit]').click();
     await expect(shown(page).locator('[data-testid=attendance-records-corrected]')).toContainText('Working day corrected.');

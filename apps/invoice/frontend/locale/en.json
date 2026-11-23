@@ -308,7 +308,9 @@
         "postalCode": "Postal code",
         "city": "City",
         "province": "Province",
-        "country": "Country"
+        "country": "Country",
+        "intraEuOperator": "Registered in the ROI (intra-EU operations)",
+        "intraEuOperatorHelp": "Your invoices and tickets will print your tax ID with your country’s prefix (ES…). VeriFactu keeps receiving it without the prefix."
       },
       "save": "Save",
       "saved": "Issuer saved.",
