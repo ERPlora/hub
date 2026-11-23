@@ -82,7 +82,7 @@ export function formatTime(value: string | null | undefined): string {
   return value ? value.slice(0, 5) : '';
 }
 
-/** What a time field (`type="time"`) holds for a value of the API: `HH:MM`, or `''`. */
+/** What a time field (`TimeField`) holds for a value of the API: `HH:MM`, or `''`. */
 export const timeValue = formatTime;
 
 /** A working day as the API gives it. */

@@ -5,7 +5,7 @@
 // Regime, Valid from, Valid to, «Root rule (component of)» (the roots the server says the component
 // may hang from: ParentRuleSelect) and «Component label». A class that charges no tax pins the rate to
 // 0 % (the server refuses any other). The server decides; its refusals stay here under their field.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
@@ -279,31 +279,21 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
           @ion-input="set('regime_key', $event.detail.value)"
         />
         <div class="tax-form__pair">
-          <ion-input
-            data-testid="tax-rule-form-valid_from"
+          <DateField
+            testid="tax-rule-form-valid_from"
             name="valid_from"
-            type="date"
-            :value="form.valid_from"
+            :model-value="form.valid_from"
             :label="$t('tax.rules.columns.validFrom')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.valid_from"
-            :class="invalid(fieldErrors.valid_from)"
-            @ion-input="set('valid_from', $event.detail.value)"
+            @update:model-value="set('valid_from', $event)"
           />
-          <ion-input
-            data-testid="tax-rule-form-valid_to"
+          <DateField
+            testid="tax-rule-form-valid_to"
             name="valid_to"
-            type="date"
-            :value="form.valid_to"
+            :model-value="form.valid_to"
             :label="$t('tax.rules.columns.validTo')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.valid_to"
-            :class="invalid(fieldErrors.valid_to)"
-            @ion-input="set('valid_to', $event.detail.value)"
+            @update:model-value="set('valid_to', $event)"
           />
         </div>
         <ParentRuleSelect

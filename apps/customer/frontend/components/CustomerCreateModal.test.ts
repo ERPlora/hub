@@ -6,6 +6,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerCreateModal from './CustomerCreateModal.vue';
 
@@ -86,18 +87,15 @@ describe('CustomerCreateModal', () => {
     expect(s.created).toEqual([]);
   });
 
-  it('a birthday the browser cannot read is told under it, in Spanish, and nothing is sent', async () => {
+  it('the birthday and the anniversary picked in the app’s calendar travel as their ISO day', async () => {
     const s = await setup('es');
+    s.net.onApi(() => json({ id: 'c9', name: 'Ana' }, 201));
     await s.type('customer-form-name', 'Ana');
-    // What a browser does with 31/02 typed in a date input: the page reads "" and the input says it could not.
-    const birthday = s.el('customer-form-birthday')! as HTMLElement & { errorText?: string };
-    const native = birthday.querySelector('input') ?? birthday.appendChild(document.createElement('input'));
-    Object.defineProperty(native, 'validity', { value: { badInput: true } });
+    await pick(s.el('customer-form-birthday'), '1990-02-03');
+    await pick(s.el('customer-form-anniversary'), '2010-05-06');
+    expect(s.el('customer-form-birthday')!.value).toBe('03/02/1990');
     await s.save();
-    expect(s.net.api).toHaveLength(0);
-    expect(birthday.errorText).toBe('Introduce una fecha válida.');
-    expect(s.open.value).toBe(true);
-    expect(s.created).toEqual([]);
+    expect(sent(s.net.api[0]).body).toMatchObject({ name: 'Ana', birthday: '1990-02-03', anniversary: '2010-05-06' });
   });
 
   it('a refusal that names no field shown is told on top of the form', async () => {
