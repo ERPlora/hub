@@ -113,6 +113,9 @@ CARD_ONLY = {
     "customer.field.detail",
     "customer.order.get",
 }
+#: The writes whose card says their data by a summary of their own (the rows of a file by their names): a dict, since
+#: ``AI`` holds no summary.
+CARD_SUMMARY = {"customer.customer.import"}
 
 
 def customer():
@@ -227,16 +230,21 @@ def test_the_system_only_permission_is_declared_by_no_app():
 
 
 def test_every_operation_tells_the_assistant_what_it_does():
-    """Typed (``AI``), with what it does and how people ask for it in English and Spanish
-    (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card are no
-    tool (``INTERNAL``)."""
+    """Typed (``AI``), or a dict with its card's summary, with what it does and how people ask for it in English and
+    Spanish (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card
+    are no tool (``INTERNAL``)."""
     for name, op in customer_operations().items():
         if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
             assert op.ai is INTERNAL, name
             continue
-        assert isinstance(op.ai, AI), name
-        assert len(op.ai.description) > 20, name
-        assert set(op.ai.asks) == {"en", "es"}, name
+        if name in CARD_SUMMARY:
+            assert isinstance(op.ai, dict) and callable(op.ai["summary"]), name
+        else:
+            assert isinstance(op.ai, AI), name
+        spec = op.ai_spec()
+        assert isinstance(spec, AI), name
+        assert len(spec.description) > 20, name
+        assert set(spec.asks) == {"en", "es"}, name
 
 
 def test_commands_declare_their_risk_and_queries_do_not():
@@ -245,12 +253,12 @@ def test_commands_declare_their_risk_and_queries_do_not():
             continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"
-            assert op.ai.risk == expected, name
+            assert op.ai_spec().risk == expected, name
         elif name == "customer.customer.export":
             # The one query the assistant confirms: it hands out the whole directory's personal data.
-            assert op.ai.risk == "high"
+            assert op.ai_spec().risk == "high"
         else:
-            assert op.ai.risk == "normal", name
+            assert op.ai_spec().risk == "normal", name
 
 
 def test_api_keys_reach_what_the_product_exposed():

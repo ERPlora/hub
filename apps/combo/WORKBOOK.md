@@ -318,8 +318,9 @@ sin productos: «Ningún producto coincide.». Si el catálogo no carga, el busc
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
 cuanto se guarda. Por el asistente, al cambiar o quitar una elección dicha por su producto, un nombre que vale para
 varias elecciones o para ninguna no saca tarjeta, y si antes del «sí» otra elección u otro menú encaja mejor con lo
-dicho no se toca nada y sale la tarjeta nueva. Al añadir u ordenar elecciones, el «sí» vale solo para el
-menú, el plato y el producto que enseñó la tarjeta.
+dicho no se toca nada y sale la tarjeta nueva. Al añadir elecciones, un menú, un plato o un producto que el negocio no
+tiene, o un nombre que vale para varios, tampoco saca tarjeta: el asistente lo busca con otro nombre o pregunta cuál es.
+Al añadir u ordenar elecciones, el «sí» vale solo para el menú, el plato y el producto que enseñó la tarjeta.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
@@ -595,7 +596,8 @@ mejor, no se toca nada y sale la tarjeta nueva (hub#1231). La tarjeta enseña el
 ordenar platos y elecciones, y con el producto de Inventario dicho por su nombre, la tarjeta enseña también el menú, el
 plato y el producto que encontró, y el «sí» vale solo para ellos: si antes de confirmar alguien crea uno que encaja
 mejor con lo dicho, no se toca nada y sale la tarjeta nueva; si lo dicho vale para varios, la tarjeta lo enseña tal
-como se dijo y la acción pregunta cuál (hub#1245). Si el menú, el plato o la elección llegan por su identificador
+como se dijo y la acción pregunta cuál (hub#1245); al añadir elecciones, en cambio, no sale tarjeta y el asistente
+pregunta cuál (hub#2213). Si el menú, el plato o la elección llegan por su identificador
 junto a un nombre que la acción no usa (el de otro menú, otro plato u otro producto), la tarjeta no lee ni enseña ese
 nombre: dice el registro del identificador, igual que cuando llega solo (hub#1250). Lo mismo con el identificador de
 otro menú o de otro plato que llegue junto al del plato o la elección, o junto al del plato en que se añade, se ordena
@@ -609,6 +611,8 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
 | Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20, BASE-F97) | ver | F06, F07 | `combo.option.get` |
 | Un plato de un menú con sus elecciones, por su id o por su nombre dentro del menú: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F05, F06 | `combo.group.get` |
+| Lo que nombra una elección nueva, antes de la tarjeta del asistente que la añade: el plato, con su menú, y el producto de Inventario; si alguno no existe o vale para varios, no sale tarjeta (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06 | `combo.option.check` |
+| Lo mismo con varias elecciones a la vez: el plato y cada producto, antes de la tarjeta que las añade (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06 | `combo.option.bulk_check` |
 | El catálogo de menús del TPV: los que se pueden vender, con sus platos y sus elecciones disponibles (en vivo) | ver | F07 | `combo.combo.for_sale` |
 | La línea de un menú con lo elegido: importe, componentes y reparto fiscal | ver | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Hasta cinco imágenes de la librería para la foto de un menú, por su nombre; no pone ninguna | ver | F14 | `combo.combo.suggest_image` |
@@ -788,9 +792,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   es por operación, no por campo; ponerlo a la venta o quitarlo del TPV es su propia acción, `combo.combo.set_active`,
   de riesgo normal, un toque como el interruptor del formulario, `inventory.product.set_sold_out` y
   `staff.schedule.set_active`: reutiliza `combo.combo.update` con ese dato solo, así que sus reglas y su aviso son los
-  mismos) y todo campo de entrada lleva `description`. Salvo dos lecturas internas
-  (`ai=INTERNAL`, sin API) que solo nombran un registro en la tarjeta del asistente: `combo.option.get` (hub#561) y
-  `combo.group.get` (hub#669); el modelo lee los platos y las elecciones con su menú.
+  mismos) y todo campo de entrada lleva `description`. Salvo cuatro lecturas internas
+  (`ai=INTERNAL`, sin API): dos que solo nombran un registro en la tarjeta del asistente, `combo.option.get` (hub#561) y
+  `combo.group.get` (hub#669), y dos que comprueban antes de su tarjeta lo que nombra una elección nueva,
+  `combo.option.check` y `combo.option.bulk_check` (hub#2213); el modelo lee los platos y las elecciones con su menú.
 - **Asks del asistente** (hub#1091): las 19 herramientas dicen lo que una persona escribe para pedir cada una, en `en`
   y `es` (`combo` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase
   traiga su herramienta entre las diez primeras, por rol). Sin ellos, «ordena las opciones de…» ofrecía antes cambiar el
