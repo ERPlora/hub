@@ -11,6 +11,8 @@
 // tagged `E2E FlowF` (plus the ids of the cards it used) and goes.
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pickTime } from './date-time-fields';
+import { choose } from './flow-helpers';
 import { A, api, capture, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { rowAction } from './service-helpers';
@@ -42,14 +44,6 @@ async function signedIn(browser: Browser, next: string, viewport: { width: numbe
   const page = await context.newPage();
   await login(page, A, next);
   return { context, page };
-}
-
-/** Picks `text` in the popover of the `IonSelect` `testid` of the page shown. */
-async function choose(page: Page, testid: string, text: string): Promise<void> {
-  await shown(page).locator(`[data-testid="${testid}"]`).click();
-  const popover = page.locator('ion-popover.select-popover:not(.overlay-hidden)');
-  await popover.locator('ion-radio', { hasText: text }).first().click();
-  await expect(popover).toHaveCount(0);
 }
 
 /** Confirms the dialog titled `title` with its main button. */
@@ -163,7 +157,7 @@ for (const viewport of VIEWPORTS) {
       await choose(page, 'flow-trigger-kind', 'On a schedule');
       await choose(page, 'flow-trigger-every', 'Every week');
       await choose(page, 'flow-trigger-weekday', 'Friday');
-      await editor.locator('[data-testid=flow-trigger-time] input').fill('18:00');
+      await pickTime(page, editor.locator('[data-testid=flow-trigger-time]'), '18:00');
       await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Every Friday at 18:00');
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F10');

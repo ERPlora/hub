@@ -8,6 +8,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
+import { pickDay, pickTime } from './date-time-fields';
 import { pickMember, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
@@ -326,8 +327,8 @@ test('STAFF-F17: «+» in Time Off registers someone’s absence, Pending', asyn
     await pickMember(page, 'staff-time-off-form-member_id', ana.full_name.split(' ').at(-1)!, ana.full_name);
     const picked = page.locator('[data-testid=staff-time-off-form-member_id]');
     await expect(picked.locator('input')).toHaveValue(ana.full_name);
-    await page.locator('[data-testid=staff-time-off-form-start_date] input').fill(day(40));
-    await page.locator('[data-testid=staff-time-off-form-end_date] input').fill(day(42));
+    await pickDay(page, page.locator('[data-testid=staff-time-off-form-start_date]'), day(40));
+    await pickDay(page, page.locator('[data-testid=staff-time-off-form-end_date]'), day(42));
     await threeShots(page, 'STAFF-F17-form', () => picked, 'CLOSE-STAFF-time-off-form');
     await page.locator('[data-testid=staff-time-off-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-time-off-form]')).toBeHidden();
@@ -424,8 +425,8 @@ test('STAFF-F22: Settings saves the default working day, and a new schedule prop
     for (const retired of ['max_daily_hours', 'allow_staff_selection', 'notify_cancellation']) {
       await expect(shown(page).locator(`[data-testid=staff-settings-${retired}]`)).toHaveCount(0);
     }
-    await shown(page).locator('[data-testid=staff-settings-default_work_start] input').fill('08:00');
-    await shown(page).locator('[data-testid=staff-settings-default_work_end] input').fill('16:00');
+    await pickTime(page, shown(page).locator('[data-testid=staff-settings-default_work_start]'), '08:00');
+    await pickTime(page, shown(page).locator('[data-testid=staff-settings-default_work_end]'), '16:00');
     await shown(page).locator('[data-testid=staff-settings-default_break_duration] input').fill('30');
     await shown(page).locator('[data-testid=staff-settings-save]').click();
     const saved = shown(page).locator('[data-testid=staff-settings-saved]');
@@ -439,7 +440,7 @@ test('STAFF-F22: Settings saves the default working day, and a new schedule prop
 
     // A day that crosses midnight cannot be a schedule's day: refused under its end, nothing saved.
     await page.setViewportSize({ width: 1440, height: 900 });
-    await shown(page).locator('[data-testid=staff-settings-default_work_end] input').fill('06:00');
+    await pickTime(page, shown(page).locator('[data-testid=staff-settings-default_work_end]'), '06:00');
     await shown(page).locator('[data-testid=staff-settings-save]').click();
     await expect(shown(page).locator('[data-testid=staff-settings-default_work_end]')).toContainText('The start time must be before the end time.');
     expect((await api<WorkingDay>(context, A, 'GET', '/staff/settings')).data.default_work_end).toBe('16:00');
@@ -449,10 +450,9 @@ test('STAFF-F22: Settings saves the default working day, and a new schedule prop
     await page.goto(`${A}/staff/schedules`);
     await openSchedules(page, sara);
     await shown(page).locator('[data-testid=staff-schedules-add]').click();
-    const monday = { start: '08:00', end: '16:00', break_start: '11:45', break_end: '12:15' };
-    for (const [part, value] of Object.entries(monday)) {
-      await expect(page.locator(`[data-testid=staff-schedule-form-day-0-${part}] input`)).toHaveValue(value);
-    }
+    // As the owner reads them, on the 12-hour clock of American English.
+    const monday = { start: /^08:00\sAM$/, end: /^04:00\sPM$/, break_start: /^11:45\sAM$/, break_end: /^12:15\sPM$/ };
+    for (const [part, value] of Object.entries(monday)) await expect(page.locator(`[data-testid=staff-schedule-form-day-0-${part}] input`)).toHaveValue(value);
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-schedule-form]')).toBeHidden();
     await expect(shown(page).locator('[data-testid=staff-schedules-row]').first()).toContainText('Mon 08:00–16:00 (11:45–12:15)');
@@ -521,8 +521,8 @@ test('STAFF-F24: the employee asks for their own time off from «+», without ch
     await shown(page).locator('[data-testid=staff-time-off-add]').click();
     await expect(page.locator('ion-modal[data-testid=staff-time-off-form] ion-title')).toHaveText('Request time off');
     await expect(page.locator('[data-testid=staff-time-off-form-member_id]')).toHaveCount(0);
-    await page.locator('[data-testid=staff-time-off-form-start_date] input').fill(day(80));
-    await page.locator('[data-testid=staff-time-off-form-end_date] input').fill(day(81));
+    await pickDay(page, page.locator('[data-testid=staff-time-off-form-start_date]'), day(80));
+    await pickDay(page, page.locator('[data-testid=staff-time-off-form-end_date]'), day(81));
     await page.locator('[data-testid=staff-time-off-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-time-off-form]')).toBeHidden();
     await search(page, 'staff-time-off', mine.full_name.split(' ').at(-1)!);

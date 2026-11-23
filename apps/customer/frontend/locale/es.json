@@ -120,8 +120,7 @@
       "customFields": "Campos personalizados",
       "active": "Activo",
       "required": "{name} *",
-      "invalidNumber": "Introduce un número.",
-      "invalidDate": "Introduce una fecha válida."
+      "invalidNumber": "Introduce un número."
     },
     "importCsv": {
       "button": "Importar CSV",

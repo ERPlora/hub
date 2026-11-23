@@ -5,6 +5,7 @@
 // Status), and «Apply» still filters the list by status, by date and by amount in euros.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, login, psql, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL';
@@ -139,8 +140,8 @@ for (const size of SIZES) {
 
       // By date: from the 1st to the 30th of September keeps September's only.
       await filterWith(page, async (scope) => {
-        await scope.locator(`[data-testid=${TABLE}-filter-payment_date_from] input`).fill('2026-09-01');
-        await scope.locator(`[data-testid=${TABLE}-filter-payment_date_to] input`).fill('2026-09-30');
+        await pickDay(page, scope.locator(`[data-testid=${TABLE}-filter-payment_date_from]`), '2026-09-01');
+        await pickDay(page, scope.locator(`[data-testid=${TABLE}-filter-payment_date_to]`), '2026-09-30');
       });
       await listed(page, [september], [august]);
 

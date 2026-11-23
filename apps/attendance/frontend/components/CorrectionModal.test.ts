@@ -5,12 +5,13 @@
 // business's wall clock. The server's refusal (an overlap, a second open day) stays in the dialog.
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, errorFrame, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
 import type { RecordOut } from '../operations';
 import CorrectionModal from './CorrectionModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; type?: string; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; type?: string; errorText?: string; disabled?: boolean; readonly?: boolean };
 
 const DAY: RecordOut = {
   id: 'r1',
@@ -43,16 +44,27 @@ async function setup(record: RecordOut = DAY, locale: 'en' | 'es' = 'en', timezo
   await settle();
   const field = (name: string) => m.inDoc(`attendance-correct-${name}`) as Control;
   const save = () => m.inDoc('attendance-correct-submit') as Control;
-  return { ...m, field, save };
+  /** What a time (`clock_in`, `clock_out`) holds, `YYYY-MM-DDTHH:MM` or '': its day and its time together. */
+  const when = (name: string) => {
+    const [day, time] = [picked(field(`${name}-date`)), picked(field(`${name}-time`))];
+    return day && time ? `${day}T${time}` : '';
+  };
+  /** Picks a time's day and its time, as a person does in its two fields. */
+  async function pickAt(name: string, value: string) {
+    const [day, time] = value.split('T');
+    await pick(field(`${name}-date`), day);
+    await pick(field(`${name}-time`), time);
+  }
+  return { ...m, field, save, when, pickAt };
 }
 
 describe('CorrectionModal (ATTENDANCE-F08)', () => {
   it("shows each time on the business's clock and keeps an untouched one to the second (hub#779)", async () => {
     const s = await setup(DAY, 'en', 'Atlantic/Canary');
     // 07:02 UTC is 08:02 in the Canaries in October (UTC+1), 09:02 in Madrid.
-    expect([s.field('clock_in').value, s.field('clock_out').value]).toEqual(['2026-10-05T08:02', '2026-10-05T16:05']);
+    expect([s.when('clock_in'), s.when('clock_out')]).toEqual(['2026-10-05T08:02', '2026-10-05T16:05']);
     s.answerBy({ '/api/attendance/records/correct': [200, DAY] });
-    await ionValue(s.field('clock_out'), '2026-10-05T16:30', 'ionInput');
+    await s.pickAt('clock_out', '2026-10-05T16:30');
     await ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput');
     await click(s.save());
     await settle();
@@ -67,7 +79,7 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
     await settle();
     expect(s.save().disabled).toBe(false);
     // Filled again on the business's clock, and what was written stays.
-    expect([s.field('clock_in').value, s.field('clock_out').value, s.field('reason').value]).toEqual([
+    expect([s.when('clock_in'), s.when('clock_out'), s.field('reason').value]).toEqual([
       '2026-10-05T08:02',
       '2026-10-05T16:05',
       'Forgot to clock out',
@@ -96,18 +108,22 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
 
   it('a time typed before the business says its zone stays as it was typed (hub#779)', async () => {
     const s = await setup(DAY, 'en', null);
-    await ionValue(s.field('clock_out'), '2026-10-05T16:30', 'ionInput');
+    await s.pickAt('clock_out', '2026-10-05T16:30');
     await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
     await settle();
-    expect(s.field('clock_out').value).toBe('2026-10-05T16:30');
+    expect(s.when('clock_out')).toBe('2026-10-05T16:30');
   });
 
   it('shows the day and its times in business time, with an empty reason', async () => {
     const s = await setup();
     expect(s.inDoc('attendance-correct')?.getAttribute('aria-label')).toBe('Correct working day');
     expect(s.inDoc('attendance-correct-day')?.textContent).toContain('Bea Ruiz');
-    expect([s.field('clock_in').type, s.field('clock_in').value, s.field('clock_in').label]).toEqual(['datetime-local', '2026-10-05T09:02', 'Clock-in']);
-    expect([s.field('clock_out').value, s.field('clock_out').label]).toEqual(['2026-10-05T17:05', 'Clock-out (empty = still open)']);
+    // Each time is a day and a time picked in the app's calendar, never the device's picker.
+    expect([s.when('clock_in'), s.when('clock_out')]).toEqual(['2026-10-05T09:02', '2026-10-05T17:05']);
+    expect([s.field('clock_in-date').label, s.field('clock_in-time').label]).toEqual(['Clock-in', 'Time']);
+    expect([s.field('clock_in-date').value, s.field('clock_in-time').value]).toEqual(['10/05/2026', expect.stringMatching(/^09:02\sAM$/)]);
+    expect([s.field('clock_in-date').readonly, s.field('clock_out-time').readonly]).toEqual([true, true]);
+    expect(s.field('clock_out-date').label).toBe('Clock-out (empty = still open)');
     expect(s.field('reason').value).toBe('');
     expect(s.save().textContent?.trim()).toBe('Save correction');
   });
@@ -115,7 +131,7 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
   it('keeps the stored instant of an untouched time and sends a changed one as business time', async () => {
     const s = await setup();
     s.answerBy({ '/api/attendance/records/correct': [200, { ...DAY, clock_out_at: '2026-10-05T14:30:00Z' }] });
-    await ionValue(s.field('clock_out'), '2026-10-05T16:30', 'ionInput');
+    await s.pickAt('clock_out', '2026-10-05T16:30');
     await ionValue(s.field('reason'), '  Forgot to clock out ', 'ionInput');
     await click(s.save());
     await settle();
@@ -134,7 +150,7 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
   it('an empty clock-out reopens the day', async () => {
     const s = await setup();
     s.answerBy({ '/api/attendance/records/correct': [200, { ...DAY, clock_out_at: null, status: 'open' }] });
-    await ionValue(s.field('clock_out'), '', 'ionInput');
+    await pick(s.field('clock_out-date'), '');
     await ionValue(s.field('reason'), 'Still working', 'ionInput');
     await click(s.save());
     await settle();
@@ -143,17 +159,17 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
 
   it('checks before sending: a clock-out after the clock-in and a reason of at least 3', async () => {
     const s = await setup();
-    await ionValue(s.field('clock_out'), '2026-10-05T08:00', 'ionInput');
+    await s.pickAt('clock_out', '2026-10-05T08:00');
     await ionValue(s.field('reason'), 'ab', 'ionInput');
     await click(s.save());
     await settle();
     expect(s.sent()).toEqual([]);
-    expect(s.field('clock_out').errorText).toBe('The clock-out must be after the clock-in.');
+    expect(s.field('clock_out-date').errorText).toBe('The clock-out must be after the clock-in.');
     expect(s.field('reason').errorText).toBe('Write a reason of at least 3 characters.');
-    await ionValue(s.field('clock_in'), '', 'ionInput');
+    await pick(s.field('clock_in-date'), '');
     await click(s.save());
     await settle();
-    expect(s.field('clock_in').errorText).toBe('Enter the clock-in date and time.');
+    expect(s.field('clock_in-date').errorText).toBe('Enter the clock-in date and time.');
   });
 
   it('the server’s refusal stays in the dialog', async () => {
@@ -170,14 +186,14 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup(DAY, 'es');
-    expect(s.field('clock_out').label).toBe('Salida (vacía = sigue abierta)');
+    expect([s.field('clock_out-date').label, s.field('clock_out-time').label]).toEqual(['Salida (vacía = sigue abierta)', 'Hora']);
     expect(s.save().textContent?.trim()).toBe('Guardar corrección');
   });
 });
 
 describe('CorrectionModal: fields refused with the same words (hub#888)', () => {
   // Each time and the reason refused by the server under their own keys (`clock_in_at`, `clock_out_at`, `reason`).
-  const FIELD_OF: Record<string, string> = { clock_in_at: 'clock_in', clock_out_at: 'clock_out' };
+  const FIELD_OF: Record<string, string> = { clock_in_at: 'clock_in-date', clock_out_at: 'clock_out-date' };
   itTellsTheCorrectedFieldApart(['clock_in_at', 'clock_out_at', 'reason'], async (locale, refusal) => {
     const s = await setup(DAY, locale);
     await ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput');
@@ -204,9 +220,9 @@ describe('CorrectionModal: Android Back with unsaved changes (hub#1031, BASE-F05
     expect(unsavedChangesIn(overlay)).toBeUndefined();
     await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
     await settle();
-    expect(s.field('clock_in').value).toBe('2026-10-05T08:02');
+    expect(s.when('clock_in')).toBe('2026-10-05T08:02');
     expect(unsavedChangesIn(overlay)).toBeUndefined();
-    await ionValue(s.field('clock_in'), '2026-10-05T08:30', 'ionInput');
+    await s.pickAt('clock_in', '2026-10-05T08:30');
     expect(unsavedChangesIn(overlay)).toBeDefined();
   });
 });

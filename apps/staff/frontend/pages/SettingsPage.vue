@@ -6,10 +6,10 @@
 // (`staff.settings.update`), so it never undoes someone else's change, and a refusal says itself as a FormModal does.
 // The server judges the ranges and the day: its 422 goes under each field. A read that fails before any value came says
 // so with «Retry» and shows no form: nothing unread is ever offered to save.
-import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, TimeField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
+import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -48,9 +48,6 @@ function toForm(settings: SettingsOut): Form {
     default_break_duration: String(settings.default_break_duration),
   };
 }
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
 <template>
@@ -120,20 +117,16 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             {{ $t('staff.settings.workdayIntro') }}
           </p>
           <div class="staff-settings__grid">
-            <ion-input
+            <TimeField
               v-for="key in TIMES"
               :key="key"
-              :data-testid="`staff-settings-${key}`"
-              type="time"
-              :value="form[key]"
+              :testid="`staff-settings-${key}`"
+              :model-value="form[key]"
               :label="$t(`staff.settings.fields.${key}`)"
               :helper-text="$t(`staff.settings.hints.${key}`)"
-              label-placement="floating"
-              fill="outline"
-              mode="md"
+              required
               :error-text="fieldErrors[key]"
-              :class="invalid(fieldErrors[key])"
-              @ion-input="set(key, text($event.detail.value))"
+              @update:model-value="set(key, $event)"
             />
             <SettingsNumberField
               v-for="key in NUMBERS"
