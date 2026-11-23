@@ -67,55 +67,31 @@ def test_off_a_list_in_another_currency_the_catalog_s_price_is_in_the_business_s
     assert charged(answer) == (250, None, "EUR")
 
 
-def test_off_a_customer_group_s_list_its_customers_pay_the_general_list_s_price():
-    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id)
-    general = make_list("GEN", "General", is_default=True)
+#: The tax basis of the Partners group's list and of the general list, the group's own prices (by from quantity), the
+#: quantity whose price is removed and what the group's customers pay for a beer (250 in the catalog, 220 on the general
+#: list) afterwards.
+GROUP_LIST_CASES = [
+    pytest.param(None, None, {"1": 180}, "1", (220, "General", "EUR"), id="the-general-list-steps-in"),
+    pytest.param(None, None, {"1": 180, "10": 150}, "10", (180, "Socios", "EUR"), id="its-own-lower-quantity-competes"),
+    pytest.param(None, True, {"1": 180}, "1", (220, "General", "EUR"), id="following-the-business-a-general-with-tax-steps-in"),
+    pytest.param(False, True, {"1": 150}, "1", (250, None, "EUR"), id="without-tax-a-general-with-tax-does-not-step-in"),
+]
+
+
+@pytest.mark.parametrize(("group_tax", "general_tax", "prices", "removed", "now"), GROUP_LIST_CASES)
+def test_off_a_customer_group_s_list_its_customers_pay_the_best_price_left(group_tax, general_tax, prices, removed, now):
+    """The best of the general list and the group's own lists: a till sells with tax, so a list that follows the business
+    competes with those that carry it, and prices with and without tax are never compared (PRICING-F13)."""
+    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id, tax_included=group_tax)
+    general = make_list("GEN", "General", is_default=True, tax_included=general_tax)
     beer = make_product("Beer", "BEER", price=250)
-    make_item(partners, beer, price=180)
+    for min_quantity, price in prices.items():
+        make_item(partners, beer, price=price, min_quantity=min_quantity)
     make_item(general, beer, price=220)
 
-    answer = heard({"price_list": "Socios", "product": "Beer"})
+    answer = heard({"price_list": "Socios", "product": "Beer", "min_quantity": removed})
 
-    assert charged(answer) == (220, "General", "EUR")
-
-
-def test_off_a_customer_group_s_list_its_own_price_for_a_lower_quantity_still_competes():
-    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id)
-    general = make_list("GEN", "General", is_default=True)
-    beer = make_product("Beer", "BEER", price=250)
-    make_item(partners, beer, price=180)
-    make_item(partners, beer, price=150, min_quantity="10")
-    make_item(general, beer, price=220)
-
-    answer = heard({"price_list": "Socios", "product": "Beer", "min_quantity": "10"})
-
-    assert charged(answer) == (180, "Socios", "EUR")
-
-
-def test_off_a_group_s_list_that_follows_the_business_a_general_list_with_tax_steps_in():
-    """A till sells with tax: a list that follows the business competes with the lists that carry it."""
-    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id)
-    general = make_list("GEN", "General", is_default=True, tax_included=True)
-    beer = make_product("Beer", "BEER", price=250)
-    make_item(partners, beer, price=180)
-    make_item(general, beer, price=220)
-
-    answer = heard({"price_list": "Socios", "product": "Beer"})
-
-    assert charged(answer) == (220, "General", "EUR")
-
-
-def test_off_a_group_s_list_without_tax_a_general_list_with_tax_does_not_step_in():
-    """Prices with and without tax are never compared (PRICING-F13): the group buys without it."""
-    partners = make_list("SOCIOS", "Socios", customer_group_id=make_group("Partners").id, tax_included=False)
-    general = make_list("GEN", "General", is_default=True, tax_included=True)
-    beer = make_product("Beer", "BEER", price=250)
-    make_item(partners, beer, price=150)
-    make_item(general, beer, price=220)
-
-    answer = heard({"price_list": "Socios", "product": "Beer"})
-
-    assert charged(answer) == (250, None, "EUR")
+    assert charged(answer) == now
 
 
 def test_off_a_list_used_by_its_name_the_general_list_does_not_step_in():
