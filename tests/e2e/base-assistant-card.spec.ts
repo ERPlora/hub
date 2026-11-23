@@ -128,6 +128,7 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText(
     'No se hizo, falló: Quitar en Empleados. Esa persona no está en este negocio.',
   );
+  await lastAnswerAtEachSize(page, 'FIX-HUB-BASE-ASSISTANT-FAILED-RECEIPT-REASON');
   await context.close();
 });
 
