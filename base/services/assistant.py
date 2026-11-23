@@ -266,7 +266,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    rounds = _assistant_rounds(messages, card, stopped)
+    rounds = shared.rounds(messages)
     last = rounds >= shared.MAX_ROUNDS
     offered = [] if last else assistant.relevance.relevant(
         tools, _assistant_asked(still_open), ctx.language, searched=_assistant_searched(still_open)
@@ -294,12 +294,6 @@ def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
         return []
     told = _assistant_refusal("refused", "base.assistant_out_of_steps", OUT_OF_STEPS).content
     return [{"role": "tool", "tool_call_id": call.call_id, "content": told} for call in pending]
-
-
-def _assistant_rounds(messages: list[dict], card: dict | None, stopped: bool) -> int:
-    """The rounds of tools of the request that count against ``shared.MAX_ROUNDS``: none while a write's card waits
-    for its answer, nor once the person stopped the request, which the model still has to hear."""
-    return 0 if card is not None or stopped else shared.rounds(messages)
 
 
 def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:

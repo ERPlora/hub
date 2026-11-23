@@ -565,6 +565,26 @@ def test_on_its_last_round_the_model_still_hears_that_the_person_stopped():
     assert plan["stop"] == ""
 
 
+def test_a_request_the_person_stopped_on_its_last_round_is_still_on_its_last_round():
+    """«Cancel all» gives the request no rounds back: the model hears that the person stopped and answers, with no
+    tools to go on with."""
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    stop = {"call_id": "c1", "accepted": False, "stop": True}
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS - 1), asked(write)], decision=stop)
+    assert (plan["stop"], plan["tools"]) == ("", [])
+    assert LAST_ROUND in plan["instructions"]
+
+
+def test_every_tool_asked_for_at_once_past_the_last_round_hears_that_it_did_not_run():
+    """A model that asks for several tools in one message gets an answer to each: a request left with none is one the
+    gateway refuses."""
+    late = [call("demo.item.create", {"name": "Mesa 4"}, "c1"), call("demo.item.list", {}, "c2")]
+    plan = turn(*late, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(*late)])
+    assert [told["tool_call_id"] for told in plan["append"]] == ["c1", "c2"]
+    assert all(out_of_steps(told["content"]) for told in plan["append"])
+    assert (plan["executed"], plan["pending"], items()) == ([], [], [])
+
+
 # ── The setup ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
