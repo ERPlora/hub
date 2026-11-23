@@ -838,15 +838,24 @@ def check_charge(card):
     return lambda: run("sale.sale.complete", {**data, "customer_id": str(card.id)})
 
 
+def own_customer_charge(card):
+    order = run("sale.order.open", {"lines": [{"product": "COF"}]})
+    run("customer.order.link", {"order_id": str(order.id), "customer_id": str(card.id)})
+    data = {"idempotency_key": "card-own", "order_id": str(order.id), "order_version": order.version}
+    return lambda: run("sale.sale.complete", data)
+
+
 #: A counter sale, and the charge of an open check.
 CARD_CHARGES = {"counter": counter_charge, "check": check_charge}
+#: And the charge of a check that names nobody: the sale is for the customer the check has.
+LINKING_CHARGES = {**CARD_CHARGES, "check's own customer": own_customer_charge}
 
 
 @pytest.mark.parametrize("how", HOW)
-@pytest.mark.parametrize("charge_of", sorted(CARD_CHARGES))
+@pytest.mark.parametrize("charge_of", sorted(LINKING_CHARGES))
 def test_the_hub_admin_cannot_delete_a_card_a_charge_links_meanwhile(coffee, hub_staff, charge_of, how):
     card = Customer.objects.create(name="Ana García")
-    charge_it = CARD_CHARGES[charge_of](card)
+    charge_it = LINKING_CHARGES[charge_of](card)
     with meanwhile(writes("sale_sale"), admin_delete(hub_staff, how, card), first=True) as answers:
         charge_it()
     [answer] = answers

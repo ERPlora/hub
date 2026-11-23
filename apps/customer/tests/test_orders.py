@@ -19,5 +19,6 @@ def test_an_order_is_for_the_live_card_linked_to_it_and_for_nobody_otherwise():
     ana = Customer.objects.create(name="Ana García")
     OrderLink.objects.create(order_id=order, customer=ana)
     assert linked_customer_id(order) == ana.id
+    assert linked_customer_id(uuid.uuid7()) is None
     Customer.objects.filter(pk=ana.pk).update(deleted_at=timezone.now())
     assert linked_customer_id(order) is None

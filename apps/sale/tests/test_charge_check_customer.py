@@ -99,6 +99,7 @@ def test_a_business_that_requires_a_customer_charges_a_check_that_has_one(coffee
     assert sale.customer_id == lucia.id
 
 
-def test_a_check_without_a_customer_is_charged_without_one(coffee):
+def test_a_check_without_a_customer_is_charged_without_one_whoever_the_others_are_for(coffee, lucia):
+    open_check(lucia)
     sale = charge(open_check())
     assert sale.customer_id is None
