@@ -15,7 +15,7 @@ Para qué: que tiques, cuentas, comandas y etiquetas salgan por la impresora que
 
 ## Recorrido
 
-1. PRINTING-F18 — la tableta de la barra recoge los trabajos.
+1. PRINTING-F18, PRINTING-F21 — la tableta de la barra recoge los trabajos; después, Sistema la da por lista.
 2. PRINTING-F03 — la impresora de la barra y la de la cocina, por su dirección.
 3. PRINTING-F19 — su estado.
 4. PRINTING-F05 — una prueba de impresión.

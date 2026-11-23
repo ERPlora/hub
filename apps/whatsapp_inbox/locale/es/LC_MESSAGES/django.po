@@ -1029,3 +1029,23 @@ msgstr "Conectar el número y gestionar las plantillas y los ajustes"
 
 msgid "Erase a number's data"
 msgstr "Borrar los datos de un número"
+
+#: apps.py
+msgid "Connect WhatsApp"
+msgstr "Conectar WhatsApp"
+
+#: apps.py
+msgid "WhatsApp connected"
+msgstr "WhatsApp conectado"
+
+#: apps.py
+msgid "WhatsApp needs reconnecting"
+msgstr "Hay que volver a conectar WhatsApp"
+
+#: apps.py
+msgid "WhatsApp not connected"
+msgstr "WhatsApp sin conectar"
+
+#: apps.py
+msgid "We couldn't check WhatsApp"
+msgstr "No hemos podido comprobar WhatsApp"
