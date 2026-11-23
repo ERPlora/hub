@@ -692,9 +692,9 @@ def _save_rule(rule: DiscountRule) -> None:
         },
         "description": "Create an automatic discount rule for a line: its code and name, its type with its value "
         "(percent: a percent; fixed: cents off each unit; buy_x_get_y: buy and free units; tiered: percents by "
-        "quantity), what it applies to (all, products, services, a category, a product or a service, by name), and "
-        "if wanted a customer group, a minimum quantity, first and last day and a priority. A line gets only the "
-        "rule that takes the most off.",
+        "quantity), what it applies to (all, products, services, a category, a product or a service, by name), and if "
+        "wanted a customer group, a minimum quantity, first and last day and a priority. A line gets only the rule that "
+        "takes the most off, so a lower discount for what a rule already covers is a change of that rule.",
         "risk": "normal",
     },
 )
@@ -760,9 +760,9 @@ _COMPARED = (
                 "sube la rebaja de la promoción de verano",
             ),
         },
-        "description": "Change a discount rule, named by its id, code or name: only the fields sent. Changing its "
-        "type asks for the new type's value; changing what it applies to asks for the new target. null takes the "
-        "group, the minimum quantity or a day off.",
+        "description": "Change a discount rule, the discount a product or a category gets by itself on every sale (the "
+        "coffee discount), named by its id, code or name: only the fields sent. A new type asks for its value; a new "
+        "target, for what it applies to. null takes the group, the minimum quantity or a day off.",
         "risk": "normal",
     },
 )

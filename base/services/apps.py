@@ -19,9 +19,9 @@ from functools import partial
 from typing import Any
 
 from django.utils import timezone, translation
-from django.utils.translation import gettext, ngettext
+from django.utils.translation import gettext, ngettext, pgettext_lazy
 from live.context import OperationContext
-from live.errors import Conflict, OperationError
+from live.errors import Conflict, NotFound, OperationError
 from live.meta import module_configs
 from live.operations import on_commit as after_commit
 from live.operations import operation
@@ -37,6 +37,9 @@ from base.services.blueprints import _load_what_waited, _stop_waiting, _waiting_
 from base.services.photo import _sync_photo_blocks
 from base.services.provisioning import ring
 from base.tenancy import migrator
+
+#: What the card of turning on an app the business's country requires calls its reason for never going off.
+ONCE_ON = pgettext_lazy("base", "Once on")
 
 
 class AppLimitReached(OperationError):
@@ -201,6 +204,22 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     return {"app": label, "state": row.state, "chosen": row.wanted and row.chosen, "along": along, "already": already}
 
 
+def _enable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The card of turning an app on, and of one the business's country requires, the reason the Apps screen gives why
+    it never goes off: the person reads it before the yes, not on trying to turn it off. A name of no app, or of
+    several, is drawn as it is: the card's check (``base.app.get``) refuses it before anyone sees it."""
+    hub = _business_hub(ctx)
+    try:
+        config = _business_module(ctx, arguments["app"], hub)
+    except (NotFound, Conflict):
+        return fields
+    country = hub.country if hub else ""
+    if not home.mandatory_in(config, country):
+        return fields
+    reason = activation.mandatory_off(config, country)
+    return [*fields, {"name": "mandatory", "label": str(ONCE_ON), "kind": "text", "value": reason}]
+
+
 @operation(
     "base.app.enable",
     kind="command",
@@ -213,10 +232,12 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
         "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
         "subscribed, the app itself says why not or the name fits several apps (ask which one). state=creating: it is "
-        "being set up and is on in a moment. already=true: it was on (or being set up) already, nothing changed. Use "
-        "this when an app should be available again, not another app's settings operation.",
+        "being set up and is on in a moment. already=true: it was on (or being set up) already, nothing changed. One "
+        "base.app.get says is mandatory can't be turned off once on: say so before turning it on. Use this when an app "
+        "should be available again, not another app's settings operation.",
         "risk": "normal",
         "check": "base.app.get",
+        "summary": _enable_card,
         "asks": {
             "en": (
                 "turn on the customers app",
@@ -312,9 +333,10 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     ai={
         "description": "Turns off one of this business's apps (by its name as the person says it, or its id): it "
         "leaves everyone's menu and its screens stop opening; the apps that came along only with it go off too. Nothing "
-        "is deleted: turned on again, it has its data; an app the business's country requires stays on. Refused while "
-        "another app on needs it, when the business's country requires the app on, when the app itself says why not "
-        "yet or when the name fits several apps (ask which one). already=true: it was off already.",
+        "is deleted: turned on again, it has its data; an app the business's country requires (mandatory in "
+        "base.app.get) stays on. Refused while another app on needs it, when the business's country requires the app "
+        "on, when the app itself says why not yet or when the name fits several apps (ask which one). already=true: it "
+        "was off already.",
         "risk": "high",
         "check": "base.app.get",
         "asks": {

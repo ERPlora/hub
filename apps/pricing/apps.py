@@ -30,6 +30,16 @@ class PricingConfig(LiveAppConfig):
     # Services is read by the name of its operations (it is no requirement: WORKBOOK).
     requires = ["inventory", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): the discount of something («el
+    # descuento de los cafés», «the discount on coffees») is the rule that takes it off, as «la regla de descuento de
+    # los cafés» is; a discount said by how much it takes off («un descuento de 5 €», «a 10 % discount on the wine»)
+    # names no rule.
+    assistant_synonyms = (
+        (
+            "regla", "rule", "el descuento de", "los descuentos de", "el descuento en", "los descuentos en",
+            "the discount on", "the discounts on",
+        ),
+    )
     permissions = {
         "pricing.view": _("View price lists, prices and rules"),
         "pricing.manage": _("Create, change, deactivate and reactivate price lists, and pick the default one"),

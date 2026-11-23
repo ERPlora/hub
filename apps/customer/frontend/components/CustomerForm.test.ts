@@ -10,11 +10,12 @@ import { IonCheckbox, IonInput, IonSelect, IonTextarea } from '@ionic/vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
-import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { flush, mountCustomer } from '../__tests__/mount-customer';
 import { countryOptions } from '../lib/countries';
 import { blankCustomer, type CustomerFields } from '../lib/customerForm';
 import type { CustomFieldValueOut } from '../operations';
+import AnnualDateField from './AnnualDateField.vue';
 import CustomerForm from './CustomerForm.vue';
 import source from './CustomerForm.vue?raw';
 
@@ -165,18 +166,19 @@ describe('CustomerForm: «Add» (F01)', () => {
     expect(s.countryField().classes()).toEqual(expect.arrayContaining(['ion-invalid', 'ion-touched']));
   });
 
-  it('the birthday and the anniversary are the app’s own calendar, optional, and go up as the ISO day', async () => {
-    const s = await setup({ locale: 'es', form: { anniversary: '2010-05-06' } });
-    expect(['birthday', 'anniversary'].map((id) => [s.date(id)!.props('label'), s.date(id)!.props('required')])).toEqual([
-      ['Cumpleaños', false],
-      ['Aniversario', false],
+  it('the birthday and the anniversary are a day and a month, the year only if known, as the card keeps them', async () => {
+    const s = await setup({ locale: 'es', form: { anniversary: '2010-05-06' }, errors: { birthday: 'Introduce una fecha válida.' } });
+    const day = (id: string) => s.wrapper.findAllComponents(AnnualDateField).find((c) => c.props('testid') === `customer-form-${id}`)!;
+    expect(['birthday', 'anniversary'].map((id) => [day(id).props('label'), day(id).props('modelValue'), day(id).props('errorText')])).toEqual([
+      ['Cumpleaños', '', 'Introduce una fecha válida.'],
+      ['Aniversario', '2010-05-06', undefined],
     ]);
-    const birthday = document.querySelector<HTMLElement & { readonly?: boolean }>('ion-input[data-testid="customer-form-birthday"]')!;
-    const anniversary = document.querySelector<HTMLElement & { value?: string }>('ion-input[data-testid="customer-form-anniversary"]')!;
-    expect([birthday.readonly, anniversary.value]).toEqual([true, '06/05/2010']);
-    await pick(birthday, '1990-02-03');
-    await pick(anniversary, '');
-    expect([s.form.value.birthday, s.form.value.anniversary, picked(birthday)]).toEqual(['1990-02-03', '', '1990-02-03']);
+    expect(s.date('birthday')).toBeUndefined();
+    day('birthday').vm.$emit('update:modelValue', '--03-12');
+    await flush();
+    day('anniversary').vm.$emit('update:modelValue', '');
+    await flush();
+    expect([s.form.value.birthday, s.form.value.anniversary]).toEqual(['--03-12', '']);
   });
 
   it('source, stage and channel are selects with their names; a card from an import keeps «Import»', async () => {
@@ -253,6 +255,13 @@ describe('CustomerForm: the country (F01, F04)', () => {
 });
 
 describe('CustomerForm: «Edit» (F04)', () => {
+  it('the birthday and the anniversary take two columns of the grid when two fit, so «Month» is never cut', async () => {
+    const s = await setup({ mode: 'edit' });
+    const double = s.wrapper.findAll('.customer-form__double').map((el) => el.attributes('data-field'));
+    expect(double).toEqual(['birthday', 'anniversary']);
+    expect(source).toMatch(/@container \(min-width: 26\.75rem\) \{\s*\.customer-form__double \{\s*grid-column: span 2;/);
+  });
+
   it('shows every field at once, then the custom fields, then «Active»', async () => {
     const s = await setup({ mode: 'edit', customFields: FIELDS });
     expect(s.wrapper.find('details').exists()).toBe(false);
@@ -317,17 +326,16 @@ describe('CustomerForm: «Edit» (F04)', () => {
   it('a number the browser cannot read is told under its field, as the server words it, and stops the save', async () => {
     const s = await setup({ mode: 'edit', customFields: FIELDS, locale: 'es', errors: { phone: 'No es un teléfono válido.' } });
     // A date field is never asked: its calendar only gives real days.
-    for (const id of ['field-f4', 'field-f5', 'birthday']) unreadable(id);
+    for (const id of ['field-f4', 'field-f5']) unreadable(id);
     expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);
     await flush();
-    expect(['field-f4', 'field-f5', 'birthday', 'phone'].map(errorText)).toEqual([
+    expect(['field-f4', 'field-f5', 'phone'].map(errorText)).toEqual([
       'Introduce un número.',
-      undefined,
       undefined,
       'No es un teléfono válido.',
     ]);
     expect(s.input('field-f4')!.classes()).toContain('ion-invalid');
-    expect(errorText('anniversary')).toBeUndefined();
+    expect(errorText('anniversary-day')).toBeUndefined();
   });
 
   it('with every number readable it lets the save go, and a previous «cannot read» is gone', async () => {

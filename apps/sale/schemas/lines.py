@@ -30,6 +30,7 @@ from apps.sale.schemas.fields import (
     Said,
     _text,
 )
+from apps.tax.schemas import A_TAX_CATEGORY
 
 
 class LineFields(Closed):
@@ -141,6 +142,7 @@ class OpenLineFields(LineFields):
     tax_category_key: _text(80, 1) | None = Field(
         None,
         description="Without departments: the tax category (key, name or alias) it is charged at.",
+        json_schema_extra=A_TAX_CATEGORY,
     )
     name: _text(200) = Field(
         "", description="The line's name; the department's by default."

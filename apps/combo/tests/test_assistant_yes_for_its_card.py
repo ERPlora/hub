@@ -38,6 +38,7 @@ def by_its_name(said: str, combo: Combo) -> dict[str, dict]:
     takes the photo picked in the menu's form): no card ever shows it."""
     return {
         "combo.combo.delete": {"combo": said},
+        "combo.combo.set_active": {"combo": said, "is_active": False},
         "combo.combo.set_image": {"combo": said, "image": ""},
         "combo.combo.update": {"combo": said, "price": 1190},
         "combo.group.reorder": {"combo": said, "group_ids": [str(g.id) for g in combo.groups.order_by("-sort_order")]},

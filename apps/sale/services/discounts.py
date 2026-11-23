@@ -79,8 +79,8 @@ def _set_discount(
     input=OrderSetDiscountIn,
     output=OrderOut,
     ai=AI(
-        description="Set the ticket discount of an open check: a percentage (0 removes it) and/or a fixed amount in cents. "
-        "Above the business's cap it is refused: only a manager can (sale.order.set_discount_over_limit).",
+        description="Set the ticket discount of an open check spoken of: a percentage (0 removes it) and/or a fixed amount "
+        "in cents. Above the business's cap it is refused: only a manager can (sale.order.set_discount_over_limit).",
         risk="high",
         asks={
             "en": (
@@ -161,8 +161,8 @@ def _set_line_discount(
     input=OrderSetLineDiscountIn,
     output=OrderOut,
     ai=AI(
-        description="Set the discount (in %, 0 removes it) of a pending line of an open check. Above the business's cap it "
-        "is refused: only a manager can (sale.order.set_line_discount_over_limit).",
+        description="Set the discount (in %, 0 removes it) of a pending line of an open check spoken of. Above the "
+        "business's cap it is refused: only a manager can (sale.order.set_line_discount_over_limit).",
         risk="high",
         asks={
             "en": (

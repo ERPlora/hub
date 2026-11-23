@@ -12,10 +12,12 @@ from apps.customer.schemas.consent import ConsentStateRow
 from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.customer.schemas.fields import (
     A_FIELD,
+    ANNUAL_DATE,
     CHANNEL,
     CUSTOM_FIELD,
     SOURCE,
     STAGE,
+    AnnualDate,
     Country,
     CustomerRefIn,
     Email,
@@ -137,10 +139,8 @@ class CustomerIn(Schema):
         "", description="Country, as its ISO 3166 two-letter code (ES, FR)."
     )
     avatar: _text(500) = Field("", description="The address (URL) of their picture.")
-    birthday: date | None = Field(None, description="Their birthday.")
-    anniversary: date | None = Field(
-        None, description="An anniversary worth remembering."
-    )
+    birthday: AnnualDate = Field(None, description=f"Their birthday: {ANNUAL_DATE}")
+    anniversary: AnnualDate = Field(None, description=f"An anniversary worth remembering: {ANNUAL_DATE}")
     source: Source = Field("walk_in", description=SOURCE)
     lifecycle_stage: Stage = Field("lead", description=STAGE)
     preferred_channel: PreferredChannel = Field("none", description=CHANNEL)
@@ -174,10 +174,8 @@ class CustomerPatchIn(CustomerRefIn):
     avatar: _text(500) | None = Field(
         None, description="The new address (URL) of their picture."
     )
-    birthday: date | None = Field(None, description="The new birthday; null clears it.")
-    anniversary: date | None = Field(
-        None, description="The new anniversary; null clears it."
-    )
+    birthday: AnnualDate = Field(None, description=f"The new birthday: {ANNUAL_DATE} Null or empty clears it.")
+    anniversary: AnnualDate = Field(None, description=f"The new anniversary: {ANNUAL_DATE} Null or empty clears it.")
     source: Source | None = Field(None, description=SOURCE)
     lifecycle_stage: Stage | None = Field(None, description=STAGE)
     preferred_channel: PreferredChannel | None = Field(None, description=CHANNEL)
@@ -227,8 +225,8 @@ class CustomerDetailOut(CustomerRow):
     postal_code: str = Field(description="Postal code.")
     country: str = Field(description="Country, ISO 3166 two-letter code.")
     avatar: str = Field(description="The address (URL) of their picture.")
-    birthday: date | None = Field(description="Birthday.")
-    anniversary: date | None = Field(description="Anniversary.")
+    birthday: AnnualDate = Field(description=f"Birthday: {ANNUAL_DATE} Null when unknown.")
+    anniversary: AnnualDate = Field(description=f"Anniversary: {ANNUAL_DATE} Null when unknown.")
     preferred_channel: PreferredChannel = Field(description=CHANNEL)
     notes: str = Field(description="Internal notes.")
     created_at: datetime = Field(description="When the card was created.")

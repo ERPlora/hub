@@ -1,6 +1,6 @@
 """Events of the combo app (``combo.<entity>.<fact>``) and its reaction to Inventory's.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that
+The writes (``services``) record them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. They carry ids (and a menu's name), never what a customer picked.
 
 Reaction: a product deleted from Inventory leaves every menu (COMBO-F13), through an operation of this

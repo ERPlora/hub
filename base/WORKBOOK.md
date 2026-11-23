@@ -1010,6 +1010,9 @@ Pasos:
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
      estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
+  5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
+     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
+     España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
@@ -2490,7 +2493,8 @@ Pasos:
      pantalla táctil, Intro salta de línea y se envía con «Enviar». «Enviar» no se activa con el cuadro vacío y sin
      adjuntos.
   3. Su mensaje sale a la derecha tal cual lo escribió. Debajo, la burbuja del asistente, con tres puntos que se
-     mueven hasta que llega el primer texto.
+     mueven hasta que llega el primer texto. En español, el asistente le trata de tú o de usted como ella le escribe
+     (si no se nota, de tú, como las pantallas) y lo mantiene hasta el final de la respuesta, sin mezclarlos.
   4. Mientras responde, «Enviar» se convierte en «Detener», «Adjuntar archivo» y «Dictar por voz» se apagan y la
      respuesta va apareciendo; la conversación baja sola hasta el final. Se puede ir escribiendo la siguiente
      pregunta, pero no se envía hasta que acaba esta.
@@ -2510,6 +2514,10 @@ Pasos:
      que cambia algo, con la confirmación de BASE-F97. Si entre las que tiene a mano para ese mensaje no está la que
      hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
      pantalla se hace.
+  10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
+     hora de ese momento, su sector, las apps que tiene encendidas y, a quien lo administra, su plan y cuántas apps le
+     cuenta (solo las que eligió el negocio, como dice Apps); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
+     pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -2764,9 +2772,11 @@ Pasos:
   3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra: aceptar la primera no acepta
      las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
   4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
-  5. Una petición admite como mucho seis rondas: es un freno contra los bucles, no un cupo. En la sexta el asistente
-     ya no puede hacer nada más y contesta con lo que ha hecho y lo que falta, para pedirlo en otro mensaje. Si aun así
-     intenta seguir, «He parado: esto necesitaba demasiados pasos. Pídelo por partes.».
+  5. Una petición admite como mucho veinte rondas, y cada acción es una: es un freno contra los bucles, no un cupo, y
+     una lectura y un cambio por cada día de la semana caben de sobra. En la vigésima el asistente ya no puede hacer
+     nada más y contesta con lo que ha hecho y lo que falta, para pedirlo en otro mensaje; si aun así pide una acción,
+     no se hace ni sale su tarjeta, y se le dice que conteste. Si sigue intentándolo, «He parado: esto necesitaba
+     demasiados pasos. Pídelo por partes.».
 Entra: la petición; el resultado de cada acción, que vuelve al asistente.
 Sale: tantas acciones como tarjetas aceptadas, cada una en su app y con su recibo.
 Si falla: si una acción falla a mitad, el asistente lo recibe y lo cuenta; las anteriores no se deshacen. Con la red
@@ -3893,9 +3903,11 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
   `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
-  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide) y `state` como lo
+  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide), `state` como lo
   dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
-  del hub recibe sus tablas). Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
+  del hub recibe sus tablas), y `mandatory`, como `base.app.list`: el país del negocio la exige y, una vez activada,
+  no se desactiva. La tarjeta de `base.app.enable` de una así añade el dato `mandatory` con el motivo de Apps
+  (`activation.mandatory_off`, el mismo `MANDATORY_OFF`). Tests: `base/tests/test_assistant_mandatory_apps.py`. Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
   es una app); si vale para varias («reserva»), 409 `base.app_ambiguous` nombrándolas en el idioma de quien pide.
   `base.app.enable`, `base.app.disable` y `base.app.retry` resuelven `AppChangeIn.app` con la misma `find_app` y declaran
   `"check": "base.app.get"` en su `ai=` (hub#542): el asistente la lee antes de la tarjeta, y un nombre de varias apps o
@@ -4372,8 +4384,10 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; la ronda que llega
-  a `MAX_ROUNDS` = 6 va a la pasarela sin herramientas y con `LAST_ROUND` en las instrucciones, para que el modelo
-  conteste con lo hecho y lo que falta, y pasada esa ronda corta con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
+  a `MAX_ROUNDS` = 20 (de live: una herramienta por ronda) va a la pasarela sin herramientas y con `LAST_ROUND` en las
+  instrucciones, para que el modelo conteste con lo hecho y lo que falta; lo que pide después no corre ni saca tarjeta
+  ni recibo, y vuelve con `base.assistant_out_of_steps` (`OUT_OF_STEPS`) para que conteste, y si aun así pide otra
+  cosa, corta con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
   huella de lo que enseñó (`assistant.fingerprint`: sus datos y «Lo que va a pasar» como los ve la persona, más el id
   de cada registro que leyó, por sus datos marcados con `names(…)` —por id o por nombre— y por su `check`), y el
   panel la devuelve tal cual con el «sí»; con él la tarjeta se vuelve a dibujar y, si la huella no coincide (o no
@@ -4382,8 +4396,12 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   leerlo (patrón de Demo, hub#1206); el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
-  instrucciones con las pantallas que puede enlazar
-  y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report`,
+  instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
+  zona y hora de allí, sector, apps encendidas y, con `base.administer_hub`, el plan de la foto con las apps que cuenta,
+  `activation.chosen_on` contra `plan.max_apps`; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
+  el modelo lee de una herramienta sale de `run_tool` de `live` con `zone=business_zone()`, así que sus horas van en
+  la zona del negocio y no en UTC: lo comprueba `base/tests/test_business_facts.py`, también con dos negocios en zonas
+  distintas), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

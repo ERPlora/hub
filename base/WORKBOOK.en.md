@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e6ee03e9193760b54ef15f4c756af1de886fdfc830ed05553911fab740644ea1 -->
+<!-- generated from WORKBOOK.md sha256:88042c6028b65830c2770a8b15405592b3f13ac75abce018b342b9228c9a8011 -->
 
 ## What it is for and who it is for
 
@@ -1009,6 +1009,9 @@ Steps:
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
      already the assistant says so ("Customers was on already") instead of "turned on".
+  5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
+     longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
+     businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
@@ -2472,7 +2475,8 @@ Steps:
   2. They write in "Write a message…" and press Enter or "Send". With a keyboard, Shift+Enter starts a new line; on a
      touch screen, Enter starts a new line and "Send" sends. "Send" is off with the box empty and no attachments.
   3. Their message shows on the right just as they wrote it. Below, the assistant's bubble, with three dots that move
-     until the first text arrives.
+     until the first text arrives. In Spanish, the assistant addresses them with «tú» or «usted» as they write to it
+     (when it does not show, «tú», as the screens do) and keeps it to the end of the answer, never mixing the two.
   4. While it answers, "Send" becomes "Stop", "Attach a file" and "Dictate by voice" turn off and the answer keeps
      appearing; the conversation scrolls down by itself. They can already write the next question, but it is not
      sent until this one ends.
@@ -2492,6 +2496,11 @@ Steps:
      changes something with the confirmation of BASE-F97. If the one it needs is not among those it has at hand for
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
      it say on which screen it is done.
+  10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
+     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan and how
+     many apps it counts (only those the business chose, as Apps says); it does not have to look them up for each
+     question. Every date and time it says is in the business's time, the one the
+     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
@@ -2660,7 +2669,7 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
 Steps:
   1. An action its app marks as dangerous is not confirmed with one click: the card says, for example, "Delete in
-     Services. Check each datum before going on.", puts each datum on its own line with its name in the person's
+     Services. Check each detail before you continue.", puts each datum on its own line with its name in the person's
      language and asks "To confirm, type CONFIRM:".
   2. If its app declares it, the card first says, under "What will happen", what the action is going to do, as its
      app works it out for the person who asks and with their permissions. For example, when taking someone's PIN
@@ -2751,9 +2760,11 @@ Steps:
      does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
      those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows six rounds at most: it is a brake against loops, not an allowance. On the sixth the assistant
-     can do nothing more and answers with what it has done and what is left, to ask for it in another message. If it
-     still tries to go on, "I stopped: this needed too many steps. Ask for it in parts.".
+  5. A request allows twenty rounds at most, and each action is one: it is a brake against loops, not an allowance,
+     and a read and a change for each day of the week fit easily. On the twentieth the assistant can do nothing more
+     and answers with what it has done and what is left, to ask for it in another message; if it still asks for an
+     action, it is not done and its card does not appear, and it is told to answer. If it keeps trying, "I stopped:
+     this needed too many steps. Ask for it in parts.".
 In: the request; the result of each action, which goes back to the assistant.
 Out: as many actions as cards accepted, each in its app and with its receipt.
 If it fails: if an action fails half way, the assistant gets it and tells it; the earlier ones are not undone. With
