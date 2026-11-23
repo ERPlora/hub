@@ -472,6 +472,9 @@ Pasos:
    (con el motivo) o «Revocado».
 7. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la
    pestaña no enseña el otorgamiento ni el trámite.
+8. A quien le pide al asistente que presente ERPlora por el negocio, el asistente le explica estos pasos. Donde ERPlora
+   no presenta por cuenta de los negocios, no se los ofrece: le dice «De momento ERPlora no presenta por cuenta de los
+   negocios: presenta con tu propio certificado.» y le explica cómo subirlo en la pestaña «Mi certificado».
 Entra: el emisor de Facturación (obligado tributario), el representante, el tipo de documento y los PDF en base64
 (`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`, que le pasa al SaaS los datos
 del emisor.
