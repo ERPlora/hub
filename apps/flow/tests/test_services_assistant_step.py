@@ -90,6 +90,22 @@ def test_only_the_tools_the_step_names_and_the_automation_was_granted_are_offere
     assert offered(seen) == ["task__task__list"]
 
 
+def test_the_step_is_never_sent_to_a_search_of_tools_it_is_not_offered(gateway, clock, worker):
+    # FLOW-F38: a step offers only what it names and the automation was granted. The chat's search of the rest of a
+    # person's tools is never among them, so the instructions of the step do not send the model to it.
+    clock(NOON)
+    flow = manual([step()])
+    gateway.reply(CHAT, json=said("Nothing to do"))
+    start(worker, flow)
+    worker()
+    [seen] = gateway.sent(CHAT)
+    assert "base__assistant__find_tools" not in offered(seen)
+    assert "base__assistant__find_tools" not in seen.body["instructions"]
+    assert "If something cannot be done from here (you have no tool for it), say on which screen it is done." in (
+        seen.body["instructions"]
+    )
+
+
 def test_a_tool_it_was_not_offered_never_runs(gateway, clock, worker):
     clock(NOON)
     flow = manual([step(mode="auto")], grants=["task.task.list"])
