@@ -31,7 +31,7 @@ from apps.pricing import events
 from apps.pricing.models import ACTOR_MAX_LENGTH, DiscountRule, PriceItem, PriceList
 from apps.pricing.queries.other_apps import call_service
 from apps.pricing.queries.reads import ITEM_NOT_FOUND, find_list, find_rule, live_items
-from apps.pricing.queries.rows import item_row, list_row, load_item, rule_row, snapshot_values
+from apps.pricing.queries.rows import item_row, list_row, load_item, removed_row, rule_row, snapshot_values
 from apps.pricing.schemas import (
     DEFAULT_CURRENCY,
     DEFAULT_HAS_GROUP,
@@ -40,7 +40,6 @@ from apps.pricing.schemas import (
     TYPE_VALUES,
     CatalogEventIn,
     CatalogOut,
-    DeletedOut,
     PriceItemIn,
     PriceItemOut,
     PriceItemPatchIn,
@@ -56,6 +55,7 @@ from apps.pricing.schemas import (
     RuleRefIn,
     rule_problems,
 )
+from apps.pricing.schemas.price_removed import PriceRemovedOut
 from base import operations as platform
 
 DUPLICATE_LIST_CODE = _("A price list with that code already exists. Pick a different code.")
@@ -584,7 +584,7 @@ def update_price_item(ctx: OperationContext, data: PriceItemPatchIn) -> dict:
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceItemRefIn,
-    output=DeletedOut,
+    output=PriceRemovedOut,
     expose_api=True,
     ai={
         "asks": {
@@ -600,8 +600,8 @@ def update_price_item(ctx: OperationContext, data: PriceItemPatchIn) -> dict:
             ),
         },
         "description": "Remove a price from a price list: by its id, or by the list (code or name), the product "
-        "(SKU or name) or the service (name) and its from quantity (1 if not said). The article is then charged at "
-        "another list's price or the catalog's.",
+        "(SKU or name) or the service (name) and its from quantity (1 if not said). It answers what the article costs on that list now, read after removing it: "
+        "price_now in cents, from the list price_now_list or, when that is null, the catalog's (price_now null: not known). Tell that price, never the price just removed.",
         "risk": "high",
     },
 )
@@ -610,7 +610,7 @@ def remove_price_item(ctx: OperationContext, data: PriceItemRefIn) -> dict:
     item_id, list_id = item.id, item.price_list_id
     item.delete()
     record_event(ctx, events.PRICE_ITEM_REMOVED, {"id": str(item_id), "price_list_id": str(list_id)})
-    return {"id": item_id}
+    return removed_row(ctx, item, item_id)
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────────────────────────
