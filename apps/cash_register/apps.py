@@ -64,6 +64,7 @@ class CashRegisterConfig(LiveAppConfig):
         ),
         ("register", "cajas de la"),
     )
+    assistant_settings = ("cash_register.settings.get",)
     permissions = {
         "cash_register.view_session": _("View sessions, settings, drawers and currency"),
         "cash_register.view_all_sessions": _("View everyone's sessions"),

@@ -46,6 +46,9 @@ class SaleConfig(LiveAppConfig):
         ("ticket", "tique", "recibo", "receipt", "sale"),
         ("quick", "para marcarlo rápido", "para marcarla rápido"),
     )
+    # What the assistant knows of the till from the start (base.assistant.business_facts): the read whoever sells may
+    # run, with the same answer as sale.settings.get.
+    assistant_settings = ("sale.pos_settings.get",)
     permissions = {
         "sale.view_sale": _("View sales and their figures, checks and the till settings"),
         "sale.add_sale": _("Build a check: open, add, split, merge, send to the kitchen and discount up to the limit"),
