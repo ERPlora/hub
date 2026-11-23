@@ -12,6 +12,12 @@
         "label": "Secciones del Inicio",
         "summary": "Resumen",
         "activity": "Actividad"
+      },
+      "health": {
+        "label": "Cómo está funcionando tu negocio",
+        "viewSystem": "Ver sistema",
+        "loadError": "No hemos podido comprobar cómo está funcionando tu negocio.",
+        "retry": "Reintentar"
       }
     },
     "apps": {

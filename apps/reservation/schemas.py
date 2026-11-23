@@ -33,8 +33,9 @@ from pydantic import (
 )
 
 from apps.customer.schemas.contact import EMAIL, PHONE
+from apps.customer.schemas.fields import A_CUSTOMER_SAID
 from apps.reservation.models import MAX_GUESTS, MAX_MINUTES
-from base.schemas.assistant import names
+from base.schemas.assistant import names, unless_given
 from base.sensitive import CUSTOMER_CONTACT
 
 T = TypeVar("T")
@@ -128,9 +129,7 @@ Guests = Annotated[int, Field(ge=1, le=MAX_GUESTS)]
 Minutes = Annotated[int, Field(ge=1, le=MAX_MINUTES)]
 Weekday = Annotated[int, Field(ge=0, le=6, json_schema_extra={"enum": list(range(7))})]
 
-D_GUEST_NAME = (
-    "The guest's name as the staff say it at the door; empty takes the customer card's."
-)
+D_GUEST_NAME = "The guest's name as the staff say it at the door; empty takes the customer card's."
 D_GUEST_PHONE = (
     "The guest's phone as typed; with no customer chosen, the live card with this number is used, or one "
     "is created."
@@ -279,6 +278,7 @@ class ReservationIn(In):
     customer: Said | None = Field(
         None,
         description="The guest's customer card by name, phone or email, when its id is not known.",
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
     )
     guest_name: GuestName = Field("", description=D_GUEST_NAME)
     guest_phone: Phone = Field("", description=D_GUEST_PHONE)

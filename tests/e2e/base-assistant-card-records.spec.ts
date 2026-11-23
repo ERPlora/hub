@@ -149,6 +149,16 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
     await captureStill(page, `${KEY}-create-${vp.label}`);
   }
   await cancelAtComputerSize(page);
+  // The customer said by her name, with the same guest name and her phone: the name once, then the day and the time
+  // (hub#2169: «Ana García · Ana García · <phone>»).
+  const said = { customer: name, guest_name: name, guest_phone: phone, date, time: '21:30', party_size: 2, source: 'phone' };
+  await askForACard(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(said)}`);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
+    await captureStill(page, `${KEY}-create-said-${vp.label}`);
+  }
+  await cancelAtComputerSize(page);
 
   // Moving it to table 7: which reservation, as the book's dialog says it, and the new table with its zone, as Tables
   // names it («7 (E2E Card …)»: the number repeats across zones, hub#550).

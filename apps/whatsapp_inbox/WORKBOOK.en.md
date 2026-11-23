@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:28afb5da49c7c69ca1944bea49dd1d8c5902c2f7d00a9e9f4fe24b083f91a3d7 -->
+<!-- generated from WORKBOOK.md sha256:1f78a90f193fce33a16cf04547d4491c8569f07d810f363e2302ff9f56aaf595 -->
 
 ## What it is for and who it is for
 
@@ -1070,6 +1070,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 | `whatsapp_inbox.note.get` | An internal note by its id, with its text: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API | F36 |
 | `whatsapp_inbox.template.get` | A template of the business by its id with its name and its language ("recordatorio (es)"), also one deleted here that Meta still has: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API | F30, F31 |
 | `whatsapp_inbox.channel.get` | The number's status and the month's usage | F01, F02, F13 |
+| `whatsapp_inbox.channel.health` | Whether the number is connected (`ok`), WhatsApp asks to reconnect it (`no_signal`) or there is no number (`not_configured`): what the Home's row of how the business is working reads, with "Connect WhatsApp" towards the settings (`WhatsappInboxConfig.health`); it is not a tool of the assistant and has no route in the API | BASE-F02 |
 | `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to | F07 |
 
 ### What it offers: actions (they change data)
