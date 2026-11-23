@@ -318,8 +318,9 @@ sin productos: «Ningún producto coincide.». Si el catálogo no carga, el busc
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
 cuanto se guarda. Por el asistente, al cambiar o quitar una elección dicha por su producto, un nombre que vale para
 varias elecciones o para ninguna no saca tarjeta, y si antes del «sí» otra elección u otro menú encaja mejor con lo
-dicho no se toca nada y sale la tarjeta nueva. Al añadir u ordenar elecciones, el «sí» vale solo para el
-menú, el plato y el producto que enseñó la tarjeta.
+dicho no se toca nada y sale la tarjeta nueva. Al añadir elecciones, un menú, un plato o un producto que el negocio no
+tiene, o un nombre que vale para varios, tampoco saca tarjeta: el asistente lo busca con otro nombre o pregunta cuál es.
+Al añadir u ordenar elecciones, el «sí» vale solo para el menú, el plato y el producto que enseñó la tarjeta.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender

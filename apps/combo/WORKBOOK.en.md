@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:906b5d68ed65465f927ea5b2be3b09d22140d17b514d2f3803c385450d33d955 -->
+<!-- generated from WORKBOOK.md sha256:ac35ae2f653baa1db7228937121ee99b33f0df8b49987c23b15529a4339db838 -->
 
 ## What it is for and who it is for
 
@@ -313,8 +313,9 @@ catalogue does not load, the search box says so with "Retry". A product that doe
 created first in Inventory: the search box finds it as soon as it is saved. Through the assistant, when changing or
 removing a choice said by its product, a name that fits several choices or none brings up no card, and if before the
 "yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up.
-When adding or reordering choices, the "yes" counts only for the menu, the course and the product the card
-showed.
+When adding choices, a menu, a course or a product the business does not have, or a name that fits several, brings up
+no card either: the assistant looks it up under another name or asks which one it is. When adding or reordering
+choices, the "yes" counts only for the menu, the course and the product the card showed.
 Involved: INVENTORY-F27
 
 ### COMBO-F07 Choose a menu when selling
