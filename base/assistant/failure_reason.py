@@ -36,11 +36,8 @@ def _not_fitting(op: Operation | None, fields: dict) -> str:
 
 
 def _names(op: Operation, fields: dict) -> list[str]:
-    """Each datum of ``op``'s input that ``fields`` refuses (``rows.0.price`` is ``rows``), once and in order; one
-    its input does not have (a datum the model made up, the whole input) is not named."""
+    """Each datum of ``op``'s input that ``fields`` refuses (``rows.0.price`` is ``rows``), once and in order; what
+    is not one of its data (the whole input, ``__all__``) is not named."""
     props = shared.input_schema(op).get("properties", {})
-    said: list[str] = []
-    for name in dict.fromkeys(path.split(".")[0] for path in fields):
-        if name in props:
-            said.append(shared.label(op, name, props[name].get("title")))
-    return list(dict.fromkeys(said))
+    refused = dict.fromkeys(path.split(".")[0] for path in fields)
+    return [shared.label(op, name, props[name].get("title")) for name in refused if name in props]
