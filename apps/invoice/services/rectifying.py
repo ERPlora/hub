@@ -13,16 +13,10 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
-from apps.invoice.queries import (
-    RECTIFYING,
-    REFUND_NOT_FOUND,
-    document_of_sale,
-    find_invoice,
-    rectifiable,
-    rectification_figures,
-    rectifying_type,
-    remaining_of,
-)
+from apps.invoice.queries.rectifying import rectifiable, rectification_figures, rectifying_type
+from apps.invoice.queries.refunds import REFUND_NOT_FOUND
+from apps.invoice.queries.rows import document_of_sale, find_invoice, remaining_of
+from apps.invoice.queries.series import RECTIFYING
 from apps.invoice.schemas import FromRefundIn, FromVoidIn, IssueOut, RectifyIn
 from apps.invoice.services.from_sale import _sale_key, _tell_sales
 from apps.invoice.services.issuer import _issuer_of
@@ -61,8 +55,8 @@ def _rectify(  # noqa: PLR0913
     whole original negated (header, breakdown and lines) when nothing rectified it yet and the amount is
     its total; else what is left prorated key by key — over the keys of the articles ``returned`` (their
     worth and their text, per key) when a refund brings them back — with one line per key at its own
-    rate (``queries.rectification_figures``, the same the preview reads). The original is cancelled when nothing is
-    left of it, and ``invoice.invoice.rectified`` says so."""
+    rate (``queries.rectifying.rectification_figures``, the same the preview reads). The original is cancelled
+    when nothing is left of it, and ``invoice.invoice.rectified`` says so."""
     entries, lines, _whole = rectification_figures(
         original, amount=amount, line_description=line_description, returned=returned
     )

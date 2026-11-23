@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e6ee03e9193760b54ef15f4c756af1de886fdfc830ed05553911fab740644ea1 -->
+<!-- generated from WORKBOOK.md sha256:220741cdc7cabfe55b404c348e4aa11206180ac350ec38754e1e25b32a66d9a9 -->
 
 ## What it is for and who it is for
 
@@ -1009,6 +1009,9 @@ Steps:
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
      already the assistant says so ("Customers was on already") instead of "turned on".
+  5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
+     longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
+     businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not

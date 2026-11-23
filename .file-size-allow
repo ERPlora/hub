@@ -31,7 +31,6 @@
 555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1057 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
 463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
-1348 apps/invoice/queries/__init__.py ERPlora/erplora-next#74
 1030 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
