@@ -14,9 +14,10 @@ const slot = (time: string, withinNotice = false) => ({
   staff_ids: ['s1'],
 });
 
-async function setup(props: Record<string, unknown> = {}) {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountAppointment(FreeSlots, {
     props: { date: '2026-10-19', serviceIds: ['c1', 'c2'], staffId: 's1', selected: '', ...props },
+    locale,
   });
   await m.live();
   const buttons = () => m.wrapper.findAll('[data-testid="appointment-slots-time"]');
@@ -45,12 +46,16 @@ describe('FreeSlots', () => {
     expect(s.wrapper.emitted('pick')).toEqual([['10:00']]);
   });
 
-  it('says when nothing is left, and offers Retry when it cannot load', async () => {
-    const s = await setup();
+  // A time is still picked in the time field when none is free or the free ones cannot load.
+  it.each([
+    ['en', 'No free times that day for this professional. You can still pick a time.', 'The free times could not be loaded. You can still pick a time.'],
+    ['es', 'No quedan horas libres ese día para este profesional. Puedes elegir una hora igualmente.', 'No se han podido cargar las horas libres. Puedes elegir una hora igualmente.'],
+  ] as const)('says when nothing is left, and offers Retry when it cannot load (%s)', async (locale, empty, failed) => {
+    const s = await setup({}, locale);
     await s.result(OP, { date: '2026-10-19', timezone: 'Europe/Madrid', duration_minutes: 30, slots: [] });
-    expect(s.find('appointment-slots-empty').text()).toContain('No free times that day');
+    expect(s.find('appointment-slots-empty').text()).toBe(empty);
     s.net.lastStream().push(errorFrame(s.subId(OP), 'appointment.boom'));
     await settle();
-    expect(s.find('appointment-slots-error').text()).toContain('The free times could not be loaded.');
+    expect(s.find('appointment-slots-error').text()).toContain(failed);
   });
 });

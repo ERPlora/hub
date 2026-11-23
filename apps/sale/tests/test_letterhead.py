@@ -105,6 +105,24 @@ def test_a_sale_whose_document_waits_names_the_issuer_of_today(coffee):
     assert identity(sale.id) == ("Salón Aurora S.L.", "B12345674", [ADDRESS])
 
 
+def test_a_business_in_the_roi_prints_its_eu_vat_number_on_its_tickets_and_bills(coffee):
+    """INVOICE-F21: the issuer marked as registered for intra-EU operations prints «ES» before its tax ID, on the
+    ticket of a sale (its document's) and on a bill (the issuer of today)."""
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": True})
+    sale = charge()
+    assert sale.invoice_id is not None
+    assert identity(sale.id)[1] == "ESB12345674"
+    assert identity()[1] == "ESB12345674"
+
+
+def test_a_ticket_prints_what_its_document_printed_whatever_the_mark_becomes(coffee):
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": True})
+    sale = charge()
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": False})
+    assert identity(sale.id)[1] == "ESB12345674"
+    assert identity()[1] == "B12345674"
+
+
 def test_an_unknown_sale_is_not_found():
     with pytest.raises(NotFound):
         letterhead("019a0000-0000-7000-8000-000000000000")

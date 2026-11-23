@@ -2,14 +2,15 @@
 // The card's form (CUSTOMER-F01, F04, F11): one form for «Add» and «Edit». Name, phone, email, tax
 // id and company in sight; the rest behind «More details» when adding; in «Edit» everything, the
 // custom fields with their own control and «Active». The server's 422 lands under its field, and so does
-// a number or a date the browser cannot read, which stops the save. The
+// a number the browser cannot read, which stops the save; a date is picked in the app's calendar. The
 // country is the shared Combo (the product's `ok-combo`): typed to filter, stored as
 // its ISO code, clearable.
-import { Combo, type ComboOption } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonTextarea } from '@ionic/vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { flush, mountCustomer } from '../__tests__/mount-customer';
 import { countryOptions } from '../lib/countries';
 import { blankCustomer, type CustomerFields } from '../lib/customerForm';
@@ -41,8 +42,8 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-/** What a browser does with «tres» in a number input or 31/02 in a date one: the page reads "" and the input
- *  says it could not read it (`validity.badInput`). Returns the input, to make it readable again. */
+/** What a browser does with «tres» in a number input: the page reads "" and the input says it could not read it
+ *  (`validity.badInput`). Returns the input, to make it readable again. */
 function unreadable(id: string): HTMLInputElement {
   const host = document.querySelector(`ion-input[data-testid="customer-form-${id}"]`)!;
   const native = host.querySelector('input') ?? host.appendChild(document.createElement('input'));
@@ -84,6 +85,7 @@ async function setup(options: Setup = {}) {
   const select = (id: string) => m.wrapper.findAllComponents(IonSelect).find(hook(id));
   const textarea = (id: string) => m.wrapper.findAllComponents(IonTextarea).find(hook(id));
   const checkbox = (id: string) => m.wrapper.findAllComponents(IonCheckbox).find(hook(id));
+  const date = (id: string) => m.wrapper.findAllComponents(DateField).find((c) => c.props('testid') === `customer-form-${id}`);
   const shownFields = () =>
     m.wrapper
       .findAll('[data-field]')
@@ -99,7 +101,7 @@ async function setup(options: Setup = {}) {
     countryField().element.dispatchEvent(new CustomEvent('ionInput', { detail: { value: text } }));
     await flush();
   }
-  return { ...m, form, values, input, select, textarea, checkbox, shownFields, country, countryField, countryShown, typeCountry };
+  return { ...m, form, values, input, select, textarea, checkbox, date, shownFields, country, countryField, countryShown, typeCountry };
 }
 
 describe('CustomerForm: «Add» (F01)', () => {
@@ -151,7 +153,6 @@ describe('CustomerForm: «Add» (F01)', () => {
       "With no prefix it is read as a number of this business's country; for another one, write its prefix (+44…).",
     ]);
     expect(s.input('email')!.props('type')).toBe('email');
-    expect(s.input('birthday')!.props('type')).toBe('date');
   });
 
   it('paints a 422 under its field, and opens «More details» when the field is in there', async () => {
@@ -164,15 +165,18 @@ describe('CustomerForm: «Add» (F01)', () => {
     expect(s.countryField().classes()).toEqual(expect.arrayContaining(['ion-invalid', 'ion-touched']));
   });
 
-  it('a birthday the browser cannot read behind a closed «More details» opens it, so the message is seen', async () => {
-    const s = await setup({ locale: 'es' });
-    const more = s.wrapper.get('[data-testid="customer-form-more"]');
-    expect((more.element as HTMLDetailsElement).open).toBe(false);
-    unreadable('birthday');
-    expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);
-    await flush();
-    expect((more.element as HTMLDetailsElement).open).toBe(true);
-    expect(errorText('birthday')).toBe('Introduce una fecha válida.');
+  it('the birthday and the anniversary are the app’s own calendar, optional, and go up as the ISO day', async () => {
+    const s = await setup({ locale: 'es', form: { anniversary: '2010-05-06' } });
+    expect(['birthday', 'anniversary'].map((id) => [s.date(id)!.props('label'), s.date(id)!.props('required')])).toEqual([
+      ['Cumpleaños', false],
+      ['Aniversario', false],
+    ]);
+    const birthday = document.querySelector<HTMLElement & { readonly?: boolean }>('ion-input[data-testid="customer-form-birthday"]')!;
+    const anniversary = document.querySelector<HTMLElement & { value?: string }>('ion-input[data-testid="customer-form-anniversary"]')!;
+    expect([birthday.readonly, anniversary.value]).toEqual([true, '06/05/2010']);
+    await pick(birthday, '1990-02-03');
+    await pick(anniversary, '');
+    expect([s.form.value.birthday, s.form.value.anniversary, picked(birthday)]).toEqual(['1990-02-03', '', '1990-02-03']);
   });
 
   it('source, stage and channel are selects with their names; a card from an import keeps «Import»', async () => {
@@ -284,8 +288,16 @@ describe('CustomerForm: «Edit» (F04)', () => {
     const newsletter = s.checkbox('field-f3')!;
     expect(newsletter.props('checked')).toBe(true);
     expect(s.input('field-f4')!.props('type')).toBe('number');
-    expect(s.input('field-f5')!.props('type')).toBe('date');
+    expect([s.date('field-f5')!.props('label'), s.date('field-f5')!.props('required')]).toEqual(['First visit', false]);
     expect(s.input('field-f6')!.props('type')).toBe('text');
+  });
+
+  it('a date custom field is the app’s own calendar: its day goes up as the ISO day; a required one has no «Clear»', async () => {
+    const required = { ...FIELDS[4], field_id: 'f7', name: 'Last patch test', is_required: true, value: '2026-01-15' };
+    const s = await setup({ mode: 'edit', customFields: [FIELDS[4], required] });
+    await pick(document.querySelector('ion-input[data-testid="customer-form-field-f5"]'), '2026-02-01');
+    expect([s.values.value.f5, s.values.value.f7]).toEqual(['2026-02-01', '2026-01-15']);
+    expect([s.date('field-f7')!.props('label'), s.date('field-f7')!.props('required')]).toEqual(['Last patch test *', true]);
   });
 
   it('a custom field\'s change goes up in the field values; a yes/no is true or false', async () => {
@@ -302,22 +314,23 @@ describe('CustomerForm: «Edit» (F04)', () => {
     expect(s.input('field-f4')!.props('errorText')).toBe('Enter a number.');
   });
 
-  it('a number or a date the browser cannot read is told under its field, as the server words it, and stops the save', async () => {
+  it('a number the browser cannot read is told under its field, as the server words it, and stops the save', async () => {
     const s = await setup({ mode: 'edit', customFields: FIELDS, locale: 'es', errors: { phone: 'No es un teléfono válido.' } });
+    // A date field is never asked: its calendar only gives real days.
     for (const id of ['field-f4', 'field-f5', 'birthday']) unreadable(id);
     expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);
     await flush();
-    expect(['field-f4', 'field-f5', 'birthday', 'phone'].map((id) => s.input(id)!.props('errorText'))).toEqual([
+    expect(['field-f4', 'field-f5', 'birthday', 'phone'].map(errorText)).toEqual([
       'Introduce un número.',
-      'Introduce una fecha válida.',
-      'Introduce una fecha válida.',
+      undefined,
+      undefined,
       'No es un teléfono válido.',
     ]);
     expect(s.input('field-f4')!.classes()).toContain('ion-invalid');
     expect(errorText('anniversary')).toBeUndefined();
   });
 
-  it('with every number and date readable it lets the save go, and a previous «cannot read» is gone', async () => {
+  it('with every number readable it lets the save go, and a previous «cannot read» is gone', async () => {
     const s = await setup({ mode: 'edit', customFields: FIELDS });
     const native = unreadable('field-f4');
     expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);

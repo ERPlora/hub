@@ -4,7 +4,7 @@
 // editor when open — and «Add override»; a row opens «Edit · {reason}» with «Save»
 // (`schedule.override.update`). It waits for both dates and a reason. The server's refusal goes under
 // its field (another override in those dates under From, an end before the start under To).
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { DateField, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -98,31 +98,21 @@ const canDismiss = useUnsavedFormOnOpen(
     <template #default="{ fieldErrors }">
       <div class="schedule-exception-form">
         <div class="schedule-exception-form__pair">
-          <ion-input
-            data-testid="schedule-override-form-start_date"
+          <DateField
+            v-model="startDate"
+            testid="schedule-override-form-start_date"
             name="start_date"
-            type="date"
-            :value="startDate"
             :label="$t('schedule.overrides.form.from')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.start_date"
-            :class="invalid(fieldErrors.start_date)"
-            @ion-input="startDate = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="schedule-override-form-end_date"
+          <DateField
+            v-model="endDate"
+            testid="schedule-override-form-end_date"
             name="end_date"
-            type="date"
-            :value="endDate"
             :label="$t('schedule.overrides.form.to')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.end_date"
-            :class="invalid(fieldErrors.end_date)"
-            @ion-input="endDate = text($event.detail.value)"
           />
         </div>
         <ion-input

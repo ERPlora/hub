@@ -3,9 +3,8 @@
 // it the day before the new one starts (Oracle E-Business Tax, Dynamics 365, SAP). This dialog asks
 // for that last day (the old `ion-alert` with a date) and sends `tax.rule.end`. A refusal (an end
 // before the start, an overlap with another active rule) stays here, under the date.
-import { FormModal } from '@erplora/ui/components';
+import { DateField, FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
-import { IonInput } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
@@ -32,8 +31,6 @@ watch(
   },
   { immediate: true },
 );
-
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
   const rule = props.rule;
@@ -70,18 +67,13 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
       >
         {{ $t('tax.rules.end.message') }}
       </p>
-      <ion-input
-        data-testid="tax-rule-end-valid_to"
+      <DateField
+        v-model="validTo"
+        testid="tax-rule-end-valid_to"
         name="valid_to"
-        type="date"
-        :value="validTo"
         :label="$t('tax.rules.end.field')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
+        required
         :error-text="fieldErrors.valid_to"
-        :class="invalid(fieldErrors.valid_to)"
-        @ion-input="validTo = String($event.detail.value ?? '')"
       />
     </template>
   </FormModal>

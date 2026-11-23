@@ -3,7 +3,7 @@
 // guest's Name and, if given, Phone (the server links the card with that phone, or makes one), the Date
 // (the day the list is on), the preferred Time, the Party and notes. No contact is required (market, duda
 // 7). A refusal goes on top, a bad field under it, and what was typed stays.
-import { FormModal } from '@erplora/ui/components';
+import { DateField, FormModal, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -125,31 +125,21 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           @ion-input="phone = text($event.detail.value)"
         />
         <div class="reservation-waitlist-form__when">
-          <ion-input
-            data-testid="reservation-waitlist-form-date"
+          <DateField
+            v-model="date"
+            testid="reservation-waitlist-form-date"
             name="date"
-            type="date"
-            :value="date"
             :label="$t('reservation.form.date')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.date"
-            :class="invalid(fieldErrors.date)"
-            @ion-input="date = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="reservation-waitlist-form-preferred_time"
+          <TimeField
+            v-model="time"
+            testid="reservation-waitlist-form-preferred_time"
             name="preferred_time"
-            type="time"
-            :value="time"
             :label="$t('reservation.form.time')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.preferred_time"
-            :class="invalid(fieldErrors.preferred_time)"
-            @ion-input="time = text($event.detail.value)"
           />
           <PartyField
             v-model="party"

@@ -120,8 +120,7 @@
       "customFields": "Custom fields",
       "active": "Active",
       "required": "{name} *",
-      "invalidNumber": "Enter a number.",
-      "invalidDate": "Enter a valid date."
+      "invalidNumber": "Enter a number."
     },
     "importCsv": {
       "button": "Import CSV",

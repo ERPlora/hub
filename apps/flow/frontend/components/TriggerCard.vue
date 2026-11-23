@@ -4,7 +4,7 @@
 // the events of this business (`flow.catalog.read`), in words, grouped by app and searchable, with
 // «Only when…» on what it brings —; a schedule (every day, week or month at a time, in the business's
 // time zone); once at a date and time; or only by hand. The server's refusals show by their field.
-import { Combo, type ComboOption } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateTimeField, TimeField } from '@erplora/ui/components';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
@@ -85,7 +85,7 @@ function setSchedule(change: { every?: 'day' | 'week' | 'month'; weekday?: numbe
   emit('update:modelValue', next);
 }
 
-/** The ISO instant as the date and time box shows it (the device's local time). */
+/** The ISO instant as its day and time fields hold it (the device's local time). */
 const atLocal = computed(() => {
   const value = trigger.value;
   if (value.kind !== 'at' || !value.at) return '';
@@ -232,28 +232,22 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
             mode="md"
             @ion-input="setSchedule({ day: Number($event.detail.value) || 1 })"
           />
-          <IonInput
-            data-testid="flow-trigger-time"
-            type="time"
-            :value="trigger.time"
+          <TimeField
+            testid="flow-trigger-time"
+            :model-value="trigger.time"
             :label="$t('flow.trigger.time')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            @ion-input="setSchedule({ time: String($event.detail.value ?? '') })"
+            required
+            @update:model-value="setSchedule({ time: $event })"
           />
         </template>
 
-        <IonInput
+        <DateTimeField
           v-else-if="trigger.kind === 'at'"
-          data-testid="flow-trigger-at"
-          type="datetime-local"
-          :value="atLocal"
+          testid="flow-trigger-at"
+          :model-value="atLocal"
           :label="$t('flow.trigger.at')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          @ion-input="setAt(String($event.detail.value ?? ''))"
+          required
+          @update:model-value="setAt"
         />
 
         <span

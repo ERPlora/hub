@@ -11,6 +11,7 @@ import {
   type DataTableColumn,
   type DataTableFilters,
   DataTable,
+  DateField,
   EmptyState,
   formatDateTime,
   InlineFeedback,
@@ -306,15 +307,11 @@ async function continueManually(): Promise<void> {
           :value="number"
           @ion-input="number = String($event.detail.value ?? '')"
         />
-        <ion-input
-          data-testid="verifactu-recovery-date"
+        <DateField
+          v-model="day"
+          testid="verifactu-recovery-date"
           :label="$t('verifactu.recovery.manualDate')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          type="date"
-          :value="day"
-          @ion-change="day = String($event.detail.value ?? '')"
+          required
         />
       </div>
       <ion-button

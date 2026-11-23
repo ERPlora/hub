@@ -24,6 +24,7 @@ import {
   searchList,
   spanishMobile,
 } from './customer-helpers';
+import { dayAsShown, pickDay } from './date-time-fields';
 import { A, api, login, psql, shot, shown } from './helpers';
 import { toastSaying, toasts } from './toast-helpers';
 
@@ -57,12 +58,17 @@ async function createNamed(context: BrowserContext, kind: 'groups' | 'tags', nam
   return res.data.id;
 }
 
-// flow: CUSTOMER-F01 — a refused save is told under its field and in sight, also on a phone
-test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is told under its field at every width', async ({ page }) => {
+/** The customers' list, with «Add»'s dialog open. */
+async function openNewCard(page: Page): Promise<Locator> {
   await login(page, A, '/customer/customers');
   await customersReady(page);
   await shown(page).locator('[data-testid=customer-list-add]').click();
-  const dialog = page.locator('ion-modal[data-testid=customer-create]');
+  return page.locator('ion-modal[data-testid=customer-create]');
+}
+
+// flow: CUSTOMER-F01 — a refused save is told under its field and in sight, also on a phone
+test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is told under its field at every width', async ({ page }) => {
+  const dialog = await openNewCard(page);
   await expect(dialog.locator('[data-testid=customer-create-submit]')).toHaveJSProperty('disabled', true);
   const name = e2eName('F01 Ana');
   await inputOf(dialog, 'customer-form-name').fill(name);
@@ -78,24 +84,20 @@ test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is tol
   await expect(rowNamed(page, 'customer-list', name)).toBeVisible();
 });
 
-// flow: CUSTOMER-F01 — the browser reads a birthday that does not exist (31/02) as "": saved, the card had none
-test('CUSTOMER-F01: a birthday that does not exist is told under «Birthday» and nothing is created', async ({ page }) => {
-  await login(page, A, '/customer/customers');
-  await customersReady(page);
-  await shown(page).locator('[data-testid=customer-list-add]').click();
-  const dialog = page.locator('ion-modal[data-testid=customer-create]');
+// flow: CUSTOMER-F01 — the birthday is picked in the app's calendar, never typed, and the card keeps that day
+test('CUSTOMER-F01: a birthday picked in the app’s calendar is the one the new card keeps', async ({ page }) => {
+  const dialog = await openNewCard(page);
   const name = e2eName('F01 Birthday');
   await inputOf(dialog, 'customer-form-name').fill(name);
   await dialog.locator('[data-testid=customer-form-more] summary').click();
   const birthday = dialog.locator('ion-input[data-testid=customer-form-birthday]');
-  await birthday.locator('input').focus();
-  await page.keyboard.type('31022026');
-  expect(await birthday.locator('input').evaluate((e: HTMLInputElement) => [e.value, e.validity.badInput])).toEqual(['', true]);
+  // Within the calendar's reach of today: last year's 14 March.
+  const day = `${new Date().getFullYear() - 1}-03-14`;
+  await pickDay(page, birthday, day);
+  await expect(birthday.locator('input')).toHaveValue(dayAsShown(day));
   await dialog.locator('[data-testid=customer-create-submit]').click();
-  await expect(birthday.locator('.error-text')).toHaveText('Enter a valid date.');
-  await expect(dialog).toBeVisible();
-  const found = await api<{ rows: { name: string }[] }>(page.context(), A, 'GET', `/customer/customers?search=${encodeURIComponent(name)}`);
-  expect(found.data.rows).toEqual([]);
+  await expect(dialog).toBeHidden();
+  expect(psql(`select birthday from customer_customer where name = '${name}'`)).toBe(day);
 });
 
 // flow: CUSTOMER-F02 — on a phone the card names the row once
@@ -142,9 +144,9 @@ test('CUSTOMER-F04: «Edit» turns the data into the form; «Save» says «Custo
   expect(((await cardOf(context, card.id)).data as unknown as { city: string }).city).toBe('Sevilla');
 });
 
-// flow: CUSTOMER-F04 (the custom fields' «Si falla» texts) — the browser reads «tres» in a number input and 31/02 in a
-// date one as "", so saving them would empty the stored values
-test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date one are told under them, and nothing is saved', async ({ browser }) => {
+// flow: CUSTOMER-F04 (the custom fields' «Si falla» texts) — the browser reads «tres» in a number input as "", so
+// saving it would empty the stored value
+test('CUSTOMER-F04 in Spanish: «tres» in a number field is told under it, and nothing is saved', async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A, locale: 'es-ES' });
   const page = await context.newPage();
   try {
@@ -152,24 +154,17 @@ test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date on
     await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
     // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-    const field = async (name: string, type: 'number' | 'date'): Promise<string> => {
-      const res = await api<{ id: string }>(context, A, 'POST', '/customer/fields', { name: e2eName(name), field_type: type });
-      expect(res.status, `create the ${type} field`).toBe(201);
-      return res.data.id;
-    };
-    const visits = await field('F04 Visits', 'number');
-    const since = await field('F04 Since', 'date');
+    const created = await api<{ id: string }>(context, A, 'POST', '/customer/fields', { name: e2eName('F04 Visits'), field_type: 'number' });
+    expect(created.status, 'create the number field').toBe(201);
+    const visits = created.data.id;
     const card = await createCard(context, { name: e2eName('F04 Spanish') });
-    const stored = [
-      { field_id: visits, value: '3' },
-      { field_id: since, value: '2026-02-01' },
-    ];
+    const stored = [{ field_id: visits, value: '3' }];
     expect((await api(context, A, 'POST', '/customer/customers/update', { id: card.id, field_values: stored })).status).toBe(200);
-    /** The card's stored value of each of the two fields. */
+    /** The card's stored value of the field. */
     const values = async () =>
       Object.fromEntries(
         ((await cardOf(context, card.id)).data as unknown as { custom_fields: { field_id: string; value: string }[] }).custom_fields
-          .filter((f) => f.field_id === visits || f.field_id === since)
+          .filter((f) => f.field_id === visits)
           .map((f) => [f.field_id, f.value]),
       );
 
@@ -178,19 +173,12 @@ test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date on
     await shown(page).locator('[data-testid=customer-detail-edit]').click();
     const form = shown(page).locator('[data-testid=customer-edit-form]');
     const number = form.locator(`ion-input[data-testid=customer-form-field-${visits}]`);
-    const date = form.locator(`ion-input[data-testid=customer-form-field-${since}]`);
     await number.locator('input').fill('');
     await number.locator('input').pressSequentially('tres');
-    await date.locator('input').fill('');
-    await date.locator('input').focus();
-    await page.keyboard.type('31022026');
-    for (const input of [number, date]) {
-      expect(await input.locator('input').evaluate((e: HTMLInputElement) => [e.value, e.validity.badInput])).toEqual(['', true]);
-    }
+    expect(await number.locator('input').evaluate((e: HTMLInputElement) => [e.value, e.validity.badInput])).toEqual(['', true]);
     await form.locator('[data-testid=customer-edit-save]').click();
 
     await expect(number.locator('.error-text')).toHaveText('Introduce un número.');
-    await expect(date.locator('.error-text')).toHaveText('Introduce una fecha válida.');
     await expect(number).toHaveClass(/ion-invalid/);
     await expect(toasts(page)).toHaveCount(0);
     for (const vp of FLOW_VIEWPORTS) {
@@ -198,13 +186,12 @@ test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date on
       await expect(async () => {
         await form.locator('[data-testid=customer-form-custom-fields]').scrollIntoViewIfNeeded({ timeout: 2000 });
         await expect(number.locator('.error-text')).toBeInViewport({ timeout: 1000 });
-        await expect(date.locator('.error-text')).toBeInViewport({ timeout: 1000 });
-      }, `both errors at ${vp.label}`).toPass();
+      }, `the error at ${vp.label}`).toPass();
       await expect.poll(() => horizontalOverflow(page), `sideways scroll at ${vp.label}`).toBeLessThanOrEqual(1);
       await page.screenshot({ path: shot(`FIX-HUB-CUSTOMER-ES-MSGIDS-SHADOWED-BY-LIVE-${vp.label}`) });
     }
     await expect(form).toBeVisible();
-    expect(await values()).toEqual({ [visits]: '3', [since]: '2026-02-01' });
+    expect(await values()).toEqual({ [visits]: '3' });
   } finally {
     await context.close();
   }
