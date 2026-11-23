@@ -74,7 +74,7 @@ export interface CategoryFiltersIn {
   color?: string;
   product_count_min?: number;
   product_count_max?: number;
-  sort?: Sorted<'name' | 'slug' | 'icon' | 'color' | 'product_count'>;
+  sort?: Sorted<'name' | 'slug' | 'icon' | 'color' | 'product_count' | 'order'>;
 }
 
 export interface CategoryListIn extends PageIn, CategoryFiltersIn {
