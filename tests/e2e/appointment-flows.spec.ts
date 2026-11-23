@@ -220,6 +220,9 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // APPOINTMENT-F02, F01: «Add appointment» with her card, the service, its professional and a free time.
       await view.locator('[data-testid=appointment-list-add]').click();
       const form = page.locator('ion-modal[data-testid=appointment-form]');
+      // Still empty, «Duration (min)» sits full size inside its box: it reads whole there too.
+      await expect(form.locator('[data-testid=appointment-form-minutes]')).toBeVisible();
+      expect(await cutLabels(form), `labels cut in the empty appointment form at ${vp.label}`).toEqual([]);
       await chooseCustomer(page, 'appointment-form', who);
       await pick(page, 'appointment-form-service-add', word(who.service.name), who.service.name);
       await pick(page, 'appointment-form-staff', word(who.member.full_name), who.member.full_name);
