@@ -25,6 +25,7 @@ ROUTES = {
     ("POST", "/combo/combos", "combo.combo.create"),
     ("POST", "/combo/combos/update", "combo.combo.update"),
     ("POST", "/combo/combos/delete", "combo.combo.delete"),
+    ("POST", "/combo/combos/set_active", "combo.combo.set_active"),
     ("POST", "/combo/groups", "combo.group.create"),
     ("POST", "/combo/groups/update", "combo.group.update"),
     ("POST", "/combo/groups/delete", "combo.group.delete"),
@@ -115,6 +116,7 @@ def test_an_employee_reads_and_prices_menus_but_does_not_build_them(employee_cli
     for path, body in (
         ("/combo/combos", {"name": "x", "supply_kind": "goods"}),
         ("/combo/combos/delete", {"id": str(combo.id)}),
+        ("/combo/combos/set_active", {"id": str(combo.id), "is_active": False}),
         ("/combo/groups", {"combo_id": str(combo.id), "name": "Mains"}),
     ):
         response = post(employee_client, path, body)
@@ -235,6 +237,16 @@ def test_a_menu_from_creation_to_the_till(admin_client):
         == 200
     )
     assert get(admin_client, "/combo/combos").json()["total"] == 0
+
+
+
+@HUB_DB
+def test_a_menu_goes_off_the_till_and_back_by_its_own_route(admin_client):
+    make_combo("Menu of the day")
+    off = post(admin_client, "/combo/combos/set_active", {"combo": "Menu of the day", "is_active": False})
+    assert (off.status_code, off.json()["is_active"]) == (200, False)
+    back = post(admin_client, "/combo/combos/set_active", {"id": off.json()["id"], "is_active": True})
+    assert (back.status_code, back.json()["is_active"]) == (200, True)
 
 
 # Errors

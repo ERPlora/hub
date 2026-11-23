@@ -31,6 +31,7 @@ from apps.combo.schemas import (
     OptionReorderIn,
     ResolveIn,
 )
+from apps.combo.schemas.on_sale import ComboOnSaleIn
 from base.request_body import accept_body_up_to
 
 router = Router(tags=["combo"])
@@ -75,6 +76,11 @@ async def combo_update(request, data: ComboPatchIn):
 @bind(router, "combo.combo.delete", "/combo/combos/delete")
 async def combo_delete(request, data: ComboRefIn):
     return await run_operation(request, services.delete_combo, data)
+
+
+@bind(router, "combo.combo.set_active", "/combo/combos/set_active")
+async def combo_set_active(request, data: ComboOnSaleIn):
+    return await run_operation(request, services.on_sale.set_active, data)
 
 
 # Courses
