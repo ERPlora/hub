@@ -24,8 +24,10 @@ SCREEN = re.compile(r"\(\s*(/[a-z_/-]+)\s*\)")
 def test_creating_a_group_names_the_tools_that_finish_it():
     """A new group has no options and applies to nothing: both are writes the assistant has, named so that it offers
     them, and the search that brings them when they are not at hand."""
-    cited = set(OPERATION.findall(shared.description(get(CREATE))))
+    text = " ".join(shared.description(get(CREATE)).split())
+    cited = set(OPERATION.findall(text))
 
+    assert "You can do both: offer it." in text
     assert {"modifier.option.create", "modifier.link.attach", "base.assistant.find_tools"} <= cited
     for name in cited:
         assert name in registry, f"{CREATE} names {name}, which is no operation"
@@ -35,9 +37,11 @@ def test_creating_a_group_names_the_tools_that_finish_it():
 
 def test_creating_a_group_sends_the_person_to_the_modifiers_screen_only():
     """Where the person applies a group is the group's own sheet, on the screen of Modifiers: the description cites
-    that path and no screen of another app."""
-    screens = SCREEN.findall(shared.description(get(CREATE)))
+    that path and no screen of another app, and it tells that a product's own form in Inventory has no groups."""
+    text = " ".join(shared.description(get(CREATE)).split())
+    screens = SCREEN.findall(text)
     own = {item.path for item in apps.get_app_config("modifier").navigation}
 
     assert screens
     assert set(screens) <= own
+    assert "a product's own form has none." in text
