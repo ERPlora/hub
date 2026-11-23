@@ -189,10 +189,9 @@ class StaffConfig(LiveAppConfig):
         ),
     ]
 
-    def own_records(self, ctx) -> frozenset:
-        """The caller's live staff record, what other apps count as theirs: the sales attributed to them
-        (``base.queries.ownership.me``); none without one."""
-        from apps.staff.queries import own_member  # the models are not loaded yet when this module is
+    def own_records(self, username: str) -> frozenset:
+        """The live staff record of the person known as ``username``, what other apps count as theirs: the sales
+        attributed to them (``base.queries.ownership``); none without one."""
+        from apps.staff.queries.records import records_of  # the models are not loaded yet when this module is
 
-        member = own_member(ctx)
-        return frozenset() if member is None else frozenset({member.pk})
+        return records_of(username)
