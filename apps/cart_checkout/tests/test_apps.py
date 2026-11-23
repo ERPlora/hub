@@ -164,7 +164,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for name, op in ops.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
         assert op.permission == PERMISSION_OF[name], name
-        assert set(op.ai) == {"description", "asks", "risk"}, name
+        assert set(op.ai) == {"description", "asks", "risk", *(("summary",) if name == "cart_checkout.item.add" else ())}, name
         assert op.ai["description"], name
         assert op.ai["risk"] == ("high" if name in HIGH_RISK else "normal"), name
         assert op.expose_api is True, name

@@ -159,7 +159,11 @@ class CompleteIn(ChargeLinesIn):
     document_type: DocumentType | None = Field(
         None, description="ticket or invoice; the settings' default when empty."
     )
-    customer_id: UUID | None = Field(None, description="The customer's card.", json_schema_extra=A_CUSTOMER)
+    customer_id: UUID | None = Field(
+        None,
+        description="The customer's card; charging a check without one, the sale is for the customer the check has.",
+        json_schema_extra=A_CUSTOMER,
+    )
     customer: _text(200, 1) | None = Field(
         None,
         description="The customer's name, phone or email, when the id is not known.",

@@ -181,7 +181,10 @@ Pasos:
 1. Pide al asistente añadir un producto a un carrito, diciendo el carrito (su sesión, o el email o el
    nombre del cliente), la referencia y el nombre del producto, la cantidad y el precio por unidad.
 2. Confirma la tarjeta del asistente, que dice el carrito por su sesión (por ejemplo, sess_a1b2c3) o por
-   el cliente dicho, nunca por su código interno.
+   el cliente dicho, nunca por su código interno; después, la línea (el producto, la cantidad como se
+   escribe en el idioma de la persona y el precio por unidad en la moneda del carrito) y la referencia
+   («Pedro · Bravas (ración) · 4 · 6,00 € · BRAVAS»). Si el carrito no se encuentra o lo dicho vale para
+   varios, la tarjeta no da el precio en ninguna moneda: la acción lo rechaza al confirmar.
 3. La línea queda guardada y los totales del carrito (ítems e importe) se recalculan.
 Entra: el carrito; referencia y nombre del producto (texto libre: no se comprueban contra el
 catálogo), SKU y atributos de variante (talla, color…) opcionales, cantidad mayor que cero y como mucho

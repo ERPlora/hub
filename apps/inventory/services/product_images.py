@@ -31,6 +31,7 @@ PHOTOS = "inventory/products/"
         "leche»), named by its id, SKU or name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
         "inventory.product.suggest_image or base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "check": "inventory.product.get",
         "asks": {
             "en": (
                 "put an image on the latte",

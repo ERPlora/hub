@@ -394,6 +394,8 @@ Sale: el producto cambiado, con sus categorías, en un solo paso. Inventario avi
 cada categoría añadida o quitada. El precio nuevo vale para lo que se añada a una cuenta desde
 ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Ventas).
 Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada.
+Pedido al asistente, un producto que el negocio no tiene, o un nombre que vale para varios, no saca tarjeta: el
+asistente dice cuál no está o pregunta cuál es (como en toda acción de Inventario, ver «Servicios»).
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
 un producto con stock. Cuenta su stock a cero y cámbiala después.». Cambiar el coste es de quien ve los costes: a
 quien no los ve se le rechaza como una operación sin permiso, y el resto de un cambio sin coste se guarda.
@@ -1262,7 +1264,9 @@ nombra cada registro como lo nombran las pantallas, nunca por su identificador: 
 («Producto: Vino tinto»), la categoría por su nombre («Categoría: Bebidas»), las categorías de un producto una a una
 («Categorías: Bebidas, Vinos») y cada línea de una recepción con su producto y su cantidad («Recibir en Inventario:
 Vino tinto · 6; Cerveza · 2,5»). Lo que quien pregunta no
-puede ver, o lo que ya no existe, no sale.
+puede ver, o lo que ya no existe, no sale. Una acción que nombra un producto o una categoría que el negocio no tiene, o
+un nombre que casa con varios, no saca tarjeta: antes de pedir el sí, Inventario lo busca como lo buscará la acción, y
+el asistente dice cuál no está (en una recepción, en qué línea) o pregunta cuál es.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -1275,6 +1279,9 @@ puede ver, o lo que ya no existe, no sale.
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
 | Una categoría por su id o su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver categorías | F06, F07, F08 | `inventory.category.get` |
+| El producto que nombra un recuento o una baja de stock, como lo encontrará la acción: lo que el asistente comprueba antes de su tarjeta; no es herramienta del asistente ni tiene ruta en la API | ver productos | F14, F15 | `inventory.product.check` |
+| Los productos de cada línea de una recepción, todas o ninguna: lo que el asistente comprueba antes de su tarjeta; no es herramienta del asistente ni tiene ruta en la API | ver productos | F13 | `inventory.product.bulk_check` |
+| El producto y la categoría que nombra poner o quitar un producto de una categoría: lo que el asistente comprueba antes de su tarjeta; no es herramienta del asistente ni tiene ruta en la API | ver productos | F08 | `inventory.product_category.check` |
 | El libro de movimientos: fecha, producto, tipo, cantidad, saldo, motivo, referencia y quién lo hizo | ver stock | F16 | `inventory.movement.list` |
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste (vacío para quien no ve los costes) y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
@@ -1449,7 +1456,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada. Después llegaron las tres de la
   foto (F30, F31) y `inventory.category.get`, lectura interna (`ai=INTERNAL`, sin API): solo nombra la categoría en
-  la tarjeta del asistente; el modelo encuentra las categorías en su lista.
+  la tarjeta del asistente; el modelo encuentra las categorías en su lista. Toda escritura que el asistente ofrece y
+  nombra un producto o una categoría declara su comprobación previa (`ai={"check": …}`, base.E012): `inventory.product.get`
+  o `inventory.category.get` si la nombra como su `id`, y si no una de las lecturas internas de `queries/write_checks.py`
+  (`inventory.product.check`, `inventory.product.bulk_check` e `inventory.product_category.check`), que buscan como la
+  acción; la recepción y su comprobación comparten `line_products` (`tests/test_write_checks.py`).
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#526): nombra el registro que una escritura señala por su
   id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: el producto por su `name` con
   `inventory.product.get` (`A_PRODUCT`: el `id` de `ProductRefIn` y el `product_id` de `_ProductLineRef`, también en

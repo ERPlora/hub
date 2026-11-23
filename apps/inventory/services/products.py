@@ -137,6 +137,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         "description": "Change a product, named by its id, SKU or name: its data, active or not, its stock "
         "control and its categories. The SKU, the type and the stock are not changed here.",
         "risk": "normal",
+        "check": "inventory.product.get",
         "asks": {
             "en": (
                 "change the price of the coffee to 1.80",
@@ -203,6 +204,7 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
         "description": "Delete a product of the catalog, named by its id, SKU or name (logically: its movements "
         "stay and its SKU and EAN-13 are freed).",
         "risk": "high",
+        "check": "inventory.product.get",
         "asks": {
             "en": (
                 "delete the product Old Tea",
@@ -275,6 +277,7 @@ def restore_product(ctx: OperationContext, data: ProductRestoreIn) -> dict:
         "description": "Mark a product sold out («86»: the till stops offering it, it stays active) or put it "
         "back on sale, named by its id, SKU or name.",
         "risk": "normal",
+        "check": "inventory.product.get",
         "asks": {
             "en": (
                 "mark the Tea as sold out for today",

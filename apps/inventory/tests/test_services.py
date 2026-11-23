@@ -41,6 +41,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import in_a_thread
 
 from .conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for
+from .test_apps import CHECKS
 
 pytestmark = HUB_DB
 
@@ -179,7 +180,10 @@ def test_declarations(name, permission, input, output, risk):
     assert (op.kind, op.permission, op.input, op.output, op.expose_api) == ("command", permission, input, output, True)
     # An import's card says its rows by their names and the tax categories they take (import_card).
     summary = {"summary"} if input in (ProductImportIn, CategoryImportIn) else set()
-    assert set(op.ai) == {"description", "risk", "asks", *summary} and op.ai["description"]
+    # A write that names a product or a category checks it before its card (hub#2295).
+    check = {"check"} if name in CHECKS else set()
+    assert set(op.ai) == {"description", "risk", "asks", *summary, *check} and op.ai["description"]
+    assert op.ai.get("check") == CHECKS.get(name)
     assert op.ai["risk"] == risk
 
 
