@@ -6,14 +6,11 @@ checks the course and the products it names before its card, as the writes on a 
 model hears which one is not there, and looks it up or asks.
 """
 
-import json
-
 import pytest
 
 from apps.combo.models import ChoiceOption
 from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, make_product
-from apps.combo.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears
-from base.tests.test_assistant_yes_for_its_card import turn_as
+from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, the_model_hears, turn_as
 from base.tests.test_services_assistant import call
 
 pytestmark = HUB_DB
@@ -30,10 +27,6 @@ def starters():
 
 def as_owner_in_english(*calls) -> dict:
     return turn_as(ctx_for("hub_admin"), *calls)
-
-
-def the_model_hears(plan: dict) -> dict:
-    return json.loads(plan["append"][0]["content"])["error"]
 
 
 def test_a_choice_of_a_product_the_business_does_not_have_draws_no_card(starters):

@@ -13,7 +13,6 @@ beside it, by its name (hub#1250) or by its id (hub#1278).
 """
 
 import dataclasses
-import json
 
 import pytest
 from live.operations import AI, registry
@@ -24,7 +23,14 @@ from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, m
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
 from base.schemas.assistant import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import (
+    no_card_but_the_model_hears,
+    read_as,
+    turn_as,
+    unless_by_id,
+    unless_of,
+    yes_to_its_card,
+)
 from base.tests.test_services_assistant import call
 
 pytestmark = HUB_DB
@@ -72,13 +78,6 @@ def assistant_writes() -> list:
 def id_mark(op) -> dict | None:
     """How the assistant's card names the record ``op``'s ``id`` says: as a menu, a course or a choice."""
     return getattr(op.input.model_fields.get("id"), "json_schema_extra", None)
-
-
-def no_card_but_the_model_hears(plan: dict, code: str) -> None:
-    """No card that would act on anything: the model hears ``code`` and asks the person which one."""
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
 
 
 def said_on(plan: dict) -> list[tuple[str, object]]:
