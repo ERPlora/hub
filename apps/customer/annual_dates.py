@@ -8,7 +8,6 @@ it back into ``--MM-DD`` on every read."""
 import re
 from datetime import date
 
-from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -61,4 +60,5 @@ class AnnualDateField(models.DateField):
         return self.value_from_object(obj) or ""
 
     def formfield(self, **kwargs):
-        return models.Field.formfield(self, **{"form_class": forms.CharField, "max_length": 10, **kwargs})
+        # The admin edits it as a text: Field's own form field, not DateField's.
+        return models.Field.formfield(self, **{"max_length": 10, **kwargs})
