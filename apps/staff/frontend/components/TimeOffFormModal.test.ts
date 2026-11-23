@@ -7,11 +7,12 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, EMPLOYEE, ionChecked, ionValue, mountStaff, type MountOptions, page, settle } from '../__tests__/mount-staff';
 import TimeOffFormModal from './TimeOffFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; type?: string; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; readonly?: boolean; required?: boolean; errorText?: string; disabled?: boolean };
 
 const MEMBERS = page([
   { id: 'm1', full_name: 'Ana López' },
@@ -46,8 +47,8 @@ async function setup(mode: 'create' | 'request', options: MountOptions = {}) {
     await settle();
   }
   async function dates(from: string, to: string) {
-    await ionValue(field('start_date'), from, 'ionInput');
-    await ionValue(field('end_date'), to, 'ionInput');
+    await pick(field('start_date'), from);
+    await pick(field('end_date'), to);
   }
   const posts = () => m.sent().filter((c) => c.method === 'POST');
   return { ...m, field, save, member, members, chooseMember, dates, posts };
@@ -57,13 +58,15 @@ describe('TimeOffFormModal: register anyone’s (STAFF-F17)', () => {
   it('is «New» with Member, Type (Vacation), From, To and Full day on; no hours while full day', async () => {
     const s = await setup('create');
     expect(s.inDoc('staff-time-off-form')?.getAttribute('aria-label')).toBe('New');
-    expect([s.field('member_id').label, s.field('leave_type').label, s.field('leave_type').value, s.field('start_date').type, s.field('end_date').label]).toEqual([
+    expect([s.field('member_id').label, s.field('leave_type').label, s.field('leave_type').value, s.field('start_date').readonly, s.field('end_date').label]).toEqual([
       'Member',
       'Type',
       'vacation',
-      'date',
+      true,
       'To',
     ]);
+    // Both days are needed to save: their calendar has no Clear.
+    expect([s.field('start_date').required, s.field('end_date').required]).toEqual([true, true]);
     expect([...s.field('leave_type').querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toEqual([
       'Vacation',
       'Sick leave',
@@ -112,9 +115,10 @@ describe('TimeOffFormModal: register anyone’s (STAFF-F17)', () => {
     await s.chooseMember('m1');
     await s.dates('2026-11-02', '2026-11-02');
     await ionChecked(s.field('is_full_day'), false);
-    expect([s.field('start_time').label, s.field('start_time').type, s.field('end_time').label]).toEqual(['From (time)', 'time', 'To (time)']);
-    await ionValue(s.field('start_time'), '09:00', 'ionInput');
-    await ionValue(s.field('end_time'), '13:00', 'ionInput');
+    // Part of a day needs both hours: their wheel has no Clear.
+    expect([s.field('start_time').label, s.field('start_time').readonly, s.field('end_time').label, s.field('end_time').required]).toEqual(['From (time)', true, 'To (time)', true]);
+    await pick(s.field('start_time'), '09:00');
+    await pick(s.field('end_time'), '13:00');
     await ionValue(s.field('leave_type'), 'personal');
     await click(s.save());
     expect(s.posts()[0].body).toEqual({
@@ -136,7 +140,7 @@ describe('TimeOffFormModal: register anyone’s (STAFF-F17)', () => {
     await s.dates('2026-11-02', '2026-11-03');
     await click(s.save());
     expect(s.inDoc('staff-time-off-form-error')?.textContent).toContain(message);
-    expect(s.field('start_date').value).toBe('2026-11-02');
+    expect(picked(s.field('start_date'))).toBe('2026-11-02');
     s.answerBy({ '/api/staff/time_off': [422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { end_date: 'The end date cannot be before the start date.' } } }] });
     await click(s.save());
     expect(s.field('end_date').errorText).toBe('The end date cannot be before the start date.');

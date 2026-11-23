@@ -2581,7 +2581,10 @@ Pasos:
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
      fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); los permisos que se conceden a una
      automatización, por la acción de cada uno como la nombra su Historial («Permisos: Crear una tarea, Crear un
-     cliente»), y las apps que carga una plantilla, por su nombre («Apps que se cargan: Ventas / TPV, Facturación»);
+     cliente»); una plantilla del catálogo, por su nombre y su idioma, como en Importar («Plantilla: Restaurante
+     (español)»), nunca por su código, y las apps que carga, por su nombre («Apps que se cargan: Ventas / TPV,
+     Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
+     y 17 más»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
@@ -2613,7 +2616,9 @@ Pasos:
      quitar la ruta de un producto en la cocina «Quitar en Cocina»; un arqueo dice «Registrar arqueo en Caja» y una
      entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
-     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
+     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice. Tras
+     «Ejecutar», el asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó
+     hecho y no propone deshacerlo salvo que se lo pidan.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la

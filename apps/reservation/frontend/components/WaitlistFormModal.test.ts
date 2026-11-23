@@ -4,18 +4,14 @@
 import { describe, expect, it } from 'vitest';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
+import { click, type Control, ionValue, LUCIA, mountOpenForm, pickCard, settle } from '../__tests__/mount-reservation';
 import { entryRow } from '../__tests__/rows';
 import WaitlistFormModal from './WaitlistFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
-
 async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountReservation(WaitlistFormModal, { props: { open: false, day: '2026-10-15' }, locale });
-  await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
-  await settle();
+  const m = await mountOpenForm(WaitlistFormModal, { props: { day: '2026-10-15' }, locale });
   const field = (name: string) => m.inDoc(`reservation-waitlist-form-${name}`) as Control;
   const submit = () => m.inDoc('reservation-waitlist-form-submit') as Control;
   return { ...m, field, submit };
@@ -31,6 +27,7 @@ describe('WaitlistFormModal', () => {
       'Time',
       'Party',
     ]);
+    expect(picked(s.field('date'))).toBe('2026-10-15');
     expect(s.wrapper.findComponent(CustomerSearch).exists()).toBe(true);
     expect(s.submit().textContent).toContain('Add to waitlist');
     expect(s.submit().disabled).toBe(true);
@@ -39,7 +36,7 @@ describe('WaitlistFormModal', () => {
   it('writes somebody down without a phone, and with one', async () => {
     const s = await setup();
     await ionValue(s.field('guest_name'), 'Luis', 'ionInput');
-    await ionValue(s.field('preferred_time'), '21:00', 'ionInput');
+    await pick(s.field('preferred_time'), '21:00');
     s.answer(201, entryRow());
     await click(s.submit());
     expect(s.sent().map((call) => call.body)).toEqual([
@@ -49,17 +46,20 @@ describe('WaitlistFormModal', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  // The date and the preferred time are the app's own calendar and time wheel, never the device's; both are needed,
+  // so neither offers «Clear».
+  it('the date and the preferred time are the app’s pickers, shown as read', async () => {
+    const s = await setup();
+    await pick(s.field('date'), '2026-10-16');
+    await pick(s.field('preferred_time'), '21:00');
+    expect([s.field('date'), s.field('preferred_time')].map((field) => [field.readonly, field.required])).toEqual([[true, true], [true, true]]);
+    expect([s.field('date').value, s.field('preferred_time').value]).toEqual(['10/16/2026', expect.stringMatching(/^09:00\sPM$/)]);
+  });
+
   it('a customer picked from Customers is the guest', async () => {
     const s = await setup();
-    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
-      customer_id: 'c1',
-      customer_name: 'Lucía Pérez',
-      customer_tax_id: '',
-      customer_address: '',
-      customer_country: '',
-    });
-    await settle();
-    await ionValue(s.field('preferred_time'), '21:00', 'ionInput');
+    await pickCard(s.wrapper, LUCIA);
+    await pick(s.field('preferred_time'), '21:00');
     s.answer(201, entryRow());
     await click(s.submit());
     expect(s.sent().at(-1)?.body).toMatchObject({ customer_id: 'c1', guest_name: 'Lucía Pérez' });
@@ -70,7 +70,7 @@ describe('WaitlistFormModal', () => {
     expect(s.submit().textContent).toContain('Añadir a la lista de espera');
     await ionValue(s.field('guest_name'), 'Luis', 'ionInput');
     await ionValue(s.field('guest_phone'), '12', 'ionInput');
-    await ionValue(s.field('preferred_time'), '21:00', 'ionInput');
+    await pick(s.field('preferred_time'), '21:00');
     s.answer(422, { error: { code: 'invalid_payload', message: 'Teléfono no válido', fields: { guest_phone: 'Teléfono no válido' } } });
     await click(s.submit());
     expect(s.field('guest_phone').errorText).toBe('Teléfono no válido');
@@ -83,7 +83,7 @@ describe('WaitlistFormModal: fields refused with the same words (hub#888)', () =
     const s = await setup(locale);
     await ionValue(s.field('guest_name'), 'Luis', 'ionInput');
     await ionValue(s.field('guest_phone'), '600123123', 'ionInput');
-    await ionValue(s.field('preferred_time'), '21:00', 'ionInput');
+    await pick(s.field('preferred_time'), '21:00');
     s.answer(422, refusal);
     return { field: s.field, send: () => click(s.submit()), settle };
   }, 'guest_phone');

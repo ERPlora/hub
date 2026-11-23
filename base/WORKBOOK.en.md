@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2f0d3f81fab33e5504b94cecb3bc0e9a47a514add07ca66e5d04a3df8fc91007 -->
+<!-- generated from WORKBOOK.md sha256:6f5ac04eb1146e35a82110e7ffde50294fb6a4110e34dec15d5aa4209d9d358a -->
 
 ## What it is for and who it is for
 
@@ -2563,8 +2563,10 @@ Steps:
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
-     Create a task, Create a customer"), and the apps a template loads, by their name ("Apps to load: Sales & POS,
-     Invoicing"); a list of lines that carry only their record, such as the services of an appointment, the same
+     Create a task, Create a customer"); a template of the catalogue, by its name and its language, as in Import
+     ("Template: Restaurant (English)"), never by its code, and the apps it loads, by their name ("Apps to load: Sales &
+     POS, Invoicing"), also when none is chosen and it loads all of its own ("Time clock, Cash register, Menus and
+     combos and 17 more"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
@@ -2595,7 +2597,9 @@ Steps:
      in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
      never "Add".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
-     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
+     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so. After "Run it",
+     the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
+     offer to undo it unless asked to.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:

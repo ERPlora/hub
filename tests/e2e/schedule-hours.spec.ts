@@ -6,6 +6,7 @@
 // viewports. The week and the settings the hub had before the file are put back after it (`afterAll`).
 import { expect, test } from '@playwright/test';
 
+import { pickTime } from './date-time-fields';
 import { A, api, EMPLOYEE, login, psql, shot, shown, testid } from './helpers';
 import { DEFAULT_WEEK, noHorizontalScroll, restoreWeek, rowTexts, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 
@@ -35,16 +36,17 @@ test('SCHEDULE-F01–F03: the default week, a split Monday, an overlap refused, 
   await view.locator('[data-testid=schedule-hours-row-0-edit]').click();
   const dialog = page.locator('ion-modal[data-testid=schedule-day-form]');
   await expect(dialog.locator('ion-title')).toHaveText('Edit hours — Monday');
-  await page.locator('[data-testid=schedule-day-form-intervals-open-0] input').fill('10:00');
-  await page.locator('[data-testid=schedule-day-form-intervals-close-0] input').fill('14:00');
+  const time = (edge: 'open' | 'close', line: number) => page.locator(`[data-testid=schedule-day-form-intervals-${edge}-${line}]`);
+  await pickTime(page, time('open', 0), '10:00');
+  await pickTime(page, time('close', 0), '14:00');
   await page.locator('[data-testid=schedule-day-form-intervals-add]').click();
-  await page.locator('[data-testid=schedule-day-form-intervals-open-1] input').fill('13:00');
-  await page.locator('[data-testid=schedule-day-form-intervals-close-1] input').fill('20:00');
+  await pickTime(page, time('open', 1), '13:00');
+  await pickTime(page, time('close', 1), '20:00');
   await page.locator('[data-testid=schedule-day-form-submit]').click();
   // Overlapping: refused under the intervals (422), the dialog stays with what was typed.
   await expect(page.locator('[data-testid=schedule-day-form-intervals-error]')).toContainText('Two intervals overlap');
   await page.screenshot({ path: shot('schedule-hours-422-1280') });
-  await page.locator('[data-testid=schedule-day-form-intervals-open-1] input').fill('17:00');
+  await pickTime(page, time('open', 1), '17:00');
   await page.locator('[data-testid=schedule-day-form-submit]').click();
   await expect(dialog).toBeHidden();
   await expect(view.locator('[data-testid=schedule-hours-row]').first()).toContainText('10:00 AM–02:00 PM · 05:00 PM–08:00 PM');

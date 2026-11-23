@@ -12,6 +12,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
+import { pickDay } from './date-time-fields';
 import { A, B, capture, psql } from './helpers';
 import { BOOKING_LOGO, cast, keepTheBusiness } from './online-booking-helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, post } from './service-helpers';
@@ -92,9 +93,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // A customer is no member of the team: no side menu, and no button to open one.
       await expect(page.locator('ion-menu-button')).toBeHidden();
       await page.locator(`[data-testid=ob-preview-service-${who.service.id}]`).click();
-      const dayInput = page.locator('[data-testid=ob-preview-day] input');
-      await dayInput.fill(day);
-      await dayInput.press('Tab');
+      await pickDay(page, page.locator('[data-testid=ob-preview-day]'), day);
       await page.locator('[data-testid="ob-preview-time-10:00"]').click();
       const marta = named(`Marta ${vp.label}`);
       await page.locator('[data-testid=ob-preview-name] input').fill(marta);
