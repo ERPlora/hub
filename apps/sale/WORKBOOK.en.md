@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c86f668a251b01e2730cc16fe212af8e66cbbe840b4a2637ed9899e762e82fb1 -->
+<!-- generated from WORKBOOK.md sha256:6f4ae32bb0129bfe7449841cec92d3611ca1058b866d934fc3847a69f9b052e8 -->
 
 ## What it is for and who it is for
 
@@ -126,7 +126,8 @@ It opens in the application's full screen; the ⋮ menu of the category strip ha
 or with the phone's back button. Two areas:
 
 - **Catalog**: the strip of Inventory categories with their number of articles, sold-out ones included
-  ("All" first and, with Services, "Services" after it), the magnifier that opens the search ("Search
+  ("All" first and, with Services, "Services" after it; the rest, in the position the business gave them
+  and, at equal position, by name: INVENTORY-F08), the magnifier that opens the search ("Search
   product…", by name or SKU; with Services it also searches its services), the "Speak" key and the grid:
   articles with their initials, their unit and their price (what is sold out, greyed with "Sold out"),
   and at the end the "Open price" tile. In "Services", each service with its initials, its duration and
