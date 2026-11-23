@@ -151,11 +151,12 @@ def line_facts(line_ids: Iterable[UUID]) -> dict[UUID, LineFacts]:
 
 def check_title(ticket: Ticket, dishes: list[ItemView]) -> str:
     """Where a ticket on the line goes now: the title of the check its dishes are on, after the check moved to another
-    table, was merged into another or was seated again. A ticket served or cancelled, made by hand, of a check with no
-    title (what the send said stays) or whose dishes are on checks with different titles keeps its own."""
+    table, was merged into another or was seated again; a dish voided in the till stays on its old check and does not
+    count. A ticket served or cancelled, made by hand, of a check with no title (what the send said stays) or whose dishes
+    are on checks with different titles keeps its own."""
     if ticket.status not in IN_FLIGHT:
         return ticket.label
-    titles = {dish.facts.order_label for dish in dishes if dish.facts and not dish.struck} - {""}
+    titles = {dish.facts.order_label for dish in dishes if dish.facts and not dish.facts.removed_at} - {""}
     return titles.pop() if len(titles) == 1 else ticket.label
 
 

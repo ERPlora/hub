@@ -65,6 +65,20 @@ def test_the_rounds_of_a_merged_check_say_the_table_that_stays(clock, product):
     assert board_labels() == ["Table 9", "Table 9"]
 
 
+def test_a_voided_dish_left_on_the_merged_check_does_not_hold_the_old_title(clock, product):
+    # The voided line stays on the absorbed check; the dishes still to cook went to the one that stays.
+    first = open_check("Table 5")
+    add_line(first.id, product("Burger"))
+    add_line(first.id, product("Fries"))
+    ticket = run("kitchen.ticket.send", {"order_id": str(first.id)})
+    run("sale.order.void_line", {"order_id": str(first.id), "line_id": str(ticket.items[1].id), "reason": "Cold"})
+    second = open_check("Table 6")
+
+    run("sale.order.merge", {"from_order_id": str(first.id), "to_order_id": str(second.id)})
+
+    assert labels(second.id) == ["Table 6"]
+
+
 def test_a_parked_check_seated_again_gives_its_rounds_the_new_table(clock, product):
     ten, three = make_table("10"), make_table("3")
     session = seat(ten)
@@ -95,6 +109,7 @@ def test_the_next_write_saves_the_new_title_and_a_served_round_keeps_it(clock, p
     save_everything()
     served = run("kitchen.ticket.list", {"search": "Table 9"}).rows
     assert [(row.id, row.label, row.status) for row in served] == [(ticket.id, "Table 9", "served")]
+    assert run("kitchen.ticket.get", {"ticket_id": str(ticket.id)}).label == "Table 9"
 
 
 def test_a_round_whose_dishes_went_to_two_checks_with_two_titles_keeps_its_own(clock, product):
@@ -106,6 +121,7 @@ def test_a_round_whose_dishes_went_to_two_checks_with_two_titles_keeps_its_own(c
     split = run("sale.order.split", {"order_id": str(order.id), "line_ids": [str(fries)], "label": "Table 8"})
     assert labels(order.id) == ["Table 8"]
 
+    run("sale.order.set_label", {"order_id": str(order.id), "label": "Table 5"})
     run("sale.order.set_label", {"order_id": str(split.new_order.id), "label": "Table 3"})
 
     assert labels(order.id) == ["Table 8"]
