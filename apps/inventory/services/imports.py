@@ -19,7 +19,7 @@ from live.context import OperationContext
 from live.operations import get, operation
 from live.outbox import record_event
 
-from apps.inventory import events
+from apps.inventory import events, import_card
 from apps.inventory.models import Category, fits_unit, Product, QUANTITY, Settings, StockMovement, Unit
 from apps.inventory.queries.exports import FORMULA_STARTS
 from apps.inventory.queries.reads import held
@@ -78,6 +78,7 @@ _QUANTITY_RE = re.compile(r"^\d+(\.\d{1,3})?$")
                 "carga todos los artículos de este CSV en el catálogo",
             ),
         },
+        "summary": import_card.summary,
     },
 )
 def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
@@ -158,6 +159,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
                 "carga estas categorías desde un CSV",
             ),
         },
+        "summary": import_card.summary,
     },
 )
 def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dict:

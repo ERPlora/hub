@@ -2622,7 +2622,10 @@ Pasos:
      cliente»); una plantilla del catálogo, por su nombre y su idioma, como en Importar («Plantilla: Restaurante
      (español)»), nunca por su código, y las apps que carga, por su nombre («Apps que se cargan: Ventas / TPV,
      Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
-     y 17 más»);
+     y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
+     como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
+     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una y por su nombre
+     («Categoría fiscal: Restauración — comida»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
