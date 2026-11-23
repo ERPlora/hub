@@ -48,6 +48,13 @@ def test_its_line_says_the_cart_and_the_product_with_how_many_and_the_price_of_o
         "kind": "object",
         "value": {"product_name": "Bravas (ración)", "quantity": "4", "unit_price": {"kind": "money", "value": 600, **EUROS}},
     }
+    # The screen writes an object datum by its values in their order: «Bravas (ración) · 4 · 6,00 €».
+    assert list(shown[1]["value"]) == ["product_name", "quantity", "unit_price"]
+
+
+def test_every_datum_said_of_the_cart_goes_before_the_line(pedro):
+    fields = drawn({"session_token": "sess_pedro", "customer": "Pedro QA", **BRAVAS})
+    assert [field["name"] for field in fields] == ["session_token", "customer", "item", "product_ref"]
 
 
 def test_the_rest_of_what_it_sends_follows_the_line(pedro):
