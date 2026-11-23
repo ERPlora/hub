@@ -528,7 +528,7 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
-    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_image", "update")},
+    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_active", "set_image", "update")},
     **{f"combo.group.{action}:id": "Plato" for action in ("delete", "update")},
     "combo.group.reorder:id": "Menú",
     **{f"combo.option.{action}:id": "Elección" for action in ("delete", "update")},

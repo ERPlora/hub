@@ -1699,6 +1699,10 @@
     "method": "post",
     "path": "/api/combo/combos/delete"
   },
+  "combo.combo.set_active": {
+    "method": "post",
+    "path": "/api/combo/combos/set_active"
+  },
   "combo.group.create": {
     "method": "post",
     "path": "/api/combo/groups"

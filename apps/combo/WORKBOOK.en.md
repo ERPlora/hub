@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d2a15b0413790d503adb007aa67f15046121ab4f1d0742b6a687544eb6003629 -->
+<!-- generated from WORKBOOK.md sha256:3af176c2dec0a0f374c5ae1c4c7f45929e22b6de9342ad08f895e177d43c4879 -->
 
 ## What it is for and who it is for
 
@@ -215,6 +215,10 @@ Steps:
 2. Change what is needed: name, price, way of selling, VAT category, order or "On sale".
 3. Tap "Save". The list shows the change at once.
 4. A menu with "On sale" unticked stays in the list, but the till stops offering it.
+5. Through the assistant, "take the menu of the day off sale" or "put it back on sale" comes up on a one-tap card,
+   like the switch: "Change in Menus and combos", "Menu: Menu of the day", "On sale: No" and "Run it".
+   Changing the name, the price, the way of selling, the VAT category or the order, alone or together with "On sale",
+   asks to type CONFIRM, because it may change how it is charged (BASE-F98).
 In: the same fields as when creating; only what is sent changes (through the assistant or the API, what
 is not named stays as it was).
 Out: the changed menu (announces: menu changed). What is already charged does not change: each sale line
@@ -223,7 +227,7 @@ goes up in price or is taken off sale; the way of selling and the VAT category a
 (COMBO-F08, F09).
 If it fails: the same warnings as when creating. Switching to "eaten in" without a VAT category is
 refused.
-Involved: SALE-F12
+Involved: SALE-F12, BASE-F98
 
 ### COMBO-F04 Withdraw a menu
 Status: done
@@ -571,7 +575,7 @@ its card (BASE-F97), which names each record as the screens name it, never by it
 Lentils"), the product by its name ("New product: Soup") and, when reordering courses or choices or adding several
 products, each one by its name and in the order sent ("Courses: Mains, Starters"). What the person asking cannot see,
 or what no longer exists, is left out; what was said in words and cannot be read comes up as it was said. A menu said
-by its name when changing it, withdrawing it, giving it a photo or
+by its name when changing it, putting it on sale or taking it off sale, withdrawing it, giving it a photo or
 reordering its courses is looked up as the action will look it up (the same name before one that contains it), and the
 card shows the menu that will be touched, with its full name ("Menu: Vegan menu" when "vegan" was said). If what was
 said fits several menus or none, no card comes up: the assistant hears "There are several menus called "vegan": Vegan
@@ -611,6 +615,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 |---|---|---|---|
 | Creates a menu | manage | F02 | `combo.combo.create` |
 | Changes a menu (only what is sent) | manage | F03 | `combo.combo.update` |
+| Puts a menu on sale or takes it off the till, changing nothing else | manage | F03 | `combo.combo.set_active` |
 | Withdraws a menu with its courses and choices | manage | F04 | `combo.combo.delete` |
 | Adds a course (at the end) | manage | F05 | `combo.group.create` |
 | Changes a course (only what is sent) | manage | F05 | `combo.group.update` |

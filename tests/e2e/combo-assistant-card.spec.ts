@@ -3,13 +3,14 @@
 // choice and no product. Now each one is named as the screens name it — a menu and a course by their name, a choice and
 // a product by the product's name —, read as the person, in their language, never by its id. End to end with the
 // stack's SaaS gateway and the e2e's provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded
-// with it (README of this folder, «El asistente»). Cancelled, nothing changes. What this file creates is named
-// «E2E Tarjeta …» (SKU `E2E-TJ-…`) and goes away before and after; the apps it turns on are turned off again.
-// flow: COMBO-F04 COMBO-F05 COMBO-F06 BASE-F97
+// with it (README of this folder, «El asistente»). Cancelled, nothing changes; taking the menu off the till (hub#2216)
+// is one tap, like the menu form's switch, and is done. What this file creates is named «E2E Tarjeta …» (SKU
+// `E2E-TJ-…`) and goes away before and after; the apps it turns on are turned off again.
+// flow: COMBO-F03 COMBO-F04 COMBO-F05 COMBO-F06 BASE-F97 BASE-F98
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
-import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
+import { cancel, card, decide, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { createProduct, stamp } from './inventory-helpers';
 import { post } from './service-helpers';
@@ -20,8 +21,8 @@ const TAG = 'E2E Tarjeta';
 
 /** What the screens call each record, by the language of the card. */
 const WORDS = {
-  es: { menu: 'Menú', course: 'Plato', choice: 'Elección', newProduct: 'Producto nuevo', courses: 'Platos' },
-  en: { menu: 'Menu', course: 'Course', choice: 'Choice', newProduct: 'New product', courses: 'Courses' },
+  es: { menu: 'Menú', course: 'Plato', choice: 'Elección', newProduct: 'Producto nuevo', courses: 'Platos', onSale: 'A la venta' },
+  en: { menu: 'Menu', course: 'Course', choice: 'Choice', newProduct: 'New product', courses: 'Courses', onSale: 'On sale' },
 };
 /** The word the card calls a record by when nothing titles it, in each language. */
 const GENERIC = { es: 'Registro', en: 'Record' };
@@ -119,7 +120,30 @@ for (const language of ['es', 'en'] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
 
-    // Cancelled, nothing changed: the menu still there with its two courses in their order and the lentils in the first.
+    // «Quita el menú del día de la venta»: one tap, like the menu form's switch: no word to type and «Run» ready at once,
+    // in every size. Run, the menu is off the till.
+    const offSale = await fieldsOf(page, 'combo__combo__set_active', { id: menu.id, is_active: false });
+    expect(offSale.map((field) => [field.name, field.label, field.value])).toEqual([
+      ['id', words.menu, menu.name],
+      ['is_active', words.onSale, false],
+    ]);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(`${words.menu}: ${menu.name}`);
+      await expect(card(page)).toContainText(`${words.onSale}: No`);
+      await expect(card(page).locator('[data-testid="assistant-confirm-input"]')).toHaveCount(0);
+      await expect(card(page).locator('[data-testid="assistant-confirm-submit"] button')).toBeEnabled();
+      await untilStill(page);
+      await capture(page, `hub-2216-off-sale-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await decide(page, 'submit');
+    await expect
+      .poll(async () => (await api<{ is_active: boolean }>(context, A, 'GET', `/combo/combos/detail?id=${menu.id}`)).data.is_active)
+      .toBe(false);
+
+    // The rest was cancelled and nothing else changed: the menu, now off the till, still there with its two courses in
+    // their order and the lentils in the first.
     const detail = await api<{ id: string; groups: { name: string; options: { product_name: string }[] }[] }>(
       context, A, 'GET', `/combo/combos/detail?id=${menu.id}`,
     );
