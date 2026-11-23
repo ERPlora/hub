@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:22d71478c98b3cd33cd0a02d8f2952ef5637bab59b52b0b591cdd634e021560a -->
+<!-- generated from WORKBOOK.md sha256:64909fbc3b5e61ea7df886c5574405bf88d0aeccfff593a698c163077499ce9a -->
 
 ## What it is for and who it is for
 
@@ -1407,7 +1407,8 @@ Steps:
      reaching what its plan includes: some things may stop or slow down until you upgrade.", and "See the plan’s
      usage" opens "System" on "Usage and plan". Without them, the notice goes away.
   10. Whoever runs the business can ask the assistant the same ("how much space do I have left?", "how many requests
-      have we had this month?") and it answers with these figures.
+      have we had this month?") and it answers with these figures. Anyone can ask it for the assistant's messages of
+      the month (BASE-F104).
 In: what is measured of this business: every night, what its files and its database take up and the people who had
 activity; during the day, its requests, its connections and who has activity. The plan's limits erplora.com passes to the
 hub, the apps it chose, the assistant's messages erplora.com counts and WhatsApp's.
@@ -2853,11 +2854,14 @@ Steps:
      upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
      plan" for the owner; the panel opens anyway.
+  7. Asked how many messages are left or how many have been used this month ("how many messages do I have left this
+     month?"), the assistant answers with the same figures as "Usage and plan" (BASE-F40) and the day they renew. It
+     reads them only when asked; if they cannot be read, it says so, without making up a number.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
 answering is what counts. If the pass of "Upgrade plan" does not arrive, the usual address opens, which asks to sign in (BASE-F11).
-Involved: BASE-F11, BASE-F106
+Involved: BASE-F11, BASE-F40, BASE-F106
 
 ### BASE-F105 Report a bad answer
 Status: done

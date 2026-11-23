@@ -183,7 +183,7 @@ class Prepared:
     usage: dict | GatewayError | None = None
 
 
-_prepared: ContextVar[Prepared] = ContextVar("base_assistant_prepared", default=Prepared())
+_prepared: ContextVar[Prepared | None] = ContextVar("base_assistant_prepared", default=None)
 
 
 def prepare_docs(ctx: OperationContext, pending: Iterable[Any]) -> dict[tuple[str, int], dict | GatewayError]:
@@ -253,7 +253,7 @@ def searched_docs(ctx: OperationContext, *, query: str, limit: int) -> dict:
     """The documentation search of ``base.docs.search``: what this request's turn asked before its transaction
     (``prepare``) or, outside a turn, erplora.com's answer now. ``GatewayError`` when it could not answer."""
     return _answered(
-        _prepared.get().docs.get((query, limit)),
+        (_prepared.get() or Prepared()).docs.get((query, limit)),
         lambda: docs_search(ctx.scope, query=query, language=ctx.language, limit=limit),
     )
 
@@ -261,7 +261,7 @@ def searched_docs(ctx: OperationContext, *, query: str, limit: int) -> dict:
 def month_usage(scope: Scope) -> dict:
     """This month's messages of ``base.assistant.usage``: what this request's turn asked before its transaction
     (``prepare``) or, outside a turn, erplora.com's answer now. ``GatewayError`` when it could not answer."""
-    return _answered(_prepared.get().usage, lambda: usage(scope))
+    return _answered((_prepared.get() or Prepared()).usage, lambda: usage(scope))
 
 
 def _answered(prepared: dict | GatewayError | None, ask: Callable[[], dict]) -> dict:
