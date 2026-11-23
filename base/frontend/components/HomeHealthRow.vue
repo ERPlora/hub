@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The Home's health row (BASE-F02), under the greeting: for who runs the business, how each app on says it is, the way
 // to fix what can be fixed and «View system». What it says moves with time and no event (a printer goes quiet), so it
-// is not live: it is asked when the Home opens and again each time the person comes back to it. A reading that fails
-// says so instead of the last one, which could say ready when it no longer is.
+// is not live: it is asked when the Home opens, again each time the person comes back to it and when their language
+// changes. A reading that fails says so instead of the last one, which could say ready when it no longer is.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
@@ -62,6 +62,14 @@ watch(
   () => route.path,
   (path, before) => {
     if (runsTheBusiness.value && path === homePath && before !== homePath) void read();
+  },
+);
+
+// The server writes the row in the session's language: a language changed with the Home open asks again.
+watch(
+  () => session.me.value?.language,
+  () => {
+    if (runsTheBusiness.value) void read();
   },
 );
 </script>
