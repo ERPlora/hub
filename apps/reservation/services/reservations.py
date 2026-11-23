@@ -14,7 +14,7 @@ from apps.reservation.models import Reservation
 from apps.reservation.queries import find_reservation, reservation_out
 from apps.reservation.schemas import ReservationIn, ReservationOut, ReservationPatchIn, ReservationRefIn
 from apps.reservation.services.gate import choose_table, judge, lock_book
-from apps.reservation.services.guests import CARD_SOURCES, _folded, _guest_contact, card_for_phone, typed_phone
+from apps.reservation.services.guests import CARD_SOURCES, _guest_contact, card_for_phone, typed_phone
 from apps.reservation.services.other_apps import drop_hold, status_changed, sync_hold
 from apps.reservation.services.writes import S, _stamp
 
@@ -44,16 +44,11 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
 
 def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
     """For whom, the day and the time first, as the book lists a reservation: the card's line says only its first
-    three data. The guest's name is left out when it says the same as the card."""
+    three data, so a guest's name said as well goes after them."""
     whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
     if whom is None:
         return fields
-    rest = [
-        field
-        for field in fields
-        if field is not whom
-        and not (field["name"] in FOR_WHOM and _folded(str(field["value"])) == _folded(str(whom["value"])))
-    ]
+    rest = [field for field in fields if field is not whom]
     return [whom, *sorted(rest, key=lambda field: field["name"] not in ("date", "time"))]
 
 

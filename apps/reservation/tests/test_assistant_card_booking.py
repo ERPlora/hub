@@ -40,15 +40,6 @@ def test_a_customer_said_by_her_name_with_the_same_guest_name_and_her_phone_is_n
     make_customer("Ana García", phone="+34600000001")
     arguments = {**BOOKING, "customer": "Ana García", "guest_name": "Ana García", "guest_phone": "600 000 001"}
     assert card_line(arguments, language) == f"Ana García · {DAY[language]} · {HOUR[language]}"
-    assert card_values(arguments, language).count("Ana García") == 1
-
-
-@HUB_DB
-def test_the_guest_name_written_without_accents_or_capitals_is_not_said_again():
-    make_customer("Ana García", phone="+34600000001")
-    arguments = {**BOOKING, "customer": "Ana García", "guest_name": "ana garcia"}
-    assert card_line(arguments, "es") == "Ana García · 15 oct 2026 · 21:00"
-    assert "ana garcia" not in card_values(arguments, "es")
 
 
 @HUB_DB
@@ -56,6 +47,14 @@ def test_the_guest_name_written_without_accents_or_capitals_is_not_said_again():
 def test_a_customer_said_by_her_phone_is_named_by_her_card(language):
     make_customer("Ana García", phone="+34600000001")
     arguments = {**BOOKING, "customer": "600 000 001"}
+    assert card_line(arguments, language) == f"Ana García · {DAY[language]} · {HOUR[language]}"
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_the_data_the_assistant_sends_empty_do_not_take_the_place_of_for_whom(language):
+    make_customer("Ana García", phone="+34600000001")
+    arguments = {**BOOKING, "customer_id": None, "customer": "600 000 001", "guest_name": ""}
     assert card_line(arguments, language) == f"Ana García · {DAY[language]} · {HOUR[language]}"
 
 
