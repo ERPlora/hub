@@ -1,6 +1,6 @@
 """Migration 0022 of the sale app, both ways, on a business's own database cloned from the template and through the
-migrator's alias, as ``migrate_hubs`` runs it. Forward, every tender has nothing added and keeps its change; the
-database refuses a change that does not take what is added out. Back, the two columns go and a tender with something
+migrator's alias, as ``migrate_hubs`` runs it. Forward, every tender has nothing added and keeps its change, the
+code of before still writes its tenders, and the database refuses a change that does not take what is added out. Back, the two columns go and a tender with something
 added keeps the sale's part alone: what was handed over loses what was added, on the tender and on its sale."""
 
 import datetime as dt
@@ -62,6 +62,11 @@ def test_what_is_added_comes_with_0022_and_its_reverse_leaves_the_sales_part_alo
     assert ADDED <= columns(database, TABLE)
     [kept] = new.get_model(APP, "SalePayment").objects.using(database.alias).all()
     assert (kept.extra, kept.extra_label, kept.change) == (0, "", 500)
+    # The code of before, still running while the deploy migrates, writes a tender without naming what is added: the
+    # database fills it with 0 and the new check takes it.
+    before = tender(old, database, 4, tendered=5000, change=500)
+    stored = new.get_model(APP, "SalePayment").objects.using(database.alias).get(pk=before.pk)
+    assert (stored.extra, stored.extra_label, stored.change) == (0, "", 500)
     # 50.00 € handed over for 45.00 € and 5.00 € of tip: no change.
     tender(new, database, 2, tendered=5000, change=0, extra=500, extra_label="Tip")
     with pytest.raises(IntegrityError), transaction.atomic(using=database.alias):
@@ -69,4 +74,4 @@ def test_what_is_added_comes_with_0022_and_its_reverse_leaves_the_sales_part_alo
 
     back = migrate(database, BEFORE)
     assert ADDED.isdisjoint(columns(database, TABLE))
-    assert tenders(back, database) == [(4500, 5000, 500, 5000), (4500, 4500, 0, 4500)]
+    assert tenders(back, database) == [(4500, 5000, 500, 5000), (4500, 4500, 0, 4500), (4500, 5000, 500, 5000)]
