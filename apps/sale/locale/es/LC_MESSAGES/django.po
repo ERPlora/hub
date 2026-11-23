@@ -372,6 +372,12 @@ msgstr "total"
 msgid "tendered"
 msgstr "entregado"
 
+msgid "added amount"
+msgstr "importe añadido"
+
+msgid "added amount label"
+msgstr "etiqueta del importe añadido"
+
 msgid "change"
 msgstr "cambio"
 
@@ -559,6 +565,9 @@ msgstr "Di qué venta: su id o su número."
 
 msgid "Say which payment method: its id, its name or its type."
 msgstr "Di qué forma de pago: su id, su nombre o su tipo."
+
+msgid "Say what the amount added to this payment is (a tip, for instance)."
+msgstr "Di qué es el importe añadido a este cobro (una propina, por ejemplo)."
 
 msgid "Say which section: its id or its name."
 msgstr "Di qué sección: su id o su nombre."
@@ -762,6 +771,9 @@ msgstr "Una línea pagada con bono vuelve entera: su sesión no se parte."
 
 msgid "The cash register is closed: open a cash session to charge in cash."
 msgstr "La caja está cerrada: abre una sesión de caja para cobrar en efectivo."
+
+msgid "This business has no app that adds anything to a charge, such as a tip: charge the sale alone."
+msgstr "Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la venta."
 
 msgid "Invoicing is not active in this business: the sale is a ticket without a fiscal document."
 msgstr "Facturación no está activa en este negocio: la venta es un tique sin documento fiscal."

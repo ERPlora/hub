@@ -35,7 +35,7 @@ OPTIONS = whole.GROUPS | {"label": "Modifier options"}
 
 def an_option(group, name: str, **fields) -> ModifierOption:
     return ModifierOption.objects.get(
-        pk=run_here("modifier.option.create", {"group_id": str(group.id), "name": name, **fields}).id
+        pk=run_here("modifier.option.create", {"group_id": str(group.id), "name": name, "price_delta": 0, **fields}).id
     )
 
 
@@ -286,7 +286,7 @@ class TestOptionsComeBack:
         sauces = run_in(hub, "modifier.group.create", name="Sauces", max_choices=most).id
         with use_hub(hub):
             own = TaxCategory.objects.filter(is_active=True).order_by("key").first().key
-        ketchup = run_in(hub, "modifier.option.create", group_id=sauces, name="Ketchup").id
+        ketchup = run_in(hub, "modifier.option.create", price_delta=0, group_id=sauces, name="Ketchup").id
         alioli = run_in(hub, "modifier.option.create", group_id=sauces, name="Alioli", kitchen_name="+ALI",
                         price_delta=50, tax_category_key=own, is_default=True, sort_order=1).id
         self.own = own

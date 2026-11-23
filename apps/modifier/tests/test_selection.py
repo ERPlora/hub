@@ -12,7 +12,7 @@ def test_the_valuation_of_the_picks_gives_each_ones_allergens_own_line_included(
     burger = make_product()
     run("modifier.link.attach", {"group": "Extras", "product_id": str(burger.id)})
     chosen = [
-        run("modifier.option.create", {"group": "Extras", "name": name, **fields}).id
+        run("modifier.option.create", {"group": "Extras", "name": name, "price_delta": 0, **fields}).id
         for name, fields in (
             ("Cheese", {"allergens": ["milk"]}),
             ("Wine sauce", {"price_delta": 150, "tax_category_key": GENERIC, "allergens": ["sulphites"]}),

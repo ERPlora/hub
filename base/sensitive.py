@@ -23,8 +23,7 @@ TEAM_CONTACT = {REQUIRES: VIEW_TEAM_CONTACT}
 #: The figures of the whole business, beyond one's own work.
 BUSINESS_TOTALS = {REQUIRES: VIEW_BUSINESS_TOTALS}
 
-#: Every data permission of base. An API key carries them all: only the owner and an administrator make keys, and they
-#: see every data of the business, so their keys see it too.
+#: Every data permission of base. An API key carries those whoever made it holds today (BASE-F125).
 DATA_PERMISSIONS = frozenset({VIEW_COSTS, VIEW_CUSTOMER_CONTACT, VIEW_TEAM_CONTACT, VIEW_BUSINESS_TOTALS})
 
 

@@ -68,7 +68,7 @@ def by_its_name(said: str) -> dict[str, dict]:
         "modifier.group.update": {"group": said, "max_choices": 3},
         "modifier.link.attach": {"group": said, "category": "Entrantes"},
         "modifier.link.detach": {"group": said, "product": "Hamburguesa"},
-        "modifier.option.create": {"group": said, "name": "Brava"},
+        "modifier.option.create": {"group": said, "name": "Brava", "price_delta": 0},
         "modifier.option.delete": {"group": said, "option": "Alioli"},
         "modifier.option.update": {"group": said, "option": "Alioli", "price_delta": 50},
     }
@@ -85,7 +85,7 @@ def a_group(name: str):
     """The group ``name`` as a restaurant's Modifiers screens show it: its option «Alioli», applied to
     «Hamburguesa»; the category «Entrantes» to apply it to. Made with each app's own operations."""
     group = run("modifier.group.create", {"name": name})
-    run("modifier.option.create", {"group_id": str(group.id), "name": "Alioli"})
+    run("modifier.option.create", {"group_id": str(group.id), "name": "Alioli", "price_delta": 0})
     run("modifier.link.attach", {"group_id": str(group.id), "product_id": str(burger().id)})
     if not _has_category("Entrantes"):
         make_category("Entrantes")

@@ -1391,8 +1391,9 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la hoja Cobro todavía no pinta pasos de otras apps ni la venta guarda lo cobrado de más
-(hub#1497, hub#1500, hub#1502)
+Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, pero hoy lo rechaza siempre:
+ninguna app puede declarar todavía su paso en el cobro, la hoja Cobro no pinta esos pasos y el Documento de venta no
+enseña lo añadido (hub#1497, hub#1500, hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
@@ -1413,10 +1414,15 @@ lleva IVA (ver «Por qué la propina no entra en el tique» en el manual de Prop
 cobro, lo cobrado de más y su nombre, para cuadrar lo entregado y el cambio y para el papel, y el aviso de venta
 cobrada lo lleva aparte; las cifras de **Ventas** (SALE-F28) no lo suman. Lo suyo lo guarda la app del paso
 (TIP-F02).
-Si falla: si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
+Si falla: sin ninguna app encendida que añada un paso al cobro, un cobro que trae un importe añadido (por la API o
+el asistente) no cobra: «Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la
+venta.». Si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
 cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
-«Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06). El tope del
-tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como siempre: la propina no es precio.
+«Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06), y esa misma
+clave con otro importe añadido es otro cobro: «Esa clave de intento ya se usó para otro cobro. Vuelve a abrir el
+cobro para cobrar este.». Un importe añadido sin decir qué es no cobra: «Di qué es el importe añadido a este cobro
+(una propina, por ejemplo).». El tope del tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como
+siempre: la propina no es precio.
 Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 Ver los alérgenos de un plato al pedirlo
@@ -1616,7 +1622,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 | Aviso | Cuándo | Qué lleva | Servicio |
 |---|---|---|---|
-| Venta cobrada | Cobrar | La venta, su número, cuenta, documento, importes en céntimos, moneda, momento, cliente y su copia fiscal, quién atendió, cita, cobros y líneas (producto o servicio, cantidad, si es servicio, si la pagó un bono, importes) | `sale.sale.completed` |
+| Venta cobrada | Cobrar | La venta, su número, cuenta, documento, importes en céntimos, moneda, momento, cliente y su copia fiscal, quién atendió, cita, cobros (cada uno con lo que otra app le añadió aparte, y su nombre) y líneas (producto o servicio, cantidad, si es servicio, si la pagó un bono, importes) | `sale.sale.completed` |
 | Venta nacida de una cita | Cobrar una cuenta con cita | La venta, la cita, quién atendió y el total | `sale.sale.created_from_appointment` |
 | Venta anulada | Anular | La venta, su número, motivo, quién y cuándo, total, cliente, cuenta y documento | `sale.sale.voided` |
 | Venta devuelta | Devolver | La venta, la devolución, el importe, el motivo, si queda devuelta del todo, los cobros y las líneas devueltas | `sale.sale.refunded` |
@@ -1770,8 +1776,9 @@ es una línea.
   cambio, descuento de la cuenta y quién lo autorizó) y `OrderLine` (fila de trabajo: precio
   congelado, unidad, ronda de cocina, venta que la cobró, anulación); `Sale` (cabecera fiscal:
   número, día del negocio, importes, documento, cliente, clave de intento), `SaleLine` (copia fiscal:
-  categoría, tipo, país, región y regla de Impuestos), `SalePayment`, `SaleCounter` (uno por día del
-  negocio); `Refund`, `RefundPayment`, `RefundLine`; `VoucherSession` (una sesión de bono hecha fuera del cobro,
+  categoría, tipo, país, región y regla de Impuestos), `SalePayment` (un cobro: su importe de la venta y, aparte, lo
+  que otra app le añade, `extra` con su nombre `extra_label`; la base exige `change = tendered - amount - extra`),
+  `SaleCounter` (uno por día del negocio); `Refund`, `RefundPayment`, `RefundLine`; `VoucherSession` (una sesión de bono hecha fuera del cobro,
   SERVICE-F21: la sesión de Servicios, única, la profesional, el día del negocio y lo que vale; como lo cobrado,
   nunca se edita ni se borra); `PaymentMethod`, `Settings` (una fila), `Department`, `QuickNote` (borrado lógico).
 - **Un solo camino de cobro**: todo cobro sale de una cuenta. Una venta de mostrador (líneas sueltas
@@ -2086,8 +2093,9 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `base.queries.ownership.Owned`. Es de la persona si la cobró (`created_by` es su usuario) o si se atribuyó a su ficha
   de Personal (`staff_id`; la ficha la dice Personal por su `own_records`, sin que Ventas la requiera). Quien no
   tiene `sale.view_all_sales` lee y toca solo esas (`SALES.visible(ctx)` y `visible_sale`, con el mismo 404
-  `sale.sale_not_found` que una venta que no existe). Quien no es una persona (una llave de API, una automatización,
-  la plataforma) no tiene «suyas»: alcanza las que le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
+  `sale.sale_not_found` que una venta que no existe). Una llave de API lee como quien la creó
+  (BASE-F125). Quien no tiene a nadie detrás (una automatización, la plataforma) no tiene «suyas»: alcanza las que
+  le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
   el periodo, hoy, los 7 días y lo de cada profesional) suman `SALES.counted(ctx)`: el negocio entero solo con
   `sale.view_all_sales` y `base.view_business_totals`, y si no, las suyas, aunque abra las de todos una a una. Lo de
   cada profesional lee `SaleLine`, que no es de nadie: filtra sus líneas con `sale__in` sobre esas ventas, y las

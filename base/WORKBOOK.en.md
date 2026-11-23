@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a2788cd20b7f4bfc83ebcff6388de3ad64bfe9dc6cee61da7b85530709058d35 -->
+<!-- generated from WORKBOOK.md sha256:e6ee03e9193760b54ef15f4c756af1de886fdfc830ed05553911fab740644ea1 -->
 
 ## What it is for and who it is for
 
@@ -753,10 +753,14 @@ Steps:
   1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list.
+  3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
+     says what the step asks for and not what the business has: "Your catalog" is done because there are already
+     products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
+     Inventory).
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: BASE-F103
+Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
 Status: done
@@ -2349,10 +2353,11 @@ Steps:
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
 In: the name, the pace and what it may do.
-Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
+Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
+(BASE-F125). Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
 app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
-Involved: BASE-F89, BASE-F90, BASE-F119
+Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
 Status: done
@@ -2583,7 +2588,9 @@ Steps:
      in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
-     no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
+     no sign when it balances); a yes or a no, as "Yes" or "No", with the name of its datum in front, also on a normal action's line,
+     because alone it says nothing of what changes ("Require an opening float: Yes · Require a count to close: Yes",
+     never "Yes · Yes"); a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
@@ -2619,7 +2626,9 @@ Steps:
      say what they do: emptying a cart says "Clear in Cart & Checkout", removing one of its lines "Remove in Cart &
      Checkout" and taking a product's route away in the kitchen "Clear in Kitchen"; a cash count says "Register count
      in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
-     never "Add".
+     never "Add"; and VeriFactu's live test, as its buttons do, "Test the connection in VeriFactu" and "Create test
+     invoice in VeriFactu", never "Run" or "Create". An action that carries no datum to show says only its action and
+     its app, ending in a full stop and with no empty colon after it: "Test the connection in VeriFactu.".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so. After "Run it",
      the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
@@ -3469,8 +3478,8 @@ Steps:
      what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
-  5. An API key sees the data whoever makes it sees: only the owner and the administrator make one, and they see all
-     of it, so an integration reads and writes a product's cost as before.
+  5. An API key sees the data whoever made it sees today (BASE-F125): a key of the owner or of an administrator, who
+     see all of it, reads and writes a product's cost as before.
   6. The business totals are the figures of the whole business, beyond what each one does: with everyone's sales,
      the figures of **Sales** and its Home panels are the whole business's; without them, those of the person's own
      sales. In **Customers**, "Revenue" only shows to whoever sees them.
@@ -3479,7 +3488,36 @@ Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
-Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
+
+### BASE-F125 A key stops working when whoever made it no longer may
+Status: done
+Actor: API (another program), owner, administrator
+Screen: none (it shows in what the API answers the other program)
+Steps:
+  1. Each key remembers who made it. A key made before that was kept goes to the business's owner's name with the
+     next photo from erplora.com, which arrives every night at the latest; until then it may do the same as the
+     owner, as before.
+  2. A key never does more than whoever made it, with what that person may do today in the business: it opens an
+     operation only if its maker has its permission; it receives a piece of sensitive data (costs, contact details,
+     the business totals) only if its maker sees it, and otherwise gets it empty (BASE-F119); and in what has an
+     owner (sales, tills, invoices, appointments, commissions) it reads everything only if its maker sees
+     everything, and otherwise only its maker's. When booking an appointment or serving a customer, the key stays on
+     the customer's side, as until today.
+  3. If whoever made it has their role changed in erplora.com and loses a permission, the key loses it at the same
+     time, without touching it: what needs it answers 403 `permission_denied`, and the data they no longer see comes
+     empty.
+  4. If whoever made it leaves the business, the key stops opening anything: every request answers 403
+     `base.api_key_owner_gone`, "Whoever made this API key is no longer in the business. Make a new one.". The key
+     stays in **Employees › API keys**: whoever runs the business revokes it (BASE-F88) and makes another
+     (BASE-F86).
+In: the key the other program calls with and the role today of whoever made it, from the last photo from
+erplora.com.
+Out: nothing saved.
+If it fails: the 403 says whether whoever made it lacks the permission (`permission_denied`) or is no longer in the
+business (`base.api_key_owner_gone`); the rest of what refuses a key does not change: what the key itself may not
+do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_rate_limited`.
+Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
 Status: done
