@@ -118,10 +118,12 @@ def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, aske
     ctx = owner("es")
     assert expected <= set(assistant.tools.catalog(ctx))  # the owner holds them: only the selection can leave one out
     # A turn ranks by the last two questions of the person (``base.assistant.turn``): the battery asks them in order.
-    before = BLOCK_B[index - 1][0] if index else None
-    for texts in ([asked], [before, asked] if before else [asked]):
-        missing = expected - set(offered(ctx, *texts))
-        assert not missing, (texts, missing)
+    # Past the places of a turn, the model searches for what was just asked (``base.assistant.find_tools``).
+    assert not expected - set(offered(ctx, asked)), asked
+    if index:
+        searched = {op.name for op in assistant.relevance.found(assistant.tools.catalog(ctx), asked, ctx.language)}
+        missing = expected - set(offered(ctx, BLOCK_B[index - 1][0], asked)) - searched
+        assert not missing, (asked, missing)
 
 
 #: Sales' own words (its ``assistant_synonyms``), in phrases no tool says as its asks: a «cuenta», a check or a

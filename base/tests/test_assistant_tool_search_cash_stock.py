@@ -1,6 +1,6 @@
 """Phrases about the till, the stock and the devices that the assistant once left without the tool they asked for.
 
-Each one reaches its tool now: either among the forty tools a turn offers for the phrase's own words, or once the model
+Each one reaches its tool now: either among the twenty tools a turn offers for the phrase's own words, or once the model
 searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what it
 found.
 """
@@ -23,15 +23,12 @@ MOVEMENT = "cash_register.movement.add"
 RECEIVE = "inventory.stock.receive"
 DEVICE = "printing.device.register"
 
-#: The tools a phrase's own words already bring into the forty a turn offers.
+#: The tools a phrase's own words already bring into the twenty a turn offers.
 OFFERED = [
     pytest.param("es", "retira 50 € de la caja para el banco", (MOVEMENT,), id="live-128-es"),
-    pytest.param("en", "open the register on this tablet", ("cash_register.session.open",), id="live-129-open"),
     pytest.param(
         "es", "saca 2 € de la caja para el pan y saca 2 copias del tique", (MOVEMENT, "sale.sale.print"), id="live-131"
     ),
-    pytest.param("en", "log two entries of 20 € in the shift", (MOVEMENT,), id="live-170"),
-    pytest.param("en", "rename it then register this device as Bar 2", (DEVICE,), id="live-127-then"),
     pytest.param(
         "es",
         "registra que el pago del pedido de QA-WEB-1 falló porque el banco lo rechazó",
@@ -47,21 +44,38 @@ OFFERED = [
     pytest.param(
         "es", "apunta que han llegado los de la reserva de Luis", ("reservation.reservation.seat",), id="live-120-seat"
     ),
-    pytest.param("es", "apunta que han llegado dos más a la mesa 7", ("table.session.set_guests",), id="live-120-guests"),
-    pytest.param("es", "apunta que han llegado Pedro y Ana", ("attendance.record.clock_in",), id="live-120-clock-in"),
-    pytest.param(
-        "es",
-        "apunta que han llegado las dos clientas de la cita de las 10",
-        ("appointment.appointment.start",),
-        id="live-120-appointment",
-    ),
 ]
 
 #: What a phrase's own words leave out, and the task the model searches for then, in English and in Spanish.
 CASH_IN = ("record a cash movement", "apuntar un movimiento de caja")
 GOODS_IN = ("receive goods", "recibir mercancía")
 NEW_DEVICE = ("register a device", "registrar un dispositivo")
+OPEN_THE_TILL = ("open the cash register", "abrir la caja")
 SEARCHED = [
+    pytest.param("en", "open the register on this tablet", OPEN_THE_TILL, "cash_register.session.open", id="live-129-open"),
+    pytest.param("en", "log two entries of 20 € in the shift", CASH_IN, MOVEMENT, id="live-170"),
+    pytest.param("en", "rename it then register this device as Bar 2", NEW_DEVICE, DEVICE, id="live-127-then"),
+    pytest.param(
+        "es",
+        "apunta que han llegado dos más a la mesa 7",
+        ("change the guests of a table", "cambiar los comensales de una mesa"),
+        "table.session.set_guests",
+        id="live-120-guests",
+    ),
+    pytest.param(
+        "es",
+        "apunta que han llegado Pedro y Ana",
+        ("clock in an employee", "fichar la entrada de un empleado"),
+        "attendance.record.clock_in",
+        id="live-120-clock-in",
+    ),
+    pytest.param(
+        "es",
+        "apunta que han llegado las dos clientas de la cita de las 10",
+        ("start an appointment", "registrar la llegada a una cita"),
+        "appointment.appointment.start",
+        id="live-120-appointment",
+    ),
     pytest.param("es", "pon una entrada de 50 € de cambio", CASH_IN, MOVEMENT, id="live-162"),
     pytest.param("en", "record that 100 € came in during the shift", CASH_IN, MOVEMENT, id="live-135"),
     pytest.param(

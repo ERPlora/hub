@@ -27,7 +27,7 @@ from apps.invoice.tests.conftest import (
 from apps.verifactu.tests.conftest import HUB_DB
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import assert_offered_or_found, assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probe_phrases
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said
@@ -203,6 +203,10 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
     assert ranked.index("verifactu.record.create") < later
 
 
+#: The task the model searches for when a person's words bring its tool past the places of a turn.
+SEARCHED = {"verifactu.stats.contingency_summary": "resumen de los registros pendientes de envío"}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
@@ -217,7 +221,7 @@ def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(catalog_
         assert probe["tool"] in catalog_of(Membership.Role.OWNER, probe["language"])
         assert probe["tool"] not in tools
         return
-    assert_offered_with_room(tools, probe["tool"], probe["phrase"])
+    assert_offered_or_found(tools, probe["tool"], probe["phrase"], SEARCHED.get(probe["tool"]))
 
 
 test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
