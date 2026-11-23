@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8afaf5c31de3c77dc6b212c3d4a2e9327180531df5a0d3d3a3226ec9d6d7e67f -->
+<!-- generated from WORKBOOK.md sha256:4231f9897a3e4a0f870c2299c5daca692481094661ae0487d22c2450d33b7164 -->
 
 ## What it is for and who it is for
 
@@ -580,12 +580,15 @@ Steps:
    reasons.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and "Test the
    connection" is disabled.
+5. Asked of the assistant ("check whether it already connects to the tax office, without sending anything"), its card
+   names it as the button does: "Test the connection in VeriFactu.", and after "Run it" the receipt says "Done: Test the
+   connection in VeriFactu".
 In: the Hub's configuration; the answer of the gateway's probe.
 Out: the result as a "Connection test" event (it announces `verifactu.diagnostic.run`), without creating any
 record or touching the chain.
 If it fails: what is missing, said in the result. It never files a sample record: a filed record cannot be
 undone.
-Involved: VERIFACTU-F15
+Involved: VERIFACTU-F15, BASE-F97
 
 ### VERIFACTU-F11 Create a test invoice
 Status: done
@@ -599,10 +602,13 @@ Steps:
 3. For example, "Test invoice TICKET-2026-000001 created: its record is in Records." shows.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and "Create test
    invoice" is disabled.
+5. Asked of the assistant, its card says "Create test invoice in VeriFactu. Check each datum before going on." and,
+   below, what it will issue: "Series: TICKET", "Price: €1.00" and "VAT: 21%"; it is issued only after typing
+   "CONFIRM".
 In: nothing to type.
 Out: a real Invoicing invoice in testing and its record, which goes out like any other.
 If it fails: Invoicing's refusal (no issuer, no permission to issue).
-Involved: INVOICE-F03
+Involved: INVOICE-F03, BASE-F97
 
 ### VERIFACTU-F12 Look up the responsible declaration
 Status: done

@@ -1,5 +1,5 @@
-"""How a price list, a price and a discount rule read (``PriceListOut``, ``PriceItemOut``, ``RuleOut``), and the
-stored fields of a rule its checks read.
+"""How a price list, a price, a removed price and a discount rule read (``PriceListOut``, ``PriceItemOut``,
+``PriceRemovedOut``, ``RuleOut``), and the stored fields of a rule its checks read.
 """
 
 from decimal import Decimal
@@ -10,9 +10,14 @@ from babel.numbers import format_decimal
 from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
 from django.utils import translation
 from django.utils.translation import pgettext_lazy
+from live.context import OperationContext
+from live.errors import OperationError
 
 from apps.customer.models import CustomerGroup
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
+from apps.pricing.queries import resolution
+from apps.pricing.schemas import ResolveIn
+from base import operations as platform
 from base.business import babel_locale
 
 #: A price outside its list, from a quantity on: «Shampoo · VIP prices · from 10» (the list's «Desde»).
@@ -76,6 +81,34 @@ def item_row(item: PriceItem) -> dict:
 
 def load_item(item_id: UUID) -> dict:
     return item_row(PriceItem.objects.select_related("price_list", "product").get(pk=item_id))
+
+
+def removed_row(ctx: OperationContext, item: PriceItem, item_id: UUID) -> dict:
+    """A ``PriceRemovedOut``: ``item``, just taken off its list, and what its article costs there now from the same
+    quantity, as the price of a line reads it: on a customer group's list, the best of the general list and that
+    group's lists; on any other, that list alone (it is only used by its name); without a price in them, the catalog's.
+    A service's catalog price is Services': when it cannot be read, what it costs now is not known."""
+    price_list = item.price_list
+    row = {
+        "id": item_id,
+        "name": item.product.name if item.product else item.service_name,
+        "price_now": None,
+        "price_now_list": None,
+        "currency": price_list.currency,
+    }
+    asked = ResolveIn(product_id=item.product_id, service_id=item.service_id, tax_included=price_list.tax_included is not False)
+    try:
+        article = resolution.article_of(ctx, asked)
+    except OperationError:
+        return row
+    lists = [price_list]
+    if price_list.customer_group_id is not None:
+        currency = platform.business_currency(ctx.scope)
+        lists = resolution.candidate_lists(asked, resolution.business_today(), [price_list.customer_group_id], currency)
+    found, source = resolution.best_list_price(article, item.min_quantity, lists)
+    if found is None:
+        return {**row, "price_now": article.base_price, "currency": platform.business_currency(ctx.scope)}
+    return {**row, "price_now": found.price, "price_now_list": source.name, "currency": source.currency}
 
 
 def item_label(row: dict, language: str) -> str:
