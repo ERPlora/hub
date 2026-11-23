@@ -12,8 +12,7 @@ import pytest
 
 from apps.combo.models import ChoiceOption
 from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, make_product
-from apps.combo.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears
-from base.tests.test_assistant_yes_for_its_card import turn_as
+from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, turn_as
 from base.tests.test_services_assistant import call
 
 pytestmark = HUB_DB

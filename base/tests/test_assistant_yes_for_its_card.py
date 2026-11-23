@@ -6,6 +6,8 @@ fingerprint of what it showed (``shown``), as the panel gives back the calls tha
 again: when what it shows, or a record it found, is not the same any more, nothing runs and the new card is shown.
 """
 
+import json
+
 import pytest
 from live.context import OperationContext, Scope
 from live.operations import Operation, get, registry
@@ -36,6 +38,13 @@ def turn_as(person: OperationContext, *calls, decision: dict | None = None) -> d
     op = get("base.assistant.turn")
     data = {"messages": [ASK, asked(*calls)], "pending": list(calls), "decision": decision}
     return op(person, op.input.model_validate(data)).model_dump(mode="json")
+
+
+def no_card_but_the_model_hears(plan: dict, code: str) -> None:
+    """No card that would act on anything: the model hears ``code`` and asks the person which one."""
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
 
 
 def yes_to_its_card(person: OperationContext, write: str, arguments: dict, meanwhile=lambda: None) -> dict:
