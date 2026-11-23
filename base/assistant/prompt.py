@@ -11,6 +11,13 @@ from live.assistant import tool_name
 from base.assistant.relevance import FIND_TOOLS
 from base.models import Membership
 
+#: What the chat's model does when none of the tools a turn gives it does what was asked: a turn offers only the
+#: ones nearest the person's words and, last, the search of the rest (``relevance.FIND_TOOLS``), so nothing is said
+#: impossible before that search. The chat adds it where the turn offers the search, and nowhere else.
+SEARCH_FIRST = f"""- The tools you are given are only the ones nearest the person's words: the rest of theirs you
+  find with `{tool_name(FIND_TOOLS)}`. Never say that something cannot be done here, nor that you have no tool for
+  it, before you search for it; if your searches find none, say on which screen it is done."""
+
 #: Who can do what a role of the business cannot (hub#585): the roles above it; for the accountancy firm, who only reads,
 #: whoever runs the business. The owner holds every permission of every app and an administrator all but owning the
 #: business (``base.permissions.permissions_of_role``): what no tool of theirs does is done on its screen, never someone
@@ -34,10 +41,10 @@ def instructions(  # noqa: PLR0913
 ) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
     tools and money (an amount sent in the minor unit of its currency, ``decimals`` the business's; one of a result
-    said as the result tells it, in its currency, ``base.assistant.tools.run``), the screens it may link, that the
-    tools it is given are a few of the person's and the rest are found with the search (``relevance.FIND_TOOLS``), and
-    the person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
-    operation name; BASE-F100)."""
+    said as the result tells it, in its currency, ``base.assistant.tools.run``), the screens it may link, and the
+    person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
+    operation name; BASE-F100). What to do when its tools fall short each caller says after it: the chat,
+    ``SEARCH_FIRST``."""
     try:
         language_name = get_language_info(language)["name"]
     except KeyError:
@@ -73,18 +80,16 @@ quieres, puedes» or «dígame, quiere, puede», never a mix. Use Markdown: bold
   tool's result tells each amount in its own currency, as the screens write it (`"{said}"`): say it as it comes, in
   that currency; an amount of your own, in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
-{links}{_who_asks(role, language, approvable)}
-- The tools you are given are only the ones nearest the person's words: the rest of theirs you find with
-  `{tool_name(FIND_TOOLS)}`. Never say that something cannot be done here, nor that you have no tool for it, before you
-  search for it; if your searches find none, say on which screen it is done."""
+{links}{_who_asks(role, language, approvable)}"""
 
 
 def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> str:
     """The lines of the instructions on whom the assistant serves (hub#585, BASE-F100): their role as the screens name
     it, in the chat's language, whose tools these are; for a role below the owner's, that what no tool of theirs does
-    (none offered, none found by the search) is said as not available to them here (their role, or its app off or out of the plan) and theirs to ask of someone else,
-    never looked for another way nor answered with the state of something else; and the writes they may only run with
-    a manager's approval. Nothing for no role of the business (an automation's step)."""
+    (none offered, none found by the search) is said as not available to them here (their role, or its app off or out
+    of the plan) and theirs to ask of someone else, never looked for another way nor answered with the state of
+    something else; and the writes they may only run with a manager's approval. Nothing for no role of the business
+    (an automation's step)."""
     lines = []
     if role in Membership.Role.values:
         with translation.override(language):

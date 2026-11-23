@@ -158,10 +158,11 @@ def test_a_role_that_cannot_do_something_is_told_who_can_and_no_other_tool_is_tr
 
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
 def test_the_owner_and_an_administrator_are_never_told_their_role_cannot(role):
-    """They hold every permission of every app: what no tool does is done on its screen, not someone else's."""
+    """They hold every permission of every app: what no tool does is done on its screen, not someone else's. Which
+    screen, after what, each caller of the instructions says (the chat, after its search: ``prompt.SEARCH_FIRST``)."""
     text = _said(role=role)
     assert "their role cannot" not in text
-    assert "if your searches find none, say on which screen it is done." in text
+    assert "on which screen it is done" not in text
 
 
 @pytest.mark.parametrize("role", ["", "staff", None])

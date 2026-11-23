@@ -313,7 +313,8 @@ def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
 
 def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:
     """The model's instructions for this round, with what it knows of the business (``assistant.business_facts``):
-    with the checklist, read again, in ``setup``, and with ``LAST_ROUND`` on the last round of the request."""
+    to search before it says something cannot be done when the round offers the search (``prompt.SEARCH_FIRST``), with
+    the checklist, read again, in ``setup``, and with ``LAST_ROUND`` on the last round of the request."""
     apps = assistant.tools.active_apps(ctx.scope)
     text = assistant.prompt.instructions(
         language=ctx.language,
@@ -325,6 +326,8 @@ def _assistant_instructions(ctx: OperationContext, business: dict, offered: list
         # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
         approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
+    if any(op.name == assistant.relevance.FIND_TOOLS for op in offered):
+        text += "\n" + assistant.prompt.SEARCH_FIRST
     text += "\n\n" + assistant.business_facts.block(ctx, business, apps, now=timezone.now())
     if setup:
         text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
