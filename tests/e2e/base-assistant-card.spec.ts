@@ -129,6 +129,10 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
     'No se hizo, falló: Quitar en Empleados. Esa persona no está en este negocio.',
   );
   await lastAnswerAtEachSize(page, 'FIX-HUB-BASE-ASSISTANT-FAILED-RECEIPT-REASON');
+  // On a phone the reason takes a second line: its icon keeps the size of the one-line receipt's above it.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const icons = panel(page).locator('[data-testid="assistant-receipt"] ion-icon');
+  expect((await icons.last().boundingBox())?.width).toBe((await icons.first().boundingBox())?.width);
   await context.close();
 });
 
