@@ -8,6 +8,7 @@ import json
 
 import pytest
 from django.db import connections
+from live.context import OperationContext
 from live.operations import get
 
 from base import assistant
@@ -108,10 +109,11 @@ def test_a_turn_that_only_searches_the_documentation_does_not_read_them(make_use
     assert gateway.requests == []
 
 
-def test_nobody_without_a_session_makes_erplora_com_read_them(client, gateway):
-    body = {"messages": [{"role": "user", "content": ASKED["en"]}, READ_ASKED], "pending": [READ], "continuation": "tok"}
+@pytest.mark.parametrize(("actor", "permissions"), [(None, {"base.view_home"}), ("ana", set())])
+def test_nobody_who_may_not_read_them_makes_erplora_com_count(gateway, actor, permissions):
+    person = OperationContext(scope=A, actor=actor, permissions=frozenset(permissions), language="en")
 
-    assert post(client, "/assistant/turn", body).status_code == 401
+    assert assistant.gateway.prepare_usage(person, [AssistantCallIn(**READ)]) is None
     assert gateway.requests == []
 
 
