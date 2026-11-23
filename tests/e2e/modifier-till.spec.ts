@@ -133,10 +133,10 @@ test.beforeAll(async ({ browser }) => {
     groups[key] = (await post<{ id: string }>(context, '/modifier/groups', fields)).id;
   }
   for (const [key, group, fields] of [
-    ['rare', 'doneness', { name: 'Rare', sort_order: 1 }],
-    ['medium', 'doneness', { name: 'Medium', sort_order: 2, is_default: true }],
+    ['rare', 'doneness', { name: 'Rare', price_delta: 0, sort_order: 1 }],
+    ['medium', 'doneness', { name: 'Medium', price_delta: 0, sort_order: 2, is_default: true }],
     ['cheese', 'extras', { name: 'Cheese', kitchen_name: '+CHEESE', price_delta: 100, sort_order: 1 }],
-    ['onion', 'extras', { name: 'No onion', kitchen_name: '-ONION', sort_order: 2 }],
+    ['onion', 'extras', { name: 'No onion', kitchen_name: '-ONION', price_delta: 0, sort_order: 2 }],
     ['soda', 'drink', { name: 'Soda', price_delta: 200, tax_category_key: GENERIC }],
   ] as const) {
     ids[key] = (await post<{ id: string }>(context, '/modifier/options', { group_id: groups[group], ...fields })).id;
@@ -150,7 +150,7 @@ test.beforeAll(async ({ browser }) => {
     ['toppings', { name: named('Toppings'), min_choices: 1, max_choices: 3, sort_order: 2 }, 'Croutons'],
   ] as const) {
     groups[key] = (await post<{ id: string }>(context, '/modifier/groups', fields)).id;
-    await post(context, '/modifier/options', { group_id: groups[key], name: option });
+    await post(context, '/modifier/options', { group_id: groups[key], name: option, price_delta: 0 });
     await post(context, '/modifier/links/attach', { group_id: groups[key], product_id: salad.id });
   }
   const list = await api<{ rows: { id: string; type: string }[] }>(context, A, 'GET', '/sale/payment_methods');

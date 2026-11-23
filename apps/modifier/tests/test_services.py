@@ -38,7 +38,7 @@ def group(name="Sauces", **fields):
 
 
 def option(group_name="Sauces", name="Ketchup", **fields):
-    return run("modifier.option.create", {"group": group_name, "name": name, **fields})
+    return run("modifier.option.create", {"group": group_name, "name": name, "price_delta": 0, **fields})
 
 
 # Groups (MODIFIER-F02, F03)
@@ -90,7 +90,7 @@ def test_an_employee_reads_but_never_writes():
     with pytest.raises(PermissionDenied):
         run(
             "modifier.option.create",
-            {"group": "Sauces", "name": "Mayo"},
+            {"group": "Sauces", "name": "Mayo", "price_delta": 0},
             role="hub_employee",
         )
 

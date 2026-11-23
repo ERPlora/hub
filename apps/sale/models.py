@@ -682,12 +682,9 @@ class SaleLine(UUIDModel):
         return self.voucher_session_id is not None
 
 
-class SalePayment(UUIDModel):
-    """One tender of a sale; change only comes out of cash."""
+class Tender(UUIDModel):
+    """Money that moved by one payment method, named as it was then: a leg of a charge or of a refund."""
 
-    sale = models.ForeignKey(
-        Sale, on_delete=models.CASCADE, related_name="payments", verbose_name=_("sale")
-    )
     position = models.PositiveIntegerField(_("position"))
     method = models.ForeignKey(
         PaymentMethod,
@@ -700,9 +697,26 @@ class SalePayment(UUIDModel):
         _("method type"), max_length=16, choices=PaymentMethod.Type.choices
     )
     amount = models.PositiveBigIntegerField(_("amount"))
+
+    class Meta:
+        abstract = True
+
+    def __str__(self) -> str:
+        return f"{self.method_name} {self.amount}"
+
+
+class SalePayment(Tender):
+    """One tender of a sale; change only comes out of cash."""
+
+    sale = models.ForeignKey(
+        Sale, on_delete=models.CASCADE, related_name="payments", verbose_name=_("sale")
+    )
     tendered = models.PositiveBigIntegerField(_("tendered"))
     change = models.PositiveBigIntegerField(_("change"), default=0)
     reference = models.CharField(_("reference"), max_length=128, blank=True)
+    # What another app adds on top of the sale (a tip): charged with the tender, never part of the sale's total or tax.
+    extra = models.PositiveBigIntegerField(_("added amount"), default=0, db_default=0)
+    extra_label = models.CharField(_("added amount label"), max_length=60, blank=True, default="", db_default="")
 
     class Meta:
         verbose_name = _("sale payment")
@@ -713,13 +727,10 @@ class SalePayment(UUIDModel):
                 condition=Q(amount__gt=0), name="sale_payment_amount_positive"
             ),
             models.CheckConstraint(
-                condition=Q(change=F("tendered") - F("amount")),
+                condition=Q(change=F("tendered") - F("amount") - F("extra")),
                 name="sale_payment_change",
             ),
         ]
-
-    def __str__(self) -> str:
-        return f"{self.method_name} {self.amount}"
 
 
 class SaleCounter(UUIDModel):
@@ -773,31 +784,19 @@ class Refund(UUIDModel):
         return f"{self.sale_id}: {self.total}"
 
 
-class RefundPayment(UUIDModel):
+class RefundPayment(Tender):
     refund = models.ForeignKey(
         Refund,
         on_delete=models.CASCADE,
         related_name="payments",
         verbose_name=_("refund"),
     )
-    position = models.PositiveIntegerField(_("position"))
     sale_payment = models.ForeignKey(
         SalePayment,
         on_delete=models.PROTECT,
         related_name="refunds",
         verbose_name=_("original payment"),
     )
-    method = models.ForeignKey(
-        PaymentMethod,
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("method"),
-    )
-    method_name = models.CharField(_("method name"), max_length=60)
-    method_type = models.CharField(
-        _("method type"), max_length=16, choices=PaymentMethod.Type.choices
-    )
-    amount = models.PositiveBigIntegerField(_("amount"))
 
     class Meta:
         verbose_name = _("refund payment")
@@ -808,9 +807,6 @@ class RefundPayment(UUIDModel):
                 condition=Q(amount__gt=0), name="sale_refundpayment_positive"
             )
         ]
-
-    def __str__(self) -> str:
-        return f"{self.method_name} {self.amount}"
 
 
 class RefundLine(UUIDModel):

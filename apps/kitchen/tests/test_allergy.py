@@ -113,7 +113,7 @@ def test_a_received_dish_keeps_the_customers_allergy_and_what_of_it_the_dish_con
 def test_an_allergen_only_an_option_brings_counts_as_the_dishs(kitchen):
     """A salad declares none, but «+Cheese» brings milk: the cook reads that the dish contains it."""
     setup("modifier.group.create", {"name": "Extras"})
-    cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "allergens": ["milk"]})
+    cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "allergens": ["milk"], "price_delta": 0})
     setup("modifier.link.attach", {"group": "Extras", "product_id": str(kitchen["salad"].id)})
     order = open_check("Table 4")
     line = add_line(order.id, kitchen["salad"], option_ids=[str(cheese.id)]).lines[-1]

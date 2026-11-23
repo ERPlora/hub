@@ -78,7 +78,7 @@ async function aSalon(context: BrowserContext, tag: string) {
 /** A group of sauces with an option, hung from a product, through each app's API. */
 async function aGroup(context: BrowserContext, tag: string) {
   const group = await post<{ id: string; name: string }>(context, '/modifier/groups', { name: `${PREFIX} Salsas ${tag}` });
-  const option = await post<{ id: string; name: string }>(context, '/modifier/options', { group_id: group.id, name: `${PREFIX} Alioli ${tag}` });
+  const option = await post<{ id: string; name: string }>(context, '/modifier/options', { group_id: group.id, name: `${PREFIX} Alioli ${tag}`, price_delta: 0 });
   const name = `${PREFIX} Hamburguesa ${tag}`;
   const product = await createProduct(context, name, `${PREFIX}-${tag}`, 900);
   const link = await post<{ id: string }>(context, '/modifier/links/attach', { group_id: group.id, product_id: product.id });

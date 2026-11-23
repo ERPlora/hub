@@ -1009,11 +1009,13 @@ Pasos:
    menos un producto para que haya algo que vender.»), marcado «Importante».
 2. «Configurar» lleva a **Inventario → Productos**.
 3. En cuanto hay un producto activo (físico o de tipo servicio), el paso sale hecho, sin recargar.
+4. Preguntado por este paso, el asistente dice que está hecho porque ya hay productos o, si se le pregunta
+   cuántos, los productos activos que hay, leídos en Inventario; nunca una cifra sacada del texto del paso.
 Entra: el número de productos activos.
 Sale: el paso hecho o pendiente. Lo ve quien puede dar de alta productos.
 Si falla: si se desactivan o eliminan todos los productos, el paso vuelve a pendiente, también sin
 recargar.
-Implicados: ninguno
+Implicados: BASE-F12
 
 ### INVENTORY-F29 Marcar un artículo como agotado
 Estado: hecho

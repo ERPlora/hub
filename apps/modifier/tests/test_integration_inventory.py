@@ -25,7 +25,7 @@ def catalog():
         ("Doneness", {"product": "BUR-01"}),
     ):
         run("modifier.group.create", {"name": name})
-        run("modifier.option.create", {"group": name, "name": f"{name} option"})
+        run("modifier.option.create", {"group": name, "name": f"{name} option", "price_delta": 0})
         run("modifier.link.attach", {"group": name, **target})
     return {"burger": burger, "mains": mains}
 
