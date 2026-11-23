@@ -13,17 +13,20 @@ panelSpec();
 type Preferences = { language: '' | 'es' | 'en'; theme_mode: string; palette: string; ui_scale: number };
 
 const WORDS = {
-  en: { run: 'Run this action?', myApps: 'My apps' },
-  es: { run: '¿Ejecutar esta acción?', myApps: 'Mis apps' },
+  en: { run: 'Run this action?', myApps: 'My apps', verifactu: 'Set up VeriFactu' },
+  es: { run: '¿Ejecutar esta acción?', myApps: 'Mis apps', verifactu: 'Configura VeriFactu' },
 } as const;
 
 async function speaking(context: BrowserContext, language: 'en' | 'es'): Promise<void> {
   await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
 }
 
+/** The Home in `language`: the shell's own words and the server's (the setup checklist, a live read). */
 async function inLanguage(page: Page, language: 'en' | 'es'): Promise<void> {
   await expect(page.locator('html')).toHaveAttribute('lang', language);
   await expect(shown(page).getByTestId('home-my-apps').locator('h2')).toHaveText(WORDS[language].myApps);
+  const verifactu = shown(page).locator('[data-testid="setup-row"][data-key="verifactu.sending_route"]');
+  await expect(verifactu).toContainText(WORDS[language].verifactu);
 }
 
 /** Asks the assistant, speaking `from`, for the app in `to`, and says yes to its card; the Home's health row, which
