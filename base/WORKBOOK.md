@@ -2513,6 +2513,10 @@ Pasos:
      que cambia algo, con la confirmación de BASE-F97. Si entre las que tiene a mano para ese mensaje no está la que
      hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
      pantalla se hace.
+  10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
+     hora de ese momento, su sector, las apps que tiene encendidas y, a quien lo administra, su plan y cuántas apps le
+     cuenta (solo las que eligió el negocio, como dice Apps); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
+     pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -4387,8 +4391,12 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   leerlo (patrón de Demo, hub#1206); el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
-  instrucciones con las pantallas que puede enlazar
-  y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report`,
+  instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
+  zona y hora de allí, sector, apps encendidas y, con `base.administer_hub`, el plan de la foto con las apps que cuenta,
+  `activation.chosen_on` contra `plan.max_apps`; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
+  el modelo lee de una herramienta sale de `run_tool` de `live` con `zone=business_zone()`, así que sus horas van en
+  la zona del negocio y no en UTC: lo comprueba `base/tests/test_business_facts.py`, también con dos negocios en zonas
+  distintas), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

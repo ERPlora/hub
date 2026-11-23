@@ -14,7 +14,7 @@ Para qué: usar el asistente como lo usa el dueño: preguntar, pedir varias cosa
 ## Recorrido
 
 1. BASE-F92 — el panel del asistente, abierto y cerrado.
-2. BASE-F93 — «¿cuánto vendimos ayer?».
+2. BASE-F93 — «¿cuánto vendimos ayer?» y «¿qué se ha hecho hoy?», con las horas de la pantalla de Actividad.
 3. BASE-F95 — una respuesta con lista, tabla y enlaces.
 4. BASE-F96 — de la respuesta a la pantalla de Ventas.
 5. BASE-F94 — una foto adjunta y una pregunta dictada por voz.
