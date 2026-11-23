@@ -32,6 +32,7 @@ class ReservationConfig(LiveAppConfig):
     # and a booking fits the opening hours of Schedules.
     requires = ["table", "customer", "schedule"]
     default_auto_field = "django.db.models.BigAutoField"
+    assistant_settings = ("reservation.settings.get",)
     permissions = {
         "reservation.view_reservation": _("View reservations"),
         "reservation.add_reservation": _("Take reservations"),
