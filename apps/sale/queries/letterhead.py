@@ -31,15 +31,16 @@ def _read_for_paper(ctx: OperationContext, name: str, data: dict | None = None):
 
 def _issuer_on_paper(ctx: OperationContext, invoice_id: UUID | None) -> dict | None:
     """The issuer a paper names: the one its fiscal document says, whatever the issuer becomes later (a reprint says
-    what the original said); without a document yet, the one Invoicing has today, once it is set up."""
+    what the original said); without a document yet, the one Invoicing has today, once it is set up. Its tax ID is the
+    one the documents print: with the country prefix while the issuer is registered for intra-EU operations (ROI)."""
     if invoice_id is not None:
         document = _read_for_paper(ctx, DOCUMENT, {"invoice_id": str(invoice_id)})
         if document is not None:
-            return {"name": document.issuer_name, "tax_id": document.issuer_tax_id, "address": document.issuer_address}
+            return {"name": document.issuer_name, "tax_id": document.issuer_vat_number, "address": document.issuer_address}
     issuer = _read_for_paper(ctx, ISSUER)
     if issuer is None or not issuer.configured:
         return None
-    return {"name": issuer.legal_name, "tax_id": issuer.tax_id, "address": issuer.address_line}
+    return {"name": issuer.legal_name, "tax_id": issuer.vat_number, "address": issuer.address_line}
 
 
 def business_letterhead(ctx: OperationContext, invoice_id: UUID | None = None) -> dict:

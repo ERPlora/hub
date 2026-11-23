@@ -35,34 +35,6 @@ msgctxt "schedule section"
 msgid "Settings"
 msgstr "Ajustes"
 
-msgctxt "weekday"
-msgid "Monday"
-msgstr "Lunes"
-
-msgctxt "weekday"
-msgid "Tuesday"
-msgstr "Martes"
-
-msgctxt "weekday"
-msgid "Wednesday"
-msgstr "Miércoles"
-
-msgctxt "weekday"
-msgid "Thursday"
-msgstr "Jueves"
-
-msgctxt "weekday"
-msgid "Friday"
-msgstr "Viernes"
-
-msgctxt "weekday"
-msgid "Saturday"
-msgstr "Sábado"
-
-msgctxt "weekday"
-msgid "Sunday"
-msgstr "Domingo"
-
 msgid "position"
 msgstr "posición"
 

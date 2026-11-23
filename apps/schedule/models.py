@@ -10,20 +10,10 @@ import datetime as dt
 from django.db import models
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
-#: Monday = 0, as ``datetime.date.weekday()``. With a context: Django's own catalogue spells them in
-#: lowercase («lunes»), and a list of days starts with a capital.
-WEEKDAY_NAMES = (
-    pgettext_lazy("weekday", "Monday"),
-    pgettext_lazy("weekday", "Tuesday"),
-    pgettext_lazy("weekday", "Wednesday"),
-    pgettext_lazy("weekday", "Thursday"),
-    pgettext_lazy("weekday", "Friday"),
-    pgettext_lazy("weekday", "Saturday"),
-    pgettext_lazy("weekday", "Sunday"),
-)
+from base.weekdays import weekday_name, weekdays
+
 _MIDNIGHT = dt.time(0, 0)
 
 
@@ -53,7 +43,7 @@ def _not_empty(prefix: str) -> models.CheckConstraint:
 class WeekDay(UUIDModel):
     """A day of the usual week (Monday = 0): closed, or open in its intervals. No row = not set."""
 
-    weekday = models.PositiveSmallIntegerField(_("weekday"), unique=True)
+    weekday = models.PositiveSmallIntegerField(_("weekday"), unique=True, choices=weekdays)
     is_closed = models.BooleanField(_("closed"), default=False)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -69,7 +59,7 @@ class WeekDay(UUIDModel):
 
     def __str__(self) -> str:
         return (
-            str(WEEKDAY_NAMES[self.weekday])
+            weekday_name(self.weekday)
             if 0 <= self.weekday <= 6
             else str(self.weekday)
         )

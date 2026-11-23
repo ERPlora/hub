@@ -19,7 +19,6 @@ from live.operations import INTERNAL, operation
 
 from apps.schedule import engine
 from apps.schedule.models import (
-    WEEKDAY_NAMES,
     Override,
     OverrideInterval,
     ScheduleSettings,
@@ -47,6 +46,7 @@ from apps.schedule.schemas import (
 )
 from base.business import business_zone, zone_name
 from base.ordering import list_order
+from base.weekdays import weekday_name
 
 SPECIAL_DAY_NOT_FOUND = _("That special day does not exist in this business.")
 OVERRIDE_NOT_FOUND = _("That temporary change does not exist in this business.")
@@ -186,7 +186,7 @@ def week_out() -> dict:
         days.append(
             {
                 "weekday": weekday,
-                "name": str(WEEKDAY_NAMES[weekday]),
+                "name": weekday_name(weekday),
                 "id": day.id if day else None,
                 "is_set": day is not None,
                 "is_closed": bool(day and day.is_closed),
