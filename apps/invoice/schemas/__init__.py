@@ -40,6 +40,7 @@ from apps.invoice.models import (
     InvoiceType,
 )
 from apps.invoice.schemas.document_issuer import DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut
+from apps.tax.schemas import A_TAX_CATEGORY
 from base.schemas.assistant import names
 
 T = TypeVar("T")
@@ -368,12 +369,11 @@ class ManualLineIn(Schema):
     unit_price: int = Field(
         ge=0, le=MAX_AMOUNT, description="Unit price WITHOUT VAT, in cents.", json_schema_extra={"money": True}
     )
-    tax_category_key: Annotated[_text(255) | None, BeforeValidator(_blank_to_none)] = (
-        Field(
-            None,
-            description="Tax category of the Taxes app (key, name or alias): its rule today gives the rate and the "
-            "qualification. Without it, tax_rate is charged as domestic VAT, subject.",
-        )
+    tax_category_key: Annotated[_text(255) | None, BeforeValidator(_blank_to_none)] = Field(
+        None,
+        description="Tax category of the Taxes app (key, name or alias): its rule today gives the rate and the "
+        "qualification. Without it, tax_rate is charged as domestic VAT, subject.",
+        json_schema_extra=A_TAX_CATEGORY,
     )
     tax_rate: Decimal | None = Field(
         None,

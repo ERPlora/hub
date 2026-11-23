@@ -21,6 +21,7 @@ from pydantic import ValidationError
 from apps.customer.tax_ids import ID_TYPES
 from apps.sale.models import ForeignIdType, OrderLine, QuickNote
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
+from apps.tax.models import TaxCategory
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -80,6 +81,18 @@ def test_a_section_is_said_by_its_name_and_titled_as_its_screen(language, title)
     for write in ("sale.department.delete", "sale.department.update"):
         field = fields_of(write, {"id": str(section.id)}, language)["id"]
         assert (field["value"], field["label"]) == ("Fruit", title)
+
+
+@HUB_DB
+@pytest.mark.parametrize(("language", "vat"), [("en", "Product — generic"), ("es", "Producto — general")])
+def test_a_new_section_says_the_tax_category_it_charges_at_by_its_name(language, vat):
+    """«Varios» at the general rate: its category by the name the Taxes screens give it, never «product.generic»; the
+    yes is for that category (its id among the records the card read)."""
+    found: list = []
+    arguments = {"name": "Varios", "tax_category_key": "product.generic", "sort_order": 0}
+    card = assistant.cards.card(get("sale.department.create"), arguments, language, ctx_for(language=language), found=found)
+    assert {field["name"]: field["value"] for field in card["fields"]}["tax_category_key"] == vat
+    assert str(TaxCategory.objects.get(key="product.generic").id) in {str(one) for one in found}
 
 
 @HUB_DB
