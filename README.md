@@ -200,8 +200,9 @@ del Hub» de erplora-next.
   La lista explícita está en `base/tenancy/inventory.py`; un modelo sin clase falla. El outbox (`live.OutboxEvent`
   y sus entregas) sigue al contexto: las operaciones del registro (`base.hub.*`, `base.demo.*`) lo escriben en control.
 - **Sin modo compartido (S5).** Todo negocio y toda demo nacen con `db_name` (`<control>_<hex>`,
-  `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test (`base/tenancy/tests/test_provision.py`)
-  impide crear un hub en `base/services/` sin ella, también `a`/`b`: `seed_local_hubs` les da su BD (clonada de
+  `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test
+  (`base/tenancy/tests/test_provision_own_database.py`) impide crear un hub en `base/services/` sin ella, también
+  `a`/`b`: `seed_local_hubs` les da su BD (clonada de
   `<control>_template`, con las tablas de todas las apps y todas encendidas) y se niega si alguna app no puede vivir en
   una (`migrator.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
   `base.hub_maintenance` y el worker lo nombra al arrancar (`ERROR base.worker.hub_without_database`) sin tocarlo, hasta
@@ -415,7 +416,7 @@ usuario `demo:<slug>`; una demo de antes de S2a no tiene BD que borrar) y la fil
 now» del admin (`hubs.localhost:8000/admin/control/hub/`, solo superusuarios) o, en cualquier entorno:
 
 ```bash
-uv run python manage.py demo_expire demo-1a2b3c4d   # base.demo.expire + una pasada del reaper → «demo-1a2b3c4d: purged»
+uv run python manage.py demo_expire demo-1a2b3c4d   # base.demo.expire + su borrado (espera al worker si se le adelantó) → «demo-1a2b3c4d: purged»
 ```
 
 Probarla en local, con el SaaS en `:8001` (su `HUB_INTERNAL_URL` por defecto apunta a `http://localhost:8000` y el

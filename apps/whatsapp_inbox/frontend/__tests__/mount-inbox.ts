@@ -23,6 +23,8 @@ export const ADMIN: SessionMe = withMenu('whatsapp_inbox', {
     'whatsapp_inbox.erase',
     'customer.view',
     'customer.manage',
+    // The customers' number and email, which the four roles see (base/apps.py).
+    'base.view_customer_contact',
   ],
   menu: [],
   apps: [],
@@ -35,7 +37,7 @@ export const OWNER: SessionMe = withMenu('whatsapp_inbox', { ...ADMIN, permissio
 /** A manager: reads, answers and assigns anybody; no settings, no erasing. */
 export const MANAGER: SessionMe = withMenu('whatsapp_inbox', {
   ...ADMIN,
-  permissions: ['whatsapp_inbox.view', 'whatsapp_inbox.reply', 'whatsapp_inbox.assign', 'customer.view', 'customer.manage'],
+  permissions: ['whatsapp_inbox.view', 'whatsapp_inbox.reply', 'whatsapp_inbox.assign', 'customer.view', 'customer.manage', 'base.view_customer_contact'],
 });
 
 /** An employee: reads, answers and takes conversations for themselves. */
@@ -43,7 +45,13 @@ export const EMPLOYEE: SessionMe = withMenu('whatsapp_inbox', {
   ...ADMIN,
   // The person of the business's database (base.HubUser), as base.session.me says it.
   user: { id: '01a16000-0000-7000-8000-0000000000b2', label: 'Luis' },
-  permissions: ['whatsapp_inbox.view', 'whatsapp_inbox.reply', 'customer.view', 'customer.manage'],
+  permissions: ['whatsapp_inbox.view', 'whatsapp_inbox.reply', 'customer.view', 'customer.manage', 'base.view_customer_contact'],
+});
+
+/** An employee in a role the business made without the customers' contact details. */
+export const WITHOUT_CONTACT: SessionMe = withMenu('whatsapp_inbox', {
+  ...EMPLOYEE,
+  permissions: EMPLOYEE.permissions.filter((p) => p !== 'base.view_customer_contact'),
 });
 
 export interface MountOptions {

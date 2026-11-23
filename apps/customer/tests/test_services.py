@@ -35,67 +35,38 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.schemas import (
-    HealthGrantIn,
-    HealthIn,
-    HealthOut,
-    HealthWithdrawIn,
-)
-from apps.customer.schemas import (
-    ActivityIn,
-    ActivityRow,
-    ConsentGrantIn,
-    ConsentRow,
-    ConsentWithdrawIn,
-    CustomerDetailOut,
-    CustomerIn,
-    CustomerPatchIn,
-    CustomerRecoveredOut,
-    CustomerRecoverIn,
-    CustomerRestoreIn,
+from apps.customer.schemas.activity import ActivityIn, ActivityRow, NoteIn
+from apps.customer.schemas.cards import CustomerDetailOut, CustomerIn, CustomerPatchIn
+from apps.customer.schemas.consent import ConsentGrantIn, ConsentRow, ConsentWithdrawIn
+from apps.customer.schemas.custom_fields import FieldIn, FieldPatchIn, FieldRow
+from apps.customer.schemas.erasing import EraseIn, ErasedOut
+from apps.customer.schemas.fields import (
     DeletedOut,
-    EraseIn,
-    ErasedOut,
-    FieldIn,
-    FieldPatchIn,
-    FieldRow,
-    GroupIn,
-    GroupPatchIn,
     GroupRefIn,
-    GroupRow,
-    ImportIn,
-    ImportOut,
-    MergeIn,
-    NoteIn,
-    OrderCustomerOut,
-    OrderLinkIn,
+    TagRefIn,
+    CustomerRefIn as RefIn,
+    FieldRefIn as FieldRef,
+)
+from apps.customer.schemas.groups import GroupIn, GroupPatchIn, GroupRow
+from apps.customer.schemas.health import HealthGrantIn, HealthIn, HealthOut, HealthWithdrawIn
+from apps.customer.schemas.importing import ImportIn, ImportOut
+from apps.customer.schemas.memberships import SetGroupsIn, SetTagsIn
+from apps.customer.schemas.merging import MergeIn
+from apps.customer.schemas.orders import OrderCustomerOut, OrderLinkIn
+from apps.customer.schemas.purchases import (
     PurchaseRecordIn,
     PurchaseRefundIn,
     PurchaseRecordOut,
     PurchaseVoidIn,
     PurchaseVoidOut,
-    SetGroupsIn,
-    SetTagsIn,
-    TagIn,
-    TagPatchIn,
-    TagRefIn,
-    TagRow,
 )
-from apps.customer.schemas import (
-    CustomerRefIn as RefIn,
-)
-from apps.customer.schemas import (
-    FieldRefIn as FieldRef,
-)
+from apps.customer.schemas.recovery import CustomerRecoveredOut, CustomerRecoverIn, CustomerRestoreIn
+from apps.customer.schemas.tags import TagIn, TagPatchIn, TagRow
 
-from apps.customer.services import (
-    ALREADY_IMPORTED,
-    DATE_IN_FUTURE,
-    FIELD_INACTIVE_LEFT,
-    FIELD_OPTION_LEFT,
-    FIELD_TYPE_LEFT,
-    HEALTH_TEST_DATE_MISSING,
-)
+from apps.customer.services.health import HEALTH_TEST_DATE_MISSING
+from apps.customer.services.importing import ALREADY_IMPORTED
+from apps.customer.services.recovery import FIELD_INACTIVE_LEFT, FIELD_OPTION_LEFT, FIELD_TYPE_LEFT
+from apps.customer.services.writes import DATE_IN_FUTURE
 
 from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import in_a_thread
@@ -2666,5 +2637,5 @@ def test_who_wrote_it_is_the_persons_name_never_their_account_id():
         ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes."),
         actor=nameless,
     )
-    assert fact.recorded_by == "luis@example.com"
+    assert fact.recorded_by == "luis"
     assert grant_health(ana, actor=clara).consent_by == "Clara Ruiz"

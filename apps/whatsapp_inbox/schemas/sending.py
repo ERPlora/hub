@@ -18,6 +18,7 @@ from apps.whatsapp_inbox.schemas.fields import (
     _blank,
     _text,
 )
+from base.sensitive import CUSTOMER_CONTACT
 
 TEXT_OR_TEMPLATE = _("Write a message or choose a template.")
 
@@ -51,6 +52,7 @@ class SendIn(Schema):
         None,
         title=gettext_noop("Phone"),
         description="A number to write to (a template to somebody who has not written yet).",
+        json_schema_extra=CUSTOMER_CONTACT,
     )
     conversation: Reference | None = Field(
         None, validate_default=True, description=CONVERSATION_REFERENCE

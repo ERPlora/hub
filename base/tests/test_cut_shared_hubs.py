@@ -29,7 +29,9 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from apps.printing.models import PrintDevice, Printer, Usage
-from base.models import AppActivation, EventDelivery, HubUser
+from base.models.activation import AppActivation
+from base.models.relay import EventDelivery
+from base.models import HubUser
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import cut, identity, names
 from base.tenancy.context import use_control, use_hub

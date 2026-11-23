@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:885d68994dd3fe07fe800d30f397930dfa919f5edfd3c6d9ee58f8d159472f13 -->
+<!-- generated from WORKBOOK.md sha256:c86f668a251b01e2730cc16fe212af8e66cbbe840b4a2637ed9899e762e82fb1 -->
 
 ## What it is for and who it is for
 
@@ -715,9 +715,10 @@ Steps:
    check with its order, and the kitchen gets nothing new.
 In: nothing from other apps.
 Out: the comped line: it adds no money or VAT, but the sale notice carries it so that Inventory lowers
-the stock; the sale keeps the cost of what was comped.
+the stock; the sale keeps the cost of what was comped, which only whoever sees the costs sees: to anyone
+else the sale, its charge and the preview of the charge give it empty (BASE-F119).
 If it fails: "That change to the line could not be saved. The line is back as it was.".
-Involved: INVENTORY-F21
+Involved: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Attribute the check or a line to whoever serves
 Status: done
@@ -747,7 +748,8 @@ person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it. In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
+sends it or, if their account has no name, what goes before the @ of their e-mail, never the whole e-mail
+(BASE-F119). In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "Who serves the check could not be changed. It stays with whoever served it.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
@@ -879,7 +881,7 @@ longer be removed: it was sent to the kitchen (void it with a reason), it is cha
 an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Through the assistant: its confirmation card says the check (by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97).
+Through the assistant: its confirmation card says the check (a table's, by its table as Tables says it and in the reader's language, "4 (Dining room)"; any other, or without access to Tables, by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97). A product asked for in words shows as the one that will be added: "two coffees" with "Espresso" and "White coffee" on the menu says "2 · White coffee · 4 (Dining room)"; if the words fit several products or none, they show as they were said and confirming adds nothing: the assistant asks which one.
 Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
@@ -889,7 +891,8 @@ Actor: employee, manager
 Screen: Bill (pre-bill)
 Steps:
 1. With the check on screen, press the footer's printer ("Print bill").
-2. "Bill" opens with the business (name, address and tax ID of the issuer, with the "Receipt header"
+2. "Bill" opens with the business (name, address and tax ID of the issuer, with its country's prefix if it is
+   registered in the ROI, and with the "Receipt header"
    under them; without an issuer, the receipt header stands for the name and address), the lines,
    notes, discounts, the VAT breakdown, the total and the title, and the notice "Bill — this is not an
    invoice. The fiscal receipt is issued on payment.". With a discount on the check, the "Discount" row
@@ -909,7 +912,7 @@ when the bill cannot be worked out. If it does not print, "Bill could not be pri
 not open its print screen, the notice says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
 another business".
-Involved: PRINTING-F09, TABLE-F34
+Involved: PRINTING-F09, TABLE-F34, INVOICE-F21
 
 ### SALE-F22 Charge only part of the check
 Status: done
@@ -1076,9 +1079,10 @@ Steps:
    without reloading. The panels count by the same rule as the screen's figures: the whole business or
    their own sales.
 In: nothing from other apps.
-Out: nothing saved. What each professional sold in the period (Staff and the assistant ask for it for the
-commission) counts by the same rule: whoever does not see the whole business gets only the lines of their
-own sales and, of the voucher sessions spent outside the till, those of their record. It already takes off
+Out: nothing saved. What each professional sold in the period (the assistant asks for it for the commission)
+counts by the same rule: whoever does not see the whole business gets only the lines of their own sales and, of
+the voucher sessions spent outside the till, those of their record. Staff asks for it as the platform, so that each
+professional's row counts everything they did, and Staff says which rows each person sees (STAFF-F21). It already takes off
 what was refunded: what goes back, to whoever sold it; the money that goes
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
@@ -1116,8 +1120,8 @@ Steps:
 1. In **Sales**, tap the row or the "Document" action; it also opens by itself after charging, the whole
    check or part of it.
 2. The ticket shows ("Receipt", or "Invoice" if it was charged as an invoice). On top, the business: name,
-   address and tax ID of the issuer (a duplicate says the same as the original, even if the issuer changes
-   later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
+   address and tax ID of the issuer, with its country's prefix if it is registered in the ROI (a duplicate
+   says the same as the original, even if the issuer changes later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
    name and the rest the address. On an invoice, under "Customer", its tax ID and its address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
    (an exempt one says its cause: "Exempt (E1)"), total, payment method (charged with several methods,
@@ -1159,7 +1163,7 @@ refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes
 "The documents could not be issued. Try again.". A sale the person does not see (someone else's, for an
 employee) is not opened, reprinted or issued: the window says "Error loading the document" and the API or
 the assistant, "That sale does not exist.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
 Status: done
@@ -1529,9 +1533,11 @@ MODIFIER-F07, MODIFIER-F08
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a product is
-named by its id, its SKU or its name; a customer by their id, their name, their phone or their email; a
-sale by its id or its number; a section or a quick note by its id or its name; a payment method by its
-id, its name or its type ("cash", "card"). If a name matches several, it is refused saying which ones
+named by its id, its SKU or its name; a customer by their id or their name and, for whoever sees the
+customers' contact details, also by their phone or their email (to whoever does not see them, those words
+only match a name: 404 `customer.customer_unavailable`, BASE-F119); a sale by its id or its number; a
+section or a quick note by its id or its name; a payment method by its id, its name or its type ("cash",
+"card"). If a name matches several, it is refused saying which ones
 (409 `*_ambiguous`).
 
 What reads or touches a charged sale (the list, the sale, its document and its paper, "Issue now", voiding
@@ -1638,8 +1644,9 @@ the quick notes and what is refundable can be followed live.
 ### What it needs from other apps
 
 - **Taxes** (required): the rule and the VAT calculation of each line when charging.
-- **Customers** (required): the sale's customer record and its search by name or phone; the link of the
-  check with its customer is kept by Customers (`customer.order.link`).
+- **Customers** (required): the sale's customer record and its search by name or, for whoever sees the
+  customers' contact details, by phone or email; the link of the check with its customer is kept by
+  Customers (`customer.order.link`).
 - **Inventory** (optional): the sale catalog, the price, the unit and the tax category of each article,
   read with its own queries when the line is added.
 - **Staff** (optional): the team for the "Served by" chip, the record of whoever is signed in
@@ -1661,7 +1668,9 @@ the quick notes and what is refundable can be followed live.
 - **Tables** (optional): the POS's "Choose table" (F19) talks to Tables only by the name of its
   operations, from the screen and with the session of whoever serves: `table.table.list` and
   `table.floor.status` (the tables), `table.session.by_order` (the check's table), `table.session.open`
-  with the check on screen, `.restore` and `.park`. Without Tables active there is no button.
+  with the check on screen, `.restore` and `.park`. Without Tables active there is no button. The
+  assistant's card says a table's check by its table with `table.session.by_order`, as the person asking;
+  without Tables, or without the right to see its checks, by its title.
 - **Appointments** (optional): a check's appointment and what it booked, to charge its booked price
   (`appointment.appointment.get`).
 
@@ -1695,6 +1704,12 @@ the quick notes and what is refundable can be followed live.
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+
+Two data permissions of the platform (BASE-F119) trim what is seen in Sales: what the comps cost (SALE-F15)
+is only seen by whoever sees the costs (owner, administrator and manager), and naming a charge's customer
+by their phone or their email is only for whoever sees the customers' contact details (the employee too).
+Sales does not show the customer's email or phone: it keeps their name and, on an invoice, their tax ID
+and their address, which are tax details that everyone who sees the sale sees.
 
 What the employee cannot do in the POS they ask for on their own device and a manager approves it with
 their PIN or their badge ("An approval is needed", BASE-F84), once and for that very request: voiding and

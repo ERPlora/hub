@@ -1,10 +1,11 @@
-<!-- generated from WORKBOOK.md sha256:5484464dde998434a0b7755954523a96f1922907adb09e155410c3786d69d418 -->
+<!-- generated from WORKBOOK.md sha256:e0b2588ffd05f74d0eb6a8b13824c8156b4e2fc38f3755c8b24474780c0cd50b -->
 
 ## What it is for and who it is for
 
 Staff is your team: who works, with which role, on which schedule each week, when they are away and how much they earn
 per hour and in commission. The manager adds the records, approves time off and sees in Commissions what each
-professional has earned; each employee sees their own record and asks for their time off. Appointments, Services, Time
+professional has earned; each employee sees their own record, what they have earned in Commissions and asks for their
+time off. Appointments, Services, Time
 clock, Tasks and the till read from here who works and who serves.
 
 ### In detail
@@ -28,7 +29,8 @@ Who uses it:
   and approves, rejects or cancels it.
 - The **employee** sees the directory, the schedules and who is away (never the rate nor the reason of
   someone else's time off), sees their own record and their time off, **asks for their time off** and
-  withdraws the requests that are still pending.
+  withdraws the requests that are still pending. In **Commissions** they see only their own row: what they did and
+  what is due to them.
 
 Appointments (and with it Online booking) reads from here who is bookable, their schedule and their
 approved time off; Services, who can perform each service; Time clock, whose each clock-in is; Tasks, who
@@ -137,8 +139,9 @@ working day of **Settings** already in place.
 Here you see what each professional has sold in a period and what is due to them in commission: "Today" on entering,
 or "Yesterday", "This week", "This month" or "Custom", with its "From" and "To" dates. At the top, the total of
 **Production** and of **Commissions**; below, one row per person with their role, what they have sold, their
-"Commission %" and their "Commission", in the business's currency. Only whoever can see the pay sees it, and it updates
-by itself when a sale is charged, voided or refunded.
+"Commission %" and their "Commission", in the business's currency. The owner, the administrator and the manager see
+one row per person on the team; an employee sees only their own, with everything they did. It updates by itself when a
+sale is charged, voided or refunded.
 
 #### Detail
 At the top, the period: "Today" (on entering), "Yesterday", "This week" (since Monday), "This month"
@@ -391,9 +394,9 @@ must be before the end time.", "The break needs a start and an end, or neither."
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
 accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
-as soon as any day changes (ticked, unticked, or an hour typed), without saving again. A day's
+as soon as any day changes (ticked, unticked, or an hour picked), without saving again. A day's
 reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
-typed), without saving again; the other days' reasons stay until those days change.
+picked), without saving again; the other days' reasons stay until those days change.
 Involved: none
 
 ### STAFF-F14 Edit a schedule
@@ -513,13 +516,15 @@ Involved: none
 
 ### STAFF-F21 Give each professional's rate and commission
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager (the whole team); employee (their own row of Commissions)
 Screen: Staff (Rate/h column and form), Commissions
 Steps:
 1. Whoever can see the pay sees the rate, the commission and the HR notes of each record.
 2. **Commissions** shows each person who can earn a commission (Active or On leave) with their name, their
    role and their commission, also without sales or with commission 0, and whoever sold in the period even
-   if they are no longer here ("No longer works here" or "Inactive" next to the name).
+   if they are no longer here ("No longer works here" or "Inactive" next to the name). That is the list of whoever
+   sees the pay and the business's totals (the owner, the administrator and the manager); whoever lacks either, like
+   the employee, sees only their own row, also without sales, and without a record in Staff sees none.
 3. To know what each professional has earned, open the **Commissions** tab. "Today" shows: what each person
    has sold in the business's day, with what was refunded already taken off, without the vouchers they sold
    and with what the voucher sessions they did are worth added, their commission and what is
@@ -530,12 +535,14 @@ Steps:
 5. It counts what was attributed to each person in Sales: the line they did (an appointment's, to the
    appointment's professional) or, if the line does not say who, whoever served the check. With «Me» at
    the till, that is whoever was signed in, if their account has a record in Staff; otherwise that sale
-   counts for nobody.
+   counts for nobody. Each person's row counts everything they did, also on a sale someone else charged or that
+   was attributed to a colleague, even if they cannot open that sale: the employee sees on their own row the same
+   as the manager sees of them.
 In: each record's rate and commission and, from Sales, each professional's production in the period (refunds
 already taken off: what comes back goes to whoever sold it; the vouchers they sold left out and the value of
 their voucher sessions added). Sales is optional.
 Out: read only.
-If it fails: without the pay permission, its address says "No access"; without Sales, "Commissions come
+If it fails: without the permission to see the team, its address says "No access"; without Sales, "Commissions come
 from the sales"; with "To" before "From", "The end date cannot be before the start date." under "To";
 with only one day, "A period of your own needs its first and its last day."; with more than two years,
 "Ask for at most 731 days at a time.".
@@ -548,8 +555,8 @@ Screen: Settings
 Steps:
 1. Open **Settings**: the saved default working day shows or, if it was never saved, the proposed one (from
    09:00 to 18:00 with a 60-minute break).
-2. Change the start and the end in HH:MM (the end, after the start: a schedule's day does not cross
-   midnight) and the break, from 0 (no break) to 480 minutes and shorter than the working day.
+2. Pick the start and the end times (the end, after the start: a schedule's day does not cross
+   midnight) and change the break, from 0 (no break) to 480 minutes and shorter than the working day.
 3. Tap **Save**.
    What is changed while it is saving is not lost: it stays on screen, still to save.
 In: what was sent; the rest stays as it was.
@@ -623,7 +630,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | The record of whoever holds the session, only its id and name: Sales attributes «Me» to it | anyone signed in | SALE-F16 | `staff.member.current` |
 | Rate, commission and HR notes, with the directory's filters, sorting and pages (the Rate/h column reads the same rows) | see the pay | F21 | `staff.member.compensation` |
 | The commission sheet: who can earn a commission, with their record, their account and their commission | see the pay | F21 | `staff.commission.summary` |
-| What each professional earned in a period (today, yesterday, this week, this month or two days): sold with refunds taken off, commission and totals; it says if the business has no Sales | see the pay (and the sales) | F21 | `staff.commission.report` |
+| What each professional earned in a period (today, yesterday, this week, this month or two days): sold with refunds taken off, commission and totals; it says if the business has no Sales | see: one's own row; with seeing the pay and the business's totals, the whole team's | F21 | `staff.commission.report` |
 | The figures: records, active, on leave, inactive, away today and pending requests | see | F23 | `staff.member.stats` |
 | The roles with their active members, with filters and sorting | see | F04, F23 | `staff.role.list` |
 | A role by its id, also a retired one: what the assistant's card reads to name it (BASE-F97) | see | F01, F02, F04, F07 | `staff.role.detail` |
@@ -681,8 +688,8 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 
 ### What it reacts to and what it needs from other apps
 It reacts to no notice and requires no app. For **Commissions** it asks **Sales**, if the business has it,
-for what each professional sold in the period, with refunds already taken off (`sale.sale.by_staff`, with
-the permission to see the sales of whoever is looking), and it updates with its notices of a sale charged,
+for what each professional sold in the period, with refunds already taken off (`sale.sale.by_staff`, read as
+the platform: which rows each person sees is Staff's to say), and it updates with its notices of a sale charged,
 voided or refunded (`sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded`). Without Sales,
 Commissions says so and lists nobody. From the platform it uses the business's accounts (to link a record)
 and the business's time zone (for "today").
@@ -698,9 +705,9 @@ the directory for "Who is serving this check" without needing Staff, and Automat
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
-| See the team, roles, schedules, availability, figures and settings | yes | yes | yes | yes | `staff.view` |
+| See the team, roles, schedules, availability, figures, settings and one's own row of Commissions | yes | yes | yes | yes | `staff.view` |
 | See the team's email and phone (a data permission of the platform) | yes | yes | yes | no | `base.view_team_contact` |
-| See rate, commission and HR notes | yes | yes | yes | no | `staff.view_compensation` |
+| See rate, commission and HR notes, and in Commissions the rows of the whole team (with the business's totals) | yes | yes | yes | no | `staff.view_compensation` |
 | Add records | yes | yes | yes | no | `staff.add_member` |
 | Edit records | yes | yes | yes | no | `staff.change_member` |
 | Deactivate and terminate | yes | yes | no | no | `staff.delete_member` |

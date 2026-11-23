@@ -2,13 +2,19 @@
 // hub `a` adds a closed special day, sees the same date refused (409 under the form), corrects it into an
 // open day with hours, and deletes it after confirming; then adds an override, sees a second one over the
 // same dates refused, and deletes it. «is it open?» answers from what the screen saved. Screenshots in the
-// three viewports. Each list filters behind its own funnel, named after the list, with its count. Everything it creates is named «E2E …» on dates of 2099 and removed after the file.
+// three viewports. Each list filters behind its own funnel, named after the list, with its count. Everything it
+// creates is named «E2E …», on dates of next year (picked in the calendar) or of 2099, and removed after the file.
 import { expect, test } from '@playwright/test';
 
+import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanupExceptions, listsReady, noHorizontalScroll, TAG, VIEWPORTS } from './schedule-helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
+
+/** Next year: no real day of the business, and still within the calendar's reach of today. */
+const YEAR = new Date().getFullYear() + 1;
+const CHRISTMAS = `${YEAR}-12-25`;
 
 test.beforeAll(cleanupExceptions);
 test.afterAll(cleanupExceptions);
@@ -23,17 +29,17 @@ test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, correct
 
   // «+»: Date, Name; closed by default.
   await view.locator('[data-testid=schedule-special-days-add]').click();
-  await page.locator('[data-testid=schedule-special-day-form-date] input').fill('2099-12-25');
+  await pickDay(page, page.locator('[data-testid=schedule-special-day-form-date]'), CHRISTMAS);
   await page.locator('[data-testid=schedule-special-day-form-name] input').fill(name);
   await page.screenshot({ path: shot('schedule-special-day-new-1280') });
   await page.locator('[data-testid=schedule-special-day-form-submit]').click();
   const row = view.locator('[data-testid=schedule-special-days-row]', { hasText: name });
-  await expect(row).toContainText('12/25/2099');
+  await expect(row).toContainText(dayAsShown(CHRISTMAS));
   await expect(row).toContainText('Closed');
 
   // The same date again: refused in the form (409 schedule.special_day_exists).
   await view.locator('[data-testid=schedule-special-days-add]').click();
-  await page.locator('[data-testid=schedule-special-day-form-date] input').fill('2099-12-25');
+  await pickDay(page, page.locator('[data-testid=schedule-special-day-form-date]'), CHRISTMAS);
   await page.locator('[data-testid=schedule-special-day-form-name] input').fill(`${TAG} Again`);
   await page.locator('[data-testid=schedule-special-day-form-submit]').click();
   await expect(page.locator('[data-testid=schedule-special-day-form-error]')).toContainText('There is already a special day on that date.');
@@ -47,13 +53,13 @@ test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, correct
   await expect(page.locator('ion-modal[data-testid=schedule-special-day-form] ion-title')).toHaveText(`Edit · ${name}`);
   await page.locator('[data-testid=schedule-special-day-form-status]').click();
   await page.locator('ion-popover ion-radio', { hasText: 'Open (with hours)' }).click();
-  await page.locator('[data-testid=schedule-special-day-form-intervals-open-0] input').fill('10:00');
-  await page.locator('[data-testid=schedule-special-day-form-intervals-close-0] input').fill('14:00');
+  await pickTime(page, page.locator('[data-testid=schedule-special-day-form-intervals-open-0]'), '10:00');
+  await pickTime(page, page.locator('[data-testid=schedule-special-day-form-intervals-close-0]'), '14:00');
   await page.locator('[data-testid=schedule-special-day-form-submit]').click();
   await expect(row).toContainText('10:00 AM–02:00 PM');
 
   // «Is it open?» answers from what the screen saved (SCHEDULE-F10).
-  const open = await api<{ is_open: boolean; source: string; reason: string }>(context, A, 'GET', '/schedule/is_open?when=2099-12-25T11:00');
+  const open = await api<{ is_open: boolean; source: string; reason: string }>(context, A, 'GET', `/schedule/is_open?when=${CHRISTMAS}T11:00`);
   expect([open.data.is_open, open.data.source, open.data.reason]).toEqual([true, 'special_day', name]);
 
   // Delete asks first.
@@ -73,18 +79,20 @@ test('SCHEDULE-F05, F06: an override added, another over the same dates refused,
   const view = shown(page);
 
   await view.locator('[data-testid=schedule-overrides-add]').click();
-  await page.locator('[data-testid=schedule-override-form-start_date] input').fill('2099-07-01');
-  await page.locator('[data-testid=schedule-override-form-end_date] input').fill('2099-08-31');
+  const from = page.locator('[data-testid=schedule-override-form-start_date]');
+  const to = page.locator('[data-testid=schedule-override-form-end_date]');
+  await pickDay(page, from, `${YEAR}-07-01`);
+  await pickDay(page, to, `${YEAR}-08-31`);
   await page.locator('[data-testid=schedule-override-form-reason] input').fill(reason);
   await page.locator('[data-testid=schedule-override-form-submit]').click();
   const row = view.locator('[data-testid=schedule-overrides-row]', { hasText: reason });
-  await expect(row).toContainText('07/01/2099');
-  await expect(row).toContainText('08/31/2099');
+  await expect(row).toContainText(dayAsShown(`${YEAR}-07-01`));
+  await expect(row).toContainText(dayAsShown(`${YEAR}-08-31`));
 
   // Another one over those dates: refused (409 schedule.override_overlaps).
   await view.locator('[data-testid=schedule-overrides-add]').click();
-  await page.locator('[data-testid=schedule-override-form-start_date] input').fill('2099-08-15');
-  await page.locator('[data-testid=schedule-override-form-end_date] input').fill('2099-09-15');
+  await pickDay(page, from, `${YEAR}-08-15`);
+  await pickDay(page, to, `${YEAR}-09-15`);
   await page.locator('[data-testid=schedule-override-form-reason] input').fill(`${TAG} More`);
   await page.locator('[data-testid=schedule-override-form-submit]').click();
   await expect(page.locator('[data-testid=schedule-override-form-error]')).toContainText(`Those dates overlap the temporary change “${reason}”`);

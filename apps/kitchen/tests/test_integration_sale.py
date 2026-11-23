@@ -241,7 +241,8 @@ def test_a_round_not_saved_yet_already_says_its_waiter_by_name(product, ana, dja
     order = open_check("Table 4")
     add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana))
     fire(order.id, ctx=ctx_for(actor=ana))
-    # Who has no name is said by their e-mail; the id of the session only as the last resort.
+    # Who has no name is said by what goes before the «@» of their e-mail, never by the address; the id of the
+    # session only as the last resort.
     for username, email in (("saas:43", "luis@example.com"), ("saas:44", "")):
         person = django_user_model.objects.create_user(username, email=email)
         other = open_check(f"Table {username[-1]}")
@@ -250,4 +251,4 @@ def test_a_round_not_saved_yet_already_says_its_waiter_by_name(product, ana, dja
 
     shown = board().cooking
     assert all(not t.saved for t in shown)
-    assert sorted(t.waiter for t in shown) == ["Ana García", "luis@example.com", "saas:44"]
+    assert sorted(t.waiter for t in shown) == ["Ana García", "luis", "saas:44"]

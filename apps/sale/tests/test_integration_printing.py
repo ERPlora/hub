@@ -17,7 +17,7 @@ from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base.business import paper_date
-from base.models import Profile
+from base.models.profile import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
 
 pytestmark = HUB_DB
@@ -258,6 +258,18 @@ def test_a_role_that_sells_without_reading_invoicing_still_prints_who_the_busine
     charge("sale-print-no-reading", ctx=dataclasses.replace(seller, permissions=seller.permissions - {"invoice.view_invoice"}))
     (job,) = jobs()
     assert (job.document["business_name"], job.document["vat_number"]) == (ISSUER["legal_name"], ISSUER["tax_id"])
+
+
+def test_the_ticket_of_a_business_in_the_roi_prints_its_eu_vat_number_and_its_reprint_too(bar, till):
+    """INVOICE-F21: with the issuer registered for intra-EU operations the printed ticket says «ESB12345674»; its QR
+    keeps the bare tax ID, and a copy printed after the mark is taken off says what the original said."""
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": True})
+    out = charge("sale-print-roi")
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": False})
+    run("sale.sale.print", {"sale_id": str(out.id), "duplicate": True})
+    original, copy = jobs()
+    assert [original.document["vat_number"], copy.document["vat_number"]] == ["ESB12345674", "ESB12345674"]
+    assert "nif=B12345674&" in original.document["qr_data"]
 
 
 def test_a_reprint_says_what_its_document_says_whatever_the_issuer_becomes(bar, till):

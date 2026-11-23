@@ -14,7 +14,9 @@ import re
 import pytest
 
 from base import access, registry, signing
-from base.models import Membership, SessionOwner, TrustedDevice
+from base.models import Membership
+from base.models.sessions import SessionOwner
+from base.models.access import TrustedDevice
 from base.access import CREDENTIAL_SESSION_KEY
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.conftest import ANA, SECRET

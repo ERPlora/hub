@@ -86,7 +86,7 @@ def test_schedule_has_the_store_metadata_and_belongs_to_both_verticals():
 
 
 def test_permissions():
-    assert schedule().permissions == PERMISSIONS
+    assert list(schedule().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

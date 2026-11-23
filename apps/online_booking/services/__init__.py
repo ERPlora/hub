@@ -31,7 +31,7 @@ from apps.appointment.schemas import SettingsIn as RulesIn
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries import business_country
-from apps.customer.schemas import CustomerIn
+from apps.customer.schemas.cards import CustomerIn
 from apps.customer.search import normalize
 from apps.online_booking.events import BOOKING_CREATED, SETTINGS_UPDATED
 from apps.online_booking.models import Booking, Settings

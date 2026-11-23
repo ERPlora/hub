@@ -22,7 +22,7 @@ from live.operations import get
 from apps.flow.models import FlowRun
 from apps.flow.tests.test_relay import heard
 from apps.task.models import Task
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB_COMMITTED, A, B

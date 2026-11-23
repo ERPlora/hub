@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // WhatsApp inbox → Inbox (WHATSAPP_INBOX-F03, F05, F09, F10, F13), the product's «Bandeja de entrada»: the
-// live `whatsapp_inbox.conversation.list` in a server-side DataTable — Contact, Phone, Status, Assigned
-// to, Unread and Last message (the time if today, «Yesterday» or the date, on the business clock) —,
-// «Filter contact or phone…» (a number typed any way), column filters by status, assignment and unread,
+// live `whatsapp_inbox.conversation.list` in a server-side DataTable — Contact, Phone (only for whoever sees the
+// customers' contact details), Status, Assigned to, Unread and Last message (the time if today, «Yesterday» or the
+// date, on the business clock) —, «Filter contact or phone…» (a number typed any way; «Filter contact…» to whoever
+// does not see the numbers), column filters by status, assignment and unread,
 // 50 a page, the latest activity first. «Open» (or the row) opens the conversation in a panel above the
 // list, kept in the address (`?conversation=`). Above it: «Reconnecting…», the number not connected or to
 // reconnect («Go to Settings», where it is connected, for whoever configures), the month's messages spent or a plan
@@ -41,6 +42,7 @@ const tabs = useAppTabs('whatsapp_inbox');
 const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
 const session = useSession();
+const seesContact = computed(() => session.can('base.view_customer_contact'));
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 /** Where the number is connected, reconnected or disconnected (WHATSAPP_INBOX-F01, F02). */
 const SETTINGS = '/whatsapp_inbox/settings';
@@ -125,7 +127,8 @@ const actions = computed<DataTableAction<ConversationOut>[]>(() => [
 
 const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
   { key: 'contact', label: t('whatsapp_inbox.inbox.columns.contact'), sortable: true, priority: 'high', cell: 'contact', format: (_, row) => row.display_name },
-  { key: 'phone', label: t('whatsapp_inbox.inbox.columns.phone'), sortable: true },
+  // The number only for whoever sees the customers' contact details, and never sorted: the order would tell it.
+  ...(seesContact.value ? [{ key: 'phone', label: t('whatsapp_inbox.inbox.columns.phone') }] : []),
   {
     key: 'status',
     label: t('whatsapp_inbox.inbox.columns.status'),
@@ -293,7 +296,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
       :entity-label="{ one: $t('whatsapp_inbox.inbox.entity.one'), many: $t('whatsapp_inbox.inbox.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' ? $t('whatsapp_inbox.inbox.loadError') : undefined"
-      :search-placeholder="$t('whatsapp_inbox.inbox.search')"
+      :search-placeholder="$t(seesContact ? 'whatsapp_inbox.inbox.search' : 'whatsapp_inbox.inbox.searchWithoutContact')"
       :labels="{ loadError: $t('whatsapp_inbox.inbox.loadError'), retry: $t('whatsapp_inbox.live.retry') }"
       :actions="actions"
       :columns="columns"

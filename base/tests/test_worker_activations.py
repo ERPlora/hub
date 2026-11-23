@@ -28,7 +28,7 @@ from psycopg import sql
 
 from base import activation, events, worker, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names
 from base.tenancy.context import use_hub

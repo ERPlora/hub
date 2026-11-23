@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:25d3baab83db604eb2e1008da0a98b526e835de9387eb2063c577638b7825c81 -->
+<!-- generated from WORKBOOK.md sha256:3199ef5356927e2c07bbbb7ebd06414135962e1490a8f4a05b2b728e7998779a -->
 
 ## What it is for and who it is for
 
@@ -470,7 +470,8 @@ Steps:
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
    its name and time. Who serves it is seen in its window: whoever serves its check in Sales (the till's
-   "Served by" chip) or, if nobody changed it, whoever seated it.
+   "Served by" chip) or, if nobody changed it, whoever seated it, by their name or, if their account has
+   none, by what goes before the @ of their e-mail, never the whole e-mail.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
    the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
@@ -478,7 +479,7 @@ Steps:
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".
-Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19
+Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19, BASE-F119
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done
@@ -493,7 +494,8 @@ Steps:
 3. If you want, before seating "Assign customer" puts the card on the check. On a Reserved one, if you
    pick none, the check carries the booking's customer.
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
-   checks** of the till sees it). Whoever seats is the server of the check.
+   checks** of the till sees it). Whoever seats is the server of the check: their name or, if their account
+   has none, what goes before the @ of their e-mail, never the whole e-mail.
 5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
 In: the table and the guests; on a Reserved one, the booking's guests and customer.
 Out: the table check opened with its guests, the time and the server (announces:
@@ -505,7 +507,7 @@ plan has been refreshed." and the table is not seated. **Two servers who seat th
 same time leave a single check**: the second one gets that same warning. A blocked, deactivated or
 deleted table is not seated. Seating is done on the floor, with the party in front: an automation
 cannot do it.
-Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
+Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12, BASE-F119
 
 ### TABLE-F11 Go back to an occupied table to order more or charge it
 Status: done
@@ -716,13 +718,15 @@ Steps:
 1. Open **Tables → Sessions**: it starts in "Open", the most recent first.
 2. "Closed" shows the closed ones with "Charged" (in the currency it was charged in: the business's) and
    "Closed"; "All", also the transferred, merged and parked ones.
-3. Filter by zone, server or status, or search by table number.
+3. Filter by zone, server or status, or search by table number. The server shows by their name or, if their
+   account has none, by what goes before the @ of their e-mail, also on earlier checks, and is never searched
+   by their e-mail.
 4. "Details" shows zone, server, status, guests, opening, closing, time, charged and notes.
 In: the table checks and what was charged in Sales.
 Out: nothing.
 If it fails: if the list does not load, a notice shows with "Retry". Refunds do not subtract from
 "Charged".
-Involved: TABLE-F18, TABLE-F19, TABLE-F23
+Involved: TABLE-F18, TABLE-F19, TABLE-F23, BASE-F119
 
 ### TABLE-F23 Delete a closed check from the history
 Status: done
@@ -1057,7 +1061,7 @@ What Reservations sends when it calls (the same names as its notices `status_cha
 
 | App | What for | Service |
 |---|---|---|
-| Sales & POS | "Choose table" of the till (SALE-F19): the tables and their status, seating or seating again the check on screen, taking its table away and following the table of a check | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
+| Sales & POS | "Choose table" of the till (SALE-F19): the tables and their status, seating or seating again the check on screen, taking its table away and following the table of a check; the assistant's card says a table's check by its table | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
 | Reservations | Holding, moving and releasing the table of a booking and seating it, inside its operation | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
 | Platform (Home) | The "Your tables" step of "Finish setting up your business" (TABLE-F02) | `table.floor.status` |
 

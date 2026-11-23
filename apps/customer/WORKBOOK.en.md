@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3b55c34ad79ead9c0f5abc6f9f41ae744dce374d390eeb8f486329b36c459322 -->
+<!-- generated from WORKBOOK.md sha256:2b95b327431d3ebeb22b2915520fa438df06c2404db01451502549ef14777bf8 -->
 
 ## What it is for and who it is for
 
@@ -219,8 +219,7 @@ that number already had.
 If it fails: the reason shows under its field and what was typed is kept. A malformed email: "Enter a
 valid email.". A phone that is not a number of its country: "This is not a valid phone number of its
 country: check the digits or write it with its international prefix (+44…).". A country that does not
-exist: "Choose a country from the list.". A date that does not exist in "Birthday" or "Anniversary" (a
-31/02): "Enter a valid date.". Nothing is saved. Custom fields are not asked for when adding.
+exist: "Choose a country from the list.". Nothing is saved. Custom fields are not asked for when adding.
 Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation, with its groups and tags, CUSTOMER-F06, and its custom fields, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Search and filter cards
@@ -260,8 +259,9 @@ Steps:
 1. From **Customers**, tap the row.
 2. The card shows all its details (also internal notes, birthday, anniversary and custom fields), its
    groups and tags, its consent per channel, the
-   activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
-   name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   activity (newest first, 50 per page; each entry says when and who: the person by their name or, if their
+   account has none, by what goes before the @ of their email, never the whole email; the API key by its
+   own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
    email, the phone and the address each consent was given for, only to whoever sees the customers' contact
    details.
@@ -271,7 +271,7 @@ Out: nothing; read only. If another person changes it while it is open, the chan
 reloading.
 If it fails: "This customer is no longer available." if it was deleted, merged into another or its data
 was erased.
-Involved: CUSTOMER-F24
+Involved: CUSTOMER-F24, BASE-F119
 
 ### CUSTOMER-F04 Edit the card and its custom fields
 Status: done
@@ -292,8 +292,7 @@ Out: the card and its fields saved in a single write, and the card-updated notic
 corrected. Saving without changing anything notifies nobody. The consent stays recorded with the address
 it was given for: changing the phone or the email does not carry it over (CUSTOMER-F14).
 If it fails: an empty required field ("This field is required."), a value that does not fit its type
-("Enter a number." if "three" is written in a number, "Enter a valid date." if the date does not exist,
-like a 31/02, also in "Birthday" and "Anniversary", "Choose one of the options."), a field that no longer
+("Enter a number." if "three" is written in a number, "Choose one of the options."), a field that no longer
 exists or a phone that is not of its country reject the WHOLE save: the reason shows next to its field
 and the card keeps what it had saved. The "Active" checkbox unticked only changes the "Active" figure:
 the card still shows in searches, at the till and on WhatsApp.

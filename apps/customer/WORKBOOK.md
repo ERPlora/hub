@@ -232,8 +232,7 @@ que ya tenía ese número.
 Si falla: el motivo sale debajo de su campo y lo tecleado se conserva. Un email mal formado: «Escribe
 un email válido.». Un teléfono que no es un número de su país: «No es un teléfono válido de su país:
 revisa las cifras o escríbelo con su prefijo internacional (+44…).». Un país que no existe: «Elige
-un país de la lista.». Una fecha que no existe en «Cumpleaños» o «Aniversario» (un 31/02): «Introduce
-una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
+un país de la lista.». No se guarda nada. Los campos personalizados no se piden en el alta.
 Implicados: WHATSAPP_INBOX-F04, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las fichas que se perdieron, cada una por esta misma alta, con sus grupos y etiquetas, CUSTOMER-F06, y sus campos propios, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Buscar y filtrar fichas
@@ -273,7 +272,8 @@ Pasos:
 2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
    personalizados), sus grupos y etiquetas, su
    consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
-   cuándo y quién: la persona o la API key por su nombre, o «Lo hizo la plataforma» cuando no la hizo
+   cuándo y quién: la persona por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su
+   correo, nunca el correo entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo
    nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
    desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
    que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
@@ -282,7 +282,7 @@ Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentim
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin
 recargar.
 Si falla: «Este cliente ya no está disponible.» si se eliminó, se unió a otra o se borraron sus datos.
-Implicados: CUSTOMER-F24
+Implicados: CUSTOMER-F24, BASE-F119
 
 ### CUSTOMER-F04 Editar la ficha y sus campos personalizados
 Estado: hecho
@@ -302,9 +302,8 @@ Sale: la ficha y sus campos guardados en una sola escritura, y el aviso de ficha
 corregido. Guardar sin cambiar nada no avisa a nadie. El consentimiento queda anotado con la
 dirección para la que se dio: cambiar el teléfono o el email no lo traslada (CUSTOMER-F14).
 Si falla: un campo obligatorio vacío («Este campo es obligatorio.»), un valor que no encaja con su
-tipo («Introduce un número.» si se escribe «tres» en un número, «Introduce una fecha válida.» si la
-fecha no existe, como un 31/02, también en «Cumpleaños» y «Aniversario», «Elige una de las
-opciones.»), un campo que ya no existe o un teléfono que no es de su país rechazan TODO el guardado:
+tipo («Introduce un número.» si se escribe «tres» en un número, «Elige una de las opciones.»), un
+campo que ya no existe o un teléfono que no es de su país rechazan TODO el guardado:
 el motivo sale junto a su campo y la ficha conserva lo que tenía guardado. La casilla «Activo»
 desmarcada solo cambia la cifra «Activos»: la ficha sigue saliendo en búsquedas, en el TPV y en
 WhatsApp.
@@ -1120,8 +1119,8 @@ asistente.
 
 ## Para quien lo mantiene
 
-- Anatomía completa de una app, copiada de `apps/demo`: `apps.py`, `models.py`, `schemas.py`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+- Anatomía completa de una app, copiada de `apps/demo`: `apps.py`, `models.py`, `schemas/` (un módulo por tema),
+  `queries.py`, `services/` (un módulo por tema), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
 - **Orden de las listas** (`_ordered`, con `base.ordering.list_order`): fichas,
@@ -1181,11 +1180,11 @@ asistente.
 - Toda operación declara `ai`: `AI(…)` con su descripción para el asistente, su `risk` en las escrituras y sus `asks`
   (2–4 frases en `en` y `es`, como las diría quien la usa); las de salud y las tres de compras que solo lanza la venta
   (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta
-  entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas.py` lleva su
+  entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas/` lleva su
   descripción: son la herramienta del asistente. Las referencias humanas
   (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
-  marcas `refers` de `schemas.py` (`A_CUSTOMER`, `A_GROUP`, `A_TAG`, `A_FIELD`, `A_ORDER`), leídas como quien
+  marcas `refers` de `schemas/fields.py` (`A_CUSTOMER`, `A_GROUP`, `A_TAG`, `A_FIELD`, `A_ORDER`), leídas como quien
   pregunta: la ficha con `customer.customer.detail` (solo las vivas, como sus pantallas) y el grupo, la etiqueta y el
   campo con `customer.group.detail`, `customer.tag.detail` y `customer.field.detail`, lecturas internas
   (`ai=INTERNAL`, sin API) porque el modelo los encuentra en sus listas. El pedido es de Venta, que no es requisito:

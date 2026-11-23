@@ -62,7 +62,7 @@ def test_role_permissions_on_its_host_only(make_user):
 
 #: An app that names only some roles: owner and admin are not in its role_permissions.
 SHOP = SimpleNamespace(
-    permissions=["shop.view", "shop.sell", "shop.refund"],
+    permissions={"shop.view": "See the shop", "shop.sell": "Sell", "shop.refund": "Refund"},
     role_permissions={"hub_manager": ["shop.view", "shop.sell"], "hub_employee": ["shop.view"]},
 )
 

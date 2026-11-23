@@ -22,7 +22,9 @@ from django.core.cache import cache
 from django.utils import timezone
 from live.models import OutboxEvent
 
-from base.models import AccessSettings, Approval, Hub, Membership
+from base.models.access import AccessSettings
+from base.models.approvals import Approval
+from base.models import Hub, Membership
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tenancy.tests.hubs import HUB_DATABASES
 from base.tests.test_people import with_badge, with_pin
@@ -98,7 +100,7 @@ def approve(client, asked: dict, person: str, pin: str = "2580", host=HOST):
 
 
 def person_id(username: str) -> str:
-    from base.models import Credential
+    from base.models.access import Credential
 
     return str(Credential.objects.get(username=username).pk)
 

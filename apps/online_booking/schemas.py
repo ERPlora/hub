@@ -24,7 +24,8 @@ from pydantic import (
 )
 
 from apps.appointment.schemas import A_MEMBER, A_SERVICE, AN_APPOINTMENT
-from apps.customer.schemas import Email
+from apps.customer.schemas.contact import EMAIL, PHONE
+from apps.customer.schemas.fields import Email
 from apps.online_booking.logo import LogoFieldsOut, LogoName
 from apps.online_booking.public_page import LinkOwnerOut, PageOwnerOut, TrapIn
 
@@ -35,9 +36,7 @@ MAX_SERVICES = 5
 #: The page's own texts.
 MAX_TEXT = 2000
 
-SAY_WHICH_BOOKING = _(
-    "Say which booking: its number, or the customer's name, phone or email (and the day)."
-)
+SAY_WHICH_BOOKING = _("Say which booking: its number, or the customer's name, phone or email (and the day).")
 END_BEFORE_START = _("The end cannot be before the start.")
 NOT_A_COLOUR = _("Write the colour as #RRGGBB (for example #6366f1).")
 SAME_SERVICE_TWICE = _("Each service only once.")
@@ -109,7 +108,8 @@ class BookingListIn(In):
     )
     search: _text(100) = Field(
         "",
-        description="Text in the number, the customer's name, phone or email, a service or the professional.",
+        description="Text in the number, the customer's name (and her phone or email, for whoever sees them), a "
+        "service or the professional.",
     )
     number: _text(24) | None = Field(
         None, description="Part of the appointment number (APT-…)."
@@ -166,7 +166,7 @@ class BookingRefIn(In):
     customer: _text(200, 1) | None = Field(
         None,
         title=gettext_noop("Customer"),
-        description="The customer as a person says it: her name (or part of it), her phone or her email.",
+        description="The customer as a person says it: her name (or part of it) or, for whoever sees them, her phone or her email.",
     )
     date: dt.date | None = Field(
         None,
@@ -200,8 +200,8 @@ class BookingRow(Schema):
     number: str
     customer_id: UUID
     customer_name: str = Field(description="Empty when the customer's data was erased.")
-    customer_phone: str
-    customer_email: str
+    customer_phone: str | None = PHONE
+    customer_email: str | None = EMAIL
     staff_id: UUID | None
     staff_name: str
     services: list[LineOut]

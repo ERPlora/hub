@@ -13,7 +13,7 @@ from base.schemas.assistant import names
 
 # ── Data: blueprints, imports and reset ───────────────
 
-#: A file uploaded in base64: 20 MB of zip (``base.blueprint.MAX_FILE_BYTES``) is 27 962 028 characters.
+#: A file uploaded in base64: 20 MB of zip (``base.blueprint.archive.MAX_FILE_BYTES``) is 27 962 028 characters.
 FILE_BASE64_MAX = 28_000_000
 BlueprintPurpose = Literal["backup", "template"]
 #: How a dataset of a load went: «applied», «partial», «already» (it was there), «failed», «empty» (nothing to copy)

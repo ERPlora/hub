@@ -83,7 +83,7 @@ def test_it_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # The product's ten but «view reports», which no operation asked for (it was the home panel's), and «view all sessions».
-    assert config().permissions == PERMISSIONS
+    assert list(config().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles():

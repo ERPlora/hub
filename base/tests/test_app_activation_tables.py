@@ -18,7 +18,7 @@ from live.operations import atomic, get
 
 from base import activation, events
 from base.activation import CREATING, FAILED, OFF, ON
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy.context import HubContextMissing, HubWithoutDatabase, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import HOST, HUB_DB, A

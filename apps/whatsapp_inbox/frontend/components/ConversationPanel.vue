@@ -163,9 +163,10 @@ async function removeNote(note: NoteOut): Promise<void> {
         {{ conversation?.display_name ?? '' }}
       </h3>
       <span
+        v-if="conversation?.phone"
         class="wa-detail__phone"
         data-testid="whatsapp-inbox-detail-phone"
-      >{{ conversation?.phone ?? '' }}</span>
+      >{{ conversation.phone }}</span>
       <StatusPill
         v-if="conversation"
         size="sm"

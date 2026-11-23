@@ -103,12 +103,12 @@ max-statements = 50
 "apps/service/admin.py" = ["DJ007"]
 "apps/service/tests/test_concurrency.py" = ["E731"]
 "apps/service/tests/test_queries.py" = ["E731"]
-"apps/service/tests/test_recovery.py" = ["B905"]
+"apps/service/tests/test_recovery_categories.py" = ["B905"]
 "apps/service/tests/test_services.py" = ["F841"]
 "apps/staff/tests/test_integration_sale.py" = ["F841"]
 "apps/staff/tests/test_services.py" = ["F841"]
 "apps/task/tests/test_services.py" = ["F841"]
-"apps/tax/tests/test_queries.py" = ["E731"]
+"apps/tax/tests/test_queries_rules.py" = ["E731"]
 "apps/verifactu/schemas/fields.py" = ["E731"]
 "apps/verifactu/tests/conftest.py" = ["F401"]
 "apps/verifactu/tests/test_concurrency.py" = ["B905"]
@@ -158,8 +158,9 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.api", "base.tenancy", "base.services", "base.queries", "base.schemas", "control", "control.services",
-    "control.queries", "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
+    "base", "base.api", "base.blueprint", "base.models", "base.tenancy", "base.services", "base.queries",
+    "base.schemas", "control", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries",
+    "apps.*.schemas",
 ]
 depth = 0
 ignore_imports = [

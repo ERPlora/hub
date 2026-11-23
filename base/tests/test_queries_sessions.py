@@ -49,7 +49,7 @@ def test_an_employee_s_menu_has_only_the_screens_of_its_work(make_user):
     assert menu["table"] == ["/table/floor-plan", "/table/sessions"]
     assert menu["customer"] == ["/customer/customers"]
     assert menu["reservation"] == ["/reservation/reservations", "/reservation/waitlist"]
-    assert menu["staff"] == ["/staff/members", "/staff/time-off", "/staff/schedules"]
+    assert menu["staff"] == ["/staff/members", "/staff/time-off", "/staff/schedules", "/staff/commissions"]
     assert menu["flow"] == ["/flow/automations"]
     assert menu["online_booking"] == ["/online_booking/bookings"]
     assert menu["whatsapp_inbox"] == ["/whatsapp_inbox/inbox"]
@@ -105,3 +105,30 @@ def test_nothing_is_locked_to_the_owner_or_the_admin(make_user):
 
 def _navigation_of(label: str) -> list:
     return next(config.navigation for config in module_configs() if config.label == label)
+
+
+# ── base.session.access: what a device follows to read its session again ──────────────────────────────────────────
+
+
+def access_key(user, permissions: frozenset[str]) -> str:
+    ctx = OperationContext(scope=A, actor=user, permissions=permissions, language="en")
+    return get("base.session.access")(ctx, get("base.session.access").input()).key
+
+
+def test_the_access_key_changes_with_what_the_role_gives(make_user):
+    ana = make_user("ana")
+    assert access_key(ana, permissions_of_role("hub_employee")) != access_key(ana, permissions_of_role("hub_manager"))
+
+
+def test_the_same_permissions_give_the_same_key_to_anyone(make_user):
+    ana, luis, employee = make_user("ana"), make_user("luis"), permissions_of_role("hub_employee")
+    assert access_key(ana, employee) == access_key(luis, employee)
+    assert access_key(ana, employee) == access_key(ana, frozenset(sorted(employee, reverse=True)))
+
+
+def test_the_access_is_read_again_with_each_photo_of_erplora_com():
+    from live.live_registry import live_registry
+
+    from base.events import HUB_STATE_APPLIED
+
+    assert "base.session.access" in live_registry.affected([HUB_STATE_APPLIED])

@@ -103,7 +103,7 @@
       "pickStaff": "Elige un profesional",
       "day": "Día",
       "time": "Hora",
-      "minutes": "Min.",
+      "minutes": "Duración (min)",
       "notes": "Notas para la clienta",
       "internalNotes": "Notas internas",
       "create": "Añadir cita",
@@ -127,8 +127,8 @@
       "label": "Horas libres",
       "hint": "Elige los servicios, un profesional y un día para ver las horas libres.",
       "loading": "Buscando horas libres…",
-      "empty": "No quedan horas libres ese día para este profesional. Puedes escribir una hora igualmente.",
-      "error": "No se han podido cargar las horas libres. Puedes escribir una hora igualmente.",
+      "empty": "No quedan horas libres ese día para este profesional. Puedes elegir una hora igualmente.",
+      "error": "No se han podido cargar las horas libres. Puedes elegir una hora igualmente.",
       "withinNotice": "dentro de la antelación mínima"
     },
     "overlap": {
@@ -221,7 +221,7 @@
         "startDate": "Empieza el",
         "fromDate": "Desde",
         "time": "Hora",
-        "minutes": "Min.",
+        "minutes": "Duración (min)",
         "endDate": "Termina el (opcional)",
         "occurrences": "Número de citas (opcional)",
         "create": "Crear cita periódica",

@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick as pickDay, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -13,7 +14,7 @@ import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean; required?: boolean };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountPricing(RuleFormModal, { props: { open: false, rule: null, ...props }, locale });
@@ -55,6 +56,8 @@ describe('RuleFormModal', () => {
     );
     expect(s.combo('target')).toBeUndefined();
     expect(s.combo('group').props('placeholder')).toBe('Every customer');
+    // The days are the app's own calendar (never the device's), and either can be emptied.
+    expect(['valid_from', 'valid_until'].map((name) => [s.field(name).readonly, s.field(name).required])).toEqual([[true, false], [true, false]]);
     await named(s);
     expect(s.save().disabled).toBe(true);
     await ionValue(s.field('percent'), '12,5', 'ionInput');
@@ -72,7 +75,8 @@ describe('RuleFormModal', () => {
     await s.pick('target', { id: 'c1', label: 'Colour' });
     await s.pick('group', { id: 'g1', label: 'VIP' });
     await ionValue(s.field('min_quantity'), '2', 'ionInput');
-    await ionValue(s.field('valid_from'), '2026-07-01', 'ionInput');
+    await pickDay(s.field('valid_from'), '2026-07-01');
+    expect(s.field('valid_from').value).toBe('07/01/2026');
     await ionValue(s.field('priority'), '5', 'ionInput');
     await click(s.save());
     expect(s.sent()).toEqual([
@@ -163,14 +167,15 @@ describe('RuleFormModal', () => {
   });
 
   it('edits a rule sending only what changed, its new type with its value', async () => {
-    const s = await setupAnswered({ rule: rule({ applies_to: 'product', product_id: 'p1', product_name: 'Shampoo', min_quantity: '2.000' }) });
+    const s = await setupAnswered({ rule: rule({ applies_to: 'product', product_id: 'p1', product_name: 'Shampoo', min_quantity: '2.000', valid_until: '2026-08-31' }) });
     expect(s.inDoc('pricing-rule-form')?.getAttribute('aria-label')).toBe('Editing rule — Ten off');
-    expect([s.field('percent').value, s.field('min_quantity').value]).toEqual(['10', '2']);
+    expect([s.field('percent').value, s.field('min_quantity').value, picked(s.field('valid_until'))]).toEqual(['10', '2', '2026-08-31']);
     expect(s.combo('target').props('modelValue')).toEqual({ id: 'p1', label: 'Shampoo' });
     s.answer(200, rule());
     await ionValue(s.field('name'), 'Ten off shampoo', 'ionInput');
+    await pickDay(s.field('valid_until'), '');
     await click(s.save());
-    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/rules/update', query: {}, body: { id: 'r1', name: 'Ten off shampoo' } }]);
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/rules/update', query: {}, body: { id: 'r1', name: 'Ten off shampoo', valid_until: null } }]);
 
     const f = await setupAnswered({ rule: rule() });
     f.answer(200, rule());

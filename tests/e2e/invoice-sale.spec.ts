@@ -11,6 +11,7 @@
 // What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, login, shot, shown } from './helpers';
 import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -226,8 +227,8 @@ test('Invoices filter by total in euros behind the funnel, with its count; a «t
 
   // «Issued» from the 14th to the 1st: said under «to», the funnel turns red, and nothing is filtered.
   await toggle.click();
-  await panel.locator('[data-testid=invoice-list-filter-issue_date_from] input').fill('2026-10-14');
-  await panel.locator('[data-testid=invoice-list-filter-issue_date_to] input').fill('2026-10-01');
+  await pickDay(page, panel.locator('[data-testid=invoice-list-filter-issue_date_from]'), '2026-10-14');
+  await pickDay(page, panel.locator('[data-testid=invoice-list-filter-issue_date_to]'), '2026-10-01');
   await panel.locator('[data-testid=invoice-list-filters-apply]').click();
   await expect(toggle).toHaveAttribute('data-invalid', 'true');
   await expect(rowOf(dear.number)).toBeVisible();

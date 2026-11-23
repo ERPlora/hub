@@ -534,14 +534,15 @@ Pasos:
 2. «Reintentar» lo devuelve a la cola con los intentos a cero, hacia la impresora que toque ahora:
    «Devuelto a la cola: lo imprimirá el próximo dispositivo que se conecte.».
 3. «Cancelar» pide un motivo (opcional) y lo retira: «Trabajo cancelado. No se imprimirá.». Queda en
-   la cola con quién, cuándo y por qué.
+   la cola con quién (por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el
+   correo entero), cuándo y por qué.
 Entra: el trabajo y, al cancelar, el motivo.
 Sale: el trabajo en cola otra vez o cancelado (avisa: `printing.job.retried`, `printing.job.cancelled`); nadie
 lo borra a mano: la cola lo olvida 30 días después de acabar (PRINTING-F20).
 Si falla: «Solo vuelve a la cola un trabajo pendiente o fallido, o uno enviado que no contestó; este está
 …», «Un trabajo que se está imprimiendo o ya se imprimió no se cancela; este está …». Sin permiso no se
 ven los botones.
-Implicados: PRINTING-F01
+Implicados: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Ir al texto del tique, que se escribe en Ventas
 Estado: hecho — el encabezado y el pie del tique viven en los ajustes de Ventas, y la nota de Ajustes lleva
@@ -691,12 +692,12 @@ Implicados: PRINTING-F01, PRINTING-F14
 Estado: parcial — la tarjeta aún no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar»
 o «No hemos podido comprobar la impresora»): Impresión ya tiene esa lectura, la misma que da a la fila de salud del
 Inicio, pero la tarjeta todavía no la usa (hub#573)
-Actor: propietario, administrador, responsable, empleado
+Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
 Pasos:
 1. Con Impresión encendida en el negocio, **Sistema → Uso y plan** tiene, debajo de lo que usa el negocio, la
    tarjeta **Tu impresora**: «Los tiques, las comandas y las etiquetas los imprime la app de ERPlora del dispositivo
-   que está junto a la impresora.». La ve cualquiera que vea Impresión, también quien no puede ver el uso del negocio.
+   que está junto a la impresora.». La ve quien abre Sistema, el propietario y el administrador (BASE-F39).
    Con Impresión apagada no hay tarjeta: un negocio que no imprime no ve nada de esto.
 2. «Configurar la impresión» abre **Impresión → Impresoras** (PRINTING-F01).
 3. En un navegador, debajo, «Descargar la app de ERPlora» con «La app de ERPlora es la que habla con tus impresoras,

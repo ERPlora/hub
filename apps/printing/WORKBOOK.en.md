@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8984a8687233be6318549ff0bdd30a2228ef0ce7734a7b3b42845980a1f23ee9 -->
+<!-- generated from WORKBOOK.md sha256:353463f19b22828af22fc188815300eb0ee26c3216d32f03a6d28b3eb56bba29 -->
 
 ## What it is for and who it is for
 
@@ -522,14 +522,15 @@ Steps:
 2. "Try again" sends it back to the queue with the attempts at zero, towards whichever printer fits now:
    "Sent back to the queue: the next device to connect will print it.".
 3. "Cancel" asks for a reason (optional) and withdraws it: "Job cancelled. It will not be printed.". It stays in
-   the queue with who, when and why.
+   the queue with who (by their name or, if their account has none, by what goes before the @ of their email,
+   never the whole email), when and why.
 In: the job and, when cancelling, the reason.
 Out: the job waiting again or cancelled (announces: `printing.job.retried`, `printing.job.cancelled`); nobody
 deletes it by hand: the queue forgets it 30 days after it finished (PRINTING-F20).
 If it fails: "Only a pending or failed job, or a sent one that did not answer, goes back to the queue; this one is
 …", "A job that is printing or has printed is not cancelled; this one is …". Without permission the
 buttons are not seen.
-Involved: PRINTING-F01
+Involved: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Go to the receipt text, which is written in Sales
 Status: done — the receipt header and footer live in the Sales settings, and the Settings note leads
@@ -679,12 +680,12 @@ Involved: PRINTING-F01, PRINTING-F14
 Status: partial — the card does not say yet whether the printer answers right now ("Printer ready", "Printer not
 connected" or "We couldn't check the printer"): Printing already has that read, the same one it gives the Home's
 health row, but the card does not use it yet (hub#573)
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
 1. With Printing on in the business, **System → Usage and plan** has, below what the business uses, the card
    **Your printer**: "Receipts, kitchen orders and labels are printed by the ERPlora app on the device next to the
-   printer.". Anyone who sees Printing sees it, also whoever cannot see what the business uses. With Printing off
+   printer.". Whoever opens System sees it, the owner and the administrator (BASE-F39). With Printing off
    there is no card: a business that does not print sees none of this.
 2. "Set up printing" opens **Printing → Printers** (PRINTING-F01).
 3. In a browser, below, "Download the ERPlora app" with "The ERPlora app is what talks to your printers, the cash

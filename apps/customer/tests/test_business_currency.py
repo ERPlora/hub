@@ -12,7 +12,9 @@ from datetime import UTC, datetime
 import pytest
 
 from apps.customer.models import Activity, Customer, Purchase
-from apps.customer.schemas import ActivityListIn, CustomerExportIn, PurchaseListIn
+from apps.customer.schemas.activity import ActivityListIn
+from apps.customer.schemas.exports import CustomerExportIn
+from apps.customer.schemas.purchases import PurchaseListIn
 from apps.sale.tests.test_business_currency import business_in
 
 from .conftest import HUB_DB, B, run

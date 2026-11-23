@@ -296,3 +296,12 @@ msgstr "Línea del carrito"
 
 msgid "Order"
 msgstr "Pedido"
+
+msgid "View carts, their lines and orders"
+msgstr "Ver los carritos, sus líneas y los pedidos"
+
+msgid "Create, change and empty carts, and erase a customer's personal data"
+msgstr "Crear, cambiar y vaciar carritos, y borrar los datos personales de un cliente"
+
+msgid "Start orders and mark them paid, failed or completed"
+msgstr "Iniciar pedidos y marcarlos como pagados, fallidos o completados"

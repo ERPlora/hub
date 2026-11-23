@@ -10,6 +10,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import type { DeviceMode } from '../operations/devices';
+import DeviceAutostart from './DeviceAutostart.vue';
 import '../settings.css';
 
 const { t } = useBaseI18n();
@@ -107,5 +108,6 @@ const MODES: DeviceMode[] = ['shared', 'personal'];
       data-testid="device-mode-error"
       :heading="t('base.device.failed')"
     />
+    <DeviceAutostart />
   </section>
 </template>

@@ -1014,3 +1014,18 @@ msgstr "Contesta antes de 24 horas desde su último mensaje: después, WhatsApp 
 #: apps.py
 msgid "Answer the customers"
 msgstr "Contestar a los clientes"
+
+msgid "Read conversations"
+msgstr "Leer las conversaciones"
+
+msgid "Reply, add notes and take a free conversation"
+msgstr "Responder, añadir notas y asignarse una conversación libre"
+
+msgid "Assign conversations to others and take them from others"
+msgstr "Asignar conversaciones a otros y quitárselas a otros"
+
+msgid "Connect the number and manage the templates and settings"
+msgstr "Conectar el número y gestionar las plantillas y los ajustes"
+
+msgid "Erase a number's data"
+msgstr "Borrar los datos de un número"

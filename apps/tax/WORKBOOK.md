@@ -323,7 +323,7 @@ Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
 1. En la fila de la regla vigente pulsa «Poner fecha de fin».
-2. Escribe el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
+2. Elige el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
    fecha de fin».
 3. Crea la regla nueva con **+** y «Vigente desde» el día siguiente.
 4. La tabla enseña las dos con sus fechas; desde el día del cambio las ventas nuevas usan la nueva.
@@ -728,7 +728,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   vigila `tests/test_integration_assistant.py`, que recorre todas las escrituras `tax.*` del registro.
   Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide
   (`live.E020`: Impuestos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1094; `tests/test_services.py` y
-  `tests/test_queries.py` exigen la clave). Sin ellas, desactivar, reactivar o poner fecha de fin a una
+  `tests/test_queries_declarations.py` exigen la clave). Sin ellas, desactivar, reactivar o poner fecha de fin a una
   regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las 40 herramientas que ofrece un turno y el
   asistente manda a la pantalla o busca una automatización. `tests/test_assistant_asks.py` mide con las
   frases reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-tax-2026-11-08.json` y la del

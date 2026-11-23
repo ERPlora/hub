@@ -513,7 +513,6 @@
         },
         "loading": "Loading the failed events…",
         "errorBody": "The queue of failed events could not be loaded. Check the connection and try again.",
-        "denied": "Only the owner or an administrator can see the failed events.",
         "retried": "Event resent.",
         "retriedAll": "Events resent: {count}.",
         "nothingToRetry": "There was nothing to resend.",
@@ -557,7 +556,6 @@
       },
       "usage": {
         "loading": "Reading the system…",
-        "denied": "Only the owner or an administrator can see how much the hub is using.",
         "plan": "{name} plan",
         "planNames": {
           "free": "Free",
@@ -797,7 +795,10 @@
       "adminOnly": "Only an administrator can change how people enter on this device.",
       "unknown": "This browser is not a device of the business yet: enter once here with your account and you will be able to choose.",
       "failed": "Could not change this device. Check the connection and try again.",
-      "loadError": "Could not load this device. Check the connection and try again."
+      "loadError": "Could not load this device. Check the connection and try again.",
+      "autostart": "Start on login",
+      "autostartHelp": "Open ERPlora when you sign in to this computer, so tickets always have somewhere to print.",
+      "autostartFailed": "Could not change the start on login setting."
     },
     "pinPolicy": {
       "title": "PIN pad",
@@ -918,6 +919,20 @@
       "empty": "This business has no roles.",
       "error": "The roles could not be loaded.",
       "change": "Change roles on erplora.com"
+    },
+    "role": {
+      "title": "What it allows",
+      "intro": "What this role lets a person do in this business, app by app. It is given on erplora.com and is not changed here.",
+      "members": "People with this role: {n}",
+      "loading": "Loading what this role allows…",
+      "error": "Could not load what this role allows.",
+      "retry": "Retry",
+      "notFound": "This role does not exist in this business.",
+      "state": {
+        "on": "Allowed",
+        "approval": "With approval",
+        "off": "No"
+      }
     },
     "person": {
       "title": "Person",

@@ -684,3 +684,63 @@ msgstr "Di qué venta cobró el bono."
 #: apps.py:140
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View services, settings and assigned professionals"
+msgstr "Ver los servicios, los ajustes y los profesionales asignados"
+
+msgid "Add services"
+msgstr "Dar de alta servicios"
+
+msgid "Edit and restore services, and assign professionals"
+msgstr "Editar y restaurar servicios, y asignar profesionales"
+
+msgid "Archive services"
+msgstr "Archivar servicios"
+
+msgid "View categories"
+msgstr "Ver categorías"
+
+msgid "Create categories"
+msgstr "Crear categorías"
+
+msgid "Edit categories"
+msgstr "Editar categorías"
+
+msgid "Delete categories"
+msgstr "Eliminar categorías"
+
+msgid "View packages"
+msgstr "Ver los bonos"
+
+msgid "Create packages"
+msgstr "Crear bonos"
+
+msgid "Edit packages"
+msgstr "Editar bonos"
+
+msgid "Delete packages"
+msgstr "Eliminar bonos"
+
+msgid "Give packages to customers"
+msgstr "Conceder bonos"
+
+msgid "Use sessions of a package"
+msgstr "Gastar sesiones de un bono"
+
+msgid "View sold packages, their balances and movements"
+msgstr "Ver los bonos vendidos, sus saldos y sus movimientos"
+
+msgid "View packages without a customer"
+msgstr "Ver los bonos sin cliente"
+
+msgid "Void sold packages"
+msgstr "Anular bonos vendidos"
+
+msgid "Adjust sold packages and tell their sale later"
+msgstr "Ajustar bonos vendidos y decir después su venta"
+
+msgid "Give sessions back when a sale is voided or refunded"
+msgstr "Devolver sesiones al anular o devolver una venta"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"

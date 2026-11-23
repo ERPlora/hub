@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pickDay, pickTime } from './date-time-fields';
 import { A, api, capture, HUB_DIR, psql, scrolledTo, settled, shot, shown, untilStill } from './helpers';
 import { liveStreamsSettled, watchLiveStreams } from './live-streams';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
@@ -185,8 +186,8 @@ test('Take a reservation at a table, confirm it, see it Reserved on the plan, se
     const form = page.locator('[data-testid=reservation-form]');
     await form.locator('[data-testid=reservation-form-guest_name] input').fill(GUEST);
     await form.locator('[data-testid=reservation-form-guest_phone] input').fill(`6${String(Date.now()).slice(-8)}`);
-    await form.locator('[data-testid=reservation-form-date] input').fill(SOON.date);
-    await form.locator('[data-testid=reservation-form-time] input').fill(SOON_TIME);
+    await pickDay(page, form.locator('[data-testid=reservation-form-date]'), SOON.date);
+    await pickTime(page, form.locator('[data-testid=reservation-form-time]'), SOON_TIME);
     await form.locator('[data-testid=reservation-form-party_size] input').fill('3');
     await pick(page, 'reservation-form-table', '51', `51 (${ZONE})`);
     await shots(page, 'RESERVATION-F23', async () => {
@@ -248,8 +249,8 @@ test('Keep the waitlist: add a guest, mark her contacted and convert her into a 
     await view.locator('[data-testid=reservation-waitlist-add]').click();
     const form = page.locator('[data-testid=reservation-waitlist-form]');
     await form.locator('[data-testid=reservation-waitlist-form-guest_name] input').fill(WAITING);
-    await form.locator('[data-testid=reservation-waitlist-form-date] input').fill(SOON.date);
-    await form.locator('[data-testid=reservation-waitlist-form-preferred_time] input').fill(SOON_TIME);
+    await pickDay(page, form.locator('[data-testid=reservation-waitlist-form-date]'), SOON.date);
+    await pickTime(page, form.locator('[data-testid=reservation-waitlist-form-preferred_time]'), SOON_TIME);
     await form.locator('[data-testid=reservation-waitlist-form-submit]').click();
     await expect(form).toBeHidden();
     const row = view.locator('[data-testid=reservation-waitlist-row]', { hasText: WAITING });
@@ -300,15 +301,15 @@ test('Availability: the day’s occupancy, a blocked date and a slot added and r
   const { context, page } = await ownerPage(browser, '/reservation/availability');
   try {
     const view = shown(page);
-    await view.locator('[data-testid=reservation-availability-date] input').fill(SOON.date);
+    await pickDay(page, view.locator('[data-testid=reservation-availability-date]'), SOON.date);
     await expect(view.locator('[data-testid=reservation-availability-hours]')).toContainText('12:00 AM');
     const occupancy = view.locator('[data-testid=reservation-availability-occupancy-row]').first();
     await expect(occupancy).toContainText('12:00 AM–11:59 PM');
 
-    // Block a far date for an event, then unblock it.
+    // Block a far date for an event (Christmas Eve of next year, within the calendar's reach), then unblock it.
     await view.locator('[data-testid=reservation-availability-blocked-add]').click();
     const blockForm = page.locator('[data-testid=reservation-blocked-form]');
-    await blockForm.locator('[data-testid=reservation-blocked-form-date] input').fill('2030-12-24');
+    await pickDay(page, blockForm.locator('[data-testid=reservation-blocked-form-date]'), `${Number(TODAY.date.slice(0, 4)) + 1}-12-24`);
     await blockForm.locator('[data-testid=reservation-blocked-form-reason] input').fill(`${TAG} event`);
     await blockForm.locator('[data-testid=reservation-blocked-form-submit]').click();
     await expect(blockForm).toBeHidden();
@@ -325,8 +326,7 @@ test('Availability: the day’s occupancy, a blocked date and a slot added and r
     await slotForm.locator('[data-testid=reservation-slot-form-day_of_week]').click();
     const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     await page.locator('ion-popover').getByText(names[free], { exact: true }).click();
-    await slotForm.locator('[data-testid=reservation-slot-form-start_time] input').fill('03:00');
-    await slotForm.locator('[data-testid=reservation-slot-form-end_time] input').fill('04:00');
+    for (const [end, time] of [['start', '03:00'], ['end', '04:00']]) await pickTime(page, slotForm.locator(`[data-testid=reservation-slot-form-${end}_time]`), time);
     await slotForm.locator('[data-testid=reservation-slot-form-max_reservations] input').fill(String(SENTINEL));
     await slotForm.locator('[data-testid=reservation-slot-form-submit]').click();
     await expect(slotForm).toBeHidden();
@@ -460,7 +460,7 @@ function workerReleases(): string[] {
     'from django.utils import timezone',
     'from live.context import Scope',
     'from base import scheduler',
-    'from base.models import TaskSchedule',
+    'from base.models.scheduler import TaskSchedule',
     'now = timezone.now()',
     'scheduler.sync(now)',
     "TaskSchedule.objects.filter(app_label='reservation', name='release_unconfirmed_reservations').update(next_run=now)",
@@ -601,8 +601,8 @@ test('A phone typed without prefix for a chosen card is kept international; one 
 
     // Not a number of its country: the reason is Customers', under «Teléfono», and nothing is booked.
     await phone.fill('600111');
-    await form.locator('[data-testid=reservation-form-date] input').fill(SOON.date);
-    await form.locator('[data-testid=reservation-form-time] input').fill(SOON_TIME);
+    await pickDay(page, form.locator('[data-testid=reservation-form-date]'), SOON.date);
+    await pickTime(page, form.locator('[data-testid=reservation-form-time]'), SOON_TIME);
     await form.locator('[data-testid=reservation-form-party_size] input').fill('2');
     await form.locator('[data-testid=reservation-form-submit]').click();
     const refusal = 'No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…).';

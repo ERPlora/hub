@@ -38,7 +38,7 @@ def declared(**fields):
 
 
 def app(label="things", health=None, permissions=("things.view",)):
-    config = SimpleNamespace(label=label, permissions=list(permissions))
+    config = SimpleNamespace(label=label, permissions=dict.fromkeys(permissions, "A phrase"))
     if health is not None:
         config.health = health
     return config

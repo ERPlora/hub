@@ -10,7 +10,9 @@ from live.operations import AI, operation
 
 from base import access
 from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import AccessSettings, Credential, Membership, SessionOwner
+from base.models.access import AccessSettings, Credential
+from base.models import Membership
+from base.models.sessions import SessionOwner
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.access import AccessDoorIn, AccessDoorOut, AccessSettingsIn, AccessSettingsOut
 from base.throttle import client_key

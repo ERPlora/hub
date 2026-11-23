@@ -18,7 +18,8 @@ from live.operations import AI, INTERNAL, operation
 
 from base import activation, business, entitlement, home
 from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.permissions import VIEW_HOME
 from base.schemas.apps import AppListIn, AppListOut, AppRefIn, AppRefOut
 

@@ -11,7 +11,8 @@ from live.operations import AI, operation
 
 from base import blueprint, home
 from base.apps_on import active_apps
-from base.models import Hub, ImportBatch
+from base.models import Hub
+from base.models.blueprints import ImportBatch
 from base.permissions import ADMINISTER_HUB
 from base.schemas.blueprints import (
     BlueprintExportIn,
@@ -63,7 +64,7 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         country, vertical = (hub.country, hub.vertical) if hub else ("", "")
         seeds = sorted(
-            blueprint.catalog(),
+            blueprint.seeds.catalog(),
             key=lambda seed: (
                 bool(country) and seed.country != country,
                 seed.language != ctx.language,
@@ -71,7 +72,7 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
                 seed.key,
             ),
         )
-        return {"templates": [blueprint.template_out(seed) for seed in seeds], "empty": blueprint.no_rows_yet(ctx)}
+        return {"templates": [blueprint.preview.template_out(seed) for seed in seeds], "empty": blueprint.export.no_rows_yet(ctx)}
 
 
 @operation(
@@ -113,15 +114,15 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
                 fields={"data": gettext("Mark the app too, not only its data.")},
             )
         named = set(data.datasets)
-        own = {app: [part.key for part in blueprint.datasets_of(app)] for app in dict.fromkeys(data.data)}
+        own = {app: [part.key for part in blueprint.datasets.datasets_of(app)] for app in dict.fromkeys(data.data)}
         if not named <= {key for keys in own.values() for key in keys}:
             raise InvalidPayload(
                 gettext("Some of the data chosen belongs to no app whose data travels."),
                 fields={"datasets": gettext("Choose only data of the app it belongs to.")},
             )
         chosen = {app: [key for key in keys if key in named] or keys for app, keys in own.items()}
-        bundle = blueprint.Bundle(
-            manifest=blueprint.manifest(
+        bundle = blueprint.archive.Bundle(
+            manifest=blueprint.archive.manifest(
                 name=data.name.strip(),
                 language=data.language,
                 country=hub.country if hub else "",
@@ -130,14 +131,14 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
                 vertical=hub.vertical if hub else "",
                 apps=registered,
             ),
-            data=blueprint.export_data(ctx, chosen, purpose=data.purpose),
+            data=blueprint.export.export_data(ctx, chosen, purpose=data.purpose),
         )
         # INVENTORY-F33: the rows' own photos travel inside the file; the library's images by their reference.
-        bundle.media = blueprint.export_media(ctx, bundle.data)
+        bundle.media = blueprint.photos.export_media(ctx, bundle.data)
         return {
-            "filename": blueprint.file_name(data.name, data.language),
+            "filename": blueprint.archive.file_name(data.name, data.language),
             "content_type": "application/zip",
-            "content_base64": base64.b64encode(blueprint.write_zip(bundle)).decode("ascii"),
+            "content_base64": base64.b64encode(blueprint.archive.write_zip(bundle)).decode("ascii"),
         }
 
 
@@ -164,8 +165,8 @@ def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
     latest = loads[0] if loads else None
     unfinished = latest if latest and latest.status != ImportBatch.Status.COMPLETE and latest.undone_at is None else None
     return {
-        "imports": [blueprint.describe_load(ctx, load) for load in loads],
-        "unfinished": blueprint.describe_load(ctx, unfinished) if unfinished else None,
+        "imports": [blueprint.loads.describe_load(ctx, load) for load in loads],
+        "unfinished": blueprint.loads.describe_load(ctx, unfinished) if unfinished else None,
     }
 
 
@@ -188,7 +189,7 @@ def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
     load = ImportBatch.objects.filter(pk=data.id).first()
     if load is None:
         raise NotFound(gettext("This load is not there any more."))
-    return blueprint.describe_load(ctx, load)
+    return blueprint.loads.describe_load(ctx, load)
 
 
 @operation(
@@ -212,7 +213,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = active_apps(ctx.scope)
-        counts = blueprint.counts(ctx)
+        counts = blueprint.export.counts(ctx)
         apps = [
             {
                 "id": config.label,
@@ -220,7 +221,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
                 "icon": config.icon,
                 "datasets": [
                     {"key": part.key, "label": str(part.label), "rows": counts.get(part.key, 0), "personal": part.personal}
-                    for part in blueprint.datasets_of(config.label)
+                    for part in blueprint.datasets.datasets_of(config.label)
                 ],
             }
             for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))

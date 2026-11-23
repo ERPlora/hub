@@ -215,3 +215,24 @@ msgstr "Tarea"
 
 msgid "Project"
 msgstr "Proyecto"
+
+msgid "View their own tasks and the projects"
+msgstr "Ver sus propias tareas y los proyectos"
+
+msgid "View all tasks"
+msgstr "Ver todas las tareas"
+
+msgid "Create tasks and subtasks"
+msgstr "Crear tareas y subtareas"
+
+msgid "Change, assign, complete and comment on their own tasks"
+msgstr "Cambiar, asignar, completar y comentar sus propias tareas"
+
+msgid "Change, assign, complete and comment on any task"
+msgstr "Cambiar, asignar, completar y comentar cualquier tarea"
+
+msgid "Delete tasks"
+msgstr "Borrar tareas"
+
+msgid "Create, change and delete projects"
+msgstr "Crear, cambiar y borrar proyectos"

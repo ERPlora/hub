@@ -72,7 +72,7 @@ def test_invoice_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # The product's four, plus configuring the issuer (the business's tax identity) and the ticket's public page.
-    assert invoice().permissions == PERMISSIONS
+    assert list(invoice().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_customer_roles_with_the_hub_prefix():

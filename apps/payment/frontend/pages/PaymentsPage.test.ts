@@ -11,6 +11,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { PaymentOut, PaymentStatus } from '../operations';
 import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
@@ -181,7 +182,7 @@ describe('PaymentsPage', () => {
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="payment-payments-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
     set('status', 'ionChange', 'approved');
-    set('payment_date_from', 'ionChange', '2026-08-01');
+    await pick(panel.get('[data-testid="payment-payments-filter-payment_date_from"]').element, '2026-08-01');
     set('amount_from', 'ionInput', '12,5');
     await flush();
     expect(s.list(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: '-payment_date', limit: 50, offset: 0 }]);

@@ -444,3 +444,39 @@ msgstr "Ficha duplicada"
 #: apps.py:113
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View reservations"
+msgstr "Ver reservas"
+
+msgid "Take reservations"
+msgstr "Apuntar reservas"
+
+msgid "Change reservations and their status"
+msgstr "Cambiar reservas y su estado"
+
+msgid "Delete reservations"
+msgstr "Borrar reservas"
+
+msgid "View time slots"
+msgstr "Ver las franjas"
+
+msgid "Create and remove time slots"
+msgstr "Crear y quitar franjas"
+
+msgid "View blocked dates"
+msgstr "Ver las fechas bloqueadas"
+
+msgid "Block and unblock dates"
+msgstr "Bloquear y desbloquear fechas"
+
+msgid "View the waiting list"
+msgstr "Ver la lista de espera"
+
+msgid "Change the waiting list"
+msgstr "Cambiar la lista de espera"
+
+msgid "View the settings"
+msgstr "Ver los ajustes"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"

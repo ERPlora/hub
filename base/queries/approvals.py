@@ -11,7 +11,7 @@ from live.meta import all_live_app_configs
 from live.operations import AI, operation
 
 from base import access, approvals as approval_rules, blueprint, business
-from base.models import Approval
+from base.models.approvals import Approval
 from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_for
 from base.schemas.approvals import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
 
@@ -128,7 +128,7 @@ def _approvals_kept(data: ApprovalExportIn, currency: str | None):
 
 def _approval_cell(text: str) -> str:
     """A cell a spreadsheet must not run: an apostrophe in front of what it would read as a formula."""
-    return f"'{text}" if text.startswith(blueprint.FORMULA_STARTS) else text
+    return f"'{text}" if text.startswith(blueprint.datasets.FORMULA_STARTS) else text
 
 
 @operation(

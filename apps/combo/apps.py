@@ -37,7 +37,10 @@ class ComboConfig(LiveAppConfig):
     assistant_synonyms = (
         ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
     )
-    permissions = ["combo.view", "combo.manage"]
+    permissions = {
+        "combo.view": _("View menus and price a menu line"),
+        "combo.manage": _("Create, change, sort and retire menus, their courses and choices"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["combo.*"],

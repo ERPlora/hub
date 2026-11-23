@@ -103,7 +103,7 @@
       "pickStaff": "Pick a professional",
       "day": "Day",
       "time": "Time",
-      "minutes": "Min.",
+      "minutes": "Duration (min)",
       "notes": "Notes for the customer",
       "internalNotes": "Internal notes",
       "create": "Add appointment",
@@ -127,8 +127,8 @@
       "label": "Free times",
       "hint": "Pick the services, a professional and a day to see the free times.",
       "loading": "Looking for free times…",
-      "empty": "No free times that day for this professional. You can still type a time.",
-      "error": "The free times could not be loaded. You can still type a time.",
+      "empty": "No free times that day for this professional. You can still pick a time.",
+      "error": "The free times could not be loaded. You can still pick a time.",
       "withinNotice": "inside the minimum notice"
     },
     "overlap": {
@@ -221,7 +221,7 @@
         "startDate": "Starts on",
         "fromDate": "From",
         "time": "Time",
-        "minutes": "Min.",
+        "minutes": "Duration (min)",
         "endDate": "Ends on (optional)",
         "occurrences": "Number of appointments (optional)",
         "create": "Create repeating appointment",

@@ -719,9 +719,10 @@ Pasos:
    sigue en la cuenta con su comanda, y a cocina no le llega nada nuevo.
 Entra: nada de otras apps.
 Sale: la línea invitada: no suma dinero ni IVA, pero el aviso de venta la lleva para que Inventario
-baje el stock; la venta guarda el coste de lo invitado.
+baje el stock; la venta guarda el coste de lo invitado, que solo ve quien ve los costes: a los demás la
+venta, su cobro y la previsión del cobro se lo dan vacío (BASE-F119).
 Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.».
-Implicados: INVENTORY-F21
+Implicados: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
 Estado: hecho
@@ -750,7 +751,8 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía. En
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si su
+cuenta no tiene nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
 Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;
@@ -881,7 +883,7 @@ Impresión.». Una línea ya enviada no se puede quitar: «Esa línea ya no se p
 (anúlala con un motivo), ya está cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Por el asistente: su tarjeta de confirmación dice la cuenta (por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97).
+Por el asistente: su tarjeta de confirmación dice la cuenta (la de una mesa, por la mesa como la dice Mesas y en el idioma de quien lee, «4 (Comedor)»; otra, o sin poder ver Mesas, por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97). Un producto pedido con palabras sale como el que se va a añadir: «dos cafés» con «Espresso» y «White coffee» en la carta dice «2 · White coffee · 4 (Comedor)»; si las palabras valen para varios productos o para ninguno, salen tal como se dijeron y al confirmar no se añade nada: el asistente pregunta cuál.
 Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
@@ -891,7 +893,8 @@ Actor: empleado, responsable
 Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
-2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con la «Cabecera del recibo»
+2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con el prefijo de su país si está
+   inscrito en el ROI, y con la «Cabecera del recibo»
    debajo; sin emisor, la cabecera del recibo hace de nombre y domicilio), las líneas, notas,
    descuentos, el desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tique
    fiscal se entrega al cobrar.». Con descuento en la cuenta, la fila «Descuento» dice lo que quita (el
@@ -910,7 +913,7 @@ el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; s
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09, TABLE-F34
+Implicados: PRINTING-F09, TABLE-F34, INVOICE-F21
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho
@@ -1074,9 +1077,10 @@ Pasos:
    una venta, sin recargar. Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el
    negocio o sus ventas.
 Entra: nada de otras apps.
-Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
-la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
-y, de las sesiones de bono gastadas fuera del cobro, las de su ficha. Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo pide el asistente para la comisión)
+cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas y, de las sesiones
+de bono gastadas fuera del cobro, las de su ficha. Personal lo pide como la plataforma, para que la fila de cada
+profesional cuente todo lo que hizo, y decide él qué filas ve cada persona (STAFF-F21). Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
@@ -1114,7 +1118,8 @@ Pasos:
 1. En **Ventas**, toca la fila o la acción «Documento»; también se abre solo tras cobrar, la cuenta
    entera o una parte.
 2. Se ve el tique («Tique», o «Factura» si se cobró como factura). Arriba, el negocio: nombre, domicilio
-   y NIF del emisor (un duplicado dice lo mismo que el original, aunque el emisor cambie después), con la
+   y NIF del emisor, con el prefijo de su país si está inscrito en el ROI (un duplicado dice lo mismo que
+   el original, aunque el emisor cambie después), con la
    «Cabecera del recibo» debajo. Sin emisor configurado, la primera línea de la cabecera es el nombre y el
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
@@ -1157,7 +1162,7 @@ abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir 
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.». Una venta que la persona no ve (la
 de otro, para un empleado) no se abre, no se reimprime ni se emite: la ventana dice «Error cargando el
 documento» y la API o el asistente, «Esa venta no existe.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho
@@ -1528,10 +1533,11 @@ MODIFIER-F07, MODIFIER-F08
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
 persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: un producto se
-nombra por su id, su SKU o su nombre; un cliente por su id, su nombre, su teléfono o su email; una
-venta por su id o su número; una sección o una nota rápida por su id o su nombre; un medio de
-pago por su id, su nombre o su tipo («efectivo», «tarjeta»). Si un nombre casa con varios, se rechaza
-diciendo cuáles (409 `*_ambiguous`).
+nombra por su id, su SKU o su nombre; un cliente por su id o su nombre y, quien ve el contacto de los
+clientes, también por su teléfono o su email (a quien no lo ve, esas palabras solo le casan con un
+nombre: 404 `customer.customer_unavailable`, BASE-F119); una venta por su id o su número; una sección
+o una nota rápida por su id o su nombre; un medio de pago por su id, su nombre o su tipo («efectivo»,
+«tarjeta»). Si un nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 
 Lo que lee o toca una venta ya cobrada (la lista, la venta, su documento y su papel, «Emitir ahora», anular y
 devolver) solo alcanza las ventas que la persona ve: sin «Ver todas las ventas», las que cobró y las que se le
@@ -1637,8 +1643,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 ### Lo que necesita de otras apps
 
 - **Impuestos** (requisito): la regla y el cálculo del IVA de cada línea al cobrar.
-- **Clientes** (requisito): la ficha del cliente de la venta y su búsqueda por nombre o teléfono; el
-  enlace de la cuenta con su cliente lo guarda Clientes (`customer.order.link`).
+- **Clientes** (requisito): la ficha del cliente de la venta y su búsqueda por nombre o, para quien ve el
+  contacto de los clientes, por teléfono o email; el enlace de la cuenta con su cliente lo guarda Clientes
+  (`customer.order.link`).
 - **Inventario** (opcional): el catálogo de venta, el precio, la unidad y la categoría fiscal de cada
   artículo, leídos con sus propias consultas al añadir la línea.
 - **Personal** (opcional): el equipo para el chip «Atiende», la ficha de quien tiene la sesión
@@ -1660,7 +1667,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Mesas** (opcional): «Elegir mesa» del TPV (F19) habla con Mesas solo por el nombre de sus
   operaciones, desde la pantalla y con la sesión de quien atiende: `table.table.list` y
   `table.floor.status` (las mesas), `table.session.by_order` (la mesa de la cuenta), `table.session.open`
-  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón.
+  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón. La tarjeta del asistente
+  dice la cuenta de una mesa por su mesa con `table.session.by_order`, como quien pregunta; sin Mesas, o sin
+  permiso de ver sus cuentas, por su título.
 - **Citas** (opcional): la cita de una cuenta y lo que reservó, para cobrar su precio reservado
   (`appointment.appointment.get`).
 
@@ -1694,6 +1703,12 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+
+Dos permisos de dato de la plataforma (BASE-F119) recortan lo que se ve en Ventas: lo que costó lo invitado
+(SALE-F15) solo lo ve quien ve los costes (propietario, administrador y responsable), y nombrar al cliente de un
+cobro por su teléfono o su email solo lo puede quien ve el contacto de los clientes (también el empleado). Ventas no
+enseña el email ni el teléfono del cliente: guarda su nombre y, en una factura, su NIF y su domicilio, que son datos
+fiscales y los ve todo el que ve la venta.
 
 Lo que el empleado no puede hacer en el TPV lo pide en su propio dispositivo y lo aprueba un responsable
 con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para esa misma petición: anular
@@ -2078,6 +2093,15 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   sesiones de bono fuera del cobro con `VOUCHER_SESSIONS` (las de su ficha). `tests/test_guardrails_ownership.py`
   prohíbe `Sale.objects` y `VoucherSession.objects` en los paquetes `queries` fuera de su lista cerrada, cada entrada
   con su motivo.
+- **Permisos de dato** (BASE-F119, `live.sensitive`): `SaleOut.gift_total` y `PreviewOut.gift_total` llevan la marca
+  `COSTS` y admiten nulo. live los da vacíos a quien no ve los costes en todas las puertas que los responden (la venta y
+  su búsqueda por intento, el cobro, la anulación, «Emitir ahora» y la previsión del cobro), y el cobro los guarda igual
+  porque lee el coste de cada línea con `recording_costs`. El aviso `sale.sale.completed` sigue llevando `gift_total`
+  para las Automatizaciones, que solo abren el propietario y el administrador; Caja lee la venta y marca su propia
+  copia. El cliente de un cobro nombrado por una referencia lo busca `find_customer` de Clientes, que solo casa el
+  teléfono o el email con `base.view_customer_contact`; la lista de ventas busca en el número y en el nombre que guarda
+  la venta, nunca en el contacto. `tests/test_guardrails_sensitive.py` cuenta `gift_total` y `total_gifts` como nombres
+  de coste.
 - **Ids sin clave ajena hacia apps fuera de `requires`** (precedente PLAN §20.5, `product_id`): la venta
   guarda `invoice_id` de Facturación y la línea `service_id`, `voucher_session_id`, `staff_id` y la
   cuenta `appointment_id`, como UUID opacos; Ventas sigue sin requerir Facturación, Caja, Citas ni

@@ -34,7 +34,10 @@ class TaxConfig(LiveAppConfig):
     # (base.activation.born_on, base.services.hub_registry.turn_on_born_apps): it binds the business to no authority.
     mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = ["tax.view", "tax.manage"]
+    permissions = {
+        "tax.view": _("View tax categories, rules and the tax territory"),
+        "tax.manage": _("Create tax categories and rules, and change the tax territory"),
+    }
     # The countries a rule is set for, by their names: no field of the models labels them, so the
     # assistant's card would say their ISO codes.
     choices = CHOICES

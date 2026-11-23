@@ -29,7 +29,8 @@ from live.outbox import record_event
 
 from base import activation, blueprint, entitlement, events, home, queries
 from base.activation import CREATING, FAILED
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.permissions import ADMINISTER_HUB
 from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.services.blueprints import _load_what_waited, _stop_waiting, _waiting_loads
@@ -368,7 +369,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     _write_states(ctx.scope.key, changes)
     along = [label for label in changes if label != app]
     record_event(ctx, events.APP_DISABLED, {"app": app, "along": along})
-    _stop_waiting(ctx, _waiting_loads(), changes, blueprint.STOPPED_TURNED_OFF)
+    _stop_waiting(ctx, _waiting_loads(), changes, blueprint.loads.STOPPED_TURNED_OFF)
     return _app_answer(app, activation.OFF_ROW, _named(ctx, along), already=False)
 
 

@@ -58,18 +58,18 @@ class AppointmentConfig(LiveAppConfig):
             "huecos libres",
         ),
     )
-    permissions = [
-        "appointment.view_appointment",
-        "appointment.view_own_appointment",
-        "appointment.add_appointment",
-        "appointment.add_own_appointment",
-        "appointment.change_appointment",
-        "appointment.change_own_appointment",
-        "appointment.delete_appointment",
-        "appointment.view_schedule",
-        "appointment.manage_schedule",
-        "appointment.manage_settings",
-    ]
+    permissions = {
+        "appointment.view_appointment": _("View the whole appointment book"),
+        "appointment.view_own_appointment": _("View their own appointment book"),
+        "appointment.add_appointment": _("Book appointments for anyone"),
+        "appointment.add_own_appointment": _("Book appointments in their own appointment book"),
+        "appointment.change_appointment": _("Change any appointment: status, move, cancel, charge and series"),
+        "appointment.change_own_appointment": _("Change their own appointments"),
+        "appointment.delete_appointment": _("Delete appointments"),
+        "appointment.view_schedule": _("View availability and blocked time"),
+        "appointment.manage_schedule": _("Block time"),
+        "appointment.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The employee sees
     # and manages their own diary; the manager everybody's; owner and admin also delete and set it up.
     role_permissions = {

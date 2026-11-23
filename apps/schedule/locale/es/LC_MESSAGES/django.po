@@ -35,34 +35,6 @@ msgctxt "schedule section"
 msgid "Settings"
 msgstr "Ajustes"
 
-msgctxt "weekday"
-msgid "Monday"
-msgstr "Lunes"
-
-msgctxt "weekday"
-msgid "Tuesday"
-msgstr "Martes"
-
-msgctxt "weekday"
-msgid "Wednesday"
-msgstr "Miércoles"
-
-msgctxt "weekday"
-msgid "Thursday"
-msgstr "Jueves"
-
-msgctxt "weekday"
-msgid "Friday"
-msgstr "Viernes"
-
-msgctxt "weekday"
-msgid "Saturday"
-msgstr "Sábado"
-
-msgctxt "weekday"
-msgid "Sunday"
-msgstr "Domingo"
-
 msgid "position"
 msgstr "posición"
 
@@ -209,3 +181,18 @@ msgstr ""
 "Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a "
 "18:00). Si coincide con el de tu negocio, confírmalo de un toque; si no, "
 "edita los días que cambien: las reservas fuera de tu horario se rechazan."
+
+msgid "View the week, special days, changes and whether it is open"
+msgstr "Ver la semana, los días especiales, los cambios y si está abierto"
+
+msgid "Add special days and temporary changes"
+msgstr "Añadir días especiales y cambios temporales"
+
+msgid "Set and confirm the week, and correct special days and changes"
+msgstr "Fijar y confirmar la semana, y corregir los días especiales y los cambios"
+
+msgid "Delete special days and temporary changes"
+msgstr "Borrar días especiales y cambios temporales"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"

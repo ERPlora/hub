@@ -73,7 +73,7 @@ def test_permissions():
     # The product's fifteen, but for the four no operation asks for (delete_sale, change_sale,
     # change_paymentmethod, delete_paymentmethod) and with `discount.over_limit` as one action. Seeing the whole
     # business's figures is base's «View business totals», not a permission of Sales.
-    assert sale().permissions == PERMISSIONS
+    assert list(sale().permissions) == PERMISSIONS
 
 
 def test_the_figures_open_to_whoever_reads_the_sales():
@@ -337,10 +337,13 @@ TASK_VIDEOS = [
     (("SALE-F02",), "6IaIDRuKHzk", "glc7T7Xpyw0"),
     (("SALE-F03",), "4iMjcVUNlGQ", "FjqB1ra8qPQ"),
     (("SALE-F04", "SALE-F05"), "QZIskHcvbx4", "WBdK2Z-XHOQ"),
+    (("SALE-F09",), "0z32wqTeTxo", "J7Gam4c_joo"),
+    (("SALE-F10",), "pvPGkpDjD0U", "PuYZJC6ix7M"),
     (("SALE-F11",), "gtsNNFvYHIw", "yViCguWhBP8"),
     (("SALE-F13",), "VkHmRSouS8U", "yQGyb_bvMi8"),
     (("SALE-F14",), "kG1MT9VEMjo", "B_-hW7QysXU"),
     (("SALE-F15",), "ADneSwlsnlg", "8vLwV_6ILUQ"),
+    (("SALE-F17",), "NjZnHKLUZuo", "vSfuoQaudRw"),
 ]
 
 

@@ -35,7 +35,7 @@ def test_website_is_a_free_module_of_the_organization_group_sold_to_both_vertica
 
 def test_permissions_and_roles():
     config = website()
-    assert config.permissions == ["website.view", "website.manage"]
+    assert list(config.permissions) == ["website.view", "website.manage"]
     assert set(config.role_permissions) == {"hub_owner", "hub_admin", "hub_manager", "hub_employee"}
     assert permissions_for_role([config], "hub_owner") == {"website.view", "website.manage"}
     assert permissions_for_role([config], "hub_admin") == {"website.view", "website.manage"}

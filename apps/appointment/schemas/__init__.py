@@ -22,7 +22,9 @@ from pydantic import (
     model_validator,
 )
 
+from apps.customer.schemas.contact import EMAIL, PHONE
 from base.schemas.assistant import names
+from base.weekdays import Weekday
 
 T = TypeVar("T")
 
@@ -55,9 +57,7 @@ SAY_WHICH_STAFF = _("Say which professional: their id, or their name.")
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
 SAY_WHICH_APPOINTMENT = _("Say which appointment: its id, or its number.")
 PICK_A_SERVICE = _("Pick at least one service.")
-SAY_WHAT_CHANGES = _(
-    "Say what changes: the time, the length, the professional or the services."
-)
+SAY_WHAT_CHANGES = _("Say what changes: the time, the length, the professional or the services.")
 SAY_WHAT_TO_EDIT = _("Say what to change.")
 SAY_THE_LENGTH = _("Say the services or how many minutes it lasts.")
 END_BEFORE_START = _("The end cannot be before the start.")
@@ -580,8 +580,8 @@ class AppointmentRow(Schema):
 
 
 class AppointmentOut(AppointmentRow):
-    customer_phone: str
-    customer_email: str
+    customer_phone: str | None = PHONE
+    customer_email: str | None = EMAIL
     notes: str
     internal_notes: str
     cancelled_at: dt.datetime | None
@@ -821,11 +821,8 @@ class RecurringRule(In):
     frequency: Frequency = Field(
         description="daily, weekly, biweekly (every two weeks) or monthly."
     )
-    day_of_week: int | None = Field(
-        None,
-        ge=0,
-        le=6,
-        description="Weekly and biweekly: the weekday, Monday = 0; empty = the start date's.",
+    day_of_week: Weekday | None = Field(
+        None, description="Weekly and biweekly: the weekday, Monday = 0; empty = the start date's."
     )
     time: dt.time = Field(
         description="The wall-clock time each appointment starts (HH:MM)."
@@ -887,9 +884,7 @@ class RecurringUpdateIn(In):
         description="The occurrence from which the change applies (this and all following).",
     )
     frequency: Frequency | None = Field(None, description="The new repetition.")
-    day_of_week: int | None = Field(
-        None, ge=0, le=6, description="The new weekday, Monday = 0."
-    )
+    day_of_week: Weekday | None = Field(None, description="The new weekday, Monday = 0.")
     time: dt.time | None = Field(None, description="The new time.")
     duration_minutes: Minutes | None = Field(None, description="The new length.")
     staff_id: UUID | None = Field(

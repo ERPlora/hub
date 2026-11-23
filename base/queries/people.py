@@ -10,7 +10,9 @@ from live.errors import NotFound
 from live.operations import AI, INTERNAL, operation
 
 from base import access, people as people_rules
-from base.models import Credential, Hub, HubUser, Membership, Profile
+from base.models.access import Credential
+from base.models import Hub, HubUser, Membership
+from base.models.profile import Profile
 from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_of_role
 from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
@@ -265,6 +267,17 @@ def person_label(user) -> str:
 def face_name(user) -> str:
     """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email."""
     return without_address(person_label(user))
+
+
+def actor_name(who) -> str:
+    """Whoever acts as a colleague reads them, kept on what they do (a kitchen ticket, a table's check): their account's
+    name, else what goes before the «@» of their e-mail, never the address; their username only as the last resort;
+    anything else (the platform, an API key) as it is."""
+    if who is None:
+        return ""
+    if hasattr(who, "get_username"):
+        return without_address(who.get_full_name() or getattr(who, "email", "")) or who.get_username()
+    return str(who)
 
 
 def without_address(name: str) -> str:

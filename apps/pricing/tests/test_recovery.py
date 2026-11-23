@@ -473,7 +473,7 @@ class TestPricesComeBack:
 
     def test_with_services_turned_off_the_price_stays_out_and_says_why(self, recoveries, every_app_on):
         from base import activation
-        from base.models import AppActivation
+        from base.models.activation import AppActivation
 
         hub, haircut = self.a_priced_service(recoveries, every_app_on)
         copy = recoveries.copy_of(hub)

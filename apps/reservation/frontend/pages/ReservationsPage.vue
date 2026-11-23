@@ -2,10 +2,10 @@
 // Reservations → Reservations (WORKBOOK «Pantallas · Reservas»; RESERVATION-F05 to F12, F20, F23): the book
 // of a day on the business's clock (its zone comes with the settings). The day bar (DayBar) gives the day
 // and its figures (`reservation.availability.day`, live); the list follows the live
-// `reservation.reservation.list` of that day by time — or, searching a guest's name, phone or email, the
-// whole book in calendar order (the old module's rule). Columns Date, Time, Guest, Phone, Party, Table and
-// Status (a cancelled one says why next to it, F09 and F13), filters by time, guest, phone, party and
-// status, list or cards, 50 a page. «New reservation» and a
+// `reservation.reservation.list` of that day by time — or, searching a guest's name (and phone or email, for
+// whoever sees them), the whole book in calendar order (the old module's rule). Columns Date, Time, Guest, Phone
+// (lib/guestContact), Party, Table and Status (a cancelled one says why next to it, F09 and F13), filters by time,
+// guest, phone, party and status, list or cards, 50 a page. «New reservation» and a
 // row open the booking panel; per row Confirm, Seat (it seats the table and opens its check), Complete,
 // Cancel and No-show (asking first), Edit and Delete (the owner and the admin), as its status allows.
 import {
@@ -22,7 +22,6 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonNote } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 
-import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import DayBar from '../components/DayBar.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
@@ -31,6 +30,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
+import { CUSTOMER_CONTACT, phoneColumns } from '../lib/guestContact';
 import { allows, cancellationNote, type RowAction, shortNote, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
@@ -47,6 +47,7 @@ const locale = useLocale();
 const canAdd = computed(() => session.can('reservation.add_reservation'));
 const canChange = computed(() => session.can('reservation.change_reservation'));
 const canDelete = computed(() => session.can('reservation.delete_reservation'));
+const seesContact = computed(() => session.can(CUSTOMER_CONTACT));
 
 const { data: settings } = useLive('reservation.settings.get', {});
 const zone = computed(() => settings.value?.timezone ?? FALLBACK_ZONE);
@@ -126,15 +127,7 @@ const columns = computed<DataTableColumn<ReservationOut>[]>(() => [
     filter: { type: 'text' },
   },
   { key: 'guest_name', label: t('reservation.list.columns.guest'), sortable: true, priority: 'high', cell: 'guest', filter: { type: 'text' } },
-  // As Customers paints it (+34 600 111 222): the book keeps it in E.164; the filter is the server's, by digits.
-  {
-    key: 'guest_phone',
-    label: t('reservation.list.columns.phone'),
-    sortable: true,
-    priority: 'low',
-    format: (_, row) => formatPhone(row.guest_phone),
-    filter: { type: 'text' },
-  },
+  ...phoneColumns<ReservationOut>(seesContact.value, t('reservation.list.columns.phone')),
   {
     key: 'party_size',
     label: t('reservation.list.columns.party'),
@@ -284,7 +277,7 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
       :addable="canAdd"
       :row-clickable="canChange"
       :actions="actions"
-      :search-placeholder="$t('reservation.list.search')"
+      :search-placeholder="$t(seesContact ? 'reservation.list.search' : 'reservation.searchGuest')"
       :labels="{ add: $t('reservation.list.new'), loadError: $t('reservation.list.loadError'), retry: $t('reservation.retry') }"
       :columns="columns"
       @filters-change="onFilters"

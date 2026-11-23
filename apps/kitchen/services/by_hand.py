@@ -15,7 +15,7 @@ from apps.kitchen.services.catalog import find_product
 from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out
 from apps.kitchen.services.writes import _ticket_event, actor, take_number, write_log
-from apps.sale.queries.people import person_label
+from base.queries.people import actor_name
 
 
 @operation(
@@ -53,7 +53,7 @@ def create_ticket(ctx: OperationContext, data: TicketCreateIn) -> dict:
         label=data.label,
         order_type=data.order_type or settings.default_order_type,
         notes=data.notes,
-        waiter=person_label(ctx.actor)[:ACTOR_MAX_LENGTH],
+        waiter=actor_name(ctx.actor)[:ACTOR_MAX_LENGTH],
         received_at=now,
         created_by=actor(ctx),
     )

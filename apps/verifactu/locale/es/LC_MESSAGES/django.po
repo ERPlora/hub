@@ -1387,3 +1387,18 @@ msgid ""
 msgstr ""
 "La AEAT de pruebas ha rechazado este certificado: no ha podido verificarlo (no lo ha emitido una entidad que "
 "reconozca, no vale para este servicio o ha caducado). Sube otro."
+
+msgid "View records, the queue, events and the chain, and verify the chain"
+msgstr "Ver los registros, la cola, los eventos y la cadena, y verificar la cadena"
+
+msgid "Register an issued invoice"
+msgstr "Registrar una factura emitida"
+
+msgid "Send the queue to the AEAT, ask the AEAT and test the connection"
+msgstr "Enviar la cola a la AEAT, consultar a la AEAT y probar la conexión"
+
+msgid "Fix and cancel records"
+msgstr "Subsanar y anular registros"
+
+msgid "Upload the certificate, switch to production and recover the chain"
+msgstr "Subir el certificado, pasar a producción y recuperar la cadena"

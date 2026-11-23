@@ -16,6 +16,7 @@
         "many": "reservas"
       },
       "search": "Buscar nº, cliente, teléfono, servicio…",
+      "searchWithoutContact": "Buscar nº, cliente, servicio…",
       "loadError": "No se pudieron cargar las reservas",
       "empty": "Aún no hay reservas online.",
       "noMatch": "Ninguna reserva coincide con la búsqueda.",

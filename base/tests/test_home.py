@@ -345,7 +345,9 @@ def test_the_check_of_the_bells_clock_runs_with_the_others(monkeypatch):
 
 
 def carded(*cards, permissions=("things.view",), path="/nowhere"):
-    return SimpleNamespace(label="things", path=path, permissions=list(permissions), system_cards=list(cards))
+    return SimpleNamespace(
+        label="things", path=path, permissions=dict.fromkeys(permissions, "A phrase"), system_cards=list(cards)
+    )
 
 
 def person(*permissions):
@@ -407,7 +409,7 @@ def components(tmp_path):
     ],
 )
 def test_what_an_app_declares_as_its_cards_is_checked_at_start(components, cards, errors):
-    declared = SimpleNamespace(label="things", path=str(components), permissions=["things.view"])
+    declared = SimpleNamespace(label="things", path=str(components), permissions={"things.view": "See the things"})
     if cards is not None:
         declared.system_cards = cards
 

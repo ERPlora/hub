@@ -26,16 +26,13 @@ from PIL import Image as PILImage
 
 from apps.service import events
 from apps.service.models import Service
-from apps.service.schemas import (
-    ServiceForSaleIn,
+from apps.service.schemas.catalog import ServiceForSaleIn, ServiceIn, ServiceListIn, ServiceOut
+from apps.service.schemas.fields import ServiceRefIn
+from apps.service.schemas.service_images import (
     ServiceImageIn,
     ServiceImageSuggestIn,
     ServiceImageSuggestOut,
     ServiceImageUploadIn,
-    ServiceIn,
-    ServiceListIn,
-    ServiceOut,
-    ServiceRefIn,
 )
 from apps.tax.models import TaxCategory
 from base.models import Hub

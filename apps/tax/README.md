@@ -57,9 +57,10 @@ pnpm e2e tests/e2e/tax-flows.spec.ts tests/e2e/tax-categories.spec.ts tests/e2e/
   tests/e2e/fix-tax-setup-hooks.spec.ts
 ```
 
-- `test_queries.py` prueba la resolución y el cálculo (región frente a país, territorios con impuesto propio,
-  redondeo, reglas ilegibles) y el guardarraíl `test_only_tax_resolves_a_rule` (ninguna otra app busca reglas
-  por su cuenta, hub#295); `test_services.py`, el solape con dos sesiones reales; `test_migrations.py`, el
+- `test_queries_resolution.py` y `test_queries_calculation.py` prueban la resolución y el cálculo (región frente
+  a país, territorios con impuesto propio, redondeo, reglas ilegibles), y el primero lleva el guardarraíl
+  `test_only_tax_resolves_a_rule` (ninguna otra app busca reglas por su cuenta, hub#295); las demás lecturas
+  tienen cada una su `test_queries_<caso>.py`; `test_services.py`, el solape con dos sesiones reales; `test_migrations.py`, el
   catálogo de fábrica y que sembrar dos veces no duplica nada; `test_admin.py`, que el territorio solo se
   guarda por su operación.
 - Lo que leen las demás apps se prueba contra Impuestos real en sus `test_integration_tax.py` y en

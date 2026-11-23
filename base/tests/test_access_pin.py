@@ -22,7 +22,9 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from base import access
-from base.models import AccessSettings, Credential, Membership, SessionOwner, TrustedDevice
+from base.models.access import AccessSettings, Credential, TrustedDevice
+from base.models import Membership
+from base.models.sessions import SessionOwner
 from base.tenancy.context import use_hub
 from base.tests.test_auth_views import A, B, HOST, ON_HUB_A
 
@@ -165,7 +167,8 @@ class TestEnteringWithThePin:
         # first paint (their «My profile» choice, else the business's): never a moment in the business's.
         from django.conf import settings
 
-        from base.models import Hub, Profile
+        from base.models import Hub
+        from base.models.profile import Profile
 
         Hub.objects.filter(pk=hub_a.pk).update(language=business)
         with use_hub(hub_a):
@@ -179,7 +182,8 @@ class TestEnteringWithThePin:
     def test_who_has_not_chosen_a_language_sees_the_business_s_not_the_browser_s(self, client, ana, hub_a):
         # BASE-F51: «The business's language — the one of whoever has not chosen theirs». The browser asks
         # for English; the business is in Spanish and the person chose nothing in «My profile»: the page is Spanish.
-        from base.models import Hub, Profile
+        from base.models import Hub
+        from base.models.profile import Profile
 
         Hub.objects.filter(pk=hub_a.pk).update(language="es")
         with use_hub(hub_a):

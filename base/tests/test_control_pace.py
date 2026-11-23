@@ -28,7 +28,8 @@ from base import catalog, control_pace, events, hub_listener, queries, registry,
 from base import worker_activations, worker_data
 from base.catalog import RegisterResult
 from base.hub_listener import Listener
-from base.models import AppActivation, TaskSchedule
+from base.models.activation import AppActivation
+from base.models.scheduler import TaskSchedule
 from base.schemas.hub_registry import HubRegistryIn
 from base.tenancy import provision
 from base.tenancy.context import use_control, use_hub

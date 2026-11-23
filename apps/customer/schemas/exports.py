@@ -1,9 +1,11 @@
-"""The row of the customers' CSV export (CUSTOMER-F09): its columns in order, each under the header the import reads.
+"""The customers' CSV export (CUSTOMER-F09): the filters it takes, the file it gives and its row, whose columns go in
+order, each under the header the import reads.
 
 A column marked with a data permission is left out of the file of whoever lacks it (``base.exports``)."""
 
 from ninja import Field, Schema
 
+from .cards import CustomerFilters
 from .contact import EMAIL, PHONE
 
 
@@ -27,3 +29,14 @@ class CustomerExportRow(Schema):
     created_at: str = Field(description="When the card was created.")
     groups: str = Field(description="Its groups, by name, separated by «; ».")
     tags: str = Field(description="Its tags, by name, separated by «; ».")
+
+
+class CustomerExportIn(CustomerFilters):
+    pass
+
+
+class ExportOut(Schema):
+    filename: str = Field(description="The file's name.")
+    content_type: str = Field(description="The file's type.")
+    rows: int = Field(description="How many customers it holds.")
+    csv: str = Field(description="The file's contents, CSV with a header row.")

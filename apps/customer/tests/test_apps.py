@@ -153,7 +153,7 @@ def test_customer_is_listed_in_the_store_for_both_verticals():
 
 
 def test_permissions():
-    assert customer().permissions == PERMISSIONS
+    assert list(customer().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

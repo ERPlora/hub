@@ -25,6 +25,7 @@ from apps.sale.schemas.fields import (
     SortDir,
     _text,
 )
+from base.sensitive import COSTS
 
 
 class SaleDishOut(Schema):
@@ -114,7 +115,10 @@ class LetterheadIn(Schema):
 class LetterheadOut(Schema):
     sale_id: UUID | None = Field(description="The sale it was asked for, if any.")
     name: str = Field(description="The business's name on paper: the issuer's legal name.")
-    tax_id: str = Field(description="The business's tax ID; empty without an issuer.")
+    tax_id: str = Field(
+        description="The business's tax ID as the paper prints it (ESB12345674 while registered for intra-EU "
+        "operations, ROI); empty without an issuer."
+    )
     lines: list[str] = Field(description="What goes under the name: the address, then the receipt header's lines.")
 
 
@@ -138,7 +142,9 @@ class SaleOut(Schema):
     tax_total: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
     discount_percent: Decimal = Field(description="Ticket discount in %.")
     discount_amount: int = Field(description="Every discount given, in cents.", json_schema_extra={"money": True})
-    gift_total: int = Field(description="Comps at cost, in cents.", json_schema_extra={"money": True})
+    gift_total: int | None = Field(
+        description="Comps at cost, in cents (empty without the costs).", json_schema_extra={"money": True, **COSTS}
+    )
     total: int = Field(description="Total charged, in cents.", json_schema_extra={"money": True})
     tendered_total: int = Field(description="Handed over, in cents.", json_schema_extra={"money": True})
     change_total: int = Field(description="Change given, in cents.", json_schema_extra={"money": True})

@@ -16,7 +16,7 @@ from apps.service.queries.catalog import find_service
 from apps.service.queries.grant_checks import redeem_refusal, void_refusal
 from apps.service.queries.grants import balance, find_grant, load_grant, lock_grant, session_value
 from apps.service.queries.packages import PACKAGE_NOT_FOUND, find_package
-from apps.service.schemas import AdjustIn, GrantIn, GrantOut, RedeemIn, RedemptionOut, VoidIn
+from apps.service.schemas.grants import AdjustIn, GrantIn, GrantOut, RedeemIn, RedemptionOut, VoidIn
 from apps.service.services.grant_sales import charged_on, tell_sales
 from apps.service.services.writes import _actor
 from apps.staff.models import Member

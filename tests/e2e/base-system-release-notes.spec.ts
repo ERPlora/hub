@@ -1,5 +1,5 @@
 // System › Updates lists what is new under the version: the notes this hub ships, as its own API serves them. Who runs
-// the business and an employee both read them, at the three sizes; a failed read says so and keeps the version.
+// the business reads them, at the three sizes; a failed read says so and keeps the version.
 // flow: BASE-F116
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
@@ -7,7 +7,6 @@ import {
   A,
   api,
   capture,
-  EMPLOYEE,
   horizontalOverflow,
   hostPage,
   shown,
@@ -31,8 +30,8 @@ async function served(context: BrowserContext): Promise<Note[]> {
   return answer.data.items;
 }
 
-async function openUpdates(browser: Browser, viewport: { width: number; height: number }, employee = false) {
-  return hostPage(browser, A, { viewport, next: '/system#updates', credentials: employee ? EMPLOYEE : undefined });
+async function openUpdates(browser: Browser, viewport: { width: number; height: number }) {
+  return hostPage(browser, A, { viewport, next: '/system#updates' });
 }
 
 /** The list on screen is the hub's: the same notes, in the same order, each with its kind and its day. */
@@ -70,17 +69,6 @@ for (const { label, ...viewport } of THREE_SIZES) {
     }
   });
 }
-
-test('an employee reads what is new too, without the version', async ({ browser }) => {
-  const { context, page } = await openUpdates(browser, THREE_SIZES[0], true);
-  try {
-    await listsWhatIsServed(page, context);
-    await expect(testid(page, 'system-release-version')).toHaveCount(0);
-    await snap(page, 'BASE-F116-release-notes-employee-390');
-  } finally {
-    await context.close();
-  }
-});
 
 test('in Spanish, the list and its kinds are in Spanish', async ({ browser }) => {
   const { context, page } = await signedInSpanish(browser, THREE_SIZES[1], '/system#updates');

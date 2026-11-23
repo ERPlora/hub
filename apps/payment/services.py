@@ -46,6 +46,7 @@ from apps.payment.schemas import (
 )
 from base import operations as platform
 from base.business import business_zone
+from base.queries.people import actor_name
 
 METHOD_NAME_TAKEN = _(
     "There is already a payment method with that name. Pick another name."
@@ -70,16 +71,9 @@ FINISHED = (Payment.Status.COMPLETED, Payment.Status.CANCELLED)
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it: an account's full name, else its email, else its username;
-    the platform or an API key as they name themselves."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        name = actor.get_full_name() or actor.email or actor.get_username()
-    else:
-        name = str(actor)
-    return name[:ACTOR_MAX_LENGTH]
+    """Who acted, as a colleague reads them (never by their address); the platform or an API key as they name
+    themselves."""
+    return actor_name(ctx.actor)[:ACTOR_MAX_LENGTH]
 
 
 # ── Methods ───────────────────────────────────────────────────────────────────────────────────

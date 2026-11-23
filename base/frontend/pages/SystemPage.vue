@@ -1,9 +1,7 @@
 <script setup lang="ts">
-// Below «Usage and plan», anyone sees the cards the apps that are on put there. What only whoever runs the business
-// may read is asked only for them: anyone else is told who may see it, has no Logs tab, and their session never asks
-// the Hub what it would refuse. The old `#backups` lands on Settings › Data.
-import { InlineFeedback } from '@erplora/ui/components';
-import { AppPage, type ShellTab, useSession } from '@erplora/ui/shell';
+// System is for whoever runs the business: the app gate says «No access» to anyone else before this page mounts.
+// Below «Usage and plan» go the cards the apps that are on put there. The old `#backups` lands on Settings › Data.
+import { AppPage, type ShellTab } from '@erplora/ui/shell';
 import { computed, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -14,15 +12,11 @@ import SystemRelease from '../components/SystemRelease.vue';
 import SystemReleaseNotes from '../components/SystemReleaseNotes.vue';
 import SystemUsage from '../components/SystemUsage.vue';
 import { useBaseI18n } from '../lib/i18n';
-import { BACKUPS_HASH, BACKUPS_TARGET, type SystemTab, TAB_HASH, tabOf, tabsFor } from '../lib/system';
+import { BACKUPS_HASH, BACKUPS_TARGET, SYSTEM_TABS, type SystemTab, TAB_HASH, tabOf } from '../lib/system';
 
 const { t } = useBaseI18n();
 const route = useRoute();
 const router = useRouter();
-const session = useSession();
-
-/** Who runs the business: the status, Failed events and Logs are theirs. */
-const admin = computed(() => session.can('base.administer_hub'));
 
 const TAB_ICON: Record<SystemTab, string> = {
   usage: 'ion:speedometer-outline',
@@ -31,14 +25,14 @@ const TAB_ICON: Record<SystemTab, string> = {
   logs: 'ion:list-outline',
 };
 const tabs = computed<ShellTab[]>(() =>
-  tabsFor(admin.value).map((id) => ({
+  SYSTEM_TABS.map((id) => ({
     id,
     label: t(`base.system.tabs.${id}`),
     icon: TAB_ICON[id],
   })),
 );
 const tab = computed<SystemTab>({
-  get: () => tabOf(route.hash, admin.value),
+  get: () => tabOf(route.hash),
   set: (next) => void router.replace({ path: route.path, hash: TAB_HASH[next] }),
 });
 
@@ -59,14 +53,7 @@ watchEffect(() => {
       v-if="tab === 'usage'"
       class="system-tab"
     >
-      <SystemUsage v-if="admin" />
-      <InlineFeedback
-        v-else
-        tone="info"
-        data-testid="system-usage-denied"
-      >
-        {{ t('base.system.usage.denied') }}
-      </InlineFeedback>
+      <SystemUsage />
       <SystemAppCards />
     </div>
     <section
@@ -76,7 +63,7 @@ watchEffect(() => {
     >
       <header class="system-updates-head">
         <h2>{{ t('base.system.updates.heading') }}</h2>
-        <SystemRelease v-if="admin" />
+        <SystemRelease />
       </header>
       <p class="system-updates-hint">
         {{ t('base.system.updates.auto') }}
@@ -87,14 +74,7 @@ watchEffect(() => {
       v-else-if="tab === 'events'"
       class="system-tab"
     >
-      <FailedEvents v-if="admin" />
-      <InlineFeedback
-        v-else
-        tone="info"
-        data-testid="system-events-denied"
-      >
-        {{ t('base.system.failed.denied') }}
-      </InlineFeedback>
+      <FailedEvents />
     </div>
     <div
       v-else

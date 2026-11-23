@@ -25,7 +25,8 @@ from live.operations import get
 
 from base import blueprint, events, services, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
-from base.models import AppActivation, ImportBatch
+from base.models.activation import AppActivation
+from base.models.blueprints import ImportBatch
 from base.tenancy import migrator
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -81,7 +82,7 @@ def count(hub, app: str, model: str) -> int:
 def listed(hub, dataset: str) -> int:
     """The rows of ``dataset`` its app shows: undoing a load archives some (a service) rather than deleting them."""
     with use_hub(fresh(hub)):
-        return blueprint.dataset(dataset).count(as_admin(hub))
+        return blueprint.datasets.dataset(dataset).count(as_admin(hub))
 
 
 def events_of(hub, name: str) -> list[dict]:
@@ -102,7 +103,7 @@ def test_a_load_says_the_app_it_waits_for_is_being_set_up_and_offers_no_retry_me
     load = load_template(hub)
 
     assert row(hub, "service").state == CREATING
-    assert by_app(load)["service"]["status"] == blueprint.WAITING
+    assert by_app(load)["service"]["status"] == blueprint.loading.WAITING
     assert by_app(load)["service"]["reason"]
     assert (load["status"], load["retry"], load["retry_blocked"]) == ("partial", False, "waiting")
     assert report_of(hub, load)["report"] == load["report"]
@@ -142,7 +143,7 @@ def test_the_whole_template_waits_and_loads_with_nothing_chosen(business):
     hub = business("a")
 
     load = load_template(hub, choose=())
-    waited = [app["id"] for app in load["report"]["apps"] if app["status"] == blueprint.WAITING]
+    waited = [app["id"] for app in load["report"]["apps"] if app["status"] == blueprint.loading.WAITING]
 
     assert {"service", "inventory"} <= set(waited)
     run_pass()
@@ -150,7 +151,7 @@ def test_the_whole_template_waits_and_loads_with_nothing_chosen(business):
     done = report_of(hub, load)
     assert count(hub, "service", "Service") == SALON_SERVICES
     assert count(hub, "inventory", "Product") == SALON_PRODUCTS
-    assert not [app["id"] for app in done["report"]["apps"] if app["status"] == blueprint.WAITING]
+    assert not [app["id"] for app in done["report"]["apps"] if app["status"] == blueprint.loading.WAITING]
 
 
 def test_the_restaurant_template_with_every_app_to_set_up_ends_with_its_menu_its_zones_and_its_tables(business):
@@ -158,14 +159,14 @@ def test_the_restaurant_template_with_every_app_to_set_up_ends_with_its_menu_its
     hub = business("a")
 
     load = load_template(hub, RESTAURANT, choose=())
-    assert by_app(load)["table"]["status"] == blueprint.WAITING
+    assert by_app(load)["table"]["status"] == blueprint.loading.WAITING
     run_pass()
 
     done = report_of(hub, load)
     assert listed(hub, "inventory.product") == RESTAURANT_PRODUCTS
     assert listed(hub, "table.zone") == RESTAURANT_ZONES
     assert listed(hub, "table.table") == RESTAURANT_TABLES
-    assert not [app["id"] for app in done["report"]["apps"] if app["status"] == blueprint.WAITING]
+    assert not [app["id"] for app in done["report"]["apps"] if app["status"] == blueprint.loading.WAITING]
     assert done["status"] == "complete"
 
 
@@ -176,9 +177,9 @@ def test_what_waited_reads_in_the_language_of_who_loaded_it_though_the_worker_lo
     run_pass()
 
     with override("es"):
-        said = str(blueprint.dataset("service.service").label)
+        said = str(blueprint.datasets.dataset("service.service").label)
     with override("en"):
-        assert said != str(blueprint.dataset("service.service").label)
+        assert said != str(blueprint.datasets.dataset("service.service").label)
     assert by_app(report_of(hub, load))["service"]["datasets"][1]["label"] == said
 
 
@@ -186,9 +187,9 @@ def test_how_its_setup_goes_reads_in_the_language_of_who_asks(business):
     hub = business("a")
     load = load_template(hub, language="en")
     with override("es"):
-        said = str(blueprint.BEING_SET_UP)
+        said = str(blueprint.loads.BEING_SET_UP)
     with override("en"):
-        assert said != str(blueprint.BEING_SET_UP)
+        assert said != str(blueprint.loads.BEING_SET_UP)
 
     assert by_app(call(hub, "base.import.detail", "es", id=load["id"]))["service"]["reason"] == said
 
@@ -196,14 +197,14 @@ def test_how_its_setup_goes_reads_in_the_language_of_who_asks(business):
 @pytest.mark.parametrize(
     "text",
     [
-        blueprint.BEING_SET_UP,
-        blueprint.SETUP_FAILING,
-        blueprint.FILE_BEING_SET_UP,
-        blueprint.STOPPED_TURNED_OFF,
-        blueprint.STOPPED_UNDONE,
-        blueprint.STOPPED_RETRIED,
-        blueprint.STOPPED_RESET,
-        blueprint.RETRY_BLOCKED["waiting"][1],
+        blueprint.loads.BEING_SET_UP,
+        blueprint.loads.SETUP_FAILING,
+        blueprint.loads.FILE_BEING_SET_UP,
+        blueprint.loads.STOPPED_TURNED_OFF,
+        blueprint.loads.STOPPED_UNDONE,
+        blueprint.loads.STOPPED_RETRIED,
+        blueprint.loads.STOPPED_RESET,
+        blueprint.loads.RETRY_BLOCKED["waiting"][1],
     ],
 )
 def test_all_it_says_has_its_spanish(text):
@@ -244,7 +245,7 @@ def test_an_app_loaded_at_once_does_not_wait_and_is_not_loaded_again(business):
 
     load = load_template(hub, choose=("inventory", "service"))
     assert by_app(load)["inventory"]["status"] == "applied"
-    assert by_app(load)["service"]["status"] == blueprint.WAITING
+    assert by_app(load)["service"]["status"] == blueprint.loading.WAITING
     run_pass()
 
     done = report_of(hub, load)
@@ -270,7 +271,7 @@ def test_a_load_that_waited_brings_its_data_to_its_own_business_and_never_opens_
     assert not [alias for alias in sent if b.id.hex in alias]
     assert count(a, "service", "Service") == SALON_SERVICES
     assert report_of(a, loaded_a)["status"] == "complete"
-    assert by_app(report_of(b, loaded_b))["inventory"]["status"] == blueprint.WAITING
+    assert by_app(report_of(b, loaded_b))["inventory"]["status"] == blueprint.loading.WAITING
     assert "service_service" not in tables(b)
     assert "inventory_product" not in tables(a)
 
@@ -298,12 +299,12 @@ def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_
     hub = business("a")
     load = load_template(hub)
 
-    with mock.patch.object(blueprint, "apply", side_effect=WorkerDied), pytest.raises(WorkerDied):
+    with mock.patch.object(blueprint.loads, "apply", side_effect=WorkerDied), pytest.raises(WorkerDied):
         run_pass()
 
     # Nothing committed: the app did not go on without its data, and the load still waits.
     assert row(hub, "service").state == CREATING
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.WAITING
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.WAITING
 
     # A new process, the hub's ring lost with it: the sweep finds it again.
     HubDue.objects.filter(hub_id=hub.pk).delete()
@@ -332,7 +333,7 @@ def test_an_app_that_cannot_be_set_up_says_so_and_its_data_loads_when_the_worker
 
     assert row(hub, "service").state == FAILED
     failed = report_of(hub, load)
-    assert by_app(failed)["service"]["status"] == blueprint.SETUP_FAILED
+    assert by_app(failed)["service"]["status"] == blueprint.loading.SETUP_FAILED
     assert by_app(failed)["service"]["reason"]
     assert (failed["status"], failed["retry"], failed["retry_blocked"]) == ("partial", True, "")
     assert count(hub, "base", "ImportBatch") == 1
@@ -382,15 +383,15 @@ def test_retrying_one_that_failed_tries_the_app_again_and_only_the_new_load_wait
     again = call(hub, "base.blueprint.import", retry_of=load["id"])
 
     assert row(hub, "service").state == CREATING
-    assert by_app(again)["service"]["status"] == blueprint.WAITING
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.INACTIVE
+    assert by_app(again)["service"]["status"] == blueprint.loading.WAITING
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.INACTIVE
     assert by_app(report_of(hub, load))["service"]["reason"]
 
     run_pass(timezone.now() + dt.timedelta(minutes=2))
 
     assert count(hub, "service", "Service") == SALON_SERVICES
     assert by_app(report_of(hub, again))["service"]["status"] == "applied"
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.INACTIVE
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.INACTIVE
     assert report_of(hub, load)["rows"] == 0
 
 
@@ -398,15 +399,17 @@ def test_a_load_that_breaks_turns_its_app_on_all_the_same_and_says_so_and_can_be
     hub = business("a")
     load = load_template(hub)
 
-    with mock.patch.object(blueprint, "apply", side_effect=RuntimeError("the load broke")):
+    with mock.patch.object(blueprint.loads, "apply", side_effect=RuntimeError("the load broke")):
         run_pass()
 
     assert row(hub, "service").state == ON
     broken = report_of(hub, load)
-    assert by_app(broken)["service"]["status"] == blueprint.FAILED
+    assert by_app(broken)["service"]["status"] == blueprint.loading.FAILED
     assert by_app(broken)["service"]["reason"]
     assert (broken["status"], broken["retry"], broken["retry_blocked"]) == ("failed", True, "")
-    assert "the load broke" in caplog.text
+    assert [record.name for record in caplog.records if record.exc_info and str(record.exc_info[1]) == "the load broke"] == [
+        "base.blueprint"
+    ]
 
     again = call(hub, "base.blueprint.import", retry_of=load["id"])
 
@@ -424,27 +427,27 @@ def test_a_load_broken_by_the_database_leaves_nothing_of_it_and_its_app_still_go
         ImportBatch.objects.create(name="half of it", source="catalog", purpose="template", status="partial")
         ImportBatch.objects.create(name=None, source="catalog", purpose="template", status="partial")
 
-    with mock.patch.object(blueprint, "apply", side_effect=half_done_then_refused):
+    with mock.patch.object(blueprint.loads, "apply", side_effect=half_done_then_refused):
         run_pass()
 
     assert row(hub, "service").state == ON
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.FAILED
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.FAILED
     assert count(hub, "base", "ImportBatch") == 1
 
 
 def test_a_template_whose_version_changed_meanwhile_loads_nothing_and_says_why(business):
     hub = business("a")
     load = load_template(hub)
-    seed = blueprint.template(SALON)
+    seed = blueprint.seeds.template(SALON)
     newer = dataclasses.replace(seed, version=f"{seed.version}-newer")
 
-    with mock.patch.object(blueprint, "template", return_value=newer):
+    with mock.patch.object(blueprint.loads, "template", return_value=newer):
         run_pass()
         gone = report_of(hub, load)
 
     assert row(hub, "service").state == ON
     assert count(hub, "service", "Service") == 0
-    assert by_app(gone)["service"]["status"] == blueprint.INACTIVE
+    assert by_app(gone)["service"]["status"] == blueprint.loading.INACTIVE
     assert by_app(gone)["service"]["reason"]
     assert gone["retry_blocked"] == "version_gone"
 
@@ -459,7 +462,7 @@ def test_an_app_turned_off_meanwhile_stops_the_wait_and_retrying_brings_it(busin
     turn_off(hub, "service")
     stopped = report_of(hub, load)
 
-    assert by_app(stopped)["service"]["status"] == blueprint.INACTIVE
+    assert by_app(stopped)["service"]["status"] == blueprint.loading.INACTIVE
     assert by_app(stopped)["service"]["reason"]
     assert (stopped["status"], stopped["retry"]) == ("failed", True)
     run_pass()
@@ -467,7 +470,7 @@ def test_an_app_turned_off_meanwhile_stops_the_wait_and_retrying_brings_it(busin
     assert "service_service" not in tables(hub)
 
     again = call(hub, "base.blueprint.import", retry_of=load["id"])
-    assert by_app(again)["service"]["status"] == blueprint.WAITING
+    assert by_app(again)["service"]["status"] == blueprint.loading.WAITING
     run_pass()
 
     assert count(hub, "service", "Service") == SALON_SERVICES
@@ -480,8 +483,8 @@ def test_turning_off_one_app_only_stops_the_wait_for_that_app(business):
     turn_off(hub, "service")
 
     stopped = report_of(hub, load)
-    assert by_app(stopped)["service"]["status"] == blueprint.INACTIVE
-    assert by_app(stopped)["printing"]["status"] == blueprint.WAITING
+    assert by_app(stopped)["service"]["status"] == blueprint.loading.INACTIVE
+    assert by_app(stopped)["printing"]["status"] == blueprint.loading.WAITING
     assert stopped["retry"] is False
 
 
@@ -497,7 +500,7 @@ def test_a_load_undone_meanwhile_brings_nothing_later(business):
     assert row(hub, "service").state == ON
     assert count(hub, "service", "Service") == 0
     assert listed(hub, "inventory.product") == 0
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.INACTIVE
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.INACTIVE
 
 
 def test_a_business_reset_meanwhile_brings_nothing_later(business):
@@ -511,7 +514,7 @@ def test_a_business_reset_meanwhile_brings_nothing_later(business):
 
     assert row(hub, "service").state == ON
     assert count(hub, "service", "Service") == 0
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.INACTIVE
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.INACTIVE
 
 
 # ── A file ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -519,19 +522,19 @@ def test_a_business_reset_meanwhile_brings_nothing_later(business):
 
 def test_a_file_is_not_kept_so_it_does_not_wait_and_says_to_upload_it_again(business):
     hub = business("a")
-    content = base64.b64encode(blueprint.write_zip(blueprint.template(SALON).bundle)).decode("ascii")
+    content = base64.b64encode(blueprint.archive.write_zip(blueprint.seeds.template(SALON).bundle)).decode("ascii")
 
     load = call(hub, "base.blueprint.import", file_base64=content, apps=["service"])
 
     assert row(hub, "service").state == CREATING
-    assert by_app(load)["service"]["status"] == blueprint.INACTIVE
+    assert by_app(load)["service"]["status"] == blueprint.loading.INACTIVE
     assert by_app(load)["service"]["reason"]
     assert load["retry_blocked"] == "file"
     run_pass()
 
     assert row(hub, "service").state == ON
     assert count(hub, "service", "Service") == 0
-    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.INACTIVE
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.loading.INACTIVE
 
 
 # ── Only what the report needs is read ──────────────────────────────────────────────────────────────────────────
@@ -560,7 +563,7 @@ def test_only_the_loads_of_the_apps_that_went_on_load(business):
         op(internal(hub), op.input.model_validate({"apps": ["printing"], "outcome": "created", "error": ""}))
 
     assert row(hub, "printing").state == ON
-    assert by_app(report_of(hub, salon))["service"]["status"] == blueprint.WAITING
+    assert by_app(report_of(hub, salon))["service"]["status"] == blueprint.loading.WAITING
     assert "service_service" not in tables(hub)
 
 
@@ -572,7 +575,7 @@ def test_what_the_person_left_unchecked_never_comes_in_later_though_its_app_is_o
 
     load = load_template(hub, choose=("service",))
     assert by_app(load)["inventory"]["status"] == "not_selected"
-    assert by_app(load)["service"]["status"] == blueprint.WAITING
+    assert by_app(load)["service"]["status"] == blueprint.loading.WAITING
     run_pass()
 
     done = report_of(hub, load)

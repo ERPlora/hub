@@ -9,6 +9,7 @@
 // What it creates is deleted after the file (`afterAll`).
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, login, shot, shown } from './helpers';
 import { THREE_SIZES_TALL_TABLET as VIEWPORTS } from './screen';
 import { noHorizontalScroll, rowAction } from './service-helpers';
@@ -43,7 +44,7 @@ async function fillRule(page: Page, dialog: Locator, key: string, rate: string, 
   await choose(page, dialog.locator('[data-testid=tax-rule-form-country_code]'), 'tax-rule-form-country_code', 'Spain', 'ES');
   await choose(page, dialog.locator('[data-testid=tax-rule-form-tax_category_key]'), 'tax-rule-form-tax_category_key', key, key);
   await dialog.locator('[data-testid=tax-rule-form-rate_pct] input').fill(rate);
-  await dialog.locator('[data-testid=tax-rule-form-valid_from] input').fill(from);
+  await pickDay(page, dialog.locator('[data-testid=tax-rule-form-valid_from]'), from);
 }
 
 test('TAX-F04/F07: a rule is created, an overlapping one is refused on «Valid from», ending the first lets the new rate in', async ({ page, context }) => {
@@ -84,7 +85,7 @@ test('TAX-F04/F07: a rule is created, an overlapping one is refused on «Valid f
   await rowAction(page, 'tax-rules', first.id, 'end');
   const end = page.locator('ion-modal[data-testid=tax-rule-end]');
   await expect(end).toBeVisible();
-  await end.locator('[data-testid=tax-rule-end-valid_to] input').fill('2026-05-31');
+  await pickDay(page, end.locator('[data-testid=tax-rule-end-valid_to]'), '2026-05-31');
   await page.screenshot({ path: shot('tax-rules-end-1280') });
   await end.locator('[data-testid=tax-rule-end-submit]').click();
   await expect(end).toBeHidden();

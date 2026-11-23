@@ -21,7 +21,7 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.services import lock_customers, lock_rows
+from apps.customer.services.writes import lock_customers, lock_rows
 
 
 class LockedDeletion:

@@ -16,7 +16,8 @@ from live.outbox import record_event
 
 from base import activation, events, queries, registry
 from base.activation import CREATING, FAILED, ON
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.registry import internal_only
 from base.schemas.apps import AppActivationSettleIn, AppActivationSettleOut
 from base.services.apps import _business_hub, _locked_states, _write_states, apps_created

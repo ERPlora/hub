@@ -19,7 +19,7 @@ from apps.sale.models import Sale
 from apps.verifactu.models import Record
 from base import catalog, relay, worker
 from base.catalog import RegisterResult
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 
 #: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
 pytestmark = HUB_DB_COMMITTED

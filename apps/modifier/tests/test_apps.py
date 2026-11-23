@@ -46,7 +46,7 @@ def test_modifier_is_in_the_store_and_in_the_restaurant_vertical():
 
 def test_permissions():
     # `modifier.system` (the reactions to Inventory) is declared by no role on purpose.
-    assert modifier().permissions == ["modifier.view", "modifier.manage"]
+    assert list(modifier().permissions) == ["modifier.view", "modifier.manage"]
 
 
 def test_roles():

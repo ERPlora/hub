@@ -1,9 +1,9 @@
 """The business's API keys at the door of its API, without the ORM.
 
 A key's token is ``erpk_live_`` and 256 random bits, sent as ``Authorization: Bearer <token>``; the hub keeps its
-SHA-256 (``base.models.ApiKey``) and its first characters. :func:`install` puts the key's door in front of the session's
-on every route of the API whose operation is published (``expose_api``) and needs a caller: the key answers first
-when the request carries one (the session's own door would refuse a request without its CSRF token before the key
+SHA-256 (``base.models.api_keys.ApiKey``) and its first characters. :func:`install` puts the key's door in front of the
+session's on every route of the API whose operation is published (``expose_api``) and needs a caller: the key answers
+first when the request carries one (the session's own door would refuse a request without its CSRF token before the key
 was looked at), else the session goes on as always. A route no app publishes never opens to a key.
 
 The door (:class:`KeyDoor`) asks ``base.services.api_keys.authenticate_api_key`` (the ORM's side) for the key of the token in

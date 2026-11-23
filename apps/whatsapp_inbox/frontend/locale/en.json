@@ -24,6 +24,7 @@
     },
     "inbox": {
       "search": "Filter contact or phone…",
+      "searchWithoutContact": "Filter contact…",
       "empty": "No conversations.",
       "loadError": "Could not load the conversations.",
       "entity": {

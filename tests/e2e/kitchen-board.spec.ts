@@ -356,7 +356,7 @@ test('KITCHEN-F10: the destination and waiter keep whole words on separate lines
     const ticketId = round.lines[0];
     const destination = card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-label]`);
     const waiter = card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-waiter]`);
-    await expect(waiter).toHaveText('Waiter: owner@example.com');
+    await expect(waiter).toHaveText('Waiter: owner');
     await ionicLabelStylesLast(page);
 
     for (const size of [

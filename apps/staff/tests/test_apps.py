@@ -113,7 +113,7 @@ def test_staff_has_the_store_metadata_and_belongs_to_the_hair_salon():
 
 
 def test_permissions():
-    assert staff().permissions == PERMISSIONS
+    assert list(staff().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -162,7 +162,7 @@ def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
         ("roles", "Roles", "/staff/roles", "ion:shield-outline", "staff.manage_settings"),
         ("time_off", "Time Off", "/staff/time-off", "ion:calendar-outline", "staff.view_time_off"),
         ("schedules", "Schedules", "/staff/schedules", "ion:time-outline", "staff.view"),
-        ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline", "staff.view_compensation"),
+        ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline", "staff.view"),
         ("settings", "Settings", "/staff/settings", "ion:settings-outline", "staff.manage_settings"),
     ]
     assert home.shell_icon(staff()) == "ion:people-outline"

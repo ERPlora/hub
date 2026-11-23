@@ -49,18 +49,18 @@ class StaffConfig(LiveAppConfig):
         ("pido", "solicito", "solicitud", "request"),
     )
     # The old module's permissions (module.json), one by one, plus asking for one's own time off.
-    permissions = [
-        "staff.view",
-        "staff.view_compensation",
-        "staff.add_member",
-        "staff.change_member",
-        "staff.delete_member",
-        "staff.view_time_off",
-        "staff.view_time_off_detail",
-        "staff.manage_time_off",
-        "staff.manage_settings",
-        "staff.request_time_off",
-    ]
+    permissions = {
+        "staff.view": _("View the team, roles, schedules, availability, figures and settings"),
+        "staff.view_compensation": _("View pay rates, commissions and HR notes"),
+        "staff.add_member": _("Add team members"),
+        "staff.change_member": _("Edit team members"),
+        "staff.delete_member": _("Deactivate team members and register leavers"),
+        "staff.view_time_off": _("View time off, without its reason"),
+        "staff.view_time_off_detail": _("View the reason and notes of any time off"),
+        "staff.manage_time_off": _("Record, approve, reject and cancel anyone's time off"),
+        "staff.manage_settings": _("Manage roles, schedules and settings"),
+        "staff.request_time_off": _("Request their own time off"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier
     # role is gone: its directory view is the employee's.
     role_permissions = {
@@ -79,8 +79,8 @@ class StaffConfig(LiveAppConfig):
         ],
         "hub_employee": ["staff.view", "staff.view_time_off", "staff.request_time_off"],
     }
-    # The sections of its tab bar, each opening with its permission: Commissions to whoever sees the
-    # pay, Roles and Settings to whoever may save the settings.
+    # The sections of its tab bar, each opening with its permission: Commissions to whoever reads the team
+    # (each person their own line; the team's with the pay), Roles and Settings to whoever may save the settings.
     navigation = [
         Nav(
             id="staff",
@@ -112,7 +112,7 @@ class StaffConfig(LiveAppConfig):
             label=_("Commissions"),
             icon="ion:wallet-outline",
             path="/staff/commissions",
-            permission="staff.view_compensation",
+            permission="staff.view",
         ),
         Nav("settings", _("Settings"), "ion:settings-outline", "/staff/settings", permission="staff.manage_settings"),
     ]

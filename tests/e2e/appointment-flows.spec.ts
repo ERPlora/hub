@@ -220,6 +220,9 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // APPOINTMENT-F02, F01: «Add appointment» with her card, the service, its professional and a free time.
       await view.locator('[data-testid=appointment-list-add]').click();
       const form = page.locator('ion-modal[data-testid=appointment-form]');
+      // Still empty, «Duration (min)» sits full size inside its box: it reads whole there too.
+      await expect(form.locator('[data-testid=appointment-form-minutes]')).toBeVisible();
+      expect(await cutLabels(form), `labels cut in the empty appointment form at ${vp.label}`).toEqual([]);
       await chooseCustomer(page, 'appointment-form', who);
       await pick(page, 'appointment-form-service-add', word(who.service.name), who.service.name);
       await pick(page, 'appointment-form-staff', word(who.member.full_name), who.member.full_name);
@@ -379,8 +382,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await chooseCustomer(page, 'series-form', who);
       await pick(page, 'series-form-service-add', word(who.service.name), who.service.name);
       await pick(page, 'series-form-staff', word(who.member.full_name), who.member.full_name);
-      await form.locator('[data-testid=series-form-start_date] input').fill(SERIES_DAY);
-      await form.locator('[data-testid=series-form-time] input').fill('16:00');
+      await pickDay(page, form.locator('[data-testid=series-form-start_date]'), SERIES_DAY);
+      await pickTime(page, form.locator('[data-testid=series-form-time]'), '16:00');
       await form.locator('[data-testid=series-form-max_occurrences] input').fill('3');
       expect(await cutLabels(form), `labels cut in the series form at ${vp.label}`).toEqual([]);
       await capture(page, 'APPOINTMENT-F12');
@@ -410,8 +413,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await rowAction(page, 'appointment-series', series, 'edit');
       await expect(form).toBeVisible();
       await expect(form.locator('ion-title')).toHaveText('Edit repeating appointment');
-      await form.locator('[data-testid=series-form-from_date] input').fill(SERIES_DAY);
-      await form.locator('[data-testid=series-form-time] input').fill('17:00');
+      await pickDay(page, form.locator('[data-testid=series-form-from_date]'), SERIES_DAY);
+      await pickTime(page, form.locator('[data-testid=series-form-time]'), '17:00');
       await expect(form.locator('[data-testid=series-form-scope]')).toContainText(`reaches ${booked()} booked appointment${booked() === 1 ? '' : 's'}.`);
       // Only what happens; nothing is charged here, so no «0 already charged».
       await expect(form.locator('[data-testid=series-form-scope]')).not.toContainText('already charged');

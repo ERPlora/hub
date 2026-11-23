@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { clockIn } from './attendance-helpers';
+import { dayAsShown, pickDayTime, timeAsShown } from './date-time-fields';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { offersRowAction, rowAction } from './service-helpers';
@@ -231,9 +232,11 @@ for (const vp of VIEWPORTS) {
       await rowAction(page, 'attendance-records', cidDay.id, 'correct');
       const dialog = page.locator('ion-modal[data-testid=attendance-correct]');
       await expect(dialog).toHaveClass(/show-modal/);
-      await expect(dialog.locator('[data-testid=attendance-correct-clock_in] input')).toHaveValue(businessLocal(cidDay.clock_in_at));
+      const opened = businessLocal(cidDay.clock_in_at);
+      await expect(dialog.locator('[data-testid=attendance-correct-clock_in-date] input')).toHaveValue(dayAsShown(opened.slice(0, 10)));
+      await expect(dialog.locator('[data-testid=attendance-correct-clock_in-time] input')).toHaveValue(timeAsShown(opened.slice(11)));
       const out = new Date(Date.parse(cidDay.clock_in_at) + 8 * 3600_000).toISOString();
-      await dialog.locator('[data-testid=attendance-correct-clock_out] input').fill(businessLocal(out));
+      await pickDayTime(page, dialog.locator('[data-testid=attendance-correct-clock_out]'), businessLocal(out));
       await dialog.locator('[data-testid=attendance-correct-reason] textarea').fill('no');
       await dialog.locator('[data-testid=attendance-correct-submit]').click();
       await expect(dialog.locator('[data-testid=attendance-correct-reason]')).toContainText('Write a reason of at least 3 characters.');

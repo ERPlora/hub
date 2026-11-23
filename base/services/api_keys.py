@@ -15,7 +15,7 @@ from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from base import api_keys, events, queries
-from base.models import ApiKey, ApiSettings
+from base.models.api_keys import ApiKey, ApiSettings
 from base.permissions import ADMINISTER_HUB
 from base.sensitive import DATA_PERMISSIONS
 from base.schemas.api_keys import (

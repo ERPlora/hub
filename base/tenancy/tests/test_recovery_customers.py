@@ -272,7 +272,7 @@ class TestCustomersComeBack:
         [why] = customers["reasons"]
         from django.utils import translation
 
-        from apps.customer.services import PHONE_INVALID
+        from apps.customer.services.writes import PHONE_INVALID
 
         with translation.override("es"):
             assert why["reason"] == f"customer.phone_invalid: {PHONE_INVALID}"

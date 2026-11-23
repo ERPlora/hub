@@ -8,7 +8,8 @@ from live.operations import AI, INTERNAL, operation
 
 from base import activation, bell, home, unpaid_plan
 from base.apps_on import active_apps
-from base.models import EventDelivery, Hub, Membership
+from base.models.relay import EventDelivery
+from base.models import Hub, Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.home import (
     NoticeListIn,

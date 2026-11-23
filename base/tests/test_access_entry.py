@@ -20,7 +20,7 @@ from django.contrib.sessions.models import Session
 from django.utils import timezone
 
 from base import access
-from base.models import AccessSettings, Credential, TrustedDevice
+from base.models.access import AccessSettings, Credential, TrustedDevice
 from base.tenancy.context import use_hub
 from base.tests.test_access_account import enter
 from base.tests.test_auth_views import A, B, HOST, ON_HUB_A, demo, host_of  # noqa: F401 (demo: a fixture)

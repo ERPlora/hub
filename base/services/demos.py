@@ -337,11 +337,11 @@ def purge_demo_data(hub: Hub) -> None:
 def reap_demos(now: dt.datetime | None = None) -> int:
     """Purge every demo that ended by ``now`` (its time ran out, or it was expired by hand); return how many.
 
-    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Every demo
-    that ended is marked ``expired`` and due (``hub_due``) first, then dropped and purged under its lease
-    (``base.tenancy.provision.drop``: its database and its files, then ``base.demo.purge`` in its own transaction). One
-    that fails, or whose lease the worker holds (it was still being made), is logged or left, and the others are purged;
-    the worker takes it again as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
+    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``). Every demo that ended is marked ``expired``
+    and due (``hub_due``) first, then dropped and purged under its lease (``base.tenancy.provision.drop``: its
+    database and its files, then ``base.demo.purge`` in its own transaction). One that fails, or whose lease the
+    worker holds (it was still being made), is logged or left, and the others are purged; the worker takes it again
+    as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
     """
     from base.tenancy import provision
 

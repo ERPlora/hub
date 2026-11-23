@@ -3,13 +3,15 @@
 // `staff.commission.report`. The period is «Today» to begin with, then Yesterday, This week, This month or
 // a range of one's own (prefilled with the period on screen); the server counts it in business days and
 // judges the range (its 422 goes under «To»). Above the list, what the period sold and its commissions;
-// a professional who no longer works here but sold in the period is marked. Only whoever sees the pay
-// reads it; a business without Sales is told why there is nothing to show.
+// a professional who no longer works here but sold in the period is marked. Whoever reads the team follows it:
+// the server answers someone without the team's pay only their own line; a business without Sales is told why
+// there is nothing to show.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick as pickIn, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { BUSINESS, business, EMPLOYEE, errorFrame, JAPANESE, type MountOptions, mountStaff, POLISH } from '../__tests__/mount-staff';
 import type { CommissionReportOut } from '../operations';
 import CommissionsPage from './CommissionsPage.vue';
@@ -50,13 +52,12 @@ async function setup(options: MountOptions = {}, live = true) {
     segment.dispatchEvent(new CustomEvent('ionChange', { detail: { value }, bubbles: true }));
     await m.reopen();
   }
-  async function type(testid: string, value: string): Promise<void> {
-    const input = m.find(testid).element as Control;
-    input.value = value;
-    input.dispatchEvent(new CustomEvent('ionInput', { detail: { value }, bubbles: true }));
+  /** Picks `day` in the day field of `testid`; the report follows it on the stream it reopens. */
+  async function pickDay(testid: string, day: string): Promise<void> {
+    await pickIn(m.find(testid).element, day);
     await m.reopen();
   }
-  return { ...m, table, prop, rows, cells, control, chip, pick, type, report: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
+  return { ...m, table, prop, rows, cells, control, chip, pick, pickDay, report: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
 }
 
 describe('CommissionsPage', () => {
@@ -128,10 +129,10 @@ describe('CommissionsPage', () => {
     expect(s.find('staff-commissions-from').exists()).toBe(false);
     await s.pick('custom');
     const from = s.control('staff-commissions-from');
-    expect([from.label, from.value, from.getAttribute('mode'), from.fill]).toEqual(['From', '2026-08-17', 'md', 'outline']);
-    expect([s.control('staff-commissions-to').label, s.control('staff-commissions-to').value]).toEqual(['To', '2026-08-19']);
+    expect([from.label, picked(from), from.value, from.getAttribute('mode'), from.fill]).toEqual(['From', '2026-08-17', '08/17/2026', 'md', 'outline']);
+    expect([s.control('staff-commissions-to').label, picked(s.control('staff-commissions-to'))]).toEqual(['To', '2026-08-19']);
     expect(s.report()).toEqual([{ date_from: '2026-08-17', date_to: '2026-08-19' }]);
-    await s.type('staff-commissions-from', '2026-08-01');
+    await s.pickDay('staff-commissions-from', '2026-08-01');
     expect(s.report()).toEqual([{ date_from: '2026-08-01', date_to: '2026-08-19' }]);
     await s.pick('this_month');
     expect(s.report()).toEqual([{ period: 'this_month' }]);
@@ -163,7 +164,7 @@ describe('CommissionsPage', () => {
     const s = await setup();
     await s.show(REPORT);
     await s.pick('custom');
-    await s.type('staff-commissions-to', '2026-08-01');
+    await s.pickDay('staff-commissions-to', '2026-08-01');
     const error = { code: 'invalid_payload', message: 'Invalid parameters.', fields: { date_to: 'The end date cannot be before the start date.' } };
     s.net.lastStream().push(`event: error\ndata: ${JSON.stringify({ id: s.subId(OP), error })}\n\n`);
     await s.reopen();
@@ -195,8 +196,21 @@ describe('CommissionsPage', () => {
     expect(s.find('staff-commissions-total-sold').exists()).toBe(false);
   });
 
-  it('an employee does not see the pay: «You do not have permission», and nothing followed', async () => {
-    const s = await setup({ session: EMPLOYEE }, false);
+  it('an employee follows it too, and paints the one line the server gives her', async () => {
+    // flow: STAFF-F21 (la línea propia de quien no ve la paga del equipo)
+    const s = await setup({ session: EMPLOYEE });
+    await s.result(BUSINESS, business());
+    expect(s.report()).toEqual([{ period: 'today' }]);
+    await s.show({ ...REPORT, rows: [REPORT.rows[0]], total_sold: 2721, total_commission: 408 });
+    expect(s.find('staff-commissions-forbidden').exists()).toBe(false);
+    expect(s.rows()).toHaveLength(1);
+    expect(s.cells(0)).toEqual(['Ana López', 'Stylist', '€27.21', '15 %', '€4.08']);
+    expect(s.find('staff-commissions-total-commission').text()).toContain('€4.08');
+  });
+
+  it('without reading the team: «You do not have permission», and nothing followed', async () => {
+    const session = { ...EMPLOYEE, permissions: EMPLOYEE.permissions.filter((p) => p !== 'staff.view') };
+    const s = await setup({ session }, false);
     expect(s.find('staff-commissions-forbidden').text()).toContain('You do not have permission');
     expect(s.report()).toEqual([]);
     expect(s.table().exists()).toBe(false);

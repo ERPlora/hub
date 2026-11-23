@@ -57,7 +57,7 @@ def test_the_sessions_alive_before_the_index_get_their_note_from_what_they_say()
     from django.contrib.sessions.models import Session
     from django.utils import timezone
 
-    from base.models import SessionOwner
+    from base.models.sessions import SessionOwner
 
     def saved(data: dict) -> str:
         store = SessionStore()
