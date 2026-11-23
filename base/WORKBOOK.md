@@ -4277,7 +4277,7 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
-  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras y como mucho `MAX_TOOLS` = 20 por turno, la última la búsqueda `base.assistant.find_tools`, por las
   palabras de la petición que sigue abierta: lo que la persona escribió desde que el modelo pidió su última escritura,
   con sus respuestas a las preguntas del asistente, y nunca menos de sus dos últimos mensajes; `base.setup.status` y
   `base.business.get` siempre; `ranking` lo ordena con las palabras propias del Hub: las de la plataforma, `SYNONYMS`

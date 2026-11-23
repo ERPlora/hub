@@ -1381,9 +1381,9 @@ def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
                 "¿cómo están puestas las reglas de las citas?",
             ),
         },
-        "description": "The booking rules: default length, minimum notice and maximum advance, overlaps, the "
-        "customer's cancellation policy, the calendar window, the slot interval and whether the customer's own "
-        "bookings are born confirmed; and the business's time zone."
+        "description": "The appointments' settings, their booking rules: default length, minimum notice and maximum "
+        "advance, overlaps, the customer's cancellation policy, the calendar window, the slot interval and whether "
+        "the customer's own bookings are confirmed automatically; and the business's time zone."
     },
 )
 def get_settings(ctx: OperationContext, data: NoIn) -> dict:

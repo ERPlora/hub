@@ -172,17 +172,17 @@ def probe_phrases() -> dict[str, str]:
 # ── What an app's own test of its asks ranks with (``apps/<app>/tests/test_assistant_asks.py`` imports them) ────────
 
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a person's own words may bring their tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
+#: The places a turn gives the person's tools: ``MAX_TOOLS`` but the last, which is the search of the rest
+#: (``base.assistant.find_tools``). How far down a person's own words may bring their tool and still have it offered.
+WITH_ROOM = shared.MAX_TOOLS - 1
 
 
 def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
     """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.relevance.ranking`` ranks them,
-    or with what ``ranking`` puts in its place (``synonyms=``…)."""
+    or with what ``ranking`` puts in its place (``synonyms=``…): its ``WITH_ROOM`` places, before the search."""
     return [
         op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.relevance.ranking(tools), **ranking})
-    ]
+    ][:WITH_ROOM]
 
 
 def assert_its_words_name(label: str, cases: Iterable[tuple[str, str]]) -> None:
@@ -221,6 +221,17 @@ def assert_offered_with_room(
     turn offers."""
     place = place_of_no_ask(tools, name, phrase, language)
     assert place is not None and place <= room, place
+
+
+def assert_offered_or_found(
+    tools: dict[str, Operation], name: str, phrase: str, task: str | None = None, language: str = "es"
+) -> None:
+    """That ``phrase``, a person's words and none of the asks of tool ``name``, brings it among the tools a turn offers
+    or, past them, that the search the model makes for ``task``, said in a few words as the search asks, finds it
+    (``base.assistant.find_tools``: the next round offers it). With no ``task``, the turn itself must offer it."""
+    offered = place_of_no_ask(tools, name, phrase, language) is not None
+    found = task is not None and name in [op.name for op in assistant.relevance.found(tools, task, language)]
+    assert offered or found, (name, task)
 
 
 def assert_reported_are_owner_probes(reported: Iterable[tuple[str, str]]) -> None:
@@ -403,28 +414,29 @@ def said_in_spanish_too_test(names: Iterable[str]) -> Callable:
     return said_in_spanish_too
 
 
-def reported_test(reported: list) -> Callable:
+def reported_test(reported: list, searched: dict[str, str] | None = None) -> Callable:
     """The test that each ``(name, phrase)`` of ``reported``, the owner's request of the real-model QA in Spanish, is
-    offered its existing operation (``assert_offered_with_room``)."""
+    offered its existing operation, or found by the search for its task in ``searched`` (``assert_offered_or_found``)."""
 
     @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize(("name", "phrase"), reported)
     def offered(catalog_of, name, phrase):
-        assert_offered_with_room(catalog_of(OWNER, "es"), name, phrase)
+        assert_offered_or_found(catalog_of(OWNER, "es"), name, phrase, (searched or {}).get(name))
 
     return offered
 
 
-def probes_test(probes: list[dict], label: str) -> Callable:
+def probes_test(probes: list[dict], label: str, searched: dict[str, str] | None = None) -> Callable:
     """The test that each probe of layer 2 of app ``label`` in ``probes``, the owner's in Spanish, is offered its tool
-    without being one of its asks (``assert_offered_with_room``): a tool that a new ask elsewhere pushes out of the
-    first half of the ones a turn offers fails here before the real-model QA sees it."""
+    without being one of its asks, or found by the search for its task in ``searched`` (``assert_offered_or_found``): a
+    tool that a new ask elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
 
     @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize("probe", probes, ids=[probe["id"] for probe in probes])
     def offered(catalog_of, probe):
         assert (probe["app"], probe["role"], probe["language"]) == (label, "owner", "es")
-        assert_offered_with_room(catalog_of(OWNER, probe["language"]), probe["tool"], probe["phrase"])
+        tools = catalog_of(OWNER, probe["language"])
+        assert_offered_or_found(tools, probe["tool"], probe["phrase"], (searched or {}).get(probe["tool"]))
 
     return offered
 
@@ -638,7 +650,7 @@ def test_no_test_of_an_app_ranks_one_of_its_asks_as_a_persons_words():
 
 
 #: The requests of hub#1083's QA (``qa20261108.owner.es.base.*``), as the owner said them: each is offered its existing
-#: operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its asks.
+#: operation, or the search finds it by its task (``SEARCHED``), so the model can choose it, without being one of its asks.
 REPORTED = [
     ("base.file.read", "busca el documento Documentos QA/nota-qa.txt y dime su tamaño y tipo"),
     (
@@ -664,6 +676,10 @@ REPORTED = [
 ]
 
 
+#: The task the model searches for when a reported request brings its tool past the places of a turn.
+SEARCHED = {"base.device.remove": "quitar un dispositivo"}
+
+
 def test_the_hub_reads_a_placa_as_a_badge_and_an_employee_as_a_person():
     """``base.assistant.relevance.SYNONYMS``: «la placa» is the badge of ``base.person.badge_*`` and «la empleada» a
     ``base.person``, so a request in the words of the till's screens reaches those tools without their own asks."""
@@ -684,7 +700,28 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_platform_request_offers_its_existing_operation(context_of, name, phrase):
-    assert place_of_no_ask(assistant.tools.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase) is not None
+    tools = assistant.tools.catalog(context_of(Membership.Role.OWNER, "es"))
+    assert_offered_or_found(tools, name, phrase, SEARCHED.get(name))
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+def test_what_the_tests_rank_as_offered_is_what_a_turn_offers_before_its_search(context_of):
+    tools = assistant.tools.catalog(context_of(Membership.Role.OWNER, "es"))
+    turn = [op.name for op in assistant.relevance.relevant(tools, ["vende dos cafés en la mesa 3"], "es")]
+    assert turn[-1] == assistant.relevance.FIND_TOOLS
+    assert offered_to(tools, "vende dos cafés en la mesa 3") == turn[:-1]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+def test_a_tool_past_the_places_of_a_turn_counts_only_when_its_search_finds_it(context_of):
+    tools = assistant.tools.catalog(context_of(Membership.Role.OWNER, "es"))
+    name = "base.device.remove"
+    phrase = dict(REPORTED)[name]
+    assert name not in offered_to(tools, phrase)  # positive control: its words bring it past the places of a turn
+    assert_offered_or_found(tools, name, phrase, SEARCHED[name])
+    for task in (None, "crear un producto"):
+        with pytest.raises(AssertionError):
+            assert_offered_or_found(tools, name, phrase, task)
 
 
 #: A phrase of some tools, each with the tool it asks for: reads and writes, both languages, and words only the Hub's

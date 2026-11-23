@@ -23,7 +23,8 @@ from live.operations import AI, registry
 from base import assistant
 from base.models import Membership
 from base.tests.roles import WORKING_ROLES
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, assert_offered_with_room, comparable, offered_place
+from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 
 from .conftest import HUB_DB, in_hubs
@@ -158,6 +159,10 @@ def test_an_employee_is_never_offered_what_only_who_runs_the_kitchen_may_do(cata
     assert {"kitchen.item.bump", "kitchen.ticket.reprint"} <= set(employee)  # positive control: an employee cooks
 
 
+#: The task the model searches for when a person's words bring its tool past the places of a turn.
+SEARCHED = {"kitchen.ticket.reprint": "volver a imprimir una comanda"}
+
+
 def test_the_reported_requests_are_the_probes_of_layer_2():
     phrases = probe_phrases()
     assert [phrases.get(comparable(phrase)) for *_, phrase in REPORTED] == [
@@ -168,7 +173,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
-    assert_offered_with_room(catalog_of(ROLES[role], "es"), name, phrase, "es")
+    assert_offered_or_found(catalog_of(ROLES[role], "es"), name, phrase, SEARCHED.get(name), "es")
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
@@ -184,7 +189,7 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
         assert name not in tools
         assert name in catalog_of(Membership.Role.OWNER, probe["language"])  # positive control: it is a real tool
         return
-    assert_offered_with_room(tools, name, phrase, probe["language"])
+    assert_offered_or_found(tools, name, phrase, SEARCHED.get(name), probe["language"])
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)

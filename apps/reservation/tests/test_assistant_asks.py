@@ -14,13 +14,13 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import comparable, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import assert_offered_or_found, comparable, probe_phrases
 
 from .conftest import HUB_DB
 
 #: The requests of hub#1105's QA (``owner.es.reservation.*`` of ``tests/e2e/qa/probes/owner-es-reservation-*.json``),
-#: as the owner said them: each is offered its existing operation (among the ``MAX_TOOLS`` a turn offers, so the model
-#: can choose it), without being one of its asks. ``no_show`` and ``release_unconfirmed`` the QA left out by their short
+#: as the owner said them: each is offered its existing operation, or the search finds it by its task (``SEARCHED``), so
+#: the model can choose it, without being one of its asks. ``no_show`` and ``release_unconfirmed`` the QA left out by their short
 #: names (the issue's comment): they are the owner's tools too, so they are measured with the rest.
 REPORTED = [
     ("reservation.blocked_date.get", "abre el bloqueo Cierre QA y dime qué día y horario impide reservar y por qué"),
@@ -68,10 +68,19 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
+#: The task the model searches for when a reported request brings its tool past the places of a turn. «entrada» is not
+#: said: the search reads it as goods coming in.
+SEARCHED = {
+    "reservation.waitlist.get": "consultar la lista de espera",
+    "reservation.time_slot.get": "ver una franja de reservas",
+    "reservation.waitlist.convert": "convertir una entrada de la lista de espera en reserva",
+}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_reservation_request_offers_its_existing_operation(catalog_of, name, phrase):
-    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
+    assert_offered_or_found(catalog_of(Membership.Role.OWNER, "es"), name, phrase, SEARCHED.get(name))
 
 
 #: What a description must never tell the model: the card of a write is the person's confirmation
