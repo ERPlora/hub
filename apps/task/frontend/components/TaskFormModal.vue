@@ -6,7 +6,7 @@
 // opened, never against the live task (another person's save meanwhile is never overwritten; the
 // assignee has its own buttons in the task's sheet). Refusals stay in the dialog, under their field;
 // what was typed stays.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -180,18 +180,13 @@ const canDismiss = useUnsavedForm('task-form', () => (open.value ? form.value : 
             {{ t(`task.priority.${priority}`) }}
           </ion-select-option>
         </ion-select>
-        <ion-input
-          data-testid="task-form-due_date"
+        <DateField
+          testid="task-form-due_date"
           name="due_date"
-          type="date"
-          :value="form.due"
+          :model-value="form.due"
           :label="$t('task.form.due')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           :error-text="fieldErrors.due_date"
-          :class="invalid(fieldErrors.due_date)"
-          @ion-input="form = { ...form, due: text($event.detail.value) }"
+          @update:model-value="form = { ...form, due: $event }"
         />
         <Combo
           v-if="!task"

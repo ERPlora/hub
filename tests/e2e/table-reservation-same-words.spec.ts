@@ -5,6 +5,7 @@
 // refused for three fields with the same words; typing in one takes the mark from it alone, then another, and the
 // third keeps its own. The refusal is answered in the browser (`page.route`), so nothing is created. Once more in
 // Spanish, whose session the fleet's visual sweep reads (`E2E_SAVE_STORAGE_STATE`).
+import { pickTime } from './date-time-fields';
 import { type SameWordsWindow, testTheMarksGoOneByOne } from './same-words-helpers';
 import { stamp } from './sale-helpers';
 
@@ -33,7 +34,7 @@ const RESERVATION: SameWordsWindow = {
   fill: async (form) => {
     await form.locator('[data-testid=reservation-form-guest_name] input').fill(`${TAG} Ana`);
     await form.locator('[data-testid=reservation-form-guest_phone] input').fill('600111222');
-    await form.locator('[data-testid=reservation-form-time] input').fill('21:00');
+    await pickTime(form.page(), form.locator('[data-testid=reservation-form-time]'), '21:00');
   },
   keys: ['guest_phone', 'guest_name', 'time'],
   created: `select count(*) from reservation_reservation where guest_name like '${TAG}%'`,

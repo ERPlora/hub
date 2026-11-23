@@ -16,7 +16,7 @@ from live.operations import AI, operation
 from live.operations import get as get_operation
 from live.outbox import record_event
 
-from base import activation, blueprint, entitlement, events
+from base import activation, blueprint, business, entitlement, events
 from base.activation import CREATING
 from base.models.blueprints import ImportBatch
 from base.permissions import ADMINISTER_HUB
@@ -36,6 +36,26 @@ def _who(ctx: OperationContext) -> str:
     if hasattr(actor, "get_username"):
         return (actor.get_full_name() or actor.get_username())[:150]
     return str(actor)[:150]
+
+
+def _import_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The template by its name and its language, as the Import screen shows them, and, when no apps are chosen (an
+    empty list loads every one too), the apps it loads by their names."""
+    seed = blueprint.seeds.template(arguments.get("template") or "")
+    if seed is None:
+        return fields
+    language = business.babel_locale(ctx.language).languages.get(seed.language, seed.language)
+    chosen = arguments.get("apps")
+    shown = [
+        {**field, "value": f"{seed.name} ({language})"} if field["name"] == "template" else field
+        for field in fields
+        if chosen or field["name"] != "apps"
+    ]
+    if chosen:
+        return shown
+    apps = [str(blueprint.datasets.app_label(app)) for app in seed.bundle.manifest["apps"]]
+    title = gettext(BlueprintImportIn.model_fields["apps"].title)
+    return [*shown, {"name": "apps", "label": title, "kind": "list", "value": apps, "titled": True, "named": True}]
 
 
 @operation(
@@ -73,8 +93,8 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     permission=ADMINISTER_HUB,
     input=BlueprintImportIn,
     output=ImportOut,
-    ai=AI(
-        description=(
+    ai={
+        "description": (
             "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on its apps "
             "that are off (with the apps they need, within the plan's limit of apps), then loads its menu or services, "
             "its tables and the rest of its apps' data, app by app; what is already there is left as it was. An app "
@@ -82,8 +102,8 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
             "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
             "fiscal data. Use this, not blueprint.list or blueprint.inspect, when asked to load, import or apply one."
         ),
-        risk="high",
-        asks={
+        "risk": "high",
+        "asks": {
             "en": (
                 "load the restaurant template",
                 "set me up like a hair salon",
@@ -96,7 +116,8 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
                 "importa la plantilla de restaurante",
             ),
         },
-    ),
+        "summary": _import_summary,
+    },
 )
 def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     """Load a template, a file or what a load left out and keep its report and the rows it created.

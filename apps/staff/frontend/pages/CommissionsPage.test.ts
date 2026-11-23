@@ -11,6 +11,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick as pickIn, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { BUSINESS, business, EMPLOYEE, errorFrame, JAPANESE, type MountOptions, mountStaff, POLISH } from '../__tests__/mount-staff';
 import type { CommissionReportOut } from '../operations';
 import CommissionsPage from './CommissionsPage.vue';
@@ -51,13 +52,12 @@ async function setup(options: MountOptions = {}, live = true) {
     segment.dispatchEvent(new CustomEvent('ionChange', { detail: { value }, bubbles: true }));
     await m.reopen();
   }
-  async function type(testid: string, value: string): Promise<void> {
-    const input = m.find(testid).element as Control;
-    input.value = value;
-    input.dispatchEvent(new CustomEvent('ionInput', { detail: { value }, bubbles: true }));
+  /** Picks `day` in the day field of `testid`; the report follows it on the stream it reopens. */
+  async function pickDay(testid: string, day: string): Promise<void> {
+    await pickIn(m.find(testid).element, day);
     await m.reopen();
   }
-  return { ...m, table, prop, rows, cells, control, chip, pick, type, report: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
+  return { ...m, table, prop, rows, cells, control, chip, pick, pickDay, report: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
 }
 
 describe('CommissionsPage', () => {
@@ -129,10 +129,10 @@ describe('CommissionsPage', () => {
     expect(s.find('staff-commissions-from').exists()).toBe(false);
     await s.pick('custom');
     const from = s.control('staff-commissions-from');
-    expect([from.label, from.value, from.getAttribute('mode'), from.fill]).toEqual(['From', '2026-08-17', 'md', 'outline']);
-    expect([s.control('staff-commissions-to').label, s.control('staff-commissions-to').value]).toEqual(['To', '2026-08-19']);
+    expect([from.label, picked(from), from.value, from.getAttribute('mode'), from.fill]).toEqual(['From', '2026-08-17', '08/17/2026', 'md', 'outline']);
+    expect([s.control('staff-commissions-to').label, picked(s.control('staff-commissions-to'))]).toEqual(['To', '2026-08-19']);
     expect(s.report()).toEqual([{ date_from: '2026-08-17', date_to: '2026-08-19' }]);
-    await s.type('staff-commissions-from', '2026-08-01');
+    await s.pickDay('staff-commissions-from', '2026-08-01');
     expect(s.report()).toEqual([{ date_from: '2026-08-01', date_to: '2026-08-19' }]);
     await s.pick('this_month');
     expect(s.report()).toEqual([{ period: 'this_month' }]);
@@ -164,7 +164,7 @@ describe('CommissionsPage', () => {
     const s = await setup();
     await s.show(REPORT);
     await s.pick('custom');
-    await s.type('staff-commissions-to', '2026-08-01');
+    await s.pickDay('staff-commissions-to', '2026-08-01');
     const error = { code: 'invalid_payload', message: 'Invalid parameters.', fields: { date_to: 'The end date cannot be before the start date.' } };
     s.net.lastStream().push(`event: error\ndata: ${JSON.stringify({ id: s.subId(OP), error })}\n\n`);
     await s.reopen();
