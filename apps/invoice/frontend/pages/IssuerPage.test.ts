@@ -1,12 +1,13 @@
 // Invoicing → Issuer (INVOICE-F21, F22): the business's tax identity that every new invoice carries —
-// Legal name, Tax ID, Address, Postal code, City, Province and Country — followed live, with «Without the
+// Legal name, Tax ID, Address, Postal code, City, Province, Country and whether it is registered for intra-EU
+// operations (ROI), which makes its documents print its EU VAT number — followed live, with «Without the
 // issuer no invoice can be issued.» until it is complete and, when the ERPlora account sent it, when. The
 // owner and the admin save it (`invoice.issuer.update`); a refusal goes under its field; anyone else only
 // looks.
 import { toastSuccess } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import { click, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
+import { click, errorFrame, flush, ionChecked, ionValue, MANAGER, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
 import type { IssuerOut } from '../operations';
 import IssuerPage from './IssuerPage.vue';
 
@@ -27,8 +28,10 @@ const EMPTY: IssuerOut = {
   synced_version: null,
   synced_at: null,
   updated_at: null,
+  intra_eu_operator: false,
+  vat_number: '',
 };
-const SET: IssuerOut = { ...EMPTY, configured: true, legal_name: 'Peluquería Ana SL', tax_id: 'B12345674', address: 'Calle Mayor 1', city: 'Madrid' };
+const SET: IssuerOut = { ...EMPTY, configured: true, legal_name: 'Peluquería Ana SL', tax_id: 'B12345674', vat_number: 'B12345674', address: 'Calle Mayor 1', city: 'Madrid' };
 
 async function setup(options: MountOptions = {}) {
   const m = await mountInvoice(IssuerPage, { path: '/invoice/issuer', ...options });
@@ -76,10 +79,55 @@ describe('IssuerPage', () => {
         method: 'POST',
         path: '/api/invoice/issuer',
         query: {},
-        body: { legal_name: 'Peluquería Ana SL', tax_id: 'B12345674', address: 'Calle Mayor 1', postal_code: '', city: 'Madrid', province: 'Madrid', country: 'ES' },
+        body: { legal_name: 'Peluquería Ana SL', tax_id: 'B12345674', address: 'Calle Mayor 1', postal_code: '', city: 'Madrid', province: 'Madrid', country: 'ES', intra_eu_operator: false },
       },
     ]);
     expect(toastSuccess).toHaveBeenCalledWith('Issuer saved.');
+  });
+
+  describe('registered for intra-EU operations (ROI)', () => {
+    const toggle = (s: Awaited<ReturnType<typeof setup>>) => s.field('intra-eu-operator');
+
+    it('is off until the business says so, and says what it changes', async () => {
+      const s = await setup();
+      await s.result(OP, SET);
+      expect(prop(toggle(s), 'checked')).toBe(false);
+      expect(toggle(s).textContent?.trim()).toBe('Registered in the ROI (intra-EU operations)');
+      expect(prop(toggle(s), 'helperText')).toBe(
+        'Your invoices and tickets will print your tax ID with your country’s prefix (ES…). VeriFactu keeps receiving it without the prefix.',
+      );
+    });
+
+    it('paints the saved mark', async () => {
+      const s = await setup();
+      await s.result(OP, { ...SET, intra_eu_operator: true, vat_number: 'ESB12345674' });
+      expect(prop(toggle(s), 'checked')).toBe(true);
+    });
+
+    it('turned on, it is saved with the rest of the issuer', async () => {
+      const s = await setup();
+      await s.result(OP, SET);
+      await ionChecked(toggle(s), true);
+      s.answer(200, { ...SET, intra_eu_operator: true, vat_number: 'ESB12345674' });
+      await click(s.find('invoice-issuer-save').element);
+      expect(s.sent()[0]?.body).toMatchObject({ tax_id: 'B12345674', intra_eu_operator: true });
+      expect(prop(toggle(s), 'checked')).toBe(true);
+    });
+
+    it('a manager only looks at it', async () => {
+      const s = await setup({ session: MANAGER });
+      await s.result(OP, { ...SET, intra_eu_operator: true, vat_number: 'ESB12345674' });
+      expect([prop(toggle(s), 'checked'), prop(toggle(s), 'disabled')]).toEqual([true, true]);
+    });
+
+    it('speaks Spanish', async () => {
+      const s = await setup({ locale: 'es' });
+      await s.result(OP, SET);
+      expect(toggle(s).textContent?.trim()).toBe('Inscrito en el ROI (operaciones intracomunitarias)');
+      expect(prop(toggle(s), 'helperText')).toBe(
+        'Tus facturas y tiques imprimirán tu NIF con el prefijo de tu país (ES…). VeriFactu lo sigue recibiendo sin prefijo.',
+      );
+    });
   });
 
   it('a refusal goes under its field', async () => {

@@ -11,6 +11,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
+from base.weekdays import weekdays
+
 ACTOR_MAX_LENGTH = 128
 #: The longest a booking lasts (a day), and a slot interval.
 MAX_MINUTES = 1440
@@ -150,9 +152,7 @@ class Recurring(Audited):
     staff_name = models.CharField(_("professional's name"), max_length=201, blank=True)
     frequency = models.CharField(_("repeats"), max_length=10, choices=Frequency.choices)
     # Monday = 0; weekly and biweekly only (the start date's weekday when empty).
-    day_of_week = models.PositiveSmallIntegerField(
-        _("day of the week"), null=True, blank=True
-    )
+    day_of_week = models.PositiveSmallIntegerField(_("day of the week"), null=True, blank=True, choices=weekdays)
     time = models.TimeField(_("time"))
     duration_minutes = models.PositiveIntegerField(_("duration (min)"))
     start_date = models.DateField(_("starts on"))
