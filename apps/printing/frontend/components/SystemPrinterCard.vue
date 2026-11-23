@@ -4,19 +4,38 @@
 // who prints — the ERPlora app on the device next to the printer, PRINTING-F18 — and leads to Printing with «Set up
 // printing». In a browser it says where to get that app: erplora.com's door of each system it publishes (base's
 // `useAppDownloads`), Windows first, each opening outside the hub (`openExternalLink`); inside the installed app there
-// is no download, which would be the app offering itself. Whether the printer answers right now is not said: Printing
-// has no read of it yet (the issue born from hub#683). It wears Settings' cards (`base/frontend/settings.css`).
+// is no download, which would be the app offering itself. It says whether the receipt printer answers right now with
+// Printing's own reading (`printing.device.health`), the one the Home's health row reads too, in its colours (base's
+// `HEALTH_PILLS`); a reading that fails says it could not check, never ready. It wears Settings' cards
+// (`base/frontend/settings.css`).
+import { StatusPill } from '@erplora/ui/components';
+import { useLiveClient } from '@erplora/ui/sdk';
 import { openExternalLink } from '@erplora/ui/shell';
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonSkeletonText } from '@ionic/vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useAppDownloads } from '../../../../base/frontend/lib/app-downloads';
+import { HEALTH_PILLS } from '../../../../base/frontend/lib/home-health';
 import '../../../../base/frontend/settings.css';
 import { useT } from '../composables/useT';
+import type { StationState } from '../operations/health';
 
 const t = useT();
 const router = useRouter();
+const client = useLiveClient();
 const { downloads, offered } = useAppDownloads();
+
+const health = ref<StationState | 'unknown'>();
+client.api.call('printing.device.health', { usage: 'receipt' }).then(
+  (answer) => {
+    health.value = answer.state;
+  },
+  (error: unknown) => {
+    console.warn('printing: «Your printer» could not check the receipt printer', error);
+    health.value = 'unknown';
+  },
+);
 </script>
 
 <template>
@@ -37,6 +56,26 @@ const { downloads, offered } = useAppDownloads();
       data-testid="printing-system-card-intro"
     >
       {{ t('printing.systemCard.intro') }}
+    </p>
+    <p
+      class="settings-card__status"
+      data-testid="printing-system-card-state"
+      :aria-busy="health === undefined"
+    >
+      <ion-skeleton-text
+        v-if="health === undefined"
+        animated
+        class="settings-card__status-loading"
+        data-testid="printing-system-card-state-loading"
+      />
+      <template v-else>
+        <StatusPill
+          :label="t(`printing.systemCard.state.${health}.title`)"
+          :tone="HEALTH_PILLS[health].tone"
+          :icon="HEALTH_PILLS[health].icon"
+        />
+        <span data-testid="printing-system-card-state-text">{{ t(`printing.systemCard.state.${health}.text`) }}</span>
+      </template>
     </p>
     <div class="settings-card__actions">
       <IonButton
