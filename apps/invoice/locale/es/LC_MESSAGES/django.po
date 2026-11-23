@@ -762,6 +762,21 @@ msgstr ""
 "Este tique ya tiene rectificativas: ya no se puede sustituir por una factura"
 " completa."
 
+#: services/paper.py:25
+msgid ""
+"No system printer takes this invoice: open it to print it or save it as PDF."
+msgstr ""
+"Ninguna impresora del sistema recibe esta factura: ábrela para imprimirla o "
+"guardarla en PDF."
+
+#: services/paper.py:26
+msgid ""
+"Its VeriFactu record could not be read, and an invoice never prints without "
+"its QR."
+msgstr ""
+"No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin "
+"su QR."
+
 #: services/rectifying.py:40
 #, python-format
 msgid ""

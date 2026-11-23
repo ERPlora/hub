@@ -30,6 +30,8 @@ beforeEach(() => {
 });
 
 const OP = 'invoice.invoice.get';
+/** What `invoice.invoice.print` answers when no system printer takes the page: the screen prints its own paper. */
+const NO_PRINTER = { error: { code: 'invoice.no_printer', message: 'No system printer takes this invoice.' } };
 
 const INVOICE: InvoiceOut = {
   id: 'i1',
@@ -189,6 +191,7 @@ describe('InvoiceDetailPage: its actions', () => {
     const s = await setup();
     await s.show({ ...INVOICE, source_type: 'sale' });
     expect(s.wrapper.findComponent(InvoicePaper).props()).toMatchObject({ duplicate: true });
+    s.answer(409, NO_PRINTER);
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).toHaveBeenCalledOnce();
@@ -200,6 +203,7 @@ describe('InvoiceDetailPage: its actions', () => {
   it('in the installed app, a print the app refuses says why (hub#455)', async () => {
     const s = await setup();
     await s.show(INVOICE);
+    s.answer(409, NO_PRINTER);
     mocks.print.mockRejectedValueOnce(new PrintRefused('refused', 'print_document_refused'));
     await click(s.find('invoice-detail-print').element);
     await flush();
@@ -209,6 +213,7 @@ describe('InvoiceDetailPage: its actions', () => {
   it('a second press while the app prints waits for it (hub#455)', async () => {
     const s = await setup();
     await s.show(INVOICE);
+    s.answer(409, NO_PRINTER);
     let done = (): void => {};
     mocks.print.mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
     await click(s.find('invoice-detail-print').element);
@@ -226,7 +231,7 @@ describe('InvoiceDetailPage: its actions', () => {
   it('«Print / PDF» asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
     const s = await setup();
     await s.show({ ...INVOICE, source_type: 'sale' });
-    s.answer(200, { queued: true, job_id: 'j1', printer: 'Office' });
+    s.answer(200, { job_id: 'j1', printer: 'Office' });
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(s.sent()).toEqual([
@@ -236,9 +241,9 @@ describe('InvoiceDetailPage: its actions', () => {
     expect(mocks.print).not.toHaveBeenCalled();
   });
 
-  it('not queued, or the queue out of reach, the browser prints the A4 paper', async () => {
+  it('no printer takes it, or the queue out of reach: the browser prints the A4 paper', async () => {
     const answers = [
-      [200, { queued: false, job_id: null, printer: null }],
+      [409, NO_PRINTER],
       [503, { error: { code: 'unavailable', message: 'down' } }],
     ] as const;
     for (const [status, body] of answers) {
@@ -355,6 +360,7 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     await s.result(RECORD_OP, { record: null });
     expect(s.find('invoice-verifactu').exists()).toBe(false);
     expect(s.wrapper.findComponent(InvoicePaper).props('record')).toBeNull();
+    s.answer(409, NO_PRINTER);
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).toHaveBeenCalledOnce();
@@ -379,7 +385,7 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     await flush();
     expect(s.find('invoice-verifactu').exists()).toBe(false);
     expect(disabled()).toBe(false);
-    s.answer(200, { queued: false, job_id: null, printer: null });
+    s.answer(409, { error: { code: 'invoice.record_unreadable', message: 'Its VeriFactu record could not be read.' } });
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).not.toHaveBeenCalled();

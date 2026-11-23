@@ -13,7 +13,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, painted, psql, shown } from './helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, openDialog, snapshotSeries } from './invoice-helpers';
+import { cleanInvoices, issuedIds, openDialog, readyToInvoice } from './invoice-helpers';
 
 const RUN = Date.now().toString(36);
 const LANGUAGES = ['es', 'en'] as const;
@@ -94,10 +94,7 @@ test.describe('«Rectify»', () => {
   let invoiceId = '';
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A });
-    await login(await context.newPage(), A, '/invoice/invoices');
-    snapshotSeries();
-    await ensureIssuer(context);
+    const context = await readyToInvoice(browser);
     const issued = await api<{ id: string }>(context, A, 'POST', '/invoice/invoices', {
       customer_name: `e2e Fits ${RUN}`,
       customer_tax_id: '12345678Z',

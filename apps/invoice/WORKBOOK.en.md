@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:595d38efe10f8dc9056e1256bf4b85e4e94acf57688c85801d5fe7993cecc91a -->
+<!-- generated from WORKBOOK.md sha256:914439012b16febebcd6dbd18650cd5f801119ba110c4358cac133027d7b3022 -->
 
 ## What it is for and who it is for
 
@@ -731,8 +731,11 @@ If it fails: "Could not print the invoice", also if the VeriFactu record of an i
 be read (it is not printed without its QR). If the installed app does not open its print screen, the notice
 says why after a colon ("…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open"…). Someone else's, for an employee, is neither printed nor downloaded: the API and the
-assistant say "Invoice not found.".
-Involved: PRINTING-F08, VERIFACTU-F19, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F21
+assistant say "Invoice not found.". Asked of the assistant, it is only done if a system printer takes it; if not,
+its receipt says "Not done, it failed: Print in Invoicing." with the reason, "No system printer takes this invoice:
+open it to print it or save it as PDF." or, if its record cannot be read, "Its VeriFactu record could not be read,
+and an invoice never prints without its QR.".
+Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F21
 
 ### INVOICE-F19 Mark an invoice as paid
 Status: done
@@ -888,7 +891,7 @@ All of them can be followed live.
 | Creates a series | keep the series | F12 | `invoice.series.create` |
 | Changes a series | keep the series | F13 | `invoice.series.update` |
 | Saves the issuer | set up the issuer | F21 | `invoice.issuer.update` |
-| Sends the A4 page of an invoice to the Printing queue (or says it was not queued: the device prints it) | view | F18 | `invoice.invoice.print` |
+| Sends the A4 page of an invoice to the Printing queue (with no printer to take it, it fails and says why) | view | F18 | `invoice.invoice.print` |
 | Saves the issuer as the system; nothing calls it today | only the system | — | `invoice.issuer.sync` |
 | Issues an ERPlora invoice with its VeriFactu record | only the system | F23 | `invoice.invoice.issue_platform` |
 

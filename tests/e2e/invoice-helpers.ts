@@ -48,6 +48,16 @@ export function snapshotSeries(): void {
     .filter(Boolean);
 }
 
+/** A context signed in at Invoicing, with the numbering noted for `cleanInvoices()` and an issuer set up: what a spec
+ *  that issues invoices does first, in `beforeAll`. */
+export async function readyToInvoice(browser: Browser): Promise<BrowserContext> {
+  const context = await browser.newContext({ baseURL: A });
+  await login(await context.newPage(), A, '/invoice/invoices');
+  snapshotSeries();
+  await ensureIssuer(context);
+  return context;
+}
+
 export interface IssuerOut {
   configured: boolean;
   legal_name: string;

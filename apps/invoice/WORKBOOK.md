@@ -734,8 +734,11 @@ Si falla: «No se pudo imprimir la factura», también si no se puede leer el re
 factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
 aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
 «…: el servicio de impresión del dispositivo no se abrió»…). La de otro, para un empleado, ni se imprime ni
-se descarga: la API y el asistente dicen «Factura no encontrada.».
-Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F21
+se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al asistente, solo se hace si una impresora
+del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
+impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
+registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F21
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
@@ -891,7 +894,7 @@ Todas se pueden seguir en vivo.
 | Crea una serie | llevar las series | F12 | `invoice.series.create` |
 | Cambia una serie | llevar las series | F13 | `invoice.series.update` |
 | Guarda el emisor | configurar el emisor | F21 | `invoice.issuer.update` |
-| Manda la página A4 de una factura a la cola de Impresión (o dice que no se encoló: la imprime el dispositivo) | ver | F18 | `invoice.invoice.print` |
+| Manda la página A4 de una factura a la cola de Impresión (sin una impresora que la reciba, falla y dice por qué) | ver | F18 | `invoice.invoice.print` |
 | Guarda el emisor como el sistema; hoy no la llama nadie | solo el sistema | — | `invoice.issuer.sync` |
 | Emite una factura de ERPlora con su registro de VeriFactu | solo el sistema | F23 | `invoice.invoice.issue_platform` |
 
