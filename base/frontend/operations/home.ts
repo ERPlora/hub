@@ -85,11 +85,26 @@ export interface DeviceNoticeRow {
   route: string;
 }
 
+/** What an app says of itself in the Home's health row; `unknown` is base's, when it could not tell. */
+export type HomeHealthState = 'ok' | 'no_signal' | 'not_configured' | 'unknown';
+
+/** `base.HealthItemOut`: one app of the Home's health row, its words already in the person's language. */
+export interface HomeHealthItem {
+  key: string;
+  app: string;
+  state: HomeHealthState;
+  title: string;
+  /** What fixes it, with `route`: only for `no_signal` and `not_configured`. */
+  action: string | null;
+  route: string | null;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
     'base.system.cards': { input: NoInput; output: { cards: SystemCardDef[] } };
+    'base.health.list': { input: NoInput; output: { items: HomeHealthItem[] } };
   }
 }
