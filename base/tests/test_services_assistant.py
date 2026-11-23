@@ -148,6 +148,7 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
             "kind": "query",
             "outcome": "ok",
             "code": "",
+            "reason": {},
         }
     ]
     assert (plan["confirm"], plan["pending"]) == (None, [])

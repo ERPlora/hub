@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2bb981d99b9e23d4671a0e0503f451fbb6eb431514b76da46750b17bb6635f25 -->
+<!-- generated from WORKBOOK.md sha256:57c276242761f8203fc3a5b0c5c8f585addb677ec2d2d2b9a349487a234e3cd2 -->
 
 ## What it is for and who it is for
 
@@ -2656,8 +2656,12 @@ Steps:
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
-     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
-     person changes language, the earlier receipts show entirely in the new one, the app's name too.
+     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". The one
+     of a failure says the reason in one sentence: if its app refuses it, the same one its screen would give ("Not
+     done, it failed: Remove in Employees. That person is not in this business."); if what did not fit was the data
+     the assistant sent, which, with the name the card gives them ("The assistant sent data that does not fit:
+     Products."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
+     too; the reason, said in the other language, no longer shows.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
 done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
 app declares it, the check it makes before the card, as the person: if it refuses the data (adding someone with a role
