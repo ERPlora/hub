@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cd9aaa551140d08014923206723ccef07d4065ae6dbbcb931146f8ac4cb30b20 -->
+<!-- generated from WORKBOOK.md sha256:71e0ec25717b809677546d1411a79cca9582041ad007f0b43a07560f71a3586a -->
 
 ## What it is for and who it is for
 
@@ -544,7 +544,7 @@ With no issuer in Invoicing, it asks to set it up first. Already live, it does n
 Settings says on top "VeriFactu is only for businesses in Spain." as the only reason and "Go live" is disabled.
 Asked of the assistant ("switch VeriFactu to the real AEAT"), while something is missing no card to confirm comes
 up: the assistant says it cannot go live yet and why, with the same reason the action would be refused with. When
-nothing is missing, its card comes up and CONFIRM has to be typed (BASE-F97).
+nothing is missing, its card comes up and CONFIRM has to be typed.
 If the fixed route is lost in production (with ERPlora's, your authorisation is revoked; with the certificate's, it
 expires or is removed), the route does not change and it does not go back to testing: nothing new is sealed. The sale
 or the invoice is refused with "Nothing was issued: this business files for real with the AEAT and cannot reach it
