@@ -751,6 +751,9 @@ Pasos:
    tienen, el primero el que menos) salen de serie; «Productos en stock» se añade con ⋮
    («Personalizar panel»), donde van agrupados bajo «Inventario». El valor sale en la moneda del
    negocio.
+4. Al asistente («¿qué me queda poco?»), la misma lista, y de cada producto si está marcado como
+   agotado. Quedarse a 0 o por debajo no lo quita del TPV, que lo sigue ofreciendo: solo deja de
+   ofrecer lo marcado con «Marcar agotado», y así lo dice el asistente.
 Entra: los productos activos, físicos y con control de stock. El valor es la suma de coste por
 saldo de los que tienen saldo positivo; un saldo negativo no resta.
 Sale: nada.
