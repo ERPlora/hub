@@ -64,6 +64,7 @@ from apps.inventory.models import Product, Unit
 from apps.inventory.queries.reads import find_product, held
 from apps.tax.models import TaxCategory
 from base import images
+from . import on_sale as on_sale  # registers combo.combo.set_active
 
 TAX_REQUIRED = _(
     "A menu eaten in needs its own VAT category: without it, it cannot be billed."
@@ -274,20 +275,19 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
     output=ComboDetailOut,
     expose_api=True,
     ai={
-        "description": "Change a menu: name, kitchen name, closed price, how it is sold, tax category, order, or "
-        "put it on sale / withdraw it from the till. Only the fields sent change. Changing how it is sold or its "
-        "tax category changes how it is billed.",
-        # Per operation, not per field: it may change how the menu is billed (supply_kind, tax_category_key).
+        "description": "Change a menu: name, kitchen name, closed price, how it is sold, tax category or order. Only "
+        "the fields sent change. Changing how it is sold or its tax category changes how it is billed. To put it on "
+        "sale or take it off the till and change nothing else, combo.combo.set_active.",
         "risk": "high",
         "check": "combo.combo.get",
         "asks": {
             "en": (
                 "bring the vegan menu down to 11.90",
-                "take the summer menu off sale for now",
+                "rename the vegan menu to Green menu",
             ),
             "es": (
                 "rebaja el menú vegano a 11,90",
-                "quita de la venta el menú de verano por ahora",
+                "cambia el nombre del menú vegano a Menú verde",
             ),
         },
     },
