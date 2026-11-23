@@ -11,7 +11,7 @@
 // in the form, under their field, with what was typed. The attempt key is born with
 // each opening and travels on every send of it: a retry after a lost answer records one payment, never
 // two; the next «New payment» is another attempt.
-import { FormModal, InlineFeedback, MoneyInput, parseMoney } from '@erplora/ui/components';
+import { DateField, FormModal, InlineFeedback, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -189,19 +189,14 @@ const canDismiss = useUnsavedFormOnOpen('payment-form', form, open);
             {{ method.name }}
           </ion-select-option>
         </ion-select>
-        <ion-input
-          data-testid="payment-form-date"
+        <DateField
+          testid="payment-form-date"
           name="payment_date"
-          type="date"
-          :value="form.date"
+          :model-value="form.date"
           :label="$t('payment.payments.form.date')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
+          required
           :error-text="fieldErrors.payment_date"
-          :class="invalid(fieldErrors.payment_date)"
-          @ion-input="set('date', text($event.detail.value))"
-          @ion-change="set('date', text($event.detail.value))"
+          @update:model-value="set('date', $event)"
         />
         <MoneyInput
           testid="payment-form-amount"

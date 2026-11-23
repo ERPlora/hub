@@ -5,7 +5,7 @@
 // «Edit · {name}» with «Save» (`schedule.special_day.update`). «Add day» waits for a date and a name. A
 // line half filled is said in the form; the server's refusal goes under its field and what was typed
 // stays.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { DateField, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -107,18 +107,13 @@ const canDismiss = useUnsavedFormOnOpen(
   >
     <template #default="{ fieldErrors }">
       <div class="schedule-exception-form">
-        <ion-input
-          data-testid="schedule-special-day-form-date"
+        <DateField
+          v-model="date"
+          testid="schedule-special-day-form-date"
           name="date"
-          type="date"
-          :value="date"
           :label="$t('schedule.specialDays.form.date')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
+          required
           :error-text="fieldErrors.date"
-          :class="invalid(fieldErrors.date)"
-          @ion-input="date = text($event.detail.value)"
         />
         <ion-input
           data-testid="schedule-special-day-form-name"

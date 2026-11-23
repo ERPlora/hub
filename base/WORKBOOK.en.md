@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0836bc6775af1427e3ce5185dba891434fd9be03df654c433565b59b0c99a808 -->
+<!-- generated from WORKBOOK.md sha256:4a612748e957b3289085329a66b8ab5aec472ce7fc245bde2f5089b6fe100643 -->
 
 ## What it is for and who it is for
 
@@ -2565,8 +2565,10 @@ Steps:
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
-     Create a task, Create a customer"), and the apps a template loads, by their name ("Apps to load: Sales & POS,
-     Invoicing"); a list of lines that carry only their record, such as the services of an appointment, the same
+     Create a task, Create a customer"); a template of the catalogue, by its name and its language, as in Import
+     ("Template: Restaurant (English)"), never by its code, and the apps it loads, by their name ("Apps to load: Sales &
+     POS, Invoicing"), also when none is chosen and it loads all of its own ("Time clock, Cash register, Menus and
+     combos and 17 more"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their

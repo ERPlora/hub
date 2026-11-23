@@ -4,12 +4,13 @@
 // native <details>, closed, as in the product) when adding; in «Edit» everything at once, then the
 // business's custom fields, each with its own control, and «Active». The parent owns the model
 // (`v-model`, `v-model:field-values`) and the submit; the server validates and its 422 comes back in
-// `errors`, painted under its field («More details» opens when the field is in there). A number or a
-// date the browser cannot read (31/02, «tres») reaches the page as "", so saving would empty the field:
-// `readable()` tells it under its field, worded as the server's refusal, and the parent does not save.
+// `errors`, painted under its field («More details» opens when the field is in there). A number the
+// browser cannot read («tres») reaches the page as "", so saving would empty the field: `readable()`
+// tells it under its field, worded as the server's refusal, and the parent does not save. The dates
+// (birthday, anniversary and the custom date fields) are picked in the app's calendar.
 // The country is the shared Combo (the product's `ok-combo`): typing its name, or its code, filters
 // the ~250 countries; the card keeps the ISO code, and clearing the field leaves it without one.
-import { Combo, type ComboOption } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 
@@ -75,25 +76,25 @@ const MAX_LENGTH: Partial<Record<CustomerField, number>> = {
 };
 
 /** The native kinds of input the form uses (a subset of Ionic's `TextFieldTypes`). */
-type InputType = 'text' | 'email' | 'tel' | 'date' | 'url' | 'number';
+type InputType = 'text' | 'email' | 'tel' | 'url' | 'number';
 
 const INPUT_TYPES: Partial<Record<CustomerField, InputType>> = {
   email: 'email',
   phone: 'tel',
-  birthday: 'date',
-  anniversary: 'date',
   avatar: 'url',
 };
 
-type Kind = 'input' | 'select' | 'country' | 'textarea';
-const kindOf = (field: CustomerField): Kind =>
-  field === 'country'
-    ? 'country'
-    : field === 'notes'
-      ? 'textarea'
-      : field === 'source' || field === 'lifecycle_stage' || field === 'preferred_channel'
-        ? 'select'
-        : 'input';
+type Kind = 'input' | 'select' | 'country' | 'textarea' | 'date';
+const KINDS: Partial<Record<CustomerField, Kind>> = {
+  country: 'country',
+  notes: 'textarea',
+  source: 'select',
+  lifecycle_stage: 'select',
+  preferred_channel: 'select',
+  birthday: 'date',
+  anniversary: 'date',
+};
+const kindOf = (field: CustomerField): Kind => KINDS[field] ?? 'input';
 
 type TextField = Exclude<CustomerField, 'is_active'>;
 
@@ -159,29 +160,17 @@ function setFieldValue(fieldId: string, value: unknown): void {
 const fieldLabel = (field: CustomFieldValueOut): string =>
   field.is_required ? t('customer.form.required', { name: field.name }) : field.name;
 const fieldError = (field: CustomFieldValueOut): string | undefined => shown.value[`field_values.${field.field_id}`];
-const fieldInputType = (field: CustomFieldValueOut): InputType =>
-  field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text';
+const fieldInputType = (field: CustomFieldValueOut): InputType => (field.field_type === 'number' ? 'number' : 'text');
 
 const root = useTemplateRef<HTMLElement>('root');
-const UNREADABLE = { number: 'customer.form.invalidNumber', date: 'customer.form.invalidDate' } as const;
 
-/** Whether the browser read every number and date typed; if not, each one is told under its field. */
+/** Whether the browser read every number typed; if not, each one is told under its field. */
 function readable(): boolean {
-  const typed = [
-    ...sections.value
-      .flatMap((section) => section.fields)
-      .filter((field) => INPUT_TYPES[field] === 'date')
-      .map((field) => ({ key: field, testid: `customer-form-${field}`, type: 'date' as const })),
-    ...(props.mode === 'edit' ? props.customFields : []).flatMap((field) =>
-      field.field_type === 'number' || field.field_type === 'date'
-        ? [{ key: `field_values.${field.field_id}`, testid: `customer-form-field-${field.field_id}`, type: field.field_type }]
-        : [],
-    ),
-  ];
+  const numbers = (props.mode === 'edit' ? props.customFields : []).filter((field) => field.field_type === 'number');
   unread.value = Object.fromEntries(
-    typed
-      .filter(({ testid }) => root.value?.querySelector<HTMLInputElement>(`[data-testid="${testid}"] input`)?.validity.badInput)
-      .map(({ key, type }) => [key, t(UNREADABLE[type])]),
+    numbers
+      .filter((field) => root.value?.querySelector<HTMLInputElement>(`[data-testid="customer-form-field-${field.field_id}"] input`)?.validity.badInput)
+      .map((field) => [`field_values.${field.field_id}`, t('customer.form.invalidNumber')]),
   );
   return Object.keys(unread.value).length === 0;
 }
@@ -260,6 +249,15 @@ defineExpose({ readable });
             :class="invalid('notes')"
             @update:model-value="set('notes', $event)"
           />
+          <DateField
+            v-else-if="kindOf(field) === 'date'"
+            :testid="`customer-form-${field}`"
+            :data-field="field"
+            :model-value="form[field]"
+            :label="t(LABELS[field])"
+            :error-text="shown[field]"
+            @update:model-value="set(field, $event)"
+          />
           <ion-input
             v-else
             :data-testid="`customer-form-${field}`"
@@ -326,6 +324,15 @@ defineExpose({ readable });
             :auto-grow="true"
             :error-text="fieldError(field)"
             :class="invalid(`field_values.${field.field_id}`)"
+            @update:model-value="setFieldValue(field.field_id, $event)"
+          />
+          <DateField
+            v-else-if="field.field_type === 'date'"
+            :testid="`customer-form-field-${field.field_id}`"
+            :model-value="fieldValues[field.field_id] ?? ''"
+            :label="fieldLabel(field)"
+            :required="field.is_required"
+            :error-text="fieldError(field)"
             @update:model-value="setFieldValue(field.field_id, $event)"
           />
           <div

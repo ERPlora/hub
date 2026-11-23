@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2214d6d0bd5ff08de3ca6b61255083bd2793b07076c6a0578535b18b831f6cdc -->
+<!-- generated from WORKBOOK.md sha256:c86f668a251b01e2730cc16fe212af8e66cbbe840b4a2637ed9899e762e82fb1 -->
 
 ## What it is for and who it is for
 
@@ -891,7 +891,8 @@ Actor: employee, manager
 Screen: Bill (pre-bill)
 Steps:
 1. With the check on screen, press the footer's printer ("Print bill").
-2. "Bill" opens with the business (name, address and tax ID of the issuer, with the "Receipt header"
+2. "Bill" opens with the business (name, address and tax ID of the issuer, with its country's prefix if it is
+   registered in the ROI, and with the "Receipt header"
    under them; without an issuer, the receipt header stands for the name and address), the lines,
    notes, discounts, the VAT breakdown, the total and the title, and the notice "Bill — this is not an
    invoice. The fiscal receipt is issued on payment.". With a discount on the check, the "Discount" row
@@ -911,7 +912,7 @@ when the bill cannot be worked out. If it does not print, "Bill could not be pri
 not open its print screen, the notice says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
 another business".
-Involved: PRINTING-F09, TABLE-F34
+Involved: PRINTING-F09, TABLE-F34, INVOICE-F21
 
 ### SALE-F22 Charge only part of the check
 Status: done
@@ -1119,8 +1120,8 @@ Steps:
 1. In **Sales**, tap the row or the "Document" action; it also opens by itself after charging, the whole
    check or part of it.
 2. The ticket shows ("Receipt", or "Invoice" if it was charged as an invoice). On top, the business: name,
-   address and tax ID of the issuer (a duplicate says the same as the original, even if the issuer changes
-   later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
+   address and tax ID of the issuer, with its country's prefix if it is registered in the ROI (a duplicate
+   says the same as the original, even if the issuer changes later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
    name and the rest the address. On an invoice, under "Customer", its tax ID and its address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
    (an exempt one says its cause: "Exempt (E1)"), total, payment method (charged with several methods,
@@ -1162,7 +1163,7 @@ refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes
 "The documents could not be issued. Try again.". A sale the person does not see (someone else's, for an
 employee) is not opened, reprinted or issued: the window says "Error loading the document" and the API or
 the assistant, "That sale does not exist.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
 Status: done

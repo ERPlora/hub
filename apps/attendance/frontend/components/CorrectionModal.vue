@@ -1,15 +1,15 @@
 <script setup lang="ts">
 // ATTENDANCE-F08: «Correct working day», the old correction dialog. The clock-in and the clock-out in
-// business time (`datetime-local`; an empty clock-out reopens the day) and a mandatory reason. What the
+// business time (a day and a time each; an empty clock-out reopens the day) and a mandatory reason. What the
 // screen can judge it judges first (a clock-out after the clock-in, a reason of at least 3); the rest
 // (an overlap with another day of the person, a second open day, a time in the future) is the server's,
 // and its refusal stays here. An untouched time keeps the stored instant to the second; a changed one is
 // sent as the business's wall clock, which the server reads in the business's zone: so it cannot be saved
 // until the business says its zone, nor a time written on another clock be sent as if it were on that one.
 // When the zone cannot be read the dialog says so: a save button that stays off with no reason is a dead end.
-import { FormModal } from '@erplora/ui/components';
+import { DateTimeField, FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
-import { IonInput, IonTextarea } from '@ionic/vue';
+import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
@@ -136,32 +136,21 @@ const canDismiss = useUnsavedFormOnOpen(
       >
         {{ heading }}
       </p>
-      <ion-input
-        data-testid="attendance-correct-clock_in"
-        type="datetime-local"
-        :value="clockIn"
+      <DateTimeField
+        v-model="clockIn"
+        class="attendance-correct__when"
+        testid="attendance-correct-clock_in"
         :label="$t('attendance.correct.clockIn')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
         name="clock_in_at"
         :error-text="local.clock_in_at || fieldErrors.clock_in_at"
-        :class="invalid(local.clock_in_at || fieldErrors.clock_in_at)"
-        @ion-input="clockIn = text($event.detail.value)"
       />
-      <ion-input
-        data-testid="attendance-correct-clock_out"
-        type="datetime-local"
-        clear-input
-        :value="clockOut"
+      <DateTimeField
+        v-model="clockOut"
+        class="attendance-correct__when"
+        testid="attendance-correct-clock_out"
         :label="$t('attendance.correct.clockOut')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
         name="clock_out_at"
         :error-text="local.clock_out_at || fieldErrors.clock_out_at"
-        :class="invalid(local.clock_out_at || fieldErrors.clock_out_at)"
-        @ion-input="clockOut = text($event.detail.value)"
       />
       <ion-textarea
         data-testid="attendance-correct-reason"
@@ -188,7 +177,7 @@ const canDismiss = useUnsavedFormOnOpen(
   margin: 0 0 16px;
   font-weight: 600;
 }
-ion-input,
+.attendance-correct__when,
 ion-textarea {
   margin-bottom: 14px;
 }

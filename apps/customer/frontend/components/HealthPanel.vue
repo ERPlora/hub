@@ -6,10 +6,10 @@
 // does the service — and «Edit» saves them (`customer.health.update`). «Withdraw permission» asks
 // first, because it erases the data (`customer.health.withdraw`). The block is live
 // (`customer.health.detail`) and never part of the card other apps read.
-import { ConfirmDialog, formatDateTime, InlineFeedback, useRefusal } from '@erplora/ui/components';
+import { ConfirmDialog, DateField, formatDateTime, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
+import { IonButton, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
@@ -252,16 +252,11 @@ const testLine = computed(() => {
             :class="invalid('allergies')"
             @update:model-value="changed('allergies')"
           />
-          <ion-input
+          <DateField
             v-model="testOn"
-            type="date"
-            data-testid="customer-health-date-input"
+            testid="customer-health-date-input"
             :label="$t('customer.health.dateLabel')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.sensitivity_test_on"
-            :class="invalid('sensitivity_test_on')"
             @update:model-value="changed('sensitivity_test_on')"
           />
           <ion-select

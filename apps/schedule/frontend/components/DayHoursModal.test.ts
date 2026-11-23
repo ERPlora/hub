@@ -4,6 +4,7 @@
 // and nothing is sent; the server's refusal (overlaps…) goes under the intervals; what was typed stays.
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { WeekDayOut } from '../operations';
 import { click, ionChecked, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import DayHoursModal from './DayHoursModal.vue';
@@ -39,7 +40,7 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
     expect(s.inDoc('schedule-day-form')?.getAttribute('aria-label')).toBe('Edit hours — Monday');
     expect(s.control('weekday').value).toBe(0);
     expect([s.control('closed').checked, s.control('open24h').checked]).toEqual([false, false]);
-    expect([(s.inDoc('schedule-day-form-intervals-open-0') as Control).value, (s.inDoc('schedule-day-form-intervals-close-1') as Control).value]).toEqual([
+    expect([picked(s.inDoc('schedule-day-form-intervals-open-0')), picked(s.inDoc('schedule-day-form-intervals-close-1'))]).toEqual([
       '10:00',
       '20:00',
     ]);
@@ -51,7 +52,7 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
     expect(closed.control('closed').checked).toBe(true);
     expect(closed.inDoc('schedule-day-form-intervals-open-0')).toBeNull();
     const unset = await setup(UNSET);
-    expect((unset.inDoc('schedule-day-form-intervals-open-0') as Control).value).toBe('09:00');
+    expect(picked(unset.inDoc('schedule-day-form-intervals-open-0'))).toBe('09:00');
   });
 
   it('«Save day» sends the day and its intervals, then closes', async () => {
@@ -101,7 +102,8 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
 
   it('a line half filled is said in the form and nothing is sent', async () => {
     const s = await setup(UNSET);
-    await ionValue(s.inDoc('schedule-day-form-intervals-close-0'), '', 'ionInput');
+    await click(s.inDoc('schedule-day-form-intervals-add'));
+    await pick(s.inDoc('schedule-day-form-intervals-open-1'), '19:00');
     await click(s.submit());
     expect(s.sent()).toEqual([]);
     expect(s.inDoc('schedule-day-form-incomplete')?.textContent?.trim()).toBe('Enter opening and closing times, or mark it as closed');
@@ -111,11 +113,11 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
     const s = await setup();
     const overlap = 'Two intervals overlap (or one runs past midnight into another); adjust the times so they do not clash.';
     s.answer(422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { intervals: overlap } } });
-    await ionValue(s.inDoc('schedule-day-form-intervals-open-1'), '13:00', 'ionInput');
+    await pick(s.inDoc('schedule-day-form-intervals-open-1'), '13:00');
     await click(s.submit());
     expect(s.inDoc('schedule-day-form-intervals-error')?.textContent?.trim()).toBe(overlap);
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
-    expect((s.inDoc('schedule-day-form-intervals-open-1') as Control).value).toBe('13:00');
+    expect(picked(s.inDoc('schedule-day-form-intervals-open-1'))).toBe('13:00');
   });
 
   it('speaks Spanish', async () => {

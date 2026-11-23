@@ -2,7 +2,7 @@
 // RESERVATION-F01: «Add slot» — the Day of the week (the weekday of the day on screen first), From, To,
 // Max reservations (10) and, optionally, Max guests; «Create slot». The slots of a day never overlap: the
 // server says which one it overlaps, on top and under «From».
-import { FormModal } from '@erplora/ui/components';
+import { FormModal, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -99,31 +99,21 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           </ion-select-option>
         </ion-select>
         <div class="reservation-slot-form__pair">
-          <ion-input
-            data-testid="reservation-slot-form-start_time"
+          <TimeField
+            v-model="start"
+            testid="reservation-slot-form-start_time"
             name="start_time"
-            type="time"
-            :value="start"
             :label="$t('reservation.availability.slotForm.from')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.start_time"
-            :class="invalid(fieldErrors.start_time)"
-            @ion-input="start = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="reservation-slot-form-end_time"
+          <TimeField
+            v-model="end"
+            testid="reservation-slot-form-end_time"
             name="end_time"
-            type="time"
-            :value="end"
             :label="$t('reservation.availability.slotForm.to')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :error-text="fieldErrors.end_time"
-            :class="invalid(fieldErrors.end_time)"
-            @ion-input="end = text($event.detail.value)"
           />
         </div>
         <div class="reservation-slot-form__pair">
