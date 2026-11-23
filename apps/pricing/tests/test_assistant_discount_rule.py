@@ -42,10 +42,15 @@ OF_A_CHECK = [
 def test_price_lists_reads_the_discount_of_something_as_a_rule():
     """Price lists says it itself: the platform's words do not, and live alone does not either (positive control)."""
     rule = shared.stem("rule")
-    assert_its_words_name(
-        "pricing",
-        [("el descuento de los cafés", rule), ("los descuentos en bebidas", rule), ("the discount on coffees", rule)],
-    )
+    said = [
+        "el descuento de los cafés",
+        "los descuentos de las bebidas",
+        "el descuento en los vinos",
+        "los descuentos en bebidas",
+        "the discount on coffees",
+        "the discounts on wines",
+    ]
+    assert_its_words_name("pricing", [(phrase, rule) for phrase in said])
 
 
 def test_a_discount_said_of_a_check_or_by_how_much_names_no_rule():
