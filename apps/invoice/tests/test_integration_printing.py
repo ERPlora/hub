@@ -6,11 +6,12 @@ with why: the invoice's screen prints its own paper instead, and the assistant's
 """
 
 import dataclasses
+import logging
 
 import pytest
 from django.utils import translation
 from django.utils.html import escape
-from live.errors import Conflict
+from live.errors import AppInactive, Conflict
 from live.operations import registry
 
 from apps.invoice.tests.conftest import HUB_DB, ctx_for, run
@@ -116,6 +117,18 @@ def test_without_printing_in_the_business_it_is_not_printed(invoice, office, mon
     assert not_printed(invoice) == "invoice.no_printer"
 
 
+def test_with_printing_off_it_is_not_printed(invoice, office, monkeypatch, caplog):
+    """Printing off is how a business is, not a failure of Printing: nothing is logged."""
+
+    def off(ctx, data):
+        raise AppInactive("Printing is off.")
+
+    monkeypatch.setitem(registry, "printing.job.create", dataclasses.replace(registry["printing.job.create"], fn=off))
+    with caplog.at_level(logging.WARNING):
+        assert not_printed(invoice) == "invoice.no_printer"
+    assert not [record for record in caplog.records if record.msg.startswith("invoice: Printing")]
+
+
 def test_without_permission_to_print_it_is_not_printed(invoice, office):
     admin = ctx_for()
     assert not_printed(invoice, dataclasses.replace(admin, permissions=admin.permissions - {"printing.print"})) == (
@@ -137,15 +150,17 @@ def test_a_record_that_cannot_be_read_keeps_the_page_from_the_queue(invoice, off
 PRINT_ASK = {"role": "user", "content": "imprímeme la factura"}
 
 
-def printed_from_the_assistant(invoice, language: str, without: frozenset[str] = frozenset()) -> dict:
-    """The receipt's row of the yes of a person ``without`` some permissions to the card that prints ``invoice``,
-    asked in ``language``."""
+def printed_from_the_assistant(
+    invoice, language: str, without: frozenset[str] = frozenset(), *, request_language: str | None = None
+) -> dict:
+    """The receipt's row of the yes of a person who reads ``language`` and lacks the permissions ``without`` to the
+    card that prints ``invoice``, asked by a request in ``request_language`` (by default, the person's)."""
     admin = ctx_for(language=language)
     person = dataclasses.replace(admin, permissions=admin.permissions - without)
 
     def turn_of(*calls, decision=None):
         data = {"messages": [PRINT_ASK, asked(*calls)], "pending": list(calls), "decision": decision}
-        with translation.override(language):
+        with translation.override(request_language or language):
             return run("base.assistant.turn", data, person).model_dump(mode="json")
 
     plan = answered(call("invoice.invoice.print", {"invoice_id": str(invoice.id)}), decision=YES, turn_of=turn_of)
@@ -164,6 +179,11 @@ def test_from_the_assistant_a_page_no_printer_takes_is_not_done_and_says_why(inv
     row = printed_from_the_assistant(invoice, language)
     assert (row["outcome"], row["code"], row["reason"]) == ("error", "invoice.no_printer", {language: said})
     assert not PrintJob.objects.exists()
+
+
+def test_from_the_assistant_why_is_said_in_the_persons_language_whatever_the_requests(invoice, till):
+    row = printed_from_the_assistant(invoice, "es", request_language="en")
+    assert row["reason"] == {"es": "Ninguna impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF."}
 
 
 def test_from_the_assistant_a_page_the_system_printer_took_is_done(invoice, office):
