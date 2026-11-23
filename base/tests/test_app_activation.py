@@ -415,9 +415,13 @@ def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
     set_rows()
     for name in ("base.app.enable", "base.app.disable"):
         card = assistant.cards.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
-        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservas online")]
+        assert [(field["name"], field["value"]) for field in card["fields"] if field["name"] == "app"] == [
+            ("app", "Reservas online")
+        ]
         card = assistant.cards.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
-        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservations")]
+        assert [(field["name"], field["value"]) for field in card["fields"] if field["name"] == "app"] == [
+            ("app", "Reservations")
+        ]
 
 
 @HUB_DB

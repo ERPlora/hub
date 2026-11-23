@@ -986,8 +986,10 @@ Pasos:
      eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
   5. Desde el asistente («Desactiva la app de reservas», o sin decir «app»: «quita Reservas del menú», «no quiero ver
-     Reservas en el menú») la app se nombra como en BASE-F24, la tarjeta de riesgo alto la pone con su nombre entero
-     y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
+     Reservas en el menú») la app se nombra como en BASE-F24 y la tarjeta de riesgo alto la pone con su nombre entero.
+     Antes del sí nombra también las que se van con ella, con la misma regla y las mismas palabras que el paso 2:
+     «Otras apps: Horarios y Mesas se desactivan con ella: solo las necesitaba Reservas.». Si ya estaba desactivada,
+     el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
 Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desactivar, no ofrece «Desactivar»
@@ -1008,8 +1010,10 @@ Pasos:
      se nombra como la dice la persona: por su nombre en
      cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
-     aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
-     estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
+     aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y antes del
+     sí nombra las que necesita y están desactivadas, como el aviso del paso 2: «Activar en Apps: Reservas · Reservas
+     necesita Horarios y Mesas: se activan con ella.». Si ya estaba activada el asistente lo dice («Clientes ya estaba
+     activada») en vez de «activada».
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
      desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
      España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
