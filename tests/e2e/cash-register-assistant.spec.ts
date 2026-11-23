@@ -214,7 +214,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: expected });
   // The read never says it closed anything; the card is the dangerous one, naming the session and the count.
   await expect(receipts(page).filter({ hasText: 'Close in Cash register' })).toHaveCount(0);
-  await expect(card(page)).toContainText('Close in Cash register. Check each datum before going on.');
+  await expect(card(page)).toContainText('Close in Cash register. Check each detail before you continue.');
   await expect(card(page)).toContainText(`Session: ${shift.number}`);
   await expect(card(page)).toContainText('Counted cash: €250.00');
   // And what closing gives (the close's summary, read as the owner): the session, its drawer, the expected and the
