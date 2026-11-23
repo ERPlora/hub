@@ -344,7 +344,10 @@ Pasos:
    otra tarifa o el de la ficha.».
 Entra: el precio, por su fila; el asistente, por la tarifa, el artículo y la cantidad mínima (1 si no la
 dice).
-Sale: `pricing.price_item.updated` o `pricing.price_item.removed`.
+Sale: `pricing.price_item.updated` o `pricing.price_item.removed`. Al quitar uno, el asistente dice lo que
+cuesta ahora el artículo en esa tarifa desde esa cantidad, leído después de quitarlo: el precio de la tarifa
+para menos cantidad, en la tarifa de un grupo de clientes el de la general, o si no el de la ficha; nunca el
+que acaba de quitar.
 Si falla: «Ese artículo ya tiene precio en esta tarifa desde esa cantidad.», «Ese precio ya no
 existe.». Los precios de una tarifa **desactivada** no se cambian (como no se añaden: «Esa tarifa no
 está disponible…»): el detalle no ofrece **+** ni **Editar**, solo **Quitar**.
@@ -629,7 +632,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
   Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
@@ -703,7 +706,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   tarifa o una regla sale antes que `base.app.enable`: live lee «activar» también como la acción `activate`
   (ERPlora/live#70).
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id
-  con las marcas `refers` de `schemas.py` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
+  con las marcas `refers` de `schemas/` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
   `A_GROUP`), leídas como quien pregunta: la tarifa y la regla por su nombre, el precio por su `label` («Champú ·
   Mayoristas · desde 10»), el producto con `inventory.product.get` y el servicio, la categoría o el grupo con
   `pricing.catalog.get` (Servicios no es requisito: su nombre, por `call_service`; apagada o ausente, la tarjeta lo

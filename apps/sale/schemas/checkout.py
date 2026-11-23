@@ -24,6 +24,7 @@ from apps.sale.schemas.fields import (
     MAX_PAYMENTS,
     ONE_SOURCE,
     OPEN_LINES,
+    SAY_WHAT_IS_ADDED,
     SAY_WHICH_METHOD,
     SERVICE_LINES,
     AttemptKey,
@@ -113,6 +114,23 @@ class PaymentIn(Closed):
     reference: _text(128) = Field(
         "", description="A free reference of the leg, e.g. the card's authorisation."
     )
+    extra: Cents = Field(
+        0,
+        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks. "
+        "A charge that brings it is refused while no active app adds such a step.",
+    )
+    extra_label: _text(60) = Field(
+        "", validate_default=True, description="Leave it out: the name of that app's added amount, filled by its step."
+    )
+
+    @field_validator("extra_label")
+    @classmethod
+    def _added_is_named(cls, label: str, info):
+        if not info.data.get("extra"):
+            return ""
+        if not label:
+            raise ValueError(str(SAY_WHAT_IS_ADDED))
+        return label
 
     @model_validator(mode="after")
     def _named(self):

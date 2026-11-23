@@ -103,7 +103,7 @@ def a_business(recoveries, every_app_on):
     ids = {}
     for group, name, allergens in (("Extras", "Cheese", ["milk"]), ("Sauces", "Mustard sauce", ["mustard"])):
         group_id = run_in(hub, "modifier.group.create", name=group).id
-        ids[name] = run_in(hub, "modifier.option.create", group_id=group_id, name=name, allergens=allergens).id
+        ids[name] = run_in(hub, "modifier.option.create", price_delta=0, group_id=group_id, name=name, allergens=allergens).id
     return hub, ids
 
 

@@ -265,6 +265,8 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
             "device.list identifies the device, use this to close its access; listing alone changes nothing."
         ),
         risk="high",
+        # Two devices without a name read the same («Chrome · Linux»): their last use tells them apart.
+        preview={"operation": "base.device.detail", "fields": ["last_entry_at"]},
         asks={
             "en": (
                 "we lost the terrace tablet, remove it",
@@ -299,6 +301,7 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     ai=AI(
         description="Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
         risk="high",
+        preview={"operation": "base.device.unused", "fields": ["count", "devices"]},
         asks={
             "en": (
                 "clean out the devices nobody has used in 30 days",

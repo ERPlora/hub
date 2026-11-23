@@ -589,7 +589,7 @@ class StationOut(Schema):
         description="A given printer by its name; empty: the function's."
     )
     sort_order: int = Field(description="Its place.")
-    is_active: bool = Field(description="Whether new dishes go to it.")
+    is_active: bool = Field(description="Switched on: it gets only the products and categories routed to it.")
     in_progress: int = Field(description="Its dishes still to cook.")
     routes: int = Field(description="How many products and categories go to it.")
 
@@ -613,7 +613,7 @@ class StationIn(In):
         description="A given printer of Printing by its name; empty: the function's.",
     )
     sort_order: int = Field(0, ge=0, le=10_000, description="Its place in the lists.")
-    is_active: bool = Field(True, description="Whether new dishes go to it.")
+    is_active: bool = Field(True, description="Switched on: it gets only the products and categories routed to it.")
 
 
 class StationPatchIn(StationRefIn):
@@ -629,7 +629,7 @@ class StationPatchIn(StationRefIn):
         None, description="A given printer by its name; empty: the function's."
     )
     sort_order: int | None = Field(None, ge=0, le=10_000, description="Its place.")
-    is_active: bool | None = Field(None, description="Whether new dishes go to it.")
+    is_active: bool | None = Field(None, description="Switched on: it gets only the products and categories routed to it.")
 
 
 class RoutingListIn(PageIn):

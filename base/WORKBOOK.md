@@ -71,6 +71,8 @@ llenarse.
 Arriba, el nombre del negocio y «Hoy» con la fecha larga; mientras el negocio no tiene nombre, un saludo
 según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo, en este orden:
 
+- **Cómo está funcionando el negocio**, solo para quien lo administra: una etiqueta de color por cada app encendida que
+  dice cómo está (la impresora de tiques, el número de WhatsApp), con lo que lo arregla, y «Ver sistema».
 - **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
   tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
   plantillas» y «Ahora no».
@@ -298,9 +300,9 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
+| Cargando | La fila de cómo está funcionando el negocio en gris, baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
-| Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». En la app de un ordenador, «No se pudo cambiar el ajuste de arranque al iniciar sesión.» (BASE-F120). |
+| Error | Cada zona falla por su cuenta: «No hemos podido comprobar cómo está funcionando tu negocio.» con «Reintentar», «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». En la app de un ordenador, «No se pudo cambiar el ajuste de arranque al iniciar sesión.» (BASE-F120). |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.»), salvo «Arrancar al iniciar sesión», que es del ordenador y no del negocio, y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
@@ -344,7 +346,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | hecho |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -499,31 +501,36 @@ nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
 Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
-Estado: parcial — la fila de salud del paso 5 todavía no se pinta en el Inicio, aunque el hub ya sabe qué decir de la
-impresora de tiques; y la Bandeja de WhatsApp todavía no dice cómo está su número (hub#573)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Tras entrar se abre el Inicio (también desde «Inicio» en el menú lateral).
   2. Arriba, el nombre del negocio (el de erplora.com) y «Hoy» con la fecha larga en el idioma de la
      aplicación; mientras el negocio no tiene nombre, «Buenos días», «Buenas tardes» o «Buenas noches».
-  3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
-     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
-     paneles.
-  4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
-     sitio, sin recargar ni reabrir la aplicación.
-  5. Para quien administra el negocio, al pie de «Resumen», una fila con cómo está lo que el negocio necesita para
-     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo: con
+  3. Para quien administra el negocio, bajo el saludo, una fila con cómo está lo que el negocio necesita para
+     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo en una
+     etiqueta de color: verde lo que funciona, ámbar lo que hay que arreglar y gris lo que no se pudo comprobar. Con
      Impresión, «Impresora lista» si el dispositivo que saca los tiques ha dado señales en el último minuto y medio,
      «Impresora sin conectar» si está dado de alta pero no responde, o «Impresora sin configurar» si no hay ninguno;
-     las dos últimas con «Configurar la impresión», que abre Impresión. Quien no administra el negocio no ve la fila.
+     las dos últimas con «Configurar la impresión», que abre Impresión. Con la Bandeja de WhatsApp, «WhatsApp
+     conectado», «Hay que volver a conectar WhatsApp» si WhatsApp lo pide, o «WhatsApp sin conectar» si no hay número
+     conectado; las dos últimas con «Conectar WhatsApp», que abre los ajustes de la Bandeja. La fila se vuelve a
+     comprobar cada vez que se vuelve al Inicio. Sin ninguna app encendida que diga cómo está, no hay fila. Quien no
+     administra el negocio no la ve.
+  4. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
+     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
+     paneles.
+  5. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
+     sitio, sin recargar ni reabrir la aplicación.
   6. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio, la fecha del dispositivo y lo que cada app encendida dice de sí misma.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se
 apilan y «Mis apps» se pliega. Lo que no se pudo comprobar sale en neutro, nunca como listo y sin botón,
-porque no es tarea de quien mira: «No hemos podido comprobar la impresora».
-Implicados: PRINTING-F21
+porque no es tarea de quien mira: «No hemos podido comprobar la impresora», «No hemos podido comprobar WhatsApp». Si
+no se puede leer la fila entera: «No hemos podido comprobar cómo está funcionando tu negocio.» con «Reintentar».
+Implicados: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
 
 ### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
 Estado: hecho
@@ -752,10 +759,13 @@ Pasos:
   1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
      dónde se hace; cada paso sigue teniendo su «Configurar» en la lista.
+  3. De un paso hecho dice que está hecho, sin sacar una cifra, un nombre ni un ajuste de su texto, que dice lo que
+     pide el paso y no lo que tiene el negocio: «Tu catálogo» está hecho porque ya hay productos, nunca «tienes uno».
+     Si se le pregunta cuántos o cuál, lo lee en la app del paso (los productos activos, en Inventario).
 Entra: la lista de lo que falta, con los permisos de quien pregunta.
 Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
-Implicados: BASE-F103
+Implicados: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 Cambiar de rol o salir del negocio con el hub abierto
 Estado: hecho
@@ -1932,13 +1942,23 @@ Pasos:
      sesión», y debajo qué pasa («Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad:
      la siguiente venta lleva el nombre de la siguiente persona.»).
   4. Cada cambio se guarda al momento, sin botón, y la tarjeta enseña lo que el negocio confirma.
+  5. Por el asistente («quiero que en la caja cada uno tenga que meter su PIN para saber quién vende»), el
+     asistente lee cómo está y lo dice con los nombres de esta tarjeta: con el pinpad encendido y «Hasta cerrar
+     sesión», cada persona ya entra con su PIN y cada venta lleva su nombre. Para que vuelva a preguntar tras
+     inactividad, antes le pregunta cuántos minutos (1, 5, 10, 15 o 30): nunca los pone él ni se quedan sin verse
+     los que hubiera guardados. La tarjeta, con cada dato en su línea (BASE-F98), dice cada control que cambia con
+     su nombre y el valor que tendrá aquí: «Mostrar pinpad: Sí» y «Volver a preguntar tras inactividad: 10 min»;
+     «Hasta cerrar sesión», «Mostrar pinpad: No» o «Dígitos del PIN: 6 dígitos» según el cambio. Si solo cambian
+     los minutos y el negocio pregunta «Hasta cerrar sesión», dice «Volver a preguntar tras inactividad: Hasta
+     cerrar sesión», que es lo que seguirá diciendo aquí (BASE-F97).
 Entra: cómo pide el PIN el negocio.
 Sale: si se pide y cuándo se vuelve a pedir, para todas las cajas del negocio. Apagarlo y volver a encenderlo
 vuelve a pedirlo por turno.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.». Si no se puede leer: «No se pudo
 cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.». Quien no administra ve los
-controles apagados y «Solo un administrador puede cambiar si se pregunta.».
-Implicados: BASE-F55, BASE-F59
+controles apagados y «Solo un administrador puede cambiar si se pregunta.». Por el asistente, «tras
+inactividad» sin sus minutos no llega a la tarjeta: vuelve al asistente, que pregunta cuántos.
+Implicados: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 Ver los dispositivos en los que se ha entrado
 Estado: hecho
@@ -1985,12 +2005,15 @@ Pasos:
      usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.».
   3. Confirma con «Quitar este dispositivo» (o «Dejarlo»). La fila desaparece y su sesión se cierra al momento. Si
      era el suyo, sale del negocio.
+  4. Desde el asistente («quita el móvil que perdí esta tarde»), la tarjeta pide escribir CONFIRMAR (BASE-F98) y, bajo
+     «Lo que va a pasar», dice cuándo se usó por última vez («Último uso: 22 nov 2026, 16:18»): dos dispositivos sin
+     nombre se llaman igual («Chrome · Linux») y solo su último uso los distingue.
 Entra: el dispositivo.
 Sale: el dispositivo olvidado y sus sesiones cerradas: se corta el dispositivo, no la persona, que puede volver a
 entrar en él con su cuenta.
 Si falla: «No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.» o «Ese dispositivo ya
 no está registrado aquí. Actualiza la lista.»; nunca queda como hecho lo que se rechazó.
-Implicados: BASE-F58, BASE-F68
+Implicados: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Quitar de golpe los dispositivos que nadie usa
 Estado: hecho
@@ -2003,10 +2026,15 @@ Pasos:
      usa desde hace 30 días?») con «Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en
      él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.».
   3. Confirma con «Quitar».
+  4. Desde el asistente («quita los dispositivos viejos que ya no usa nadie»), la tarjeta pide escribir CONFIRMAR
+     (BASE-F98) y, bajo «Lo que va a pasar», dice cuántos va a quitar y cuáles, por su nombre, el último usado primero
+     («Dispositivos que se quitan: 2» y «Cuáles: Chrome · Linux, Barra»); el que se está usando nunca está entre ellos.
+     Si ninguno lleva 30 días sin usarse, no sale tarjeta y el asistente lo dice: «Ningún dispositivo lleva 30 días sin
+     usarse, así que no hay nada que quitar.».
 Entra: qué dispositivos lleva 30 días sin usar nadie.
 Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
-Implicados: BASE-F70
+Implicados: BASE-F70, BASE-F98
 
 ### BASE-F72 Ver los archivos del negocio
 Estado: hecho
@@ -2334,10 +2362,11 @@ Pasos:
      muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
      dice «Copiado»). «Hecho» la cierra.
 Entra: el nombre, el ritmo y lo que puede hacer.
-Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
+Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla, y quién la creó, que pone su techo
+(BASE-F125). Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
 publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
-Implicados: BASE-F89, BASE-F90, BASE-F119
+Implicados: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotar una llave de API
 Estado: hecho
@@ -2576,7 +2605,8 @@ Pasos:
      que agrupa otros: «1,50 $» en los dos, nunca «1,50 US$» al lado. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
      suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
-     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
+     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No», con el nombre de su dato delante, también en la línea de una acción normal,
+     porque solo no dice qué cambia («Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí», nunca «Sí · Sí»);
      una lista que su app (el servidor) nombra, por sus elementos uno tras otro («Impresoras: Caja, Cocina»; con más
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
      fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); los permisos que se conceden a una
@@ -2614,9 +2644,14 @@ Pasos:
      factura dice «Rectificar en Facturación». Dos acciones que se llaman igual en dos apps dicen cada una lo que
      hace: vaciar un carrito dice «Vaciar en Carrito y pago», quitar una de sus líneas «Quitar en Carrito y pago» y
      quitar la ruta de un producto en la cocina «Quitar en Cocina»; un arqueo dice «Registrar arqueo en Caja» y una
-     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir».
+     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir»; y la prueba en
+     vivo de VeriFactu, como sus botones, «Probar la conexión en VeriFactu» y «Crear factura de prueba en VeriFactu»,
+     nunca «Ejecutar» ni «Crear». Una acción que no lleva ningún dato que enseñar dice solo su acción y su app, acabada
+     en punto y sin dos puntos vacíos detrás: «Probar la conexión en VeriFactu.».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
-     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
+     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice. Tras
+     «Ejecutar», el asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó
+     hecho y no propone deshacerlo salvo que se lo pidan.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
@@ -3454,8 +3489,8 @@ Pasos:
      va antes de la @.
   4. Un panel de Inicio cuya cifra es un dato que la persona no ve no le sale en el tablero ni entre los que puede
      añadir.
-  5. Una llave de API ve los datos que ve quien la crea: solo la crean el propietario y el administrador, que los ven
-     todos, así que una integración lee y escribe el coste de un producto como antes.
+  5. Una llave de API ve los datos que ve hoy quien la creó (BASE-F125): una llave del propietario o de un
+     administrador, que los ven todos, lee y escribe el coste de un producto como antes.
   6. Los totales del negocio son las cifras de todo el negocio, más allá de lo que hace cada uno: con las ventas de
      todos, las cifras de **Ventas** y sus paneles de Inicio son las del negocio entero; sin ellos, las de las ventas
      de la persona. En **Clientes**, «Ingresos» solo sale a quien los ve.
@@ -3463,7 +3498,32 @@ Entra: el rol de la persona en este negocio.
 Sale: nada guardado.
 Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
-Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
+Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
+
+### BASE-F125 Una llave deja de servir si su creador ya no puede
+Estado: hecho
+Actor: API (otro programa), propietario, administrador
+Pantalla: ninguna (se ve en lo que la API contesta al otro programa)
+Pasos:
+  1. Cada llave recuerda quién la creó. Una llave creada antes de que se guardara pasa a nombre del propietario del
+     negocio con la siguiente foto de erplora.com, que llega como mucho cada noche; hasta entonces puede lo mismo que
+     el propietario, como antes.
+  2. Una llave nunca hace más que quien la creó, con lo que esa persona puede hoy en el negocio: abre una operación
+     solo si su creador tiene su permiso; recibe un dato delicado (los costes, el contacto, los totales del negocio)
+     solo si su creador lo ve, y si no le llega vacío (BASE-F119); y en lo que tiene dueño (las ventas, las cajas,
+     las facturas, las citas, las comisiones) lee todo solo si su creador lo ve todo, y si no, solo lo de su creador.
+     Al dar una cita o atender a una clienta, la llave sigue del lado de la clienta, como hasta hoy.
+  3. Si a quien la creó le cambian el rol en erplora.com y pierde un permiso, la llave lo pierde a la vez, sin
+     tocarla: lo que lo necesita contesta 403 `permission_denied`, y el dato que ya no ve llega vacío.
+  4. Si quien la creó deja el negocio, la llave deja de abrir nada: cada petición contesta 403
+     `base.api_key_owner_gone`, «Quien creó esta API key ya no está en el negocio. Crea una nueva.». La llave sigue
+     en **Empleados › API keys**: quien lleva el negocio la revoca (BASE-F88) y crea otra (BASE-F86).
+Entra: la llave con la que llama el otro programa y el rol de hoy de quien la creó, de la última foto de erplora.com.
+Sale: nada guardado.
+Si falla: el 403 dice si a quien la creó le falta el permiso (`permission_denied`) o si ya no está en el negocio
+(`base.api_key_owner_gone`); lo demás que rechaza una llave no cambia: lo que la propia llave no puede hacer, 403
+`base.api_key_scope`, y pasada de sus peticiones por minuto, 429 `base.api_key_rate_limited`.
+Implicados: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Arrancar ERPlora al iniciar sesión en el ordenador
 Estado: hecho
@@ -3621,9 +3681,16 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   cuyo permiso tiene. Devuelve `{key, app, state, title, action, route}`; `action` y `route` solo con `no_signal` o
   `not_configured`. Si la consulta falla o contesta un estado que no conoce, `unknown` con el título de la app y sin
   acción, y se anota en el log. No es viva: cambia con el paso del tiempo, sin evento. Impresión la declara con
-  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora». Tests:
-  `test_home_health.py`, `test_queries_health.py`, `test_api_health.py` y
-  `apps/printing/tests/test_integration_home_health.py`.
+  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora»; la Bandeja de WhatsApp,
+  con `whatsapp_inbox.channel.health` (el estado del número de la foto de erplora.com). En pantalla la pinta
+  `components/HomeHealthRow.vue`, bajo el saludo, solo si la sesión tiene `base.administer_hub` (si no, ni la pide),
+  y la vuelve a pedir cuando la ruta vuelve al Inicio: en la pila de Ionic la página sigue montada mientras se va a
+  otra pantalla, y `onIonViewWillEnter` solo llega a la página, no a sus piezas. Una lectura que falla quita la de
+  antes, que podría decir «lista» cuando ya no lo está. Los colores e iconos de cada estado son `HEALTH_PILLS`
+  (`lib/home-health.ts`), los mismos que usa «Tu impresora». Tests: `test_home_health.py`, `test_queries_health.py`,
+  `test_api_health.py` (también el tipo `HomeHealthItem` de `operations/home.ts` contra el esquema),
+  `apps/printing/tests/test_integration_home_health.py`, `apps/whatsapp_inbox/tests/test_integration_home_health.py`,
+  `HomeHealthRow.test.ts`, `home-health.test.ts` y `tests/e2e/home-health.spec.ts`.
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
@@ -4775,8 +4842,6 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
-- **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
-  impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).

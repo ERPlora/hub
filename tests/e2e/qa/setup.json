@@ -626,6 +626,7 @@
       "arguments": {
         "group": "Endulzante QA",
         "name": "Sin azúcar QA",
+        "price_delta": 0,
         "is_default": true
       },
       "provides": [

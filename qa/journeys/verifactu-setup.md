@@ -18,7 +18,7 @@ Para qué: activar VeriFactu, decidir quién remite los registros a la AEAT y co
 2. VERIFACTU-F32 — una vez encendido, ya no se puede apagar.
 3. VERIFACTU-F12 — la declaración responsable.
 4. VERIFACTU-F04 — quién remite: el certificado del negocio o ERPlora.
-5. VERIFACTU-F05 — el otorgamiento de representación, para que remita ERPlora.
+5. VERIFACTU-F05 — el otorgamiento de representación, para que remita ERPlora; solo donde ERPlora presenta por cuenta de los negocios (si no, los pasos 5 y 6 no se ofrecen y se sigue en el 7).
 6. VERIFACTU-F06 — el otorgamiento, enviado otra vez.
 7. VERIFACTU-F02 — o, en su lugar, el certificado propio del negocio.
 8. VERIFACTU-F34 — el certificado, renovado.

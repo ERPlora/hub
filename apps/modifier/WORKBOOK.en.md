@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fdcb415bacc7ae6ed135e5f34b1ebd639ad6649a3067c310908515cf3b44ce57 -->
+<!-- generated from WORKBOOK.md sha256:33f69d4c493414e5664c973cbf296d07602ca4db7c8eb5f0c34f454565997f51 -->
 
 ## What it is for and who it is for
 
@@ -219,7 +219,9 @@ Steps:
 1. Open the group and, in Options, tap "Add option".
 2. Type the Name (unique within the group) and, if needed, the kitchen ticket name.
 3. Type the Supplement in the business's currency, its country's, with its decimals (the yen has none):
-   positive charges more, negative is a discount, empty or 0 is free.
+   positive charges more, negative is a discount, empty or 0 is free. Through the assistant, an option asked
+   for without its supplement ("in Extras I want an Extra cheese") draws no card: it first asks how much it
+   charges, and it is free only if the person says so.
 4. Only if the option is taxed differently from the dish, choose its own tax category; empty, it
    inherits the dish's.
 5. Tick "Chosen by default" if the till must bring it already ticked. In a group of maximum 1, ticking

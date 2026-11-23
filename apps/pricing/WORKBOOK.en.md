@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0aa9ef4ea13f86ca07b50fd482a6ba83b11cd0118e5772c0b79691dd2de82a6c -->
+<!-- generated from WORKBOOK.md sha256:c68e00a8db22b5f9d9d63565c643cd3d28589ab5773627fcc4863b6a32ca31dc -->
 
 ## What it is for and who it is for
 
@@ -339,7 +339,9 @@ Steps:
    another list's price or the catalog's.".
 In: the price, by its row; the assistant, by the price list, the item and the minimum quantity (1 if it does not
 say).
-Out: `pricing.price_item.updated` or `pricing.price_item.removed`.
+Out: `pricing.price_item.updated` or `pricing.price_item.removed`. When one is removed, the assistant says what
+the article costs on that list now from that quantity, read after removing it: the list's price for a lower
+quantity, on a customer group's list the general list's, or else the catalog's; never the one it has just removed.
 If it fails: "That article already has a price in this list from that quantity.", "That price no longer
 exists.". The prices of a **deactivated** price list are not changed (as they are not added: "That price list is not
 available…"): the detail offers neither **+** nor **Edit**, only **Remove**.

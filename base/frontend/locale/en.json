@@ -12,6 +12,12 @@
         "label": "Home sections",
         "summary": "Summary",
         "activity": "Activity"
+      },
+      "health": {
+        "label": "How your business is working",
+        "viewSystem": "View system",
+        "loadError": "We couldn't check how your business is working.",
+        "retry": "Retry"
       }
     },
     "apps": {
@@ -1504,6 +1510,14 @@
             },
             "movement": {
               "add": "Register movement"
+            }
+          },
+          "verifactu": {
+            "diagnostic": {
+              "run": "Test the connection"
+            },
+            "test_invoice": {
+              "create": "Create test invoice"
             }
           }
         }

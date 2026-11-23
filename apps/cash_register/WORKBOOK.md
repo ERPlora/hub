@@ -226,6 +226,9 @@ Pasos:
    obligatorio al cerrar, el saldo negativo, el arqueo ciego y el cierre automático, venga la orden de la
    pantalla, del asistente o de la API. En el Inicio, «Tu caja» sale hecho
    sin recargar.
+5. Por el asistente («quiero que al abrir me pida el fondo y que al cerrar tenga que contar el dinero»), la
+   tarjeta dice cada ajuste que cambia por su nombre y su valor, como en **Caja → Ajustes**: «Cambiar en Caja:
+   Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí».
 Entra: las decisiones del administrador.
 Sale: los ajustes de caja del negocio, una sola fila (avisa: `cash_register.settings.updated`, también
 el primer guardado sin cambios). Sin guardar nunca, valen los de fábrica y «Tu caja» sigue pendiente;
@@ -234,7 +237,7 @@ Si falla: «No se pudieron guardar los ajustes.» con el motivo, y los ajustes q
 la lectura falla, la pantalla no enseña valores (nunca los de fábrica como si fueran los del negocio)
 y ofrece «Reintentar». Sin el permiso de ajustes, la pantalla dice «Sin acceso» y el
 Inicio no le enseña el paso «Tu caja».
-Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
+Implicados: CASH_REGISTER-F03, F05, F07, F09, F10, BASE-F97
 
 ### CASH_REGISTER-F02 Dar de alta, renombrar y desactivar un cajón
 Estado: hecho
@@ -795,7 +798,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   y es el cajón en el que se cobra (Ventas la pide con la sesión de quien cobra, F04), se cuenta y se cierra. Quien no
   tiene `cash_register.view_all_sessions` lee y escribe solo en esas (`find_session`, `named_or_open`,
   `session_to_close`, la lista y la sesión actual, con el mismo 404 `cash_register.session_not_found` que una que no
-  existe); quien no es una persona (una llave, una automatización, la plataforma) alcanza las que le abre su permiso.
+  existe); una llave de API lee como quien la creó (BASE-F125), y quien no tiene a nadie detrás (una automatización,
+  la plataforma) alcanza las que le abre su permiso.
   Lo que suma una sesión es todo el cajón: `lines.sale_lines` lee las ventas de todos los que cobraron en ella, y
   `unassigned_window` y `unassigned_totals` miran la última sesión cerrada y cuentan lo de fuera de turno sin mirar de
   quién es; las tres están en la lista cerrada de `tests/test_guardrails_ownership.py` con su motivo.

@@ -636,10 +636,14 @@ Pasos:
    «Hecho» sin recargar, y sigue hecho los años siguientes (la serie de un año nuevo hereda la del anterior).
 4. El asistente o la API preguntan además si la numeración del año está preparada: la respuesta dice el año
    del negocio y cuántas series ordinarias (F1, F2, F3), de rectificativas (R1–R5) y predeterminadas tiene ese
-   año, cuántas tiene en total, y si está preparada (al menos una ordinaria y una de rectificativas).
+   año, cuántas tiene en total, y si ese año ya tiene al menos una ordinaria y una de rectificativas. Sin
+   series no falta nada: el asistente contesta lo mismo que **Series**, que se crean solas con la primera
+   venta y que solo hace falta crear una para cambiar el prefijo o el formato, o para seguir la numeración
+   de otro sistema.
 Entra: las series del negocio.
 Sale: nada; solo se lee (ni el Inicio ni la pregunta crean ninguna serie).
-Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente y responde que no está preparada.
+Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente (recomendado) y, preguntado, el
+asistente dice que aún no hay series y que se crearán solas con la primera venta.
 Implicados: ninguno
 
 ### INVOICE-F15 Comprobar que la numeración no tiene huecos
@@ -786,6 +790,10 @@ Pasos:
    «Inscrito en el ROI (operaciones intracomunitarias)»; el NIF se sigue escribiendo sin prefijo.
 4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso desaparece de la campana y el paso del Inicio queda «Hecho»,
    sin recargar y también en los demás dispositivos.
+5. También se le puede pedir al asistente («pon los datos fiscales de la empresa en las facturas: Bar Lema SL,
+   B12345674, Calle Mayor 10, 28013 Madrid»). Antes de guardar, su tarjeta enseña cada dato con el nombre de su
+   campo y el país por su nombre en el idioma de quien lo pide, como el selector de Emisor («País: España»,
+   «Country: Spain»), nunca su código. Al escribir «CONFIRMAR», se guarda igual que con «Guardar».
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`. Con «Inscrito en el ROI» encendido, la factura en pantalla, su A4 (PDF), el tique
@@ -795,7 +803,7 @@ el QR siguen siempre con el NIF sin prefijo.
 Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
 es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
 también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento.
-Implicados: INVOICE-F18, SALE-F21, SALE-F29
+Implicados: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 Estado: hecho

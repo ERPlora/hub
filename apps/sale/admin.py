@@ -214,6 +214,8 @@ class SalePaymentInline(ChargedInline):
         "amount",
         "tendered",
         "change",
+        "extra",
+        "extra_label",
         "reference",
     )
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:59fee1e11b29718f5f166a17070bbbd875bc8e42f961f139d69171aa77b9b9e8 -->
+<!-- generated from WORKBOOK.md sha256:de7ed648408b3bf2022fc11afc556252c9130910429a2ad22aa060c43511a8c1 -->
 
 ## What it is for and who it is for
 
@@ -218,6 +218,9 @@ Steps:
    negative balance, the blind count and the auto-close apply, whether the order comes from the screen, the
    assistant or the API. On the Home, "Your cash drawer"
    shows done without reloading.
+5. Through the assistant ("I want it to ask me for the float when opening and to make me count the cash when
+   closing"), the card says each setting it changes by its name and its value, as in **Cash register → Settings**:
+   "Change in Cash register: Require an opening float: Yes · Require a count to close: Yes".
 In: the administrator's decisions.
 Out: the business's cash register settings, a single row (announces: `cash_register.settings.updated`, also
 the first save with no changes). Never saved, the default ones apply and "Your cash drawer" stays pending;
@@ -226,7 +229,7 @@ If it fails: "Could not save the settings." with the reason, and the settings st
 reading fails, the screen shows no values (never the default ones as if they were the business's) and
 offers "Retry". Without the settings permission, the screen says "No access" and the
 Home does not show the step "Your cash drawer".
-Involved: CASH_REGISTER-F03, F05, F07, F09, F10
+Involved: CASH_REGISTER-F03, F05, F07, F09, F10, BASE-F97
 
 ### CASH_REGISTER-F02 Add, rename and deactivate a drawer
 Status: done

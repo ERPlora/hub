@@ -46,7 +46,7 @@ def admin_client(client, make_user):
 
 
 def option(name="Cheese", **fields):
-    return run("modifier.option.create", {"group": "Extras", "name": name, **fields})
+    return run("modifier.option.create", {"group": "Extras", "name": name, "price_delta": 0, **fields})
 
 
 def update(option_id, **fields):
@@ -123,7 +123,7 @@ def test_the_option_takes_the_platforms_closed_list_of_allergens(schema):
 def test_the_api_refuses_an_allergen_off_the_list_on_its_field_and_creates_nothing(extras, admin_client, language):
     response = admin_client.post(
         "/api/modifier/options",
-        json.dumps({"group": "Extras", "name": "Cheese", "allergens": ["milk", "nuts"]}),
+        json.dumps({"group": "Extras", "name": "Cheese", "price_delta": 0, "allergens": ["milk", "nuts"]}),
         content_type="application/json",
         HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE=language,
@@ -142,7 +142,7 @@ def test_the_api_refuses_a_change_off_the_list_and_keeps_the_allergens_it_had(ex
 
 
 def test_the_api_saves_them_and_reads_them_back(extras, admin_client):
-    created = post(admin_client, "/modifier/options", {"group": "Extras", "name": "Cheese", "allergens": ["milk"]})
+    created = post(admin_client, "/modifier/options", {"group": "Extras", "name": "Cheese", "price_delta": 0, "allergens": ["milk"]})
     read = get(admin_client, "/modifier/options/detail", id=created.json()["id"])
     assert (created.status_code, created.json()["allergens"]) == (201, ["milk"])
     assert (read.status_code, read.json()["allergens"]) == (200, ["milk"])
@@ -213,7 +213,7 @@ def test_allergens_declared_in_business_b_tell_b_only_and_stay_in_b(listen, hub_
     with use_hub(hub_b):
         ctx = ctx_for("hub_admin", B)
         run("modifier.group.create", {"name": "Extras"}, ctx=ctx)
-        cheese = run("modifier.option.create", {"group": "Extras", "name": "Cheese"}, ctx=ctx)
+        cheese = run("modifier.option.create", {"group": "Extras", "name": "Cheese", "price_delta": 0}, ctx=ctx)
         on_a, on_b = listen(A), listen(B)
         run("modifier.option.update", {"id": str(cheese.id), "allergens": ["milk"]}, ctx=ctx)
         assert ModifierOption.objects.get(pk=cheese.id).allergens == ["milk"]
