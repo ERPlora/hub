@@ -51,8 +51,8 @@ test.beforeAll(async ({ browser }) => {
   });
   expect(group.status, 'create the group').toBe(201);
   for (const option of [
-    { name: 'Rare', sort_order: 1 },
-    { name: 'Medium', sort_order: 2, is_default: true },
+    { name: 'Rare', price_delta: 0, sort_order: 1 },
+    { name: 'Medium', price_delta: 0, sort_order: 2, is_default: true },
   ]) {
     const made = await api(context, A, 'POST', '/modifier/options', { group_id: group.data.id, ...option });
     expect(made.status, `option ${option.name}`).toBe(201);

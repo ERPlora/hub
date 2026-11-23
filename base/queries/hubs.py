@@ -60,9 +60,10 @@ def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
     output=BusinessOut,
     ai=AI(
         description=(
-            "Reads this business's name, country, time zone, language and currency, as erplora.com registered it. They "
-            "are changed on erplora.com by the owner or an administrator, never here; the country no longer changes "
-            "once the business is ready, and the currency is always the country's."
+            "Reads this business's name, country, time zone, language and currency, as erplora.com registered it. Its "
+            "name, time zone and language are changed on erplora.com by the owner or an administrator, never here. Its "
+            "country no longer changes once the business is ready, and its currency is always the country's: it "
+            "changes only with the country."
         ),
         asks={
             "en": (

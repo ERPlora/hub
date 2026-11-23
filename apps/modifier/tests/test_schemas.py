@@ -108,11 +108,17 @@ def test_an_option_names_its_group_and_carries_a_signed_supplement():
         "",
         False,
     )
-    assert refused(OptionIn, name="Cheese") == {"__all__"}
+    assert refused(OptionIn, name="Cheese", price_delta=0) == {"__all__"}
     assert refused(
         OptionIn, group="Extras", name="Gold", price_delta=MAX_DELTA + 1
     ) == {"price_delta"}
-    assert refused(OptionIn, group="Extras", name="") == {"name"}
+    assert refused(OptionIn, group="Extras", name="", price_delta=0) == {"name"}
+
+
+def test_a_new_option_needs_its_supplement_said_and_free_is_said_as_zero():
+    assert refused(OptionIn, group="Extras", name="Extra cheese") == {"price_delta"}
+    free = OptionIn.model_validate({"group": "Doneness", "name": "Rare", "price_delta": 0})
+    assert free.price_delta == 0
 
 
 def test_an_option_is_named_by_its_id_or_by_its_name_and_optionally_its_group():

@@ -107,3 +107,15 @@ def test_the_refusal_is_said_in_spanish():
     assert refusal.value.message == (
         "La caja está cerrada: abre una sesión de caja para cobrar en efectivo."
     )
+
+
+def test_what_another_app_adds_in_cash_is_not_counted_by_the_till_in_the_drawer(a_step_at_the_charge):
+    # The drawer expects the sale's cash: what another app adds (a tip), that app records there itself, never twice (CASH_REGISTER-F18).
+    run("cash_register.session.open", {"opening_balance": 10000})
+    sale = charge(
+        "drawer-0010",
+        payments=[{"method": "cash", "tendered": 500, "extra": 100, "extra_label": "Tip"}],
+        ctx=ctx_for(EMPLOYEE),
+    )
+    assert (sale.total, sale.change_total) == (150, 250)
+    assert run("cash_register.session.current", {}).session.expected_balance == 10150

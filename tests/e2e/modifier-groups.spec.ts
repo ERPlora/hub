@@ -99,7 +99,7 @@ async function makeGroup(context: BrowserContext, fields: Record<string, unknown
   const made = await api<Group>(context, A, 'POST', '/modifier/groups', fields);
   expect(made.status, `group ${JSON.stringify(fields)}`).toBe(201);
   for (const option of options) {
-    const res = await api(context, A, 'POST', '/modifier/options', { group_id: made.data.id, ...option });
+    const res = await api(context, A, 'POST', '/modifier/options', { group_id: made.data.id, price_delta: 0, ...option });
     expect(res.status, `option ${JSON.stringify(option)}`).toBe(201);
   }
   return made.data;
@@ -366,6 +366,21 @@ test('MODIFIER-F11: an option is saved with the allergens it adds, and the sheet
     ['No onion', []],
   ]);
   await shoot(page, 'MODIFIER-F11', () => expect(cheeseRow).toContainText('Allergens: Gluten, Milk'));
+});
+
+test('MODIFIER-F04: an option added with its supplement left empty is free, sent as 0', async ({ page, context }) => {
+  await login(page, A, '/modifier/groups');
+  const group = await makeGroup(context, { name: named('Seasoning') });
+  await openSheet(page, group);
+  const optionForm = dialog(page, 'modifier-option-form');
+  await sheet(page).locator('[data-testid=modifier-sheet-options-add]').click();
+  await expect(optionForm).toBeVisible();
+  await fill(optionForm, 'modifier-option-form-name', 'No salt');
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(optionForm).toBeHidden();
+  await expect(sheet(page).locator('[data-testid^=modifier-sheet-options-row-]').filter({ hasText: 'No salt' })).toContainText('Free');
+  const made = await api<{ rows: { name: string; price_delta: number }[] }>(context, A, 'GET', `/modifier/options?group_id=${group.id}`);
+  expect(made.data.rows.map((row) => [row.name, row.price_delta])).toEqual([['No salt', 0]]);
 });
 
 test('MODIFIER-F04: one default too many is refused under «Chosen by default», and switching it off takes the refusal away', async ({ page, context }) => {

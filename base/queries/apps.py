@@ -185,8 +185,9 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
         description=(
             "Says which of this business's apps a name names, as the person says it (e.g. «Reservas»), or an id: its "
             "id, its name and whether it is on, off, blocked (a paid app without its right), creating (being set up, "
-            "on in a moment) or failed (it could not be set up: base.app.retry). A name that fits several apps is "
-            "refused naming them: ask the person which one."
+            "on in a moment) or failed (it could not be set up: base.app.retry). mandatory=true: the business's country "
+            "requires it, so once on it can't be turned off. A name that fits several apps is refused naming them: ask "
+            "the person which one."
         ),
         asks={
             "en": ("is the reservations app on?", "what state is the website app in?", "do I have the kitchen app?"),
@@ -199,14 +200,20 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
     ),
 )
 def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
-    """Which app ``data.app`` names (``find_app``), with its state as the Apps screen says it: what the assistant's card
-    of ``base.app.enable`` and ``base.app.disable`` names it by (``refers``), never by its id (hub#539)."""
+    """Which app ``data.app`` names (``find_app``), with its state and whether the business's country requires it as the
+    Apps screen says them: what the assistant's card of ``base.app.enable`` and ``base.app.disable`` names it by
+    (``refers``), never by its id."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     config = find_app(data.app, demo=bool(hub and hub.is_demo), language=ctx.language)
     row = activation.states_of(ctx.scope)[config.label]
     state = "blocked" if config.label in entitlement.blocked_apps(ctx.scope) else row.state if row.wanted else "off"
     with translation.override(ctx.language):
-        return {"id": config.label, "name": str(config.verbose_name), "state": state}
+        return {
+            "id": config.label,
+            "name": str(config.verbose_name),
+            "state": state,
+            "mandatory": home.mandatory_in(config, hub.country if hub else ""),
+        }
 
 
 def app_limit(hub: Hub | None) -> int | None:

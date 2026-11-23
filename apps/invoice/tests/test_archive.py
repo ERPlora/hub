@@ -15,7 +15,8 @@ from live.operations import UnknownOperation
 
 from apps.invoice.services import issuing
 from apps.invoice.models import Invoice
-from apps.invoice.queries import fiscal_archive, render_document
+from apps.invoice.queries import fiscal_archive
+from apps.invoice.queries.documents import render_document
 from apps.invoice.tests.conftest import A, HUB_DB
 from apps.invoice.tests.test_integration_verifactu import manual
 from apps.verifactu import chain
