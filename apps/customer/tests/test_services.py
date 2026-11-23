@@ -258,9 +258,9 @@ def test_update_by_the_customers_name_and_null_leaves_a_field_but_clears_a_date(
         "customer.customer.update",
         CustomerPatchIn(customer="ana", city=None, birthday=None, is_active=False),
     )
-    assert (detail.city, detail.birthday, detail.is_active) == ("Madrid", "", False)
+    assert (detail.city, detail.birthday, detail.is_active) == ("Madrid", None, False)
     ana.refresh_from_db()
-    assert ana.birthday == ""
+    assert ana.birthday is None
 
 
 def test_an_update_that_changes_nothing_announces_nothing():
@@ -1328,8 +1328,8 @@ def test_erase_replaces_the_personal_data_and_keeps_what_the_law_keeps(erasable)
         personal, ""
     )
     assert (ana.birthday, ana.anniversary, ana.preferred_channel, ana.is_active) == (
-        "",
-        "",
+        None,
+        None,
         "none",
         False,
     )

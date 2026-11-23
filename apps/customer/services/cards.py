@@ -11,6 +11,10 @@ from apps.customer.schemas.cards import CustomerDetailOut, CustomerIn, CustomerP
 from apps.customer.services.field_values import _apply_field_values, _validated_field_values
 from apps.customer.services.writes import _changes, _e164
 
+#: The fields a patch may clear by sending ``null``.
+NULLABLE = frozenset({"birthday", "anniversary"})
+
+
 @operation(
     "customer.customer.create",
     kind="command",
@@ -73,7 +77,7 @@ def update_customer(ctx: OperationContext, data: CustomerPatchIn) -> dict:
         for field, value in data.model_dump(
             exclude_unset=True, exclude={"id", "customer", "field_values"}
         ).items()
-        if value is not None
+        if value is not None or field in NULLABLE
     }
     if "phone" in sent:
         sent["phone"] = _e164(sent["phone"], ctx)

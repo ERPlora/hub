@@ -65,7 +65,7 @@ def test_a_walk_in_needs_only_a_name_and_lands_with_the_defaults():
     assert {field: getattr(customer, field) for field in texts} == dict.fromkeys(
         texts, ""
     )
-    assert (customer.birthday, customer.anniversary) == ("", "")
+    assert (customer.birthday, customer.anniversary) == (None, None)
     assert (customer.lifecycle_stage, customer.source, customer.preferred_channel) == (
         "lead",
         "walk_in",

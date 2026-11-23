@@ -65,7 +65,7 @@ describe('CustomerCreateModal', () => {
     expect(s.net.api).toHaveLength(1);
     const call = sent(s.net.api[0]);
     expect([s.net.api[0].init.method, call.path]).toEqual(['POST', '/api/customer/customers']);
-    expect(call.body).toMatchObject({ name: 'Ana', phone: '600 111 222', source: 'walk_in', lifecycle_stage: 'lead', birthday: '' });
+    expect(call.body).toMatchObject({ name: 'Ana', phone: '600 111 222', source: 'walk_in', lifecycle_stage: 'lead', birthday: null });
     expect(s.open.value).toBe(false);
     expect(s.created).toEqual([{ id: 'c9', name: 'Ana' }]);
     expect(toastSuccess).toHaveBeenCalledWith('Customer Ana created');

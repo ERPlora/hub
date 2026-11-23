@@ -63,6 +63,8 @@ def _import_row(
         "source": raw["source"].strip().lower() or Customer.Source.IMPORT,
         "preferred_channel": raw["preferred_channel"].strip().lower()
         or Customer.PreferredChannel.NONE,
+        "birthday": raw["birthday"].strip() or None,
+        "anniversary": raw["anniversary"].strip() or None,
     }
     try:
         values = CustomerIn.model_validate(candidate).model_dump()

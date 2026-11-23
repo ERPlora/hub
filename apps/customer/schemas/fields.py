@@ -1,8 +1,6 @@
 """What every schema of the customer app shares: text and choice fields, pages, the messages, titles and marks
 of several topics, and naming a card, a group, a tag or a custom field by its id or as a person says it."""
 
-import re
-from datetime import date
 from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
@@ -15,6 +13,7 @@ from ninja import Field, Schema
 from pydantic import AfterValidator, BeforeValidator, StringConstraints, ValidationInfo, WithJsonSchema, field_validator
 from pydantic_core import PydanticCustomError
 
+from apps.customer.annual_dates import annual_date
 from base.business import currency_decimals
 from base.schemas.assistant import names, unless_given
 
@@ -95,33 +94,20 @@ def _text(max_length: int, min_length: int = 0) -> Any:
 
 #: A day that comes back every year without its year, as vCard writes it: ``--03-14`` is the 14th of March.
 YEARLESS_DAY = r"^--(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
-_DAY = re.compile(r"(\d{4}|-)-(\d{2})-(\d{2})")
 
 
-def annual_date(value: object) -> str:
-    """A birthday or an anniversary as the card keeps it: ``YYYY-MM-DD``, or ``--MM-DD`` when the year is not known
-    (the 29th of February too); none is empty. Refused as any wrong date, so it reads «Enter a valid date.». A ``date``
-    is how a separate copy of the business taken while the card kept these as dates gives one back."""
-    if value is None:
-        return ""
-    if isinstance(value, date):
-        return value.isoformat()
-    text = value.strip() if isinstance(value, str) else ""
-    if isinstance(value, str) and not text:
-        return ""
-    day = _DAY.fullmatch(text)
+def _annual_date(value: object) -> str | None:
+    """``annual_date``, refused as any wrong date, so it reads «Enter a valid date.»."""
     try:
-        if day is None:
-            raise ValueError(text)
-        date(2000 if day[1] == "-" else int(day[1]), int(day[2]), int(day[3]))
+        return annual_date(value)
     except ValueError:
         raise PydanticCustomError("date_parsing", "Input should be a valid date") from None
-    return text
 
 
+#: A birthday or an anniversary: ``YYYY-MM-DD``, or ``--MM-DD`` when the year is not known; empty or null is none.
 AnnualDate = Annotated[
-    str,
-    BeforeValidator(annual_date),
+    str | None,
+    BeforeValidator(_annual_date),
     WithJsonSchema(
         {"anyOf": [{"type": "string", "format": "date"}, {"type": "string", "pattern": YEARLESS_DAY}, {"type": "null"}]}
     ),

@@ -3,8 +3,7 @@
 // call and what «Save» sends (only what changed). Every rule on the values is the server's.
 import type { CustomerDetailOut, CustomerIn, CustomerPatchIn, CustomerSource, CustomerStage, PreferredChannel } from '../operations';
 
-/** Everything the form edits; the days as the card keeps them (`YYYY-MM-DD`, `--MM-DD` or `''`); an email or a phone
- *  the card came without, `null`. */
+/** Everything the form edits; dates as `YYYY-MM-DD` or `''`; an email or a phone the card came without, `null`. */
 export interface CustomerFields {
   name: string;
   email: string | null;
@@ -61,6 +60,8 @@ export const PICKABLE_SOURCES: readonly CustomerSource[] = ['walk_in', 'phone', 
 
 export const CHANNELS: readonly PreferredChannel[] = ['none', 'email', 'sms', 'whatsapp', 'phone'];
 
+const DATE_FIELDS = new Set<CustomerField>(['birthday', 'anniversary']);
+
 export function blankCustomer(): CustomerFields {
   return {
     name: '',
@@ -89,6 +90,8 @@ export function createInput(form: CustomerFields): CustomerIn {
     ...form,
     email: form.email ?? '',
     phone: form.phone ?? '',
+    birthday: form.birthday || null,
+    anniversary: form.anniversary || null,
   };
   delete input.is_active;
   return input;
@@ -107,8 +110,8 @@ export function fieldsFromDetail(detail: CustomerDetailOut): CustomerFields {
     postal_code: detail.postal_code,
     country: detail.country,
     avatar: detail.avatar,
-    birthday: detail.birthday,
-    anniversary: detail.anniversary,
+    birthday: detail.birthday ?? '',
+    anniversary: detail.anniversary ?? '',
     source: detail.source,
     lifecycle_stage: detail.lifecycle_stage,
     preferred_channel: detail.preferred_channel,
@@ -117,11 +120,12 @@ export function fieldsFromDetail(detail: CustomerDetailOut): CustomerFields {
   };
 }
 
-/** What «Save» sends: the fields that changed (an emptied one empty, which clears it). */
+/** What «Save» sends: the fields that changed (an emptied date as `null`, which clears it). */
 export function patchInput(original: CustomerFields, form: CustomerFields): Partial<CustomerPatchIn> {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(form) as CustomerField[]) {
-    if (form[key] !== original[key]) out[key] = form[key];
+    if (form[key] === original[key]) continue;
+    out[key] = DATE_FIELDS.has(key) ? form[key] || null : form[key];
   }
   return out as Partial<CustomerPatchIn>;
 }

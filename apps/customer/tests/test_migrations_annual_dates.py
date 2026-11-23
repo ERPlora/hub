@@ -1,7 +1,7 @@
 """Migration 0006 of the customer app, both ways, on a business's own database cloned from the template and through the
-migrator's alias, as ``migrate_hubs`` runs it. Forward, a birthday and an anniversary become the text the card keeps
-(``YYYY-MM-DD``, none empty), so a day may then go without its year (``--MM-DD``). Back, a full day is a date again;
-a day without its year cannot be one and is left empty."""
+migrator's alias, as ``migrate_hubs`` runs it. It writes nothing to the database: a birthday and an anniversary stay
+``date`` columns, so the code of before, which keeps running while the deploy migrates (and after a rollback), reads a
+day the new code wrote without its year as a date in 1604, and writes its own dates as always."""
 
 from datetime import date
 
@@ -12,7 +12,7 @@ __all__ = ["database"]
 
 APP = "customer"
 BEFORE = [(APP, "0005_actor_without_address")]
-AFTER = [(APP, "0006_annual_dates_as_text")]
+AFTER = [(APP, "0006_annual_dates_without_year")]
 
 
 def cards(apps, database):
@@ -23,18 +23,22 @@ def days(apps, database) -> list[tuple]:
     return sorted(cards(apps, database).values_list("name", "birthday", "anniversary"))
 
 
-def test_the_days_go_forward_as_text_and_back_as_dates(database):
+def test_the_code_of_before_reads_and_writes_the_days_the_new_code_keeps(database):
     old = migrate(database, BEFORE)
-    cards(old, database).create(name="Ana", birthday=date(1990, 3, 14), anniversary=date(2015, 6, 1))
-    cards(old, database).create(name="Bea")
+    cards(old, database).create(name="Ana", birthday=date(1990, 3, 14))
 
     new = migrate(database, AFTER)
-    assert days(new, database) == [("Ana", "1990-03-14", "2015-06-01"), ("Bea", "", "")]
-    cards(new, database).create(name="Carla", birthday="--03-14", anniversary="2016-02-29")
+    cards(new, database).create(name="Lucía", birthday="--03-14", anniversary="2016-02-29")
+    assert days(new, database) == [("Ana", "1990-03-14", None), ("Lucía", "--03-14", "2016-02-29")]
+    with database.cursor() as cursor:
+        cursor.execute("SELECT data_type FROM information_schema.columns WHERE table_name = 'customer_customer' "
+                       "AND column_name IN ('birthday', 'anniversary')")
+        assert {row[0] for row in cursor.fetchall()} == {"date"}
+    cards(old, database).create(name="Bea", birthday=date(1985, 7, 1))
 
     old = migrate(database, BEFORE)
     assert days(old, database) == [
-        ("Ana", date(1990, 3, 14), date(2015, 6, 1)),
-        ("Bea", None, None),
-        ("Carla", None, date(2016, 2, 29)),
+        ("Ana", date(1990, 3, 14), None),
+        ("Bea", date(1985, 7, 1), None),
+        ("Lucía", date(1604, 3, 14), date(2016, 2, 29)),
     ]

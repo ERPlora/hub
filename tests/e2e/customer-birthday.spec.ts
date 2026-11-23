@@ -3,7 +3,7 @@
 // should not have had. Seen at the three sizes, with no sideways scroll.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, horizontalOverflow, inputOf } from './customer-helpers';
+import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, horizontalOverflow, inputOf } from './customer-helpers';
 import { A, login, psql, shot, shown } from './helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -35,6 +35,11 @@ async function threeShots(page: Page, key: string, target: Locator): Promise<voi
   }
 }
 
+/** The birthday the card gives back through the API. */
+async function birthdayOf(context: BrowserContext, id: string): Promise<unknown> {
+  return ((await cardOf(context, id)).data as unknown as { birthday: string | null }).birthday;
+}
+
 const birthdayShown = (page: Page): Locator => shown(page).locator('[data-testid=customer-facts]').getByText('12 de marzo', { exact: true });
 
 // flow: CUSTOMER-F01, CUSTOMER-F03 — a birthday is a day and a month; the year only if it is known
@@ -55,7 +60,7 @@ test('CUSTOMER-F01: a birthday typed without its year is saved and shown as «12
     await dialog.locator('[data-testid=customer-create-submit]').click();
     await expect(dialog).toBeHidden();
     const id = psql(`select id from customer_customer where name = '${name}'`);
-    expect(psql(`select birthday from customer_customer where id = '${id}'`)).toBe('--03-12');
+    expect(await birthdayOf(context, id)).toBe('--03-12');
     await page.goto(`/customer/customers/${id}`);
     await expect(birthdayShown(page)).toBeVisible();
     await threeShots(page, 'CUSTOMER-F03-BIRTHDAY-WITHOUT-YEAR', birthdayShown(page));
@@ -78,7 +83,7 @@ test('CUSTOMER-F04: «Edit» drops the year of a birthday and the card shows the
     await shown(page).locator('[data-testid=customer-edit-save]').click();
     await expect(toastSaying(page, /Cliente actualizado/)).toBeVisible();
     await expect(birthdayShown(page)).toBeVisible();
-    expect(psql(`select birthday from customer_customer where id = '${card.id}'`)).toBe('--03-12');
+    expect(await birthdayOf(context, card.id)).toBe('--03-12');
   } finally {
     await context.close();
   }

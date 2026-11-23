@@ -130,8 +130,8 @@ def test_the_alta_needs_only_a_name():
         "postal_code": "",
         "country": "",
         "avatar": "",
-        "birthday": "",
-        "anniversary": "",
+        "birthday": None,
+        "anniversary": None,
         "source": "walk_in",
         "lifecycle_stage": "lead",
         "preferred_channel": "none",
@@ -182,8 +182,8 @@ def test_choices_and_dates():
         ("1990-03-14", "1990-03-14"),
         # How a separate copy of the business taken before the card kept its days as text gives them back.
         (date(1990, 3, 14), "1990-03-14"),
-        ("", ""),
-        (None, ""),
+        ("", None),
+        (None, None),
     ],
 )
 def test_a_birthday_or_an_anniversary_may_go_without_its_year(sent, kept):
@@ -215,7 +215,7 @@ def test_a_patch_carries_only_what_was_sent():
     assert patch.model_dump(exclude_unset=True) == {
         "id": ID,
         "notes": "",
-        "birthday": "",
+        "birthday": None,
     }
     assert invalid_fields(CustomerPatchIn, id=ID, name="") == {"name"}
     assert (

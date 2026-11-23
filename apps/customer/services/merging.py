@@ -42,8 +42,6 @@ MERGE_FILLED = (
     "postal_code",
     "country",
     "avatar",
-    "birthday",
-    "anniversary",
 )
 
 
@@ -99,6 +97,8 @@ def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
     for field in MERGE_FILLED:
         if not getattr(survivor, field):
             setattr(survivor, field, getattr(absorbed, field))
+    survivor.birthday = survivor.birthday or absorbed.birthday
+    survivor.anniversary = survivor.anniversary or absorbed.anniversary
     if survivor.preferred_channel == Customer.PreferredChannel.NONE:
         survivor.preferred_channel = absorbed.preferred_channel
     survivor.notes = "\n".join(

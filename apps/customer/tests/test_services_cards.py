@@ -22,9 +22,9 @@ def test_editing_a_card_sets_and_clears_a_day_without_its_year():
     detail = run("customer.customer.update", CustomerPatchIn(id=lucia.id, birthday="--03-14", anniversary="--06-01"))
     assert (detail.birthday, detail.anniversary) == ("--03-14", "--06-01")
     detail = run("customer.customer.update", CustomerPatchIn(id=lucia.id, birthday=None, anniversary=""))
-    assert (detail.birthday, detail.anniversary) == ("", "")
+    assert (detail.birthday, detail.anniversary) == (None, None)
     lucia.refresh_from_db()
-    assert (lucia.birthday, lucia.anniversary) == ("", "")
+    assert (lucia.birthday, lucia.anniversary) == (None, None)
 
 
 def test_an_import_takes_a_birthday_without_its_year_and_skips_a_day_that_does_not_exist():
@@ -34,7 +34,7 @@ def test_an_import_takes_a_birthday_without_its_year_and_skips_a_day_that_does_n
         "hub_employee",
     )
     assert [(row.id is not None, sorted(row.errors)) for row in result.rows] == [(True, []), (False, ["anniversary"])]
-    assert Customer.objects.values_list("name", "birthday", "anniversary").get() == ("Lucía", "--03-14", "")
+    assert Customer.objects.values_list("name", "birthday", "anniversary").get() == ("Lucía", "--03-14", None)
 
 
 def test_merging_fills_an_empty_day_from_the_duplicate_and_keeps_its_own():
