@@ -168,6 +168,8 @@ class Issuer(UUIDModel):
     province = models.CharField(_("province"), max_length=100, blank=True)
     # ISO 3166-1 alpha-2.
     country = models.CharField(_("country"), max_length=2, default="ES")
+    # Registered in the ROI: the documents print its EU VAT number (ESB12345674); VeriFactu keeps the bare tax ID.
+    intra_eu_operator = models.BooleanField(_("registered for intra-EU operations"), default=False, db_default=False)
     source = models.CharField(
         _("source"), max_length=8, choices=Source.choices, default=Source.MANUAL
     )
@@ -255,6 +257,9 @@ class Invoice(UUIDModel):
     issuer_tax_id = models.CharField(_("issuer tax ID"), max_length=TAX_ID_MAX_LENGTH)
     issuer_address = models.CharField(_("issuer address"), max_length=400, blank=True)
     issuer_country = models.CharField(_("issuer country"), max_length=2, blank=True)
+    issuer_intra_eu_operator = models.BooleanField(
+        _("issuer registered for intra-EU operations"), default=False, db_default=False
+    )
     # The recipient: a copy (editing the card never changes an issued document); the card, a link.
     customer = models.ForeignKey(
         "customer.Customer",

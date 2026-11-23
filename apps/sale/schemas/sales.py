@@ -117,7 +117,10 @@ class LetterheadIn(Schema):
 class LetterheadOut(Schema):
     sale_id: UUID | None = Field(description="The sale it was asked for, if any.")
     name: str = Field(description="The business's name on paper: the issuer's legal name.")
-    tax_id: str = Field(description="The business's tax ID; empty without an issuer.")
+    tax_id: str = Field(
+        description="The business's tax ID as the paper prints it (ESB12345674 while registered for intra-EU "
+        "operations, ROI); empty without an issuer."
+    )
     lines: list[str] = Field(description="What goes under the name: the address, then the receipt header's lines.")
 
 

@@ -27,7 +27,7 @@ from live.operations import UnknownOperation, operation
 from live.operations import get as get_operation
 
 from apps.invoice import fiscal
-from apps.invoice.document_issuer import document_issuer, issuer_vat_number
+from apps.invoice.document_issuer import document_issuer, printed_issuer
 from . import fiscal_archive as fiscal_archive
 from . import public as public
 from .ownership import INVOICES
@@ -319,8 +319,7 @@ def series_row(series: InvoiceSeries) -> dict:
 
 
 def issuer_row(issuer: Issuer | None) -> dict:
-    """An ``IssuerOut``; an empty one while nothing is set up."""
-    updated = issuer.updated_at if issuer is not None else None
+    """An ``IssuerOut``; an empty one while nothing is set up (never saved: no ``updated_at``)."""
     issuer = issuer or Issuer(legal_name="", tax_id="", address="")
     return {
         "configured": issuer.configured,
@@ -335,7 +334,8 @@ def issuer_row(issuer: Issuer | None) -> dict:
         "source": issuer.source,
         "synced_version": issuer.synced_version,
         "synced_at": issuer.synced_at,
-        "updated_at": updated,
+        "updated_at": issuer.updated_at,
+        **printed_issuer(issuer),
     }
 
 
@@ -560,7 +560,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     discounted = any(line.discount_amount for line in lines)
     context = {
         "invoice": invoice,
-        "issuer_vat_number": issuer_vat_number(invoice.issuer_tax_id, invoice.issuer_country),
+        "issuer_vat_number": document_issuer(invoice)["issuer_vat_number"],
         "language": language,
         "title": title,
         "duplicate": duplicate,

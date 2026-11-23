@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aa102b64ce37080c510bb2a1bd639b67a976f4d5813fa9c9a323df0f9c851120 -->
+<!-- generated from WORKBOOK.md sha256:5337aacb8087cbd81b400c5974949a91d7f4a66341fbe1473bd86ee5f8c7a44e -->
 
 ## What it is for and who it is for
 
@@ -194,13 +194,15 @@ continue another system’s numbering.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
 ### Issuer
-Your business's fiscal details that appear on every invoice: legal name, tax ID and full address. Without them no
-ticket or invoice is issued. Only the owner and the administrator see this tab and change
+Your business's fiscal details that appear on every invoice: legal name, tax ID and full address, and whether it is
+registered in the ROI. Without them no ticket or invoice is issued. Only the owner and the administrator see this tab and change
 them.
 
 #### Detail
 Menu **Invoicing → Issuer**. "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and
-"Country", and "Save". On top, if it is not complete yet, "Without the issuer no invoice can be issued.";
+"Country"; the switch "Registered in the ROI (intra-EU operations)", off at first, with "Your invoices and tickets
+will print your tax ID with your country’s prefix (ES…). VeriFactu keeps receiving it without the prefix." under
+it; and "Save". On top, if it is not complete yet, "Without the issuer no invoice can be issued.";
 if the ERPlora account sent it, "Received from your ERPlora account on {date}.". Only the owner and the
 administrator change it; the rest see it without being able to edit.
 
@@ -715,7 +717,8 @@ Steps:
    read for that printer), the device's print dialog opens (the browser's or, in the installed app, its
    print screen: the system's dialog, with the printer or "Save as PDF", and the job named, for example,
    "Invoice FACT-2026-000003") with the A4 invoice (with VeriFactu, on top
-   the record's QR with "QR tributario:" and "VERI*FACTU", fixed in Spanish by the AEAT; issuer, "Bill
+   the record's QR with "QR tributario:" and "VERI*FACTU", fixed in Spanish by the AEAT; issuer, with its EU VAT
+   number if it is registered in the ROI, "Bill
    to", lines, breakdown per rate, totals and the note of what it rectifies), from where it can be saved
    as PDF. While the record arrives, "Print / PDF" waits: the paper never goes out without its QR.
 4. Always in the language of whoever prints. A document of a sale comes out as "Copy" (the original was
@@ -727,7 +730,7 @@ be read (it is not printed without its QR). If the installed app does not open i
 says why after a colon ("…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open"…). Someone else's, for an employee, is neither printed nor downloaded: the API and the
 assistant say "Invoice not found.".
-Involved: PRINTING-F08, VERIFACTU-F19, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF)
+Involved: PRINTING-F08, VERIFACTU-F19, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F21
 
 ### INVOICE-F19 Mark an invoice as paid
 Status: done
@@ -777,16 +780,20 @@ Steps:
    notice "You cannot issue invoices yet", which shows on any screen while there is no issuer (to whoever cannot
    change the issuer, the notice says "An administrator has to set this up.", with no button).
 3. Type "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and choose the "Country"
-   (Spain at first).
+   (Spain at first). If the business is registered in the Register of Intra-Community Operators, turn on
+   "Registered in the ROI (intra-EU operations)"; the tax ID is still typed without the prefix.
 4. Tap "Save": "Issuer saved." comes, the notice disappears from the bell and the Home step becomes "Done",
    without reloading and on the other devices too.
 In: what the person types.
 Out: the issuer, which is copied into every document issued from now on (those already issued do not
-change); announces `invoice.issuer.updated`.
+change); announces `invoice.issuer.updated`. With "Registered in the ROI" on, the invoice on screen, its A4 (PDF),
+the ticket and the bill print the tax ID with the issuer's country prefix ("Tax ID: ESB12345674"), domestic sales
+too; off, the tax ID as it is. A document already issued is reprinted as it came out. VeriFactu's record and the QR
+always keep the tax ID without the prefix.
 If it fails: without legal name, tax ID or address, under its field; a Spanish tax ID that is not valid,
 "That tax ID is not valid.". A field's reason goes as soon as that field is corrected and comes back if the
 next try is refused too; a refusal that names no field shows above the form and stays until the next try.
-Involved: none
+Involved: INVOICE-F18, SALE-F21, SALE-F29
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
 Status: done

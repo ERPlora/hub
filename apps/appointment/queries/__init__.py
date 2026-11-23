@@ -20,8 +20,6 @@ from uuid import UUID
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet
 from django.utils import timezone, translation
-from django.utils.dates import WEEKDAYS
-from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -80,6 +78,7 @@ from apps.staff.schemas.availability import AvailabilityIn
 from base.business import business_zone, zone_name
 from base.ordering import list_order_for
 from base.relay import by_platform
+from base.weekdays import weekday_name
 
 from .ownership import APPOINTMENTS, SERIES, is_own, sees_whose
 
@@ -1305,8 +1304,8 @@ def series_label(series: Recurring) -> str:
     """How a person names ``series`` in the active language, as each card of the series list is titled: its customer
     (nothing once her data were erased), its repetition, its weekday (only a weekly or biweekly one keeps one) and its
     hour."""
-    weekday = "" if series.day_of_week is None else WEEKDAYS[series.day_of_week]
-    parts = (series.customer_name, series.get_frequency_display(), capfirst(weekday), f"{series.time:%H:%M}")
+    weekday = "" if series.day_of_week is None else weekday_name(series.day_of_week)
+    parts = (series.customer_name, series.get_frequency_display(), weekday, f"{series.time:%H:%M}")
     return " · ".join(str(part) for part in parts if part)
 
 

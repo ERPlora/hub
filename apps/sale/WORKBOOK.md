@@ -893,7 +893,8 @@ Actor: empleado, responsable
 Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
-2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con la «Cabecera del recibo»
+2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con el prefijo de su país si está
+   inscrito en el ROI, y con la «Cabecera del recibo»
    debajo; sin emisor, la cabecera del recibo hace de nombre y domicilio), las líneas, notas,
    descuentos, el desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tique
    fiscal se entrega al cobrar.». Con descuento en la cuenta, la fila «Descuento» dice lo que quita (el
@@ -912,7 +913,7 @@ el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; s
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09, TABLE-F34
+Implicados: PRINTING-F09, TABLE-F34, INVOICE-F21
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho
@@ -1117,7 +1118,8 @@ Pasos:
 1. En **Ventas**, toca la fila o la acción «Documento»; también se abre solo tras cobrar, la cuenta
    entera o una parte.
 2. Se ve el tique («Tique», o «Factura» si se cobró como factura). Arriba, el negocio: nombre, domicilio
-   y NIF del emisor (un duplicado dice lo mismo que el original, aunque el emisor cambie después), con la
+   y NIF del emisor, con el prefijo de su país si está inscrito en el ROI (un duplicado dice lo mismo que
+   el original, aunque el emisor cambie después), con la
    «Cabecera del recibo» debajo. Sin emisor configurado, la primera línea de la cabecera es el nombre y el
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
@@ -1160,7 +1162,7 @@ abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir 
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.». Una venta que la persona no ve (la
 de otro, para un empleado) no se abre, no se reimprime ni se emite: la ventana dice «Error cargando el
 documento» y la API o el asistente, «Esa venta no existe.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho

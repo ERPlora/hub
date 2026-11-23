@@ -129,6 +129,12 @@ describe('InvoiceDetailPage: what it shows', () => {
     expect(s.find('invoice-missing-tax-id').exists()).toBe(false);
   });
 
+  it('names the issuer with the tax ID its document prints: the EU VAT number of one in the ROI', async () => {
+    const s = await setup();
+    await s.show({ ...INVOICE, issuer_vat_number: 'ESB12345674' });
+    expect(s.field('issuer')).toBe('Peluquería Ana SL (ESB12345674)');
+  });
+
   it('names the rate column by the tax the invoice declares: IGIC for a business of the Canary Islands', async () => {
     const s = await setup();
     await s.show({ ...INVOICE, tax_breakdown: INVOICE.tax_breakdown.map((entry) => ({ ...entry, tax: 'igic', rate: '7.00' })) });
