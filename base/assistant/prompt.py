@@ -8,6 +8,7 @@ from django.utils import translation
 from django.utils.translation import get_language_info
 from live.assistant import tool_name
 
+from base.assistant.relevance import FIND_TOOLS
 from base.models import Membership
 
 #: Who can do what a role of the business cannot (hub#585): the roles above it; for the accountancy firm, who only reads,
@@ -33,8 +34,9 @@ def instructions(  # noqa: PLR0913
 ) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
     tools and money (an amount sent in the minor unit of its currency, ``decimals`` the business's; one of a result
-    said as the result tells it, in its currency, ``base.assistant.tools.run``), the screens it may link, and the
-    person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
+    said as the result tells it, in its currency, ``base.assistant.tools.run``), the screens it may link, that the
+    tools it is given are a few of the person's and the rest are found with the search (``relevance.FIND_TOOLS``), and
+    the person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
     operation name; BASE-F100)."""
     try:
         language_name = get_language_info(language)["name"]
@@ -72,13 +74,15 @@ quieres, puedes» or «dígame, quiere, puede», never a mix. Use Markdown: bold
   that currency; an amount of your own, in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}{_who_asks(role, language, approvable)}
-- If something cannot be done from here (you have no tool for it), say on which screen it is done."""
+- The tools you are given are only the ones nearest the person's words: the rest of theirs you find with
+  `{tool_name(FIND_TOOLS)}`. Never say that something cannot be done here, nor that you have no tool for it, before you
+  search for it; if your searches find none, say on which screen it is done."""
 
 
 def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> str:
     """The lines of the instructions on whom the assistant serves (hub#585, BASE-F100): their role as the screens name
-    it, in the chat's language, whose tools these are; for a role below the owner's, that what no tool does is said as
-    not available to them here (their role, or its app off or out of the plan) and theirs to ask of someone else,
+    it, in the chat's language, whose tools these are; for a role below the owner's, that what no tool of theirs does
+    (none offered, none found by the search) is said as not available to them here (their role, or its app off or out of the plan) and theirs to ask of someone else,
     never looked for another way nor answered with the state of something else; and the writes they may only run with
     a manager's approval. Nothing for no role of the business (an automation's step)."""
     lines = []
@@ -90,9 +94,9 @@ def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> s
         )
         if role in ABOVE:
             lines.append(
-                "  When they ask for something none of your tools does, do not try other tools for it and never tell\n"
-                "  the state of something else instead: say plainly that it is not available to them here, because\n"
-                "  their role cannot do it or because its app is not on, and that "
+                "  When they ask for something your tools do not do and your searches do not find, do not try other\n"
+                "  tools for it and never tell the state of something else instead: say plainly that it is not\n"
+                "  available to them here, because their role cannot do it or because its app is not on, and that "
                 f"{ABOVE[role]} can, or on which screen it is done."
             )
     if approvable:

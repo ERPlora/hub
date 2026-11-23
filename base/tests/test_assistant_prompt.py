@@ -149,9 +149,10 @@ def test_a_role_that_cannot_do_something_is_told_who_can_and_no_other_tool_is_tr
     says it is not available to them here, with both reasons, never that the role alone is to blame."""
     text = _said(role=role)
     assert (
-        "When they ask for something none of your tools does, do not try other tools for it and never tell the state "
-        "of something else instead: say plainly that it is not available to them here, because their role cannot do "
-        f"it or because its app is not on, and that {who} can, or on which screen it is done."
+        "When they ask for something your tools do not do and your searches do not find, do not try other tools for "
+        "it and never tell the state of something else instead: say plainly that it is not available to them here, "
+        f"because their role cannot do it or because its app is not on, and that {who} can, or on which screen it is "
+        "done."
     ) in text
 
 
@@ -160,7 +161,7 @@ def test_the_owner_and_an_administrator_are_never_told_their_role_cannot(role):
     """They hold every permission of every app: what no tool does is done on its screen, not someone else's."""
     text = _said(role=role)
     assert "their role cannot" not in text
-    assert "If something cannot be done from here (you have no tool for it), say on which screen it is done." in text
+    assert "if your searches find none, say on which screen it is done." in text
 
 
 @pytest.mark.parametrize("role", ["", "staff", None])
