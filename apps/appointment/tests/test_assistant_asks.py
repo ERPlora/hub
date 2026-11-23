@@ -157,6 +157,14 @@ def test_every_probe_of_appointments_offers_its_tool_without_being_one_of_its_as
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("task", ["ver los ajustes de las citas", "configuración de citas"])
+def test_the_search_finds_the_booking_rules_by_the_appointments_settings(catalog_of, task):
+    """What a turn leaves out the model searches for in a few words: «los ajustes de las citas» are its booking rules."""
+    found = assistant.relevance.found(catalog_of(Membership.Role.OWNER, "es"), task, "es")
+    assert "appointment.settings.get" in [op.name for op in found], [op.name for op in found]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "twin"), TWINS)
 def test_the_reported_request_offers_appointments_tool_before_online_bookings_twin(catalog_of, name, twin):
     tools = catalog_of(Membership.Role.OWNER, "es")
