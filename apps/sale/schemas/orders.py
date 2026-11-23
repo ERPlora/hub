@@ -341,7 +341,7 @@ class OrderOut(Schema):
         description="A manager approved a ticket discount over the cap."
     )
     provisional_total: int = Field(
-        description="Σ of its lines' amounts, before the ticket discount (provisional).",
+        description="Σ of its lines' amounts in cents, before the ticket discount (provisional).",
         json_schema_extra={"money": True},
     )
     version: int = Field(

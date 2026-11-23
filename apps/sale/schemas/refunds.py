@@ -117,9 +117,9 @@ class RefundOptionsOut(Schema):
     status: SaleStatus = Field(description="Its status.")
     currency: str = Field(description="ISO 4217 currency it was charged in: what goes back goes in it.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
-    total: int = Field(description="Its total.", json_schema_extra={"money": True})
-    refunded_total: int = Field(description="Refunded so far.", json_schema_extra={"money": True})
-    refundable_total: int = Field(description="Still refundable.", json_schema_extra={"money": True})
+    total: int = Field(description="Its total, in minor units.", json_schema_extra={"money": True})
+    refunded_total: int = Field(description="Refunded so far, in minor units.", json_schema_extra={"money": True})
+    refundable_total: int = Field(description="Still refundable, in minor units.", json_schema_extra={"money": True})
     tenders: list[TenderOption] = Field(description="One row per tender, always.")
     lines: list[LineOption] = Field(description="Its lines and what is left of each.")
 

@@ -60,6 +60,18 @@ def test_every_amount_a_tool_answers_is_marked():
     assert {op.name: found for op in tools() if (found := unmarked_answers(op))} == {}
 
 
+def test_every_amount_a_tool_answers_would_be_missed_here_without_its_mark():
+    """The ratchet knows an amount only by its name or its description: a marked one that neither says so («Sales in
+    cash», «Its total») could lose its mark, and reach the model in cents again, with nothing failing."""
+    unseen = {
+        f"{op.name}:{path}"
+        for op in tools()
+        for name, path, prop in data_of(op.output.model_json_schema())
+        if is_marked_amount(prop) and not looks_like_an_amount(name, prop)
+    }
+    assert unseen == set()
+
+
 class PriceListOut(Schema):
     currency: str
     price: int = Field(json_schema_extra=MONEY)
