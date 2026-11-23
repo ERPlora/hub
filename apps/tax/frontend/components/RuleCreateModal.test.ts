@@ -8,6 +8,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick as pickDay, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryRowOut, RuleOut } from '../operations';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
@@ -19,6 +20,8 @@ type Control = HTMLElement & {
   placeholder?: string;
   fill?: string;
   type?: string;
+  readonly?: boolean;
+  required?: boolean;
   errorText?: string;
   helperText?: string;
   disabled?: boolean;
@@ -111,7 +114,9 @@ describe('RuleCreateModal: the fields of the old panel', () => {
       'Component label',
     ]);
     for (const n of names) expect([n, s.control(n).fill, s.control(n).getAttribute('mode')]).toEqual([n, 'outline', 'md']);
-    expect([s.control('valid_from').type, s.control('valid_to').type, s.control('rate_pct').type]).toEqual(['date', 'date', 'number']);
+    // The days are the app's own calendar (never the device's), and either can stay empty.
+    const days = [s.control('valid_from'), s.control('valid_to')];
+    expect([...days.map((day) => [day.readonly, day.required]), s.control('rate_pct').type]).toEqual([[true, false], [true, false], 'number']);
     expect(s.control('region_code').placeholder).toBe('Optional — ISO 3166-2, e.g. ES-CN');
     expect(s.inDoc('tax-rule-form-hint')?.textContent).toContain('equivalence surcharge');
     expect(s.add().textContent?.trim()).toBe('Add');
@@ -177,7 +182,8 @@ describe('RuleCreateModal: sending the rule', () => {
     await s.fillBasics();
     await s.type('region_code', ' es-cn ');
     await s.pick('tax_type', 'igic');
-    await s.type('valid_from', '2027-01-01');
+    await pickDay(s.control('valid_from'), '2027-01-01');
+    expect(s.control('valid_from').value).toBe('01/01/2027');
     await click(s.add());
     expect(s.sent()).toEqual([
       {
@@ -203,13 +209,13 @@ describe('RuleCreateModal: sending the rule', () => {
     const message = 'It overlaps another active rule of this country, region and category: two rates cannot apply on the same day.';
     s.answer(409, { error: { code: 'tax.rule_overlaps', message, fields: { valid_from: message } } });
     await s.fillBasics();
-    await s.type('valid_from', '2020-01-01');
+    await pickDay(s.control('valid_from'), '2020-01-01');
     await click(s.add());
     expect(s.control('valid_from').errorText).toBe(message);
     expect(s.control('valid_from').classList.contains('ion-invalid')).toBe(true);
     expect(s.control('rate_pct').classList.contains('ion-invalid')).toBe(false);
     expect(s.inDoc('tax-rule-form-error')?.textContent).toContain(message);
-    expect([s.control('country_code').value, s.control('rate_pct').value, s.control('valid_from').value]).toEqual(['Spain (ES)', '10', '2020-01-01']);
+    expect([s.control('country_code').value, s.control('rate_pct').value, picked(s.control('valid_from'))]).toEqual(['Spain (ES)', '10', '2020-01-01']);
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 

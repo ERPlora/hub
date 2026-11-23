@@ -124,3 +124,11 @@ def test_the_card_names_the_special_days_of_a_bulk_as_their_tab():
     arguments = {"special_days": [{"date": "2026-12-25", "name": "Navidad"}]}
     assert labels(assistant.cards.card(bulk, arguments, "es")) == [SCREENS["specialDays"]["heading"]]
     assert labels(assistant.cards.card(bulk, arguments, "en")) == [SCREENS_EN["specialDays"]["heading"]]
+
+
+@pytest.mark.parametrize(("language", "friday"), [("es", "Viernes"), ("en", "Friday")])
+def test_the_card_names_the_day_a_write_sets_as_the_weeks_hours_do(language, friday):
+    """SCHEDULE-F02 asked to the assistant: «Cambiar en Horarios: Viernes · Sí», never «4 · Sí»: whoever confirms sees
+    which day changes, said as the week's hours say it."""
+    card = assistant.cards.card(get("schedule.week.set_day"), {"weekday": 4, "is_closed": True}, language)
+    assert card["fields"][0]["value"] == friday

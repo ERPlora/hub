@@ -15,12 +15,3 @@ sin registrar no pinta nada). Mientras tanto, la app usa los registrados que se 
 
 El del módulo ya es `ion:finger-print-outline` (registrado). Al registrar los demás: cambiar los `name` de las páginas;
 `frontend/tabs.test.ts` y `icons.test.ts` del shell vigilan que estén registrados.
-
-## Componentes
-
-### Fecha y hora del negocio en «Corregir jornada»
-
-- **Para qué:** la corrección (ATTENDANCE-F08) usa `ion-input type="datetime-local"`, que pinta en el
-  orden del sistema operativo (en un Chrome en inglés con el Hub en español, `mm/dd/yyyy`). Es la misma
-  petición de `apps/staff/UI-REQUESTS.md` («Fecha y hora en el orden del idioma del negocio»), con un
-  `DateTimeField` (`v-model` `YYYY-MM-DDTHH:MM`, en la hora del negocio).
