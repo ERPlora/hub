@@ -23,7 +23,7 @@ from apps.inventory.schemas.products import (
 )
 from apps.inventory.schemas.stock import LowStockListIn, LowStockPage
 from base import images
-from base.queries.catalog_images import business_language, image_library
+from base.queries.catalog_images import business_language, image_library, image_suggestion
 from base.ordering import list_order_for
 
 #: Products that cannot be sold for lack of a live tax category.
@@ -128,8 +128,7 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Propose images of ERPlora's shared image library for a product's photo («ponle foto al café "
-        "con leche»), the product named by its id, SKU or name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with inventory.product.set_image.",
+        "con leche»), the product named by its id, SKU or name: " + image_suggestion("inventory.product.set_image"),
         "asks": {
             "en": (
                 "which library images could fit the latte?",

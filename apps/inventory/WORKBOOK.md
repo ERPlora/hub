@@ -1056,7 +1056,8 @@ Pasos:
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
    panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta.
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
-   enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
+   enseña hasta cinco imágenes candidatas solo por su título, sin su código interno, y pregunta cuál;
+   nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
 Entra: el artículo y la librería de imágenes de ERPlora, la misma para todos los negocios, con el título
 y los sinónimos de cada imagen en español y en inglés.
