@@ -176,6 +176,8 @@ def test_each_task_of_the_help_window_shows_its_short_video_in_the_person_s_lang
 
 #: The reads that only name a record on the assistant's card: no tool, no route.
 CARD_ONLY = {"inventory.category.get"}
+#: The writes whose card says their data by a summary of their own: the rows of a file by their names.
+CARD_SUMMARY = {"inventory.product.bulk_create", "inventory.category.bulk_create"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -194,6 +196,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
             expected |= {"asks"}
+        if op.name in CARD_SUMMARY:
+            expected |= {"summary"}
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name

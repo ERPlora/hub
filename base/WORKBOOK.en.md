@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:88042c6028b65830c2770a8b15405592b3f13ac75abce018b342b9228c9a8011 -->
+<!-- generated from WORKBOOK.md sha256:922b319eedf56f27c862e40120f7edcc597cfb820a827d55b064f7a52340974b -->
 
 ## What it is for and who it is for
 
@@ -2606,7 +2606,10 @@ Steps:
      Create a task, Create a customer"); a template of the catalogue, by its name and its language, as in Import
      ("Template: Restaurant (English)"), never by its code, and the apps it loads, by their name ("Apps to load: Sales &
      POS, Invoicing"), also when none is chosen and it loads all of its own ("Time clock, Cash register, Menus and
-     combos and 17 more"); a list of lines that carry only their record, such as the services of an appointment, the same
+     combos and 17 more"); the rows of a file being imported (products, categories or customers), by the name of each,
+     as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
+     another of its cells) and, in Inventory, the tax categories they take, once each and by their name ("Tax category:
+     Restaurant — food"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
