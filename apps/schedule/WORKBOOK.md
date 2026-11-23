@@ -263,9 +263,9 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
 Pasos:
 1. En **Días especiales**, pulsa **+** (Nuevo día especial).
-2. Escribe la **Fecha** y el **Nombre** (los dos obligatorios).
-3. Deja **Cerrado** (lo que viene) o elige «Abierto (con horario)» y escribe uno o más tramos, igual que
-   al editar un día en **Horario**.
+2. Elige la **Fecha** en el calendario y escribe el **Nombre** (los dos obligatorios).
+3. Deja **Cerrado** (lo que viene) o elige «Abierto (con horario)» y elige las horas de uno o más tramos,
+   igual que al editar un día en **Horario**.
 4. Marca **Se repite cada año** si cae el mismo día y mes todos los años (Navidad); si quieres, **Notas**.
 5. Pulsa **Añadir día**: el formulario se cierra y el día aparece en la lista.
 Entra: fecha (real: el 31 de febrero no vale), nombre (hasta 200), cerrado o tramos, anual y notas (hasta
@@ -284,9 +284,9 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
 Pasos:
 1. En la tabla «Cambios temporales», pulsa **+** (Nuevo cambio temporal).
-2. Escribe **Desde**, **Hasta** y **Motivo** (los tres obligatorios).
-3. Deja **Cerrado** (vacaciones del negocio) o elige «Abierto (con horario)» y escribe los tramos que
-   valen esas fechas (horario de verano).
+2. Elige **Desde** y **Hasta** en el calendario y escribe el **Motivo** (los tres obligatorios).
+3. Deja **Cerrado** (vacaciones del negocio) o elige «Abierto (con horario)» y elige las horas de los
+   tramos que valen esas fechas (horario de verano).
 4. Pulsa **Añadir cambio temporal**.
 Entra: las dos fechas (ambas incluidas), el motivo (hasta 200) y cerrado o tramos: el cambio vale todos
 los días del rango con las mismas horas.
@@ -611,9 +611,8 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - **La semana de la peluquería** (lunes a viernes 09:30–20:00 con descanso de 14:00 a 16:00, sábado
   09:30–14:00): es de los catálogos de arranque, que no la plantan.
 - **Calendario de festivos del país precargado**: cada día especial lo escribe el negocio o el asistente (SCHEDULE-F07).
-- **Fechas y horas en el orden del idioma del Hub** escritas a mano (`dd/mm/aaaa`, «2:30 pm», «1430»): los
-  campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga `TimeField` y `DateField`
-  (`UI-REQUESTS.md`; los piden también Personal, Citas, Asistencia y Reservas online).
+- **Fechas y horas escritas a mano** (`dd/mm/aaaa`, «2:30 pm», «1430»): se eligen en el calendario y la
+  rueda de horas de la app (`DateField` y `TimeField` de `@erplora/ui`), que las enseñan en el idioma del Hub.
 - **«Abrir ajustes del hub»** desde Ajustes: el Hub aún no tiene ajustes de zona horaria a los que ir (la
   zona la manda el SaaS al dar de alta el hub; ver «Zona horaria» en «Para quien lo mantiene»).
 - **El icono de estrella** de la pestaña **Días especiales**: `ion:star-outline` está registrado en `@erplora/ui`

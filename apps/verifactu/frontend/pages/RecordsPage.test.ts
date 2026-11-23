@@ -7,6 +7,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { business, IN_YEN } from '../../../../base/frontend/__tests__/business';
@@ -229,8 +230,8 @@ describe('RecordsPage: the filters behind the table funnel', () => {
     const panel = s.find('verifactu-records-filters-panel');
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="verifactu-records-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
-    set('issue_date_from', 'ionChange', '2026-10-01');
-    set('issue_date_to', 'ionChange', '2026-10-14');
+    await pick(panel.get('[data-testid="verifactu-records-filter-issue_date_from"]').element, '2026-10-01');
+    await pick(panel.get('[data-testid="verifactu-records-filter-issue_date_to"]').element, '2026-10-14');
     set('record_type', 'ionChange', 'alta');
     set('total_amount_from', 'ionInput', '12,50');
     set('total_amount_to', 'ionInput', '100');

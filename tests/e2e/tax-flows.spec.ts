@@ -6,6 +6,7 @@
 // tax-categories.spec.ts, tax-rules.spec.ts, tax-employee.spec.ts and the app's pytest and Vitest suites.
 import { expect, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, login, shown } from './helpers';
 import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 import { rowAction } from './service-helpers';
@@ -148,7 +149,7 @@ test('TAX-F04: a rule is created with the Country and Category combos; an overla
     await pickCombo(page, dialog, 'tax-rule-form-country_code', 'Spain', 'ES');
     await pickCombo(page, dialog, 'tax-rule-form-tax_category_key', key, key);
     await dialog.locator('[data-testid=tax-rule-form-rate_pct] input').fill(rate);
-    await dialog.locator('[data-testid=tax-rule-form-valid_from] input').fill(from);
+    await pickDay(page, dialog.locator('[data-testid=tax-rule-form-valid_from]'), from);
   }
   await fill('10', '2026-01-01');
   await dialog.locator('[data-testid=tax-rule-form-submit]').click();
@@ -239,7 +240,7 @@ test('TAX-F07: «Set end date» closes the rate in force and the new one starts 
   await rowAction(page, 'tax-rules', first.id, 'end');
   const end = page.locator('ion-modal[data-testid=tax-rule-end]');
   await expect(end).toBeVisible();
-  await end.locator('[data-testid=tax-rule-end-valid_to] input').fill('2026-12-31');
+  await pickDay(page, end.locator('[data-testid=tax-rule-end-valid_to]'), '2026-12-31');
   await end.locator('[data-testid=tax-rule-end-submit]').click();
   await expect(end).toBeHidden();
   await expect(rows(page, 'rules').first()).toContainText('Dec 31, 2026');

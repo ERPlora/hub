@@ -7,7 +7,7 @@
 // group or another currency is chosen, or the business has not answered). A row's Edit opens «Editing price list — {name}» without
 // the general switch (its own action) and «Save» sends only what changed (no group =
 // `customer_group_id: null`, an emptied day = `null`).
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -242,31 +242,21 @@ const canDismiss = useUnsavedFormOnOpen(
           @update:model-value="pickGroup"
         />
         <div class="pricing-form__row">
-          <ion-input
-            data-testid="pricing-list-form-valid_from"
+          <DateField
+            testid="pricing-list-form-valid_from"
             name="valid_from"
-            type="date"
-            :value="form.validFrom"
+            :model-value="form.validFrom"
             :label="$t('pricing.lists.form.validFrom')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.valid_from"
-            :class="invalid(fieldErrors.valid_from)"
-            @ion-input="form = { ...form, validFrom: text($event.detail.value) }"
+            @update:model-value="form = { ...form, validFrom: $event }"
           />
-          <ion-input
-            data-testid="pricing-list-form-valid_until"
+          <DateField
+            testid="pricing-list-form-valid_until"
             name="valid_until"
-            type="date"
-            :value="form.validUntil"
+            :model-value="form.validUntil"
             :label="$t('pricing.lists.form.validUntil')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.valid_until"
-            :class="invalid(fieldErrors.valid_until)"
-            @ion-input="form = { ...form, validUntil: text($event.detail.value) }"
+            @update:model-value="form = { ...form, validUntil: $event }"
           />
         </div>
         <ion-toggle
