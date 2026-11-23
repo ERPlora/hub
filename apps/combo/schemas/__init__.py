@@ -28,6 +28,7 @@ from pydantic import (
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
 from apps.combo.schemas.dish_options import MAX_DISH_OPTIONS, DishOptionIn, DishOptionOut
+from apps.tax.schemas import A_TAX_CATEGORY
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn
 from base.schemas import assistant, catalog_images
@@ -140,7 +141,7 @@ D_GROUP = (
     "The course's name inside the menu («Starters», «Drink»), when its id is not known."
 )
 D_PRODUCT_ID = "Id of the product (Inventory app)."
-D_PRODUCT = "The product's SKU or name («Lentils»), when its id is not known."
+D_PRODUCT = "The product's SKU or name («Lentils»), without its id: in the person's own words, never translated."
 D_PRICE = "The closed price in cents: what the customer pays for the whole menu, whatever they pick."
 D_DELTA = "Supplement in cents added to the closed price when this choice is picked; negative makes it cheaper."
 D_SUPPLY = (
@@ -303,7 +304,7 @@ class OptionRefIn(_ComboOfIn):
     )
     product: Reference | None = Field(
         None,
-        description="The SKU or name of the choice's product, when its id is not known.",
+        description="The choice's product SKU or name, without its id: in the person's own words, never translated.",
         json_schema_extra=assistant.unless_given(A_CHOICE_BY_NAME, "id"),
     )
 
@@ -351,7 +352,7 @@ class ComboIn(In):
     price: Cents = Field(0, description=D_PRICE)
     supply_kind: SupplyKind = Field("service", description=D_SUPPLY)
     tax_category_key: TaxKey | None = Field(
-        None, title=VAT_CATEGORY, description=D_TAX
+        None, title=VAT_CATEGORY, description=D_TAX, json_schema_extra=A_TAX_CATEGORY
     )
     sort_order: Order = Field(
         0, description="Position on the list of menus and on the till."
@@ -378,8 +379,7 @@ class ComboPatchIn(ComboRefIn):
     price: Cents | None = Field(None, description="New closed price, in cents.")
     supply_kind: SupplyKind | None = Field(None, description=D_SUPPLY)
     tax_category_key: TaxKey | None = Field(
-        None,
-        title=VAT_CATEGORY,
+        None, title=VAT_CATEGORY, json_schema_extra=A_TAX_CATEGORY,
         description=D_TAX + " Empty clears it (only to take away).",
     )
     sort_order: Order | None = Field(None, description="New position on the list.")
@@ -526,7 +526,7 @@ class ChoiceIn(In):
     option_id: UUID | None = Field(None, description="Id of the choice picked.")
     product: Reference | None = Field(
         None,
-        description="SKU or name of the product picked, when the choice's id is not known.",
+        description="SKU or name of the product picked, without the choice's id: in the person's own words, never translated.",
     )
     group: Reference | None = Field(
         None, description="The course it is picked in, when the product is in several."

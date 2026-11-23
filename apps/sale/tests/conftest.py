@@ -81,6 +81,13 @@ def without_cash_register(monkeypatch):
     )
 
 
+@pytest.fixture
+def a_step_at_the_charge(monkeypatch):
+    """An active app adds a step to the charge (the tip of Tips), so what it adds to a tender is taken (SALE-F39). No
+    app can declare such a step yet, so without this fixture the charge refuses any added amount."""
+    monkeypatch.setattr("apps.sale.services.charge_validation._refuse_added_amounts", lambda payments: None)
+
+
 @pytest.fixture(autouse=True)
 def english():
     """Each test starts in English: a request of an earlier test may have left another language."""

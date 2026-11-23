@@ -105,6 +105,18 @@ def test_a_payment_names_its_method_and_never_a_negative_amount():
     assert s.checkout.PaymentIn(method_id=uuid7(), amount=100).tendered is None
 
 
+def test_a_payment_carries_what_another_app_adds_to_it_with_its_name():
+    leg = s.checkout.PaymentIn(method="cash", amount=4500, extra=500, extra_label="Tip")
+    assert (leg.amount, leg.extra, leg.extra_label) == (4500, 500, "Tip")
+    assert (s.checkout.PaymentIn(method="card").extra, s.checkout.PaymentIn(method="card").extra_label) == (0, "")
+    assert refused(s.checkout.PaymentIn, method="cash", extra=-1, extra_label="Tip") == {"extra"}
+    # What is added says what it is: the receipt and the notice name it.
+    assert refused(s.checkout.PaymentIn, method="cash", extra=500) == {"extra_label"}
+    assert refused(s.checkout.PaymentIn, method="cash", extra=500, extra_label="   ") == {"extra_label"}
+    # Nothing added names nothing.
+    assert s.checkout.PaymentIn(method="cash", extra_label="Tip").extra_label == ""
+
+
 def test_the_customer_of_an_invoice_says_its_country_and_document_type():
     key = "pos-2026-abc"
     sale = s.checkout.CompleteIn(

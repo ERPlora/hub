@@ -389,8 +389,10 @@ def test_one_already_on_says_so_also_when_it_had_come_along_with_another():
 @HUB_DB
 def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
     set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
-    assert app_get("reservas", language="es") == {"id": "reservation", "name": "Reservas", "state": "off"}
-    assert app_get("Reservas online", language="es") == {"id": "online_booking", "name": "Reservas online", "state": "on"}
+    assert app_get("reservas", language="es") == {"id": "reservation", "name": "Reservas", "state": "off", "mandatory": False}
+    assert app_get("Reservas online", language="es") == {
+        "id": "online_booking", "name": "Reservas online", "state": "on", "mandatory": False
+    }
     assert app_get("online_booking")["name"] == "Online booking"
     with pytest.raises(NotFound):
         app_get("nope")

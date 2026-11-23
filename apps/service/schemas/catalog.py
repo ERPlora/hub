@@ -24,6 +24,7 @@ from apps.service.schemas.fields import (
     Said,
     ServiceRefIn,
 )
+from apps.tax.schemas import A_TAX_CATEGORY
 from base.sensitive import COSTS
 
 #: Services of one bulk create, as the old module (500).
@@ -100,6 +101,7 @@ class ServiceIn(In):
         title=TAX_CATEGORY,
         description="Key of the tax category (Taxes app) the service is charged with; without it, the settings' "
         "default tax category. Without either, the service is created but cannot be charged.",
+        json_schema_extra=A_TAX_CATEGORY,
     )
     pricing_type: PricingType = Field(
         "fixed",
@@ -163,7 +165,7 @@ class ServicePatchIn(ServiceRefIn):
 
     name: Name | None = Field(None, description="New name.")
     tax_category_key: Code | None = Field(
-        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied."
+        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied.", json_schema_extra=A_TAX_CATEGORY
     )
     pricing_type: PricingType | None = Field(None, description="New pricing.")
     price: Cents | None = Field(None, description="New price in cents (minor units of the business's currency).")

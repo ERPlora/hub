@@ -97,7 +97,7 @@ export interface OptionIn {
   group?: string;
   name: string;
   kitchen_name?: string;
-  price_delta?: number;
+  price_delta: number;
   /** Key or name of its own tax category; empty = the dish's. */
   tax_category_key?: string;
   is_default?: boolean;

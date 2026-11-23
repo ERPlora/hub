@@ -759,10 +759,13 @@ Pasos:
   1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
      dónde se hace; cada paso sigue teniendo su «Configurar» en la lista.
+  3. De un paso hecho dice que está hecho, sin sacar una cifra, un nombre ni un ajuste de su texto, que dice lo que
+     pide el paso y no lo que tiene el negocio: «Tu catálogo» está hecho porque ya hay productos, nunca «tienes uno».
+     Si se le pregunta cuántos o cuál, lo lee en la app del paso (los productos activos, en Inventario).
 Entra: la lista de lo que falta, con los permisos de quien pregunta.
 Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
-Implicados: BASE-F103
+Implicados: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 Cambiar de rol o salir del negocio con el hub abierto
 Estado: hecho
@@ -1007,6 +1010,9 @@ Pasos:
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
      estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
+  5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
+     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
+     España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
@@ -2602,7 +2608,8 @@ Pasos:
      que agrupa otros: «1,50 $» en los dos, nunca «1,50 US$» al lado. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
      suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
-     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
+     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No», con el nombre de su dato delante, también en la línea de una acción normal,
+     porque solo no dice qué cambia («Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí», nunca «Sí · Sí»);
      una lista que su app (el servidor) nombra, por sus elementos uno tras otro («Impresoras: Caja, Cocina»; con más
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
      fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); los permisos que se conceden a una
@@ -2640,7 +2647,10 @@ Pasos:
      factura dice «Rectificar en Facturación». Dos acciones que se llaman igual en dos apps dicen cada una lo que
      hace: vaciar un carrito dice «Vaciar en Carrito y pago», quitar una de sus líneas «Quitar en Carrito y pago» y
      quitar la ruta de un producto en la cocina «Quitar en Cocina»; un arqueo dice «Registrar arqueo en Caja» y una
-     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir».
+     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir»; y la prueba en
+     vivo de VeriFactu, como sus botones, «Probar la conexión en VeriFactu» y «Crear factura de prueba en VeriFactu»,
+     nunca «Ejecutar» ni «Crear». Una acción que no lleva ningún dato que enseñar dice solo su acción y su app, acabada
+     en punto y sin dos puntos vacíos detrás: «Probar la conexión en VeriFactu.».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice. Tras
      «Ejecutar», el asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó
@@ -3886,9 +3896,11 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
   `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
-  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide) y `state` como lo
+  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide), `state` como lo
   dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
-  del hub recibe sus tablas). Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
+  del hub recibe sus tablas), y `mandatory`, como `base.app.list`: el país del negocio la exige y, una vez activada,
+  no se desactiva. La tarjeta de `base.app.enable` de una así añade el dato `mandatory` con el motivo de Apps
+  (`activation.mandatory_off`, el mismo `MANDATORY_OFF`). Tests: `base/tests/test_assistant_mandatory_apps.py`. Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
   es una app); si vale para varias («reserva»), 409 `base.app_ambiguous` nombrándolas en el idioma de quien pide.
   `base.app.enable`, `base.app.disable` y `base.app.retry` resuelven `AppChangeIn.app` con la misma `find_app` y declaran
   `"check": "base.app.get"` en su `ai=` (hub#542): el asistente la lee antes de la tarjeta, y un nombre de varias apps o

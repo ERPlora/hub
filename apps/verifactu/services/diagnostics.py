@@ -2,8 +2,12 @@
 (``verifactu.test_invoice.create``)."""
 
 
-from django.utils import timezone
+from decimal import Decimal
+
+from babel.numbers import format_percent
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import Conflict
 from live.operations import get as get_operation
@@ -28,6 +32,7 @@ from apps.verifactu.queries.route import (
 )
 from apps.verifactu.schemas.diagnostics import DiagnosticOut, TestInvoiceOut
 from apps.verifactu.schemas.fields import NoInput
+from base.business import babel_locale
 
 from .sealing import _seal_alta
 from .sending import _outlast_the_gateway
@@ -36,6 +41,27 @@ from .writes import CONFIGURE, TRANSMIT, _config, _event
 TESTING_ONLY = _("The test invoice is only for the test environment.")
 #: Line of the test invoice (VERIFACTU-F11): a fiscal document's text, in the AEAT's language.
 TEST_LINE = "Prueba VeriFactu"
+#: What the test invoice asks Invoicing to issue: a ticket of one line, 1.00 plus 21 % VAT, in its TICKET series.
+TEST_INVOICE = {
+    "series_code": "TICKET",
+    "lines": [{"description": TEST_LINE, "quantity": "1", "unit_price": 100, "tax_rate": "21"}],
+}
+SERIES = pgettext_lazy("assistant card", "Series")
+PRICE = pgettext_lazy("assistant card", "Price")
+VAT = pgettext_lazy("assistant card", "VAT")
+
+
+def _test_invoice_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """What the test invoice issues, as Invoicing's form of a manual invoice says it: its series, the price of its
+    line before VAT and its VAT rate, written as the person's language writes a percentage."""
+    (line,) = TEST_INVOICE["lines"]
+    locale = babel_locale(translation.get_language())
+    rate = format_percent(Decimal(line["tax_rate"]) / 100, locale=locale, decimal_quantization=False)
+    return [
+        {"name": "series", "label": str(SERIES), "kind": "text", "value": TEST_INVOICE["series_code"]},
+        {"name": "price", "label": str(PRICE), "kind": "money", "value": line["unit_price"]},
+        {"name": "vat", "label": str(VAT), "kind": "text", "value": rate},
+    ]
 
 
 @operation(
@@ -150,6 +176,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
                 "emite la prueba oficial de VeriFactu en el entorno de pruebas",
             ),
         },
+        "summary": _test_invoice_summary,
     },
 )
 def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
@@ -159,22 +186,7 @@ def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
     if environment != Environment.TESTING:
         raise Conflict(str(TESTING_ONLY), code="verifactu.testing_only")
     issue = get_operation("invoice.invoice.create")
-    invoice_out = issue(
-        ctx,
-        issue.input.model_validate(
-            {
-                "series_code": "TICKET",
-                "lines": [
-                    {
-                        "description": TEST_LINE,
-                        "quantity": "1",
-                        "unit_price": 100,
-                        "tax_rate": "21",
-                    }
-                ],
-            }
-        ),
-    )
+    invoice_out = issue(ctx, issue.input.model_validate(TEST_INVOICE))
     invoice = find_invoice(invoice_out.id, None)
     record, _already = _seal_alta(ctx, config, invoice, environment=environment)
     return TestInvoiceOut(

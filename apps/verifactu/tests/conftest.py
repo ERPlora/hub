@@ -14,6 +14,7 @@ Every test that uses the database works as production does: inside the business 
 import base64
 import datetime as dt
 import re
+import socket
 from pathlib import Path
 
 import pytest
@@ -242,6 +243,17 @@ def db_dsn(django_db_setup):
 @pytest.fixture
 def issuer(db):
     return run("invoice.issuer.update", ISSUER)
+
+
+@pytest.fixture
+def offline(monkeypatch):
+    """Nothing may leave the machine: a connection opened from Python fails the test (the database's is not)."""
+
+    def refuse(*args, **kwargs):
+        raise AssertionError(f"a test opened a connection: {args!r}")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
 
 
 #: Half a minute before minute 23, when VeriFactu's certificate check falls due.

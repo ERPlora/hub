@@ -255,8 +255,8 @@ async function addSteak(context: BrowserContext): Promise<Product> {
   const steak = await createProduct(context, { name: `E2E Steak ${RUN}`, sku: `${SKU}-STK`, price: 1800, tax_category_key: FOOD });
   await post(context, '/combo/options', { combo: MENU, group: 'Mains', product: steak.sku, price_delta: 200 });
   await post(context, '/modifier/groups', { name: DONENESS, min_choices: 1, max_choices: 1 });
-  await post(context, '/modifier/options', { group: DONENESS, name: 'Rare', kitchen_name: 'RARE' });
-  await post(context, '/modifier/options', { group: DONENESS, name: 'Well done' });
+  await post(context, '/modifier/options', { group: DONENESS, name: 'Rare', kitchen_name: 'RARE', price_delta: 0 });
+  await post(context, '/modifier/options', { group: DONENESS, name: 'Well done', price_delta: 0 });
   for (const group of [DONENESS, GROUP]) await post(context, '/modifier/links/attach', { group, product_id: steak.id });
   return steak;
 }

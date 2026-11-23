@@ -7,6 +7,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints
 
 from apps.inventory.schemas.fields import MAX_BATCH, TAX_RATE, CategoryRefIn, Description, Page, PageIn, TaxKey, _text
+from apps.tax.schemas import A_TAX_CATEGORY
 
 CategorySort = Literal[
     "name",
@@ -64,7 +65,10 @@ class CategoryListIn(PageIn, CategoryFiltersIn):
 
 
 class CategoryIn(Schema):
-    name: CategoryName = Field(description="The category's name.")
+    name: CategoryName = Field(
+        description="The category's name. Before creating one, look at the ones there are (inventory.category.list): "
+        "they may be written in another language («Desserts» for «postres»); if one is the same, ask."
+    )
     slug: Slug = Field(
         "", description="Lowercase with dashes; empty = made from the name."
     )
@@ -77,7 +81,7 @@ class CategoryIn(Schema):
         0, ge=0, le=1_000_000, description="Position on the till's strip: lower first, ties by name."
     )
     tax_category_key: TaxKey | None = Field(
-        None, title=TAX_RATE, description="Key of a tax category (Taxes app), optional."
+        None, title=TAX_RATE, description="Key of a tax category (Taxes app), optional.", json_schema_extra=A_TAX_CATEGORY
     )
 
 
@@ -101,7 +105,7 @@ class CategoryPatchIn(CategoryRefIn):
     color: Color | None = Field(None, description="New colour.")
     order: int | None = Field(None, ge=0, le=1_000_000, description="New position on the till's strip.")
     tax_category_key: _text(64) | None = Field(
-        None, title=TAX_RATE, description="Key of the new tax category; an empty text removes it."
+        None, title=TAX_RATE, description="Key of the new tax category; an empty text removes it.", json_schema_extra=A_TAX_CATEGORY
     )
 
 

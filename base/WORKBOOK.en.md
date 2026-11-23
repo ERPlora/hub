@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:720427f042880d14ee78e9fea3709aff3da05f874b507f9445eb11d583710390 -->
+<!-- generated from WORKBOOK.md sha256:220741cdc7cabfe55b404c348e4aa11206180ac350ec38754e1e25b32a66d9a9 -->
 
 ## What it is for and who it is for
 
@@ -753,10 +753,14 @@ Steps:
   1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list.
+  3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
+     says what the step asks for and not what the business has: "Your catalog" is done because there are already
+     products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
+     Inventory).
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: BASE-F103
+Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
 Status: done
@@ -1005,6 +1009,9 @@ Steps:
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
      already the assistant says so ("Customers was on already") instead of "turned on".
+  5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
+     longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
+     businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
@@ -2584,7 +2591,9 @@ Steps:
      in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
-     no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
+     no sign when it balances); a yes or a no, as "Yes" or "No", with the name of its datum in front, also on a normal action's line,
+     because alone it says nothing of what changes ("Require an opening float: Yes · Require a count to close: Yes",
+     never "Yes · Yes"); a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
@@ -2620,7 +2629,9 @@ Steps:
      say what they do: emptying a cart says "Clear in Cart & Checkout", removing one of its lines "Remove in Cart &
      Checkout" and taking a product's route away in the kitchen "Clear in Kitchen"; a cash count says "Register count
      in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
-     never "Add".
+     never "Add"; and VeriFactu's live test, as its buttons do, "Test the connection in VeriFactu" and "Create test
+     invoice in VeriFactu", never "Run" or "Create". An action that carries no datum to show says only its action and
+     its app, ending in a full stop and with no empty colon after it: "Test the connection in VeriFactu.".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so. After "Run it",
      the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
