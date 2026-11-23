@@ -10,7 +10,8 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { askForACard, card, decide, lastAnswer, openPanelAtTheDesk, panel } from './assistant-panel';
 import { A, api, capture, login, psql, shown } from './helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
+import { cleanInvoices, issuedIds, readyToInvoice } from './invoice-helpers';
+import { printersBackOn, printersOff } from './printing-helpers';
 import { panelSpec } from './provider-helpers';
 import { stamp } from './sale-helpers';
 import { toasts } from './toast-helpers';
@@ -33,22 +34,15 @@ panelSpec();
 let printersOn: string[] = [];
 
 test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  await login(await context.newPage(), A, '/invoice/invoices');
-  snapshotSeries();
-  await ensureIssuer(context);
-  printersOn = psql("select string_agg(id::text, ',') from printing_printer where is_active").split(',').filter(Boolean);
-  if (printersOn.length) psql(`update printing_printer set is_active = false where id in (${printersOn.map((id) => `'${id}'`).join(',')})`);
-  await context.close();
+  await (await readyToInvoice(browser)).close();
+  printersOn = printersOff();
 });
 
 test.afterAll(() => {
   try {
-    psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like 'e2e %')`);
-    psql(`delete from printing_printer where name like 'e2e %'`);
     cleanInvoices();
   } finally {
-    if (printersOn.length) psql(`update printing_printer set is_active = true where id in (${printersOn.map((id) => `'${id}'`).join(',')})`);
+    printersBackOn(printersOn);
   }
 });
 

@@ -11,6 +11,7 @@ import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { printersBackOn, printersOff } from './printing-helpers';
 import { numberRow } from './sale-receipt';
 import { rowAction } from './service-helpers';
 import { toastSaying, toasts } from './toast-helpers';
@@ -92,8 +93,7 @@ test.beforeAll(async ({ browser }) => {
   await ensureIssuer(context);
   await drawerOff(context);
   coffee = await createProduct(context, { name: `E2E App Coffee ${RUN}`, sku: `E2E-PIA-${RUN}`, price: 150 });
-  printersOn = psql('select string_agg(id::text, \',\') from printing_printer where is_active').split(',').filter(Boolean);
-  if (printersOn.length) psql(`update printing_printer set is_active = false where id in (${printersOn.map((id) => `'${id}'`).join(',')})`);
+  printersOn = printersOff();
   await context.close();
 });
 
@@ -107,7 +107,7 @@ test.afterAll(() => {
     }
     cleanInvoices();
   } finally {
-    if (printersOn.length) psql(`update printing_printer set is_active = true where id in (${printersOn.map((id) => `'${id}'`).join(',')})`);
+    printersBackOn(printersOn);
     cleanSales();
     cleanInventory();
     restoreDrawer();

@@ -59,3 +59,16 @@ export function forgetDevices(like: string, { ids = [], names = [] }: { ids?: re
   psql(`delete from printing_printdevice_printers where printdevice_id in (select id from printing_printdevice where ${where})`);
   psql(`delete from printing_printdevice where ${where}`);
 }
+
+/** Switches off every printer of the business that is on, for a run where nothing may be queued (the device prints);
+ *  returns them, for `printersBackOn` after it. */
+export function printersOff(): string[] {
+  const on = psql("select string_agg(id::text, ',') from printing_printer where is_active").split(',').filter(Boolean);
+  if (on.length) psql(`update printing_printer set is_active = false where id in (${on.map((id) => `'${id}'`).join(',')})`);
+  return on;
+}
+
+/** Switches back on the printers `printersOff` switched off. */
+export function printersBackOn(ids: readonly string[]): void {
+  if (ids.length) psql(`update printing_printer set is_active = true where id in (${ids.map((id) => `'${id}'`).join(',')})`);
+}
