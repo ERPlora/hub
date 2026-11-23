@@ -1,13 +1,13 @@
 // The Home: headed by the business's name (a
-// greeting by the hour while it has none) and today's date; «Summary» = «My apps», «Finish setting up your
-// business» and the board; «Activity» = the last sales. The tab is in the address: `/#actividad` opens it.
+// greeting by the hour while it has none) and today's date, and under it how the business is working; «Summary» =
+// «My apps», «Finish setting up your business» and the board; «Activity» = the last sales. The tab is in the address: `/#actividad` opens it.
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import HomePage from './HomePage.vue';
 
-const STUBS = { BlueprintCard: true, HomeMyApps: true, SetupChecklist: true, WidgetBoard: true, HomeActivity: true };
+const STUBS = { HomeHealthRow: true, BlueprintCard: true, HomeMyApps: true, SetupChecklist: true, WidgetBoard: true, HomeActivity: true };
 
 function embed(name: string) {
   document.head.innerHTML = `<script id="hub-home" type="application/json">${JSON.stringify({ name, plan_url: 'x' })}</script>`;
@@ -37,29 +37,31 @@ describe('HomePage', () => {
     expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Hoy, jueves, 22 de octubre');
   });
 
-  it('greets by the hour while the business has no name', async () => {
-    embed('');
-    vi.setSystemTime(new Date(2026, 9, 22, 21, 0));
-    const m = await home();
-    expect(m.wrapper.get('h1').text()).toBe('Good evening');
-    expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Today, Thursday, October 22');
-  });
-
   // base/spa.py embeds `hub-home` only for a person with a session: without the block at all, the Home still paints.
-  it('greets by the hour without the hub-home block at all', async () => {
+  it.each([
+    ['while the business has no name', () => embed('')],
+    ['without the hub-home block at all', () => undefined],
+  ])('greets by the hour %s', async (_case, given) => {
+    given();
     vi.setSystemTime(new Date(2026, 9, 22, 21, 0));
     const m = await home();
     expect(m.wrapper.get('h1').text()).toBe('Good evening');
     expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Today, Thursday, October 22');
   });
 
-  it('«Summary»: the templates card, «My apps», then the checklist, then the board', async () => {
+  it('«Summary»: under the greeting how the business is working, then the templates card, «My apps», the checklist and the board', async () => {
     embed('Bar');
     const m = await home();
     const order = m.wrapper
-      .findAll('blueprint-card-stub, home-my-apps-stub, setup-checklist-stub, widget-board-stub')
+      .findAll('header + home-health-row-stub, blueprint-card-stub, home-my-apps-stub, setup-checklist-stub, widget-board-stub')
       .map((el) => el.element.tagName.toLowerCase());
-    expect(order).toEqual(['blueprint-card-stub', 'home-my-apps-stub', 'setup-checklist-stub', 'widget-board-stub']);
+    expect(order).toEqual([
+      'home-health-row-stub',
+      'blueprint-card-stub',
+      'home-my-apps-stub',
+      'setup-checklist-stub',
+      'widget-board-stub',
+    ]);
     expect(m.wrapper.find('home-activity-stub').exists()).toBe(false);
   });
 

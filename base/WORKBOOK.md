@@ -71,6 +71,8 @@ llenarse.
 Arriba, el nombre del negocio y «Hoy» con la fecha larga; mientras el negocio no tiene nombre, un saludo
 según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo, en este orden:
 
+- **Cómo está funcionando el negocio**, solo para quien lo administra: una etiqueta de color por cada app encendida que
+  dice cómo está (la impresora de tiques, el número de WhatsApp), con lo que lo arregla, y «Ver sistema».
 - **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
   tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
   plantillas» y «Ahora no».
@@ -298,9 +300,9 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
+| Cargando | La fila de cómo está funcionando el negocio en gris, baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
-| Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». En la app de un ordenador, «No se pudo cambiar el ajuste de arranque al iniciar sesión.» (BASE-F120). |
+| Error | Cada zona falla por su cuenta: «No hemos podido comprobar cómo está funcionando tu negocio.» con «Reintentar», «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». En la app de un ordenador, «No se pudo cambiar el ajuste de arranque al iniciar sesión.» (BASE-F120). |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.»), salvo «Arrancar al iniciar sesión», que es del ordenador y no del negocio, y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
@@ -344,7 +346,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | hecho |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -499,31 +501,36 @@ nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
 Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
-Estado: parcial — la fila de salud del paso 5 todavía no se pinta en el Inicio, aunque el hub ya sabe qué decir de la
-impresora de tiques; y la Bandeja de WhatsApp todavía no dice cómo está su número (hub#573)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Tras entrar se abre el Inicio (también desde «Inicio» en el menú lateral).
   2. Arriba, el nombre del negocio (el de erplora.com) y «Hoy» con la fecha larga en el idioma de la
      aplicación; mientras el negocio no tiene nombre, «Buenos días», «Buenas tardes» o «Buenas noches».
-  3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
-     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
-     paneles.
-  4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
-     sitio, sin recargar ni reabrir la aplicación.
-  5. Para quien administra el negocio, al pie de «Resumen», una fila con cómo está lo que el negocio necesita para
-     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo: con
+  3. Para quien administra el negocio, bajo el saludo, una fila con cómo está lo que el negocio necesita para
+     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo en una
+     etiqueta de color: verde lo que funciona, ámbar lo que hay que arreglar y gris lo que no se pudo comprobar. Con
      Impresión, «Impresora lista» si el dispositivo que saca los tiques ha dado señales en el último minuto y medio,
      «Impresora sin conectar» si está dado de alta pero no responde, o «Impresora sin configurar» si no hay ninguno;
-     las dos últimas con «Configurar la impresión», que abre Impresión. Quien no administra el negocio no ve la fila.
+     las dos últimas con «Configurar la impresión», que abre Impresión. Con la Bandeja de WhatsApp, «WhatsApp
+     conectado», «Hay que volver a conectar WhatsApp» si WhatsApp lo pide, o «WhatsApp sin conectar» si no hay número
+     conectado; las dos últimas con «Conectar WhatsApp», que abre los ajustes de la Bandeja. La fila se vuelve a
+     comprobar cada vez que se vuelve al Inicio. Sin ninguna app encendida que diga cómo está, no hay fila. Quien no
+     administra el negocio no la ve.
+  4. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
+     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
+     paneles.
+  5. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
+     sitio, sin recargar ni reabrir la aplicación.
   6. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio, la fecha del dispositivo y lo que cada app encendida dice de sí misma.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se
 apilan y «Mis apps» se pliega. Lo que no se pudo comprobar sale en neutro, nunca como listo y sin botón,
-porque no es tarea de quien mira: «No hemos podido comprobar la impresora».
-Implicados: PRINTING-F21
+porque no es tarea de quien mira: «No hemos podido comprobar la impresora», «No hemos podido comprobar WhatsApp». Si
+no se puede leer la fila entera: «No hemos podido comprobar cómo está funcionando tu negocio.» con «Reintentar».
+Implicados: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
 
 ### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
 Estado: hecho
@@ -3631,9 +3638,16 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   cuyo permiso tiene. Devuelve `{key, app, state, title, action, route}`; `action` y `route` solo con `no_signal` o
   `not_configured`. Si la consulta falla o contesta un estado que no conoce, `unknown` con el título de la app y sin
   acción, y se anota en el log. No es viva: cambia con el paso del tiempo, sin evento. Impresión la declara con
-  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora». Tests:
-  `test_home_health.py`, `test_queries_health.py`, `test_api_health.py` y
-  `apps/printing/tests/test_integration_home_health.py`.
+  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora»; la Bandeja de WhatsApp,
+  con `whatsapp_inbox.channel.health` (el estado del número de la foto de erplora.com). En pantalla la pinta
+  `components/HomeHealthRow.vue`, bajo el saludo, solo si la sesión tiene `base.administer_hub` (si no, ni la pide),
+  y la vuelve a pedir cuando la ruta vuelve al Inicio: en la pila de Ionic la página sigue montada mientras se va a
+  otra pantalla, y `onIonViewWillEnter` solo llega a la página, no a sus piezas. Una lectura que falla quita la de
+  antes, que podría decir «lista» cuando ya no lo está. Los colores e iconos de cada estado son `HEALTH_PILLS`
+  (`lib/home-health.ts`), los mismos que usa «Tu impresora». Tests: `test_home_health.py`, `test_queries_health.py`,
+  `test_api_health.py` (también el tipo `HomeHealthItem` de `operations/home.ts` contra el esquema),
+  `apps/printing/tests/test_integration_home_health.py`, `apps/whatsapp_inbox/tests/test_integration_home_health.py`,
+  `HomeHealthRow.test.ts`, `home-health.test.ts` y `tests/e2e/home-health.spec.ts`.
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
@@ -4785,8 +4799,6 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
-- **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
-  impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
