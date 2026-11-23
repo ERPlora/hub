@@ -1116,7 +1116,9 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;
   `document_issuer.py`, el emisor de `InvoiceOut`), `fiscal.py` (aritmética pura: cierre por clave fiscal,
   prorrateo, formato del número), `document_issuer.py` (puro: el emisor de un documento y el NIF que imprime),
-  `queries.py`, `services/` (un módulo por tema: `issuer`, `numbering`, `issuing`, `recipient`, `manual`,
+  `queries/` (un módulo por tema: `invoices`, `documents`, `refunds`, `series`, `rectifying`, `numbering`,
+  `issuer`, `platform_invoices`, `fiscal_archive` y `public`; cómo se lee un documento, en `rows`, y quién ve
+  qué, en `ownership`), `services/` (un módulo por tema: `issuer`, `numbering`, `issuing`, `recipient`, `manual`,
   `from_sale`, `substitution`, `rectifying`, `paying`, `series`, `platform_invoices`, `paper` y `public`; lo que
   comparten todos, en `writes`), `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
@@ -1126,7 +1128,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   COMMIT, así que dos emisiones de la misma serie se ponen en cola y un rechazo deshace el número. Nunca
   secuencias de Postgres. Únicas en la base de datos: `(code, year)` de la serie, `(series, sequence)` y
   `(series_code, number)` del documento. Prefijo, formato y siguiente número se bloquean con el **primer
-  documento** de la serie (`queries.series_started`), no con el contador: una serie que empieza en el 7
+  documento** de la serie (`queries.series.series_started`), no con el contador: una serie que empieza en el 7
   para continuar otro sistema sigue editable hasta que numera (lo cazó el e2e de INVOICE-F12).
 - **Una por**: una factura por venta (`sale` con origen `sale`), una rectificativa por devolución
   (`refund`), una por anulación (`sale` con origen `void`) y una F3 por tique (`substitutes`), todas

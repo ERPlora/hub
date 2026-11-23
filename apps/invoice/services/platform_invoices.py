@@ -8,7 +8,7 @@ from live.operations import operation
 
 from apps.invoice import platform
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.queries import find_platform_invoice, platform_answer
+from apps.invoice.queries.platform_invoices import find_platform_invoice, platform_answer
 from apps.invoice.schemas.platform import PlatformInvoiceIn, PlatformInvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import _issue, _settle_rectified

@@ -173,12 +173,12 @@ def test_what_cannot_be_rectified_the_preview_says_why_in_the_persons_language_a
     # The person's request is in Spanish: what the model is told, and says, is why in Spanish.
     with translation.override("es"):
         plan = turn(call("invoice.invoice.rectification_preview", {"number": rect.number, "reason": REASON}))
-        why = str(queries.CANNOT_RECTIFY_RECTIFICATION)
+        why = str(queries.rectifying.CANNOT_RECTIFY_RECTIFICATION)
     assert plan["confirm"] is None
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [
         ("error", "invoice.cannot_rectify_rectification")
     ]
-    assert json.loads(plan["append"][0]["content"])["error"]["message"] == why != str(queries.CANNOT_RECTIFY_RECTIFICATION)
+    assert json.loads(plan["append"][0]["content"])["error"]["message"] == why != str(queries.rectifying.CANNOT_RECTIFY_RECTIFICATION)
     assert rectifications().count() == 1
 
 
@@ -364,7 +364,7 @@ def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_say
     rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
     with translation.override("es"):
         plan = turn(call("invoice.invoice.rectify", {"number": rect.number, "reason": REASON}))
-        why = str(queries.CANNOT_RECTIFY_RECTIFICATION)
+        why = str(queries.rectifying.CANNOT_RECTIFY_RECTIFICATION)
     assert (plan["confirm"], plan["pending"]) == (None, [])
     assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
         ("invoice.invoice.rectify", "error", "invoice.cannot_rectify_rectification")

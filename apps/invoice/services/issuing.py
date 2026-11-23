@@ -15,7 +15,7 @@ from live.outbox import record_event
 
 from apps.invoice import events, fiscal
 from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries
-from apps.invoice.queries import remaining_of
+from apps.invoice.queries.rows import remaining_of
 from apps.invoice.services.numbering import _take_number
 from apps.invoice.services.writes import _now, actor, logger
 from base.business import business_zone
