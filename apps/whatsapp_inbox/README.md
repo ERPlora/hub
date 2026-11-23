@@ -37,7 +37,7 @@ llega por `/internal` (el contrato está en «Para quien lo mantiene» del WORKB
 | `requires` | `customer` |
 | La usan | Automatizaciones (sus recetas de fábrica: `recipes.py`, y el paso «Mandar un mensaje», FLOW-F31), Citas y Reservas (sus avisos de confirmación), Clientes (la ficha que borra, une o crea), `base` (las puertas `/internal/whatsapp/*` de erplora.com, el Inicio y la campana) |
 | Pantallas | `/whatsapp_inbox/inbox` (la bandeja, con la conversación en `?conversation=<id>`) y `/whatsapp_inbox/settings` (el número, el consumo, las respuestas automáticas y las plantillas) |
-| Operaciones | 15 consultas (`queries/`) y 35 acciones (`services/`), todas con `ai=`; las que llama erplora.com o el sistema, con `ai=INTERNAL` y sin ruta; 32 rutas en `/api/whatsapp_inbox/…` |
+| Operaciones | 16 consultas (`queries/`) y 35 acciones (`services/`), todas con `ai=`; las que llama erplora.com o el sistema y la que lee la fila de salud del Inicio, con `ai=INTERNAL` y sin ruta; 32 rutas en `/api/whatsapp_inbox/…` |
 | Permisos | `view`, `reply`, `assign`, `configure` y `erase` (`whatsapp_inbox.*`); el empleado lee y contesta |
 | Hooks del Inicio | `bell` «Clientes de WhatsApp esperando respuesta» y `notices` (un aviso del dispositivo por cliente sin contestar), con `conversation.count_awaiting_reply` y `conversation.notices` |
 | Tarea programada | `whatsapp_inbox.delivery.resume`, cada 5 minutos: vuelve a dar a erplora.com los mensajes, borrados, plantillas y borrados de plantillas cuya entrega tras el COMMIT no terminó |
