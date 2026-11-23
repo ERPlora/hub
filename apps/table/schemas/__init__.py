@@ -273,8 +273,8 @@ class ZoneListIn(PageIn):
 class ZoneIn(In):
     name: Name = Field(description="The zone's name, e.g. Dining room, Terrace, Bar.")
     description: Description = Field(
-        "", description="A description of the zone (optional)."
-    )
+        "", description="Only a description the person asks to put on the zone: empty unless they ask, never written "
+        "from what else they say of it (what it is for, who sits there).")
     color: Color = Field(
         "primary", title=ZONE_COLOUR, description="Its colour in the list of zones."
     )
