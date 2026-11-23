@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from apps.modifier.models import MAX_CHOICES, MAX_DELTA, MAX_OPTIONS, NAME_MAX_LENGTH
+from apps.tax.schemas import A_TAX_CATEGORY
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import RecoveredOut
 from base.schemas.assistant import names, unless_given
@@ -316,7 +317,7 @@ class _OptionFields(_Input):
     )
     tax_category_key: TaxKey = Field(
         "",
-        title=OWN_TAX_CATEGORY,
+        title=OWN_TAX_CATEGORY, json_schema_extra=A_TAX_CATEGORY,
         description="Only when it taxes differently from the dish: the key (e.g. product.generic) or the name of "
         "its own tax category, billed on a line of its own; empty = the dish's.",
     )
@@ -357,8 +358,7 @@ class OptionPatchIn(AllergensPatchIn, OptionRefIn):
         None, description="New supplement in cents (negative = a discount)."
     )
     tax_category_key: TaxKey | None = Field(
-        None,
-        title=OWN_TAX_CATEGORY,
+        None, title=OWN_TAX_CATEGORY, json_schema_extra=A_TAX_CATEGORY,
         description="New own tax category (key or name); empty = back to the dish's.",
     )
     is_default: bool | None = Field(

@@ -5,7 +5,7 @@ from uuid import UUID
 from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 
-from apps.customer.schemas.fields import CHANNEL, SOURCE, STAGE
+from apps.customer.schemas.fields import ANNUAL_DATE, CHANNEL, SOURCE, STAGE
 
 
 class ImportRowIn(Schema):
@@ -25,10 +25,8 @@ class ImportRowIn(Schema):
     avatar: str = Field(
         "", max_length=1000, description="Address (URL) of the picture."
     )
-    birthday: str = Field("", max_length=1000, description="Birthday, YYYY-MM-DD.")
-    anniversary: str = Field(
-        "", max_length=1000, description="Anniversary, YYYY-MM-DD."
-    )
+    birthday: str = Field("", max_length=1000, description=f"Birthday: {ANNUAL_DATE}")
+    anniversary: str = Field("", max_length=1000, description=f"Anniversary: {ANNUAL_DATE}")
     lifecycle_stage: str = Field(
         "", max_length=1000, description=f"Stage; empty is active. {STAGE}"
     )

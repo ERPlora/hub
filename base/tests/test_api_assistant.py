@@ -6,6 +6,7 @@ import json
 
 import pytest
 from asgiref.sync import async_to_sync
+from live import assistant as shared
 
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway, signed
@@ -121,20 +122,31 @@ def _rounds_of_reads(count: int) -> dict:
 def test_on_the_last_round_the_model_answers_without_tools(client, make_user, gateway):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-    got = frames(post(client, "/assistant/turn", _rounds_of_reads(6)))
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(shared.MAX_ROUNDS)))
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     result, answer = got[-1]["append"]
-    assert result["tool_call_id"] == "r5"
+    assert result["tool_call_id"] == f"r{shared.MAX_ROUNDS - 1}"
     assert answer == {"role": "assistant", "content": "Hecho."}
     assert gateway.sent("/internal/assistant/chat/stream")[0].body["tools"] == []
 
 
-def test_past_the_last_round_it_stops_and_says_why(client, make_user, gateway):
+def test_a_read_asked_for_past_the_last_round_never_runs_and_the_model_answers(client, make_user, gateway):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
-    got = frames(post(client, "/assistant/turn", _rounds_of_reads(7)))
-    assert [frame["type"] for frame in got] == ["executed", "error", "done"]
-    assert got[1]["code"] == "assistant.too_many_steps"
-    assert got[-1]["append"][0]["tool_call_id"] == "r6"
+    gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(shared.MAX_ROUNDS + 1)))
+    assert [frame["type"] for frame in got] == ["text", "done"]
+    told, answer = got[-1]["append"]
+    assert json.loads(told["content"])["error"]["code"] == "base.assistant_out_of_steps"
+    assert answer == {"role": "assistant", "content": "Hecho."}
+    assert gateway.sent("/internal/assistant/chat/stream")[0].body["tools"] == []
+
+
+def test_past_the_answer_it_was_owed_it_stops_and_says_why(client, make_user, gateway):
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(shared.MAX_ROUNDS + 2)))
+    assert [frame["type"] for frame in got] == ["error", "done"]
+    assert got[0]["code"] == "assistant.too_many_steps"
+    assert got[-1]["append"][0]["tool_call_id"] == f"r{shared.MAX_ROUNDS + 1}"
     assert got[-1]["web"] is False  # no pages: it never reached the gateway (hub#870)
     assert gateway.requests == []
 

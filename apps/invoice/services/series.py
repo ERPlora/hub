@@ -11,7 +11,7 @@ from live.outbox import record_event
 
 from apps.invoice import events, fiscal
 from apps.invoice.models import InvoiceSeries
-from apps.invoice.queries import series_row, series_started
+from apps.invoice.queries.series import series_row, series_started
 from apps.invoice.schemas import SeriesCreateIn, SeriesOut, SeriesUpdateIn
 from apps.invoice.services.numbering import SERIES_NOT_FOUND
 from apps.invoice.services.writes import actor

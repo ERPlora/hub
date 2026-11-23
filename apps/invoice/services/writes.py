@@ -9,7 +9,7 @@ from django.utils import timezone, translation
 from live.context import OperationContext
 
 from apps.invoice.models import Invoice
-from apps.invoice.queries import invoice_detail
+from apps.invoice.queries.rows import invoice_detail
 from base.business import business_zone
 
 # One logger for every module of the invoice app's writes, named after the package rather than each module.

@@ -21,7 +21,7 @@ const SAID = {
   },
   en: {
     connection: 'Test the connection in VeriFactu.',
-    invoice: 'Create test invoice in VeriFactu. Check each datum before going on.',
+    invoice: 'Create test invoice in VeriFactu. Check each detail before you continue.',
     lines: ['Series: TICKET', 'Price: €1.00', 'VAT: 21%'],
   },
 } as const;

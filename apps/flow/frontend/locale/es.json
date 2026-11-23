@@ -943,6 +943,7 @@
       "combo__combo__get": "Leer un menú",
       "combo__combo__list": "Buscar menús",
       "combo__combo__resolve": "Calcular el precio de un menú",
+      "combo__combo__set_active": "Poner o quitar un menú de la venta",
       "combo__combo__set_image": "Elegir la foto de un menú",
       "combo__combo__suggest_image": "Proponer fotos para un menú",
       "combo__combo__upload_image": "Subir la foto de un menú",

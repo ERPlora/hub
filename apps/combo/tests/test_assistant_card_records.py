@@ -26,6 +26,7 @@ FRONTEND = Path(apps.get_app_config("combo").path) / "frontend/locale"
 #: Each write of Menus and combos and the datum of it that names a menu by its id.
 ON_A_MENU = [
     ("combo.combo.delete", "id"),
+    ("combo.combo.set_active", "id"),
     ("combo.combo.set_image", "id"),
     ("combo.combo.update", "id"),
     ("combo.group.create", "combo_id"),

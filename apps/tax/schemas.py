@@ -142,9 +142,9 @@ CATEGORY = gettext_noop("Category")
 #: What the assistant's card calls the rule a write acts on by its id (its Spanish in this app's catalog), as the Rules
 #: list calls one, never «Record».
 T_RULE = gettext_noop("Rule")
-#: The assistant's card names the rule a write acts on by this read (base/assistant/cards.py ``REFERS``), run as whoever asks,
-#: never by its id: by its category, its country and its rate (``RuleNamedOut.label``).
+#: How the assistant's card names a rule a write acts on, and a category the write of any app takes (``REFERS``): never by an id or a key.
 A_RULE = names("tax.rule.get", name=("label",))
+A_TAX_CATEGORY = names("tax.category.get", by="key", name=("display_name",), as_said=True)
 SEARCH = "Free text to search."
 DIRECTION = "Sort direction: asc or desc."
 TAX_TYPE = "Tax family: vat, igic (Canary Islands), ipsi (Ceuta and Melilla), surcharge, sales_tax, withholding, excise or import_duty."
@@ -330,7 +330,7 @@ class RuleFields(_RegionOfTheCountry, Schema):
 
     country_code: CountryCode = Field(description=COUNTRY)
     region_code: OptionalRegion = Field(None, description=REGION)
-    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF)
+    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF, json_schema_extra=A_TAX_CATEGORY)
     operation_class: OperationClass = Field("subject", description=OPERATION_CLASS)
     rate_pct: Rate = Field(
         description="The rate in %, 0 to 100, two decimals; 0 for a class that charges no tax."
@@ -414,7 +414,7 @@ class RuleRefIn(_RegionOfTheCountry, Schema):
     )
     region_code: OptionalRegion = Field(None, description=REGION)
     tax_category_key: CategoryRef | None = Field(
-        None, title=CATEGORY, description=CATEGORY_REF + " With the country, instead of the id."
+        None, title=CATEGORY, description=CATEGORY_REF + " With the country, instead of the id.", json_schema_extra=A_TAX_CATEGORY
     )
 
     @model_validator(mode="after")
@@ -468,7 +468,7 @@ class AliasIn(Schema):
     alias: AliasText = Field(
         description="The outside text; kept lowercase with single spaces."
     )
-    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF)
+    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF, json_schema_extra=A_TAX_CATEGORY)
     source: AliasSource = Field(
         "learned", description="learned (the default) or shipped (factory)."
     )

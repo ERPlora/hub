@@ -32,9 +32,10 @@ from base.ordering import list_order
                 "¿qué se rebaja solo y para quién?",
             ),
         },
-        "description": "List the automatic discount rules (the active ones by default): type and value (a percent, "
-        "an amount per unit, buy X get Y, tiers by quantity), what each applies to, its customer group, minimum "
-        "quantity, dates and priority. Search by code or name."
+        "description": "List the automatic discount rules, the discount a product or a category gets by itself on "
+        "every sale (the coffee discount), the active ones by default: type and value (a percent, an amount per unit, "
+        "buy X get Y, tiers by quantity), what each applies to, its customer group, minimum quantity, dates and "
+        "priority. Search by code or name."
     },
 )
 def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:

@@ -9,7 +9,7 @@ from live.errors import Conflict
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.queries import born_series_values
+from apps.invoice.queries.series import born_series_values
 from apps.invoice.services.writes import actor
 
 SERIES_NOT_FOUND = _("This numbering series does not exist.")

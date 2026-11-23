@@ -5,6 +5,7 @@
 // button; a category is never added twice nor offered once chosen. Only there when the business has
 // categories: the first page, followed live, decides it and names the chosen ones; with more than one
 // query holds, the chosen ones beyond it are asked for by id, in one query («Loading…» meanwhile).
+// A first page that could not be read says so, also while the stream tries again after the failure.
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -12,6 +13,7 @@ import { IonButton, IonChip, IonLabel } from '@ionic/vue';
 import { computed, nextTick, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
+import { readFailed } from '../lib/live-read';
 
 const props = withDefaults(
   defineProps<{
@@ -35,6 +37,7 @@ const PAGE = { limit: 100, sort: 'name' } as const;
 const { data, status, error } = useLive('inventory.category.list', () => PAGE);
 
 const any = computed(() => (data.value?.total ?? 0) > 0);
+const listFailed = computed(() => readFailed(status.value, error.value, data.value !== undefined));
 /** The first page holds every category. */
 const complete = computed(() => !!data.value && data.value.total <= data.value.rows.length);
 /** Names of categories beyond the first page, by id: picked here or asked for. */
@@ -146,7 +149,7 @@ function remove(id: string): void {
     </InlineFeedback>
   </div>
   <InlineFeedback
-    v-else-if="status === 'error'"
+    v-else-if="listFailed"
     tone="danger"
     :data-testid="`${testid}-error`"
     :heading="t('inventory.form.categoriesLoadError')"

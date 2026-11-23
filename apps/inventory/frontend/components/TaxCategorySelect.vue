@@ -10,7 +10,7 @@
 //     at all says where to make them;
 //   - category (`allowDefault`): «— (default)» first, an empty key.
 // The first page is followed live: it names the chosen category and tells «Not configured», «none» and
-// a loading error. With more categories than one query serves, a chosen category beyond the first page
+// a loading error, also while the stream tries again after a failure before the first page arrived. With more categories than one query serves, a chosen category beyond the first page
 // is asked of Taxes by its key («Loading…» meanwhile) and named the same way; one Taxes no longer lists
 // is «Not configured».
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
@@ -21,6 +21,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
 import { formatPercent } from '../lib/format';
+import { readFailed } from '../lib/live-read';
 
 type TaxRow = OutputOf<'tax.category.list'>['rows'][number];
 
@@ -111,6 +112,7 @@ const choice = computed<ComboOption | null>(() => {
   return known === undefined ? { id: key, label: t('inventory.common.loading') } : known;
 });
 const failure = computed(() => failed.value.get(props.modelValue));
+const listFailed = computed(() => readFailed(status.value, error.value, loaded.value));
 
 async function search(query: string): Promise<ComboOption[]> {
   const text = query.trim();
@@ -166,12 +168,12 @@ function pick(option: ComboOption | null): void {
       {{ t('inventory.tax.none') }}
     </InlineFeedback>
     <InlineFeedback
-      v-if="status === 'error' || failure"
+      v-if="listFailed || failure"
       tone="danger"
       :data-testid="`${testid}-error`"
       :heading="t('inventory.tax.loadError')"
     >
-      {{ status === 'error' ? error?.message : failure }}
+      {{ listFailed ? error?.message : failure }}
     </InlineFeedback>
   </div>
 </template>

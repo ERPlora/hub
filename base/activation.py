@@ -336,13 +336,19 @@ def refusals(  # noqa: PLR0913
         with translation.override(language) if language else nullcontext():
             reason = ask(ctx) if callable(ask) else None
             if not (isinstance(reason, str) and reason.strip()) and label in kept:
-                reason = MANDATORY_OFF % {
-                    "app": by_label[label].verbose_name,
-                    "country": country_name(country_or_market(country), translation.get_language()),
-                }
+                reason = mandatory_off(by_label[label], country)
         if isinstance(reason, str) and reason.strip():
             said[label] = reason.strip()
     return said
+
+
+def mandatory_off(config: Any, country: str) -> str:
+    """Base's reason (:data:`MANDATORY_OFF`) why ``config``'s app, which a business of ``country`` must have on, never
+    goes off there, in the language at work."""
+    return MANDATORY_OFF % {
+        "app": config.verbose_name,
+        "country": country_name(country_or_market(country), translation.get_language()),
+    }
 
 
 def veto(

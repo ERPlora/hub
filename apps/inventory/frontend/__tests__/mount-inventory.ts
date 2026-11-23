@@ -6,7 +6,7 @@ import type { Component, Ref } from 'vue';
 
 import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import type { ApiCall, StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-import { flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
+import { BYE, flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business } from '../../../../base/frontend/__tests__/business';
 import type { Business } from '../../../../base/frontend/operations/business';
 import en from '../locale/en.json';
@@ -80,6 +80,10 @@ export const ok = (data: unknown, status = 200): Response => Response.json(data,
 /** The error envelope of the API. */
 export const refusal = (status: number, code: string, message: string, fields?: Record<string, string>): Response =>
   Response.json({ error: { code, message, ...(fields ? { fields } : {}) } }, { status });
+
+/** A proxy's 502 page, what the stream's opening gets while the Hub restarts: not the API's envelope. */
+const badGateway = (): Response =>
+  new Response('<html><body><h1>502 Bad Gateway</h1></body></html>', { status: 502, headers: { 'content-type': 'text/html' } });
 
 /** The `ApiError` a refusal becomes. */
 export const apiError = (status: number, code: string, message: string, fields?: Record<string, string>): ApiError =>
@@ -215,7 +219,23 @@ export async function mountInventory(component: Component, options: MountOptions
   const body = (call: ApiCall): unknown => JSON.parse(String(call.init.body));
   /** The query of an API call. */
   const query = (call: ApiCall): Record<string, string> => Object.fromEntries(new URL(call.url, 'http://a.localhost').searchParams);
-  return { ...mounted, result, calls, body, query };
+  /** The stream's first opening gets a proxy's 502 page: nothing has answered, every read hears it and the stream keeps
+   *  trying by itself. */
+  async function cannotOpen(): Promise<void> {
+    net.refuseLive(badGateway);
+    await mounted.clock.advance(150);
+    await flush();
+  }
+  /** The open stream `call` ends and every new opening gets a proxy's 502 page: what was answered stays, every read
+   *  hears the failure and the stream keeps trying by itself. */
+  async function falls(call: StreamCall): Promise<void> {
+    net.refuseLive(badGateway);
+    call.push(BYE);
+    await flush();
+    await mounted.clock.advance(30000);
+    await flush();
+  }
+  return { ...mounted, result, calls, body, query, cannotOpen, falls };
 }
 
 export * from '../../../../base/frontend/__tests__/mount-in-shell';

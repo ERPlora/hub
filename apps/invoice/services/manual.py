@@ -12,7 +12,7 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.queries import FULL
+from apps.invoice.queries.series import FULL
 from apps.invoice.schemas import InvoiceCreateIn, InvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import GENERAL_REGIME, _issue, _line_values

@@ -316,57 +316,57 @@ msgstr "El máximo (%(max)s) queda por debajo del mínimo (%(min)s): nadie podr�
 msgid "Each one goes once in the list."
 msgstr "Cada uno va una sola vez en la lista."
 
-#: services.py:60
+#: services/__init__.py:60
 msgid ""
 "A menu eaten in needs its own VAT category: without it, it cannot be billed."
 msgstr "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar."
 
-#: services.py:62
+#: services/__init__.py:62
 msgctxt "combo"
 msgid "That tax category does not exist in Taxes."
 msgstr "Ese tipo de IVA no existe en Impuestos."
 
-#: services.py:63
+#: services/__init__.py:63
 #, python-format
 msgid "That menu already has a course “%(name)s”."
 msgstr "Ese menú ya tiene un plato «%(name)s»."
 
-#: services.py:64
+#: services/__init__.py:64
 #, python-format
 msgid "A menu holds %(max)s courses at most."
 msgstr "Un menú admite como mucho %(max)s platos."
 
-#: services.py:66
+#: services/__init__.py:66
 msgid ""
 "This course already offers that product. To let it be picked twice, switch "
 "on «the same choice may be picked more than once»."
 msgstr "Este plato ya ofrece ese producto. Para que se pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez»."
 
-#: services.py:69
+#: services/__init__.py:69
 #, python-format
 msgid "This course already offers %(names)s."
 msgstr "Este plato ya ofrece %(names)s."
 
-#: services.py:70
+#: services/__init__.py:70
 #, python-format
 msgid "A course holds %(max)s choices at most."
 msgstr "Un plato admite como mucho %(max)s elecciones."
 
-#: services.py:72
+#: services/__init__.py:72
 #, python-format
 msgid ""
 "“%(product)s” is deactivated in Inventory: activate it before putting it in "
 "a menu."
 msgstr "«%(product)s» está desactivado en Inventario: actívalo antes de ponerlo en un menú."
 
-#: services.py:75
+#: services/__init__.py:75
 #, python-format
 msgid ""
 "Only a product sold and priced by the unit can be a menu choice; "
 "“%(product)s” is sold by %(unit)s."
 msgstr "Solo un producto que se vende y se cobra por unidades puede ser una elección de menú; «%(product)s» se vende por %(unit)s."
 
-#: services.py:78
+#: services/__init__.py:78
 msgid "The new order has to list every one of them, once, and nothing else."
 msgstr "El orden nuevo tiene que nombrarlos a todos, una vez cada uno, y nada más."
 # How the assistant's card names the data of combo's writes (titles of the schemas).

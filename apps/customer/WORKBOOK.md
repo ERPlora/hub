@@ -225,14 +225,16 @@ Pasos:
 4. Pulsa **Guardar**: el panel se cierra y la ficha aparece en la lista; las cifras se recalculan.
 Entra: lo que se teclea. El país se guarda con su código de dos letras (`ES`, `FR`). El teléfono se
 guarda en formato internacional (`+34` y las cifras seguidas, CUSTOMER-F11); el email y el NIF, sin los
-espacios de los extremos.
+espacios de los extremos. «Cumpleaños» y «Aniversario» se escriben en tres casillas, «Día», «Mes» y «Año» (en el
+orden en que el idioma escribe una fecha), y el año solo si se sabe: «12» y «3» sin año guardan el 12 de marzo.
 Sale: la ficha nueva, activa y sin consentimiento de ningún tipo (CUSTOMER-F14), y el aviso de ficha
 creada (`customer.customer.created`), que escucha WhatsApp para unir a la ficha las conversaciones
 que ya tenía ese número.
 Si falla: el motivo sale debajo de su campo y lo tecleado se conserva. Un email mal formado: «Escribe
 un email válido.». Un teléfono que no es un número de su país: «No es un teléfono válido de su país:
 revisa las cifras o escríbelo con su prefijo internacional (+44…).». Un país que no existe: «Elige
-un país de la lista.». No se guarda nada. Los campos personalizados no se piden en el alta.
+un país de la lista.». Un día que no existe en «Cumpleaños» o «Aniversario» (un 31 de febrero), o al que le falta el
+día o el mes: «Introduce una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
 Implicados: WHATSAPP_INBOX-F04, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las fichas que se perdieron, cada una por esta misma alta, con sus grupos y etiquetas, CUSTOMER-F06, y sus campos propios, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Buscar y filtrar fichas
@@ -270,7 +272,7 @@ Pantalla: Ficha de cliente
 Pasos:
 1. Desde **Clientes**, toca la fila.
 2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
-   personalizados), sus grupos y etiquetas, su
+   personalizados; un cumpleaños sin año, como «12 de marzo»), sus grupos y etiquetas, su
    consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
    cuándo y quién: la persona por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su
    correo, nunca el correo entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo
@@ -386,7 +388,9 @@ Entra: el fichero, que la pantalla envía en bloques de 50 filas. Cabeceras que 
 `email`/«Email»/«correo», `phone`/«Teléfono»/«tel», `tax_id`/«NIF»/«CIF», `company_name`/«Empresa»,
 `address`/«Dirección», `city`/«Ciudad», `postal_code`/«CP»/«Código postal», `country`/«País»,
 `lifecycle_stage`/«Etapa» y `notes`/«Notas» (las mismas columnas que da la exportación, CUSTOMER-F09), y además
-`source`, `preferred_channel`, `birthday`, `anniversary` y `avatar`.
+`source`, `preferred_channel`, `birthday`, `anniversary` y `avatar`. Un cumpleaños o un aniversario va como
+`AAAA-MM-DD`, o como `--MM-DD` si no se sabe el año (`--03-12`, el 12 de marzo); otro, omite la fila con «Introduce
+una fecha válida.».
 Sale: las fichas creadas, con origen «Importación», el teléfono en formato internacional y sin
 consentimiento (aunque el fichero traiga una columna de consentimiento), y un aviso de ficha creada
 por cada una, así WhatsApp une sus conversaciones como en el alta a mano. Una fila sin etapa entra

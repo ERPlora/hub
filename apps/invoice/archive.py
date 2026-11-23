@@ -11,7 +11,9 @@ from django.utils import translation
 from live.context import OperationContext
 
 from apps.invoice.models import Invoice
-from apps.invoice.queries import fiscal_archive, record_of, render_document
+from apps.invoice.queries import fiscal_archive
+from apps.invoice.queries.documents import render_document
+from apps.invoice.queries.platform_invoices import record_of
 from base import pdf
 
 

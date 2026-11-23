@@ -213,6 +213,23 @@ describe('TaxCategorySelect', () => {
     expect(s.testid('tax-error').text()).toContain('msg permission_denied');
   });
 
+  it('says so while the stream tries again after a failure heard before the first page arrived', async () => {
+    const m = await mountInventory(TaxCategorySelect, { props: { modelValue: 'product.generic', markMissing: true, testid: 'tax' } });
+    await m.cannotOpen();
+    expect(m.client.stream.status()).toBe('reconnecting');
+    expect(m.wrapper.find('[data-testid="tax-error"]').text()).toContain('The tax categories could not be loaded');
+    expect(m.wrapper.find('[data-testid="tax-unconfigured"]').exists()).toBe(false);
+  });
+
+  it('keeps the chosen category by its name without a word while the stream tries again over the first page', async () => {
+    const s = await setup({ modelValue: 'product.generic' });
+    await s.show(TAX_CATEGORIES);
+    await s.falls(s.call);
+    expect([s.client.stream.status(), s.net.opened.length > 1]).toEqual(['reconnecting', true]);
+    expect(s.combo().props('modelValue')).toEqual({ id: 'product.generic', label: 'Product — generic · 21%' });
+    expect(s.testid('tax-error').exists()).toBe(false);
+  });
+
   it('a search the server refuses fails, so the field says so and offers to retry', async () => {
     const s = await setup({}, { api: () => refusal(503, 'unavailable', 'Try again later.') });
     await expect(s.offers('wine')).rejects.toThrow('Try again later.');
