@@ -19,7 +19,7 @@ from live.context import OperationContext
 from live.operations import get, operation
 from live.outbox import record_event
 
-from apps.inventory import events
+from apps.inventory import events, import_card
 from apps.inventory.models import Category, fits_unit, Product, QUANTITY, Settings, StockMovement, Unit
 from apps.inventory.queries.exports import FORMULA_STARTS
 from apps.inventory.queries.reads import held
@@ -31,7 +31,6 @@ from apps.inventory.services.products import EAN13_TAKEN, _created_payload, _sav
 from apps.inventory.services.writes import _actor
 from apps.tax.models import TaxCategory
 from base import allergens
-from base.assistant import file_rows
 from base import operations as platform
 
 # The reasons of an import report (INVENTORY-F09, F10).
@@ -79,7 +78,7 @@ _QUANTITY_RE = re.compile(r"^\d+(\.\d{1,3})?$")
                 "carga todos los artículos de este CSV en el catálogo",
             ),
         },
-        "summary": file_rows.by_name,
+        "summary": import_card.summary,
     },
 )
 def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
@@ -160,7 +159,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
                 "carga estas categorías desde un CSV",
             ),
         },
-        "summary": file_rows.by_name,
+        "summary": import_card.summary,
     },
 )
 def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dict:
