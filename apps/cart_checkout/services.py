@@ -24,7 +24,7 @@ from live.errors import Conflict, InvalidPayload
 from live.operations import atomic, operation
 from live.outbox import record_event
 
-from apps.cart_checkout import events
+from apps.cart_checkout import events, item_card
 from apps.cart_checkout.models import ACTOR_MAX_LENGTH, QUANTITY, Cart, CartItem, Order, OrderCounter
 from apps.cart_checkout.queries import (
     business_currency,
@@ -366,20 +366,15 @@ def _line_and_cart(item_id) -> tuple[CartItem, Cart]:
     expose_api=True,
     ai={
         "asks": {
-            "en": (
-                "add two shampoos to Carmen's cart",
-                "put a bottle of wine at 12 euros each in the web basket",
-            ),
-            "es": (
-                "añade dos champús al carrito de Carmen",
-                "mete un vino a 12 € cada uno en la cesta web",
-            ),
+            "en": ("add two shampoos to Carmen's cart", "put a bottle of wine at 12 euros each in the web basket"),
+            "es": ("añade dos champús al carrito de Carmen", "mete un vino a 12 € cada uno en la cesta web"),
         },
         "description": "Add a product line to an active shopping cart (named by its session code, its customer or "
         "its id): the product's reference and name as free text, the quantity (up to three decimals) and the "
         "unit price in minor units of the cart's currency (its currency_decimals: 12.50 is 1250 with two, ¥1,250 is "
         "1250). The cart's totals are recomputed.",
         "risk": "normal",
+        "summary": item_card.summary,
     },
 )
 def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:

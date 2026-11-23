@@ -82,6 +82,12 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) deja elegir los
     campos del ticket.
   - Es lo que promete el propio TPV en «Quién atiende esta cuenta».
+- **La comanda dice la mesa donde está hoy su cuenta**: el KDS nombra la comanda por la mesa de su cuenta
+  ([Toast — lo que enseña la comanda en el KDS](https://doc.toasttab.com/doc/platformguide/adminUnderstandingOrderInfoAppearsKDSTickets.html))
+  y pasar la cuenta a otra mesa le cambia la mesa a la cuenta entera
+  ([Toast — traspasar cuentas](https://support.toasttab.com/en/article/Transferring-Items-Checks-and-Payments)).
+  Así, la comanda en marcha de una cuenta que se pasa a otra mesa, se junta con otra o se vuelve a sentar dice
+  la mesa nueva; la Servida o Cancelada se queda con la que tenía, que es donde fue.
 
 ## Antes de empezar
 
@@ -351,15 +357,22 @@ Pasos:
    cocinan.
 4. La comanda aparece en la pantalla «Por preparar», suena (KITCHEN-F16), sale en papel
    (KITCHEN-F08) y la app instalada muestra su aviso del sistema, que abre Cocina al tocarlo.
+5. Si después su cuenta se pasa a otra mesa (TABLE-F15), se junta con otra (TABLE-F16) o se vuelve a
+   sentar (TABLE-F24), la comanda en marcha dice el título nuevo de la cuenta («Mesa 9») en la pantalla, en
+   «Comandas» y para el asistente («marca urgente lo de la mesa 9»), sin recargar. Una comanda Servida o
+   Cancelada se queda con el título que tenía.
 Entra: de Ventas, las líneas enviadas de la cuenta (su ronda, su hora de envío, su producto, su
-cantidad, su nota, sus suplementos, su categoría y, si es un menú, sus platos) y, cuando el envío lo hace Cocina, la prioridad, el canal y quién
-envía.
+cantidad, su nota, sus suplementos, su categoría y, si es un menú, sus platos), el título de su cuenta y,
+cuando el envío lo hace Cocina, la prioridad, el canal y quién envía.
 Sale: la comanda «Por preparar» con sus platos y «Recibida» en el Historial, a la hora del envío
 (avisa: comanda recibida).
 Si falla: una ronda de solo servicios no abre comanda. Lo que se envió antes de que existiera Cocina en
 el negocio no aparece. Una misma ronda nunca abre dos comandas, aunque llegue dos veces. Ningún fallo de
-aquí bloquea al camarero.
-Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119
+aquí bloquea al camarero. Si la cuenta no tiene título, la comanda se queda con lo que dijo el envío
+(«Recoge Ana»); si sus platos acabaron en dos cuentas de títulos distintos (una cuenta dividida y una de las
+dos pasada a otra mesa), se queda con el suyo.
+Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119,
+TABLE-F15, TABLE-F16, TABLE-F24
 
 ### KITCHEN-F06 Un menú del día en la comanda
 Estado: hecho
@@ -782,7 +795,8 @@ Pasos:
    el Historial como canceladas. Si la ronda salió en papel, sale el vale «ANULADA · Mesa 4» con lo que
    quedaba por hacer (KITCHEN-F22).
 2. Se juntan dos cuentas: las rondas enviadas desde la absorbida pasan a la que queda, como sus
-   platos, en el mismo estado y con su etiqueta; al cobrar la que queda se cierran como las suyas.
+   platos, en el mismo estado y con el título de la que queda (KITCHEN-F05); al cobrar la que queda se
+   cierran como las suyas.
 Entra: de Ventas, la cuenta anulada o las líneas que cambiaron de cuenta.
 Sale: rondas canceladas (avisa: comanda cancelada) o de otra cuenta.
 Si falla: una ronda ya Servida o Cancelada no se toca. Una cuenta sin rondas en marcha no cambia nada
@@ -916,14 +930,15 @@ hizo Ventas se lee en cada lectura y se asienta en cada escritura**, para el rat
 reacción. Una ronda enviada que
 Cocina aún no tiene se pinta igual (comanda «por recibir», con el número que tendrá) y la primera
 escritura de Cocina la guarda; una cuenta cobrada, anulada o una línea anulada cambian el estado que se
-lee, y la primera escritura lo guarda con su Historial. `live.py` re-ejecuta las consultas con los
-avisos de Ventas (`sale.order.*`).
+lee, y la primera escritura lo guarda con su Historial. Igual el título: una comanda en marcha lee el de la
+cuenta de sus platos (`queries.views.check_title`) y la primera escritura lo guarda. `live.py` re-ejecuta las
+consultas con los avisos de Ventas (`sale.order.*`), también el del cambio de título (`sale.order.relabeled`).
 
 ### Lo que necesita de otras apps
 
 - **Ventas** (requisito): sus cuentas y sus líneas enviadas (`Order`, `OrderLine`: ronda, hora de
-  envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado y hora de cierre de
-  la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
+  envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado, título y hora de cierre
+  de la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
   y el menú con su `kitchen_name` y sus platos, `combo.components`; los alérgenos del producto con los de sus
   suplementos, `allergens`, y en un menú los de cada plato, `combo.components[].allergens`, y la alergia del
   cliente, `allergy`), leídas con sus modelos; el envío,
@@ -945,12 +960,11 @@ avisos de Ventas (`sale.order.*`).
   `kitchen.ticket.send` (`priority: "rush"` si se armó la llama), y sin ella, a `sale.order.fire`; y la
   hoja «Comandas de la cuenta» (KITCHEN-F19, F20): `useLive('kitchen.ticket.by_order', {order_id})` y
   `kitchen.ticket.set_rush`, con los textos y estados de la pantalla de cocina.
-- **A Ventas** (sigue pedido):
-  1. Un aviso propio del cambio de título de una cuenta (p. ej. `sale.order.relabeled`): la pantalla ya
-     no se relanza con `sale.order.changed` (cada línea añadida en cualquier TPV la relanzaba), así que
-     el título nuevo de una ronda por recibir sale en el siguiente aviso de cocina.
-  2. Índices parciales para la lectura de las rondas por recibir: `sale_orderline(fired_at) WHERE
-     fired_at IS NOT NULL` y `sale_order(closed_at)`.
+- **A Ventas** (ya hecho): el aviso propio del cambio de título de una cuenta, `sale.order.relabeled`
+  (solo el id de la cuenta), que relanza la pantalla sin relanzarla con cada línea añadida
+  (`sale.order.changed`).
+- **A Ventas** (sigue pedido): índices parciales para la lectura de las rondas por recibir:
+  `sale_orderline(fired_at) WHERE fired_at IS NOT NULL` y `sale_order(closed_at)`.
 - **A Impresión**: nada nuevo; usa `kitchen_order` tal como está. Cada plato lleva además sus
   suplementos (`modifiers`, una lista) y, si es de un menú, `combo_ref` (la línea del menú) y
   `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07). Un plato con alergia
@@ -1129,8 +1143,8 @@ Cocina necesita:
 
 - Iconos deseados, las copias de `useServerTable`/`useLiveList`/`useT`/`useNow` y el selector de color
   (`UI-REQUESTS.md`): no han llegado a `@erplora/ui` y cada uno tiene su sustituto.
-- Lo que sigue pedido a Ventas («Lo que pide a otras apps»): el aviso propio del cambio de título y los
-  índices parciales de las rondas por recibir. Sin ellos no se rompe ningún flujo.
+- Lo que sigue pedido a Ventas («Lo que pide a otras apps»): los índices parciales de las rondas por
+  recibir. Sin ellos no se rompe ningún flujo.
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.

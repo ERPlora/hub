@@ -91,6 +91,7 @@ def _new_category(ctx: OperationContext, data: CategoryIn) -> Category:
         "description": "Change a category, named by its id or name; what is not sent (icon, colour, order, "
         "description) is kept.",
         "risk": "normal",
+        "check": "inventory.category.get",
         "asks": {
             "en": (
                 "rename the Drinks category to Beverages",
@@ -133,6 +134,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
     ai={
         "description": "Delete a category, named by its id or name: its products stay, only unlinked from it.",
         "risk": "high",
+        "check": "inventory.category.get",
         "asks": {
             "en": (
                 "delete the Desserts category",

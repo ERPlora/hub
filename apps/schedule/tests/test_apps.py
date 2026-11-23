@@ -227,8 +227,7 @@ def test_the_homes_step_is_confirm_your_opening_hours_done_once_the_week_is_conf
     assert home.level_of(f"schedule.{step.key}", step.required) == home.LEVEL_RECOMMENDED
 
 
-def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
-    # The default week it names is the one migration 0002 plants: Monday to Friday, 09:00–18:00.
+def test_the_step_says_what_it_asks_in_the_language_of_whoever_reads_it():
     (step,) = schedule().setup
     with translation.override("en"):
         english = (str(step.title), str(step.description))
@@ -236,14 +235,13 @@ def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
         spanish = (str(step.title), str(step.description))
     assert english == (
         "Confirm your opening hours",
-        "We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches your business, confirm it "
-        "in one tap; if not, edit the days that differ — bookings outside your opening hours are refused.",
+        "Check that the week's hours are your business's: if they are, confirm them in one tap; if not, edit the days "
+        "that differ — bookings outside your opening hours are refused.",
     )
     assert spanish == (
         "Confirma tu horario",
-        "Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a 18:00). Si coincide con el de tu "
-        "negocio, confírmalo de un toque; si no, edita los días que cambien: las reservas fuera de tu horario se "
-        "rechazan.",
+        "Revisa que el horario de la semana es el de tu negocio: si lo es, confírmalo de un toque; si no, edita los "
+        "días que cambien: las reservas fuera de tu horario se rechazan.",
     )
 
 

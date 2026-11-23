@@ -12,7 +12,7 @@ from live.operations import AI, registry
 
 from apps.invoice.tests.conftest import in_hubs
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, english_coverage_test, place_of_no_ask
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_or_found, english_coverage_test
 from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
 
 from .conftest import HUB_DB
@@ -48,10 +48,9 @@ def test_an_employee_is_never_offered_the_printers_settings(catalog_of):
 
 #: The requests of hub#1086's QA as the person said them (``tests/e2e/qa/probes/*-es-printing-2026-11-08.json``), with
 #: the role that said each, and nothing of the tools' ``asks``: before Printing said its asks, none of these tools was
-#: among the ones a turn offers (``MAX_TOOLS``), so the model answered it had no tool. Now a turn offers all of them
-#: (measured on this branch: the test page 16th, the printer change 25th, the employee's devices 9th): the model can
-#: choose them, and their words stay the person's, never the asks'
-#: (``test_no_ask_copies_a_qa_probe_or_names_a_qa_record``).
+#: among the ones a turn offers (``MAX_TOOLS``), so the model answered it had no tool. Now a turn offers them or, past
+#: its places, the search finds them by their task (``SEARCHED``): the model can choose them, and their words stay the
+#: person's, never the asks' (``test_no_ask_copies_a_qa_probe_or_names_a_qa_record``).
 REPORTED = [
     (
         Membership.Role.OWNER,
@@ -71,10 +70,14 @@ REPORTED = [
 ]
 
 
+#: The task the model searches for when a reported request brings its tool past the places of a turn.
+SEARCHED = {"printing.printer.test": "imprimir una página de prueba", "printing.printer.update": "cambiar una impresora"}
+
+
 @HUB_DB
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_printing_requests_are_offered_their_tool_without_being_its_asks(catalog_of, role, name, phrase):
-    assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
+    assert_offered_or_found(catalog_of(role, "es"), name, phrase, SEARCHED.get(name))
 
 
 #: A device that prints, retired in words that are no ask nor probe and that only its tool's asks bring among the first

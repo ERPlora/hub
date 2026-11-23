@@ -1,6 +1,6 @@
 """What the assistant is asked about apps, settings, the theme, names and payments, in phrases that once reached no tool.
 
-A turn offers the forty tools the person's words name best. Some phrases bring theirs in, though not always first; for
+A turn offers the twenty tools the person's words name best. Some phrases bring theirs in, though not always first; for
 the rest the model searches the whole catalogue for the task (``base.assistant.find_tools``) and the next step of the
 same request offers what the search found.
 """
@@ -25,12 +25,8 @@ THEME = "base.profile.preferences_set"
 APP_ON = "base.app.enable"
 RENAME_FLOW = "flow.flow.update"
 
-#: Phrases whose own words bring the tool they ask for into the forty a turn offers.
+#: Phrases whose own words bring the tool they ask for into the twenty a turn offers.
 OFFERED = [
-    pytest.param(
-        "es", ("pausa los recordatorios de citas", "suspende los recordatorios de citas"), RECIPE_OFF, id="live-97-es"
-    ),
-    pytest.param("en", ("pause the appointment reminders",), RECIPE_OFF, id="live-97-en"),
     pytest.param(
         "es",
         ("apaga el sonido de la cocina", "desactiva el temporizador de la cocina"),
@@ -45,7 +41,6 @@ OFFERED = [
             "desactiva hoy los recordatorios de las citas",
             "por favor desactiva los recordatorios automáticos de citas",
             "no quiero que se manden recordatorios de citas, desactívalos",
-            "quiero que desactives los recordatorios de las citas",
             "desactiva los recordatorios por WhatsApp",
             "apaga los recordatorios por correo de las reservas",
             "apaga temporalmente los recordatorios de citas",
@@ -76,17 +71,6 @@ OFFERED = [
     ),
     pytest.param("en", ("add Tables to the menu",), APP_ON, id="live-165-en"),
     pytest.param("es", ("quita del menú Clientes",), "base.app.disable", id="live-165-off"),
-    pytest.param(
-        "en",
-        (
-            "set up a 'no onion' quick note",
-            "set up a quick note that says 'no onion'",
-            "set up the 'No cilantro' warning so I can tap it quickly when keying in dishes",
-        ),
-        "sale.quick_note.create",
-        id="live-166-quick-note",
-    ),
-    pytest.param("en", ("set up Bizum as a payment method",), "sale.payment_method.create", id="live-166-payment"),
     pytest.param("es", ("renombra Bienvenida como «Clientes nuevos»",), RENAME_FLOW, id="live-157-es"),
     pytest.param(
         "es", ("renombra la lista Verano como «Nueva temporada»",), "pricing.price_list.update", id="live-157-list"
@@ -98,7 +82,32 @@ OFFERED = [
 #: reads the words as a turn does: a switch is found by turning it off or on, not by pausing or resuming it.
 REMINDERS_OFF = ("turn off the appointment reminders", "desactivar los recordatorios de citas")
 REMINDERS_ON = ("turn on the appointment reminders", "activar los recordatorios de citas")
+QUICK_NOTE = ("create a quick note", "crear una nota rápida")
 SEARCHED = [
+    pytest.param("es", "pausa los recordatorios de citas", REMINDERS_OFF, RECIPE_OFF, id="live-97-es"),
+    pytest.param("es", "suspende los recordatorios de citas", REMINDERS_OFF, RECIPE_OFF, id="live-97-es-suspende"),
+    pytest.param("en", "pause the appointment reminders", REMINDERS_OFF, RECIPE_OFF, id="live-97-en"),
+    pytest.param(
+        "es", "quiero que desactives los recordatorios de las citas", REMINDERS_OFF, RECIPE_OFF, id="live-100-quiero"
+    ),
+    pytest.param("en", "set up a 'no onion' quick note", QUICK_NOTE, "sale.quick_note.create", id="live-166-quick-note"),
+    pytest.param(
+        "en", "set up a quick note that says 'no onion'", QUICK_NOTE, "sale.quick_note.create", id="live-166-says"
+    ),
+    pytest.param(
+        "en",
+        "set up the 'No cilantro' warning so I can tap it quickly when keying in dishes",
+        QUICK_NOTE,
+        "sale.quick_note.create",
+        id="live-166-cilantro",
+    ),
+    pytest.param(
+        "en",
+        "set up Bizum as a payment method",
+        ("create a payment method", "crear un método de pago"),
+        "sale.payment_method.create",
+        id="live-166-payment",
+    ),
     pytest.param("en", "stop the appointment reminders", REMINDERS_OFF, RECIPE_OFF, id="live-97-stop"),
     pytest.param(
         "es",

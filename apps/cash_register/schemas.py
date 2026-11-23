@@ -316,10 +316,10 @@ class SessionSummary(Schema):
         description="Sales of every payment method, in cents (empty when hidden).",
         json_schema_extra={"money": True},
     )
-    cash_sales: int | None = Field(description="Sales in cash (empty when hidden).", json_schema_extra={"money": True})
-    card_sales: int | None = Field(description="Sales by card (empty when hidden).", json_schema_extra={"money": True})
+    cash_sales: int | None = Field(description="Sales in cash, in cents (empty when hidden).", json_schema_extra={"money": True})
+    card_sales: int | None = Field(description="Sales by card, in cents (empty when hidden).", json_schema_extra={"money": True})
     other_sales: int | None = Field(
-        description="Sales by transfer or other methods (empty when hidden).", json_schema_extra={"money": True}
+        description="Sales by transfer or other methods, in cents (empty when hidden).", json_schema_extra={"money": True}
     )
     total_refunds: int | None = Field(
         description="Refunds and voids, every method, in cents (empty when hidden).",

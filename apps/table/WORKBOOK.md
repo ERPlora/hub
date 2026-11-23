@@ -605,7 +605,7 @@ Sale: la cuenta de origen «Trasladada» y una cuenta de mesa nueva en el destin
 de Ventas (avisa: `table.session.transferred`).
 Si falla: «Otro dispositivo acaba de ocupar esa mesa. Se ha actualizado el plano.» si el destino ya no
 está libre; «Esa cuenta no está abierta…» si otro ya la movió.
-Implicados: TABLE-F28, SALE-F25
+Implicados: TABLE-F28, SALE-F25, KITCHEN-F05
 
 ### TABLE-F16 Juntar las cuentas de dos mesas ocupadas (fusionar)
 Estado: hecho
@@ -627,7 +627,7 @@ Sale: una sola cuenta abierta en la mesa que se queda (avisa: `table.session.mer
 `sale.order.merged`).
 Si falla: «Esa mesa no tiene ninguna otra cuenta abierta con la que fusionar.» si el destino está libre
 o es la misma mesa sin otra cuenta.
-Implicados: TABLE-F17, SALE-F24
+Implicados: TABLE-F17, SALE-F24, KITCHEN-F05
 
 ### TABLE-F17 Dividir la cuenta de una mesa
 Estado: hecho
@@ -759,7 +759,7 @@ Sale: la cuenta de mesa sentada (avisa: `table.session.restored`).
 Si falla: «Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa.»; la
 mesa tiene que estar libre, como al sentar a un grupo, y salen los mismos avisos. Volver a sentar se
 hace con el grupo delante: una automatización no puede hacerlo.
-Implicados: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
+Implicados: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12, KITCHEN-F05
 
 ### TABLE-F25 Retener la mesa de una reserva confirmada
 Estado: hecho

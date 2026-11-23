@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:715363cb3050e1b2149bc5ab7cdbb9e811044640a256df92e1dff129fd27be9e -->
+<!-- generated from WORKBOOK.md sha256:49821b38817589885f63e11050fefcbd216e7ced36018f2b82a6815d7a889791 -->
 
 ## What it is for and who it is for
 
@@ -639,10 +639,11 @@ Steps:
    Sales & POS asks for the link without a customer and the link is removed.
 In: the order and the customer (or none), with the permission of whoever is at the till.
 Out: the customer ↔ order link and its notice (`customer.order.linked` or `customer.order.unlinked`).
-Sales & POS reads it to give the customer back to the check (CUSTOMER-F17).
+Sales & POS reads it to give the customer back to the check (CUSTOMER-F17) and, when a check is charged
+without naming the customer (through the assistant or the API), so that the sale is theirs (SALE-F01).
 If it fails: the sale goes on; Sales & POS warns "The customer could not be linked to the check. Choose
 them again." (or with the reason Customers gives). A customer that is no longer available is not linked.
-Involved: SALE-F17
+Involved: SALE-F01, SALE-F17
 
 ### CUSTOMER-F20 Add the purchase to the card when charging
 Status: done

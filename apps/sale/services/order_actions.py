@@ -377,6 +377,7 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
     order.label = data.label
     order.save(update_fields=["label", "updated_at"])
     _touch(ctx, order)
+    record_event(ctx, events.ORDER_RELABELED, {"order_id": str(order.id)})
     return _out(order)
 
 

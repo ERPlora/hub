@@ -1,4 +1,4 @@
-"""The search the assistant has in every turn (``base.assistant.find_tools``): a turn offers only the forty tools that
+"""The search the assistant has in every turn (``base.assistant.find_tools``): a turn offers only the twenty tools that
 best match the person's words, so when none of them does what was asked, the model searches the person's whole
 catalogue for the task and the next round of the same request offers what it found.
 

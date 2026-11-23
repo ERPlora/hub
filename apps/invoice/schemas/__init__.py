@@ -742,9 +742,9 @@ class BreakdownOut(Schema):
     surcharge_rate: Decimal = Field(
         description="Equivalence surcharge rate, % (0 = none)."
     )
-    base: int = Field(description="Taxable base, cents.")
-    quota: int = Field(description="Quota of the main rate, cents.")
-    surcharge_quota: int = Field(description="Quota of the surcharge, cents.")
+    base: int = Field(description="Taxable base, cents.", json_schema_extra={"money": True})
+    quota: int = Field(description="Quota of the main rate, cents.", json_schema_extra={"money": True})
+    surcharge_quota: int = Field(description="Quota of the surcharge, cents.", json_schema_extra={"money": True})
 
 
 class InvoiceLineOut(Schema):
@@ -756,14 +756,14 @@ class InvoiceLineOut(Schema):
         description="Unit price WITHOUT VAT and before any discount, in cents with two decimals."
     )
     discount_amount: int = Field(
-        description="Discount of the line WITHOUT VAT, in cents, with the line's sign (0 = none)."
+        description="Discount of the line WITHOUT VAT, in cents, with the line's sign (0 = none).", json_schema_extra={"money": True}
     )
     tax_rate: Decimal
     surcharge_rate: Decimal
     tax_category_key: str
-    base_amount: int
-    tax_amount: int
-    total_amount: int
+    base_amount: int = Field(json_schema_extra={"money": True})
+    tax_amount: int = Field(json_schema_extra={"money": True})
+    total_amount: int = Field(json_schema_extra={"money": True})
     product_id: UUID | None
 
 
@@ -862,8 +862,8 @@ class PreviewLineOut(Schema):
     description: str
     quantity: Decimal = Field(description="Negative: the quantity carries the sign, the price does not.")
     tax_rate: Decimal = Field(description="Its rate, %.")
-    base_amount: int = Field(description="Its base, in cents (negative).")
-    total_amount: int = Field(description="Its total with tax, in cents (negative).")
+    base_amount: int = Field(description="Its base, in cents (negative).", json_schema_extra={"money": True})
+    total_amount: int = Field(description="Its total with tax, in cents (negative).", json_schema_extra={"money": True})
 
 
 class RectificationPreviewOut(Schema):

@@ -123,7 +123,7 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
     with translation.override(flow.language):
         _log(run, step, "answered", now, approved=data.approve, by=who, note=data.note)
         if goes_on and step["kind"] == "assistant":
-            _make_proposal(ctx, run, flow, step, {"approved": True, "note": data.note, "answered_by": who}, now)
+            _make_proposal(ctx, run, flow, {"approved": True, "note": data.note, "answered_by": who}, now)
         elif goes_on:
             left = {"approved": data.approve, "expired": False, "note": data.note, "answered_by": who}
             _carry_on(ctx, run, flow, step, left, now)

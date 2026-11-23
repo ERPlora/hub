@@ -44,12 +44,12 @@ test(`SCHEDULE-F03: «Confirma tu horario» pending with the default week, it le
   psql(DEFAULT_WEEK);
   const { context, page, streams } = await spanishOwner(browser, { width: 1440, height: 900 });
   try {
-    // The old module's item, same words, «Recomendado», while the week is the default one.
+    // «Recomendado» while the week is the default one; its line names no day or hour of it.
     await unfolded(page);
     await expect(step(page).locator('.setup-row-title')).toHaveText('Confirma tu horario');
     await expect(step(page).locator('.setup-row-desc')).toHaveText(
-      'Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a 18:00). Si coincide con el de tu ' +
-        'negocio, confírmalo de un toque; si no, edita los días que cambien: las reservas fuera de tu horario se rechazan.',
+      'Revisa que el horario de la semana es el de tu negocio: si lo es, confírmalo de un toque; si no, edita los ' +
+        'días que cambien: las reservas fuera de tu horario se rechazan.',
     );
     await expect(pill(page)).toHaveText('Recomendado');
 

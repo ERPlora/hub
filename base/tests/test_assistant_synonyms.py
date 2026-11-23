@@ -163,7 +163,7 @@ def test_an_element_in_a_customers_words_brings_their_tool_and_not_demos_items(o
     """With Demo's words, these came 30th and 18th: «elemento» brought a cart's items and a price list's first."""
     every = assistant.relevance.synonyms()
     assert offered_place(owner_tools, name, phrase) <= 10
-    assert offered_place(owner_tools, name, phrase, synonyms=every) > 10
+    assert name not in offered_to(owner_tools, phrase, synonyms=every)[:10]
 
 
 def synonym_errors() -> list:
@@ -283,7 +283,7 @@ def test_the_probe_that_asks_for_an_app_back_in_the_menu_brings_turning_it_on_am
     assert probe_phrases()[comparable(APP_BACK_IN_THE_MENU_PROBE)] == "qa20261108.owner.es.base.app.enable"
     assert offered_place(tools, "base.app.enable", APP_BACK_IN_THE_MENU_PROBE) <= TOP
     without = without_base_groups(tools)
-    assert offered_place(tools, "base.app.enable", APP_BACK_IN_THE_MENU_PROBE, synonyms=without) > TOP
+    assert "base.app.enable" not in offered_to(tools, APP_BACK_IN_THE_MENU_PROBE, synonyms=without)[:TOP]
 
 
 @pytest.mark.parametrize(

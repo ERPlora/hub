@@ -102,8 +102,8 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "demo__item__create" in names
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
-    # The business's currency with its decimals: an amount in its minor unit.
-    assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
+    # The business's currency with its decimals: an amount sent in its minor unit, one of a result as it comes.
+    assert "17.00 EUR → 1700" in plan["instructions"] and '(`"17.00 EUR"`): say it as it comes' in plan["instructions"]
 
 
 def test_a_turn_whose_actor_has_no_role_here_names_none():
@@ -148,6 +148,7 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
             "kind": "query",
             "outcome": "ok",
             "code": "",
+            "reason": {},
         }
     ]
     assert (plan["confirm"], plan["pending"]) == (None, [])
