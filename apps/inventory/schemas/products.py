@@ -27,6 +27,7 @@ from apps.inventory.schemas.fields import (
     UnitCode,
     _text,
 )
+from apps.tax.schemas import A_TAX_CATEGORY
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import ImageInCopyIn
 from base.sensitive import COSTS
@@ -139,7 +140,8 @@ class ProductIn(AllergensIn):
     )
     tax_category_key: TaxKey = Field(
         title=TAX_CATEGORY,
-        description="Key of the tax category (Taxes app) that says how it is taxed."
+        description="Key of the tax category (Taxes app) that says how it is taxed.",
+        json_schema_extra=A_TAX_CATEGORY,
     )
     cost: Cents = Field(0, description="Cost in cents; only whoever sees the costs sends one.", json_schema_extra=COSTS)
     initial_stock: Quantity = Field(
@@ -210,7 +212,7 @@ class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     )
     description: Description | None = Field(None, description="New description.")
     tax_category_key: TaxKey | None = Field(
-        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied."
+        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied.", json_schema_extra=A_TAX_CATEGORY
     )
     is_active: bool | None = Field(
         None, description="Activate (true) or deactivate (false) it."
