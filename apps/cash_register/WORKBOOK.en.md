@@ -417,7 +417,7 @@ Steps:
    blind count it does not tell them to whoever may not see them: the assistant does not know them
    either), and whatever the shift review finds still open.
 6. In that same answer, without you having to ask again, "Run this action?" shows with "Close in Cash
-   register. Check each datum before going on.", the
+   register. Check each detail before you continue.", the
    session by its number (never by its internal code) and the counted cash and, in "What will happen", what closing gives: the "Session", the
    "Drawer" (if the session has one), the "Expected in the drawer" and the "Difference", in the business's
    currency (with the blind count, whoever may not see the expected cash does not get those two).

@@ -111,13 +111,14 @@ _CHECKS = {
     output=GroupOut,
     ai={
         "description": "Create a modifier group (e.g. «Sauces», «Doneness») with how many options must be chosen "
-        "(a minimum of 1 or more makes it required; a maximum of 0 is no ceiling) and whether one can repeat.",
+        "(a minimum of 1 or more makes it required; a maximum of 0 is no ceiling) and whether one can repeat. It "
+        "starts empty: the till asks for it once it has its options (modifier.option.create) and is applied to "
+        "products or categories (modifier.link.attach, which base.assistant.find_tools gives you when you lack it). "
+        "You can do both: offer it. On screen, both are done on the group's sheet in Modifiers (/modifier/groups); a "
+        "product's own form has none.",
         "risk": "normal",
         "asks": {
-            "en": (
-                "create a sauces group for the pizzas",
-                "new Doneness group, required, one choice only",
-            ),
+            "en": ("create a sauces group for the pizzas", "new Doneness group, required, one choice only"),
             "es": (
                 "crea un grupo de salsas para las pizzas",
                 "nuevo grupo Punto de la carne, obligatorio y de una sola opción",
@@ -127,9 +128,7 @@ _CHECKS = {
 )
 def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     _check_group_name(data.name)
-    group = ModifierGroup(
-        **data.model_dump(), created_by=_actor(ctx), updated_by=_actor(ctx)
-    )
+    group = ModifierGroup(**data.model_dump(), created_by=_actor(ctx), updated_by=_actor(ctx))
     _save(group)
     record_event(ctx, events.GROUP_CREATED, _group_payload(group))
     return load_group(group.id)

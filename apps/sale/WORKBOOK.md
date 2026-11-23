@@ -695,7 +695,9 @@ Pasos:
    vuelve a pedir; si al cobrar el descuento pasa del máximo sin autorizar, se pregunta igual, con «Se
    aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda lo aprobado
    con su cifra.
-Entra: «Permitir descuentos» y el descuento máximo de los ajustes.
+Entra: «Permitir descuentos» y el descuento máximo de los ajustes. El asistente solo lo pone en una cuenta de la
+que se le habla (su mesa o su nombre): el descuento que un producto o una categoría lleva en todas las ventas es
+una regla de Tarifas (PRICING-F11).
 Sale: el descuento en la cuenta o en la línea; al cobrar se reparte entre las líneas, la base y el IVA
 declarados ya lo llevan descontado, y la venta guarda el importe descontado.
 Si falla: con «Permitir descuentos» apagado no hay botones de descuento, y el asistente tampoco puede

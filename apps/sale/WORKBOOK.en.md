@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e8d0fa4f76de5aff25fc53b7f8dfa336e2666a7c544a12a648adca45eb055a87 -->
+<!-- generated from WORKBOOK.md sha256:4c7721e734b517e50e26983609ef215d0005a8e7e4bc2a1944fb6025ac3d206e -->
 
 ## What it is for and who it is for
 
@@ -690,7 +690,9 @@ Steps:
    asked again when charging; if, when charging, the discount goes over the maximum without
    authorization, it asks just the same, with "Approving: Charge with a discount above the maximum".
    Employees › Approvals keeps what was approved with its figure.
-In: "Allow discounts" and the maximum discount of the settings.
+In: "Allow discounts" and the maximum discount of the settings. The assistant only sets one on a check it is
+told about (its table or its name): the discount a product or a category gets on every sale is a rule of Price
+Lists (PRICING-F11).
 Out: the discount on the check or on the line; when charging it is shared out among the lines, the
 declared base and VAT already carry it discounted, and the sale keeps the discounted amount.
 If it fails: with "Allow discounts" off there are no discount buttons, and the assistant cannot set one

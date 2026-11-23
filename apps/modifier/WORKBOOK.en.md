@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:33f69d4c493414e5664c973cbf296d07602ca4db7c8eb5f0c34f454565997f51 -->
+<!-- generated from WORKBOOK.md sha256:6ae0d5de8dc1ecfc80b0c0db4e80005ab08a17959efc1828b8294467bf53d897 -->
 
 ## What it is for and who it is for
 
@@ -170,7 +170,7 @@ Involved: none
 
 ### MODIFIER-F02 Create a group
 Status: done
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Modifiers
 Steps:
 1. Tap "New group".
@@ -182,7 +182,10 @@ Steps:
    not 0, it cannot be below the minimum), whether an option can be repeated and the Order in which it
    shows at the till.
 5. Tap "Create": the form closes and the group shows in the table. It does not show at the till yet:
-   its options and where it applies are missing, and they are set in its sheet.
+   its options and where it applies are missing, and they are set in its sheet. When the assistant
+   creates it, it says so and offers to add its options and to apply it to the dishes or the categories
+   itself; on screen, both are done on the group's sheet, in Modifiers, never on the form of a product of
+   Inventory.
 In: what the person types.
 Out: the group (announces: group created). It creates no options or links.
 If it fails: an empty name or one of more than 255 characters, a minimum or maximum outside 0–50 or a

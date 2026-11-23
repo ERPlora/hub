@@ -406,10 +406,11 @@ Pantalla: Tarifas
 Pasos:
 1. **Editar** en la fila: **Editar regla — Happy hour**.
 2. Cambia lo que quieras y **Guardar**.
-Entra: solo lo cambiado; el asistente nombra la regla por su código o su nombre.
+Entra: solo lo cambiado; el asistente nombra la regla por su código o su nombre, o la busca por lo que descuenta
+(«el descuento de los cafés») y propone cambiarla, sin crear otra ni descontar una línea de una cuenta.
 Sale: la regla y `pricing.rule.updated` (sin cambios, nada).
 Si falla: los mismos rechazos que al crear.
-Implicados: Inventario, Servicios, Clientes
+Implicados: Inventario, Servicios, Clientes, Ventas
 
 ### PRICING-F12 Desactivar o reactivar una regla
 Estado: hecho (servidor y pantalla)
