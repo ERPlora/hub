@@ -105,7 +105,7 @@ for (const size of SIZES) {
     const name = `${GROUP} ${size.label}`;
     const group = await api<{ id: string }>(context, A, 'POST', '/modifier/groups', { name, max_choices: 2 });
     expect(group.status).toBe(201);
-    expect((await api(context, A, 'POST', '/modifier/options', { group_id: group.data.id, name: 'Mayo' })).status).toBe(201);
+    expect((await api(context, A, 'POST', '/modifier/options', { group_id: group.data.id, name: 'Mayo', price_delta: 0 })).status).toBe(201);
     await page.reload();
     await shown(page).locator('[data-testid=modifier-groups-row], [data-testid=modifier-groups-empty]').first().waitFor({ state: 'visible' });
     await shown(page).locator('[data-testid=modifier-groups-search] input').fill(name);
