@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c68e00a8db22b5f9d9d63565c643cd3d28589ab5773627fcc4863b6a32ca31dc -->
+<!-- generated from WORKBOOK.md sha256:8ef2bb9a7edbd12b330e40878545983c08b06a45fc7bcb0ef7cdd3f8d83b636b -->
 
 ## What it is for and who it is for
 
@@ -399,10 +399,11 @@ Screen: Price Lists
 Steps:
 1. **Edit** on the row: **Editing rule — Happy hour**.
 2. Change whatever you want and **Save**.
-In: only what changed; the assistant names the rule by its code or its name.
+In: only what changed; the assistant names the rule by its code or its name, or looks it up by what it takes
+off ("the coffee discount") and offers to change it, without creating another one or discounting a line of a check.
 Out: the rule and `pricing.rule.updated` (without changes, nothing).
 If it fails: the same refusals as when creating.
-Involved: Inventory, Services, Customers
+Involved: Inventory, Services, Customers, Sales
 
 ### PRICING-F12 Deactivate or reactivate a rule
 Status: done (server and screen)
