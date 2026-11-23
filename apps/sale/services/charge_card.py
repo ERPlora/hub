@@ -53,8 +53,8 @@ def summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[
         data = CompleteIn.model_validate(arguments)
     except ValidationError:
         return fields
-    preview = get(PREVIEW)
-    failure, valued = shared.run(ctx, preview, {name: arguments[name] for name in ChargeLinesIn.model_fields if name in arguments})
+    charge_lines = {name: arguments[name] for name in ChargeLinesIn.model_fields if name in arguments}
+    failure, valued = shared.run(ctx, get(PREVIEW), charge_lines)
     if failure is not None:
         return fields
     total = {"name": "total", "label": label(get(CHARGE), "total", None), "kind": "money", "value": valued.total}
