@@ -14,6 +14,7 @@ from base.models import Hub, Membership
 from base.schemas.assistant import AN_ATTACHED_FILE
 from base.storage import hub_prefix
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests.assistant_context import asked, turn
 from base.tests.test_services_data import person
 
 __all__ = ["in_business_a"]
@@ -51,20 +52,6 @@ def attaching() -> dict:
 def keep(name: str, call_id: str) -> dict:
     arguments = {"folder": FOLDER, "name": name, "content_base64": name}
     return {"call_id": call_id, "name": shared.tool_name("base.file.upload"), "arguments": json.dumps(arguments)}
-
-
-def asked(*calls) -> dict:
-    tool_calls = [
-        {"id": c["call_id"], "type": "function", "function": {"name": c["name"], "arguments": c["arguments"]}}
-        for c in calls
-    ]
-    return {"role": "assistant", "content": "", "tool_calls": tool_calls}
-
-
-def turn(ctx, messages, pending, decision=None):
-    op = get("base.assistant.turn")
-    data = op.input.model_validate({"messages": messages, "pending": pending, "decision": decision})
-    return op(ctx, data).model_dump(mode="json")
 
 
 def kept(store, name: str) -> bytes:
