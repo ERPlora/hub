@@ -114,4 +114,16 @@ class KitchenConfig(LiveAppConfig):
             refresh_on=NOTICE_EVENTS,
         )
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "rowV_0Chbus", "en": "2PDPgXCpbic"},
+        flow_videos={
+            "KITCHEN-F01": {"es": ["v3Puf35Z5GI"], "en": ["JiZOKyJrxao"]},
+            "KITCHEN-F02": {"es": ["v3Puf35Z5GI"], "en": ["JiZOKyJrxao"]},
+            "KITCHEN-F03": {"es": ["v3Puf35Z5GI"], "en": ["JiZOKyJrxao"]},
+            "KITCHEN-F04": {"es": ["7iCI2JEd3Kc"], "en": ["nLW-JNwjaHg"]},
+            "KITCHEN-F11": {"es": ["8NFM7vaJ5p4"], "en": ["h3M9UuelYn4"]},
+            "KITCHEN-F12": {"es": ["Y8_ivChjSPI"], "en": ["IH2ppGCdFts"]},
+            "KITCHEN-F13": {"es": ["8NFM7vaJ5p4"], "en": ["h3M9UuelYn4"]},
+            "KITCHEN-F14": {"es": ["zRBB-uH4PMU"], "en": ["U2OSH7MKZSA"]},
+        },
+    )

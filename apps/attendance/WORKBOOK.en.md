@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8f057bf46d6c057296ec8f6f55728fd78587c5b8f0bb55b9625786e2571d30d9 -->
+<!-- generated from WORKBOOK.md sha256:0154df0798949b3eb04e9f72a35d7d913fd367594f3ad0ea54c8f99116beadee -->
 
 ## What it is for and who it is for
 
@@ -166,9 +166,9 @@ the error and "Retry".
 Involved: STAFF-F03, ATTENDANCE-F05, ATTENDANCE-F11
 
 ### ATTENDANCE-F02 Take a break without leaving the working day
-Status: done (server and screen)
+Status: done (server, screen and assistant)
 Actor: owner, administrator, manager, employee
-Screen: Clock in
+Screen: Clock in (or the assistant)
 Steps:
 1. With the working day open, tap "Start break". You see "Break started at 13:00." and "On break since
    13:00"; the button becomes "End break".
@@ -176,13 +176,16 @@ Steps:
 3. You can take as many breaks as you like, one after another.
 4. If you tap "Clock out" in the middle of a break, the break ends at that very moment.
 5. In "Today", "Breaks" adds up the break time and "Worked" already discounts it.
+6. You can also ask the assistant ("put me on a break", "I'm back"): before doing it, it asks for confirmation
+   with "Start a break in Time clock." or "End the break in Time clock.", and the receipt says the same. If
+   someone else is named, the card says who by their name.
 In: the person's open working day (ATTENDANCE-F01).
 Out: each break saved inside its working day; the break started and ended notices.
 If it fails: without an open working day, "There is no open working day: clock in first."; with a break
 already running, "A break is already running."; ending a break that does not exist, "There is no running
 break to end."; on a forgotten working day, open more hours than set in Settings, "This working day has been open
 more than 12 hours and is waiting for review…".
-Involved: ATTENDANCE-F01, ATTENDANCE-F05
+Involved: ATTENDANCE-F01, ATTENDANCE-F05, ATTENDANCE-F12
 
 ### ATTENDANCE-F03 Clock in from a phone when the business asks for the location
 Status: done (server and screen)
@@ -386,7 +389,8 @@ Steps:
 1. The manager tells the assistant "clock Ana in" or "clock Ana out" (or calls the API with the person
    by their id or their name).
 2. Before clocking, the assistant asks for confirmation and says whom, in "Person", by their name (Ana
-   López), never by a code; the manager confirms.
+   López), never by a code; also when it was said in other words ("Ana", "ana lópez"): the card shows the
+   person the clocking's own search finds, not the words said. The manager confirms.
 3. The Hub clocks Ana with the server's time, as if she did it, and keeps who did it. It never asks for
    the location, even if the business asks for it and the manager is on their personal phone: the manager
    vouches for her, and the manager's position is not kept on Ana's working day.
@@ -394,7 +398,7 @@ In: that person's Staff record.
 Out: the same as ATTENDANCE-F01 and ATTENDANCE-F02.
 If it fails: an employee cannot clock someone else ("You can only clock yourself in and out."); if the
 name fits several people, it says which and asks to choose; if it does not exist, "That person does not
-exist in Staff.".
+exist in Staff.". In the assistant, none of those cases reaches the card: it hears it first and asks.
 Involved: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Close the open working day of whoever is terminated
@@ -433,6 +437,7 @@ ISO 8601 with their zone; durations, in seconds.
 | How many are clocked in now (the Home "Clocked in now" panel) | see the team | F11 | `attendance.presence.count` |
 | The people that can be filtered (Staff records, also the terminated ones with working days), with search | see the team | F07 | `attendance.person.list` |
 | One of those people by their id, with their name and the status of their record: their own for whoever clocks; anyone for whoever sees the team, clocks others or corrects | clock | F01, F02, F12, F13 | `attendance.person.detail` |
+| The person a clocking or a break is for (one's own, or the one named by their id or in words), as the clocking finds them: what the assistant checks before its card and the name it says; it is no tool of the assistant and has no API route | clock | F01, F02, F12 | `attendance.person.check` |
 | The settings | clock | F03, F04 | `attendance.settings.get` |
 
 ### What it offers: actions (they change data)
