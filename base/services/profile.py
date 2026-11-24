@@ -20,7 +20,7 @@ from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from base import access, events, queries
+from base import access, chosen_language, events, queries
 from base.media import AVATARS_FOLDER
 from base.models.access import AccessSettings
 from base.models.profile import Profile
@@ -195,6 +195,7 @@ def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     language = queries.profile.language_of(user, ctx.scope.key) or settings.LANGUAGE_CODE
+    chosen_language.choose(ctx.request, language)
     return {"language": language, "theme_mode": profile.theme_mode, "palette": profile.palette, "ui_scale": profile.ui_scale}
 
 

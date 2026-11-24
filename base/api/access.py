@@ -4,10 +4,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 from ninja.decorators import decorate_view
 
-from django.http import HttpResponse
-
 from base import queries, services
-from base.auth_views import with_language_cookie
 from base.request_body import accept_body_up_to
 from base.schemas.access import AccessSettingsUpdateIn
 from base.schemas.devices import DeviceByIdIn, DeviceModeIn, DeviceRenameIn, PinSetIn
@@ -82,12 +79,9 @@ async def profile_update(request, data: ProfileUpdateIn):
     return await run_operation(request, services.profile.profile_update, data)
 
 
-# The language applies at once: the answer leaves its cookie, as the login does (base.auth_views._with_language).
 @bind(router, "base.profile.preferences_set", "/me/preferences")
-async def preferences_set(request, response: HttpResponse, data: PreferencesIn):
-    answer = await run_operation(request, services.profile.preferences_set, data)
-    with_language_cookie(response, answer.language)
-    return answer
+async def preferences_set(request, data: PreferencesIn):
+    return await run_operation(request, services.profile.preferences_set, data)
 
 
 #: The photo's body: 2 MB in base64 (2 796 204 characters) and its JSON around it, past Django's 2.5 MB ceiling.
