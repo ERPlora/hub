@@ -36,13 +36,11 @@ import {
   canTurnOff,
   canTurnOn,
   comesWith,
-  goesOffWith,
   includedWith,
   offFirst,
   sellsApart,
   TAB_HASH,
   tabOf,
-  turnsOnWith,
 } from '../lib/apps';
 import { appActions, appSwitch } from '../lib/apps-table';
 import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
@@ -246,11 +244,8 @@ async function toggle(app: AppRow): Promise<void> {
       refusal.value = t('base.appsPage.offFirst', { apps: listOf(first) });
       return;
     }
-    const along = goesOffWith(app, apps.value);
-    const message = [
-      t('base.appsPage.confirmOff.message'),
-      along.length ? t('base.appsPage.confirmOff.along', { apps: listOf(along), app: app.name, n: along.length }) : '',
-    ].filter(Boolean);
+    // What else goes off with it is the list's to say: the server's rule, the same sentence as the assistant's card.
+    const message = [t('base.appsPage.confirmOff.message'), app.along_said].filter(Boolean);
     const yes = await confirm({
       title: t('base.appsPage.confirmOff.title', { app: app.name }),
       message: message.join(' '),
@@ -262,11 +257,10 @@ async function toggle(app: AppRow): Promise<void> {
     return;
   }
   if (!canTurnOn(app)) return;
-  const along = turnsOnWith(app, apps.value);
-  if (along.length) {
+  if (app.along_said) {
     const yes = await confirm({
       title: t('base.appsPage.confirmOn.title', { app: app.name }),
-      message: t('base.appsPage.confirmOn.message', { app: app.name, apps: listOf(along), n: along.length }),
+      message: app.along_said,
       confirmLabel: t('base.appsPage.confirmOn.confirm'),
       cancelLabel: t('base.appsPage.confirmOn.cancel'),
       tone: 'primary',

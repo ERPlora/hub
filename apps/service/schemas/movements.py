@@ -39,10 +39,15 @@ class MovementOut(Schema):
     service_id: UUID | None
     service_name: str | None
     member_id: UUID | None = Field(
-        description="The professional who did a session; null = nobody said (and on an adjustment)."
+        description="The professional who did a session: the one said when it was spent outside the till, or who "
+        "served its line of the sale (the check's when the line says nobody); null = nobody said (and on an adjustment)."
     )
     member_name: str | None
     sale_id: UUID | None
+    sale_number: str | None = Field(
+        description="The number Sales names the sale by (e.g. 20261123-0003); null when the reader cannot read that "
+        "sale (Sales off, or a sale not theirs to see)."
+    )
     appointment_id: UUID | None
     note: str
     actor: str
