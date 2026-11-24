@@ -436,5 +436,9 @@ test.describe('files attached in the panel, kept in Files', () => {
       const raw = await page.context().request.get(`${A}/api/files/raw?path=${encodeURIComponent(`${folder}/${name}`)}`);
       expect(Buffer.from(await raw.body()).equals(bytes)).toBe(true);
     }
+    // The model heard the name of each file, the one it gave back for the upload.
+    const sent = JSON.stringify(chats(provider()).map((seen) => seen.body));
+    expect(sent).toContain('«albaran.pdf»');
+    expect(sent).toContain('«factura.png»');
   });
 });
