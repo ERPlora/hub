@@ -26,15 +26,9 @@ from apps.flow.schemas.fields import (
     _text,
 )
 
-D_RUN_IF = (
-    "«Only if…»: when these comparisons do not all hold the step is skipped (later steps read "
-    "`steps.<id>.skipped`) and the run goes on. " + D_CONDITION
-)
-D_ON_ERROR = (
-    "What a failure of this step does: `stop` (none: the run stops with its reason) or `continue` (the "
-    "failure is written in the step, later steps read `steps.<id>.failed` and `steps.<id>.error_code`, and "
-    "the run goes on)."
-)
+# What a step's «Only if…» and its failure do is said once, in the description of the steps that hold them.
+D_RUN_IF = "«Only if…»: comparisons as in a condition's `when`."
+D_ON_ERROR = "What a failure of this step does: `stop` (none) or `continue`."
 
 
 class _OperationStep(In):
@@ -48,7 +42,7 @@ class _OperationStep(In):
     )
     params: dict[str, Any] = Field(
         default_factory=dict,
-        description="What the operation receives: literals, paths (`input.total`) or text with `{{…}}`.",
+        description="What the operation receives, each input by its name.",
     )
 
     @field_validator("operation")
@@ -146,7 +140,9 @@ class HttpStep(In):
 
 
 class AskStep(In):
-    id: StepId = Field(description="The step's id; later steps read `steps.<id>.approved`, `.expired`, `.note`.")
+    id: StepId = Field(
+        description="The step's id; later steps read `steps.<id>.approved`, `.expired`, `.note` and `.answered_by`."
+    )
     kind: Literal["ask"] = Field(description="Ask someone first: the run waits for a person's yes or no.")
     title: _text(300, 1) = Field(description="The question, with `{{…}}` data filled in when it is asked.")
     details: _text(2000) = Field("", description="More words under the question, with `{{…}}` data.")

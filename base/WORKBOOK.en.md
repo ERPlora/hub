@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:932ee0a8db9e237bf6a69d3b8cef68899ea5f437e2f65cabdb104cba898e7e8c -->
+<!-- generated from WORKBOOK.md sha256:7e106a263d608af5629c114ab68305857f143e84d2b8283027f7d3f70a4381c9 -->
 
 ## What it is for and who it is for
 
@@ -2816,13 +2816,18 @@ Steps:
      was done (or it was cancelled, failed or was not allowed), "The assistant said it made a change, but no action
      was run. Nothing was changed." shows outside the bubble.
   3. If it writes an identifier that no lookup of the turn returned and that the person did not write: "This answer
-     shows an identifier the assistant did not really read. Do not trust it.".
+     shows an identifier the assistant did not really read. Do not trust it.". The same with a web address: the
+     assistant only gives the ones it looked up in the turn (a web search, an exchange rate or what a tool returned),
+     and if it writes another one the person did not write: "This answer shows a web address the assistant did not
+     really look up. Do not trust it.". The same page written another way (with or without "https://", "www." or the
+     closing slash) counts as looked up.
   4. If it points to a screen this business does not have: "This answer points to a screen that does not exist
      here.", and without "Go to …" (BASE-F96).
   5. The notices carry their alert icon, are not written by the assistant and stay with the message, also on
      reloading. A clean answer carries none.
   6. The receipts of BASE-F97 say what was really done, action by action.
-In: what was done in the turn, with its result, and what its lookups returned.
+In: what was done in the turn, with its result, what its lookups returned and the web addresses erplora.com's tools
+looked up.
 Out: the notices and the receipts, kept with the conversation.
 If it fails: "Done" means the action of its app ended without an error: if an app answers fine without having changed
 anything, it is that action that has to say so. If the turn ends in an error, the bubble carries its failure

@@ -10,12 +10,8 @@ from live.outbox import record_event
 from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import BlockedTime
-from apps.appointment.queries import (
-    BLOCK_NOT_FOUND,
-    blocked_out,
-    business_zone,
-    read_moment,
-)
+from apps.appointment.queries.blocked_times import BLOCK_NOT_FOUND, blocked_out
+from apps.appointment.queries.business import read_moment
 from apps.appointment.schemas import (
     BlockedTimeCreateIn,
     BlockedTimeOut,
@@ -24,6 +20,7 @@ from apps.appointment.schemas import (
 )
 from apps.appointment.services.writes import _actor
 from apps.staff.queries import resolve_member
+from base.business import business_zone
 
 MANAGE_SCHEDULE = "appointment.manage_schedule"
 

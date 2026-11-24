@@ -516,10 +516,12 @@ primero y por su precio después. El examen son las sondas de arriba: la misma s
 deja un registro por turno que se puede comparar entre ejecuciones. Lo mismo vale para el panel del SaaS (su
 `tests/e2e/README.md`, «Sondas del asistente»): sus informes tienen el mismo formato y este mismo comando los compara.
 
-**Qué modelo contesta.** Sin ninguna variable `QA_ANSWER_*`, el de producción: Qwen (`qwen3.7-plus`) con
-`gpt-5.4-mini` de reserva. Con `QA_ANSWER_MODEL`, el modelo a prueba, en un proveedor propio del SaaS de la pila
-(`qa-answer`) y **sin reserva**: un turno en el que falla cuenta como fallo suyo, nunca como respuesta de otro modelo
-(`assistant-seed.ts`, probado en `assistant-seed.test.ts`).
+**Qué modelo contesta.** En producción, Claude Haiku 5.5 (`claude-haiku-5-5`), con Qwen 3.7 Plus de reserva: lo dejó la
+migración `assistant/0010_haiku_answers` del SaaS, y lo que se elija después en su admin manda. La pila no pregunta a
+ese: sin ninguna variable `QA_ANSWER_*` siembra Qwen (`qwen3.7-plus`) con `gpt-5.4-mini` de reserva, y para preguntar al
+de producción se le nombra como modelo a prueba. Con `QA_ANSWER_MODEL`, el modelo a prueba, en un proveedor propio del
+SaaS de la pila (`qa-answer`) y **sin reserva**: un turno en el que falla cuenta como fallo suyo, nunca como respuesta
+de otro modelo (`assistant-seed.ts`, probado en `assistant-seed.test.ts`).
 
 | Variable | Qué dice |
 |---|---|
@@ -586,7 +588,7 @@ las peticiones del turno (`rounds`), los tokens de entrada, salida y huellas, el
 - Una ejecución es de un modelo: volver a preguntar sondas (`QA_PROBES_RUN`) con otro modelo se niega.
 
 ```bash
-# El modelo de producción, 150 sondas con la semilla 7:
+# El que siembra la pila (Qwen, con su reserva), 150 sondas con la semilla 7:
 QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
 # Otro modelo, las mismas 150 sondas, sin reserva (en una pila con su BD recién creada y su SaaS arrancado con
 # ANTHROPIC_API_KEY exportada):

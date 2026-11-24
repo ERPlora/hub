@@ -74,7 +74,10 @@ A_QUESTION = names("flow.question.get", name=("title",))
 # Field descriptions shared by several schemas (the assistant reads them).
 D_FLOW_ID = "The automation's id. Give it, or its name in `flow`."
 D_FLOW = "The automation's name, or part of it, when the id is not known («welcome», «cash close»)."
-D_TRIGGER = (
+# Each kind of trigger and of step describes its own data, so a field that holds them says only what they share.
+D_TRIGGER = "When it starts, by its `kind`."
+#: For an automation sent as JSON text, which carries no trigger schema for the model to read.
+D_TRIGGER_IN_WORDS = (
     "When it starts, by `kind`: `event` (something happens: `event` is its name, as "
     "`sale.sale.completed`, and `filter` an optional condition on what it brings), `schedule` "
     "(`every` day, week or month at `time` HH:MM in the business's time zone; `weekday` 0=Monday for "
@@ -82,17 +85,13 @@ D_TRIGGER = (
     "`manual` (only when somebody runs it)."
 )
 D_STEPS = (
-    "What it does, in order, at most 50. A step has an `id` (a-z, 0-9, _; later steps read its output as "
-    "`steps.<id>.<field>`) and a `kind`: `command` (runs the action `operation` of another app with "
-    "`params`), `query` (reads with the query `operation` and `params`, `result` `first` keeps the first "
-    "row's fields and `count` only how many; both leave `found` and `count`), `condition` (`when`: every "
-    "comparison must hold, or the run ends there without error) or `delay` (`seconds`, 60 to 2592000, "
-    "counted from the previous step). A value in `params` is a literal, a path that keeps its type "
-    "(`input.customer_id`) or text with `{{input.name}}` inside. Money is in cents. Every step but a "
-    "condition may carry `run_if` (skipped when it does not hold) and an action or a read `on_error` "
-    "(`continue`: its failure does not stop the run). `ask` asks a person first (`title`, `details`, `role` "
-    "'' / manager / employee, `hours` 1 to 720, `on_no` stop / continue, `on_timeout` no / stop / continue) "
-    "and leaves `approved`, `expired`, `note` and `answered_by`."
+    "What it does, in order, each step by its `kind`. Every step but a condition may carry `run_if` («Only if…», "
+    "comparisons as in a condition's `when`): when they do not all hold, the step is skipped (later steps read "
+    "`steps.<id>.skipped`) and the run goes on. A step that runs something (an action, a read, a call or the "
+    "assistant) may carry `on_error`: `stop` (none: the run stops with its reason) or `continue` (the failure is "
+    "written in the step, later steps read `steps.<id>.failed` and `steps.<id>.error_code`, and the run goes on). "
+    "A value in `params` is a literal, a path that keeps its type (`input.customer_id`) or text with "
+    "`{{input.name}}` inside. Money is in cents."
 )
 D_CONDITION = (
     "Comparisons, all at once: `{path: {operator: value}}` with eq, neq, in, exists, contains, gt, gte, "
