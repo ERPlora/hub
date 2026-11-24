@@ -257,5 +257,12 @@ class RedemptionOut(Schema):
     )
 
 
-GrantPage = Page[GrantOut]
+class ListedGrantOut(GrantOut):
+    sale_number: str | None = Field(
+        description="The number Sales names the sale that charged it by (e.g. 20261124-0001); null when it says no "
+        "sale or the reader cannot read that sale (Sales off, or a sale not theirs to see)."
+    )
+
+
+GrantPage = Page[ListedGrantOut]
 OrphanPage = Page[OrphanOut]

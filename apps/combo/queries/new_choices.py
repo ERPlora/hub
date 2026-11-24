@@ -8,7 +8,8 @@ from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound
 from live.operations import INTERNAL, get, operation
 
-from apps.combo.schemas import GroupOut, OptionBulkIn, OptionIn
+from apps.combo.schemas.choices import OptionBulkIn, OptionIn
+from apps.combo.schemas.courses import GroupOut
 from apps.inventory.models import Product
 from apps.inventory.queries.reads import find_product
 
