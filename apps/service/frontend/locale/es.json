@@ -213,7 +213,7 @@
       },
       "customer": "Cliente: {name}",
       "customerRef": "Referencia del cliente: {id}",
-      "sale": "Venta: {id}",
+      "sale": "Venta: {number}",
       "uses": "{used} usadas · quedan {remaining}",
       "usesUnlimited": "{used} usadas · sin límite",
       "expires": "Caduca el {when}",
