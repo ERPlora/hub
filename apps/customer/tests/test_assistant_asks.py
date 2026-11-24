@@ -16,7 +16,8 @@ from apps.customer.models import Customer
 from apps.customer.schemas.merging import MergeIn
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, offered_to
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_its_words_name, assert_offered_or_found
+from base.tests.test_assistant_asks import offered_to
 from base.tests.test_assistant_asks import english_words_test, said_in_spanish_too_test
 
 from .conftest import HUB_DB, ctx_for, in_hubs
@@ -218,3 +219,82 @@ def test_a_merge_whose_survivor_fits_two_cards_leaves_it_out_of_the_card_and_mer
     assert excinfo.value.code == "customer.customer_ambiguous"
     duplicate.refresh_from_db()
     assert duplicate.merged_into_id is None
+
+
+LINK = "customer.order.link"
+#: A customer put on an open check, in the owner's words, with the search the model makes for it when the turn does not
+#: offer the link: the Spanish one and its search are the QA's (hub#2325), which got «I can't do that».
+CHECK_SAID_TO_BE_A_CUSTOMERS = [
+    ("es", "La cuenta de la mesa 4 es de Lucía QA, ponla a su nombre.", "assign customer to an open check of a table"),
+    ("en", "set the customer on table 4's check to Lucía", "assign the customer of an open check"),
+]
+#: What the model searches for when the turn lacks the link: «assign» is the till's own word («Assign customer»).
+SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK = [
+    ("es", "assign customer to an open check of a table"),
+    ("en", "assign customer to an open check of a table"),
+    ("en", "assign the customer of an open check"),
+    ("es", "asignar un cliente a la cuenta de una mesa"),
+    ("es", "asignar cliente a una cuenta abierta"),
+]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "phrase", "search"), CHECK_SAID_TO_BE_A_CUSTOMERS)
+def test_a_check_said_to_be_a_customers_reaches_the_link(catalog_of, language, phrase, search):
+    assert_offered_or_found(catalog_of(Membership.Role.OWNER, language), LINK, phrase, search, language)
+
+
+#: The places a turn gives the tools before the search, the fewer the Hub has given (19, then 15). The QA's Spanish words
+#: bring the link 16th: within 19, and past 15, where the search the model made for them finds it.
+PLACES = 15
+
+
+@HUB_DB
+def test_the_turn_itself_offers_the_link_for_a_customer_set_on_a_check(catalog_of):
+    language, phrase, _ = CHECK_SAID_TO_BE_A_CUSTOMERS[1]
+    offered = offered_to(catalog_of(Membership.Role.OWNER, language), phrase, language)[:PLACES]
+    assert LINK in offered, offered
+
+
+@HUB_DB
+def test_the_qas_words_keep_offering_the_write_that_names_the_check(catalog_of):
+    """«ponla a su nombre» may also mean the check's own name: the words that bring the link take no place from it."""
+    language, phrase, _ = CHECK_SAID_TO_BE_A_CUSTOMERS[0]
+    offered = offered_to(catalog_of(Membership.Role.OWNER, language), phrase, language)
+    assert offered[len(assistant.relevance.ALWAYS)] == "sale.order.set_label", offered
+
+
+@HUB_DB
+@pytest.mark.parametrize(("language", "search"), SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK)
+def test_searching_for_a_customer_on_a_check_finds_the_link(catalog_of, language, search):
+    found = [op.name for op in assistant.relevance.found(catalog_of(Membership.Role.OWNER, language), search, language)]
+    assert LINK in found, found
+
+
+#: Opening a new check in a customer's name: the open comes first, as before the words of a customer put on a check.
+NEW_CHECK_IN_A_CUSTOMERS_NAME = [
+    ("es", "abre una cuenta nueva a nombre de Lucía QA en la mesa 5"),
+    ("en", "open a new check for a customer"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize(("language", "phrase"), NEW_CHECK_IN_A_CUSTOMERS_NAME)
+def test_opening_a_new_check_in_a_customers_name_still_offers_the_open_first(catalog_of, language, phrase):
+    tools = catalog_of(Membership.Role.OWNER, language)
+    assert offered_to(tools, phrase, language)[len(assistant.relevance.ALWAYS)] == "sale.order.open"
+    assert assistant.relevance.found(tools, phrase, language)[0].name == "sale.order.open"
+
+
+def test_customers_words_name_a_customer_put_on_a_check():
+    assert_its_words_name(
+        "customer",
+        [
+            ("ponla a su nombre", "link"),
+            ("pon la cuenta a su nombre", "link"),
+            ("asignar un cliente a la cuenta", "link"),
+            ("assign customer to this check", "link"),
+            ("set the customer of this tab", "link"),
+            ("enlaza a Ana con la cuenta", "link"),
+        ],
+    )

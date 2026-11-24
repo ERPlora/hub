@@ -19,11 +19,21 @@ from apps.customer.schemas.orders import OrderCustomerOut, OrderLinkIn
     input=OrderLinkIn,
     output=OrderCustomerOut,
     ai=AI(
-        "Puts a customer on an open order (at most one per order; a new one replaces the old), or takes the customer "
-        "off when none is given.",
+        "Links a customer to an open order, such as a table's check, as the till's «Assign customer» does: the order "
+        "is then in the customer's name (at most one per order; a new one replaces the old). With no customer given it "
+        "takes the customer off.",
         asks={
-            "en": ("put this order on Ana", "this tab is Luis's", "take the customer off this order"),
-            "es": ("Ana es la clienta de este pedido", "quita el cliente de este pedido"),
+            "en": (
+                "put this order on Ana",
+                "this tab is Luis's",
+                "take the customer off this order",
+                "put this check in Marta's name",
+            ),
+            "es": (
+                "Ana es la clienta de este pedido",
+                "quita el cliente de este pedido",
+                "enlaza a Marta con esta cuenta",
+            ),
         },
     ),
 )

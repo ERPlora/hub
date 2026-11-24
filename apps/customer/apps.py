@@ -26,6 +26,17 @@ class CustomerConfig(LiveAppConfig):
     )
     verticals = ["hair_salon", "restaurant"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): a customer assigned to a check, as
+    # the till's button says it («Asignar cliente», «Assign customer»), or a check put in their name is what
+    # customer.order.link does. Only as phrases: «asigna», «pon» or «set» alone assign or set anything.
+    assistant_synonyms = (
+        (
+            "link", "enlaza", "enlazar", "assign customer", "assign a customer", "assign the customer", "set the customer",
+            "set a customer", "set customer", "in her name", "in his name", "in their name", "asignar cliente",
+            "asigna cliente", "asignar un cliente", "asigna un cliente", "asignar el cliente", "asigna el cliente",
+            "poner un cliente", "pon un cliente", "poner el cliente", "pon el cliente", "a su nombre",
+        ),
+    )
     # The product's 21 permissions, folded where every role held them together. Not declared on
     # purpose: ``customer.record_purchase``, which only the system context holds (the product's
     # ``internal`` commands): owner and admin get every declared permission.
