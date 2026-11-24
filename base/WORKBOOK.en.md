@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac2c7abb1c774b98c806a970d2d18ead406686fc5aa3485bb1fb34079926a68d -->
+<!-- generated from WORKBOOK.md sha256:939ea28308954262783dbed7112f2880eea3401eb538a3ef12ffe8e8909e9fad -->
 
 ## What it is for and who it is for
 
@@ -2604,7 +2604,13 @@ Steps:
      for it in one short question and never makes it up ("Which tax do you sell it with?"), and if the request fits
      several records, it asks which one. It never asks in its text whether to go ahead: the card asks that.
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
-     for example "Create in Services: Haircut · €15.00 · 30". An amount, every datum its app declares as money, shows
+     for example "Create in Services: Haircut · Price: €15.00 · Duration (minutes): 30". The first, what the action
+     touches (its record or its name), shows by its value alone when it reads on its own (a name, a record, a date or
+     records by their names); each datum after it, and a figure, an amount or a yes or a no in first place, carries the
+     name of its datum in front, the same as on its screen, because alone it does not say what it is: "Change in
+     Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same as its price;
+     "Create in Sales & POS: Misc · Tax category: Product — general · Position: 0"; "Open in Tables: Table: 4 ·
+     Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a

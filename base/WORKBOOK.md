@@ -2621,7 +2621,13 @@ Pasos:
      en una sola pregunta corta y nunca se lo inventa («¿Con qué impuesto lo vendes?»), y si la petición vale para
      varios registros, le pregunta cuál. Nunca pregunta en su texto si sigue adelante: eso lo pregunta la tarjeta.
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
-     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe, todo dato que su app declara como
+     línea, por ejemplo «Crear en Servicios: Corte · Precio: 15,00 € · Duración (minutos): 30». El primero, lo que la
+     acción toca (su registro o su nombre), sale solo por su valor cuando se entiende solo (un nombre, un registro, una
+     fecha o unos registros por su nombre); cada dato detrás, y una cifra, un importe o un sí o un no en primer lugar,
+     lleva delante el nombre de su dato, el mismo que en su pantalla, porque suelto no dice qué es: «Cambiar en
+     Servicios: Mechas · Precio mínimo: 65,00 €», nunca «Mechas · 65,00 €», que se lee igual que su precio; «Crear en
+     Ventas / TPV: Varios · Categoría fiscal: Producto — general · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
+     3». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
