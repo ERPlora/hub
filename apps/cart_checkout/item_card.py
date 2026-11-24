@@ -37,4 +37,4 @@ def summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[
             "unit_price": {key: price[key] for key in ("kind", "value", "money") if key in price},
         },
     }
-    return card_order.first(fields, tuple(CartRefIn.model_fields), line, dropped=LINE)
+    return card_order.put_first(fields, tuple(CartRefIn.model_fields), line, dropped=LINE)

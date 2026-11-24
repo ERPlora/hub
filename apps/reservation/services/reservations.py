@@ -49,7 +49,7 @@ def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict])
     whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
     if whom is None:
         return fields
-    return card_order.first(fields, (whom["name"], "date", "time"))
+    return card_order.put_first(fields, (whom["name"], "date", "time"))
 
 
 @operation(

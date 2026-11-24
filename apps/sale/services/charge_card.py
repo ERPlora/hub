@@ -60,4 +60,4 @@ def summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[
         return fields
     total = {"name": "total", "label": label(get(CHARGE), "total", None), "kind": "money", "value": valued.total}
     charged = tuple(ChargeLinesIn.model_fields)
-    return card_order.first(fields, charged, total, _payments(data, valued.total), dropped=SCREEN_ONLY)
+    return card_order.put_first(fields, charged, total, _payments(data, valued.total), dropped=SCREEN_ONLY)

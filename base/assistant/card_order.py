@@ -10,7 +10,7 @@ from live.context import OperationContext
 Summary = Callable[[OperationContext, dict, list[dict]], list[dict]]
 
 
-def first(fields: list[dict], names: Sequence[str], *computed: dict, dropped: Collection[str] = ()) -> list[dict]:
+def put_first(fields: list[dict], names: Sequence[str], *computed: dict, dropped: Collection[str] = ()) -> list[dict]:
     """The data of ``fields`` named in ``names``, in that order (those not said, skipped); then ``computed``; then the
     rest as they came. None twice: a computed datum takes the place of the one said by its name. ``dropped`` are left
     out."""
@@ -20,9 +20,9 @@ def first(fields: list[dict], names: Sequence[str], *computed: dict, dropped: Co
 
 
 def said_first(*names: str) -> Summary:
-    """The ``summary`` of a card that only puts ``names`` first (``first``)."""
+    """The ``summary`` of a card that only puts ``names`` first (``put_first``)."""
 
     def summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
-        return first(fields, names)
+        return put_first(fields, names)
 
     return summary
