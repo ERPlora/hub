@@ -6,7 +6,8 @@ host the Hub does not know (``base.custom_domains``, at no read per request: the
 through) goes on to ``CommonMiddleware``, whose 400 it always was. One it knows, a business's own domain, is answered
 here and never goes further down this chain, so no gate below has to know of it and nothing of the app can be reached by
 it: its ``/``, the business's published website (``base.public_home``), its images (``/p/media/<its id>/``, the public
-ones: no session is ever read here) and the activation's probe (:data:`PROBE_PATH`), and for any other path or a site
+ones: no session is ever read here), the shared library's that its catalog shows (:data:`LIBRARY_IMAGES`) and the
+activation's probe (:data:`PROBE_PATH`), and for any other path or a site
 that is not there, 404 (``/api`` with its envelope), before any read. The session's cookie does not reach another domain,
 and one sent by hand is not read. A business that left, or suspended, is 404: a visitor of its domain
 has nothing to do with its invoices; one being prepared or moved says to come back (503). The page and its images read
@@ -82,7 +83,7 @@ from django.db import DatabaseError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
 from django.http.request import split_domain_port, validate_host
 from django.template.loader import render_to_string
-from django.urls import get_script_prefix, reverse
+from django.urls import get_script_prefix, resolve, reverse
 from django.utils.cache import add_never_cache_headers
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
@@ -124,6 +125,8 @@ DEMO_ENTRY_PATH = "/auth/login"
 #: What a business's own domain answers the SaaS's probe with, that it reaches this hub: its id and nothing else, which
 #: its website's images already carry. Under ``/.well-known/``, where the WAF lets an HTTP library through.
 PROBE_PATH = "/.well-known/erplora-hub"
+#: The shared library's images (``base.image_catalog``), the same for every business: a product's photo may be one.
+LIBRARY_IMAGES = "/p/catalog/"
 
 
 class CustomDomainMiddleware(MiddlewareMixin):
@@ -146,7 +149,7 @@ class CustomDomainMiddleware(MiddlewareMixin):
     def _answer(self, request: HttpRequest, domain: str, hub_id) -> HttpResponse:
         path = request.path_info
         images = f"/p/media/{hub_id.hex}/"
-        if path not in ("/", PROBE_PATH) and not path.startswith(images):
+        if path not in ("/", PROBE_PATH) and not path.startswith((images, LIBRARY_IMAGES)):
             return _not_found(request)
         if request.method not in ("GET", "HEAD"):
             return HttpResponseNotAllowed(["GET", "HEAD"])
@@ -169,6 +172,9 @@ class CustomDomainMiddleware(MiddlewareMixin):
         try:
             with tenancy_context.use_hub(hub):
                 _count_the_request(request)
+                if request.path_info.startswith(LIBRARY_IMAGES):
+                    match = resolve(request.path_info)
+                    return match.func(request, **match.kwargs)
                 if request.path_info != "/":
                     return media(request, hub.id.hex, image)
                 if not website_enabled(request):

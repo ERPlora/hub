@@ -5,8 +5,8 @@ A row keeps one reference, never a URL (a ``.blueprint.zip`` never changes; a UR
 
 - ``catalog:<folder>/<name>``: an image of the shared library (``base.image_catalog``), one copy for every hub;
 - ``file:<app>/<folder>/<uuid7 hex>.webp``: a photo of its own, under its hub's prefix of the hub file store
-  (``hub-<hex>/``, ``base.storage``), in the folder its app declares in ``members_media`` (``base.media`` serves it to
-  the hub's sessions only);
+  (``hub-<hex>/``, ``base.storage``), in the folder its app declares for ``base.media`` to serve: in ``public_media``
+  when the website's catalog shows it to anyone (a product's), in ``members_media`` for the hub's sessions only;
 - empty: no image (the till shows its initials).
 
 A photo comes in as a JPG, PNG or WebP of :data:`MAX_UPLOAD_BYTES` at most, in base64 (:func:`decode`), of

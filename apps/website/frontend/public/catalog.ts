@@ -21,20 +21,38 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
 /** The anchor of the `index`-th category (from 0), the target of its pill. */
 const anchor = (index: number): string => `ws-cat-${index + 1}`;
 
-/** An item's card: a gradient with its initial (the catalog has no photos), its name, its minutes and its price. */
-function card(item: CatalogOut['groups'][number]['items'][number]): HTMLElement {
-  const col = element('div', 'col');
-  const box = element('div', 'card h-100 border-0 rounded-4 shadow-sm overflow-hidden ws-lift');
+type Item = CatalogOut['groups'][number]['items'][number];
+
+/** An item's photo, loaded only when it comes into view; without one, a gradient with its initial. */
+function thumbnail(item: Item): HTMLElement {
   const thumb = element('div', 'ratio ratio-21x9 ws-thumb');
   thumb.setAttribute('aria-hidden', 'true');
+  if (item.image_url) {
+    const photo = element('img', 'object-fit-contain');
+    for (const [name, value] of [['src', item.image_url], ['alt', ''], ['width', '512'], ['height', '512'], ['loading', 'lazy']]) {
+      photo.setAttribute(name, value);
+    }
+    thumb.append(photo);
+    return thumb;
+  }
   // The first letter, as Django's `first|upper` takes it: a whole character, never half of one.
   thumb.append(
     element('span', 'd-flex align-items-center justify-content-center fs-1 fw-bold ws-display', (Array.from(item.name)[0] ?? '').toUpperCase()),
   );
+  return thumb;
+}
+
+/** An item's card: its photo, its name, its minutes, its description, its allergens and its price. */
+function card(item: Item): HTMLElement {
+  const col = element('div', 'col');
+  const box = element('div', 'card h-100 border-0 rounded-4 shadow-sm overflow-hidden ws-lift');
+  const thumb = thumbnail(item);
   const body = element('div', 'card-body d-flex align-items-start justify-content-between gap-3');
   const text = element('div');
   text.append(element('h4', 'h6 card-title mb-1', item.name));
   if (item.minutes) text.append(element('p', 'small text-body-secondary mb-0', `${item.minutes} min`));
+  if (item.description) text.append(element('p', 'small text-body-secondary mb-0', item.description));
+  if (item.allergens_label) text.append(element('p', 'small text-body-secondary mb-0 mt-1', item.allergens_label));
   body.append(text);
   if (item.price_label) body.append(element('span', 'badge rounded-pill text-bg-secondary fs-6 text-nowrap', item.price_label));
   box.append(thumb, body);

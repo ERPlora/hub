@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a19fa841c007927a9f9fda74108dce188688df2350b8ac8898833edd27425fe1 -->
+<!-- generated from WORKBOOK.md sha256:e7ef759bd4df1718e8cb03954f013a4ba22b1b0963a39af9d9aa9ce278067ea7 -->
 
 ## What it is for and who it is for
 
@@ -109,7 +109,9 @@ switches between the two.
 The website's address with **Copy link**, its QR code and **Download PNG** (to print) and **Download SVG** (to scale up
 without losing quality). It warns that, on the device where you signed in, the address opens the app (to see the
 page: your phone or a private window) and, if the page is not online, that the address still leads to the team's
-sign-in.
+sign-in. If the draft shows the catalog, below it, after a line, «Your catalog's address»: the same address, which
+opens the page right at the catalog, with its **Copy link**, its QR and its **Download PNG** and **Download SVG**, and
+the note «Opens your website right at the catalog: print its QR for your tables or your counter.».
 
 #### The public page
 The chosen template with what is published, at the business's address: a sticky see-through top bar with the
@@ -118,8 +120,10 @@ logo, the name, the sections' menu (folded on a phone) and **Log in** (an outlin
 **Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
 without contact or address, one to the first section. Each section has a small line over its heading («Who we are»,
 «What we offer», «Take a look», «Google reviews», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
-the text; the catalog as a grid of cards (a gradient with the initial, since items have no photo; the price in a pill;
-pills to jump between categories when there are two or more); the gallery as a grid of square, rounded photos (two
+the text; the catalog as a grid of cards (the product's photo or, without a photo, and for services, a gradient with the
+initial; under the name, a service's duration, the product's description and its allergens, «Allergens: Gluten, Milk»;
+the price in a pill; pills to jump between categories when there are two or more; the photos load as they come into
+view, so a long menu is not downloaded whole on opening); the gallery as a grid of square, rounded photos (two
 a row on a phone, three on a tablet, four on a computer) that grow a little under the pointer and open whole apart;
 the Google reviews with the rating in large type, its stars (rounded to the half star) and «128 reviews on Google»,
 the **See on Google** and **Write a review** buttons (they open on Google) and up to five cards with the author's
@@ -255,7 +259,9 @@ Steps:
    It saves by itself, like the rest of the draft.
 In: the source, the chosen categories and whether prices show.
 Out: on the preview and, once published, on the page: the catalog grouped by category in their order (what has no
-category, last), up to 200 items, with pills to jump between categories when there are two or more. Prices, in the
+category, last), up to 200 items, with pills to jump between categories when there are two or more. Each product
+carries its photo (its own or the image library's; without a photo, a gradient with its initial), its description and
+its allergens by name, in the visitor's language («Allergens: Gluten, Milk»); each service, its duration. Prices, in the
 business's currency (its country's) with its decimals; for a business in Spain: «€15.00», «From €40.00», «€20.00 /
 hour» or «Free»; a variable price is not shown. Publishing keeps a copy, and the page refreshes it on opening with the
 products or services of that moment; if the business's country changes, the page and the preview come out in the new
@@ -321,21 +327,27 @@ Steps:
 1. In **Website**, tap **Share and QR**.
 2. **Copy link** copies the address («Link copied»); **Download PNG** gets the QR to print it and **Download SVG** to
    enlarge it without losing quality.
-3. **Close** goes back to the editor.
+3. If the draft shows the catalog (WEBSITE-F05), below is «Your catalog's address», with its own **Copy link**,
+   **Download PNG** and **Download SVG**: it is the QR to print and leave on the tables.
+4. **Close** goes back to the editor.
 In: nothing: the address is the business's.
-Out: the business's public address, its own on erplora.com as the browser sees it, and its QR. It warns that on that
-device the address opens the app (to see the page: the phone or a private window) and, if the page is not online,
-that it still leads to the team's sign-in.
+Out: the business's public address, its own on erplora.com as the browser sees it, and its QR; with the catalog on
+show, the catalog's too, the same address ending in `#catalog`, which opens the page right at it (on the business's own
+domain too, with its address), and its QR. With the catalog hidden, without a source or with its app off, that block
+does not show. It warns that on that device the address opens the app (to see the page: the phone or a private window)
+and, if the page is not online, that it still leads to the team's sign-in.
 If it fails: if it cannot be copied, «The link could not be copied: select it and copy it by hand.».
-Involved: WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
+Involved: WEBSITE-F05, WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
 
 ### WEBSITE-F10 Visit the public page
 Status: done (server, public page and e2e)
 Actor: anyone, without an account
 Screen: The public page
 Steps:
-1. Open the business's address (your-business on erplora.com) on a phone, a tablet or a computer.
-2. The published page shows in the browser's language (English or Spanish), with what the owner wrote as written.
+1. Open the business's address (your-business on erplora.com) on a phone, a tablet or a computer, or scan the
+   catalog's QR on the table, which opens the page right at the catalog.
+2. The published page shows in the browser's language (English or Spanish), with what the owner wrote as written; in
+   the catalog, each product with its photo, its description and its allergens in that language.
 3. **Log in** leads to ERPlora's sign-in and, once signed in, to the app; with a session open, the address opens the
    app as always.
 In: the business's address.
@@ -406,9 +418,9 @@ speaks) and the API, with the same rules and the same permissions.
 | The categories of Inventory or Services to choose from | manage | F05 | `website.catalog.categories` |
 | An uploaded image by the name of its file: what the assistant's card reads to name it (BASE-F97) | view | F04, F11 | `website.image.get` |
 | A category of Inventory or Services by its name: what the assistant's card reads to name it (BASE-F97) | manage | F05 | `website.category.get` |
-| The QR of the public address, in PNG or SVG | view | F09 | `website.qr.get` |
+| The QR of the public address or of the catalog (`target`: `page` or `catalog`, the same address with `#catalog`), in PNG or SVG | view | F09 | `website.qr.get` |
 | What is published, without the hidden sections (no session) | anyone | F10 | `website.public.site` |
-| The published catalog, read at that moment and with the prices in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
+| The published catalog, read at that moment: each product with its photo, its description and its allergens, and the prices and the allergens' names in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
 | The Google reviews kept for the published site, with their texts in the asker's language (no session; never asks Google) | anyone | F10, F12 | `website.public.reviews` |
 
 The three public ones answer only with the page online (otherwise, 404 `website.not_published`) and count each visitor:

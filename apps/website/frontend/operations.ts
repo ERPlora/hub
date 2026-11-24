@@ -3,6 +3,8 @@
 // schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters.
 
+import type { AllergenCode } from '@erplora/ui/components';
+
 export type WebsiteTemplate = 'classic' | 'modern' | 'minimal' | 'bold';
 export type CatalogSource = 'inventory' | 'service';
 export type Day = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -177,6 +179,8 @@ export interface ImageOut {
 
 export interface QrIn {
   format?: 'png' | 'svg';
+  /** `page` (the website's address) or `catalog` (that address, right at its catalog). */
+  target?: 'page' | 'catalog';
 }
 
 export interface QrOut {
@@ -201,6 +205,13 @@ export interface CatalogItemOut {
   price_kind: PriceKind;
   minutes: number | null;
   price_label: string;
+  /** A product's; `''` for a service. */
+  description: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, the card shows the initial. */
+  image_url: string;
+  allergens: AllergenCode[];
+  /** «Allergens: Gluten, Milk» in the visitor's language; `''`: none. */
+  allergens_label: string;
 }
 
 export interface CatalogOut {

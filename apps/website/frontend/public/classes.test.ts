@@ -58,11 +58,25 @@ function templateClasses(path: string): { attribute: string; tokens: string[] }[
   return [...attributes, ...classesPassed(source).map(({ value }) => ({ attribute: value, tokens: tokensOf(value) }))];
 }
 
+const NO_EXTRAS = { description: '', image_url: '', allergens: [], allergens_label: '' };
+
 function catalogClasses(): string[] {
   const catalog = {
     source: 'service' as const,
     show_prices: true,
-    groups: [{ name: 'Hair', items: [{ name: 'Cut', price: 1500, price_kind: 'fixed' as const, minutes: 30, price_label: '€15.00' }] }],
+    groups: [
+      {
+        name: 'Hair',
+        items: [
+          { name: 'Cut', price: 1500, price_kind: 'fixed' as const, minutes: 30, price_label: '€15.00', ...NO_EXTRAS },
+          {
+            ...{ name: 'Toast', price: 350, price_kind: 'fixed' as const, minutes: null, price_label: '€3.50' },
+            ...{ description: 'Bread', image_url: '/p/catalog/food/toast.webp', allergens: ['gluten' as const] },
+            allergens_label: 'Allergens: Gluten',
+          },
+        ],
+      },
+    ],
   };
   const nodes = [...catalogNodes(catalog, 'Empty'), ...catalogNodes({ ...catalog, groups: [] }, 'Empty')];
   return nodes.flatMap((node) => [node, ...node.querySelectorAll('*')].flatMap((el) => [...el.classList]));
