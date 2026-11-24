@@ -548,6 +548,9 @@ Si falla: mientras falte algo, «Pasar a producción» se queda desactivado, el 
 Sin emisor en Facturación, pide configurarlo antes. Ya en producción, no hace nada. En un negocio de fuera de España,
 Ajustes dice arriba «VeriFactu solo es para negocios de España.» como único motivo y «Pasar a producción» va
 deshabilitado.
+Pedido al asistente («pasa VeriFactu a la AEAT real»), mientras falte algo no sale la tarjeta de confirmar: el
+asistente dice que todavía no se puede y por qué, con el mismo motivo con el que se rechazaría la acción. Cuando no
+falta nada, sale su tarjeta y hay que escribir CONFIRMAR.
 Si en producción se pierde la vía fijada (con la de ERPlora, se revoca tu autorización; con la del certificado, caduca
 o se quita), no se cambia de vía ni se vuelve a pruebas: no se sella nada nuevo. La venta o la factura se rechazan con
 «No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros:» y el

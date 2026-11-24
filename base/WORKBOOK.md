@@ -1885,6 +1885,9 @@ Pasos:
      negocio» deshace lo propio y devuelve el tamaño a 100%. El idioma pasa a toda la aplicación abierta, también a
      los textos que manda el servidor (el menú lateral, «Mis apps», el checklist, los paneles de Inicio y la campana),
      sin recargar ni volver a Inicio.
+  5. Si se lo pide al asistente («ponme el idioma en inglés») y confirma la tarjeta, el idioma nuevo se aplica igual
+     que desde el selector: la aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla
+     en este dispositivo.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,

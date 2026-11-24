@@ -1358,6 +1358,7 @@
       "verifactu__aeat_record__list": "Buscar los registros en Hacienda",
       "verifactu__chain__status": "Leer el estado de la cadena de registros",
       "verifactu__chain__validate": "Comprobar la cadena de registros",
+      "verifactu__config__check_go_live": "Comprobar si VeriFactu puede pasar a producción",
       "verifactu__config__get": "Leer los ajustes de VeriFactu",
       "verifactu__contingency__list": "Buscar los registros retenidos",
       "verifactu__diagnostic__last": "Leer la última comprobación de VeriFactu",

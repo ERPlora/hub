@@ -1,16 +1,12 @@
-"""What every write of VeriFactu shares: the permissions it asks, the message of a missing issuer, the person
-who acts, the audit trail's entry, the configuration's row and the chain's head, locked, and a change of the
-configuration recorded."""
+"""What every write of VeriFactu shares: the permissions it asks, the person who acts, the audit trail's entry, the
+configuration's row and the chain's head, locked, and a change of the configuration recorded."""
 
 
-from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.outbox import record_event
 
 from apps.verifactu import events
 from apps.verifactu.models import Chain, Config, Event, SendControl
-
-ISSUER_MISSING = _("Set up the issuer first in Invoicing → Issuer.")
 
 CONFIGURE = "verifactu.configure"
 TRANSMIT = "verifactu.transmit_record"

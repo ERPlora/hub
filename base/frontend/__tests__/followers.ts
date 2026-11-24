@@ -1,6 +1,6 @@
-// The followers beside the pane (`BackgroundChrome`: AppsFollower, AccessFollower) mounted as base mounts them: on a
-// session the test changes while the screen is open, with a screen at each of `screens` (`/<app>/<page>`, carrying
-// its app as the apps' own routes do, so the app gate judges it) and the live call they open.
+// The followers beside the pane (`BackgroundChrome`: AppsFollower, AccessFollower, LanguageFollower) mounted as base
+// mounts them: on a session the test changes while the screen is open, with a screen at each of `screens`
+// (`/<app>/<page>`, carrying its app as the apps' own routes do, so the app gate judges it) and the live call they open.
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component, Ref } from 'vue';
 
