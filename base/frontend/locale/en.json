@@ -1311,8 +1311,8 @@
           "archive": "Archive",
           "assign": "Assign",
           "attach": "Apply",
-          "auto_close": "Close",
-          "avatar_remove": "Remove",
+          "auto_close": "Close the sessions due to close by themselves",
+          "avatar_remove": "Remove the profile photo",
           "back_to_testing": "Go back to testing",
           "badge_remove": "Remove",
           "book": "Book",
@@ -1324,7 +1324,7 @@
           "charge": "Charge",
           "claim": "Take",
           "claim_call": "Take the call",
-          "cleanup_expired": "Clean up the expired",
+          "cleanup_expired": "Clean up the expired carts",
           "clear": "Clear",
           "clock_in": "Clock in",
           "clock_out": "Clock out",
@@ -1393,13 +1393,13 @@
           "pin_remove": "Remove",
           "place": "Set aside",
           "preferences_set": "Change",
-          "prepare": "Prepare",
+          "prepare": "Prepare the connection",
           "print": "Print",
           "print_bill": "Print the bill",
           "print_label": "Print the label",
-          "process": "Process",
+          "process": "Process the queue now",
           "propose": "Propose",
-          "prune": "Clean up",
+          "prune": "Remove the unused devices",
           "publish": "Publish",
           "query": "Ask the AEAT",
           "react": "Start",
@@ -1422,7 +1422,7 @@
           "release": "Release",
           "release_check": "Release",
           "release_member": "Release",
-          "release_unconfirmed": "Release",
+          "release_unconfirmed": "Release the unconfirmed reservations",
           "remove": "Remove",
           "remove_line": "Remove",
           "remove_voucher": "Remove",
@@ -1439,9 +1439,9 @@
           "resume_due": "Resume",
           "retire": "Retire",
           "retry": "Retry",
-          "retry_all": "Retry all",
+          "retry_all": "Retry all failed events",
           "return": "Give back",
-          "review_stale": "Flag for review",
+          "review_stale": "Flag forgotten days for review",
           "revoke": "Revoke",
           "run": "Run",
           "save": "Save",
@@ -1497,6 +1497,12 @@
           "other": "Do this"
         },
         "operations": {
+          "attendance": {
+            "break": {
+              "end": "End the break",
+              "start": "Start a break"
+            }
+          },
           "cart_checkout": {
             "cart": {
               "clear": "Clear"
@@ -1510,7 +1516,15 @@
               "add": "Register movement"
             }
           },
+          "schedule": {
+            "week": {
+              "confirm": "Confirm the weekly hours"
+            }
+          },
           "verifactu": {
+            "certificate": {
+              "remove": "Remove the certificate"
+            },
             "diagnostic": {
               "run": "Test the connection"
             },
