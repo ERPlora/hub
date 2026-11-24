@@ -1104,6 +1104,7 @@
       "payment__method__get": "Read a payment method",
       "payment__method__list": "Look for payment methods",
       "payment__method__update": "Change a payment method",
+      "payment__payment__check": "Check the method a new payment leaves from",
       "payment__payment__create": "Create a payment",
       "payment__payment__get": "Read a payment",
       "payment__payment__list": "Look for payments",

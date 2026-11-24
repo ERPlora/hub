@@ -24,7 +24,7 @@ from apps.payment.models import (
     INVOICE_REF_MAX_LENGTH,
     NAME_MAX_LENGTH,
 )
-from base.schemas.assistant import names
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 
@@ -52,6 +52,8 @@ T_METHOD = gettext_noop("Method")
 #: The word the payments list calls one («Pago»).
 T_PAYMENT = gettext_noop("Payment")
 A_METHOD = names("payment.method.get")
+#: A method said in the person's words: the card names the one the write's own search finds.
+A_METHOD_SAID = names("payment.method.get", by="method", as_said=True)
 A_PAYMENT = names("payment.payment.get", name=("reference",))
 
 MethodType = Literal["cash", "transfer", "card", "sepa", "check", "other"]
@@ -140,6 +142,7 @@ class MethodRefIn(In):
     method: Said | None = Field(
         None,
         description="The payment method's name, when its id is not known (e.g. said aloud).",
+        json_schema_extra=unless_given(A_METHOD_SAID, "id"),
     )
 
     @model_validator(mode="after")
@@ -311,7 +314,9 @@ class PaymentListIn(PageIn):
     )
 
 
-class PaymentIn(In):
+class MethodToPayFromIn(In):
+    """The active method a new payment leaves from, by its id or its name."""
+
     method_id: UUID | None = Field(
         None,
         description="The id of the active payment method the money leaves from.",
@@ -320,7 +325,17 @@ class PaymentIn(In):
     method: Said | None = Field(
         None,
         description="The name of the active payment method, when its id is not known (e.g. «Cash drawer»).",
+        json_schema_extra=unless_given(A_METHOD_SAID, "method_id"),
     )
+
+    @model_validator(mode="after")
+    def _said(self):
+        if self.method_id is None and self.method is None:
+            raise ValueError(str(SAY_WHICH_METHOD))
+        return self
+
+
+class PaymentIn(MethodToPayFromIn):
     payment_date: dt.date = Field(
         description="The day of the payment (YYYY-MM-DD); not the day it is recorded."
     )
@@ -383,12 +398,6 @@ class PaymentIn(In):
         if len(code) != 3 or pycountry.currencies.get(alpha_3=code) is None:
             raise ValueError(str(CURRENCY_UNKNOWN))
         return code
-
-    @model_validator(mode="after")
-    def _said(self):
-        if self.method_id is None and self.method is None:
-            raise ValueError(str(SAY_WHICH_METHOD))
-        return self
 
 
 class PaymentOut(Schema):

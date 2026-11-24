@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3270e1edb8a5da0faf1622b2e0a3f6e8ed67fcbe89eccfdfe9bbe5838aac8d41 -->
+<!-- generated from WORKBOOK.md sha256:89f53a4f9ab4bb3fb2d133179acd3cce6dfd89e7052b33b3154c69b53431bd75 -->
 
 ## What it is for and who it is for
 
@@ -1022,14 +1022,18 @@ Steps:
 4. When there is some again, tap "Put back on sale" in the "⋮" menu or on the card: the badge goes away
    and the till sells it again.
 In: the item (through the screen, or by its SKU or its name from the assistant or the API) and whether
-it is sold out or goes back on sale.
+it is sold out or goes back on sale. The assistant's card says the item it is going to change as it
+finds it, even when it was said in other words ("Change in Inventory: Tarta de queso QA · Sold out: Yes"
+when "the cheesecake" was said).
 Out: the item marked or unmarked; Inventory tells of the change (`inventory.product.updated`). Marking
 it twice changes nothing. Turning it off, on or editing it does not take the mark away. A sold-out item
 keeps counting in its category, because the till keeps showing it in grey (INVENTORY-F27), and it does
 not show in the sales catalog.
 If it fails: the reason shows above the table or inside the card ("Could not change whether the product
 is sold out" or the one the app gives). Whoever cannot change products sees the badge, but not the
-actions. An item that no longer exists gives "This product does not exist in this hub".
+actions. An item that no longer exists gives "This product does not exist in this hub". Through the
+assistant, words that fit several items or none draw no card: the assistant says which ones fit and asks
+which one.
 Involved: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Choose an item's image from the library

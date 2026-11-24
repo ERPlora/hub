@@ -13,7 +13,7 @@ Para qué: carritos que acaban en pedido, el cobro de esos pedidos y los pagos q
 ## Recorrido
 
 1. PAYMENT-F01 — el método de pago «Transferencia».
-2. PAYMENT-F08 — el método, cambiado, desactivado y reactivado.
+2. PAYMENT-F08 — el método, cambiado (pidiéndoselo al asistente con una palabra de su nombre), desactivado y reactivado.
 3. CART_CHECKOUT-F01 — un carrito para un cliente.
 4. CART_CHECKOUT-F02 — dos productos al carrito, pedidos al asistente.
 5. CART_CHECKOUT-F03 — una cantidad cambiada y una línea quitada.

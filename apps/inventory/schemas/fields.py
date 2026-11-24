@@ -65,6 +65,9 @@ ProductSearch = Annotated[
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
 A_PRODUCT = assistant.names("inventory.product.get")
 A_CATEGORY = assistant.names("inventory.category.get")
+# A product or a category said in the person's words: the card names the one the write's own search finds.
+A_PRODUCT_SAID = assistant.names("inventory.product.get", by="product", as_said=True)
+A_CATEGORY_SAID = assistant.names("inventory.category.get", by="category", as_said=True)
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -91,7 +94,9 @@ class Page(Schema, Generic[T]):
 
 class ProductRefIn(Schema):
     id: UUID | None = Field(None, title=T_PRODUCT, description="The product's id.", json_schema_extra=A_PRODUCT)
-    product: Said | None = Field(None, description=PRODUCT_SAID)
+    product: Said | None = Field(
+        None, description=PRODUCT_SAID, json_schema_extra=assistant.unless_given(A_PRODUCT_SAID, "id")
+    )
 
     @model_validator(mode="after")
     def _named(self):
@@ -103,7 +108,9 @@ class ProductRefIn(Schema):
 class CategoryRefIn(Schema):
     id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
-        None, description="The category's name or slug, when its id is not known."
+        None,
+        description="The category's name or slug, when its id is not known.",
+        json_schema_extra=assistant.unless_given(A_CATEGORY_SAID, "id"),
     )
 
     @model_validator(mode="after")
@@ -117,7 +124,9 @@ class _ProductLineRef(Schema):
     """A product named by ``product_id`` or by its SKU or name (``product``)."""
 
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
-    product: Said | None = Field(None, description=PRODUCT_SAID)
+    product: Said | None = Field(
+        None, description=PRODUCT_SAID, json_schema_extra=assistant.unless_given(A_PRODUCT_SAID, "product_id")
+    )
 
     @model_validator(mode="after")
     def _named(self):

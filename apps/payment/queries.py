@@ -11,8 +11,8 @@ from uuid import UUID
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.errors import Conflict, InvalidPayload, NotFound
+from live.operations import INTERNAL, operation
 from stdnum import iban as iban_number
 
 from apps.payment.models import Payment, PaymentMethod
@@ -21,6 +21,7 @@ from apps.payment.schemas import (
     MethodOut,
     MethodPage,
     MethodRefIn,
+    MethodToPayFromIn,
     PaymentListIn,
     PaymentOut,
     PaymentPage,
@@ -34,6 +35,7 @@ METHOD_AMBIGUOUS = _(
     "“%(said)s” matches several payment methods: %(names)s. Say which one."
 )
 PAYMENT_NOT_FOUND = _("That payment does not exist in this business.")
+METHOD_INACTIVE = _("That payment method is deactivated: pick an active one.")
 
 #: How many names an ambiguous reference lists.
 MAX_CANDIDATES = 5
@@ -84,6 +86,25 @@ def find_method(
     method = (found.select_for_update() if lock else found).first()
     if method is None:
         raise NotFound(str(METHOD_NOT_FOUND), code="payment.method_not_found")
+    return method
+
+
+def method_to_pay_from(data: MethodToPayFromIn, *, lock: bool = False) -> PaymentMethod:
+    """The active method a new payment leaves from; a missing or deactivated one is refused under the
+    field the caller used (the screen sends ``method_id``, the assistant may say ``method``)."""
+    field = "method_id" if data.method_id is not None else "method"
+    try:
+        method = find_method(data.method_id, data.method, lock=lock)
+    except NotFound as missing:
+        raise InvalidPayload(
+            missing.message, code=missing.code, fields={field: missing.message}
+        ) from None
+    if not method.is_active:
+        raise InvalidPayload(
+            str(METHOD_INACTIVE),
+            code="payment.method_inactive",
+            fields={field: str(METHOD_INACTIVE)},
+        )
     return method
 
 
@@ -357,3 +378,16 @@ def keeps_fiscal_documents() -> bool:
     """Whether this database holds its outgoing payments (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
     too, for what it asks is whether a database can go, and that cannot be undone."""
     return Payment.objects.exists()
+
+
+@operation(
+    "payment.payment.check",
+    kind="query",
+    permission="payment.add_payment",
+    input=MethodToPayFromIn,
+    output=MethodOut,
+    ai=INTERNAL,
+)
+def check_method_to_pay_from(ctx: OperationContext, data: MethodToPayFromIn) -> dict:
+    """The method a new payment leaves from, as recording the payment finds it, checked before the assistant's card."""
+    return method_row(method_to_pay_from(data))
