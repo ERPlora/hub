@@ -36,7 +36,7 @@ from apps.kitchen.tests.conftest import add_printers
 from apps.printing.models import PrintJob
 from apps.sale.tests.conftest import db_dsn
 from apps.verifactu.models import Record
-from base import relay
+from base import activation, relay
 from base.models.activation import AppActivation
 from base.models.relay import EventDelivery
 from base.services import relay_runs
@@ -684,8 +684,9 @@ def test_what_a_hub_recorded_before_its_address_changed_is_delivered_under_the_n
     type(hub_b).objects.filter(pk=hub_b.pk).update(slug=renamed.key)
     here = type(hub_b).objects.get(pk=hub_b.pk)
     with use_hub(here):
-        # Its apps on are kept under the address they were turned on at.
+        # Its apps are on under the new address alone: whoever asks for the former one finds none.
         AppActivation.objects.filter(host=B.key).update(host=renamed.key)
+    activation.forget(B.key)
     on_the_new_one = listen(renamed)
 
     worker_loop()

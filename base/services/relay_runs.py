@@ -114,7 +114,7 @@ def _of_the_hub_at_work(event: OutboxEvent) -> OutboxEvent:
     """``event`` in the scope its hub has now: an outbox holds its own hub's events alone, and that hub's address may
     have changed since ``event`` was recorded, when its reactions would run for a hub that is not there."""
     hub = current_hub()
-    if hub is not None and event.scope_kind == HUB_SCOPE_KIND:
+    if hub is not None:
         event.scope_key = hub.slug
     return event
 
