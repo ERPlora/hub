@@ -98,8 +98,8 @@ class TestTheSetting:
         with use_hub(hub_b):
             assert SupportAccess.objects.get().enabled is True
 
-    def test_a_business_keeps_one_row(self, olga):
-        SupportAccess.objects.create()
+    def test_a_business_keeps_one_row_that_comes_off(self, olga):
+        assert SupportAccess.objects.create().enabled is False
         with pytest.raises(IntegrityError), atomic():
             SupportAccess.objects.create()
 
