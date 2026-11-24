@@ -270,6 +270,8 @@ BASE_SCREENS = {
     "app": "apps",
     "api_key": "employees",
     "approval": "employees",
+    # This month's messages of the assistant, which «Usage and plan» shows.
+    "assistant": "system",
     "blueprint": "settings",
     "business": "settings",
     # The shared image library opens from the form of a product, a service or a menu: no screen of the platform.
