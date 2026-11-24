@@ -7,7 +7,7 @@ from uuid import UUID
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 
 from apps.sale.models import OrderLine
 from apps.sale.queries.business import actor, missing_tax
@@ -21,6 +21,10 @@ from base.sensitive import recording_costs
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
 )
+
+
+#: Words of a person that fit no product of the catalog, said back as they were said.
+NO_SUCH_PRODUCT = _("There is no product “%(said)s”. Say which one.")
 
 
 PRODUCT_SOLD_OUT = _("«%(name)s» is sold out.")
@@ -211,18 +215,26 @@ def _dish_allergens(product, chosen) -> list[str]:
     return in_order([*product.allergens, *picked])
 
 
+def catalog_product(ctx: OperationContext, data: ProductLineIn):
+    """The product a new line names, as Inventory finds it for ``ctx``: by its id, or by the words of whoever asks.
+    One named by an id is no longer in the catalog when it is gone; words that fit no product are a 422 on ``product``
+    that says them back, so whoever asked looks it up or says which one (several that fit: Inventory's own 409)."""
+    try:
+        return _product(ctx, {"id": data.product_id, "product": data.product})
+    except NotFound:
+        if data.product_id is None:
+            message = str(NO_SUCH_PRODUCT) % {"said": data.product}
+            raise InvalidPayload(message, code="invalid_field", fields={"product": message}) from None
+        raise Conflict(str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available") from None
+
+
 def freeze_product_line(
     ctx: OperationContext, data: ProductLineIn, units: dict | None = None
 ) -> OrderLine:
     """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
     new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
-    try:
-        # The line keeps the cost even when whoever sells does not see it (base.view_costs): it values the comps.
-        product = _product(recording_costs(ctx), {"id": data.product_id, "product": data.product})
-    except NotFound:
-        raise Conflict(
-            str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available"
-        ) from None
+    # The line keeps the cost even when whoever sells does not see it (base.view_costs): it values the comps.
+    product = catalog_product(recording_costs(ctx), data)
     if not product.is_active:
         raise Conflict(str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available")
     # Sold out («86», INVENTORY-F29) stops only a new line: what was ordered before is still charged.

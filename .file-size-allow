@@ -41,7 +41,7 @@
 732 apps/online_booking/queries.py ERPlora/erplora-next#74
 515 apps/online_booking/schemas.py ERPlora/erplora-next#74
 565 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
-615 apps/payment/services.py ERPlora/erplora-next#74
+612 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
 699 apps/pricing/schemas/__init__.py ERPlora/erplora-next#74
 1015 apps/pricing/services.py ERPlora/erplora-next#74

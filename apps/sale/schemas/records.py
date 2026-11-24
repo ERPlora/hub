@@ -1,8 +1,9 @@
-"""The record a write of Sales names by its id, for the assistant's card (``sale.record.get``)."""
+"""The record a write of Sales names, for the assistant's card: by its id (``sale.record.get``), and the product of a new
+line as the write finds it (``sale.order_line.check``)."""
 
 from uuid import UUID
 
-from ninja import Field
+from ninja import Field, Schema
 from pydantic import model_validator
 
 from apps.sale.schemas.fields import ONE_RECORD, Closed, Said
@@ -34,3 +35,10 @@ class RecordRefIn(Closed):
     @model_validator(mode="after")
     def _one(self):
         return exactly_one(self, ONE_RECORD)
+
+
+class LineProductOut(Schema):
+    """The product a new line names, found as the write that adds it finds it."""
+
+    id: UUID = Field(description="The product's id.")
+    name: str = Field(description="The product's name in the catalog.")

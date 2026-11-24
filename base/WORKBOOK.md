@@ -1415,7 +1415,8 @@ Pasos:
      está llegando a lo que incluye su plan: algunas cosas pueden pararse o ir lentas hasta que lo amplíes.», y «Ver el
      uso del plan» abre «Sistema» en «Uso y plan». Sin ellos, el aviso desaparece.
   10. Quien administra el negocio puede preguntar lo mismo al asistente («¿cuánto espacio me queda?», «¿cuántas
-      peticiones llevamos este mes?») y contesta con estas cifras.
+      peticiones llevamos este mes?») y contesta con estas cifras. Los mensajes del asistente del mes se los puede
+      preguntar cualquiera (BASE-F104).
 Entra: lo que se mide de este negocio: cada noche, lo que ocupan sus archivos y su base de datos y las personas que
 tuvieron actividad; durante el día, sus peticiones, sus conexiones y quién tiene actividad. Los topes del plan que
 erplora.com le pasa al hub, las apps que eligió, los mensajes del asistente que cuenta erplora.com y los de WhatsApp.
@@ -2878,11 +2879,14 @@ Pasos:
      mejorando de plan.
   6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para el
      propietario; el panel se abre igual.
+  7. Al preguntarle al asistente cuántos mensajes le quedan o cuántos lleva este mes («¿cuántos mensajes me quedan
+     este mes?»), contesta con las mismas cifras que «Uso y plan» (BASE-F40) y con el día en que se renuevan. Solo
+     las lee al preguntarlo; si no se pueden leer, lo dice, sin inventar un número.
 Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
 Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
 responder es lo que vale. Si el pase de «Mejorar plan» no llega, se abre la dirección de siempre, que pide entrar (BASE-F11).
-Implicados: BASE-F11, BASE-F106
+Implicados: BASE-F11, BASE-F40, BASE-F106
 
 ### BASE-F105 Informar de una respuesta mala
 Estado: hecho

@@ -24,6 +24,6 @@ Para qué: usar el asistente como lo usa el dueño: preguntar, pedir varias cosa
 9. BASE-F101 — varias cosas seguidas en un solo mensaje.
 10. BASE-F100 — la empleada pide algo que su rol no puede hacer.
 11. BASE-F102 — la conversación: qué se guarda y cuándo se borra.
-12. BASE-F104 — el plan del asistente y su límite de uso.
+12. BASE-F104 — el plan del asistente y su límite de uso; «¿cuántos mensajes me quedan este mes?», contra «Uso y plan».
 13. BASE-F105 — una respuesta mala, informada.
 14. BASE-F106 — sin conexión.
