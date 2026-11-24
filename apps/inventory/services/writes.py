@@ -63,5 +63,6 @@ def _product_payload(product: Product) -> dict:
         "tax_category_key": product.tax_category.key if product.tax_category else None,
         "is_active": product.is_active,
         "is_sold_out": product.is_sold_out,
+        "show_on_website": product.show_on_website,
         "track_stock": product.track_stock,
     }

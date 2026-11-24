@@ -175,6 +175,20 @@ def test_the_products_catalog_lists_what_is_on_sale_by_category(products_catalog
     }
 
 
+def test_a_product_the_business_hides_from_its_website_is_not_in_the_catalog(products_catalog):
+    from apps.inventory.models import Product, ProductCategory
+
+    hidden = Product.objects.create(name="Staff meal", sku="STAFF", price=500, show_on_website=False)
+    ProductCategory.objects.create(product=hidden, category=products_catalog["food"])
+
+    groups = read_catalog(ctx_for(None), CatalogSection(source="inventory"))["groups"]
+    assert {group["name"]: [item["name"] for item in group["items"]] for group in groups} == {
+        "Food": ["Bocata"],
+        "Drinks": ["Cola"],
+        "": ["Loose"],
+    }
+
+
 def test_a_category_filter_keeps_only_those_categories(products_catalog):
     section = CatalogSection(source="inventory", category_ids=[products_catalog["drinks"].id])
     assert [group["name"] for group in read_catalog(ctx_for(None), section)["groups"]] == ["Drinks"]

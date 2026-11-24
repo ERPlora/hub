@@ -46,27 +46,27 @@ async def price_list_get(request, params: Query[PriceListRefIn]):
 
 @bind(router, "pricing.price_list.create", "/pricing/price_lists", status=201)
 async def price_list_create(request, data: PriceListIn):
-    return await run_operation(request, services.create_price_list, data)
+    return await run_operation(request, services.price_lists.create_price_list, data)
 
 
 @bind(router, "pricing.price_list.update", "/pricing/price_lists/update")
 async def price_list_update(request, data: PriceListPatchIn):
-    return await run_operation(request, services.update_price_list, data)
+    return await run_operation(request, services.price_lists.update_price_list, data)
 
 
 @bind(router, "pricing.price_list.set_default", "/pricing/price_lists/set_default")
 async def price_list_set_default(request, data: PriceListDefaultIn):
-    return await run_operation(request, services.set_default_price_list, data)
+    return await run_operation(request, services.price_lists.set_default_price_list, data)
 
 
 @bind(router, "pricing.price_list.deactivate", "/pricing/price_lists/deactivate")
 async def price_list_deactivate(request, data: PriceListRefIn):
-    return await run_operation(request, services.deactivate_price_list, data)
+    return await run_operation(request, services.price_lists.deactivate_price_list, data)
 
 
 @bind(router, "pricing.price_list.activate", "/pricing/price_lists/activate")
 async def price_list_activate(request, data: PriceListRefIn):
-    return await run_operation(request, services.activate_price_list, data)
+    return await run_operation(request, services.price_lists.activate_price_list, data)
 
 
 # Prices
@@ -84,17 +84,17 @@ async def price_item_get(request, params: Query[PriceItemIdIn]):
 
 @bind(router, "pricing.price_item.add", "/pricing/price_items", status=201)
 async def price_item_add(request, data: PriceItemIn):
-    return await run_operation(request, services.add_price_item, data)
+    return await run_operation(request, services.prices.add_price_item, data)
 
 
 @bind(router, "pricing.price_item.update", "/pricing/price_items/update")
 async def price_item_update(request, data: PriceItemPatchIn):
-    return await run_operation(request, services.update_price_item, data)
+    return await run_operation(request, services.prices.update_price_item, data)
 
 
 @bind(router, "pricing.price_item.remove", "/pricing/price_items/remove")
 async def price_item_remove(request, data: PriceItemRefIn):
-    return await run_operation(request, services.remove_price_item, data)
+    return await run_operation(request, services.prices.remove_price_item, data)
 
 
 # Rules
@@ -112,22 +112,22 @@ async def rule_get(request, params: Query[RuleRefIn]):
 
 @bind(router, "pricing.rule.create", "/pricing/rules", status=201)
 async def rule_create(request, data: RuleIn):
-    return await run_operation(request, services.create_rule, data)
+    return await run_operation(request, services.rules.create_rule, data)
 
 
 @bind(router, "pricing.rule.update", "/pricing/rules/update")
 async def rule_update(request, data: RulePatchIn):
-    return await run_operation(request, services.update_rule, data)
+    return await run_operation(request, services.rules.update_rule, data)
 
 
 @bind(router, "pricing.rule.deactivate", "/pricing/rules/deactivate")
 async def rule_deactivate(request, data: RuleRefIn):
-    return await run_operation(request, services.deactivate_rule, data)
+    return await run_operation(request, services.rules.deactivate_rule, data)
 
 
 @bind(router, "pricing.rule.activate", "/pricing/rules/activate")
 async def rule_activate(request, data: RuleRefIn):
-    return await run_operation(request, services.activate_rule, data)
+    return await run_operation(request, services.rules.activate_rule, data)
 
 
 # The price of a line

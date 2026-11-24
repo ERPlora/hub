@@ -96,6 +96,7 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
         is_sold_out=True,
         image="catalog:drinks/coffee",
         allergens=["gluten", "milk"],
+        show_on_website=False,
     )
     ProductCategory.objects.create(product=coffee, category=drinks)
     ProductCategory.objects.create(product=coffee, category=gone)
@@ -125,6 +126,7 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
         "is_active": False,
         "image": "catalog:drinks/coffee",
         "allergens": ["gluten", "milk"],
+        "show_on_website": False,
     }
 
 
@@ -915,6 +917,13 @@ class TestProductsComeBack:
         copy = recoveries.copy_of(hub)
 
         assert self.the_cake_comes_back(recoveries, hub, ids, copy).allergens == ["gluten", "milk"]
+
+    def test_a_product_no_longer_held_comes_back_still_hidden_from_the_website(self, recoveries, every_app_on):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        run_in(hub, "inventory.product.update", id=ids["cake"], show_on_website=False)
+        copy = recoveries.copy_of(hub)
+
+        assert self.the_cake_comes_back(recoveries, hub, ids, copy).show_on_website is False
 
     def test_a_copy_from_before_allergens_still_gives_its_products_back_without_them(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)

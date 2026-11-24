@@ -779,6 +779,9 @@ msgstr "La caja está cerrada: abre una sesión de caja para cobrar en efectivo.
 msgid "This business has no app that adds anything to a charge, such as a tip: charge the sale alone."
 msgstr "Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la venta."
 
+msgid "You have no permission to add anything to a charge, such as a tip: charge the sale alone."
+msgstr "No tienes permiso para añadir nada al cobro, como una propina: cobra solo la venta."
+
 msgid "Invoicing is not active in this business: the sale is a ticket without a fiscal document."
 msgstr "Facturación no está activa en este negocio: la venta es un tique sin documento fiscal."
 

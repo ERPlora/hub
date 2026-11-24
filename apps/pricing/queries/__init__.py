@@ -1,4 +1,4 @@
-"""Read operations of the pricing app (``READ ONLY``), the lookups services.py shares, and the one
+"""Read operations of the pricing app (``READ ONLY``), the lookups services/ shares, and the one
 resolution of the price of a line (WORKBOOK PRICING-F13).
 """
 

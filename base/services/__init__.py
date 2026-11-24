@@ -2,6 +2,7 @@
 
 from . import (
     activation as activation,
+    address_change as address_change,
     api_keys as api_keys,
     approvals as approvals,
     apps as apps,

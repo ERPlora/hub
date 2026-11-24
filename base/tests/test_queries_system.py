@@ -14,6 +14,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from base.models.relay import EventDelivery
+from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.routes import assert_bound
 
@@ -31,8 +32,7 @@ def run(name, *permissions, scope=A, language="en", **data):
 
 
 def event(scope=A, name="sale.sale.completed", at=None, taken=True):
-    """An event in the outbox of the business at work; one with another business's scope stands for a row no query of
-    this business may show."""
+    """An event in the outbox of the business at work."""
     at = at or timezone.now()
     return OutboxEvent.objects.create(
         scope_kind=scope.kind,
@@ -93,7 +93,7 @@ def test_the_status_carries_no_error_text(settings):
 # ── base.event.list: the log of events between apps ─────────────────────────────────────────────────────────
 
 
-def test_the_log_is_this_hubs_newest_first_with_a_level_and_what_happened():
+def test_the_log_is_this_hubs_newest_first_with_a_level_and_what_happened(hub_b):
     now = timezone.now()
     delivered = event(at=now - dt.timedelta(minutes=5))
     delivery(delivered, status=EventDelivery.Status.DELIVERED, attempts=1, error="")
@@ -103,7 +103,8 @@ def test_the_log_is_this_hubs_newest_first_with_a_level_and_what_happened():
     delivery(dead)
     event(name="customer.customer.created", at=now - dt.timedelta(minutes=2))  # nobody listens
     event(at=now - dt.timedelta(minutes=1), taken=False)  # not handed over yet
-    event(B, at=now)  # another hub's
+    with use_hub(hub_b):
+        event(B, at=now)  # another hub's
 
     entries = run("base.event.list", ADMIN)["entries"]
 
@@ -164,14 +165,15 @@ def test_an_event_of_an_app_that_is_gone_keeps_its_label():
 # ── base.failed_event.list: what the relay gave up on ──────────────────────────────────────────────────────
 
 
-def test_the_failed_events_of_this_hub_newest_first_with_what_failed():
+def test_the_failed_events_of_this_hub_newest_first_with_what_failed(hub_b):
     now = timezone.now()
     older = delivery(event(at=now - dt.timedelta(hours=2)), error="Conflict: Set up the issuer first.")
     newer = delivery(event(name="kitchen.round.fired", at=now - dt.timedelta(hours=1)), app="printing", attempts=3)
     delivery(event(at=now), status=EventDelivery.Status.PENDING)  # still retrying: not failed yet
     delivery(event(at=now), status=EventDelivery.Status.DELIVERED)
     delivery(event(at=now), status=EventDelivery.Status.DISCARDED)
-    delivery(event(B, at=now))  # another hub's
+    with use_hub(hub_b):
+        delivery(event(B, at=now))  # another hub's
 
     page = run("base.failed_event.list", ADMIN)
 
@@ -193,12 +195,14 @@ def test_the_failed_events_of_this_hub_newest_first_with_what_failed():
     }
 
 
-def test_one_failed_event_is_read_by_its_id_as_the_list_shows_it_and_only_this_hubs():
+def test_one_failed_event_is_read_by_its_id_as_the_list_shows_it_and_only_this_hubs(hub_b):
     """``base.failed_event.detail``, what names a failed event on the assistant's card: this hub's and still failed;
     another hub's or one resent meanwhile is not there."""
     mine = delivery(event())
     assert run("base.failed_event.detail", ADMIN, id=str(mine.id)) == run("base.failed_event.list", ADMIN)["items"][0]
-    for other in (delivery(event(B)), delivery(event(), status=EventDelivery.Status.PENDING)):
+    with use_hub(hub_b):
+        theirs = delivery(event(B))
+    for other in (theirs, delivery(event(), status=EventDelivery.Status.PENDING)):
         with pytest.raises(NotFound):
             run("base.failed_event.detail", ADMIN, id=str(other.id))
 
