@@ -11,6 +11,7 @@ from live.operations import get
 from base.models import Membership
 from base.models.blueprints import ImportBatch
 from base.tenancy.tests.business import HUB_DB, in_business_a
+from base.tests.assistant_context import asked, turn
 from base.tests.test_services_data import a_file, person
 
 __all__ = ["in_business_a"]
@@ -32,17 +33,6 @@ def attaching(data: str) -> dict:
 
 def load_call() -> dict:
     return {"call_id": "c1", "name": shared.tool_name("base.blueprint.import"), "arguments": json.dumps({"file_base64": NAME})}
-
-
-def asked(call: dict) -> dict:
-    function = {"name": call["name"], "arguments": call["arguments"]}
-    return {"role": "assistant", "content": "", "tool_calls": [{"id": call["call_id"], "type": "function", "function": function}]}
-
-
-def turn(ctx, messages, pending, decision=None):
-    op = get("base.assistant.turn")
-    data = op.input.model_validate({"messages": messages, "pending": pending, "decision": decision})
-    return op(ctx, data).model_dump(mode="json")
 
 
 def test_the_copy_goes_to_the_gateway_by_its_name_only(owner):

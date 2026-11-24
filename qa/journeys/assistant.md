@@ -18,7 +18,7 @@ Para qué: usar el asistente como lo usa el dueño: preguntar, pedir varias cosa
 2. BASE-F93 — «¿cuánto vendimos ayer?» y «¿qué se ha hecho hoy?», con las horas de la pantalla de Actividad.
 3. BASE-F95 — una respuesta con lista, tabla y enlaces.
 4. BASE-F96 — de la respuesta a la pantalla de Ventas.
-5. BASE-F94 — una foto adjunta y una pregunta dictada por voz.
+5. BASE-F94 — una foto y un PDF del proveedor, guardados en la carpeta «Facturas de proveedores»; y una pregunta dictada por voz.
 6. BASE-F97 — una acción que pide confirmación antes de hacerse.
 7. BASE-F98 — una acción peligrosa.
 8. BASE-F99 — lo que dice que hizo, contra lo que de verdad hizo.
