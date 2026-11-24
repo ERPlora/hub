@@ -197,6 +197,9 @@ msgstr "forma de pago"
 msgid "concept"
 msgstr "concepto"
 
+msgid "recorded by app"
+msgstr "apuntado por la app"
+
 msgid "sale"
 msgstr "venta"
 
@@ -378,6 +381,27 @@ msgstr "Invitaciones"
 msgctxt "cash report"
 msgid "Expected"
 msgstr "Esperado"
+
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s in cash"
+msgstr "%(app)s en efectivo"
+
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s by card"
+msgstr "%(app)s con tarjeta"
+
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s with other payment methods"
+msgstr "%(app)s con otras formas de pago"
+
+#. Translators: %(app)s is the name of the app that records these lines in the drawer: Tips («Propinas pagadas»).
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s paid out"
+msgstr "%(app)s pagadas"
 
 msgid "View sessions, settings, drawers and currency"
 msgstr "Ver las sesiones, los ajustes, los cajones y la moneda"
