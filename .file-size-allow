@@ -13,15 +13,13 @@
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 758 apps/cart_checkout/services.py ERPlora/erplora-next#74
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
-622 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
+619 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
 742 apps/cash_register/services.py ERPlora/erplora-next#74
 301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
 1047 apps/combo/queries/__init__.py ERPlora/erplora-next#74
 897 apps/combo/services/__init__.py ERPlora/erplora-next#74
 542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
-1064 apps/customer/queries/__init__.py ERPlora/erplora-next#74
-1082 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
 2641 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74

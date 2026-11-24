@@ -29,7 +29,7 @@ from apps.appointment.queries.business import now
 from apps.appointment.schemas import AppointmentCreateIn, CancelIn as AppointmentCancelIn, SettingsIn as RulesIn
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
-from apps.customer.queries import business_country
+from apps.customer.queries.reads import business_country
 from apps.customer.schemas.cards import CustomerIn
 from apps.customer.search import normalize
 from apps.online_booking.events import BOOKING_CREATED, SETTINGS_UPDATED

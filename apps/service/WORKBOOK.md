@@ -1231,7 +1231,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `ServiceSettings.default_tax_category` son claves ajenas a `tax.TaxCategory`;
   `Assignment.member` y `Redemption.member` (la profesional que hizo una sesión gastada fuera del cobro, F21;
   `PROTECT`: una ficha no se borra, se da de baja), a `staff.Member`; `Grant.customer`, a `customer.Customer`. Los nombres se
-  resuelven con `apps.staff.queries.resolve_member` y `apps.customer.queries.find_customer`. La venta
+  resuelven con `apps.staff.queries.resolve_member` y `apps.customer.queries.reads.find_customer`. La venta
   y la cita de una sesión o de una compra son identificadores opacos (`sale_id`, `appointment_id`),
   sin clave ajena: Ventas y Citas no son requisito (como `sale` guarda `staff_id`).
 - Modelos: `ServiceSettings` (una fila, restricción `service_settings_singleton`), `Category`,

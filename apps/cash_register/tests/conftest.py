@@ -121,6 +121,15 @@ def refund(sale, amount: int, *, payment: int = 0, to_method_id=None):
     )
 
 
+@pytest.fixture
+def till(db):
+    """The business's receipt printer, made by Printing."""
+    return run(
+        "printing.printer.create",
+        {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"},
+    )
+
+
 def open_session(opening_balance: int = 10000, **more):
     return run(
         "cash_register.session.open", {"opening_balance": opening_balance, **more}
