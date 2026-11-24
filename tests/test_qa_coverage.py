@@ -15,6 +15,7 @@ from django.core.management.base import CommandError
 
 from base import qa_coverage
 from base.catalog import known_verticals
+from base.qa_coverage import Walk
 
 REPO = Path(__file__).resolve().parent.parent
 VERTICALS = ("hair_salon", "restaurant")
@@ -110,7 +111,8 @@ Para qué: comprobar el recorrido de ejemplo.
 3. SAMPLE-F05 — «Mesa 1» sale en la lista.
 """
 
-LEDGER_HEADER = "flow,date,device,app_version,result,issue\n"
+LEDGER_HEADER = "flow,date,device,app_version,result,issue,channel,phrase,model_result\n"
+OLD_LEDGER_HEADER = "flow,date,device,app_version,result,issue\n"
 COUNTS = re.compile(r"^(\w+): (\d+) in a journey, (\d+) in none, (\d+) out of visual scope$")
 
 
@@ -127,6 +129,18 @@ def tree(tmp_path):
     journeys.mkdir(parents=True)
     (journeys / "sample-day.md").write_text(JOURNEY, encoding="utf-8")
     return tmp_path
+
+
+@pytest.fixture
+def ledger(tmp_path):
+    return tmp_path / "walks.csv"
+
+
+def report_of(**options):
+    """The lines ``manage.py qa_coverage`` writes."""
+    out = io.StringIO()
+    call_command("qa_coverage", stdout=out, **options)
+    return out.getvalue().splitlines()
 
 
 def journey_from(tmp_path, text):
@@ -278,59 +292,115 @@ class TestTheCoverage:
 
 
 class TestTheLedger:
-    def test_the_last_walk_of_each_flow_is_its_latest_date(self, tmp_path):
-        ledger = tmp_path / "walks.csv"
+    def test_the_last_walk_of_each_flow_on_each_channel_is_its_latest_date(self, ledger):
         ledger.write_text(
             LEDGER_HEADER
-            + "SAMPLE-F01,2026-11-02,tablet,1.4.0,ok,\n"
-            + "SAMPLE-F01,2026-11-20,phone,1.5.0,fail,ERPlora/hub#1\n"
-            + "SAMPLE-F01,2026-11-10,desktop,1.4.2,ok,\n"
-            + "SAMPLE-F02,2026-11-03,tablet,1.4.0,ok,\n",
+            + "SAMPLE-F01,2026-11-02,tablet,1.4.0,ok,,screen,,\n"
+            + "SAMPLE-F01,2026-11-20,phone,1.5.0,fail,ERPlora/hub#1,screen,,\n"
+            + "SAMPLE-F01,2026-11-10,desktop,1.4.2,ok,,screen,,\n"
+            + "SAMPLE-F01,2026-11-22,tablet,1.6.0,ok,,assistant-es,whole,partial\n"
+            + "SAMPLE-F01,2026-11-21,tablet,1.5.0,partial,ERPlora/hub#2,assistant-es,partial,ok\n"
+            + "SAMPLE-F01,2026-11-05,tablet,1.4.0,fail,,assistant-en,partial,fail\n"
+            + "SAMPLE-F02,2026-11-03,tablet,1.4.0,ok,,assistant-en,whole,ok\n",
             encoding="utf-8",
         )
         walks = qa_coverage.last_walks(ledger)
-        assert walks["SAMPLE-F01"] == qa_coverage.Walk("2026-11-20", "phone", "1.5.0", "fail", "ERPlora/hub#1")
-        assert walks["SAMPLE-F02"].date == "2026-11-03"
+        assert walks["SAMPLE-F01"] == {
+            "screen": Walk("2026-11-20", "phone", "1.5.0", "fail", "ERPlora/hub#1", "screen", "", ""),
+            "assistant-es": Walk("2026-11-22", "tablet", "1.6.0", "ok", "", "assistant-es", "whole", "partial"),
+            "assistant-en": Walk("2026-11-05", "tablet", "1.4.0", "fail", "", "assistant-en", "partial", "fail"),
+        }
+        assert set(walks["SAMPLE-F02"]) == {"assistant-en"}
         assert "SAMPLE-F08" not in walks
 
-    def test_a_ledger_without_a_column_is_refused_naming_it(self, tmp_path):
-        ledger = tmp_path / "walks.csv"
-        ledger.write_text("flow,date,device,result\nSAMPLE-F01,2026-11-02,tablet,ok\n", encoding="utf-8")
-        with pytest.raises(qa_coverage.LedgerError, match="app_version, issue"):
+    def test_of_two_walks_on_the_same_date_the_last_one_is_the_one_written_later(self, ledger):
+        ledger.write_text(
+            LEDGER_HEADER
+            + "SAMPLE-F01,2026-11-20,tablet,1.5.0,fail,ERPlora/hub#1,screen,,\n"
+            + "SAMPLE-F01,2026-11-20,tablet,1.5.1,ok,,screen,,\n",
+            encoding="utf-8",
+        )
+        assert qa_coverage.last_walks(ledger)["SAMPLE-F01"]["screen"].app_version == "1.5.1"
+
+    @pytest.mark.parametrize(
+        ("header", "missing"),
+        [
+            ("flow,date,device,result,channel,phrase,model_result\n", "no column app_version, issue$"),
+            (OLD_LEDGER_HEADER, "no column channel, phrase, model_result$"),
+        ],
+        ids=["two-columns-short", "without-the-channel"],
+    )
+    def test_a_ledger_without_a_column_is_refused_naming_it(self, ledger, header, missing):
+        ledger.write_text(header, encoding="utf-8")
+        with pytest.raises(qa_coverage.LedgerError, match=missing):
             qa_coverage.last_walks(ledger)
 
-    def test_a_date_that_is_not_iso_is_refused_naming_its_line(self, tmp_path):
-        ledger = tmp_path / "walks.csv"
-        ledger.write_text(LEDGER_HEADER + "SAMPLE-F01,20/11/2026,tablet,1.4.0,ok,\n", encoding="utf-8")
-        with pytest.raises(qa_coverage.LedgerError, match="line 2"):
+    def test_a_date_that_is_not_iso_is_refused_naming_its_line(self, ledger):
+        ledger.write_text(LEDGER_HEADER + "SAMPLE-F01,20/11/2026,tablet,1.4.0,ok,,screen,,\n", encoding="utf-8")
+        with pytest.raises(qa_coverage.LedgerError, match=r"line 2: '20/11/2026'"):
+            qa_coverage.last_walks(ledger)
+
+    @pytest.mark.parametrize(
+        ("row", "channel"),
+        [
+            ("SAMPLE-F01,2026-11-20,tablet,1.4.0,ok,,assistant,,", "'assistant'"),
+            ("SAMPLE-F01,2026-11-20,tablet,1.4.0,ok,,,,", "''"),
+            ("SAMPLE-F01,2026-11-20,tablet,1.4.0,ok,", "''"),
+        ],
+        ids=["another-channel", "empty", "row-of-six-columns"],
+    )
+    def test_a_channel_that_is_none_of_the_three_is_refused_naming_its_line(self, ledger, row, channel):
+        walked = "SAMPLE-F01,2026-11-20,tablet,1.4.0,ok,,screen,,\n"
+        ledger.write_text(LEDGER_HEADER + walked + row + "\n", encoding="utf-8")
+        with pytest.raises(qa_coverage.LedgerError, match=rf"line 3: {channel} .*screen, assistant-es, assistant-en"):
             qa_coverage.last_walks(ledger)
 
 
 class TestTheCommand:
     def test_it_reports_each_app_and_totals_that_add_them_up(self, repo_flows):
-        out = io.StringIO()
-        call_command("qa_coverage", stdout=out)
-        lines = out.getvalue().splitlines()
+        lines = report_of()
         counts = {match[1]: tuple(map(int, match.groups()[1:])) for line in lines if (match := COUNTS.match(line))}
         assert set(counts) == {flow.app for flow in repo_flows.values()} | {"total"}
         assert counts.pop("total") == tuple(map(sum, zip(*counts.values(), strict=True)))
         assert lines[-1].startswith("total: ")
 
-    def test_with_a_ledger_it_says_when_each_walkable_flow_was_last_walked(self, tmp_path):
-        ledger = tmp_path / "walks.csv"
+    def test_with_a_ledger_it_gives_the_last_walk_of_each_walkable_flow_by_channel(self, tree, ledger, settings):
+        settings.BASE_DIR = tree
         ledger.write_text(
-            LEDGER_HEADER + "SALE-F01,2026-11-20,tablet,1.5.0,ok,\nNOPE-F01,2026-11-20,tablet,1.5.0,ok,\n",
+            LEDGER_HEADER
+            + "BASE-F01,2026-11-21,tablet,1.5.0,ok,,screen,,\n"
+            + "SAMPLE-F01,2026-11-20,phone,1.5.0,fail,ERPlora/hub#1,screen,,\n"
+            + "SAMPLE-F01,2026-11-23,tablet,1.6.0,ok,,assistant-es,partial,fail\n"
+            + "SAMPLE-F01,2026-11-19,tablet,1.4.0,partial,ERPlora/hub#2,assistant-en,whole,ok\n"
+            + "SAMPLE-F08,2026-11-22,tablet,1.6.0,ok,,assistant-en,,\n"
+            + "SAMPLE-F02,2026-11-20,tablet,1.5.0,ok,,assistant-es,whole,ok\n"
+            + "SAMPLE-F05,2026-11-22,tablet,1.6.0,ok,,screen,,\n"
+            + "HUB_APP-F02,2026-11-22,tablet,1.6.0,ok,,screen,,\n",
             encoding="utf-8",
         )
-        out = io.StringIO()
-        call_command("qa_coverage", ledger=str(ledger), stdout=out)
-        text = out.getvalue()
-        assert "SALE-F01 2026-11-20 ok tablet 1.5.0" in text
-        assert "SALE-F02 never" in text
-        assert "the ledger names flows no WORKBOOK has: NOPE-F01" in text
+        lines = report_of(ledger=str(ledger))
+        walks = lines[lines.index("last walks, screen: 2 walked, 2 never") : -1]
+        assert walks == [
+            "last walks, screen: 2 walked, 2 never",
+            "  SAMPLE-F02 never",
+            "  SAMPLE-F08 never",
+            "  SAMPLE-F01 screen 2026-11-20 fail phone 1.5.0 ERPlora/hub#1",
+            "  BASE-F01 screen 2026-11-21 ok tablet 1.5.0",
+            "last walks, assistant: 3 walked, 1 never",
+            "  BASE-F01 never",
+            "  SAMPLE-F01 assistant-en 2026-11-19 partial model:ok phrase:whole tablet 1.4.0 ERPlora/hub#2",
+            "  SAMPLE-F02 assistant-es 2026-11-20 ok model:ok phrase:whole tablet 1.5.0",
+            "  SAMPLE-F08 assistant-en 2026-11-22 ok tablet 1.6.0",
+            "  SAMPLE-F01 assistant-es 2026-11-23 ok model:fail phrase:partial tablet 1.6.0",
+            "  the ledger names flows in no WORKBOOK of the Hub: HUB_APP-F02",
+        ]
+        assert lines[-1].startswith("total: ")
 
-    def test_a_ledger_it_cannot_read_stops_it_with_the_reason(self, tmp_path):
-        ledger = tmp_path / "walks.csv"
+    def test_without_a_ledger_it_says_nothing_about_walks(self, tree, settings):
+        settings.BASE_DIR = tree
+        assert "last walks" not in "\n".join(report_of())
+
+    def test_a_ledger_it_cannot_read_stops_it_with_the_reason(self, ledger):
         ledger.write_text("flow,date\nSALE-F01,2026-11-20\n", encoding="utf-8")
         with pytest.raises(CommandError, match="device"):
             call_command("qa_coverage", ledger=str(ledger), stdout=io.StringIO())
