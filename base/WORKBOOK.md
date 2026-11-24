@@ -1011,12 +1011,12 @@ Pasos:
      cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y antes del
-     sí nombra las que necesita y están desactivadas, como el aviso del paso 2: «Activar en Apps: Reservas · Reservas
-     necesita Horarios y Mesas: se activan con ella.». Si ya estaba activada el asistente lo dice («Clientes ya estaba
-     activada») en vez de «activada».
+     sí nombra las que necesita y están desactivadas, como el aviso del paso 2: «Activar en Apps: Reservas · Otras
+     apps: Reservas necesita Horarios y Mesas: se activan con ella.». Si ya estaba activada el asistente lo dice
+     («Clientes ya estaba activada») en vez de «activada».
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
-     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
-     España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
+     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · Una vez activada: VeriFactu es obligatoria para
+     los negocios de España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
