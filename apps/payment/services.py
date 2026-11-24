@@ -22,12 +22,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.payment import events
-from apps.payment.models import (
-    ACTOR_MAX_LENGTH,
-    Payment,
-    PaymentCounter,
-    PaymentMethod,
-)
+from apps.payment.models import ACTOR_MAX_LENGTH, Payment, PaymentCounter, PaymentMethod
 from apps.payment.queries import (
     find_method,
     find_payment,
@@ -45,6 +40,7 @@ from apps.payment.schemas import (
     PaymentRefIn,
 )
 from base import operations as platform
+from base.assistant import card_order
 from base.business import business_zone
 from base.queries.people import actor_name
 
@@ -368,6 +364,7 @@ def _recorded(data: PaymentIn, currency: str) -> dict | None:
         "day, the amount in minor units (12,50 € = 1250), the beneficiary and optionally the concept, IBAN, "
         "supplier's invoice and currency. It moves no money. Never use it to charge a customer.",
         "risk": "normal",
+        "summary": card_order.said_first("beneficiary_name", "supplier_invoice_ref", "amount"),
     },
 )
 def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
