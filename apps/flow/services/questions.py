@@ -21,7 +21,7 @@ from apps.flow.queries.questions import (
     proposal_held,
 )
 from apps.flow.queries.reads import ANSWER, SYSTEM, TURN
-from apps.flow.queries.reasons import action_label
+from apps.flow.phrasing import action_label
 from apps.flow.schemas.fields import DueIn, DueOut
 from apps.flow.schemas.questions import AnsweredOut, AnswerIn
 
