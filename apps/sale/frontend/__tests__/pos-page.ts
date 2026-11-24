@@ -1,11 +1,16 @@
 // Test helper of Sell: the page mounted with the till settings read, a product added from the catalogue, and the
-// checks and the customer its tests share. The pieces they mount in place of others are in `pos-page-stubs.ts`.
+// checks and the customer its tests share. Every test file that imports it mounts the page with the checkout sheet,
+// the document window and Customers' search replaced by the pieces of `pos-page-stubs.ts`.
 import { afterEach, beforeEach, vi } from 'vitest';
 
 import PosCatalog from '../components/pos/PosCatalog.vue';
 import { line, memoryStorage, order, product, settings } from '../components/pos/__tests__/fixtures';
 import PosPage from '../pages/PosPage.vue';
 import { MANAGER, mountSale, settle } from './mount-sale';
+
+vi.mock('../components/checkout/CheckoutSheet.vue', async () => (await import('./pos-page-stubs')).CHECKOUT_SHEET);
+vi.mock('../components/document/DocumentModal.vue', async () => (await import('./pos-page-stubs')).DOCUMENT_MODAL);
+vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => (await import('./pos-page-stubs')).CUSTOMER_SEARCH);
 
 /** Every test starts on a device that keeps nothing, and the globals a test stubs go with it. */
 export function freshEachTest(): void {

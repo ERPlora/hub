@@ -6,11 +6,6 @@ import { click, settle } from '../__tests__/mount-sale';
 import { freshEachTest, setup, TWO } from '../__tests__/pos-page';
 import { preview } from '../components/pos/__tests__/fixtures';
 
-// The checkout sheet, the document window and Customers' search, by their contracts.
-vi.mock('../components/checkout/CheckoutSheet.vue', async () => (await import('../__tests__/pos-page-stubs')).CHECKOUT_SHEET);
-vi.mock('../components/document/DocumentModal.vue', async () => (await import('../__tests__/pos-page-stubs')).DOCUMENT_MODAL);
-vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => (await import('../__tests__/pos-page-stubs')).CUSTOMER_SEARCH);
-
 freshEachTest();
 
 /** The window is as narrow as a phone's. */

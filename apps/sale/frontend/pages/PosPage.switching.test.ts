@@ -10,11 +10,6 @@ import PosCart from '../components/pos/PosCart.vue';
 import { line, order, settings } from '../components/pos/__tests__/fixtures';
 import { CURRENT_CHECK_KEY } from '../composables/pos/useCurrentCheck';
 
-// The checkout sheet, the document window and Customers' search, by their contracts.
-vi.mock('../components/checkout/CheckoutSheet.vue', async () => (await import('../__tests__/pos-page-stubs')).CHECKOUT_SHEET);
-vi.mock('../components/document/DocumentModal.vue', async () => (await import('../__tests__/pos-page-stubs')).DOCUMENT_MODAL);
-vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => (await import('../__tests__/pos-page-stubs')).CUSTOMER_SEARCH);
-
 freshEachTest();
 
 describe('PosPage: parking and switching', () => {

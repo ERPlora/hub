@@ -1,8 +1,6 @@
 // What the tests of Sell mount in place of the checkout sheet, the document window and Customers' search, by their
-// contracts. `vi.mock` is hoisted above a test's imports, so its factory reaches this module through a dynamic import,
-// and this module imports nothing that imports those pieces:
-//
-//   vi.mock('../components/checkout/CheckoutSheet.vue', async () => (await import('../__tests__/pos-page-stubs')).CHECKOUT_SHEET);
+// contracts. The `vi.mock` calls of `pos-page.ts` are hoisted above its imports, so their factories reach this module
+// through a dynamic import; it imports nothing that imports those pieces, which would make a factory wait for itself.
 import { h } from 'vue';
 
 export const CHECKOUT_SHEET = {
