@@ -3,11 +3,11 @@
 Asked for what an app that is off does, the model was offered none of its tools and was never told the app existed: to
 «quiero gestionar reservas» it answered it could not; asked for the salon's opening hours with Schedules off, it read
 the staff's working hours; asked to start the online booking page with Online booking off, it turned off the automatic
-confirmation of Appointments and said the page was running. A turn now ranks the person's words, and the model's
-searches, against the tools the person would have with every app on: each app not on with a tool among the places a
-turn gives is named in the instructions with its state and what it is for, as ``base.app.get`` reads it, and whoever may
-turn apps on is offered ``base.app.enable``, whose card asks before it does. The app's own tools stay out of the turn
-until it is on (``base.assistant.tools.catalog``), and every tool the turn offered keeps its place.
+confirmation of Appointments and said the page was running. Now an app not on whose name the person's words say, or the
+model's searches, is named in the instructions with its state and what it is for, as ``base.app.get`` reads it, when it
+has a tool among the places a turn gives with every app on; whoever may turn apps on is offered ``base.app.enable``,
+whose card asks before it does. What the apps on already do names nothing and adds no tool. The app's own tools stay
+out of the turn until it is on (``base.assistant.tools.catalog``), and every tool the turn offered keeps its place.
 """
 
 import dataclasses
@@ -57,6 +57,41 @@ REPORTED = [
     ("es", ONLINE, WITH_APPOINTMENTS, "online_booking"),
 ]
 IDS = ["reservas", "cita", "reservations", "appointment", "hours", "online-booking"]
+#: A restaurant with what it uses every day on, and Reservations, Appointments, Price Lists and the rest off.
+RESTAURANT = {
+    label: "on"
+    for label in ("sale", "table", "kitchen", "inventory", "cash_register", "payment", "invoice", "verifactu",
+                  "customer", "tax", "printing", "modifier", "staff", "schedule")
+}
+#: What a business asks every day of the apps it has on: no app off is named nor any switch offered. The prices are of
+#: Services or of the products («precio» is a word of Price Lists too, which stays off).
+DAILY = [
+    *((SALON, said) for said in (
+        "gracias", "hola", "¿cuántos servicios tengo?", "crea el servicio Corte de pelo a 15 €",
+        "da de alta a la clienta Ana López", "¿qué empleados tengo?", "¿cómo se llama mi negocio?",
+        "añade a Marta como empleada", "¿qué IVA tienen mis servicios?", "sube el precio del tinte a 40 €",
+        "borra el servicio Peinado", "cambia el precio del corte a 18 €", "¿qué clientas tengo?",
+        "pon a Laura en el servicio de mechas", "apúntale el teléfono 600123123 a Ana",
+    )),
+    *((RESTAURANT, said) for said in (
+        "¿cuánto vendí hoy?", "abre la mesa 4", "añade dos cafés a la mesa 2", "sube un 5 % las bebidas",
+        "da de alta la tónica a 2,50 €", "cambia el precio del café a 1,50 €", "¿qué mesas están libres?",
+        "¿a qué hora abrimos el sábado?", "¿qué camareros tengo?", "pon la hamburguesa agotada",
+    )),
+]
+#: How the instructions say the apps named, and what the model does with them, to whoever may turn apps on and to
+#: anyone else.
+HEADER = "Apps not on whose tools would do what was asked (their tools are yours only once the app is on):"
+DOES_IT = (
+    "If one of them does it and none of your tools does, say that app does it and its state, and never try it with "
+    "another tool."
+)
+TURN_ON = (
+    " Off: offer to turn it on with `base__app__enable`, whose card asks the person, then go on with what they asked."
+    " Blocked: a paid app the business has no right to, bought on erplora.com. Creating: on in a moment. Failed: it is"
+    " tried again in Apps."
+)
+ASK_WHO_RUNS_IT = " Whoever runs the business turns it on in Apps."
 
 
 def read_app(context, app: str) -> dict:
@@ -77,6 +112,12 @@ def said_off(context, label: str) -> str:
     """How the instructions name an app that is not on: its name, its state and what it is for."""
     app = read_app(context, label)
     return f"- «{app['name']}» ({app['state']}): {app['summary']}"
+
+
+def ranked_for(context, said: str) -> list[str]:
+    """The tools a turn offers ``context`` for ``said`` by relevance alone, with the search last."""
+    tools = assistant.tools.catalog(context)
+    return [shared.tool_name(op.name) for op in assistant.relevance.relevant(tools, [said], context.language)]
 
 
 def person(make_user, role: str, language: str = "es") -> OperationContext:
@@ -122,27 +163,60 @@ def test_with_the_app_on_nothing_is_said_of_it_and_its_tools_are_offered_or_foun
     assert_offered_or_found(tools, first, said, tasks[app], language)
 
 
-def test_once_the_yes_turns_the_app_on_the_same_request_has_its_tools(make_user):
-    """The card of ``base.app.enable`` answered, the round that follows offers the app's tools for what was asked, not
-    only the next message: the model goes on with it."""
-    set_rows(**SALON)
-    context = owner_of_a(make_user, "es")
-    said = user("quiero gestionar reservas")
-    enable = call(ENABLE, {"app": "reservation"})
+def said_yes(context, said: str, write: str, app: str) -> dict:
+    """The round after the person's yes to the card of ``write`` on ``app``, asked for in reply to ``said``."""
+    switch = call(write, {"app": app})
     op = get("base.assistant.turn")
 
     def answer(pending, decision=None):
-        given = op.input(messages=[said, asked(enable)], pending=pending, decision=decision)
+        given = op.input(messages=[user(said), asked(switch)], pending=pending, decision=decision)
         return op(context, given).model_dump(mode="json")
 
-    drawn = answer([enable])
+    drawn = answer([switch])
     assert drawn["confirm"] is not None
-    yes = {"call_id": enable["call_id"], "accepted": True, "typed": "CONFIRMAR"}
-    plan = answer(drawn["pending"], yes)
+    plan = answer(drawn["pending"], {"call_id": switch["call_id"], "accepted": True, "typed": "CONFIRMAR"})
     assert plan["executed"][0]["outcome"] == "ok"
+    return plan
+
+
+def test_once_the_yes_turns_the_app_on_the_same_request_has_its_tools(make_user):
+    """The card of ``base.app.enable`` answered, the round that follows offers the app's tools for what was asked, not
+    only the next message: the model goes on with it, and is told of no app off."""
+    set_rows(**SALON)
+    plan = said_yes(owner_of_a(make_user, "es"), "quiero gestionar reservas", ENABLE, "reservation")
     assert json.loads(plan["append"][0]["content"])["state"] == "on"
     assert of_app(offered(plan), "reservation") != []
-    assert "«Reservas» (" not in plan["instructions"]
+    assert HEADER not in plan["instructions"]
+
+
+def test_once_the_yes_turns_the_app_off_the_round_that_follows_offers_none_of_its_tools(make_user):
+    """What the person just turned off is no app to offer back, and its tools run no more."""
+    set_rows(**{label: "on" for label in activation.module_graph()})
+    context = owner_of_a(make_user, "es")
+    said = "quita Citas del menú"
+    assert of_app(offered(turn(context, user(said))), "appointment") != []  # positive control: on, they are offered
+    plan = said_yes(context, said, "base.app.disable", "appointment")
+    assert json.loads(plan["append"][0]["content"])["state"] == "off"
+    assert of_app(offered(plan), "appointment") == []
+    assert HEADER not in plan["instructions"]
+
+
+def test_once_the_yes_tries_a_failed_app_again_the_round_that_follows_reads_it_anew(make_user):
+    set_rows(**{label: "on" for label in activation.module_graph()})
+    AppActivation.objects.filter(host=A.key, app="appointment").update(state=activation.FAILED)
+    activation.forget(A.key)
+    context = owner_of_a(make_user, "es")
+    plan = said_yes(context, "la app de citas no se pudo activar, inténtalo otra vez", "base.app.retry", "appointment")
+    state = json.loads(plan["append"][0]["content"])["state"]
+    assert (state, of_app(offered(plan), "appointment") != []) in {("on", True), ("creating", False)}
+    assert HEADER not in plan["instructions"]
+
+
+def test_who_runs_the_business_is_told_the_app_and_what_to_do_with_it(make_user):
+    set_rows(**SALON)
+    context = owner_of_a(make_user, "es")
+    told = "\n".join([HEADER, said_off(context, "appointment"), DOES_IT + TURN_ON])
+    assert told in turn(context, user("apunta una cita"))["instructions"]
 
 
 @pytest.mark.parametrize("role", [Membership.Role.MANAGER, Membership.Role.EMPLOYEE])
@@ -151,7 +225,7 @@ def test_whoever_may_not_turn_apps_on_is_told_the_app_and_offered_no_switch(make
     set_rows(**SALON)
     context = person(make_user, role)
     plan = turn(context, user("apunta una cita"))
-    assert said_off(context, "appointment") in plan["instructions"]
+    assert "\n".join([HEADER, said_off(context, "appointment"), DOES_IT + ASK_WHO_RUNS_IT]) in plan["instructions"]
     assert shared.tool_name(ENABLE) not in offered(plan)
     assert shared.tool_name(ENABLE) not in plan["instructions"]
 
@@ -179,30 +253,42 @@ def test_an_app_being_set_up_or_that_failed_is_named_with_its_state_and_not_offe
 
 
 def test_at_most_three_apps_not_on_are_named_the_best_first(make_user):
-    """A salon just born has nearly every app off, and broad words name many of them: the three whose tools rank first
+    """A salon just born has nearly every app off, and words can name many of them: the three whose tools rank first
     are enough to say which does it, and each one more costs tokens in every call of the request."""
     set_rows(tax="on")
     context = owner_of_a(make_user, "es")
-    said = "quiero cobrar las ventas en la caja, imprimir los tickets y mandar las comandas a la cocina"
-    shown = {config.label for config in home.shown_modules(demo_hub=False)}
+    said = "quiero llevar las ventas, la caja, la cocina y las mesas"
+    called = {"sale", "cash_register", "kitchen", "table"}  # the apps this says by their names
+    shown = {config.label for config in home.shown_modules()}
     every = assistant.tools.catalog(context, active_labels={*shown, "base"})
     ranked = assistant.relevance.relevant(every, [said], "es")
-    apps = list(dict.fromkeys(op.app_label for op in ranked if op.app_label in shown - {"tax"}))
-    assert len(apps) > 3  # positive control: the words name more apps off than are said
+    best = list(dict.fromkeys(op.app_label for op in ranked if op.app_label in called))
+    assert len(best) == 4  # positive control: all four have a tool among the places
     text = turn(context, user(said))["instructions"]
-    assert [app for app in apps if said_off(context, app) in text] == apps[:3]
+    assert [app for app in best if said_off(context, app) in text] == best[:3]
 
 
-def test_no_tool_the_turn_offers_loses_its_place(make_user):
-    """The switch goes after the tools the person's words rank, before the search: none of theirs moves."""
-    set_rows(**SALON)
+@pytest.mark.parametrize(("language", "said", "on", "app"), REPORTED, ids=IDS)
+def test_the_switch_goes_last_before_the_search_and_no_tool_loses_its_place(make_user, language, said, on, app):
+    """Where the words already bring ``base.app.enable`` it stays in its place and is not added again."""
+    set_rows(**on)
+    context = owner_of_a(make_user, language)
+    ranked = ranked_for(context, said)
+    switch = shared.tool_name(ENABLE)
+    expected = ranked if switch in ranked else [*ranked[:-1], switch, ranked[-1]]
+    assert offered(turn(context, user(said))) == expected
+
+
+@pytest.mark.parametrize(("on", "said"), DAILY, ids=[said for _, said in DAILY])
+def test_what_the_apps_on_do_names_no_app_off_and_offers_the_same_tools(make_user, on, said):
+    """«¿cuántos servicios tengo?» in a salon with Services on is no request of an app off, though an app off has a tool
+    among the places its words give with every app on: the turn is as it was."""
+    set_rows(**on)
     context = owner_of_a(make_user, "es")
-    tools = assistant.tools.catalog(context)
-    for said in ("quiero gestionar reservas", "apunta una cita", HOURS, "¿cuántos servicios tengo?"):
-        ranked = [shared.tool_name(op.name) for op in assistant.relevance.relevant(tools, [said], "es")]
-        names = offered(turn(context, user(said)))
-        assert names[: len(ranked) - 1] == ranked[:-1], said
-        assert names[len(ranked) - 1 :] in ([ranked[-1]], [shared.tool_name(ENABLE), ranked[-1]]), said
+    ranked = ranked_for(context, said)
+    plan = turn(context, user(said))
+    assert HEADER not in plan["instructions"]
+    assert offered(plan) == ranked
 
 
 def test_an_app_off_the_models_search_finds_is_named_in_the_round_that_follows(make_user):
