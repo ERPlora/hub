@@ -10,13 +10,14 @@ from live.context import OperationContext
 from live.errors import OperationError
 from live.operations import get as get_operation
 
-from base import events
-from base.models import HubUser, Membership
+from base import events, queries
+from base.models import Membership
 from base.models.roles import BusinessRole
 from base.permissions import OWNER_ONLY, permissions_of_role
 from base.roles import APPROVAL, OFF, ON
 from base.sensitive import DATA_PERMISSIONS
 from base.tenancy.tests.business import A, HOST, HUB_DB, in_business_a
+from base.tests.roles import a_role, held_by
 from base.tests.routes import bound_routes, spa_routes
 
 __all__ = ["in_business_a"]
@@ -135,16 +136,6 @@ def listed(client, host=HOST) -> list[dict]:
     return client.get("/api/roles", HTTP_HOST=host).json()["roles"]
 
 
-def a_role(name="Cashier", origin=Membership.Role.EMPLOYEE, **states) -> BusinessRole:
-    """A role of the business saved with ``states`` (permission names with ``__`` for ``.``)."""
-    saved = {permission.replace("__", "."): state for permission, state in states.items()}
-    return BusinessRole.objects.create(name=name, origin=origin, states=saved)
-
-
-def held_by(user, role: BusinessRole) -> None:
-    HubUser.objects.update_or_create(username=user.get_username(), defaults={"business_role": role})
-
-
 class TestTheRolesOfTheBusiness:
     """A role the business made (BASE-F127): listed after the basic ones, with what was saved in it."""
 
@@ -158,6 +149,17 @@ class TestTheRolesOfTheBusiness:
         assert [(row["key"], row["label"]) for row in rows[5:]] == [
             (str(early.pk), "Cashier"), (str(late.pk), "waiter"),
         ]
+
+    def test_which_apps_are_on_is_read_once_whatever_the_roles(self, client, eva, monkeypatch):
+        for number in range(3):
+            a_role(f"Role {number}")
+        client.force_login(eva)
+        read = []
+        real = queries.roles.active_apps
+        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: read.append(scope) or real(scope))
+
+        assert len(listed(client)) == 8
+        assert read == [A]
 
     def test_it_says_how_many_permissions_it_gives(self, client, eva):
         saved = {permission: OFF for permission in permissions_of_role(Membership.Role.OWNER) - OWNER_ONLY}

@@ -18,6 +18,7 @@ from base.permissions import OWNER_ONLY, access_for, permissions_of_role
 from base.roles import APPROVAL, OFF, ON
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
+from base.tests.roles import a_role, held_by
 from base.tests.routes import bound_routes, spa_routes
 
 __all__ = ["in_business_a"]
@@ -41,16 +42,6 @@ def code(response) -> str:
 
 def facts(name: str) -> list[dict]:
     return list(OutboxEvent.objects.filter(name=name).values_list("payload", flat=True))
-
-
-def a_role(name="Cashier", origin=EMPLOYEE, **states) -> BusinessRole:
-    """A role of the business saved with ``states`` (permission names with ``__`` for ``.``)."""
-    saved = {permission.replace("__", "."): state for permission, state in states.items()}
-    return BusinessRole.objects.create(name=name, origin=origin, states=saved)
-
-
-def held_by(user, role: BusinessRole) -> None:
-    HubUser.objects.update_or_create(username=user.get_username(), defaults={"business_role": role})
 
 
 def detail(client, role: BusinessRole) -> dict[str, str]:

@@ -2,20 +2,17 @@
 the words of «What it allows» with what it becomes, and how many people have the role. Never a key, a permission's name
 nor a state as it is kept."""
 
-import json
-
 import pytest
-from django.utils import translation
-from live import assistant as shared
 from live.context import OperationContext
 from live.operations import get
 
 from base import assistant
-from base.models import HubUser, Membership
-from base.models.roles import BusinessRole
+from base.models import Membership
 from base.permissions import access_for
 from base.roles import OFF, ON
 from base.tenancy.tests.business import A, HUB_DB, in_business_a
+from base.tests import card_turn
+from base.tests.roles import a_role, held_by
 
 __all__ = ["in_business_a"]
 
@@ -31,12 +28,9 @@ def olga(make_user):
 
 @pytest.fixture
 def cashier(make_user):
-    role = BusinessRole.objects.create(
-        name="Cashier", origin=Membership.Role.EMPLOYEE, states={"sale.view_sale": ON, "sale.void_sale": ON}
-    )
+    role = a_role(sale__view_sale=ON, sale__void_sale=ON)
     for username in ("saas:3", "saas:4"):
-        make_user(username, host=A.key, role=Membership.Role.EMPLOYEE)
-        HubUser.objects.create(username=username, business_role=role)
+        held_by(make_user(username, host=A.key, role=Membership.Role.EMPLOYEE), role)
     return role
 
 
@@ -44,20 +38,8 @@ def asking(user, language: str) -> OperationContext:
     return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
 
 
-def turn(user, language: str, name: str, arguments: dict, **said) -> dict:
-    pending = {"call_id": "c1", "name": shared.tool_name(name), "arguments": json.dumps(arguments), **said.pop("shown", {})}
-    asked = {
-        "role": "assistant",
-        "content": "",
-        "tool_calls": [
-            {"id": "c1", "type": "function", "function": {"name": pending["name"], "arguments": pending["arguments"]}}
-        ],
-    }
-    op = get("base.assistant.turn")
-    messages = [{"role": "user", "content": "the roles"}, asked]
-    data = op.input.model_validate({"messages": messages, "pending": [pending], **said})
-    with translation.override(language):
-        return op(asking(user, language), data).model_dump(mode="json")
+def turn(user, language: str, name: str, arguments: dict) -> dict:
+    return card_turn.turn(asking(user, language), card_turn.call(name, arguments), said="the roles")
 
 
 def lines(fields: list[dict]) -> list[tuple]:
@@ -132,12 +114,10 @@ def test_deleting_one_says_its_name_and_how_many_have_it(olga, cashier, language
 
 
 def test_the_yes_changes_the_role(olga, cashier):
-    arguments = {"role": str(cashier.pk), "states": {"sale.void_sale": "off"}}
-    drawn = turn(olga, "es", "base.role.update", arguments)
+    drawn = turn(olga, "es", "base.role.update", {"role": str(cashier.pk), "states": {"sale.void_sale": "off"}})
 
-    plan = turn(
-        olga, "es", "base.role.update", arguments,
-        shown={"shown": drawn["pending"][0]["shown"]},
+    plan = card_turn.turn(
+        asking(olga, "es"), drawn["pending"][0], said="the roles",
         decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"},
     )
 

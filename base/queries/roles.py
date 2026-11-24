@@ -55,7 +55,7 @@ ROLE_NOT_FOUND = _("This role does not exist in this business.")
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
     """Employees › Roles: erplora.com's, from the top, and the business's own by their name."""
-    members = members_by_role(ctx.scope)
+    members, on = members_by_role(ctx.scope), configs_on(ctx.scope)
     own = sorted(BusinessRole.objects.all(), key=lambda role: role.name.casefold())
     with translation.override(ctx.language):
         return {
@@ -64,7 +64,7 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
                     {**_basic_out(role, members), "permissions": len(permissions_of_role(role.value))}
                     for role in people_rules.ROLE_ORDER
                 ),
-                *(role_row(ctx.scope, role, members) for role in own),
+                *(_own_row(role, members, on) for role in own),
             ]
         }
 
@@ -146,10 +146,13 @@ def members_by_role(scope: Scope) -> Counter[str]:
     return Counter((invited | own).values())
 
 
-def role_row(scope: Scope, role: BusinessRole, members: Counter[str] | None = None) -> dict[str, Any]:
+def role_row(scope: Scope, role: BusinessRole) -> dict[str, Any]:
     """A role of the business as the list shows it."""
-    members = members_by_role(scope) if members is None else members
-    return {**_own_out(role, members, configs_on(scope)), "permissions": len(permissions_of_business_role(role))}
+    return _own_row(role, members_by_role(scope), configs_on(scope))
+
+
+def _own_row(role: BusinessRole, members: Counter[str], on: list[LiveAppConfig]) -> dict[str, Any]:
+    return {**_own_out(role, members, on), "permissions": len(permissions_of_business_role(role))}
 
 
 def _basic_out(role: Membership.Role, members: Counter[str]) -> dict[str, Any]:

@@ -1,7 +1,7 @@
 // «What it allows» of a role, basic or the business's own: opened from Employees › Roles, read only, app by app; and it
 // follows live what the business changes in its own.
 // flow: BASE-F82
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test, type ViewportSize } from '@playwright/test';
 
 import { A, api, capture, collectProblems, EMPLOYEE, horizontalOverflow, hostPage, shown, uniqueName, untilStill } from './helpers';
 
@@ -29,6 +29,15 @@ async function expectLine(page: Page, permission: string, phrase: string, tone: 
   await expect(line.locator('[data-testid="role-state"]')).toHaveAttribute('data-tone', tone);
 }
 
+/** Employees › Roles as the owner opens it, with the five basic roles. */
+async function openRoles(browser: Browser, viewport: ViewportSize) {
+  const { context, page } = await hostPage(browser, A, { viewport, next: '/employees#roles' });
+  const problems = await collectProblems(page);
+  const rows = shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]');
+  await expect(rows).toHaveCount(5);
+  return { context, page, problems, rows };
+}
+
 /** A role the business makes from the employee's, deleted with its context's session after ``use``. */
 async function withRole(context: BrowserContext, use: (role: { key: string; label: string }) => Promise<void>): Promise<void> {
   const made = await api<{ key: string; label: string }>(context, A, 'POST', '/roles', {
@@ -47,10 +56,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
   test(`the owner opens what the employee role allows from Roles at ${width}`, async ({ browser }) => {
-    const { context, page } = await hostPage(browser, A, { viewport, next: '/employees#roles' });
-    const problems = await collectProblems(page);
-    const rows = shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]');
-    await expect(rows).toHaveCount(5);
+    const { context, page, problems, rows } = await openRoles(browser, viewport);
     await rows.nth(3).click();
     await expect(page).toHaveURL(/\/employees\/roles\/hub_employee$/);
     await expect(testid(page, 'role-members')).toBeVisible();
@@ -69,10 +75,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 
   test(`a role the business made goes by its name, and what it allows follows live what changes in it, at ${width}`, async ({ browser }) => {
-    const { context, page } = await hostPage(browser, A, { viewport, next: '/employees#roles' });
-    const problems = await collectProblems(page);
-    const rows = shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]');
-    await expect(rows).toHaveCount(5);
+    const { context, page, problems, rows } = await openRoles(browser, viewport);
     await withRole(context, async ({ key, label: name }) => {
       await expect(rows).toHaveCount(6);
       await expect(rows.nth(5)).toContainText(name);
