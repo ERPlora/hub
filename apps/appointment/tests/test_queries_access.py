@@ -2,7 +2,7 @@
 
 import pytest
 
-from apps.appointment.queries.access import PRIVATE, for_caller
+from apps.appointment.queries.access import for_caller
 from base.sensitive import DATA_PERMISSIONS
 
 from .conftest import HUB_DB, MONDAY, at, ctx_for, make_appointment, run
@@ -11,9 +11,10 @@ pytestmark = HUB_DB
 
 
 def test_what_is_private_reads_empty_to_a_caller_that_is_not_a_person_and_the_rest_whole():
-    answer = {"number": "APT-1", **dict.fromkeys(PRIVATE, "kept")}
+    private = ("customer_phone", "customer_email", "notes", "internal_notes", "cancellation_reason")
+    answer = {"number": "APT-1", **dict.fromkeys(private, "kept")}
     assert for_caller(ctx_for(), answer) == answer
-    assert for_caller(ctx_for(actor="system"), answer) == {"number": "APT-1", **dict.fromkeys(PRIVATE, "")}
+    assert for_caller(ctx_for(actor="system"), answer) == {"number": "APT-1", **dict.fromkeys(private, "")}
 
 
 # A model reading a stranger's message (a flow's step gets every
