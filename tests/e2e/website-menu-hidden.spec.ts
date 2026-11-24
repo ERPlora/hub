@@ -107,6 +107,9 @@ test(`${KEY}: the sheet says the dish is hidden and its form shows the box untic
   const box = form.getByTestId('inventory-product-show-on-website');
   await expect(box).toHaveJSProperty('checked', false);
   await expect(form.getByTestId('inventory-product-show-on-website-note')).toBeVisible();
+  // The form's reads answered: its tax category and its category are in their fields.
+  await expect(form.locator('[data-testid=inventory-product-tax] input')).not.toHaveValue('');
+  await expect(form.locator('[data-testid^="inventory-product-categories-chip-"]')).toHaveCount(1);
   for (const size of PUBLIC_SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await form.getByTestId('inventory-product-show-on-website-note').scrollIntoViewIfNeeded();
