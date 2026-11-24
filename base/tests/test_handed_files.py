@@ -115,3 +115,11 @@ def test_an_export_the_person_may_not_run_hands_no_file(lucia):
 
     [ran] = plan["executed"]
     assert (ran["outcome"], ran["file"]) == ("refused", None)
+
+
+def test_an_export_its_read_refuses_hands_no_file_and_the_model_hears_why(owner, menu):
+    plan = turn(owner, "inventory.product.export", status="nope")
+
+    [ran] = plan["executed"]
+    assert (ran["outcome"], ran["code"], ran["file"]) == ("error", "invalid_payload", None)
+    assert json.loads(plan["append"][0]["content"])["error"]["fields"]["status"]
