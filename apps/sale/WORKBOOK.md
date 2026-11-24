@@ -1405,9 +1405,9 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, pero hoy lo rechaza siempre:
-ninguna app puede declarar todavía su paso en el cobro, la hoja Cobro no pinta esos pasos y el Documento de venta no
-enseña lo añadido (hub#1497, hub#1500, hub#1502)
+Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, y una app ya puede declarar su
+paso en el cobro, pero Ventas todavía no pregunta esos pasos y rechaza siempre lo añadido, la hoja Cobro no los pinta y
+el Documento de venta no enseña lo añadido (hub#1497, hub#1500, hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
