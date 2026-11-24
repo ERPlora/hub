@@ -6,8 +6,8 @@ from live.assistant.tools import input_schema
 from live.operations import get
 
 from apps.invoice.models import Issuer
-from apps.invoice.schemas import COUNTRY_CODES
 from apps.invoice.tests.conftest import HUB_DB, run
+from apps.tax.choices import COUNTRY_CODES
 from base import assistant
 
 ISSUER = {

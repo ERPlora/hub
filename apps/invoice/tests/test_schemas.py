@@ -10,7 +10,11 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from apps.invoice import schemas
+from apps.invoice.schemas.fields import InvoiceRefIn
+from apps.invoice.schemas.invoices import FromSaleIn, InvoiceCreateIn, InvoiceListIn, SubstituteIn
+from apps.invoice.schemas.issuer import IssuerIn
+from apps.invoice.schemas.rectifying import RectifyIn
+from apps.invoice.schemas.series import SERIES_CODE_INVALID, SeriesCreateIn, SeriesUpdateIn
 
 
 def fields(error: ValidationError) -> set[str]:
@@ -40,7 +44,7 @@ def recipient(**more):
     ],
 )
 def test_a_spanish_nif_nie_or_cif_is_accepted_and_written_compact(tax_id, kept):
-    data = schemas.SubstituteIn.model_validate(
+    data = SubstituteIn.model_validate(
         {"number": "TICKET-2026-000001", **recipient(customer_tax_id=tax_id)}
     )
     assert data.customer_tax_id == kept
@@ -49,14 +53,14 @@ def test_a_spanish_nif_nie_or_cif_is_accepted_and_written_compact(tax_id, kept):
 @pytest.mark.parametrize("tax_id", ["12345678A", "B12345678", "hello"])
 def test_a_spanish_tax_id_that_does_not_check_is_refused_under_its_field(tax_id):
     with pytest.raises(ValidationError) as refused:
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {"number": "TICKET-2026-000001", **recipient(customer_tax_id=tax_id)}
         )
     assert fields(refused.value) == {"customer_tax_id"}
 
 
 def test_an_eu_vat_number_is_checked_with_its_country():
-    ok = schemas.SubstituteIn.model_validate(
+    ok = SubstituteIn.model_validate(
         {
             "number": "T-1",
             **recipient(
@@ -68,7 +72,7 @@ def test_an_eu_vat_number_is_checked_with_its_country():
     )
     assert ok.customer_tax_id == "FR40303265045"
     with pytest.raises(ValidationError) as refused:
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {
                 "number": "T-1",
                 **recipient(
@@ -82,7 +86,7 @@ def test_an_eu_vat_number_is_checked_with_its_country():
 
 
 def test_a_passport_or_a_foreign_tax_id_is_taken_as_written():
-    data = schemas.SubstituteIn.model_validate(
+    data = SubstituteIn.model_validate(
         {
             "number": "T-1",
             **recipient(
@@ -95,13 +99,13 @@ def test_a_passport_or_a_foreign_tax_id_is_taken_as_written():
 
 def test_the_country_is_iso_and_spain_is_empty():
     assert (
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {"number": "T-1", **recipient(customer_country="es")}
         ).customer_country
         == ""
     )
     with pytest.raises(ValidationError) as refused:
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {"number": "T-1", **recipient(customer_country="XX")}
         )
     assert fields(refused.value) == {"customer_country"}
@@ -110,7 +114,7 @@ def test_the_country_is_iso_and_spain_is_empty():
 def test_a_foreign_tax_id_needs_its_kind_of_document():
     # VeriFactu declares a foreign recipient as IDOtro, which the AEAT refuses without its IDType.
     with pytest.raises(ValidationError) as refused:
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {
                 "number": "T-1",
                 **recipient(customer_tax_id="X99 123", customer_country="US"),
@@ -124,7 +128,7 @@ def test_the_charge_of_a_sale_reads_its_recipient_and_lets_the_operation_decide(
     # but a tax ID that does not check is kept with its refusal: a ticket goes without it, an invoice is
     # refused under that field (the operation knows which one the sale is).
     sale = {"sale_id": "01999999-0000-7000-8000-000000000000", "items": [{"x": 1}]}
-    data = schemas.FromSaleIn.model_validate(
+    data = FromSaleIn.model_validate(
         {
             **sale,
             "customer_tax_id": "b-12345674",
@@ -139,14 +143,14 @@ def test_the_charge_of_a_sale_reads_its_recipient_and_lets_the_operation_decide(
         "",
     )
     assert data.tax_id_refusal is None
-    wrong = schemas.FromSaleIn.model_validate({**sale, "customer_tax_id": "nonsense"})
+    wrong = FromSaleIn.model_validate({**sale, "customer_tax_id": "nonsense"})
     assert wrong.tax_id_refusal[0] == "customer_tax_id"
-    foreign = schemas.FromSaleIn.model_validate(
+    foreign = FromSaleIn.model_validate(
         {**sale, "customer_tax_id": "P1234567", "customer_country": "US"}
     )
     assert foreign.tax_id_refusal[0] == "customer_id_type"
     with pytest.raises(ValidationError) as refused:
-        schemas.FromSaleIn.model_validate({**sale, "customer_country": "XX"})
+        FromSaleIn.model_validate({**sale, "customer_country": "XX"})
     assert fields(refused.value) == {"customer_country"}
 
 
@@ -155,18 +159,18 @@ def test_the_charge_of_a_sale_reads_its_recipient_and_lets_the_operation_decide(
 
 def test_a_document_is_named_by_its_id_or_its_number():
     with pytest.raises(ValidationError):
-        schemas.InvoiceRefIn.model_validate({})
+        InvoiceRefIn.model_validate({})
     assert (
-        schemas.InvoiceRefIn.model_validate({"number": " FACT-2026-000001 "}).number
+        InvoiceRefIn.model_validate({"number": " FACT-2026-000001 "}).number
         == "FACT-2026-000001"
     )
 
 
 def test_a_sale_is_named_by_its_id_or_its_number():
     with pytest.raises(ValidationError):
-        schemas.FromSaleIn.model_validate({})
+        FromSaleIn.model_validate({})
     assert (
-        schemas.FromSaleIn.model_validate({"sale": "20261014-0001"}).sale
+        FromSaleIn.model_validate({"sale": "20261014-0001"}).sale
         == "20261014-0001"
     )
 
@@ -177,13 +181,13 @@ def test_a_sale_is_named_by_its_id_or_its_number():
 def test_a_manual_line_needs_a_rate_or_a_tax_category():
     line = {"description": "Consulting", "quantity": "1", "unit_price": 10000}
     with pytest.raises(ValidationError) as refused:
-        schemas.InvoiceCreateIn.model_validate({"lines": [line]})
+        InvoiceCreateIn.model_validate({"lines": [line]})
     assert fields(refused.value) == {"lines.0.tax_rate"}
-    with_rate = schemas.InvoiceCreateIn.model_validate(
+    with_rate = InvoiceCreateIn.model_validate(
         {"lines": [{**line, "tax_rate": "21"}]}
     )
     assert with_rate.lines[0].tax_rate == Decimal("21")
-    schemas.InvoiceCreateIn.model_validate(
+    InvoiceCreateIn.model_validate(
         {"lines": [{**line, "tax_category_key": "service.generic"}]}
     )
 
@@ -191,34 +195,34 @@ def test_a_manual_line_needs_a_rate_or_a_tax_category():
 def test_a_manual_invoice_has_one_to_a_hundred_lines_of_a_positive_quantity():
     line = {"description": "x", "quantity": "1", "unit_price": 100, "tax_rate": "21"}
     with pytest.raises(ValidationError):
-        schemas.InvoiceCreateIn.model_validate({"lines": []})
+        InvoiceCreateIn.model_validate({"lines": []})
     with pytest.raises(ValidationError):
-        schemas.InvoiceCreateIn.model_validate({"lines": [line] * 101})
+        InvoiceCreateIn.model_validate({"lines": [line] * 101})
     with pytest.raises(ValidationError) as refused:
-        schemas.InvoiceCreateIn.model_validate({"lines": [{**line, "quantity": "0"}]})
+        InvoiceCreateIn.model_validate({"lines": [{**line, "quantity": "0"}]})
     assert fields(refused.value) == {"lines.0.quantity"}
     with pytest.raises(ValidationError) as refused:
-        schemas.InvoiceCreateIn.model_validate({"lines": [{**line, "unit_price": -1}]})
+        InvoiceCreateIn.model_validate({"lines": [{**line, "unit_price": -1}]})
     assert fields(refused.value) == {"lines.0.unit_price"}
     with pytest.raises(ValidationError) as refused:
-        schemas.InvoiceCreateIn.model_validate(
+        InvoiceCreateIn.model_validate(
             {"lines": [{**line, "quantity": "1.0001"}]}
         )
     assert fields(refused.value) == {"lines.0.quantity"}
 
 
 def test_a_rectification_picks_r1_to_r4_and_needs_a_reason():
-    ok = schemas.RectifyIn.model_validate(
+    ok = RectifyIn.model_validate(
         {"number": "F-1", "reason": " wrong price ", "rectification_type": "R4"}
     )
     assert (ok.reason, ok.rectification_type) == ("wrong price", "R4")
     with pytest.raises(ValidationError) as refused:
-        schemas.RectifyIn.model_validate(
+        RectifyIn.model_validate(
             {"number": "F-1", "reason": "x", "rectification_type": "R5"}
         )
     assert fields(refused.value) == {"rectification_type"}
     with pytest.raises(ValidationError) as refused:
-        schemas.RectifyIn.model_validate({"number": "F-1", "reason": "  "})
+        RectifyIn.model_validate({"number": "F-1", "reason": "  "})
     assert fields(refused.value) == {"reason"}
 
 
@@ -226,12 +230,12 @@ def test_a_rectification_picks_r1_to_r4_and_needs_a_reason():
 
 
 def test_a_series_code_is_written_in_capitals():
-    data = schemas.SeriesCreateIn.model_validate(
+    data = SeriesCreateIn.model_validate(
         {"code": " shop-1 ", "invoice_type": "F1", "year": 2026}
     )
     assert data.code == "SHOP-1"
     with pytest.raises(ValidationError) as refused:
-        schemas.SeriesCreateIn.model_validate(
+        SeriesCreateIn.model_validate(
             {"code": "shop 1", "invoice_type": "F1", "year": 2026}
         )
     assert fields(refused.value) == {"code"}
@@ -241,25 +245,25 @@ def test_a_series_code_is_written_in_capitals():
 def test_a_series_code_of_another_shape_is_refused_with_its_own_message(wrong):
     """hub#872: what a code takes, as the format of the number says its own (never pydantic's pattern)."""
     with pytest.raises(ValidationError) as refused:
-        schemas.SeriesCreateIn.model_validate({"code": wrong, "invoice_type": "F1", "year": 2026})
+        SeriesCreateIn.model_validate({"code": wrong, "invoice_type": "F1", "year": 2026})
     [error] = refused.value.errors()
     assert (error["loc"], error["type"], str(error["ctx"]["error"])) == (
         ("code",),
         "value_error",
-        str(schemas.SERIES_CODE_INVALID),
+        str(SERIES_CODE_INVALID),
     )
 
 
 @pytest.mark.parametrize("right", ["A", "9", "FACT", "E2E_1-B", "a-1", "X" * 20])
 def test_a_series_code_of_the_right_shape_is_taken(right):
     """Positive control: letters (in any case), digits, hyphens and underscores, from a letter or a digit."""
-    data = schemas.SeriesCreateIn.model_validate({"code": right, "invoice_type": "F1", "year": 2026})
+    data = SeriesCreateIn.model_validate({"code": right, "invoice_type": "F1", "year": 2026})
     assert data.code == right.upper()
 
 
 def test_a_series_code_still_tells_its_shape_to_the_openapi_and_the_assistant():
     """The code's own check (hub#872) keeps the shape in the JSON Schema the OpenAPI and the assistant's tool read."""
-    code = schemas.SeriesCreateIn.model_json_schema()["properties"]["code"]
+    code = SeriesCreateIn.model_json_schema()["properties"]["code"]
     assert (code["pattern"], code["minLength"], code["maxLength"]) == (r"^[A-Z0-9][A-Z0-9_-]*$", 1, 20)
 
 
@@ -267,16 +271,16 @@ def test_a_series_format_needs_its_year_and_its_sequence():
     # Without the year, the series of the next year (born from this one) would repeat its numbers.
     for wrong in ("{prefix}-{year}", "{prefix}-{seq}"):
         with pytest.raises(ValidationError) as refused:
-            schemas.SeriesCreateIn.model_validate(
+            SeriesCreateIn.model_validate(
                 {"code": "A", "invoice_type": "F1", "year": 2026, "format": wrong}
             )
         assert fields(refused.value) == {"format"}
         with pytest.raises(ValidationError) as refused:
-            schemas.SeriesUpdateIn.model_validate(
+            SeriesUpdateIn.model_validate(
                 {"series_id": "01999999-0000-7000-8000-000000000000", "format": wrong}
             )
         assert fields(refused.value) == {"format"}
-    data = schemas.SeriesCreateIn.model_validate(
+    data = SeriesCreateIn.model_validate(
         {"code": "A", "invoice_type": "F1", "year": 2026, "format": " "}
     )
     assert data.format == ""
@@ -284,7 +288,7 @@ def test_a_series_format_needs_its_year_and_its_sequence():
 
 def test_the_next_number_starts_at_one_at_least():
     with pytest.raises(ValidationError) as refused:
-        schemas.SeriesUpdateIn.model_validate(
+        SeriesUpdateIn.model_validate(
             {"series_id": "01999999-0000-7000-8000-000000000000", "next_number": 0}
         )
     assert fields(refused.value) == {"next_number"}
@@ -295,13 +299,13 @@ def test_the_next_number_starts_at_one_at_least():
 
 def test_a_list_stops_at_a_hundred_rows():
     with pytest.raises(ValidationError) as refused:
-        schemas.InvoiceListIn.model_validate({"limit": 101})
+        InvoiceListIn.model_validate({"limit": 101})
     assert fields(refused.value) == {"limit"}
-    assert schemas.InvoiceListIn.model_validate({}).limit == 50
+    assert InvoiceListIn.model_validate({}).limit == 50
 
 
 def test_the_list_sorts_by_the_last_issued_first_by_default():
-    data = schemas.InvoiceListIn.model_validate({})
+    data = InvoiceListIn.model_validate({})
     assert (data.sort, data.dir) == ("issued_at", "desc")
 
 
@@ -309,19 +313,19 @@ def test_the_list_sorts_by_the_last_issued_first_by_default():
 
 
 def test_the_issuer_needs_name_tax_id_and_address_and_a_valid_spanish_nif():
-    ok = schemas.IssuerIn.model_validate(
+    ok = IssuerIn.model_validate(
         {"legal_name": "Bar Pepe SL", "tax_id": "b12345674", "address": "Calle Mayor 1"}
     )
     assert (ok.tax_id, ok.country) == ("B12345674", "ES")
     with pytest.raises(ValidationError) as refused:
-        schemas.IssuerIn.model_validate(
+        IssuerIn.model_validate(
             {"legal_name": " ", "tax_id": "B12345678", "address": ""}
         )
     assert fields(refused.value) == {"legal_name", "tax_id", "address"}
 
 
 def test_a_foreign_issuer_keeps_its_tax_id_as_written():
-    ok = schemas.IssuerIn.model_validate(
+    ok = IssuerIn.model_validate(
         {
             "legal_name": "Café SARL",
             "tax_id": "123 456",
@@ -337,9 +341,9 @@ def test_a_prefix_and_a_format_are_printable_ascii():
     base = {"code": "A", "invoice_type": "F1", "year": 2026}
     for field, wrong in (("prefix", "Fª"), ("format", "Nº{year}-{seq}"), ("prefix", "F\t1")):
         with pytest.raises(ValidationError) as refused:
-            schemas.SeriesCreateIn.model_validate({**base, field: wrong})
+            SeriesCreateIn.model_validate({**base, field: wrong})
         assert fields(refused.value) == {field}
-    ok = schemas.SeriesCreateIn.model_validate(
+    ok = SeriesCreateIn.model_validate(
         {**base, "prefix": "F/A", "format": "{prefix} {year}#{seq:04d}"}
     )
     assert (ok.prefix, ok.format) == ("F/A", "{prefix} {year}#{seq:04d}")
@@ -348,12 +352,12 @@ def test_a_prefix_and_a_format_are_printable_ascii():
 def test_names_and_tax_ids_fit_verifactus_record():
     # SuministroInformacion.xsd: NombreRazon is TextMax120Type, IDOtro's ID TextMax20Type.
     with pytest.raises(ValidationError) as refused:
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {"number": "T-1", **recipient(customer_name="x" * 121)}
         )
     assert fields(refused.value) == {"customer_name"}
     with pytest.raises(ValidationError) as refused:
-        schemas.SubstituteIn.model_validate(
+        SubstituteIn.model_validate(
             {
                 "number": "T-1",
                 **recipient(
@@ -364,9 +368,9 @@ def test_names_and_tax_ids_fit_verifactus_record():
     assert fields(refused.value) == {"customer_tax_id"}
     issuer = {"legal_name": "x" * 121, "tax_id": "B12345674", "address": "Calle 1"}
     with pytest.raises(ValidationError) as refused:
-        schemas.IssuerIn.model_validate(issuer)
+        IssuerIn.model_validate(issuer)
     assert fields(refused.value) == {"legal_name"}
-    assert schemas.SubstituteIn.model_validate(
+    assert SubstituteIn.model_validate(
         {"number": "T-1", **recipient(customer_name="x" * 120)}
     ).customer_name == "x" * 120
 
