@@ -54,6 +54,12 @@ def test_an_edit_that_names_only_its_record_changes_nothing(write, arguments):
         ("service.category.update", {"id": AN_ID, "parent_id": AN_ID}),
         ("table.table.update", {"id": AN_ID, "move_to_zone_id": AN_ID}),
         ("sale.settings.update", {"allow_cash": False}),
+        # Emptying a datum is a change: sent as null, or as an empty text.
+        ("customer.customer.update", {"id": AN_ID, "email": None}),
+        ("customer.customer.update", {"customer": "Lucía QA", "notes": ""}),
+        # An edit with no read of its record goes on as it did: nothing says which of its data name it.
+        ("sale.department.update", {"id": AN_ID}),
+        ("sale.quick_note.update", {"quick_note": "Sin sal"}),
         # Not edits: a write that only names records still does something.
         ("customer.order.link", {"order_id": AN_ID, "customer": "Lucía QA"}),
         ("customer.customer.delete", {"id": AN_ID}),
