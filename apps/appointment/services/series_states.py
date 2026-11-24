@@ -25,7 +25,7 @@ from apps.appointment.services.writes import (
     SYSTEM,
     _member_for_booking,
 )
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 
 
 def _set_active(ctx: OperationContext, series_id: UUID, active: bool) -> dict:

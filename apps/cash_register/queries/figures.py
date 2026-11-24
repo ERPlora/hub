@@ -1,6 +1,7 @@
 """The figures of a session (its X/Z report) and its expected cash, with what a blind count hides."""
 
 from apps.cash_register.models import Movement, Session
+from apps.cash_register.queries.app_lines import app_lines
 from apps.cash_register.queries.lines import CASH, Line, session_lines
 
 
@@ -11,7 +12,8 @@ def visible_lines(hidden: bool, lines: list[Line]) -> list[Line]:
 
 
 def figures(session: Session, lines: list[Line], *, hidden: bool, costs: bool) -> dict:
-    """The summary of a session (the X/Z report): totals by type and tender, expected, counted, difference.
+    """The summary of a session (the X/Z report): totals by type and tender, what other apps recorded, expected, counted
+    and difference.
 
     Hidden (a blind count, an open session, a reader without `view_expected_totals`): no total that adds
     up to the expected — only the float, and the lines written by hand counted. Without ``costs`` (a reader who
@@ -40,6 +42,7 @@ def figures(session: Session, lines: list[Line], *, hidden: bool, costs: bool) -
                     "total_cash_in",
                     "total_cash_out",
                     "total_gifts",
+                    "app_lines",
                     "expected_cash",
                 )
             },
@@ -59,9 +62,11 @@ def figures(session: Session, lines: list[Line], *, hidden: bool, costs: bool) -
         "card_sales": total([line for line in sales if line.method_type == "card"]),
         "other_sales": total([line for line in sales if line.method_type in ("transfer", "other")]),
         "total_refunds": total([line for line in counted if line.type in ("refund", "void")]),
-        "total_cash_in": total([line for line in lines if line.type == "in"]),
-        "total_cash_out": total([line for line in lines if line.type == "out"]),
+        # What another app records (tips) is not cash brought in or taken out by hand: it has lines of its own.
+        "total_cash_in": total([line for line in lines if line.type == "in" and not line.app]),
+        "total_cash_out": total([line for line in lines if line.type == "out" and not line.app]),
         "total_gifts": sum(line.gift_total for line in sales) if costs else None,
+        "app_lines": app_lines(lines),
         "expected_cash": expected,
         "counted": session.closing_balance,
         "difference": session.difference,

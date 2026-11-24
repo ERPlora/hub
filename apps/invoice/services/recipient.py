@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.invoice.models import Invoice
 from apps.invoice.schemas.fields import NAME_MAX, TAX_ID_MAX, check_tax_id
 from apps.invoice.services.writes import logger

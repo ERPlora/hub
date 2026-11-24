@@ -464,6 +464,7 @@ En la pantalla Archivos:
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
+| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3622,6 +3623,26 @@ Si falla: debajo, «No se pudo cambiar el ajuste de arranque al iniciar sesión.
 dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
+### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
+Estado: parcial — se cambia y se consulta por la API y con el asistente; falta su tarjeta en Ajustes › General y que
+el personal de soporte pueda entrar en el negocio con el acceso encendido
+Actor: propietario, administrador
+Pantalla: Ajustes · General
+Pasos:
+  1. Cuando el negocio quiere que el personal de soporte de ERPlora entre para ayudarle a configurarlo (cargar los
+     productos, ajustar sus apps), el propietario o un administrador enciende el acceso de soporte. Viene apagado.
+     Hoy se enciende y se apaga por la API o pidiéndoselo al asistente, que lo confirma antes de cambiarlo (BASE-F97).
+  2. El cambio se guarda al instante, con quién lo hizo y cuándo. No caduca: sigue encendido hasta que alguien del
+     negocio lo apaga, porque una puesta en marcha puede durar varios días.
+  3. Cualquiera del negocio puede consultar si está encendido, quién lo cambió por última vez y cuándo, si él mismo
+     puede cambiarlo y las 10 últimas entradas de soporte (quién y cuándo), la más reciente primero. Mientras nadie de
+     soporte haya entrado, la lista está vacía.
+Entra: encendido o apagado.
+Sale: el ajuste del negocio, con quién lo cambió y cuándo. Evento `base.support_access.changed`.
+Si falla: a quien no administra el negocio se le rechaza el cambio (403 `permission_denied`) y el ajuste se queda como
+estaba; al consultarlo, le sale que no puede cambiarlo.
+Implicados: BASE-F97, BASE-F100
+
 ## Para quien lo mantiene
 
 - **Permisos de dato** (BASE-F119; `base/sensitive.py`, `base/visibility.py`, `live.sensitive`): un campo de un
@@ -4655,6 +4676,13 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `base.models.api_keys.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
+- Acceso de soporte (BASE-F126): el ajuste es `base.models.support_access.SupportAccess`, de una sola fila como
+  `ApiSettings` (sin fila, apagado), y cada entrada de soporte, una fila de `SupportVisit`; los dos, en la base de datos
+  del negocio. `base.support_access.get` (`base/queries/support_access.py`) da el estado, quién lo cambió y cuándo, si
+  quien pregunta puede cambiarlo y las 10 últimas entradas, y se sigue en vivo con `base.support_access.changed`;
+  `base.support_access.update` (`base/services/support_access.py`, con `base.administer_hub`) lo guarda y deja ese
+  evento en el outbox en la misma transacción. Rutas en `base/api/access.py`; tests en
+  `base/tests/test_support_access.py`.
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
   además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección
@@ -4917,6 +4945,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.api_doc.get` | F90 |
 | `base.api_doc.settings` | F90, F91 |
 | `base.api_doc.settings_update` | F91 |
+| `base.support_access.get`, `base.support_access.update` | F126 |
 | `base.assistant.turn` | F93, F97, F101 |
 | `base.assistant.find_tools`, `base.assistant.speak`, `base.docs.search` | F93 |
 | `base.assistant.transcribe` | F94 |

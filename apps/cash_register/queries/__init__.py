@@ -19,6 +19,7 @@ from . import (
     movements as movements,
     counts as counts,
     currency as currency,
+    app_lines as app_lines,
     auto_close as auto_close,
     figures as figures,
     lines as lines,

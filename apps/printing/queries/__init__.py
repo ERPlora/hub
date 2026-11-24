@@ -3,7 +3,7 @@
 A printer's state is read, never stored: inactive; failing when its last failure is newer than its last
 paper; waiting when a job of its own has been queued for over a minute; ready otherwise. A job sent to a
 device and unanswered past its 90 s lease is «stale»: it can be retried or cancelled, and the next claim
-puts it back in the queue (services.py).
+puts it back in the queue (services/claims.py).
 """
 
 import datetime as dt
