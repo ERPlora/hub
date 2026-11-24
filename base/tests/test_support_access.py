@@ -19,6 +19,7 @@ from base.models import Membership
 from base.models.support_access import SupportAccess, SupportVisit
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
+from base.tests.routes import assert_bound
 
 __all__ = ["in_business_a"]
 
@@ -120,3 +121,14 @@ class TestTheEntries:
     def test_an_entry_without_a_name_says_its_email(self, client, olga):
         SupportVisit.objects.create(username="saas-support:7", email="sam@erplora.com")
         assert [visit["person"] for visit in get(client).json()["visits"]] == ["sam@erplora.com"]
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "operation"),
+    [
+        ("GET", "/support-access", "base.support_access.get"),
+        ("POST", "/support-access/update", "base.support_access.update"),
+    ],
+)
+def test_each_route_calls_its_operation(method, path, operation):
+    assert_bound(method, path, operation)
