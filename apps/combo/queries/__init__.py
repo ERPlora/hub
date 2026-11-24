@@ -28,22 +28,12 @@ from psycopg import sql
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from .dish_options import TAKEAWAY_CATEGORY, Dish, categories, options_amount, priced, takeaway_key, weights
 from . import new_choices as new_choices  # registers the checks of a new choice
-from apps.combo.schemas import (
-    ComboDetailOut,
-    ComboListIn,
-    ComboImageSuggestIn,
-    ComboImageSuggestOut,
-    ComboPage,
-    ComboRefIn,
-    ForSaleIn,
-    GroupOut,
-    GroupRefIn,
-    OptionOut,
-    OptionRefIn,
-    ResolvedOut,
-    ResolveIn,
-    SaleComboPage,
-)
+from apps.combo.schemas.choices import OptionOut
+from apps.combo.schemas.courses import GroupOut
+from apps.combo.schemas.images import ComboImageSuggestIn, ComboImageSuggestOut
+from apps.combo.schemas.menus import ComboDetailOut, ComboListIn, ComboPage
+from apps.combo.schemas.references import ComboRefIn, GroupRefIn, OptionRefIn
+from apps.combo.schemas.till import ForSaleIn, ResolvedOut, ResolveIn, SaleComboPage
 from apps.inventory.models import Product, ProductCategory, Unit
 from apps.inventory.queries.recovery import products_standing_for
 from apps.tax.models import TaxCategory
@@ -514,8 +504,8 @@ def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
     ai=INTERNAL,
 )
 def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
-    """One course of a menu with its choices: what names a course on the assistant's card (``schemas.A_COURSE``); the
-    model reads the courses with their menu."""
+    """One course of a menu with its choices: what names a course on the assistant's card (``schemas.fields.A_COURSE``);
+    the model reads the courses with their menu."""
     group = find_group(data.id, data.combo_id, data.combo, data.group)
     prefetch_related_objects([group], _options())
     return group_row(group, takeaway_targets())

@@ -6,7 +6,7 @@ menu is billed."""
 from live.context import OperationContext
 from live.operations import get, operation
 
-from apps.combo.schemas import ComboDetailOut
+from apps.combo.schemas.menus import ComboDetailOut
 from apps.combo.schemas.on_sale import ComboOnSaleIn
 
 

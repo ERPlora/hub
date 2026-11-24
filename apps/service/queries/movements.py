@@ -7,16 +7,14 @@ from uuid import UUID
 from django.db.models import Case, DateTimeField, F, Q, When
 from django.utils import timezone
 from live.context import OperationContext
-from live.errors import AppInactive, NotFound, PermissionDenied
-from live.operations import UnknownOperation, operation
+from live.operations import operation
 
 from apps.service.models import Grant, GrantAdjustment, Redemption
 from apps.service.queries.packages import find_package
 from apps.service.queries.reads import CUSTOMER_VIEW
-from apps.service.queries.records import SALE_GET
+from apps.service.queries.sale_numbers import name_the_sales
 from apps.service.schemas.movements import MovementListIn, MovementPage
 from apps.staff.models import Member
-from base.operations import call
 
 
 @operation(
@@ -132,7 +130,6 @@ def _session_row(ctx: OperationContext, session: Redemption, now: dt.datetime) -
         "member_id": session.member_id,
         "member_name": session.member.full_name if session.member else None,
         "sale_id": session.sale_id,
-        "sale_number": None,
         "appointment_id": session.appointment_id,
         "note": session.note,
         "actor": _session_actor(session, kind, ended),
@@ -153,7 +150,6 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "member_id": None,
         "member_name": None,
         "sale_id": None,
-        "sale_number": None,
         "appointment_id": None,
         "note": "",
         "actor": adjustment.actor,
@@ -161,16 +157,6 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "days_delta": adjustment.days_delta,
         "reason": adjustment.reason,
     }
-
-
-def _readable_sale(ctx: OperationContext, sale_id: UUID):
-    """Sales' read of the sale a session was spent in, as the caller reads it (Services does not require Sales);
-    ``None`` when they cannot: Sales off or absent, no permission to see sales, or a sale not theirs to see, which
-    Sales answers as one that does not exist."""
-    try:
-        return call(ctx, SALE_GET, {"sale_id": str(sale_id)})
-    except (UnknownOperation, AppInactive, PermissionDenied, NotFound):
-        return None
 
 
 def _served_by(sale, check_line_id: UUID) -> UUID | None:
@@ -183,15 +169,12 @@ def _served_by(sale, check_line_id: UUID) -> UUID | None:
 def _name_the_sales(ctx: OperationContext, rows: list[dict], check_lines: dict[UUID, UUID | None]) -> None:
     """A session spent in a sale says it by the number Sales names it by; one of the till (it has a check line and
     never says its own professional) also says who served that line. One spent by hand keeps the professional it
-    said. Each sale is read once."""
-    sales = {sale_id: _readable_sale(ctx, sale_id) for sale_id in {row["sale_id"] for row in rows} - {None}}
+    said."""
+    sales = name_the_sales(ctx, rows)
     for row in rows:
         sale = sales.get(row["sale_id"])
-        if sale is None:
-            continue
-        row["sale_number"] = sale.number
         check_line_id = check_lines.get(row["id"])
-        if check_line_id:
+        if sale is not None and check_line_id:
             row["member_id"] = _served_by(sale, check_line_id)
 
 

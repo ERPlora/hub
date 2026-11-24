@@ -42,6 +42,7 @@ def test_a_query_is_read_whatever_its_verb():
         ("appointment.appointment.cancel", UPDATE),
         ("service.grant.void", UPDATE),
         ("inventory.product.upload_image", UPDATE),
+        ("sale.order.note_bill", UPDATE),
         ("customer.customer.delete", DELETE),
         ("pricing.price_item.remove", DELETE),
         ("appointment.appointment.bulk_delete", DELETE),
