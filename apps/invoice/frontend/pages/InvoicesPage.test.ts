@@ -3,35 +3,29 @@
 // issued first, 50 a page, search «Search invoices…» and the filters behind the table's funnel. A row opens its invoice; «Mark
 // as paid» only where it applies and for whoever may issue; «Rectify» only where it applies and for
 // whoever may rectify; «+» opens «New manual invoice». Every state of the screen and the tabbar.
-import { DataTable, EmptyState } from '@erplora/ui/components';
-import { AppPage, toastError } from '@erplora/ui/shell';
-import { IonButton } from '@ionic/vue';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Component } from 'vue';
+import { EmptyState } from '@erplora/ui/components';
+import { AppPage } from '@erplora/ui/shell';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   answerIssuer,
   business,
   BYE,
-  ACCOUNTANT,
   EMPLOYEE,
   errorFrame,
   flush,
   itPaintsTheTabsItsSessionOpens,
   MANAGER,
-  mountInvoice,
-  type MountOptions,
   POLISH,
 } from '../__tests__/mount-invoice';
 import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
-import { browserDownloads, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
 import type { InvoiceRowOut } from '../operations';
-import InvoicesPage from './InvoicesPage.vue';
 import source from './InvoicesPage.vue?raw';
+import { EMPTY, OP, PAGE, setup } from '../__tests__/invoices-page';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
@@ -40,119 +34,6 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   useConfirm: () => ({ confirm: mocks.confirm }),
 }));
 beforeEach(() => mocks.confirm.mockReset());
-
-const OP = 'invoice.invoice.list';
-
-const row = (number: string, over: Partial<InvoiceRowOut> = {}): InvoiceRowOut => ({
-  id: number,
-  number,
-  invoice_type: 'F1',
-  series_code: 'FACT',
-  year: 2026,
-  issue_date: '2026-10-14',
-  issued_at: '2026-10-14T10:00:00Z',
-  customer_name: 'Talleres Pérez SL',
-  customer_tax_id: 'B12345674',
-  base_amount: 1000,
-  tax_amount: 210,
-  total_amount: 1210,
-  currency: 'EUR',
-  currency_decimals: 2,
-  status: 'issued',
-  source_type: 'manual',
-  rectifies_id: null,
-  rectifies_number: '',
-  substituted: false,
-  can_mark_paid: true,
-  can_rectify: true,
-  can_substitute: false,
-  ...over,
-});
-
-const PAGE = {
-  rows: [
-    row('FACT-2026-000002'),
-    row('TICKET-2026-000001', { invoice_type: 'F2', customer_name: '', status: 'paid', can_mark_paid: false, can_substitute: true, source_type: 'sale' }),
-    row('RECT-2026-000001', { invoice_type: 'R1', total_amount: -1210, status: 'issued', can_mark_paid: false, can_rectify: false, rectifies_number: 'FACT-2026-000001' }),
-  ],
-  total: 3,
-  limit: 50,
-  offset: 0,
-};
-const EMPTY = { rows: [], total: 0, limit: 50, offset: 0 };
-
-async function setup(options: MountOptions = {}) {
-  const m = await mountInvoice(InvoicesPage, options);
-  const call = await m.live();
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="invoice-list-row"]');
-  const params = () => m.params(OP);
-  const show = (page: unknown) => m.result(OP, page);
-  async function emit(name: string, ...args: unknown[]) {
-    table().vm.$emit(name, ...args);
-    await flush();
-  }
-  /** What the table's funnel applies (`v-model:filters`): the filters by name, as typed. */
-  const filter = (values: Record<string, string>) => emit('update:filters', values);
-  return { ...m, call, table, prop, rows, params, show, emit, filter };
-}
-
-describe('InvoicesPage: «Download in Excel»', () => {
-  const FILE = { filename: 'invoices.xlsx', content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', invoices: 2, content_base64: btoa('PK-xlsx') };
-  const button = (s: Awaited<ReturnType<typeof setup>>) => s.wrapper.find('[data-testid="invoice-export"]');
-
-  it('is offered to whoever sees everyone’s invoices, and to nobody else', async () => {
-    const owner = await setup();
-    expect(button(owner).text()).toBe('Download in Excel');
-    const employee = await setup({ session: EMPLOYEE });
-    expect(button(employee).exists()).toBe(false);
-  });
-
-  it('downloads what the list shows: its filters and its search, with neither its sort nor its page', async () => {
-    const s = await setup({ session: ACCOUNTANT });
-    await s.show(PAGE);
-    await s.filter({ issue_date_from: '2026-10-01', issue_date_to: '2026-10-31' });
-    await s.emit('update:search', ' pérez ');
-    const asked: string[] = [];
-    s.net.onApi(({ url }) => (asked.push(url), Response.json(FILE)));
-    const saved = browserDownloads();
-    await button(s).trigger('click');
-    await flush();
-    await flush();
-    const [url] = asked.map((u) => new URL(u, 'http://localhost'));
-    expect(url.pathname).toBe('/api/invoice/invoices/export');
-    expect(Object.fromEntries(url.searchParams)).toEqual({ issue_date_from: '2026-10-01', issue_date_to: '2026-10-31', search: 'pérez' });
-    expect(saved.map((file) => file.name)).toEqual(['invoices.xlsx']);
-    expect(saved[0].blob.type).toBe(FILE.content_type);
-    expect(await saved[0].blob.text()).toBe('PK-xlsx');
-  });
-
-  it('says why when the file is refused', async () => {
-    const s = await setup();
-    await s.show(PAGE);
-    s.net.onApi(() => Response.json({ error: { code: 'base.hub_busy', message: 'Your business is busy.' } }, { status: 503 }));
-    await button(s).trigger('click');
-    await flush();
-    expect(toastError).toHaveBeenCalledWith('The invoices could not be downloaded: Your business is busy.');
-  });
-
-  it('waits for the list: nothing to download while it is loading or empty', async () => {
-    const s = await setup();
-    const disabled = () => s.wrapper.findAllComponents(IonButton).find((b) => b.attributes('data-testid') === 'invoice-export')?.props('disabled');
-    expect(disabled()).toBe(true);
-    await s.show(PAGE);
-    expect(disabled()).toBe(false);
-    await s.filter({ status: 'paid' });
-    await s.show(EMPTY);
-    expect(disabled()).toBe(true);
-  });
-
-  it('speaks Spanish', async () => {
-    const s = await setup({ locale: 'es' });
-    expect(button(s).text()).toBe('Descargar en Excel');
-  });
-});
 
 describe('InvoicesPage: the live list', () => {
   it('follows invoice.invoice.list, the last issued first, 50 from the first, until the first result loading', async () => {
