@@ -535,7 +535,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   (`tests/e2e/qa/probes/owner-es-cart_checkout-2026-11-08.json`), nunca con los propios `asks`: cada una
   ofrece su herramienta, la de cambiar la cantidad antes que la ficha de producto, la de vaciar una cesta
   que sigue activa antes que borrarla o quitarle una línea y, con las que cambian o quitan una línea, una
-  lectura del carrito que da su id; el empleado solo recibe las seis lecturas.
+  lectura del carrito que da su id (la de cambiar la cantidad, por la búsqueda de las líneas de un carrito); el empleado solo recibe las seis lecturas.
 - Datos personales (CART_CHECKOUT-F14): `cart_checkout.customer.erase` vacía email, nombre, notas y
   motivo de abandono de los carritos con ese email (también los borrados) y email, direcciones, notas y
   motivo de fallo de sus pedidos, en una transacción con las filas bloqueadas; su aviso lleva los números,

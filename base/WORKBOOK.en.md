@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:39ec62aad70fd435049a843f87676f0323b23f16b8564eb13755cdf76bfe2edf -->
+<!-- generated from WORKBOOK.md sha256:071060c365b77163e378778e3812528097d614703eff05946236ae76ee495094 -->
 
 ## What it is for and who it is for
 
@@ -3088,13 +3088,16 @@ Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
 Settings · Data and copies › Export, Files, Employees › Approvals, the API documentation, Attendance, Inventory
-(Products and Categories), Customers and the website's "Share and QR"
+(Products and Categories), Customers, the website's "Share and QR" and the assistant (the export it is asked for)
 Steps:
   1. The person presses download: the authorisation's form, an export, a file, a CSV, the OpenAPI file or the QR.
   2. In a browser, the file goes with its name to the browser's downloads, which already say so.
   3. Inside the ERPlora app (computer, or Android 10 or later), the Hub hands the file to the app, which saves it in the
      Downloads folder, and "Saved to {path}" appears (on Android, "Saved to Download/<name>"): inside the app there is
      no downloads bar nor any other notice.
+  4. In the assistant, when asked for an export ("Give me the whole menu as a CSV"), "Download <name>" comes under its
+     answer: the same file the export button of that screen gives, which comes down as in steps 2 and 3. The assistant
+     says it is there, without pasting its content into the chat.
 In: the file the screen already holds, with its name.
 Out: the file in Downloads and, inside the app, the notice with its path. Nothing is kept in the Hub.
 If it fails: inside the app the button is never left without an answer. With no downloads folder the person can open
@@ -3102,7 +3105,8 @@ If it fails: inside the app the button is never left without an answer. With no 
 download it."; with the app linked to another business: "The file could not be saved: this app is linked to another
 business."; a version of the app without this feature: "This version of the ERPlora app cannot save files. Update it
 to download."; any other failure (a name the app refuses, no space left): "The file could not be downloaded.". In
-those cases the screen does not say it was downloaded. The copies ERPlora keeps (Data and copies › Copies) come down
+those cases the screen does not say it was downloaded. The file the assistant gave lives in that tab: after the page
+reloads, in its place it says "The file «<name>» is no longer here: ask for it again to download it.". The copies ERPlora keeps (Data and copies › Copies) come down
 through a signed link and do not go through here.
 Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
