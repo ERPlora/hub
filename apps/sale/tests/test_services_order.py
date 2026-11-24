@@ -717,7 +717,7 @@ def test_whoever_builds_checks_voids_an_empty_one(coffee):
     assert run("sale.order.void", {"order_id": str(emptied.id)}, waiter).status == "voided"
 
 
-def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee):
+def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee, without_kitchen):
     waiter = ctx_for(EMPLOYEE)
     ordered = open_order({"product": "COF"}, ctx=waiter)
     with pytest.raises(PermissionDenied) as refusal:

@@ -24,6 +24,7 @@ from live.models import OutboxEvent
 from live.operations import get, registry
 from psycopg.conninfo import make_conninfo
 
+from base import activation
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
@@ -299,6 +300,12 @@ def refund(sale, *, lines=(), allocations=(), key=None, ctx=None):
         },
         ctx,
     )
+
+
+@pytest.fixture
+def without_kitchen(monkeypatch):
+    """A business without Kitchen, as a shop or a salon sells: a charge sends nothing to it first."""
+    monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"kitchen"}))
 
 
 @pytest.fixture

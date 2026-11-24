@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c4b157bf8a163956de373475bd8460fa664abe453dc933dfa6e8a9b97a33f96d -->
+<!-- generated from WORKBOOK.md sha256:edcb2cf4bcafb29875d5ffb850fa2d2742b5f6b85163ee896898f9303dc8d58a -->
 
 ## What it is for and who it is for
 
@@ -857,7 +857,9 @@ Steps:
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad can be tapped from the first moment. If the send fails, the
-   charge does not open and it says why.
+   charge does not open and it says why. A charge through the assistant or the API does the same: what
+   the check has not sent yet goes to the kitchen as a new round before the charge, and if Kitchen
+   refuses it, nothing is charged and it says why.
 4. A sent line is locked: no quantity, no note, no discount. It can still be comped with its gift: it
    stays on the check at 0 and the kitchen gets nothing new.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «Croquettes»" opens with
