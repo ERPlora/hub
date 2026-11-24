@@ -289,7 +289,7 @@
       },
       "customer": "Cliente: {name}",
       "professional": "Profesional: {name}",
-      "sale": "Venta: {id}",
+      "sale": "Venta: {number}",
       "noService": "Sin servicio en la línea",
       "given": "+{sessions} · +{days}",
       "correctedDelta": "−{sessions} · +{days}",
