@@ -146,6 +146,9 @@ def _value_text(value: Any, p: Phrasing) -> str:
         return ", ".join(_value_text(item, p) for item in value)
     if value is None:
         return "—"
+    if isinstance(value, float) and value.is_integer():
+        # The screens have one kind of number: 10000.0 is said «10000».
+        return str(int(value))
     return json.dumps(value, ensure_ascii=False, separators=(",", ":")) if isinstance(value, dict) else str(value)
 
 
@@ -178,7 +181,8 @@ def _delay(step: dict, p: Phrasing) -> str:
     seconds = int(step.get("seconds") or 0)
     unit, amount = next(
         ((unit, seconds // size) for unit, size in UNIT_SECONDS if seconds and seconds % size == 0),
-        ("minutes", max(1, round(seconds / 60))),
+        # Half a minute rounds up, as the screens' ``Math.round``; Python's ``round`` goes to the even one.
+        ("minutes", max(1, (seconds + 30) // 60)),
     )
     units = p.words["steps"]["units"][unit]
     return _fill(p.words["steps"]["wait"], amount=amount, unit=units["one" if amount == 1 else "many"])
