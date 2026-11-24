@@ -1,6 +1,6 @@
 """Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's
-schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``) and the names it reads
-(``exactly_one``, ``RecordNameOut``)."""
+schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``), a file the person attaches in
+the chat (``AN_ATTACHED_FILE``) and the names it reads (``exactly_one``, ``RecordNameOut``)."""
 
 from typing import Annotated, Any, Literal
 
@@ -38,6 +38,11 @@ def unless_given(mark: dict, *data: str) -> dict:
     """``mark`` (``names``) left unread when any of ``data`` of its own object comes (``unless``): one mark declared
     once, beside the datum each object takes its record by instead (a course's ``id``, a menu's ``combo_id``)."""
     return {"refers": {**mark["refers"], "unless": list(data)}}
+
+
+#: The mark of a datum that takes a whole file in base64 (base/assistant/attachments.py): from the chat, the model gives
+#: the name of a file the person attached, and the turn gives the operation that file.
+AN_ATTACHED_FILE: dict = {"attached_file": True}
 
 
 def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:

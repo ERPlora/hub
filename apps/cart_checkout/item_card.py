@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from apps.cart_checkout.models import CartItem
 from apps.cart_checkout.schemas import CartRefIn, ItemAddIn
+from base.assistant import card_order
 from base.business import babel_locale
 
 LINE = ("product_name", "quantity", "unit_price")
@@ -36,6 +37,4 @@ def summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[
             "unit_price": {key: price[key] for key in ("kind", "value", "money") if key in price},
         },
     }
-    cart = [field for field in fields if field["name"] in CartRefIn.model_fields]
-    rest = [field for field in fields if field["name"] not in {*CartRefIn.model_fields, *LINE}]
-    return [*cart, line, *rest]
+    return card_order.put_first(fields, tuple(CartRefIn.model_fields), line, dropped=LINE)

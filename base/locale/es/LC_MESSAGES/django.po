@@ -1064,6 +1064,10 @@ msgstr "El almacén de archivos no ha respondido. Inténtalo de nuevo en un mome
 msgid "There is already a file or folder with that name here."
 msgstr "Ya hay un archivo o una carpeta con ese nombre aquí."
 
+#: base/assistant/attachments.py
+msgid "There is no file «{name}» attached to this conversation: attach it again."
+msgstr "No hay ningún archivo «{name}» adjunto en esta conversación: vuelve a adjuntarlo."
+
 #: base/files.py
 #, python-format
 msgid "There is no space left for that file: your plan includes %(space)s."

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3c202f103fe4d7fa0a6525234a0bc8f2a2d372561e96d7b2c02ae0d0a49d4c35 -->
+<!-- generated from WORKBOOK.md sha256:2213ab742a6b900a0fecdc2eac3de2c77e89bdd2467f3dddb5bd9f1d472283a5 -->
 
 ## What it is for and who it is for
 
@@ -188,7 +188,10 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, "Rec
 Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
-recorded instead of recording another.
+recorded instead of recording another. The assistant's card says on its line who is paid, the supplier
+invoice and the amount ("Create in Payments: Pescados QA · F-2611 · €180.00"); without an invoice, the
+method it leaves from goes after the amount ("Pescados QA · €180.00 · BBVA"), and the other data follow,
+each one once.
 Out: a draft payment with reference `PAY-YYYYMMDD-NNNN` — the date is that of the business day on which
 it is recorded, not the payment's; the number counts per day and never repeats — and the notice
 `payment.payment.created` (it carries the reference, the beneficiary, the amount and the currency).

@@ -33,6 +33,8 @@ HIGH_RISK = {
     "payment.payment.mark_completed",
     "payment.payment.cancel",
 }
+#: Recording a payment puts first on its card whom it pays, the invoice and how much (hub#2292).
+WITH_A_SUMMARY = {"payment.payment.create"}
 
 
 def payment():
@@ -115,7 +117,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     assert set(operations) == COMMANDS | QUERIES
     for name, op in operations.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
-        assert set(op.ai) == {"description", "risk", "asks"}, name
+        assert set(op.ai) == {"description", "risk", "asks", *(("summary",) if name in WITH_A_SUMMARY else ())}, name
         assert {
             language: len(op.ai["asks"].get(language, ())) >= MIN_ASKS
             for language in ("en", "es")

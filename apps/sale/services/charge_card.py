@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from apps.sale.queries.payment_methods import find_method
 from apps.sale.schemas.checkout import ChargeLinesIn, CompleteIn, PaymentIn
 from apps.sale.services.charge_validation import tender_amounts
+from base.assistant import card_order
 
 CHARGE = "sale.sale.complete"
 PREVIEW = "sale.checkout.preview"
@@ -58,6 +59,5 @@ def summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[
     if failure is not None:
         return fields
     total = {"name": "total", "label": label(get(CHARGE), "total", None), "kind": "money", "value": valued.total}
-    charged = [field for field in fields if field["name"] in ChargeLinesIn.model_fields]
-    rest = [field for field in fields if field["name"] not in {*ChargeLinesIn.model_fields, *SCREEN_ONLY, "payments"}]
-    return [*charged, total, _payments(data, valued.total), *rest]
+    charged = tuple(ChargeLinesIn.model_fields)
+    return card_order.put_first(fields, charged, total, _payments(data, valued.total), dropped=SCREEN_ONLY)

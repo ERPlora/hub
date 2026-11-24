@@ -195,7 +195,9 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Regis
 Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
 quiere, una clave del intento: repetir la misma llamada con la misma clave responde el pago ya registrado
-en vez de registrar otro.
+en vez de registrar otro. La tarjeta del asistente dice en su línea a quién se paga, la factura del
+proveedor y el importe («Crear en Pagos: Pescados QA · F-2611 · 180,00 €»); sin factura, el método del que
+sale va detrás del importe («Pescados QA · 180,00 € · BBVA»), y los demás datos siguen, cada uno una vez.
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` — la fecha es la del día del negocio en
 que se registra, no la del pago; el número cuenta por día y nunca se repite — y el aviso
 `payment.payment.created` (lleva la referencia, el beneficiario, el importe y la moneda).
