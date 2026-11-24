@@ -4,12 +4,10 @@
 // by Reference; sort by Date, Type, Quantity or Balance. An empty ledger says where movements come
 // from; a search that finds nothing says how a sale is found. A new movement (a reception, a count, a
 // sale) arrives through the stream.
-import { DataTable } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
-import type { Component } from 'vue';
 
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
+import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId, tableOf } from '../__tests__/mount-inventory';
 import { formatShortDateTime } from '../lib/format';
 import MovementsPage from './MovementsPage.vue';
 import source from './MovementsPage.vue?raw';
@@ -40,9 +38,7 @@ const LEDGER = page([
 async function setup(options: MountOptions = {}) {
   const m = await mountInventory(MovementsPage, { path: '/inventory/movements', ...options });
   const call = await m.live();
-  const testid = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
+  const { testid, table, prop } = tableOf(m);
   const rows = () => m.wrapper.findAll('[data-testid="inventory-movements-row"]');
   async function onNewStream(data: unknown) {
     await m.clock.advance(150);

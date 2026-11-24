@@ -9,7 +9,7 @@ Para qué: montar la página pública con su diseño, sus fotos, la carta o los 
 ## Punto de partida
 
 - Un negocio con Página web y su carta o sus servicios dados de alta.
-- Un dominio propio apuntando al negocio, para el paso 12.
+- Un dominio propio apuntando al negocio, para el paso 13.
 
 ## Recorrido
 
@@ -19,10 +19,11 @@ Para qué: montar la página pública con su diseño, sus fotos, la carta o los 
 4. WEBSITE-F04 — la foto de portada.
 5. WEBSITE-F11 — una galería de fotos del local.
 6. WEBSITE-F05 — la carta o los servicios; en la carta, un plato con foto propia, otro con foto de la librería, descripción y alérgenos.
-7. WEBSITE-F12 — las reseñas de Google.
-8. WEBSITE-F06 — la vista previa.
-9. WEBSITE-F07 — la página, publicada.
-10. WEBSITE-F09 — la dirección y el QR, compartidos, y el QR del catálogo para las mesas.
-11. WEBSITE-F10 — un cliente abre la página desde el QR, y otro escanea el de la mesa y llega directo a la carta.
-12. BASE-F110 — la misma página, por el dominio propio, con las fotos de la carta.
-13. WEBSITE-F08 — la página, desconectada.
+7. INVENTORY-F36 — la comida del personal, oculta de la página web: no sale en la carta ni en la vista previa, y el TPV la sigue vendiendo.
+8. WEBSITE-F12 — las reseñas de Google.
+9. WEBSITE-F06 — la vista previa.
+10. WEBSITE-F07 — la página, publicada.
+11. WEBSITE-F09 — la dirección y el QR, compartidos, y el QR del catálogo para las mesas.
+12. WEBSITE-F10 — un cliente abre la página desde el QR, y otro escanea el de la mesa y llega directo a la carta.
+13. BASE-F110 — la misma página, por el dominio propio, con las fotos de la carta.
+14. WEBSITE-F08 — la página, desconectada.

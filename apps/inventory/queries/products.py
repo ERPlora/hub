@@ -183,6 +183,8 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
         products = products.filter(
             Q(name__icontains=params.search) | Q(sku__icontains=params.search)
         )
+    if params.show_on_website is not None:
+        products = products.filter(show_on_website=params.show_on_website)
     return _page(products.order_by("name", "id"), params, partial(_sale_row, urls=images.Urls(ctx.scope)))
 
 
@@ -336,6 +338,7 @@ def _sale_row(product: Product, urls: images.Urls) -> dict:
         "price_quantity",
         "pricing_unit",
         "allergens",
+        "show_on_website",
     )
     return {
         **{field: getattr(product, field) for field in fields},
