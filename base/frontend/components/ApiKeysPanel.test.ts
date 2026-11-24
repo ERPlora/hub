@@ -12,8 +12,7 @@ function key(fields: Partial<ApiKeyRow> = {}): ApiKeyRow {
     id: '0199aaaa-0000-7000-8000-000000000001',
     name: 'Gestoría',
     prefix: 'erpk_live_AbCdEfGh',
-    mode: 'read',
-    scopes: {},
+    scopes: { '*': ['read'] },
     rate_per_minute: 60,
     created_by: 'Olga',
     created_at: '2026-10-20T09:00:00Z',
@@ -24,17 +23,21 @@ function key(fields: Partial<ApiKeyRow> = {}): ApiKeyRow {
   };
 }
 
-const APPS = [
-  { id: 'cart_checkout', name: 'Online shop', read: true, write: true },
-  { id: 'tax', name: 'Taxes', read: true, write: true },
+const ALL = ['read', 'create', 'update', 'delete'] as const;
+const APPS: ApiKeyList['apps'] = [
+  { id: 'cart_checkout', name: 'Online shop', actions: [...ALL] },
+  { id: 'tax', name: 'Taxes', actions: ['read', 'update'] },
 ];
+/** Who asks may give everything but deleting in the online shop, and only reading the taxes. */
+const GRANTABLE = { '*': ['read', 'create', 'update'], cart_checkout: ['read', 'create', 'update'], tax: ['read'] } as const;
 const LIST: ApiKeyList = {
   keys: [
     key(),
-    key({ id: '0199aaaa-0000-7000-8000-000000000002', name: 'Tienda', mode: 'per_app', scopes: { cart_checkout: ['read', 'write'] }, last_used_at: '2026-10-23T10:00:00Z' }),
-    key({ id: '0199aaaa-0000-7000-8000-000000000003', name: 'Vieja', mode: 'full', revoked_at: '2026-10-22T10:00:00Z' }),
+    key({ id: '0199aaaa-0000-7000-8000-000000000002', name: 'Tienda', scopes: { cart_checkout: ALL }, last_used_at: '2026-10-23T10:00:00Z' }),
+    key({ id: '0199aaaa-0000-7000-8000-000000000003', name: 'Vieja', scopes: { '*': ALL }, revoked_at: '2026-10-22T10:00:00Z' }),
   ],
   apps: APPS,
+  grantable: GRANTABLE,
 };
 
 /** What the panel posted: [path, body]. */
@@ -87,8 +90,16 @@ describe('ApiKeysPanel', () => {
     expect(rows[0].text()).toContain('Activa');
     expect(rows[0].text()).toContain('Nunca');
     expect(rows[0].text()).toContain('60/min');
-    expect(rows[1].find('[data-testid="api-keys-scopes"]').text()).toBe('Online shop L/E');
+    expect(rows[1].find('[data-testid="api-keys-scopes"]').text()).toBe('Online shop L/C/M/B');
     expect(rows[2].text()).toContain('Revocada');
+    expect(rows[2].text()).toContain('Acceso total');
+  });
+
+  it('a key that is no general mode says its actions on every app and app by app', async () => {
+    const m = await open({ locale: 'es' });
+    const keys = [key({ scopes: { '*': ['read', 'create'], tax: ['update'] } })];
+    await m.result(m.call, 'base.api_key.list', { ...LIST, keys });
+    expect(m.wrapper.get('[data-testid="api-keys-scopes"]').text()).toBe('Todas las apps L/C · Taxes M');
   });
 
   it('each key’s buttons tell a screen reader which key they are for, their short words first', async () => {
@@ -108,7 +119,7 @@ describe('ApiKeysPanel', () => {
 
   it('none yet is said, with what a key is for', async () => {
     const m = await open({ locale: 'es' });
-    await m.result(m.call, 'base.api_key.list', { keys: [], apps: APPS });
+    await m.result(m.call, 'base.api_key.list', { ...LIST, keys: [] });
     expect(m.wrapper.text()).toContain('Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.');
   });
 
@@ -142,8 +153,59 @@ describe('ApiKeysPanel', () => {
     submit().click();
     await flush();
     expect(posted(m)).toEqual([
-      ['/api/keys', { name: 'Tienda', rate_per_minute: 60, mode: 'per_app', scopes: { cart_checkout: ['read'] } }],
+      ['/api/keys', { name: 'Tienda', rate_per_minute: 60, scopes: { cart_checkout: ['read'] } }],
     ]);
+  });
+
+  it('per app, «Write» gives the creating, changing and deleting who asks may give there', async () => {
+    const m = await open({ onApi: () => Response.json({ key: key({ name: 'Tienda' }), token: TOKEN }) });
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    type(byTestId('api-key-form-name')!, 'Tienda');
+    (byTestId('api-key-form-cart_checkout-write') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
+    await flush();
+    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
+    await flush();
+    expect(posted(m)).toEqual([['/api/keys', { name: 'Tienda', rate_per_minute: 60, scopes: { cart_checkout: ['create', 'update'] } }]]);
+  });
+
+  it('a box is there only for what who asks may give on that app', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    expect([byTestId('api-key-form-tax-read'), byTestId('api-key-form-tax-write')].map(Boolean)).toEqual([true, false]);
+  });
+
+  it('a general mode is given on every app', async () => {
+    const m = await open({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    type(byTestId('api-key-form-name')!, 'Gestoría');
+    (byTestId('api-key-form-mode-write') as HTMLElement).click();
+    await flush();
+    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
+    await flush();
+    expect(posted(m)).toEqual([['/api/keys', { name: 'Gestoría', rate_per_minute: 60, scopes: { '*': ['create', 'update', 'delete'] } }]]);
+  });
+
+  it('more than who asks may do is refused in words', async () => {
+    const reason = 'Una key no puede hacer más de lo que puedes hacer tú.';
+    const m = await open({
+      locale: 'es',
+      onApi: () => Response.json({ error: { code: 'base.api_key_beyond_maker', message: reason, fields: { scopes: reason } } }, { status: 403 }),
+    });
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    type(byTestId('api-key-form-name')!, 'Gestoría');
+    (byTestId('api-key-form-mode-full') as HTMLElement).click();
+    await flush();
+    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
+    await flush();
+    expect(byTestId('api-key-form-error')?.textContent?.trim()).toBe(reason);
   });
 
   it('the token once, with «Copy» that says «Copied» for two seconds', async () => {

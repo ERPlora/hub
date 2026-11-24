@@ -1013,8 +1013,11 @@
       },
       "short": {
         "read": "L",
-        "write": "E"
+        "create": "C",
+        "update": "M",
+        "delete": "B"
       },
+      "allApps": "Todas las apps",
       "states": {
         "active": "Activa",
         "revoked": "Revocada"
@@ -1063,6 +1066,7 @@
         "gone": "Esa key ya no existe. Actualiza la lista y vuelve a intentarlo.",
         "scopesRequired": "Elige al menos una app y qué puede hacer la key en ella.",
         "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
+        "beyondMaker": "Una key no puede hacer más de lo que puedes hacer tú.",
         "denied": "Solo quien lleva el negocio gestiona las API keys."
       },
       "docs": "Documentación de la API"
