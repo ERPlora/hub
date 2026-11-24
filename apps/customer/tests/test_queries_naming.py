@@ -74,6 +74,8 @@ def test_a_card_no_longer_live_is_not_named_by_a_part_of_its_name():
     with pytest.raises(NotFound) as refused:
         named("Lucía")
     assert refused.value.code == "customer.customer_unavailable"
+    gomez = card("Lucía Gómez")
+    assert named("Lucía").id == gomez.id
 
 
 @pytest.mark.parametrize("reference", ["600 222", "lucia.fernandez@"])
