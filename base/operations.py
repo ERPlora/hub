@@ -230,7 +230,8 @@ def _note_the_person(request: HttpRequest, user: Any) -> None:
     from base.services.devices import saas_user_id_of
 
     hub = getattr(request, "hub", None)
-    support = request.session.get(CREDENTIAL_SESSION_KEY) == SessionOwner.Credential.SUPPORT
+    session = getattr(request, "session", None)
+    support = session is not None and session.get(CREDENTIAL_SESSION_KEY) == SessionOwner.Credential.SUPPORT
     if hub is not None and not hub.is_demo and not support:
         meter.note_seen(hub.slug, saas_user_id_of(user))
 

@@ -53,8 +53,9 @@ def test_every_event_is_named_as_the_convention_says():
         "base.approval.used",
         # The API's documentation shown or hidden.
         "base.api_doc.settings_changed",
-        # ERPlora's support access turned on or off.
+        # ERPlora's support access turned on or off, and each entry of support.
         "base.support_access.changed",
+        "base.support_access.entered",
         # An app turned on or off by the business.
         "base.app.enabled",
         "base.app.disabled",
