@@ -5,7 +5,7 @@
 // the hub, past the deadline it says the deadline went by with the ring empty, an employee never sees it, and once paid
 // it goes without reloading. The photo is sent the way erplora.com sends it (`PUT /internal/hubs/{id}/state`, signed)
 // and `a`'s photo is put back after the run.
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   arrivalCard,
@@ -19,7 +19,7 @@ import {
   serverCounter,
 } from './action-center';
 import { capture, EMPLOYEE, horizontalOverflow, internalPut, psql, saveSessionForTheSweep } from './helpers';
-import { spanishContext, spanishHome } from './home-helpers';
+import { spanishPerson } from './home-helpers';
 import { STACK } from './stack';
 
 const KEY = 'base.payment_pending';
@@ -62,13 +62,6 @@ test.beforeAll(() => {
 test.afterAll(() => {
   psql([`update base_hub h set state = b.state, state_version = b.state_version from ${BACKUP} b where b.id = h.id`, `drop table ${BACKUP}`].join('; '));
 });
-
-async function spanishPerson(browser: Browser, size: (typeof SIZES)[number], who?: typeof EMPLOYEE) {
-  const context = await spanishContext(browser, size);
-  const page = await context.newPage();
-  await spanishHome(page, who);
-  return { context, page };
-}
 
 async function snap(page: Page, name: string, width: number): Promise<void> {
   expect(await horizontalOverflow(page), `${name} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);

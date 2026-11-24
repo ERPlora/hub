@@ -42,6 +42,16 @@ def turn(user, language: str, name: str, arguments: dict) -> dict:
     return card_turn.turn(asking(user, language), card_turn.call(name, arguments), said="the roles")
 
 
+def confirmed(user, name: str, arguments: dict) -> list[str]:
+    """How it went once the person typed the yes of the card of the write ``name``."""
+    drawn = turn(user, "es", name, arguments)
+    plan = card_turn.turn(
+        asking(user, "es"), drawn["pending"][0], said="the roles",
+        decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"},
+    )
+    return [row["outcome"] for row in plan["executed"]]
+
+
 def lines(fields: list[dict]) -> list[tuple]:
     return [(field["label"], field["value"]) for field in fields]
 
@@ -114,14 +124,9 @@ def test_deleting_one_says_its_name_and_how_many_have_it(olga, cashier, language
 
 
 def test_the_yes_changes_the_role(olga, cashier):
-    drawn = turn(olga, "es", "base.role.update", {"role": str(cashier.pk), "states": {"sale.void_sale": "off"}})
+    arguments = {"role": str(cashier.pk), "states": {"sale.void_sale": "off"}}
 
-    plan = card_turn.turn(
-        asking(olga, "es"), drawn["pending"][0], said="the roles",
-        decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"},
-    )
-
-    assert [row["outcome"] for row in plan["executed"]] == ["ok"]
+    assert confirmed(olga, "base.role.update", arguments) == ["ok"]
     cashier.refresh_from_db()
     assert cashier.states == {"sale.view_sale": ON, "sale.void_sale": OFF}
 
@@ -177,12 +182,5 @@ def test_somebody_who_is_not_of_the_business_is_not_said_by_their_id(olga, cashi
 
 
 def test_the_yes_gives_the_role(olga, cashier, luis):
-    drawn = turn(olga, "es", "base.role.assign", {"person": "saas:6", "role": str(cashier.pk)})
-
-    plan = card_turn.turn(
-        asking(olga, "es"), drawn["pending"][0], said="the roles",
-        decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"},
-    )
-
-    assert [row["outcome"] for row in plan["executed"]] == ["ok"]
+    assert confirmed(olga, "base.role.assign", {"person": "saas:6", "role": str(cashier.pk)}) == ["ok"]
     assert HubUser.objects.get(username="saas:6").business_role == cashier

@@ -9,7 +9,6 @@ import json
 
 import pytest
 from live.models import OutboxEvent
-from live.operations import get as get_operation
 
 from base import events
 from base.apps_on import active_apps
@@ -20,9 +19,9 @@ from base.roles import OFF, ON
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 from base.tests.roles import a_role, held_by
-from base.tests.routes import bound_routes, spa_routes
+from base.tests.test_services_roles import adam, eva, olga
 
-__all__ = ["in_business_a"]
+__all__ = ["adam", "eva", "in_business_a", "olga"]
 
 pytestmark = HUB_DB
 
@@ -47,21 +46,6 @@ def role_of(username: str) -> BusinessRole | None:
 
 def facts() -> list[dict]:
     return list(OutboxEvent.objects.filter(name=events.ROLE_ASSIGNED).values_list("payload", flat=True))
-
-
-@pytest.fixture
-def olga(make_user):
-    return make_user("saas:1", host=A.key, role=OWNER, first_name="Olga")
-
-
-@pytest.fixture
-def adam(make_user):
-    return make_user("saas:2", host=A.key, role=ADMIN, first_name="Adam")
-
-
-@pytest.fixture
-def eva(make_user):
-    return make_user("saas:3", host=A.key, role=EMPLOYEE, first_name="Eva")
 
 
 @pytest.fixture
@@ -350,18 +334,3 @@ class TestTwoBusinesses:
         assert role_of("saas:3") == cashier
         with use_hub(hub_b):
             assert role_of("saas:3") == theirs
-
-
-class TestHowItIsReached:
-    ROUTE = ("POST", "/roles/assign", "base.role.assign")
-
-    def test_its_route_is_the_one_the_spa_calls(self):
-        from base.api.people import router
-
-        assert self.ROUTE in bound_routes(router)
-        assert self.ROUTE in spa_routes("base.role.")
-
-    def test_an_api_key_does_not_reach_it(self):
-        op = get_operation("base.role.assign")
-
-        assert (op.kind, op.permission, op.expose_api, op.repeatable) == ("command", "base.manage_roles", False, True)

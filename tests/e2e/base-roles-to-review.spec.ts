@@ -3,7 +3,7 @@
 // and 1440: a role that lacks a permission comes as a card without reloading, the bell says how many, «Revisar los
 // roles» opens Empleados › Roles, an employee never sees it, and once the role is saved with what it lacked it goes
 // without reloading. The role is the run's own, deleted after it.
-import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import {
   arrivalCard,
@@ -15,7 +15,7 @@ import {
   serverCounter,
 } from './action-center';
 import { A, api, capture, EMPLOYEE, horizontalOverflow, psql, shown, uniqueName } from './helpers';
-import { spanishContext, spanishHome } from './home-helpers';
+import { spanishPerson } from './home-helpers';
 
 const KEY = 'base.roles_to_review';
 const TITLE = '1 rol por revisar';
@@ -30,13 +30,6 @@ const SIZES = [
 async function snap(page: Page, name: string, width: number): Promise<void> {
   expect(await horizontalOverflow(page), `${name} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await capture(page, `BASE-F131-${name}-${width}`);
-}
-
-async function spanishPerson(browser: Browser, size: (typeof SIZES)[number], who?: typeof EMPLOYEE) {
-  const context = await spanishContext(browser, size);
-  const page = await context.newPage();
-  await spanishHome(page, who);
-  return { context, page };
 }
 
 /** A role the owner makes from the employee's, which then lacks `PERMISSION`; saving another one tells the bell. */
