@@ -182,6 +182,10 @@ describe('HUB_ASSISTANT: the files its tools take whole', () => {
     expect(said(en)('base.data.import.fileTooBig')).toBe('The file could not be read: the file is larger than 20 MB.');
     expect(said(es)('base.data.import.fileTooBig')).toBe('No se pudo leer el fichero: el fichero pasa de 20 MB.');
   });
+
+  it('each attached photo comes to the turn with its name, so the assistant can keep it in Files', () => {
+    expect(HUB_ASSISTANT.imageNames).toBe(true);
+  });
 });
 
 describe('HUB_ASSISTANT: who', () => {
