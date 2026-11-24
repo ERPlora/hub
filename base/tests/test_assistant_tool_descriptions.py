@@ -21,9 +21,9 @@ def descriptions(node: object) -> list[str]:
     return own + [text for value in node.values() for text in descriptions(value)]
 
 
-def said_more_than_once(name: str) -> dict[str, int]:
-    """Each paragraph of ``name``'s parameters said in more than one description, whole or inside a longer one."""
-    said = Counter(descriptions(shared.tool_spec(registry[name])["parameters"]))
+def said_more_than_once(parameters: dict) -> dict[str, int]:
+    """Each paragraph of a tool's parameters said in more than one description, whole or inside a longer one."""
+    said = Counter(descriptions(parameters))
     times = {
         paragraph: sum(count for text, count in said.items() if paragraph in text)
         for paragraph in said
@@ -37,4 +37,27 @@ TOOLS = sorted(name for name, op in registry.items() if shared.is_tool(op))
 
 @pytest.mark.parametrize("name", TOOLS)
 def test_a_tool_says_each_paragraph_of_its_parameters_once(name):
-    assert said_more_than_once(name) == {}
+    assert said_more_than_once(shared.tool_spec(registry[name])["parameters"]) == {}
+
+
+RULE = "Comparisons, all at once: `{path: {operator: value}}`; a field that is not there never matches."
+
+
+def parameters(first: str, second: str) -> dict:
+    """A tool's parameters with one description on a field and another on a model the field refers to."""
+    return {
+        "properties": {"steps": {"description": first, "items": {"$ref": "#/$defs/Step"}}},
+        "$defs": {"Step": {"properties": {"run_if": {"description": second}}}},
+    }
+
+
+def test_a_paragraph_on_a_field_and_on_a_model_it_refers_to_is_said_twice():
+    assert said_more_than_once(parameters(RULE, RULE)) == {RULE[:60]: 2}
+
+
+def test_a_paragraph_pasted_inside_a_longer_description_is_said_twice():
+    assert said_more_than_once(parameters(RULE, "«Only if…»: " + RULE)) == {RULE[:60]: 2}
+
+
+def test_a_short_phrase_may_repeat():
+    assert said_more_than_once(parameters("How many, 1 or more.", "How many, 1 or more.")) == {}
