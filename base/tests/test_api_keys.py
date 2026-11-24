@@ -1,7 +1,8 @@
 """The business's API keys (``erpk_live``), in Employees › API keys.
 
-Who runs the business creates a key with a name, a pace (requests a minute) and what it may do — everything, read only,
-write only, or per app, read and write — and sees its token once; the hub keeps only its digest. The key reaches only
+Who runs the business creates a key with a name, a pace (requests a minute) and what it may do — read, create, update
+and delete, on every app or app by app, never more than its maker may do — and sees its token once; the hub keeps only
+its digest. The key reaches only
 the operations its apps publish (``expose_api``), of the apps this business has, with the same checks as anyone; it is
 rotated (a new token, the old one stops at once) and revoked (at once, for good). A key lives in its hub's own
 database: a key of one business never opens another. A business without its own database is not served at all, so
@@ -18,10 +19,13 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.utils import timezone
 from live.models import OutboxEvent
+from live.operations import registry
 
 from apps.customer.models import Consent, Customer
+from apps.inventory.models import Category
 from apps.tax.models import TaxCategory
-from base import api_keys
+from base import api_keys, permissions
+from base.api_actions import ACTIONS, CREATE, DELETE, READ, UPDATE, action_of
 from base.models.api_keys import ApiKey
 from base.models import Membership
 from base.tenancy.context import use_hub
@@ -68,7 +72,7 @@ def code(response) -> str:
 
 
 def create(client, hub, **fields) -> dict:
-    body = {"name": "Gestoría — facturas", "rate_per_minute": 60, "mode": "full", "scopes": {}, **fields}
+    body = {"name": "Gestoría — facturas", "rate_per_minute": 60, "scopes": {"*": list(ACTIONS)}, **fields}
     response = post(client, host(hub), "/keys", body)
     assert response.status_code == 200, response.content
     return response.json()
@@ -82,6 +86,23 @@ def admin_on_a(client, hub_a):
 
 CARTS = "/cart_checkout/carts"
 TAX_CATEGORIES = "/tax/categories"
+CATEGORIES = "/inventory/categories"
+#: What each action's call of Inventory's categories answers when it opens.
+OPENED = {READ: 200, CREATE: 201, UPDATE: 200, DELETE: 200}
+
+
+def call(client, hub, action: str, key: dict):
+    """The call of ``action`` on a category of Inventory, with ``key``; the category is made by whoever runs the
+    business, so a key that does not create still has one to change or delete."""
+    if action == READ:
+        return get(client, host(hub), CATEGORIES, **key)
+    if action == CREATE:
+        return post(client, host(hub), CATEGORIES, {"name": "Bebidas"}, **key)
+    with use_hub(hub):
+        category = Category.objects.create(name=f"C {Category.objects.count()}", slug=f"c-{Category.objects.count()}")
+    if action == UPDATE:
+        return post(client, host(hub), f"{CATEGORIES}/update", {"id": str(category.id), "name": "Otra"}, **key)
+    return post(client, host(hub), f"{CATEGORIES}/delete", {"id": str(category.id)}, **key)
 
 
 class TestWithoutItsOwnDatabase:
@@ -92,7 +113,7 @@ class TestWithoutItsOwnDatabase:
     def test_the_screen_and_a_new_key_answer_503_and_nothing_is_created(self, client):
         client.force_login(member("a"))
         listed = get(client, "a.localhost:8000", "/keys")
-        refused = post(client, "a.localhost:8000", "/keys", {"name": "X", "rate_per_minute": 60, "mode": "full", "scopes": {}})
+        refused = post(client, "a.localhost:8000", "/keys", {"name": "X", "rate_per_minute": 60, "scopes": {"*": ["read"]}})
         assert [(answer.status_code, code(answer)) for answer in (listed, refused)] == [(503, "base.hub_maintenance")] * 2
 
     @pytest.mark.django_db
@@ -116,7 +137,7 @@ class TestCreate:
         assert kept.token_digest == hashlib.sha256(token.encode()).hexdigest()
         assert token not in json.dumps([getattr(kept, field.attname) for field in ApiKey._meta.fields], default=str)
         listed = get(admin_on_a, host(hub_a), "/keys").json()
-        assert set(listed) == {"keys", "apps"}
+        assert set(listed) == {"keys", "apps", "grantable"}
         assert "token" not in listed["keys"][0] and token not in json.dumps(listed)
         assert listed["keys"][0]["created_by"] == "Olga"
 
@@ -132,13 +153,16 @@ class TestCreate:
             ({"name": "  "}, "name"),
             ({"rate_per_minute": 0}, "rate_per_minute"),
             ({"rate_per_minute": 10_001}, "rate_per_minute"),
-            ({"mode": "per_app", "scopes": {}}, "scopes"),
-            ({"mode": "per_app", "scopes": {"nope": ["read"]}}, "scopes"),
-            ({"mode": "per_app", "scopes": {"cart_checkout": ["delete"]}}, "scopes"),
+            ({"scopes": {}}, "scopes"),
+            ({"scopes": {"cart_checkout": []}}, "scopes"),
+            ({"scopes": {"nope": ["read"]}}, "scopes"),
+            # Customers publishes only what it reads: no key creates a customer.
+            ({"scopes": {"customer": ["create"]}}, "scopes"),
+            ({"scopes": {"cart_checkout": ["write"]}}, "scopes"),
         ],
     )
     def test_what_is_wrong_is_said_on_its_field(self, admin_on_a, hub_a, fields, field):
-        body = {"name": "Gestoría", "rate_per_minute": 60, "mode": "full", "scopes": {}, **fields}
+        body = {"name": "Gestoría", "rate_per_minute": 60, "scopes": {"*": ["read"]}, **fields}
         response = post(admin_on_a, host(hub_a), "/keys", body)
         assert response.status_code == 422, response.content
         # Said on its field: the field itself, or a path inside it (``scopes.cart_checkout.0``).
@@ -148,19 +172,20 @@ class TestCreate:
         ("fields", "field"),
         [
             ({"name": "  "}, "name"),
-            ({"mode": "per_app", "scopes": {}}, "scopes"),
-            ({"mode": "per_app", "scopes": {"nope": ["read"]}}, "scopes"),
+            ({"scopes": {}}, "scopes"),
+            ({"scopes": {"nope": ["read"]}}, "scopes"),
+            ({"scopes": {"customer": ["create"]}}, "scopes"),
         ],
     )
     def test_a_field_is_refused_in_words_a_person_can_read(self, admin_on_a, hub_a, fields, field):
         # A form says on top what no field shows (FormModal, hub#833): a code or an app's id would reach the person.
-        body = {"name": "Gestoría", "rate_per_minute": 60, "mode": "full", "scopes": {}, **fields}
+        body = {"name": "Gestoría", "rate_per_minute": 60, "scopes": {"*": ["read"]}, **fields}
         error = post(admin_on_a, host(hub_a), "/keys", body).json()["error"]
         assert error["fields"] == {field: error["message"]}
 
     def test_only_who_runs_the_business(self, client, hub_a):
         client.force_login(member(hub_a.slug, role="hub_manager", username="saas:4"))
-        response = post(client, host(hub_a), "/keys", {"name": "X", "rate_per_minute": 60, "mode": "full", "scopes": {}})
+        response = post(client, host(hub_a), "/keys", {"name": "X", "rate_per_minute": 60, "scopes": {"*": ["read"]}})
         assert code(response) == "permission_denied"
         assert code(get(client, host(hub_a), "/keys")) == "permission_denied"
 
@@ -170,21 +195,21 @@ class TestUse:
     """A key reaches what its apps publish, read or write as it says, and nothing else."""
 
     def test_a_read_key_reads_and_does_not_write(self, admin_on_a, client, hub_a):
-        token = create(admin_on_a, hub_a, mode="read")["token"]
+        token = create(admin_on_a, hub_a, scopes={"*": [READ]})["token"]
         client.logout()
         assert get(client, host(hub_a), CARTS, **bearer(token)).status_code == 200
         refused = post(client, host(hub_a), CARTS, {"session_token": "sess_api001"}, **bearer(token))
         assert (refused.status_code, code(refused)) == (403, "base.api_key_scope")
 
-    def test_a_write_key_writes_and_does_not_read(self, admin_on_a, client, hub_a):
-        token = create(admin_on_a, hub_a, mode="write")["token"]
+    def test_a_key_that_creates_updates_and_deletes_writes_and_does_not_read(self, admin_on_a, client, hub_a):
+        token = create(admin_on_a, hub_a, scopes={"*": [CREATE, UPDATE, DELETE]})["token"]
         client.logout()
         created = post(client, host(hub_a), CARTS, {"session_token": "sess_api002"}, **bearer(token))
         assert created.status_code == 201, created.content
         assert code(get(client, host(hub_a), CARTS, **bearer(token))) == "base.api_key_scope"
 
     def test_a_key_per_app_reaches_its_apps_only(self, admin_on_a, client, hub_a):
-        token = create(admin_on_a, hub_a, mode="per_app", scopes={"cart_checkout": ["read"]})["token"]
+        token = create(admin_on_a, hub_a, scopes={"cart_checkout": [READ]})["token"]
         client.logout()
         assert get(client, host(hub_a), CARTS, **bearer(token)).status_code == 200
         assert code(get(client, host(hub_a), TAX_CATEGORIES, **bearer(token))) == "base.api_key_scope"
@@ -194,6 +219,28 @@ class TestUse:
         client.logout()
         assert get(client, host(hub_a), TAX_CATEGORIES, **bearer(token)).status_code == 200
         assert post(client, host(hub_a), CARTS, {"session_token": "sess_api003"}, **bearer(token)).status_code == 201
+
+    @pytest.mark.parametrize("action", ACTIONS)
+    def test_each_action_opens_its_own_calls_only(self, admin_on_a, client, hub_a, action):
+        token = create(admin_on_a, hub_a, scopes={"inventory": [action]})["token"]
+        client.logout()
+        answers = {each: call(client, hub_a, each, bearer(token)) for each in ACTIONS}
+        assert {each: answer.status_code for each, answer in answers.items() if answer.status_code < 400} == {
+            action: OPENED[action]
+        }
+        assert {code(answer) for each, answer in answers.items() if each != action} == {"base.api_key_scope"}
+
+    def test_a_key_that_reads_and_creates_in_one_app_does_just_that(self, admin_on_a, client, hub_a):
+        token = create(admin_on_a, hub_a, scopes={"inventory": [READ, CREATE]})["token"]
+        client.logout()
+        key = bearer(token)
+        made = post(client, host(hub_a), CATEGORIES, {"name": "Postres"}, **key)
+        assert made.status_code == 201, made.content
+        assert [row["name"] for row in get(client, host(hub_a), CATEGORIES, **key).json()["rows"]] == ["Postres"]
+        changed = post(client, host(hub_a), f"{CATEGORIES}/update", {"id": made.json()["id"], "name": "Dulces"}, **key)
+        gone = post(client, host(hub_a), f"{CATEGORIES}/delete", {"id": made.json()["id"]}, **key)
+        elsewhere = get(client, host(hub_a), CARTS, **key)
+        assert {code(changed), code(gone), code(elsewhere)} == {"base.api_key_scope"}
 
     def test_what_no_app_publishes_never_opens_to_a_key(self, admin_on_a, client, hub_a):
         token = create(admin_on_a, hub_a)["token"]
@@ -295,21 +342,64 @@ class TestRotateAndRevoke:
 
 @HUB_DB
 class TestTheList:
-    """Each key, what it may do, its pace, its last use; and the apps a key per app can reach."""
+    """Each key, what it may do, its pace, its last use; the apps a key can reach, with what each publishes; and the
+    most who asks may give a key."""
 
     def test_each_key_and_what_it_may_do(self, admin_on_a, hub_a):
-        create(admin_on_a, hub_a, name="Read", mode="read", rate_per_minute=30)
-        create(admin_on_a, hub_a, name="Carts", mode="per_app", scopes={"cart_checkout": ["read", "write"]})
+        create(admin_on_a, hub_a, name="Read", scopes={"*": [READ]}, rate_per_minute=30)
+        create(admin_on_a, hub_a, name="Carts", scopes={"cart_checkout": [DELETE, READ, DELETE]})
         keys = {key["name"]: key for key in get(admin_on_a, host(hub_a), "/keys").json()["keys"]}
-        assert (keys["Read"]["mode"], keys["Read"]["rate_per_minute"], keys["Read"]["scopes"]) == ("read", 30, {})
-        assert keys["Carts"]["scopes"] == {"cart_checkout": ["read", "write"]}
-        assert keys["Carts"]["revoked_at"] is None
+        assert (keys["Read"]["scopes"], keys["Read"]["rate_per_minute"]) == ({"*": [READ]}, 30)
+        assert keys["Carts"]["scopes"] == {"cart_checkout": [READ, DELETE]}
+        assert keys["Carts"]["revoked_at"] is None and "mode" not in keys["Carts"]
 
-    def test_the_apps_that_publish_their_api_with_what_each_offers(self, admin_on_a, hub_a):
+    def test_the_apps_that_publish_their_api_with_what_each_publishes(self, admin_on_a, hub_a):
         apps = {app["id"]: app for app in get(admin_on_a, host(hub_a), "/keys").json()["apps"]}
-        assert apps["cart_checkout"]["read"] is True and apps["cart_checkout"]["write"] is True
-        assert apps["tax"]["read"] is True
+        assert apps["cart_checkout"]["actions"] == list(ACTIONS)
+        assert apps["tax"]["actions"] == [READ, UPDATE]
+        assert apps["customer"]["actions"] == [READ]
         assert "base" not in apps and all(app["name"] for app in apps.values())
+
+    def test_who_runs_the_business_may_give_a_key_all_it_publishes(self, admin_on_a, hub_a):
+        listed = get(admin_on_a, host(hub_a), "/keys").json()
+        assert listed["grantable"] == {"*": list(ACTIONS), **{app["id"]: app["actions"] for app in listed["apps"]}}
+
+
+@pytest.fixture
+def cannot_delete_in_inventory(monkeypatch):
+    """Whoever runs the business holds, today, nothing that deletes in Inventory (as a role made by the business could
+    leave out)."""
+    deleting = {op.permission for op in registry.values() if op.app_label == "inventory" and action_of(op) == DELETE}
+    assert deleting, "Inventory publishes no deletion any more: pick another app"
+    role_permissions = permissions.permissions_of_role
+    monkeypatch.setattr(permissions, "permissions_of_role", lambda role: role_permissions(role) - deleting)
+
+
+@HUB_DB
+@pytest.mark.usefixtures("cannot_delete_in_inventory")
+class TestNeverMoreThanItsMaker:
+    """A key is given only what whoever makes it may do on each app: asked for more, nothing is made."""
+
+    @pytest.mark.parametrize("scopes", [{"inventory": [READ, DELETE]}, {"*": [READ, DELETE]}])
+    def test_more_than_its_maker_may_do_is_refused_on_its_field(self, admin_on_a, hub_a, scopes):
+        response = post(admin_on_a, host(hub_a), "/keys", {"name": "Tienda", "rate_per_minute": 60, "scopes": scopes})
+        assert (response.status_code, code(response)) == (403, "base.api_key_beyond_maker")
+        error = response.json()["error"]
+        assert error["fields"] == {"scopes": error["message"]}
+        with use_hub(hub_a):
+            assert ApiKey.objects.count() == 0
+
+    @pytest.mark.parametrize("scopes", [{"inventory": [READ, CREATE, UPDATE]}, {"*": [READ, CREATE, UPDATE]}])
+    def test_what_its_maker_may_do_is_given(self, admin_on_a, hub_a, scopes):
+        assert create(admin_on_a, hub_a, scopes=scopes)["key"]["scopes"] == scopes
+
+    def test_the_most_it_may_give_leaves_out_what_its_maker_may_not_do(self, admin_on_a, hub_a):
+        listed = get(admin_on_a, host(hub_a), "/keys").json()
+        apps = {app["id"]: app for app in listed["apps"]}
+        assert apps["inventory"]["actions"] == list(ACTIONS)
+        assert listed["grantable"]["inventory"] == [READ, CREATE, UPDATE]
+        assert listed["grantable"]["*"] == [READ, CREATE, UPDATE]
+        assert listed["grantable"]["cart_checkout"] == list(ACTIONS)
 
 
 KEY_ROUTES = {
