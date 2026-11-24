@@ -1,8 +1,12 @@
 """The kitchen app declares its module metadata, its menu, its permissions and what each role gets
 (WORKBOOK «Quién puede qué»)."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "kitchen.view_ticket",
@@ -170,5 +174,21 @@ def test_the_reaction_to_sales_is_the_systems_only():
     assert "kitchen.system" not in kitchen().permissions
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert kitchen().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert kitchen().help.videos == {"es": "rowV_0Chbus", "en": "2PDPgXCpbic"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("KITCHEN-F11", "KITCHEN-F13"), "8NFM7vaJ5p4", "h3M9UuelYn4"),
+    (("KITCHEN-F12",), "Y8_ivChjSPI", "IH2ppGCdFts"),
+    (("KITCHEN-F14",), "zRBB-uH4PMU", "U2OSH7MKZSA"),
+    (("KITCHEN-F01", "KITCHEN-F02", "KITCHEN-F03"), "v3Puf35Z5GI", "JiZOKyJrxao"),
+    (("KITCHEN-F04",), "7iCI2JEd3Kc", "nLW-JNwjaHg"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("kitchen", language) == help_videos.by_task(TASK_VIDEOS, language)
