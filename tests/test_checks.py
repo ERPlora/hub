@@ -299,6 +299,21 @@ def test_fast_fails_on_a_change_to_a_workbook_alone_that_its_tests_refuse(head_t
     assert "has a flow id: 'INVENTORY-F14'" in output, output[-6000:]
 
 
+UNSEEN = {"apps/demo/unseen.py": "X = 1\n"}
+UNSEEN_TEST = {"apps/demo/tests/test_unseen.py": "from apps.demo.unseen import X\n\n\ndef test_x():\n    assert X == 1\n"}
+
+
+@pytest.mark.parametrize("files, returncode", [(UNSEEN, 1), ({**UNSEEN, **UNSEEN_TEST}, 0)], ids=["alone", "with-test"])
+def test_fast_fails_on_a_committed_module_without_a_test_named_after_it(head_tree, files, returncode):
+    """However the module was written: a shell redirection or a script never passes through an editor's hook."""
+    commit(head_tree, files)
+    done = checks(head_tree, "fast", "HEAD")
+    output = done.stdout + done.stderr
+    assert done.returncode == returncode, output[-6000:]
+    named = "apps/demo/unseen.py has no test named after it: apps/demo/tests/test_unseen.py" in output
+    assert named == (returncode == 1), output[-6000:]
+
+
 @pytest.mark.parametrize("args", [(), ("slow",)])
 def test_an_unknown_mode_says_which_ones_there_are(args):
     done = checks(REPO, *args)
