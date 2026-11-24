@@ -207,7 +207,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         )
     counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
     operation = operation_total(None if counter_sale else order, closes, valuation, on=day)
-    legs = _legs(data, valuation.total, settings, operation)
+    legs = _legs(ctx, data, valuation.total, settings, operation)
     _check_drawer(ctx, legs)
 
     if counter_sale:
