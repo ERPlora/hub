@@ -3,7 +3,7 @@ with the tools every operation is by construction (``ai=``).
 
 Asked in Spanish, the turn offers ``inventory.product.suggest_image`` and ``inventory.product.set_image`` (never the
 upload: a file is picked on the screen). The suggestion for «Café con leche» brings the library's coffee with milk first,
-titled in the business's language; it sets nothing. The card that confirms the write names the image by its title,
+titled in the language of the person who asks, whatever the business's; it sets nothing. The card that confirms the write names the image by its title,
 never by its reference.
 """
 
@@ -39,7 +39,7 @@ def owner() -> OperationContext:
 @pytest.fixture
 def latte(owner, db):
     TaxCategory.objects.get_or_create(key="restaurant.drink", defaults={"name": "Drinks"})
-    Hub.objects.filter(slug=A.key).update(language="es")
+    Hub.objects.filter(slug=A.key).update(language="en")
     op = get("inventory.product.create")
     return op(owner, op.input(name="Café con leche", sku="CAF-02", price=180, tax_category_key="restaurant.drink"))
 

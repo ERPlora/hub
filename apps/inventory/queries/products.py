@@ -23,7 +23,7 @@ from apps.inventory.schemas.products import (
 )
 from apps.inventory.schemas.stock import LowStockListIn, LowStockPage
 from base import images
-from base.queries.catalog_images import business_language, image_library, image_suggestion
+from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order_for
 
 #: Products that cannot be sold for lack of a live tax category.
@@ -142,15 +142,12 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     },
 )
 def suggest_image(ctx: OperationContext, data: ProductImageSuggestIn) -> dict:
-    """INVENTORY-F30: the library searched by the product's name in either of its languages, titled in the business's
-    (the one its products are named in)."""
+    """INVENTORY-F30: the library searched by the product's name in either of its languages, titled in the person's."""
     product = find_product(data.id, data.product)
-    language = business_language(ctx)
-    found = image_library(ctx).search(product.name, language)
     return {
         "product_id": product.id,
         "query": product.name,
-        "rows": [image.row(language) for image in found[: data.limit]],
+        "rows": titled_search(ctx, product.name)[: data.limit],
     }
 
 

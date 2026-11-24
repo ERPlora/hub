@@ -48,7 +48,7 @@ from apps.inventory.models import Product, ProductCategory, Unit
 from apps.inventory.queries.recovery import products_standing_for
 from apps.tax.models import TaxCategory
 from base import images
-from base.queries.catalog_images import business_language, image_library, image_suggestion
+from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order
 
 COMBO_NOT_FOUND = _("That menu does not exist in this business.")
@@ -544,14 +544,12 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     },
 )
 def suggest_image(ctx: OperationContext, data: ComboImageSuggestIn) -> dict:
-    """COMBO-F14: the library searched by the menu's name in either of its languages, titled in the business's."""
+    """COMBO-F14: the library searched by the menu's name in either of its languages, titled in the person's."""
     combo = find_combo(data.id, data.combo)
-    language = business_language(ctx)
-    found = image_library(ctx).search(combo.name, language)
     return {
         "combo_id": combo.id,
         "query": combo.name,
-        "rows": [image.row(language) for image in found[: data.limit]],
+        "rows": titled_search(ctx, combo.name)[: data.limit],
     }
 
 

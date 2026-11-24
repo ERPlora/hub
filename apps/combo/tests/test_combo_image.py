@@ -14,6 +14,7 @@ import base64
 import io
 import json
 import re
+from dataclasses import replace
 
 import pytest
 from django.apps import apps as django_apps
@@ -184,12 +185,13 @@ def test_a_photo_of_its_own_is_said_at_the_address_of_the_business_that_asks(hub
     assert [(theirs.image, theirs.image_url), *said_to_b] == [(theirs.image, own_url(theirs.image, B))] * 4
 
 
-def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(library):
+def test_it_suggests_the_librarys_images_for_its_name_titled_in_the_persons_language_and_sets_none(library):
     combo = make_combo("Menú del día")
+    Hub.objects.filter(slug=A.key).update(language="en")
 
-    found = run("combo.combo.suggest_image", {"id": str(combo.id)}, ctx_for("hub_employee"))
+    found = run("combo.combo.suggest_image", {"id": str(combo.id)}, replace(ctx_for("hub_employee"), language="es"))
 
-    assert (found.query, found.rows[0].reference) == ("Menú del día", MENU)
+    assert (found.query, found.rows[0].reference, found.rows[0].title) == ("Menú del día", MENU, "Menú del día")
     assert Combo.objects.get().image == ""
     assert found.combo_id == combo.id
 

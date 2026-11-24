@@ -7,7 +7,7 @@ export interface CatalogImage {
   reference: string;
   folder: string;
   name: string;
-  /** In the business's language (in English when it is not Spanish); in the person's for `.get`. */
+  /** In the person's language (in English when it is not Spanish). */
   title: string;
   /** `/p/catalog/<folder>/<name>.webp`, cached for a year. */
   url: string;

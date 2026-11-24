@@ -21,7 +21,7 @@ from apps.service.schemas.catalog import (
 from apps.service.schemas.fields import NoIn, ServiceRefIn
 from apps.service.schemas.service_images import ServiceImageSuggestIn, ServiceImageSuggestOut
 from base import images
-from base.queries.catalog_images import business_language, image_library, image_suggestion
+from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order_for
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
@@ -260,15 +260,12 @@ def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     },
 )
 def suggest_image(ctx: OperationContext, data: ServiceImageSuggestIn) -> dict:
-    """SERVICE-F34: the library searched by the service's name in either of its languages, titled in the business's
-    (the one its services are named in)."""
+    """SERVICE-F34: the library searched by the service's name in either of its languages, titled in the person's."""
     service = find_service(data.id, data.service)
-    language = business_language(ctx)
-    found = image_library(ctx).search(service.name, language)
     return {
         "service_id": service.id,
         "query": service.name,
-        "rows": [image.row(language) for image in found[: data.limit]],
+        "rows": titled_search(ctx, service.name)[: data.limit],
     }
 
 
