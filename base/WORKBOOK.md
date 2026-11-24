@@ -2683,9 +2683,10 @@ Pasos:
      nunca «Ejecutar» ni «Crear». Una acción que no lleva ningún dato que enseñar dice solo su acción y su app, acabada
      en punto y sin dos puntos vacíos detrás: «Probar la conexión en VeriFactu.».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
-     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice. Tras
-     «Ejecutar», el asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó
-     hecho y no propone deshacerlo salvo que se lo pidan.
+     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que la persona dijo que no y dice que no
+     se hizo porque lo canceló, sin pedirle que lo confirme, porque esa tarjeta ya está cerrada. Tras «Ejecutar», el
+     asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó hecho y no propone
+     deshacerlo salvo que se lo pidan.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». El de
