@@ -228,7 +228,8 @@ CHECK_SAID_TO_BE_A_CUSTOMERS = [
     ("es", "La cuenta de la mesa 4 es de Lucía QA, ponla a su nombre.", "assign customer to an open check of a table"),
     ("en", "set the customer on table 4's check to Lucía", "assign the customer of an open check"),
 ]
-#: What the model searches for when the turn lacks the link: «assign» is the till's own word («Assign customer»).
+#: What the model searches for when the turn lacks the link, found with room to spare (``WITH_ROOM``): «assign» is the
+#: till's own word («Assign customer»).
 SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK = [
     ("es", "assign customer to an open check of a table"),
     ("en", "assign customer to an open check of a table"),
@@ -274,7 +275,7 @@ def test_the_link_tells_the_model_it_puts_the_check_in_the_customers_name():
 @pytest.mark.parametrize(("language", "search"), SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK)
 def test_searching_for_a_customer_on_a_check_finds_the_link(catalog_of, language, search):
     found = [op.name for op in assistant.relevance.found(catalog_of(Membership.Role.OWNER, language), search, language)]
-    assert LINK in found, found
+    assert LINK in found[:WITH_ROOM], found
 
 
 #: Opening a new check in a customer's name: the open comes first, as before the words of a customer put on a check.
