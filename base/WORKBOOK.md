@@ -4152,7 +4152,8 @@ Implicados: BASE-F97, BASE-F100
   erplora.com, solo el nombre.
   «Mejorar plan» y la Tienda, solo con `useMayBuy` (`base/frontend/lib/plan-link.ts`). e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
-- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio nace con todo
+- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`, la dirección web, que
+  al cambiar se lleva las apps como estaban: `base.services.address_change`; un negocio nace con todo
   apagado, también una demo, salvo las obligatorias de su país que la plataforma
   enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
   anteriores a la migración `base/0017` conservan todo encendido con sus raíces elegidas, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
