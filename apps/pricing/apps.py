@@ -33,17 +33,16 @@ class PricingConfig(LiveAppConfig):
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): the discount of something («el
     # descuento de los cafés», «the discount on coffees») is the rule that takes it off, as «la regla de descuento de
     # los cafés» is; a discount said by how much it takes off («un descuento de 5 €», «a 10 % discount on the wine»)
-    # names no rule. What the business charges for something («la caña la cobro a 2,50») is its price; «I charge» is not
-    # one, because it also charges a check («should I charge again?»).
+    # names no rule. What the business charges for something at an amount («la caña la cobro a 2,50») is its price, not
+    # what it charges to a table («se la cobro a la mesa 4»). A phrase matches whole words in a row and an amount is read
+    # by its whole part («2,50» as «2»), so each amount up to 999 is a phrase of its own. «I charge» is not one, because
+    # it also charges a check («should I charge again?»).
     assistant_synonyms = (
         (
             "regla", "rule", "el descuento de", "los descuentos de", "el descuento en", "los descuentos en",
             "the discount on", "the discounts on",
         ),
-        (
-            "precio", "price", "la cobro a", "lo cobro a", "las cobro a", "los cobro a", "la cobramos a",
-            "lo cobramos a", "las cobramos a", "los cobramos a",
-        ),
+        ("precio", "price", *(f"{charged} a {amount}" for charged in ("cobro", "cobramos") for amount in range(1000))),
     )
     permissions = {
         "pricing.view": _("View price lists, prices and rules"),
