@@ -15,6 +15,7 @@ from django.core.management.base import CommandError
 
 from base import qa_coverage
 from base.catalog import known_verticals
+from base.qa_coverage import Walk
 
 REPO = Path(__file__).resolve().parent.parent
 VERTICALS = ("hair_salon", "restaurant")
@@ -305,9 +306,9 @@ class TestTheLedger:
         )
         walks = qa_coverage.last_walks(ledger)
         assert walks["SAMPLE-F01"] == {
-            "screen": qa_coverage.Walk("2026-11-20", "phone", "1.5.0", "fail", "ERPlora/hub#1", "screen", "", ""),
-            "assistant-es": qa_coverage.Walk("2026-11-22", "tablet", "1.6.0", "ok", "", "assistant-es", "whole", "partial"),
-            "assistant-en": qa_coverage.Walk("2026-11-05", "tablet", "1.4.0", "fail", "", "assistant-en", "partial", "fail"),
+            "screen": Walk("2026-11-20", "phone", "1.5.0", "fail", "ERPlora/hub#1", "screen", "", ""),
+            "assistant-es": Walk("2026-11-22", "tablet", "1.6.0", "ok", "", "assistant-es", "whole", "partial"),
+            "assistant-en": Walk("2026-11-05", "tablet", "1.4.0", "fail", "", "assistant-en", "partial", "fail"),
         }
         assert set(walks["SAMPLE-F02"]) == {"assistant-en"}
         assert "SAMPLE-F08" not in walks
@@ -349,7 +350,8 @@ class TestTheLedger:
         ids=["another-channel", "empty", "row-of-six-columns"],
     )
     def test_a_channel_that_is_none_of_the_three_is_refused_naming_its_line(self, ledger, row, channel):
-        ledger.write_text(LEDGER_HEADER + "SAMPLE-F01,2026-11-20,tablet,1.4.0,ok,,screen,,\n" + row + "\n", encoding="utf-8")
+        walked = "SAMPLE-F01,2026-11-20,tablet,1.4.0,ok,,screen,,\n"
+        ledger.write_text(LEDGER_HEADER + walked + row + "\n", encoding="utf-8")
         with pytest.raises(qa_coverage.LedgerError, match=rf"line 3: {channel} .*screen, assistant-es, assistant-en"):
             qa_coverage.last_walks(ledger)
 
