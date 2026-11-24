@@ -30,7 +30,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
-from apps.staff.queries import actor_user_id, own_member
+from apps.staff.queries.reads import actor_user_id, own_member
 from base.business import business_zone
 from base.models import HubUser
 from base.ordering import list_order_for

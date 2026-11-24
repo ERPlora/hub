@@ -3,7 +3,8 @@
 It runs the guardrail tests of the size of each file, ruff, the import contracts, the cognitive complexity and a test
 named after each module the branch adds, the lists that only shrink included, in seconds, without the network or a
 database. Then it checks what the change touches:
-ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them, and pytest
+ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them and to its
+.json files (those of the root configure the tools), and pytest
 on its test files and on each touched module's ``tests/test_<module>.py``, on Postgres; a touched WORKBOOK runs the
 tests that read the WORKBOOKs. A tree that breaks any of them fails the command, and its output names the file and the
 reason.
@@ -73,6 +74,15 @@ import { answer } from './probe';
 
 test('the answer', () => {
   expect(answer).toBe(42);
+});
+"""
+PROBE_JSON = "apps/demo/frontend/probe.json"
+PROBE_JSON_TEST = """import { expect, test } from 'vitest';
+
+import probe from './probe.json';
+
+test('the answer', () => {
+  expect(probe.answer).toBe(42);
 });
 """
 # One edit, three faults no other check sees: four parameters (ESLint's max-params), a string where a number is
@@ -211,6 +221,19 @@ def test_a_sound_frontend_change_passes_with_the_borrowed_dependencies(head_tree
     assert f"checks: pnpm exec vitest related --run --passWithNoTests {PROBE_TS}" in output, output[-4000:]
 
 
+@needs_lent_frontend
+def test_a_change_to_a_json_file_alone_fails_on_the_vitest_tests_that_import_it(head_tree):
+    """As a new route in frontend/generated/operations.json that operation-routes.test.ts does not expect."""
+    commit(head_tree, {PROBE_JSON: '{ "answer": 42 }\n', "apps/demo/frontend/probe.test.ts": PROBE_JSON_TEST})
+    (head_tree / PROBE_JSON).write_text('{ "answer": 41 }\n', encoding="utf-8")
+    done = checks(head_tree, "fast", "HEAD", CHECKS_DEPENDENCIES_FROM=str(LENDER))
+    output = done.stdout + done.stderr
+    assert done.returncode == 1, output[-6000:]
+    assert f"checks: pnpm exec vitest related --run --passWithNoTests {PROBE_JSON}" in output, output[-6000:]
+    assert "FAIL  apps/demo/frontend/probe.test.ts > the answer" in output, output[-6000:]
+    assert "checks: pnpm exec eslint" not in output, output[-6000:]
+
+
 FIXES = {"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
 
 
@@ -249,6 +272,59 @@ def load_helper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def ran_on(tmp_path, monkeypatch, files: list[str]) -> list[list[str]]:
+    """The commands the command runs on a tree whose change since HEAD is ``files``, recorded instead of run, with the
+    frontend's dependencies in place."""
+    helper = load_helper()
+    monkeypatch.chdir(tmp_path)
+    for variable in [key for key in os.environ if key.startswith("GIT_")] + ["CHECKS_DEPENDENCIES_FROM"]:
+        monkeypatch.delenv(variable, raising=False)
+    subprocess.run(["git", "init", "-q"], check=True)
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "packages/ui").mkdir(parents=True)
+    commit(tmp_path, {"packages/ui/package.json": "{}\n"})
+    for path in files:
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text("{}\n", encoding="utf-8")
+    ran = []
+
+    def passing(command: list[str], **_env: str) -> bool:
+        ran.append(command)
+        return False
+
+    monkeypatch.setattr(helper, "run", passing)
+    assert helper.main(["fast", "HEAD"]) == 0
+    return ran
+
+
+def given_to(ran: list[list[str]], *program: str) -> set[str] | None:
+    """The files given to ``program``, or None when it did not run."""
+    commands = [command[len(program) :] for command in ran if command[: len(program)] == list(program)]
+    return {arg for arg in commands[0] if not arg.startswith("-")} if commands else None
+
+
+CODE, LOCALE, ROUTES = "shop/frontend/probe.ts", "shop/frontend/locale/en.json", "frontend/generated/operations.json"
+
+
+@pytest.mark.parametrize(
+    "files, linted, related",
+    [
+        ([CODE, LOCALE], {CODE}, {CODE, LOCALE}),
+        ([ROUTES], None, {ROUTES}),
+        (["package.json", "complexipy-snapshot.json"], None, None),
+        (["shop/orders.py", "shop/notes.md"], None, None),
+    ],
+    ids=["with-code", "alone", "the-root-s-tool-configuration", "neither-json-nor-code"],
+)
+def test_a_json_file_goes_to_the_related_vitest_tests_and_never_to_eslint(tmp_path, monkeypatch, files, linted, related):
+    """No linter reads a .json, but a frontend module that imports it has tests that pin what it says. Those of the root
+    configure the tools, and Vitest would run its whole suite for package.json."""
+    ran = ran_on(tmp_path, monkeypatch, files)
+    assert given_to(ran, "pnpm", "exec", "eslint") == linted
+    assert (["pnpm", "typecheck"] in ran) == bool(linted)
+    assert given_to(ran, "pnpm", "exec", "vitest", "related") == related
 
 
 def test_by_default_the_change_is_what_differs_from_where_head_left_origin_main(tmp_path, monkeypatch):

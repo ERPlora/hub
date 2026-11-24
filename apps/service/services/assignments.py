@@ -25,7 +25,7 @@ from apps.service.schemas.assignments import (
 from apps.service.schemas.fields import DeletedOut
 from apps.service.services.writes import _changes
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 
 
 def _demote_other_primaries(member: Member, keep) -> None:
