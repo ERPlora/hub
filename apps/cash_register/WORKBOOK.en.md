@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:de7ed648408b3bf2022fc11afc556252c9130910429a2ad22aa060c43511a8c1 -->
+<!-- generated from WORKBOOK.md sha256:3f050eeedd14bd2af1976d8ff9416028228dffcc4e57ecbd2ff56f197c72caa4 -->
 
 ## What it is for and who it is for
 
@@ -610,7 +610,10 @@ print; update it", "…: the device's print service did not open"…). With the 
 see the expected cash does not see "Print" in an open session (the report carries the expected cash); in a
 closed one they do. The report of a session they do not see (another employee's) is not printed: "That cash
 session does not exist."
-Involved: CASH_REGISTER-F11, PRINTING-F17
+If the assistant is asked ("print the X report of the till"), it is only done if an active receipt printer takes it;
+if not, nothing is printed and its receipt says it was not done, with the reason: "No receipt printer takes this
+report: open the session to print it on this device.".
+Involved: CASH_REGISTER-F11, PRINTING-F17, BASE-F97
 
 ### CASH_REGISTER-F17 See the sale lines in no shift
 Status: done
@@ -700,7 +703,7 @@ All of them can be followed live.
 | Closes the sessions forgotten at the cut-off of the day | close | F10 | `cash_register.session.auto_close` |
 | Records cash in or cash out (also the one another app records, such as Tips, marked as its own) | record | F05, F18 | `cash_register.movement.add` |
 | Registers a count | count | F06 | `cash_register.count.add` |
-| Prints the X or Z report of a session on the receipt printer | view sessions | F16 | `cash_register.session.print` |
+| Prints the X or Z report of a session on the receipt printer; without an active receipt printer, it fails and says why, and the screen prints it on the device | view sessions | F16 | `cash_register.session.print` |
 
 ### What it announces
 

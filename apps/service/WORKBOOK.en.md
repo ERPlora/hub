@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:494fc31e2e432ee73b3dc475059c399dca9b6557c0906aea8120fbe41e41233d -->
+<!-- generated from WORKBOOK.md sha256:64e34f1aaf09667ff38728c9c7e2618f630976a8c2fc1002b5f14c1f3e45ba2d -->
 
 ## What it is for and who it is for
 
@@ -523,8 +523,8 @@ Screen: assistant
 Steps:
 1. Ask the assistant to grant the voucher to the customer (by her name or her phone), with the amount
    charged and the sale that charged it. If that sale charged several lines, also which of them.
-2. The assistant's confirmation card names the voucher, the customer, the sale by its number
-   ("20261014-0007") and the line by what it charges; confirm it.
+2. The assistant's confirmation card puts first the voucher, the customer and the sale by its number
+   ("20261014-0007"), and then the line by what it charges and the amounts; confirm it.
 3. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
 In: the voucher of the catalogue, live and active, and the customer (Customers).
 Out: a sold voucher with the owner, the date, the amount and the "Uses" and the "Validity" of the
