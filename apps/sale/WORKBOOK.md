@@ -1812,7 +1812,7 @@ es una línea.
   hacia arriba; invitación a 0 (y su coste a `gift_total`); el importe fijo de la cuenta se reparte por
   peso (bruto con IVA incluido, base sin él) con resto mayor y empate a la línea anterior; y el cierre
   **una vez por clave fiscal**: cada categoría se resuelve a su regla con
-  `apps.tax.queries.calculate_tax` (la vigente el día del negocio, en su país y su territorio fiscal de
+  `apps.tax.queries.calculation.calculate_tax` (la vigente el día del negocio, en su país y su territorio fiscal de
   Impuestos → Ajustes, TAX-F11) y las líneas se
   agrupan por la clave de esa regla (impuesto, régimen, calificación, causa de exención y tipos de sus
   componentes: la `FiscalKey` de `apps/invoice/fiscal.py`); cada clave se cierra una sola vez sobre el
@@ -2172,7 +2172,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `requires` nuevo), igual que copia en la línea lo que vale la del cobro (`SaleLine.voucher_value`, hub#783). No la
   lee de Servicios al pedir las cifras: así la producción de un periodo no cambia si Servicios se apaga (como la del
   cobro, `test_a_session_keeps_counting_with_services_off`) y el informe no pide permisos de Servicios. El día es el
-  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, el del negocio. Una
+  del cobro (`apps.tax.queries.jurisdiction.business_today`), el mismo reloj que el de una venta, el del negocio. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
 - **El código del tique para pedir la factura completa** (INVOICE-F04, hub#500): toda venta cobrada como tique

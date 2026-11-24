@@ -56,7 +56,7 @@ from apps.modifier.schemas import (
     OptionRefIn,
 )
 from apps.tax.models import TaxCategory
-from apps.tax.queries import resolve_category_text
+from apps.tax.queries.naming import resolve_category_text
 from base.recovery import LeftOut
 
 GROUP_NAME_TAKEN = _("There is already a group with that name.")

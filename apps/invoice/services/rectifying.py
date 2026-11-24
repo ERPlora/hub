@@ -28,7 +28,7 @@ from apps.invoice.services.writes import _now, _result, _today
 from apps.sale.models import Refund, Sale
 from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
-from apps.tax.queries import round_half_up
+from apps.tax.queries.calculation import round_half_up
 from base.business import business_zone
 
 SALE_NOT_INVOICED = _(

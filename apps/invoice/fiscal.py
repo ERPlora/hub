@@ -26,7 +26,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
-from apps.tax.queries import round_half_up, split_amount
+from apps.tax.queries.calculation import round_half_up, split_amount
 
 DEFAULT_FORMAT = "{prefix}-{year}-{seq:06d}"
 FORMAT_MAX_LENGTH = 60

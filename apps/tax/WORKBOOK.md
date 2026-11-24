@@ -642,7 +642,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `test_a_component_stays_right_under_its_root_in_a_descending_list`.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
-  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries.py`, `services.py`, `events.py`,
+  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries/`, `services.py`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero, y las páginas
   (`frontend/`: Categorías, Reglas, Alias y Ajustes, con sus diálogos) con su Vitest y su e2e por flujo en
   tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules`, `tax-employee`,
@@ -654,11 +654,11 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Servicios (servicio y ajustes), Ventas (sección), Menús y combos (menú) y Suplementos (opción). Ninguna
   operación borra ni desactiva una categoría; desactivarla en el admin del Hub no es un borrado (no espera a
   ninguna escritura) y deja sin vender lo que la nombra hasta que se elija otra.
-- **La lectura retenida de una categoría** (`queries.held_categories(keys)`, hub#62): `FOR KEY SHARE` en
+- **La lectura retenida de una categoría** (`queries.categories.held_categories(keys)`, hub#62): `FOR KEY SHARE` en
   orden de clave, el mismo patrón que `held()` de Inventario. La usa Servicios al guardar un servicio, el
   alta en bloque o sus ajustes, para que un borrado a la vez espere a la escritura o la rechace como una
   clave que no existe (422 `service.tax_category_unknown`), nunca con un 500 en el COMMIT.
-- **La resolución, una sola vez** (`queries.resolve_tax` y `queries.calculate_tax`): raíces activas y
+- **La resolución, una sola vez** (`queries.resolution.resolve_tax` y `queries.calculation.calculate_tax`): raíces activas y
   vigentes en la fecha, del país y la categoría; la región exacta gana a la del país entero y nunca se
   usa otra región; una región con impuesto propio (`own_tax_kind`: ES-CN, ES-CE, ES-ML) solo toma sus
   reglas, nunca las del país entero (`pick_root`, también en `current_rates`): sin la suya, `tax.no_rate`; dentro de un nivel, la de «Vigente desde» más reciente y, a igualdad, el `id` menor.
@@ -670,7 +670,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   componente con tipo mayor que 0: uno al 0 % nunca lleva cuota.
 - **País y región en cualquier caso**: `resolve_tax` y `calculate_tax` los pasan a mayúsculas, porque
   Ventas y Facturación los llaman sin pasar por los esquemas.
-- **La jurisdicción del negocio, una sola fuente** (TAX-F11, pm#629 VF-17): `queries.business_jurisdiction()`
+- **La jurisdicción del negocio, una sola fuente** (TAX-F11, pm#629 VF-17): `queries.jurisdiction.business_jurisdiction()`
   da `(país, región)`: el país es el que erplora.com registró para el negocio activo
   (`base.operations.current_business_country`: el de `base.business.get` del hub del contexto, `use_hub`, por
   `base.business.country_or_market`, la misma regla que Clientes y VeriFactu; España sin país; hub#996) y la
@@ -684,7 +684,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `RULE_EVENTS`, así que la caja y las listas vivas se recalculan. Ventas (`business_country`, el tipo de
   las secciones y `tax_closer`) y Facturación (`resolve_tax` de una línea con categoría) no pasan región
   suelta: leen esta fuente.
-- **El impuesto de un territorio** (`REGION_TAX_KINDS`; `queries.tax_kind_of(país, región)` y
+- **El impuesto de un territorio** (`REGION_TAX_KINDS`; `queries.jurisdiction.tax_kind_of(país, región)` y
   `business_tax_kind()`): `igic` en ES-CN, `ipsi` en ES-CE y ES-ML, `vat` en el resto (una región de otro
   país, también). Lo llevan lo que no tiene regla de la que sacarlo: la línea de factura con tipo tecleado
   (el territorio del negocio hoy), la línea de venta sin su regla (`_charged_kind` de Facturación: el

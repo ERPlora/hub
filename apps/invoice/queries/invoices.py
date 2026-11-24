@@ -23,7 +23,8 @@ from apps.invoice.schemas.invoices import (
     LineDefaultsOut,
 )
 from apps.sale.queries.sales import visible_sale
-from apps.tax.queries import business_tax_kind, resolve_tax
+from apps.tax.queries.jurisdiction import business_tax_kind
+from apps.tax.queries.resolution import resolve_tax
 
 #: A sort column → its ordering; every one ends with the newest first, then the id.
 _SORTS = {
