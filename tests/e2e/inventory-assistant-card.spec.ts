@@ -5,7 +5,8 @@
 // `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El asistente»). Cancelled, nothing
 // changes. What this file creates is named «E2E …» (SKU `E2E-…`) and goes away (inventory-helpers.ts `cleanInventory`);
 // the apps it turns on are turned off again.
-// flow: INVENTORY-F04 INVENTORY-F07 INVENTORY-F08 INVENTORY-F13 BASE-F97
+// A product said in the person's words is named as the write's own search finds it (hub#2290).
+// flow: INVENTORY-F04 INVENTORY-F07 INVENTORY-F08 INVENTORY-F13 INVENTORY-F29 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
@@ -63,6 +64,21 @@ for (const language of ['es', 'en'] as const) {
       await expect(card(page)).not.toContainText(product.sku);
       await untilStill(page);
       await capture(page, `hub-526-product-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await cancel(page);
+
+    // «Se ha acabado el vino tinto»: the product said in the person's words, named as the write will find it, never as
+    // said.
+    const said = product.name.replace('E2E Vino', 'vino');
+    const soldOut = await datumOf(page, 'inventory__product__set_sold_out', { product: said, sold_out: true }, 'product');
+    expect(soldOut.value).toBe(product.name);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(product.name);
+      await expect(card(page)).not.toContainText(said, { ignoreCase: false });
+      await untilStill(page);
+      await capture(page, `hub-2290-sold-out-${language}-${vp.label}`);
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
@@ -127,11 +143,13 @@ for (const language of ['es', 'en'] as const) {
 
     // Cancelled, nothing changed: the product still there, in its category, with no stock received; the category
     // still there.
-    const detail = await api<{ id: string; stock: string; category_ids: string[] }>(
+    const detail = await api<{ id: string; stock: string; category_ids: string[]; is_sold_out: boolean }>(
       context, A, 'GET', `/inventory/products/detail?id=${product.id}`,
     );
     expect(detail.status, JSON.stringify(detail.data)).toBe(200);
-    expect([detail.data.id, Number(detail.data.stock), detail.data.category_ids]).toEqual([product.id, 0, [category.id]]);
+    expect([detail.data.id, Number(detail.data.stock), detail.data.category_ids, detail.data.is_sold_out]).toEqual([
+      product.id, 0, [category.id], false,
+    ]);
     const categories = await api<{ rows: { id: string }[] }>(
       context, A, 'GET', `/inventory/categories?search=${encodeURIComponent(category.name)}`,
     );
