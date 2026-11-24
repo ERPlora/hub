@@ -2512,7 +2512,9 @@ Pasos:
      adjuntos.
   3. Su mensaje sale a la derecha tal cual lo escribió. Debajo, la burbuja del asistente, con tres puntos que se
      mueven hasta que llega el primer texto. En español, el asistente le trata de tú o de usted como ella le escribe
-     (si no se nota, de tú, como las pantallas) y lo mantiene hasta el final de la respuesta, sin mezclarlos.
+     (si no se nota, de tú, como las pantallas) y lo mantiene hasta el final de la respuesta, sin mezclarlos. Todo lo
+     que escribe va en el idioma de la persona, también lo que dice mientras consulta o antes de sacar una tarjeta: ni
+     una frase en inglés ni palabras de otro alfabeto; los nombres de los registros, tal como están escritos.
   4. Mientras responde, «Enviar» se convierte en «Detener», «Adjuntar archivo» y «Dictar por voz» se apagan y la
      respuesta va apareciendo; la conversación baja sola hasta el final. Se puede ir escribiendo la siguiente
      pregunta, pero no se envía hasta que acaba esta.

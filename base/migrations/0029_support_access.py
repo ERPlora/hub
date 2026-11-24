@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0027_api_key_actions'),
+        ('base', '0028_business_roles'),
     ]
 
     operations = [

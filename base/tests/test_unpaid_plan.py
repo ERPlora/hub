@@ -18,7 +18,7 @@ from live.context import OperationContext, Scope
 from live.operations import get
 
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from control.models import Hub
@@ -44,7 +44,7 @@ def bell_of(hub, role="hub_owner", language="en") -> dict:
     op = get("base.bell.counters")
     with use_hub(hub), override(language):
         Membership.objects.get_or_create(user=user, host=hub.slug, defaults={"role": role})
-        ctx = OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope), language=language)
+        ctx = OperationContext(scope=scope, actor=user, permissions=access_for(user, scope), language=language)
         return op(ctx, op.input()).model_dump(mode="json")
 
 

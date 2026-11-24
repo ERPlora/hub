@@ -25,6 +25,7 @@ from . import (
     locations as locations,
     profile as profile,
     relay as relay,
+    roles as roles,
     scheduler as scheduler,
     sessions as sessions,
     support_access as support_access,
@@ -90,6 +91,15 @@ class HubUser(UUIDModel):
     name = models.CharField(_("name"), max_length=150, blank=True)
     is_active = models.BooleanField(pgettext_lazy("person", "active"), default=True)
     created_at = models.DateTimeField(_("added at"), auto_now_add=True)
+    #: The role of this business they were given; none is the role of their invitation (``Membership``).
+    business_role = models.ForeignKey(
+        roles.BusinessRole,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="people",
+        verbose_name=_("role in this business"),
+    )
 
     class Meta:
         verbose_name = _("business user")

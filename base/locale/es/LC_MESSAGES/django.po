@@ -2585,6 +2585,30 @@ msgstr "El asistente envió datos que no valen: {names}."
 msgid "The assistant did not say what to change."
 msgstr "El asistente no dijo qué cambiar."
 
+#: models/roles.py
+msgid "description"
+msgstr "descripción"
+
+#: models/roles.py
+msgid "based on"
+msgstr "a partir de"
+
+#: models/roles.py
+msgid "what it allows"
+msgstr "qué permite"
+
+#: models/roles.py
+msgid "role of the business"
+msgstr "rol propio"
+
+#: models/roles.py
+msgid "roles of the business"
+msgstr "roles propios"
+
+#: models/__init__.py
+msgid "role in this business"
+msgstr "rol en este negocio"
+
 msgctxt "support access"
 msgid "support may come in"
 msgstr "soporte puede entrar"

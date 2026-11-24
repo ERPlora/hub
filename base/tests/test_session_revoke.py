@@ -239,7 +239,8 @@ def open_stream(saas_id: str, hub: Hub, role: str = "hub_owner", operation: str 
     request.session = request.session.__class__(key)
     request.user = Membership.objects.get(user__username=f"saas:{saas_id}", host=hub.slug).user
     request.LANGUAGE_CODE = "en"
-    stream = Stream(HubContextBuilder().from_request(request))
+    with use_hub(hub):
+        stream = Stream(HubContextBuilder().from_request(request))
     op = get(operation)
     stream.subs[operation] = Subscription(id=operation, op=op, params=op.input.model_validate({}))
     return stream
