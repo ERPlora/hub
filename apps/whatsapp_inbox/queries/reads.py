@@ -7,7 +7,7 @@ from django.db.models import QuerySet
 from live.context import OperationContext
 
 from apps.customer.phones import InvalidPhone, to_e164
-from apps.customer.queries import business_country
+from apps.customer.queries.reads import business_country
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.schemas.fields import PageIn
 from base.models import HubUser

@@ -7,7 +7,7 @@ from live.outbox import record_event
 
 from apps.customer import events
 from apps.customer.models import Activity, Customer, HealthRecord
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.customer.schemas.erasing import EraseIn, ErasedOut
 from apps.customer.services.merging import MERGE_FILLED
 from apps.customer.services.writes import _actor

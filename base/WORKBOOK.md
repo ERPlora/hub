@@ -2084,6 +2084,9 @@ Pasos:
      guarda como «nombre (1).ext» y sale «Se ha subido como «{name}»: ya había uno con ese nombre.».
   3. Para una carpeta nueva pulsa «Nueva carpeta», escribe el «Nombre de la carpeta» (hasta 100 caracteres) y pulsa
      «Crear carpeta». Sale «Carpeta creada.» y la carpeta aparece en el árbol y en la carpeta abierta.
+  4. Desde el asistente se guarda igual un archivo adjunto en el chat: la persona le pide guardarlo en una carpeta, el
+     asistente lo sube con su tarjeta, que lo dice por su nombre, y tras el «sí» queda en la carpeta, con las mismas
+     reglas (BASE-F94).
 Entra: los archivos, de hasta 25 MB cada uno, o el nombre de la carpeta; la carpeta abierta.
 Sale: el archivo o la carpeta, en los archivos del negocio (`base.file.uploaded`, `base.file.folder_created`).
 Si falla: cada archivo rechazado dice por qué, sin parar los demás: «No se pudo subir «{name}»: {reason}», con «Ese
@@ -2094,7 +2097,7 @@ la vez y el nuevo cierra el anterior, nunca uno encima de otro. Al crear una car
 no es válido. Usa un nombre sin barras ni puntos sueltos.» o «Ya hay un archivo o una carpeta con ese nombre aquí.».
 Quien no administra el negocio no ve los botones y, si lo intenta igual, lee «Solo un administrador puede modificar
 los archivos.».
-Implicados: BASE-F40
+Implicados: BASE-F40, BASE-F94
 
 ### BASE-F74 Previsualizar y descargar un archivo
 Estado: hecho
@@ -2561,8 +2564,10 @@ Pasos:
      Viajan con la conversación mientras la página sigue abierta; al recargarla, la conversación solo recuerda cómo
      se llamaban.
   3. La copia de un negocio no la lee el asistente: si la persona le pide cargarla, el asistente la carga con su
-     tarjeta, como Importar (BASE-F31, BASE-F97). Si la página se recargó antes de decir «sí», no carga nada y pide
-     adjuntarla otra vez.
+     tarjeta, como Importar (BASE-F31, BASE-F97). Cualquier adjunto, también una foto o un PDF, lo guarda en Archivos
+     si se le pide: lo sube a la carpeta con su tarjeta, que lo dice por su nombre, y en la carpeta queda el mismo
+     archivo, como con «Subir archivo» (BASE-F73). Si la página se recargó antes de decir «sí», no carga ni guarda
+     nada y pide adjuntarlo otra vez.
   4. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador (en la app
      instalada, el dispositivo) pide permiso para el micrófono; mientras lo pide, otra pulsación no abre una segunda
      grabación. Mientras graba, el botón se pone rojo y se llama «Detener la grabación»; a los dos minutos para solo.
@@ -2572,19 +2577,20 @@ Pasos:
 Entra: los archivos (8 MB cada uno; la copia de un negocio, 20 MB como en Importar; y 20 MB entre todos los de una
 pregunta) o la grabación.
 Sale: el archivo viaja con la pregunta a erplora.com, que lo lee; la copia de un negocio se queda en el negocio:
-erplora.com solo recibe su nombre. La grabación pasa por el negocio a la transcripción de erplora.com. El navegador
+erplora.com solo recibe su nombre. Lo que se carga o se guarda en Archivos es el archivo que adjuntó la persona, tal
+cual. La grabación pasa por el negocio a la transcripción de erplora.com. El navegador
 nunca habla directamente con erplora.com.
 Si falla: en una línea sobre el cuadro, y el archivo no se adjunta: «menu.pdf es demasiado grande: 8 MB como mucho
 por archivo.», «No se pudo leer el fichero: el fichero pasa de 20 MB.» (la copia de un negocio, como Importar), «Los
 archivos de una pregunta suman 20 MB como mucho.», «menu.rar no se puede adjuntar: imágenes, PDF, Word, Excel, texto
-o CSV.» o «No se ha podido leer menu.pdf.». Una copia que ya no está en la conversación no se carga: «No hay ningún
+o CSV.» o «No se ha podido leer menu.pdf.». Un archivo que ya no está en la conversación no se carga ni se guarda: «No hay ningún
 archivo «copia.blueprint.zip» adjunto en esta conversación: vuelve a adjuntarlo.». Con el micrófono denegado, «El acceso al
 micrófono está denegado. Permítelo en tu navegador para dictar.» y, en la app instalada (Android o Windows), donde
 no hay navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para dictar.»; una
 grabación demasiado larga, «La grabación es demasiado larga: dicta un mensaje más corto.»; sin voz, «No se ha oído
 nada. Inténtalo de nuevo más cerca del micrófono.»; y si no se puede transcribir, «No se ha podido transcribir el
 audio. Inténtalo de nuevo.».
-Implicados: BASE-F93, BASE-F97
+Implicados: BASE-F73, BASE-F93, BASE-F97
 
 ### BASE-F95 Leer la respuesta: texto, listas, tablas y enlaces
 Estado: hecho
