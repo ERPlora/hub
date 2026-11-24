@@ -19,6 +19,8 @@ ROUTES = {
     ("POST", "/devices/prune", "base.device.prune"),
     ("GET", "/access/settings", "base.access.settings"),
     ("POST", "/access/settings/update", "base.access.settings_update"),
+    ("GET", "/support-access", "base.support_access.get"),
+    ("POST", "/support-access/update", "base.support_access.update"),
     ("GET", "/me/profile", "base.profile.get"),
     ("POST", "/me/profile/update", "base.profile.update"),
     ("POST", "/me/preferences", "base.profile.preferences_set"),

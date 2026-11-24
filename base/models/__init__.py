@@ -27,6 +27,7 @@ from . import (
     relay as relay,
     scheduler as scheduler,
     sessions as sessions,
+    support_access as support_access,
 )
 
 # One DNS label, lowercase: what HostScopeResolver takes from the Host.

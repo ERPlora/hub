@@ -2584,3 +2584,43 @@ msgstr "El asistente envió datos que no valen: {names}."
 
 msgid "The assistant did not say what to change."
 msgstr "El asistente no dijo qué cambiar."
+
+msgctxt "support access"
+msgid "support may come in"
+msgstr "soporte puede entrar"
+
+msgctxt "support access"
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "support access"
+msgid "updated by"
+msgstr "actualizado por"
+
+msgctxt "support access"
+msgid "support access"
+msgstr "acceso de soporte"
+
+msgctxt "support visit"
+msgid "person"
+msgstr "persona"
+
+msgctxt "support visit"
+msgid "name"
+msgstr "nombre"
+
+msgctxt "support visit"
+msgid "email"
+msgstr "email"
+
+msgctxt "support visit"
+msgid "entered at"
+msgstr "entró el"
+
+msgctxt "support visit"
+msgid "support entry"
+msgstr "entrada de soporte"
+
+msgctxt "support visit"
+msgid "support entries"
+msgstr "entradas de soporte"

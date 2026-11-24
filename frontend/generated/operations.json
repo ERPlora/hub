@@ -2963,6 +2963,14 @@
     "method": "post",
     "path": "/api/access/settings/update"
   },
+  "base.support_access.get": {
+    "method": "get",
+    "path": "/api/support-access"
+  },
+  "base.support_access.update": {
+    "method": "post",
+    "path": "/api/support-access/update"
+  },
   "base.profile.get": {
     "method": "get",
     "path": "/api/me/profile"
