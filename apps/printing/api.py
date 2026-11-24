@@ -44,7 +44,7 @@ async def settings_get(request):
 
 @bind(router, "printing.settings.update", "/printing/settings")
 async def settings_update(request, data: SettingsPatchIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 # Printers
@@ -67,17 +67,17 @@ async def printer_status(request, params: Query[PrinterRefIn]):
 
 @bind(router, "printing.printer.create", "/printing/printers", status=201)
 async def printer_create(request, data: PrinterIn):
-    return await run_operation(request, services.create_printer, data)
+    return await run_operation(request, services.printers.create_printer, data)
 
 
 @bind(router, "printing.printer.update", "/printing/printers/update")
 async def printer_update(request, data: PrinterUpdateIn):
-    return await run_operation(request, services.update_printer, data)
+    return await run_operation(request, services.printers.update_printer, data)
 
 
 @bind(router, "printing.printer.test", "/printing/printers/test", status=201)
 async def printer_test(request, data: PrinterRefIn):
-    return await run_operation(request, services.test_printer, data)
+    return await run_operation(request, services.queueing.test_printer, data)
 
 
 # Jobs
@@ -100,32 +100,32 @@ async def job_get(request, params: Query[JobRefIn]):
 
 @bind(router, "printing.job.create", "/printing/jobs", status=201)
 async def job_create(request, data: JobCreateIn):
-    return await run_operation(request, services.create_job, data)
+    return await run_operation(request, services.queueing.create_job, data)
 
 
 @bind(router, "printing.job.claim", "/printing/jobs/claim")
 async def job_claim(request, data: JobClaimIn):
-    return await run_operation(request, services.claim_job, data)
+    return await run_operation(request, services.claims.claim_job, data)
 
 
 @bind(router, "printing.job.complete", "/printing/jobs/complete")
 async def job_complete(request, data: JobCompleteIn):
-    return await run_operation(request, services.complete_job, data)
+    return await run_operation(request, services.claims.complete_job, data)
 
 
 @bind(router, "printing.job.fail", "/printing/jobs/fail")
 async def job_fail(request, data: JobFailIn):
-    return await run_operation(request, services.fail_job, data)
+    return await run_operation(request, services.claims.fail_job, data)
 
 
 @bind(router, "printing.job.retry", "/printing/jobs/retry")
 async def job_retry(request, data: JobRefIn):
-    return await run_operation(request, services.retry_job, data)
+    return await run_operation(request, services.job_actions.retry_job, data)
 
 
 @bind(router, "printing.job.cancel", "/printing/jobs/cancel")
 async def job_cancel(request, data: JobCancelIn):
-    return await run_operation(request, services.cancel_job, data)
+    return await run_operation(request, services.job_actions.cancel_job, data)
 
 
 # The devices that print
@@ -143,17 +143,17 @@ async def device_detail(request, params: Query[DeviceRefIn]):
 
 @bind(router, "printing.device.register", "/printing/devices", status=201)
 async def device_register(request, data: DeviceRegisterIn):
-    return await run_operation(request, services.register_device, data)
+    return await run_operation(request, services.devices.register_device, data)
 
 
 @bind(router, "printing.device.update", "/printing/devices/update")
 async def device_update(request, data: DeviceUpdateIn):
-    return await run_operation(request, services.update_device, data)
+    return await run_operation(request, services.devices.update_device, data)
 
 
 @bind(router, "printing.device.retire", "/printing/devices/retire")
 async def device_retire(request, data: DeviceRefIn):
-    return await run_operation(request, services.retire_device, data)
+    return await run_operation(request, services.devices.retire_device, data)
 
 
 @bind(router, "printing.device.coverage", "/printing/devices/coverage")
