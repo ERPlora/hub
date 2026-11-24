@@ -3,7 +3,7 @@
 // detail`): «Session detail · S-…» with Back to the sessions, the summary (who opened and closed it, the
 // drawer, the figures by payment method, expected, counted, difference and the notes), the session's
 // «Movements» and «Counts», and «Print»: the X report of an open session or the Z of a closed one, to the
-// receipt printer's queue (Printing's PRINTING-F17), or on the device when Printing is not on in the business
+// receipt printer's queue (Printing's PRINTING-F17), or on the device when no receipt printer takes it
 // (the browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why). A blind count
 // hides «Print» on an open session from whoever may not see the expected cash. Read-only; everything re-runs by
 // itself (a sale, a movement, a count, the close).
@@ -41,7 +41,7 @@ const printing = useCommand('cash_register.session.print');
 const printable = computed(() => !!session.value && !(session.value.status === 'open' && session.value.expected_hidden));
 
 /** The device's dialog, with the paper alone (inside the installed app, its print screen, hub#455): the way out
- *  when Printing is not on in the business. Titled with the report and the session, as the paper heads them. */
+ *  when no receipt printer takes the report. Titled with the report and the session, as the paper heads them. */
 async function printHere(): Promise<void> {
   printedAt.value = new Date();
   await nextTick();
@@ -61,11 +61,11 @@ async function printReport(): Promise<void> {
   try {
     sent = await printing.run({ session_id: props.id });
   } catch (refused) {
-    const message = (refused as { message?: string }).message;
+    const { code, message } = refused as { code?: string; message?: string };
+    if (code === 'cash_register.no_printer') return printHere();
     toastError(message ? `${t('cash_register.detail.printFailed')} ${message}` : t('cash_register.detail.printFailed'));
     return;
   }
-  if (!sent.queued) return printHere();
   toastSuccess(sent.printer ? t('cash_register.detail.printQueued', { printer: sent.printer }) : t('cash_register.detail.printQueuedDefault'));
 }
 </script>

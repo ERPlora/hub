@@ -152,7 +152,8 @@ for (const language of ['es', 'en'] as const) {
     await cancel(page);
 
     // «Bloquea la tarde de Ana»: the professional by their name. A write that is not dangerous goes in one line, its
-    // first three data (@erplora/ui ``cardLine``), and the professional is a block's sixth: the card sends it named.
+    // first three data (@erplora/ui ``cardLine``): whose the block is, its start and end as one period, and what it is
+    // (hub#2347).
     const blocking = await datumOf(
       page,
       'appointment__blocked_time__create',
@@ -160,6 +161,7 @@ for (const language of ['es', 'en'] as const) {
       'staff_id',
     );
     expect([blocking.label, blocking.value]).toEqual([words.professional, diary.member.full_name]);
+    await expect(card(page)).toContainText(new RegExp(`${diary.member.full_name} · [^·]+ · ${TAG} Descanso`));
     await cancel(page);
 
     // «Pasa la cita de Lucía a Bea»: in that one line, the appointment as the Agenda tells it and Bea by her name.

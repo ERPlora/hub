@@ -923,7 +923,8 @@ Pantalla: Plano de sala (Servicio); asistente
 Pasos:
 1. En Ventas, con la cuenta de una mesa en pantalla, el camarero imprime la cuenta para llevarla a la mesa
    («Imprimir cuenta»), por la impresora de tiques o por el diálogo de impresión del dispositivo, o se la pide
-   al asistente («imprime la cuenta de la mesa 4»).
+   al asistente («imprime la cuenta de la mesa 4»), que solo la imprime por la impresora de tiques: si ninguna la
+   recibe, no se imprime ni se marca, y su recibo lo dice.
 2. En **Mesas → Plano de sala**, esa mesa pasa a **Cuenta pedida**: su estado escrito, con su icono, dice
    «Cuenta pedida» en lugar de «Ocupada», y la mesa se pinta de un color propio que no se confunde con los de
    los otros estados ni con el ámbar y el rojo del aviso de tiempo. Sigue enseñando el tiempo, los comensales

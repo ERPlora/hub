@@ -125,6 +125,7 @@ class TestAnEmployeeReachesOnlyTheirOwnShifts:
         assert get(ana, "/cash_register/counts", session_id=own).status_code == 200
 
     def test_nor_its_paper(self, people, shifts):
+        run("printing.printer.create", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"})
         ana = people["ana"]
         assert missing(post(ana, "/cash_register/sessions/print", {"session_id": shifts["bea"]["id"]}))
         assert post(ana, "/cash_register/sessions/print", {"session_id": shifts["ana"]["id"]}).status_code == 200
@@ -173,6 +174,7 @@ class TestTheShiftOpenNow:
 
 class TestWhoSeesEveryShift:
     def test_the_manager_lists_opens_and_prints_everyones(self, people, shifts):
+        run("printing.printer.create", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"})
         marta, theirs = people["marta"], shifts["bea"]["id"]
         assert listed(marta) == {shifts["ana"]["number"], shifts["bea"]["number"]}
         assert get(marta, "/cash_register/sessions/detail", session_id=theirs).status_code == 200

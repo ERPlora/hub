@@ -39,8 +39,14 @@ GRANTS = {
 
 #: The only commands its permissions reach beyond what every person does for themselves (``base.view_home``: their
 #: profile, their PIN, the assistant): printing a document and checking VeriFactu's chain, which write nothing of the
-#: business.
-READING_COMMANDS = {"invoice.invoice.print", "sale.order.print_bill", "sale.sale.print", "verifactu.chain.validate"}
+#: business but the note that a check's bill was printed (the printer's or the device's).
+READING_COMMANDS = {
+    "invoice.invoice.print",
+    "sale.order.note_bill",
+    "sale.order.print_bill",
+    "sale.sale.print",
+    "verifactu.chain.validate",
+}
 
 GEMA = "0199c4b0-0000-7000-8000-00000000c0c0"
 

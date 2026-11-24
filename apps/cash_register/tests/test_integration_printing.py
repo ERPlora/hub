@@ -1,8 +1,9 @@
 """The X and Z reports through the Hub's print queue (CASH_REGISTER-F16; Printing's PRINTING-F17), against the
 real printing app: «Print» puts a ``cash_session_report`` in the queue of the receipt printer, with the
 session's figures as the paper shows them. Without Printing in the business, or without an active receipt
-printer in it (the paper would wait for ever), nothing is queued and the screen prints through the browser;
-a blind count does not print an open session's figures to whoever may not see the expected cash."""
+printer in it (the paper would wait for ever), nothing is queued and the print fails with why: the screen prints
+through the browser, and the assistant's receipt says it was not done. A blind count does not print an open
+session's figures to whoever may not see the expected cash."""
 
 import dataclasses
 import datetime as dt
@@ -10,7 +11,7 @@ import datetime as dt
 import pytest
 from django.test import RequestFactory
 from django.utils import timezone
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import AppInactive, Conflict, NotFound, PermissionDenied
 from live.operations import registry
 
 from apps.cash_register.models import Session
@@ -23,12 +24,21 @@ from apps.cash_register.tests.conftest import (
     void,
 )
 from apps.printing.models import PrintJob
+from apps.sale.tests.conftest import confirmed_by_the_assistant
 
 pytestmark = HUB_DB
 
 
 def print_report(session, ctx=None):
     return run("cash_register.session.print", {"session_id": str(session.id)}, ctx)
+
+
+def not_printed(session, ctx=None) -> str:
+    """The code ``cash_register.session.print`` fails with; nothing is queued."""
+    with pytest.raises(Conflict) as failed:
+        print_report(session, ctx)
+    assert not PrintJob.objects.exists()
+    return failed.value.code
 
 
 def lines(job: PrintJob) -> list[tuple[str, float]]:
@@ -62,7 +72,7 @@ def test_the_z_report_goes_to_the_receipt_printer_with_the_frozen_figures(shift)
         {"session_id": str(shift.id), "closing_balance": 10090},
     )
     printed = print_report(shift)
-    assert (printed.report, printed.queued) == ("z", True)
+    assert printed.model_dump() == {"report": "z", "job_id": printed.job_id, "printer": "Till"}
     job = PrintJob.objects.get(pk=printed.job_id)
     assert (job.document_type, job.usage, job.source_app, job.reference) == (
         "cash_session_report",
@@ -90,7 +100,7 @@ def test_the_z_report_goes_to_the_receipt_printer_with_the_frozen_figures(shift)
 
 def test_an_open_session_prints_the_x_report_without_count_or_over_short(shift):
     printed = print_report(shift)
-    assert (printed.report, printed.queued) == ("x", True)
+    assert printed.report == "x"
     job = PrintJob.objects.get(pk=printed.job_id)
     assert job.document["receipt_id"] == f"{shift.number} (X)"
     assert job.document["closing_balance"] == 101.0
@@ -129,16 +139,14 @@ def test_every_print_is_a_paper_of_its_own(shift):
     assert PrintJob.objects.filter(source_app="cash_register").count() == 2
 
 
-def test_without_an_active_receipt_printer_nothing_is_queued_and_the_screen_prints(shift, till):
+def test_without_an_active_receipt_printer_it_is_not_printed(shift, till):
     run("printing.printer.update", {"printer": str(till.id), "is_active": False})
-    printed = print_report(shift)
-    assert (printed.queued, printed.job_id) == (False, None)
-    assert not PrintJob.objects.exists()
+    assert not_printed(shift) == "cash_register.no_printer"
     run(
         "printing.printer.create",
         {"name": "Bar", "kind": "network", "address": "192.168.1.51", "usage": "kitchen"},
     )
-    assert print_report(shift).queued is False
+    assert not_printed(shift) == "cash_register.no_printer"
 
 
 def test_the_receipt_printer_named_is_said(shift):
@@ -155,16 +163,47 @@ def test_with_two_tills_the_report_comes_out_at_the_till_that_prints_it(shift, t
     at_the_terrace = dataclasses.replace(ctx_for("hub_manager"), request=RequestFactory().post("/", HTTP_X_DEVICE_ID="terrace"))
     run("printing.device.register", {"name": "Terrace", "printers": [str(terrace.id)]}, at_the_terrace)
     out = print_report(shift, at_the_terrace)
-    assert (out.queued, out.printer) == (True, "Till 2")
+    assert out.printer == "Till 2"
     assert PrintJob.objects.get(pk=out.job_id).printer_id == terrace.id
 
 
-def test_without_printing_in_the_business_nothing_is_queued_and_the_screen_prints(shift, monkeypatch):
+def test_without_printing_in_the_business_it_is_not_printed(shift, monkeypatch):
     # Not installed or off in this business: its operation is not there (the same path as app_inactive).
     monkeypatch.delitem(registry, "printing.job.create")
-    printed = print_report(shift)
-    assert (printed.report, printed.queued, printed.job_id) == ("x", False, None)
+    assert not_printed(shift) == "cash_register.no_printer"
+
+
+def test_with_printing_off_it_is_not_printed(shift, monkeypatch):
+    def off(ctx, data):
+        raise AppInactive("Printing is off.")
+
+    summary = registry["printing.job.summary"]
+    monkeypatch.setitem(registry, "printing.job.summary", dataclasses.replace(summary, fn=off))
+    assert not_printed(shift) == "cash_register.no_printer"
+
+
+# ── From the assistant (BASE-F97, BASE-F99) ───────────────────────────────────────────────────────────────────────────
+# hub#2328: with no receipt printer, the receipt under the answer said «Done» and nothing was printed.
+
+
+@pytest.mark.parametrize(
+    ("language", "said"),
+    [
+        ("es", "Ninguna impresora de recibos recibe este informe: abre la sesión para imprimirlo en este dispositivo."),
+        ("en", "No receipt printer takes this report: open the session to print it on this device."),
+    ],
+)
+def test_from_the_assistant_a_report_no_printer_takes_is_not_done_and_says_why(shift, till, language, said):
+    run("printing.printer.update", {"printer": str(till.id), "is_active": False})
+    row = confirmed_by_the_assistant("cash_register.session.print", {"session_id": str(shift.id)}, ctx_for(language=language))
+    assert (row["outcome"], row["code"], row["reason"]) == ("error", "cash_register.no_printer", {language: said})
     assert not PrintJob.objects.exists()
+
+
+def test_from_the_assistant_a_report_the_receipt_printer_took_is_done(shift):
+    row = confirmed_by_the_assistant("cash_register.session.print", {"session_id": str(shift.id)}, ctx_for(language="es"))
+    assert (row["outcome"], row["code"], row["reason"]) == ("ok", "", {})
+    assert PrintJob.objects.filter(source_app="cash_register").count() == 1
 
 
 def test_a_blind_count_keeps_the_open_report_from_whoever_may_not_see_the_expected(shift):
@@ -173,7 +212,7 @@ def test_a_blind_count_keeps_the_open_report_from_whoever_may_not_see_the_expect
         print_report(shift, ctx_for("hub_employee"))
     assert refused.value.code == "cash_register.report_hidden"
     assert not PrintJob.objects.exists()
-    assert print_report(shift, ctx_for("hub_manager")).queued is True
+    assert print_report(shift, ctx_for("hub_manager")).job_id is not None
 
 
 def test_a_blind_count_does_not_keep_a_closed_report(shift):
@@ -182,7 +221,7 @@ def test_a_blind_count_does_not_keep_a_closed_report(shift):
         "cash_register.session.close",
         {"session_id": str(shift.id), "closing_balance": 10100},
     )
-    assert print_report(shift, ctx_for("hub_employee")).queued is True
+    assert print_report(shift, ctx_for("hub_employee")).job_id is not None
 
 
 def test_whoever_may_not_print_is_refused_by_printing(shift):
