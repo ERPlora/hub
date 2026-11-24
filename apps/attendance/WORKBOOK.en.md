@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:0154df0798949b3eb04e9f72a35d7d913fd367594f3ad0ea54c8f99116beadee -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:3a679387f7c3 -->
 
 Time clock is your business's working-day record: each person on the team clocks in on arrival, takes their breaks
 and clocks out on leaving, with one tap. The manager sees everyone's working days, corrects the wrong ones with a
@@ -8,6 +7,7 @@ reason that stays in their history and exports the month in CSV for the accounta
 working day is ever deleted.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:a555ff60ba5a -->
 
 It is the business's **working-day record**. Each person on the team clocks in on arrival and clocks out
 on leaving, with their breaks in between, with one tap and without choosing anything: whoever clocks is
@@ -24,6 +24,7 @@ for four years and make it available to the worker, their representatives and th
 - **The worker sees their own working days** and who corrected them, when and why.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:6d6d4eb2b904 -->
 
 - The **employee** clocks in, clocks out and takes their breaks, sees their working days and their
   correction history, and exports their working days in CSV. They do not open the settings: by its address, "No access" (BASE-F118).
@@ -32,6 +33,7 @@ for four years and make it available to the worker, their representatives and th
   assistant or the API: "clock Ana out") and change the settings.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:266787dc11e0 -->
 
 - **Odoo Attendances, Square Team, Toast and Lightspeed**: a working day is one person's clock-in and
   clock-out, with breaks inside; only one open working day per person.
@@ -43,6 +45,7 @@ for four years and make it available to the worker, their representatives and th
 - The time clock does not calculate payroll or overtime: on the market, that is another product.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:f2c4b724528e -->
 
 1. The **Staff** app turned on: a clocking belongs to a **Staff record** (Time clock needs it and turns
    it on with it).
@@ -55,14 +58,17 @@ for four years and make it available to the worker, their representatives and th
    location is asked for.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Clock in
+<!-- from WORKBOOK.md sha256:412ed607eed7 -->
 Here you clock yourself. The big button changes with the moment: "Clock in" and, once in, "Start break" or "End
 break" and "Clock out". At the top you see whether you are in or on a break, since what time and how long you have
 been in, which runs by itself; beside it, what you worked today and your recent days. Whoever has the session open is
 the one who clocks, through their Staff record.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:aba812accfc3 -->
 Reached from the app's menu, "Clock in". At the top, "Hello, Ana" and "It is 09:00"; in the middle,
 the state ("You are clocked out", "Clocked in since 09:00", "On break since 13:00"), the time since the
 clock-in, which runs by itself, and the big button of the moment: "Clock in", or "Start break" / "End
@@ -71,12 +77,14 @@ themselves) and "Recent days" (the last ten, with their status: "Open", "Closed"
 Records). Anyone on the team can open it.
 
 ### Records
+<!-- from WORKBOOK.md sha256:2f0f3071136a -->
 Here are the month's working days, with their clock-in, their clock-out, their breaks, the time worked and their
 status: "Open", "Closed" or "Needs review" if nobody clocked out. Each person sees their own; the manager sees the
 whole team's and who is clocked in now, and corrects a wrongly clocked day with its reason. "History" shows who
 changed a working day and why, and "Export CSV" downloads the month.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:49def273609f -->
 Reached from the app's menu, "Records". A table of the working days of the chosen month: Date, Person,
 Clock-in, Clock-out, Breaks (min), Worked, Status and Location, with the actions "Correct" and "History"
 on each row; on a phone, cards, with each value's name before it ("Clock-in 21:01",
@@ -88,22 +96,26 @@ and who, since what time and whether they are on a break. At the top, "Export CS
 name and their status read in full.
 
 #### Home panel
+<!-- from WORKBOOK.md sha256:d3d945b616ee -->
 The Hub's **Home** shows the "Clocked in now" panel by default, grouped as "Time clock" in **Customize
 panel**: the number of people who have their working day open right now, the same one "Clocked in now"
 says above Records. Only whoever sees the working days of the whole team has it; an employee does not.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:44c22bc52cff -->
 Here a manager decides whether whoever clocks in from their own phone is asked for their location, how far from the
 workplace they may clock in and where the workplace is. They also choose after how many hours a working day nobody
 closed becomes "Needs review". Only whoever can change them sees this tab.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:9308c25772dc -->
 The app's "Settings" tab. "Require location when clocking in from a personal device" (below it, where a
 device is marked as personal), "Allowed radius", "Workplace location" (Latitude, Longitude and "Use my
 current location") and "Flag for review after (hours)". Only a manager or an administrator opens and saves
 it; an employee, by its address, "No access" (BASE-F118).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:c170576e5a97 -->
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
@@ -118,12 +130,14 @@ app is not active in this business" if it is turned off and "You do not have per
 does not reach.
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:196df0e68d0e -->
 
 In the "Correct working day" window, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); a time rewritten by itself in the business's time zone is no change.
 
 ## Flows
+<!-- from WORKBOOK.md sha256:de11284d01f5 -->
 
 | Flow | What | Vertical | Status |
 |---|---|---|---|
@@ -142,6 +156,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a time r
 | ATTENDANCE-F13 | Close the open working day of whoever is terminated | common | done (reaction through the outbox relay) |
 
 ### ATTENDANCE-F01 Clock in on arrival and clock out on leaving
+<!-- from WORKBOOK.md sha256:b183a52af3ff -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, employee
 Screen: Clock in
@@ -166,6 +181,7 @@ the error and "Retry".
 Involved: STAFF-F03, ATTENDANCE-F05, ATTENDANCE-F11
 
 ### ATTENDANCE-F02 Take a break without leaving the working day
+<!-- from WORKBOOK.md sha256:7c180635287d -->
 Status: done (server, screen and assistant)
 Actor: owner, administrator, manager, employee
 Screen: Clock in (or the assistant)
@@ -188,6 +204,7 @@ more than 12 hours and is waiting for review…".
 Involved: ATTENDANCE-F01, ATTENDANCE-F05, ATTENDANCE-F12
 
 ### ATTENDANCE-F03 Clock in from a phone when the business asks for the location
+<!-- from WORKBOOK.md sha256:6f6fe87757fe -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, employee
 Screen: Clock in
@@ -221,6 +238,7 @@ every case you do not clock in and you can clock in at the counter.
 Involved: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 
 ### ATTENDANCE-F04 Set the workplace location and when a forgotten working day is reviewed
+<!-- from WORKBOOK.md sha256:0841df5921c7 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Settings
@@ -253,6 +271,7 @@ red notice and the fields' reasons of the last refusal, which do not come back u
 Involved: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Flag for review a working day nobody closed
+<!-- from WORKBOOK.md sha256:7ef280535ce1 -->
 Status: done (server, worker task and screen)
 Actor: system
 Screen: none (the "Needs review" badge shows in Clock in and in Records)
@@ -273,6 +292,7 @@ person clocks in again.
 Involved: ATTENDANCE-F04, ATTENDANCE-F08
 
 ### ATTENDANCE-F06 See my working days of the month and who corrected them
+<!-- from WORKBOOK.md sha256:52e143cf2f6f -->
 Status: done (server and screen)
 Actor: employee (and anyone, for their own)
 Screen: Records
@@ -290,6 +310,7 @@ If it fails: "The working days could not be loaded." and "Retry".
 Involved: ATTENDANCE-F09, ATTENDANCE-F10
 
 ### ATTENDANCE-F07 See the working days of the whole team
+<!-- from WORKBOOK.md sha256:25ae6d008056 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Records
@@ -306,6 +327,7 @@ If it fails: "The working days could not be loaded." and "Retry".
 Involved: STAFF-F06, ATTENDANCE-F08, ATTENDANCE-F09, ATTENDANCE-F10, ATTENDANCE-F11
 
 ### ATTENDANCE-F08 Correct a wrongly clocked working day, with its reason
+<!-- from WORKBOOK.md sha256:f13ec5b2572b -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Records
@@ -331,6 +353,7 @@ A refused correction changes nothing and leaves no trace. "Correct" only shows t
 Involved: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 See who changed a working day, when and why
+<!-- from WORKBOOK.md sha256:bd94b07cd696 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager; the employee, for their own
 Screen: Records
@@ -345,6 +368,7 @@ If it fails: "The history could not be loaded.".
 Involved: ATTENDANCE-F08, ATTENDANCE-F13
 
 ### ATTENDANCE-F10 Export the month in CSV for the accountant or the Inspectorate
+<!-- from WORKBOOK.md sha256:2e6b84bb1d20 -->
 Status: done (server and screen)
 Actor: everyone (the employee, only their working days)
 Screen: Records
@@ -363,6 +387,7 @@ Try again.".
 Involved: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (inside the app)
 
 ### ATTENDANCE-F11 See who is clocked in now
+<!-- from WORKBOOK.md sha256:66508430d424 -->
 Status: done (server, screen and Home panel)
 Actor: owner, administrator, manager
 Screen: Records ("Clocked in now"), Home
@@ -382,6 +407,7 @@ If it fails: the error notice in its place, without covering the table; on the *
 Involved: ATTENDANCE-F01, ATTENDANCE-F02, ATTENDANCE-F08
 
 ### ATTENDANCE-F12 Clock someone else in or out
+<!-- from WORKBOOK.md sha256:eeb8ae99bc8b -->
 Status: done (assistant and API)
 Actor: owner, administrator, manager
 Screen: none (assistant and API)
@@ -402,6 +428,7 @@ exist in Staff.". In the assistant, none of those cases reaches the card: it hea
 Involved: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Close the open working day of whoever is terminated
+<!-- from WORKBOOK.md sha256:3c12a988392a -->
 Status: done (reaction through the outbox relay)
 Actor: system
 Screen: none
@@ -418,6 +445,7 @@ notice).
 Involved: STAFF-F06, ATTENDANCE-F08, ATTENDANCE-F09
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:a18f91113af5 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and the same permissions. A person is named by their id
@@ -425,6 +453,7 @@ or by their name ("clock Ana out"); "my working day today" is `attendance.record
 ISO 8601 with their zone; durations, in seconds.
 
 ### What it offers: queries (they read and change nothing; all but the export can be followed live)
+<!-- from WORKBOOK.md sha256:dc8d0890f53c -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -441,6 +470,7 @@ ISO 8601 with their zone; durations, in seconds.
 | The settings | clock | F03, F04 | `attendance.settings.get` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:751a3ad69949 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -456,6 +486,7 @@ ISO 8601 with their zone; durations, in seconds.
 There is no action to delete a working day, on purpose: the law asks to keep them four years.
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:7824fe5606b5 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -470,6 +501,7 @@ There is no action to delete a working day, on purpose: the law asks to keep the
 The notices never carry the position or the reason of a correction (personal data).
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:45c3f801bd45 -->
 
 - **Staff** (`requires = ["staff"]`): the working day belongs to a Staff record (`staff.Member`), and the
   person of the session is found through the record linked to their account. It reads the records'
@@ -480,6 +512,7 @@ The notices never carry the position or the reason of a correction (personal dat
 - From the platform: the session and the business's time zone.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:869ea2b4e7ea -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

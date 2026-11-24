@@ -17,6 +17,7 @@ from pathlib import Path
 from django.utils.translation import pgettext_lazy
 
 from base import catalog
+from base.workbook_sections import current_body
 
 #: The language WORKBOOK.md is written in; any other reads its own ``WORKBOOK.<language>.md`` while it is current.
 SOURCE_LANGUAGE = "es"
@@ -109,27 +110,23 @@ def words() -> Words:
 
 
 def workbook(root: Path, language: str) -> tuple[str, str]:
-    """The language served and the customer's part in it: ``WORKBOOK.<language>.md`` while its first line is the hash of
-    the source's part (``catalog.en_header``), else the file of its base language (``en`` for ``en-gb``), else the
-    source's part of ``WORKBOOK.md``."""
+    """The language served and the customer's part in it: ``WORKBOOK.<language>.md`` while it carries the marks of the
+    source's part (``workbook_sections``), else the file of its base language (``en`` for ``en-gb``), else the source's
+    part of ``WORKBOOK.md``."""
     source = catalog.user_part((root / catalog.WORKBOOK).read_text(encoding="utf-8"))
-    header = catalog.en_header(catalog.source_hash(source))
     for candidate in dict.fromkeys((language, language.split("-")[0])):
         if candidate == SOURCE_LANGUAGE:
             break
         path = root / catalog.WORKBOOK_TRANSLATION.format(candidate)
-        body = _current(path, header) if _LANGUAGE.fullmatch(candidate) else None
+        body = _current(path, source) if _LANGUAGE.fullmatch(candidate) else None
         if body is not None:
             return candidate, body
     return SOURCE_LANGUAGE, source
 
 
-def _current(path: Path, header: str) -> str | None:
-    """The body of the translation at ``path`` while its first line is ``header``, else ``None``."""
-    if not path.is_file():
-        return None
-    first, _, body = path.read_text(encoding="utf-8").partition("\n")
-    return body.strip("\n") + "\n" if first.strip() == header else None
+def _current(path: Path, source: str) -> str | None:
+    """The body of the translation of ``source`` at ``path`` while it is current, else ``None``."""
+    return current_body(source, path.read_text(encoding="utf-8")) if path.is_file() else None
 
 
 def parse(markdown: str, tabs: Sequence[Tab], vocabulary: Words) -> Help:
