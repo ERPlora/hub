@@ -61,9 +61,12 @@ class Words:
 
 @dataclass(frozen=True)
 class Tab:
+    """A screen a WORKBOOK describes; ``permission``, the one a person needs to get its help (none: anyone's)."""
+
     id: str
     label: str
     path: str
+    permission: str | None = None
 
 
 @dataclass(frozen=True)

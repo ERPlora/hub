@@ -16,6 +16,11 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Es lo que el Hub trae siempre, sin activar ninguna app: el **Inicio**, las **personas** del negocio, sus **archivos**,
+sus **apps**, el **sistema** y los **ajustes**. Desde aquí se abre cada app y se prepara el negocio para trabajar.
+
+### De un vistazo
+
 El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vistazo:
 
 - **Sus apps**, para abrir la que necesite sin buscarla en ningún menú.
@@ -68,27 +73,32 @@ llenarse.
 ## Pantallas
 
 ### Inicio · Resumen
-Arriba, el nombre del negocio y «Hoy» con la fecha larga; mientras el negocio no tiene nombre, un saludo
-según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo, en este orden:
+Arriba, el nombre del negocio y «Hoy» con la fecha larga. Debajo, en este orden:
 
 - **Cómo está funcionando el negocio**, solo para quien lo administra: una etiqueta de color por cada app encendida que
   dice cómo está (la impresora de tiques, el número de WhatsApp), con lo que lo arregla, y «Ver sistema».
 - **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
-  tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
-  plantillas» y «Ahora no».
+  tiene nada de lo que trae una plantilla.
 - **«Mis apps»**: una baldosa por app que la persona puede abrir, con su icono y su nombre; las que más se abren
-  en este navegador, primero. En el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
-- **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
-  cada uno con su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
-  «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». Plegada: cinco pasos (dos en el
+  en este navegador, primero.
+- **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan, cada uno con
+  «Configurar».
+- **El tablero de paneles**, con «Personalizar panel» (⋮) arriba a la derecha.
+
+#### Lo que trae cada parte
+- **El nombre del negocio**: mientras no lo tiene, un saludo según la hora («Buenos días», «Buenas tardes», «Buenas
+  noches»).
+- **Las plantillas**: hasta cuatro, con «Usar esta», «Ver todas las plantillas» y «Ahora no».
+- **«Mis apps»**: en el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
+- **Cada paso por configurar**: su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
+  «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». La lista, plegada: cinco pasos (dos en el
   móvil), primero los que impiden facturar, con «Ver todo» y «Ver menos». Cuando no falta nada: «Tu negocio
   está listo».
-- **El tablero de paneles**, con «Personalizar panel» (⋮) arriba a la derecha.
 
 ### Inicio · Actividad
 La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método», «Importe» y «Estado», con
 «Buscar actividad…», el embudo de filtros (método y estado), el orden, la vista de tarjetas y «Columnas».
-Se abre también con el enlace del Inicio terminado en `#actividad`.
+Se abre también con el enlace del Inicio terminado en #actividad.
 
 ### La campana
 Arriba a la derecha, la última de la barra, después de «Mis apps», de los destellos del asistente y, en la aplicación
@@ -151,14 +161,16 @@ tiene que configurar un administrador.». Se va solo en cuanto el paso queda hec
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
 «Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps tiene
-activadas el negocio (las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra)
-y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan» o, sin límite, «27 apps
-activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
+activadas el negocio y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan».
 Cada pestaña, una tabla (o tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y
 nombre), «Categoría» y «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con».
 «Abrir» en la fila de una app que la persona puede abrir y, para quien administra, «Activar» o «Desactivar».
-Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué no se ha cambiado una app.
 «De pago» y «Precio» solo salen si alguna app se contrata aparte; hoy ninguna: todas van en todos los planes.
+
+#### La cuenta de apps y los avisos
+Cuentan las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra. Sin límite:
+«27 apps activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
+Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué no se ha cambiado una app.
 
 ### La pantalla de una app que no se abre
 En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
@@ -232,7 +244,7 @@ foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz
 ### Ajustes · General
 Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»
 (en la app de ERPlora de un ordenador, también «Arrancar al iniciar sesión»), «Pinpad», para quien administra
-«Dispositivos» y, al final, «Documentación de la API».
+«Dispositivos» y, al final, la tarjeta de la documentación de la API.
 
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
@@ -241,13 +253,16 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
 negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
 estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
-para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, la ruta de la carpeta abierta, con ⋮ al
-lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y el límite del plan («{used} de {limit}»)
-o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las carpetas y luego los archivos, cada uno con su
-icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮: «Abrir», «Descargar», «Renombrar», «Mover a…»
-y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se corta con «…» y la extensión se ve
-siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris. Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en
-imágenes y PDF).
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, lo que hay en la carpeta abierta: pulsar
+un archivo lo abre.
+
+#### La carpeta abierta
+Arriba, la ruta de la carpeta, con ⋮ al lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y
+el límite del plan («{used} de {limit}») o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las
+carpetas y luego los archivos, cada uno con su icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮:
+«Abrir», «Descargar», «Renombrar», «Mover a…» y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se
+corta con «…» y la extensión se ve siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris.
+Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en imágenes y PDF).
 
 ### Empleados · Personal
 Lo que se abre con «Empleados» en el menú lateral: la primera pestaña de abajo, «Personal», con las plazas del plan,
@@ -265,8 +280,8 @@ Un rol, de solo lectura: cuántas personas lo tienen y, en un panel por app ence
 y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
 
 ### Empleados · API keys
-Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
-«Documentación de la API».
+Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie, el
+enlace a la documentación de la API.
 
 ### Empleados · Aprobaciones
 El registro de lo que se aprobó con el PIN de un responsable, solo de lectura.
@@ -4600,7 +4615,7 @@ Implicados: BASE-F97, BASE-F100
   `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
   del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
   lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
-  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. Con ellos, `HelpEntry.vue`
+  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esas apps en `help_apps`. Con ellas, `HelpEntry.vue`
   pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
   `base/frontend/components/`); `base/frontend/lib/help.ts` guarda lo leído por módulo e idioma hasta que se recarga la
   página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños (`tests/e2e/base-help-video.spec.ts`, con el
@@ -4633,6 +4648,17 @@ Implicados: BASE-F97, BASE-F100
   código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
   publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
   pestañas y flujos que el original.
+- **La ayuda de las pantallas propias del Hub** (BASE-F115): `base.help.get` con `app=base` la sirve igual que la de un
+  módulo, por la misma ruta y con el mismo permiso. `base` declara `help = Help()`, y `base/platform_screens.py` dice
+  cada pantalla (una por pestaña, si la página las tiene) con la etiqueta de su `###` en los dos idiomas (msgids
+  `pgettext("workbook", …)`), su ruta en el router de la SPA (sin leer sus parámetros y con el `#` de su pestaña) y el
+  permiso que pide su página. Quien no tiene ese permiso no recibe su ayuda: el filtro se aplica en cada llamada, fuera
+  de lo guardado en `_READ`. Un `###` que no es una de esas pantallas (la campana, el menú lateral, el asistente) se
+  queda en el fichero, y de los flujos de `base` todavía no se publica ninguno: sus pasos llevan ids, referencias y
+  marcadores para quien los mantiene. Ninguna pantalla la enseña todavía: las rutas de `base` no llevan `meta.app`, así
+  que el «?» sigue saliendo solo en los módulos. `tests/test_help_workbooks.py` exige de cada pantalla su `###`, una
+  sola vez, y las mismas reglas de texto que a un módulo; `base/tests/test_platform_screens.py`, que cada dirección
+  exista en la SPA y que su permiso sea el de la operación que lee.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del

@@ -1,6 +1,11 @@
-<!-- generated from WORKBOOK.md sha256:667387732386f109ac07a363c532361d05a2831cbed527d7b4e5d8f9d1df3b8a -->
+<!-- generated from WORKBOOK.md sha256:ef9df8eb221944d75a869012aa676259b68c96c7bd30ee5fef2edbd3e96b3573 -->
 
 ## What it is for and who it is for
+
+It is what the Hub always brings, without turning on any app: the **Home**, the business's **people**, its **files**, its
+**apps**, the **system** and the **settings**. From here each app is opened and the business is set up to work.
+
+### At a glance
 
 The Home is the first thing anyone in the business sees on coming in. At a glance:
 
@@ -55,25 +60,29 @@ against what the plan includes and, like Google Workspace, the yellow notice at 
 ## Screens
 
 ### Home · Summary
-On top, the business's name and "Today" with the long date; while the business has no name, a greeting
-by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this order:
+On top, the business's name and "Today" with the long date. Below, in this order:
 
 - **How the business is working**, only for who administers it: a coloured label for each app on that says how it is
   doing (the receipt printer, the WhatsApp number), with what fixes it, and "View system".
 - **"Start with a business like yours"**, only for who administers the business and while the business has
-  nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
+  nothing a template brings.
 - **"My apps"**: one tile per app the person can open, with its icon and its name; the ones opened most in this
-  browser, first. On a phone, with six apps or more, the first four and "View all apps".
-- **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
-  icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
-  available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
-  with "View all" and "Show less". When nothing is left: "Your business is ready".
+  browser, first.
+- **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with "Set up".
 - **The board of panels**, with "Customize panel" (⋮) at the top right.
+
+#### What each part brings
+- **The business's name**: while it has none, a greeting by the hour ("Good morning", "Good afternoon", "Good evening").
+- **The templates**: up to four, with "Use this one", "See all templates" and "Not now".
+- **"My apps"**: on a phone, with six apps or more, the first four and "View all apps".
+- **Each step to set up**: its icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done"
+  or "Not available yet") and "Set up". The list, folded: five steps (two on a phone), first the ones that stop
+  invoicing, with "View all" and "Show less". When nothing is left: "Your business is ready".
 
 ### Home · Activity
 The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" and "Status", with
 "Search activity…", the filters funnel (method and status), the order, the cards view and "Columns". It
-also opens with the Home's link ending in `#actividad`.
+also opens with the Home's link ending in #actividad.
 
 ### The bell
 At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
@@ -139,14 +148,16 @@ up.". It goes by itself as soon as the step is done, on any device.
 ### Apps
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
 apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business has
-turned on (those in "My apps", also the ones born on, like Taxes, and the ones that came along with another) and how
-many of the ones its plan allows it has chosen: "27 apps turned on · 17 of 20 in your plan" or, with no limit, "27
-apps turned on · Unlimited". A business just signed up: "1 app turned on · 0 of 20 in your plan" (hub#1286).
+turned on and how many of the ones its plan allows it has chosen: "27 apps turned on · 17 of 20 in your plan".
 Each tab, a table (or cards) with its search, the filters funnel, the order and "Columns": "App" (icon and name),
 "Category" and "Status"; in "Add apps" and "Paid", also "Description", "Price" and "Comes with". "Open" on the
-row of an app the person can open and, for whoever runs the business, "Turn on" or "Turn off". Above the table,
-when it applies, the notice of the plan's limit or the one saying why an app was not changed.
+row of an app the person can open and, for whoever runs the business, "Turn on" or "Turn off".
 "Paid" and "Price" only show if some app is subscribed to separately; today none is: every app comes with every plan.
+
+#### The count of apps and the notices
+It counts those in "My apps", also the ones born on, like Taxes, and the ones that came along with another. With no
+limit: "27 apps turned on · Unlimited". A business just signed up: "1 app turned on · 0 of 20 in your plan" (hub#1286).
+Above the table, when it applies, the notice of the plan's limit or the one saying why an app was not changed.
 
 ### The screen of an app that does not open
 In the same address as the app's screen, the reason: "Subscription needed" or "This app is not available in
@@ -218,7 +229,7 @@ photo), "Preferences" (language and appearance: palette, theme and interface siz
 ### Settings · General
 What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device" (in the
 ERPlora app on a computer, also "Start on login"), "PIN pad", for whoever runs the business "Devices" and, at the
-end, "API documentation".
+end, the card of the API's documentation.
 
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
@@ -227,13 +238,15 @@ The page that shows at the address of a business erplora.com is still preparing;
 From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
 which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
 "Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
-folder" and "Upload file". Below, the open folder's path, with ⋮ beside it to rename, move or delete that folder;
-"Space", with what is used and the plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder
-holds: the folders first and then the files, each with its icon, its name, its size (in the list, also when it
-changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". In the list, each name takes one line:
-what does not fit is cut with "…" and the extension always shows whole; on a phone, the size and the date go under
-the name, in grey. Tapping a file opens it in the viewer, with
-its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
+folder" and "Upload file". Below, what the open folder holds: tapping a file opens it.
+
+#### The open folder
+On top, the folder's path, with ⋮ beside it to rename, move or delete that folder; "Space", with what is used and the
+plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder holds: the folders first and then
+the files, each with its icon, its name, its size (in the list, also when it changed) and its ⋮: "Open", "Download",
+"Rename", "Move to…" and "Delete". In the list, each name takes one line: what does not fit is cut with "…" and the
+extension always shows whole; on a phone, the size and the date go under the name, in grey. Tapping a file opens it in
+the viewer, with its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
 
 ### Employees · Staff
 What "Employees" in the side menu opens: the first tab at the bottom, "Staff", with the plan's places, "Invite on
@@ -251,8 +264,8 @@ A role, read only: how many people have it and, in a panel per app that is on, e
 and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
-The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
-"API documentation".
+The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom, the
+link to the API's documentation.
 
 ### Employees · Approvals
 The record of what was approved with a manager's PIN, read only.
