@@ -11,6 +11,8 @@
 //   needed», then the same turn again with the pass in `X-Elevation-Token`.
 // - A copy of a business (`.blueprint.zip`) may be attached for `base.blueprint.import`, which takes it whole: with the
 //   limit and the words of Settings › Data › Import.
+// - A file a read hands the person (the CSV of an export) is saved as every download of the Hub (`saveFile`), also
+//   inside the installed app.
 // - base's words: the verb of each write (`base.assistant.card.actions.<action>`, or of the whole operation when its
 //   action's verb does not say it, `base.assistant.card.operations.<app>.<entity>.<action>`; one per action of every
 //   write the assistant may run, guardrail: base/tests/test_assistant.py), the platform's screens
@@ -22,6 +24,7 @@ import type { SetupStatus } from '../operations/home';
 import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
 import { BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
+import { saveFile } from './download';
 import { type HubHome, readJsonBlock } from './home';
 import { OWN_BUSINESS } from './plan-link';
 import { useSaasPass } from './saas-pass';
@@ -132,6 +135,7 @@ const planUrl = () => readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
 export const HUB_ASSISTANT: AssistantConfig = {
   turnUrl: '/api/assistant/turn',
   toolFiles: [{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }],
+  saveFile: (filename, file, t) => saveFile(filename, file, t),
   elevationToken: () => approvalPass(),
   approval: hubApproval(),
   usage: (client) => client.api.call('base.assistant.usage', {}),

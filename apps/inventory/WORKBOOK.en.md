@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3270e1edb8a5da0faf1622b2e0a3f6e8ed67fcbe89eccfdfe9bbe5838aac8d41 -->
+<!-- generated from WORKBOOK.md sha256:683ca69f0231adab3cacdea57a6e717c7eae43244063f9c0e32d36e0a68233c2 -->
 
 ## What it is for and who it is for
 
@@ -584,6 +584,8 @@ Steps:
    filters, not only the page shown.
 3. In **Categories**, the same button downloads "inventory-categories.csv" (Name, Slug and number of
    products).
+4. Asked of the assistant ("Give me the whole menu as a CSV"), "Download inventory-products.csv" comes under its
+   answer, the same file the button gives; the assistant does not paste its content into the chat.
 In: the products or the categories that match the search and the filters.
 Out: the file, with the same headers the import recognises (Name, SKU, Price, Cost, Stock, Threshold,
 EAN-13, Description, Allergens, Unit, Tax category, Active) and the figures as they read on screen (€2.20, 3
@@ -594,7 +596,7 @@ If it fails: with no products, the file carries only the header. Without permiss
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
 would run as a formula (it starts with =, +, -, @…) comes out with an apostrophe in front, which the
 import removes.
-Involved: BASE-F112 (inside the app), BASE-F119
+Involved: BASE-F112 (inside the app and from the assistant), BASE-F119
 
 ### INVENTORY-F12 Load the menu of a sector template
 Status: done

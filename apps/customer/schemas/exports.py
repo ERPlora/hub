@@ -5,6 +5,8 @@ A column marked with a data permission is left out of the file of whoever lacks 
 
 from ninja import Field, Schema
 
+from base.schemas.assistant import A_HANDED_FILE
+
 from .cards import CustomerFilters
 from .contact import EMAIL, PHONE
 
@@ -39,4 +41,4 @@ class ExportOut(Schema):
     filename: str = Field(description="The file's name.")
     content_type: str = Field(description="The file's type.")
     rows: int = Field(description="How many customers it holds.")
-    csv: str = Field(description="The file's contents, CSV with a header row.")
+    csv: str = Field(description="The file's contents, CSV with a header row.", json_schema_extra=A_HANDED_FILE)
