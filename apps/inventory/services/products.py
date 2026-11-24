@@ -136,7 +136,8 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
     expose_api=True,
     ai={
         "description": "Change a product, named by its id, SKU or name: its data, active or not, its stock "
-        "control and its categories. The SKU, the type and the stock are not changed here.",
+        "control, its categories and whether the website's catalog shows it. The SKU, the type and the stock are not "
+        "changed here.",
         "risk": "normal",
         "check": "inventory.product.get",
         "asks": {
@@ -144,11 +145,13 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
                 "change the price of the coffee to 1.80",
                 "rename the Tea product and make it inactive",
                 "the croissant now costs 2.20",
+                "hide the product Coffee from the website",
             ),
             "es": (
                 "cámbiale el precio al café a 1,80",
                 "renombra el producto Té y desactívalo",
                 "el cruasán ahora cuesta 2,20",
+                "oculta el producto Café de la página web",
             ),
         },
     },
