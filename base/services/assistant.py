@@ -143,7 +143,8 @@ def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.To
         screen = assistant.cards.screen(op)
         named = {"name": op.name, "app": op.app_label, "app_name": app_name, "screen": screen, "kind": op.kind}
     reason = assistant.failure_reason.reason(op, outcome, ctx.language)
-    return {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code, "reason": reason}
+    ran = {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code, "reason": reason}
+    return {**ran, **assistant.handed_files.receipt(outcome)}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,7 +169,7 @@ def _assistant_answer(ctx, calls: _Calls, call, decision, *, stopped: bool):
     except ValueError:
         arguments = None
     if not isinstance(arguments, dict):
-        return assistant.tools.run(ctx, op, call.arguments), None, ""
+        return assistant.handed_files.run(ctx, op, call.arguments), None, ""
     return _assistant_write(ctx, op, call, decision, calls.files)
 
 
