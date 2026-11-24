@@ -6,11 +6,12 @@ refusal that names them, so the person can say which one; the words of a contact
 sees the customers' contact details (BASE-F119)."""
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.errors import Conflict, NotFound
 
 from apps.customer.models import Customer
 from apps.customer.schemas.fields import CustomerRefIn
+from base import listing
 from base.permissions import permissions_of_role
 from base.sensitive import VIEW_CUSTOMER_CONTACT
 
@@ -47,15 +48,16 @@ def test_her_exact_name_names_her_before_the_cards_that_hold_it():
     assert named("ana garcia").id == ana.id
 
 
-def test_two_cards_that_hold_the_words_are_named_in_the_refusal_by_their_names():
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_two_cards_that_hold_the_words_are_named_in_the_refusal_as_a_screen_joins_them(language):
     card("Lucía Gómez")
     card("Lucía Fernández QA")
     card("Carmen Ruiz")
-    with pytest.raises(Conflict) as refused:
-        named("Lucía")
+    with translation.override(language), pytest.raises(Conflict) as refused:
+        named("Lucía", ctx_for(language=language))
     assert refused.value.code == "customer.customer_ambiguous"
     message = refused.value.message
-    assert message.index("Lucía Fernández QA") < message.index("Lucía Gómez")
+    assert listing.joined(["Lucía Fernández QA", "Lucía Gómez"], language) in message
     assert "Carmen Ruiz" not in message
 
 

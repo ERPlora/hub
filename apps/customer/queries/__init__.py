@@ -114,7 +114,7 @@ def find_customer(
             )
         if len(found) > 1:
             raise Conflict(
-                SEVERAL_CUSTOMERS_MATCH % {"reference": reference, "matches": naming.names(found)},
+                SEVERAL_CUSTOMERS_MATCH % {"reference": reference, "matches": naming.names(found, ctx.language)},
                 code=CUSTOMER_AMBIGUOUS_CODE,
             )
         customer_id = found[0][0]

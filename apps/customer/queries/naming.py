@@ -12,6 +12,7 @@ from live.context import OperationContext
 from apps.customer.models import Customer
 from apps.customer.phones import candidates
 from apps.customer.search import normalize, search_term
+from base import listing
 
 from . import contact
 
@@ -33,9 +34,9 @@ def matching(ctx: OperationContext, reference: str, country: str) -> list[tuple[
     return list(contact.searched(ctx, cards, term).values_list("id", "name")[: MAX_NAMED + 1])
 
 
-def names(found: list[tuple[UUID, str]]) -> str:
-    """The names a refusal says of ``found``, the first ``MAX_NAMED``."""
-    return ", ".join(name for _, name in found[:MAX_NAMED])
+def names(found: list[tuple[UUID, str]], language: str) -> str:
+    """The names a refusal says of ``found``, the first ``MAX_NAMED``, joined as a screen in ``language`` joins them."""
+    return listing.joined((name for _, name in found[:MAX_NAMED]), language)
 
 
 def _exactly(ctx: OperationContext, cards: QuerySet, text: str, country: str) -> list[tuple[UUID, str]]:
