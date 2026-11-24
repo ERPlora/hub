@@ -268,7 +268,7 @@ Pantalla: Página web
 Pasos:
 1. Despliega **Catálogo** y enciende **Mostrar**.
 2. En **Qué mostrar**, elige **Productos** (los de Inventario a la venta: activos, no agotados y sin ocultar de la página
-   web, INVENTORY-F36) o **Servicios** (los
+   web) o **Servicios** (los
    ofrecidos); solo salen los de las apps activas en el negocio.
 3. Si quieres, elige las **Categorías** (ninguna = **Todas las categorías**) y si se ven los precios con **Mostrar
    precios**. Se guarda solo, como el resto del borrador.

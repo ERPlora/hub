@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a72786a5bd15835fbc926116456f13bef2b8579df1ace5c9cb8592baff36982c -->
+<!-- generated from WORKBOOK.md sha256:fad32a13cfa619a5db5b4724e50a7d8d237dc28674087b9e8185cee73c857e53 -->
 
 ## What it is for and who it is for
 
@@ -254,7 +254,7 @@ Screen: Website
 Steps:
 1. Unfold **Catalog** and turn **Show** on.
 2. In **What to show**, choose **Products** (Inventory's on sale: active, not sold out and not hidden from the
-   website, INVENTORY-F36) or **Services** (those
+   website) or **Services** (those
    offered); only those of the apps on in the business are offered.
 3. If you want, choose the **Categories** (none = **All categories**) and whether prices show with **Show prices**.
    It saves by itself, like the rest of the draft.
