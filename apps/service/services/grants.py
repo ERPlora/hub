@@ -10,6 +10,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.customer.queries import find_customer
+from apps.service import grant_card
 from apps.service import events
 from apps.service.models import Assignment, Grant, GrantAdjustment, Redemption, Service
 from apps.service.queries.catalog import find_service
@@ -72,6 +73,7 @@ def _grant_payload(grant: Grant) -> dict:
         "and its expiry counts from the purchase. If it was charged at the till, say the sale: without it, its "
         "sessions count for nobody's commission.",
         "risk": "normal",
+        "summary": grant_card.summary,
         "asks": {
             "en": ("sell Inés the five-massage voucher", "Pilar has bought the laser pack, give it to her"),
             "es": ("véndele a Inés el bono de cinco masajes", "Pilar ha comprado el bono de láser, dáselo"),

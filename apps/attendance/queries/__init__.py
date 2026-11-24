@@ -34,7 +34,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import NotFound, PermissionDenied
 from live.operations import operation
 
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
@@ -61,11 +61,10 @@ from apps.attendance.schemas import (
 from apps.staff.models import Member
 from base.models import HubUser
 from base.ordering import list_order_for
-from base.queries.people import hub_user_of
 from base.business import babel_locale, business_zone
 
-MEMBER_NOT_FOUND = _("That person does not exist in Staff.")
-AMBIGUOUS_MEMBER = _("Several people match “%(name)s”: %(matches)s. Say which one.")
+from .people import MEMBER_NOT_FOUND, actor_user, find_member, member_name_expression, own_member, person_out
+
 RECORD_NOT_FOUND = _("That working day does not exist in this business.")
 OWN_DAYS_ONLY = _("You can only see your own working days.")
 #: The reason of the system's correction when a termination closes a day (ATTENDANCE-F13). Stored in
@@ -108,64 +107,10 @@ DEFAULTS = {
 # ── Lookups shared with services.py ─────────────────────────────────────────────────────────────
 
 
-def member_name_expression() -> Concat:
-    return Concat("first_name", Value(" "), "last_name", output_field=CharField())
-
-
-def actor_user(ctx: OperationContext) -> HubUser | None:
-    """The caller's person in the business's database (``base.HubUser``), read only; ``None`` for the platform itself,
-    an API key, an anonymous caller or a person it does not know yet (whom no record names)."""
-    return hub_user_of(ctx)
-
-
 def user_name(person: HubUser | None) -> str:
     if person is None:
         return ""
     return (person.name or person.username).strip()
-
-
-def own_member(ctx: OperationContext) -> Member | None:
-    """The live (not terminated) staff record linked to the caller's user, if any."""
-    user = actor_user(ctx)
-    if user is None:
-        return None
-    return (
-        Member.objects.exclude(status=Member.Status.TERMINATED)
-        .filter(user_id=user.pk)
-        .first()
-    )
-
-
-def find_member(
-    member_id: UUID | None, name: str | None, *, include_terminated: bool = False
-) -> Member:
-    """The staff record named by id, or by name: an exact full name first, then a part of it.
-
-    ``NotFound`` when nothing matches; 409 ``attendance.ambiguous_member`` naming the candidates.
-    """
-    members = Member.objects.annotate(full=member_name_expression())
-    if not include_terminated:
-        members = members.exclude(status=Member.Status.TERMINATED)
-    member = None
-    if member_id is not None:
-        member = members.filter(pk=member_id).first()
-    elif name:
-        text = name.strip()
-        matches = list(members.filter(full__iexact=text)[:2]) or list(
-            members.filter(full__icontains=text).order_by(
-                "first_name", "last_name", "id"
-            )[:6]
-        )
-        if len(matches) > 1:
-            names = ", ".join(m.full_name for m in matches[:5])
-            raise Conflict(
-                str(AMBIGUOUS_MEMBER) % {"name": text, "matches": names},
-                code="attendance.ambiguous_member",
-            )
-        member = matches[0] if matches else None
-    if member is None:
-        raise NotFound(str(MEMBER_NOT_FOUND))
-    return member
 
 
 def saved_settings() -> AttendanceSettings | None:
@@ -777,10 +722,6 @@ def listed_people() -> QuerySet:
     return Member.objects.annotate(name=member_name_expression()).filter(
         ~Q(status=Member.Status.TERMINATED) | Q(pk__in=with_days.values("member"))
     )
-
-
-def person_out(member: Member) -> dict:
-    return {"id": member.id, "name": member.name, "status": member.status}
 
 
 @operation(

@@ -110,7 +110,8 @@ def bill_requested(table_id) -> bool:
 
 
 def print_bill(order_id):
-    run("sale.order.print_bill", {"order_id": str(order_id)})
+    """The bill printed on the device, with no receipt printer in the business: the screen notes it."""
+    run("sale.order.note_bill", {"order_id": str(order_id)})
 
 
 def test_a_table_whose_bill_was_printed_has_asked_for_it(coffee):

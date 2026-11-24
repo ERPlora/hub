@@ -819,6 +819,10 @@
     "method": "post",
     "path": "/api/sale/orders/print_bill"
   },
+  "sale.order.note_bill": {
+    "method": "post",
+    "path": "/api/sale/orders/note_bill"
+  },
   "sale.order.split": {
     "method": "post",
     "path": "/api/sale/orders/split"

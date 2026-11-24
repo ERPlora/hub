@@ -702,3 +702,6 @@ msgstr "Bloquear tiempo"
 
 msgid "Change the settings"
 msgstr "Cambiar los ajustes"
+
+msgid "When"
+msgstr "Cuándo"

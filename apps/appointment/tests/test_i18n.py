@@ -8,7 +8,7 @@ from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
 
-from apps.appointment import queries, schemas, services
+from apps.appointment import assistant_cards, queries, schemas, services
 from apps.appointment.models import (
     Appointment,
     AppointmentService,
@@ -44,7 +44,7 @@ def visible_texts() -> set[str]:
         *config_texts(config),
         *(counter.label for counter in config.bell),
         *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, services, schemas, assistant_cards),
     ]
     lazies += model_texts(MODELS)
     for choices in (

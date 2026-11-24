@@ -126,19 +126,31 @@ class SaleConfig(LiveAppConfig):
     ]
     help = Help(
         videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"},
+        # What Customers and Kitchen do in the till is read in Sales' help, not in theirs: their videos of it show in
+        # SALE-F05 and SALE-F20.
         flow_videos={
             "SALE-F01": {"es": ["0j9NMnpgXWM"], "en": ["TALKAH4xCLM"]},
             "SALE-F02": {"es": ["6IaIDRuKHzk"], "en": ["glc7T7Xpyw0"]},
             "SALE-F03": {"es": ["4iMjcVUNlGQ"], "en": ["FjqB1ra8qPQ"]},
             "SALE-F04": {"es": ["QZIskHcvbx4"], "en": ["WBdK2Z-XHOQ"]},
-            "SALE-F05": {"es": ["QZIskHcvbx4"], "en": ["WBdK2Z-XHOQ"]},
+            "SALE-F05": {"es": ["QZIskHcvbx4", "KvYeyeNY-CA"], "en": ["WBdK2Z-XHOQ", "94FyBhA7QIo"]},
             "SALE-F09": {"es": ["0z32wqTeTxo"], "en": ["J7Gam4c_joo"]},
             "SALE-F10": {"es": ["pvPGkpDjD0U"], "en": ["PuYZJC6ix7M"]},
             "SALE-F11": {"es": ["gtsNNFvYHIw"], "en": ["yViCguWhBP8"]},
             "SALE-F13": {"es": ["VkHmRSouS8U"], "en": ["yQGyb_bvMi8"]},
             "SALE-F14": {"es": ["kG1MT9VEMjo"], "en": ["B_-hW7QysXU"]},
             "SALE-F15": {"es": ["ADneSwlsnlg"], "en": ["8vLwV_6ILUQ"]},
+            "SALE-F16": {"es": ["pFFSYoohjuk"], "en": ["_eMbZDJpfyw"]},
             "SALE-F17": {"es": ["NjZnHKLUZuo"], "en": ["vSfuoQaudRw"]},
+            "SALE-F20": {
+                "es": ["C0jWNygnU0U", "GHkILBVV-Sk", "gtqSJWbcjQE"],
+                "en": ["3IQxiU3BnHU", "8IBXwlE-urA", "hRnc17QyZPA"],
+            },
+            "SALE-F30": {"es": ["f2hi4kRxNjY"], "en": ["VGsi3kyPx_s"]},
+            "SALE-F31": {"es": ["lzKFSJAT-bc"], "en": ["GzlfnHMKBx4"]},
+            "SALE-F34": {"es": ["hGVDzQ5E0E0"], "en": ["ZsUbgRPTcXs"]},
+            "SALE-F35": {"es": ["xcjU2omEAI0"], "en": ["EmgHg4RKKH0"]},
+            "SALE-F36": {"es": ["vWyct5l3cNE"], "en": ["j5pACMwpr98"]},
         },
     )
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query

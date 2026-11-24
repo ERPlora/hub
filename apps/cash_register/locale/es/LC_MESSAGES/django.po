@@ -408,3 +408,6 @@ msgstr "Ver el esperado en un arqueo ciego"
 
 msgid "Change the settings and drawers"
 msgstr "Cambiar los ajustes y los cajones"
+
+msgid "No receipt printer takes this report: open the session to print it on this device."
+msgstr "Ninguna impresora de recibos recibe este informe: abre la sesión para imprimirlo en este dispositivo."

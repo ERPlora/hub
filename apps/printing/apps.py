@@ -140,4 +140,11 @@ class PrintingConfig(LiveAppConfig):
             permission="printing.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "uW6aQbBMWZY", "en": "L7PsjxqO-x0"},
+        flow_videos={
+            "PRINTING-F03": {"es": ["dyI_PmIvzTI"], "en": ["ULjehZ6kAd4"]},
+            "PRINTING-F04": {"es": ["9W6PHb_rz_w"], "en": ["2B56aOPDrs0"]},
+            "PRINTING-F06": {"es": ["RpcOHsdMT0M"], "en": ["7ljnN72MdDE"]},
+        },
+    )

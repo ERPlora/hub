@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5aa05709589510c0e397182bfa6b48d8a3f6ecf460e27fcce98e106c3b4e6399 -->
+<!-- generated from WORKBOOK.md sha256:f17fd1aafd366aeb18abfd4c1b5c60fc62724c4e4d8b5028d57ff9ae577e1557 -->
 
 ## What it is for and who it is for
 
@@ -928,7 +928,8 @@ Screen: Floor plan (Service); assistant
 Steps:
 1. In Sales, with a table's check on screen, the waiter prints the bill to take it to the table ("Print
    bill"), on the receipt printer or through the device's print dialog, or asks the assistant for it ("print
-   the bill for table 4").
+   the bill for table 4"), which only prints it on the receipt printer: if none takes it, it is neither printed
+   nor marked, and its receipt says so.
 2. In **Tables → Floor plan**, that table turns **Bill requested**: its written status, with its icon, says
    "Bill requested" instead of "Occupied", and the table is painted in a colour of its own that cannot be
    mistaken for those of the other statuses nor for the amber and red of the time warning. It still shows the

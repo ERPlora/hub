@@ -8,7 +8,7 @@ from pathlib import Path
 from django.apps import apps
 from django.utils import translation
 
-from apps.staff import queries, schemas, services
+from apps.staff import queries, schemas, services, time_off_card
 from apps.staff.models import (
     Member,
     Role,
@@ -41,7 +41,7 @@ def visible_texts() -> set[str]:
     lazies = [
         *config_texts(config),
         *(widget.title for widget in config.widgets),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, services, schemas, time_off_card),
     ]
     lazies += model_texts(MODELS)
     for choices in (Member.Status, TimeOff.LeaveType, TimeOff.Status):
