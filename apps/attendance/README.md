@@ -37,7 +37,7 @@ que queda en su historial y saca el mes en CSV. Ninguna jornada se borra y se co
 | Usa de otras apps | Personal (fichas y nombres, también las dadas de baja); de la plataforma, la persona de la sesión (`base.HubUser`) y el modo del dispositivo (`base.queries.devices.device_of`, BASE-F62); la pantalla Fichar sigue `base.device.current` |
 | La usan | ninguna app la requiere hoy; el Inicio pinta su panel «Fichados ahora» |
 | Pantallas | `/attendance/clock`, `/attendance/records` y `/attendance/settings` |
-| Operaciones | 10 consultas (`queries.py`) y 8 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/attendance/…`; 16 operaciones abiertas a las API keys |
+| Operaciones | 10 consultas (`queries/`) y 8 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/attendance/…`; 16 operaciones abiertas a las API keys |
 | Eventos | 7, `attendance.<entidad>.<hecho>` (`events.py`); reacciona a `staff.member.terminated` |
 | Tareas programadas | `attendance.record.review_stale`, `*/15 * * * *` |
 | Migraciones | `0001_initial`, `0002_correction_author` y `0003_hub_users` (expand de la BD por negocio) |
