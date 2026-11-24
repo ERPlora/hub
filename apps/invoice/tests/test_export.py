@@ -232,11 +232,11 @@ def test_the_file_takes_the_list_s_search_and_filters(issuer):
 
 def test_the_period_is_the_issue_date_of_the_business_s_clock(issuer, monkeypatch, in_business_a):
     # 23:30 of 31 October in the Canary Islands is 00:30 of 1 November in Madrid: the invoice belongs to October.
+    monkeypatch.setattr(timezone, "now", lambda: dt.datetime(2026, 11, 2, 12, 0, tzinfo=dt.UTC))
+    november = manual()
     monkeypatch.setattr(timezone, "now", lambda: dt.datetime(2026, 10, 31, 23, 30, tzinfo=dt.UTC))
     monkeypatch.setattr(in_business_a, "timezone", "Atlantic/Canary")
     october = manual()
-    monkeypatch.setattr(timezone, "now", lambda: dt.datetime(2026, 11, 2, 12, 0, tzinfo=dt.UTC))
-    november = manual()
 
     assert [r["Number"] for r in values(export(issue_date_from="2026-10-01", issue_date_to="2026-10-31"))] == [
         october.number
@@ -244,7 +244,8 @@ def test_the_period_is_the_issue_date_of_the_business_s_clock(issuer, monkeypatc
     assert [r["Number"] for r in values(export(issue_date_from="2026-11-01", issue_date_to="2026-11-30"))] == [
         november.number
     ]
-    assert len(values(export())) == 2
+    # The older day first, whatever the order they were issued in.
+    assert [r["Number"] for r in values(export())] == [october.number, november.number]
 
 
 @pytest.mark.parametrize(
@@ -319,6 +320,15 @@ def test_a_business_s_file_holds_only_its_own_invoices(issuer, hub_b):
 
 
 # The words
+
+
+def test_the_money_goes_in_the_units_of_its_currency(issuer):
+    manual(line(1000, "21"))
+    Invoice.objects.update(currency="JPY")
+
+    [row] = values(export())
+
+    assert (row["Taxable base"], row["Tax"], row["Total"]) == (1000, 210, 1210)
 
 
 def test_the_headers_and_the_file_name_are_in_the_person_s_language(issuer):

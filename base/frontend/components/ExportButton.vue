@@ -53,7 +53,10 @@ async function exportFile(): Promise<void> {
 </template>
 
 <style scoped>
+/* As tall as the toolbar's other controls: a finger's target on a tablet and a phone. */
 .export-button {
   margin: 0;
+  min-height: 44px;
+  --border-radius: 10px;
 }
 </style>

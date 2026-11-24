@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:042f0979cadba4fbe04d58e21b320b984ed7f254288c7e45c408429b5e998feb -->
+<!-- generated from WORKBOOK.md sha256:afc2947a25c54686d01eaa9c255463403bb3f6bec1c95d09b6f0f86c6b1c2c86 -->
 
 ## What it is for and who it is for
 
@@ -22,9 +22,11 @@ restaurant and the hair salon alike: nothing in it belongs to one vertical.
 - The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them,
   issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
   paid.
-- The **manager**, besides, sees everyone's invoices, rectifies and keeps the numbering series.
+- The **manager**, besides, sees everyone's invoices, downloads them in Excel, rectifies and keeps the numbering
+  series.
 - The **owner** and the **administrator**, besides, set up the **issuer** (the business's tax identity
   that appears on every invoice).
+- The **accountancy firm** sees and downloads in Excel everyone's invoices, without issuing or changing anything.
 - The **system**, with nobody in front, invoices every charge and rectifies every refund and every void.
 
 It does not charge or refund money (that is Sales), it sends nothing to the AEAT and does not compute the
@@ -101,7 +103,8 @@ the owner and the administrator see everyone's.
 #### Detail
 Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card view; on the phone, cards
 with the number as title) with "Number", "Customer", "Total", "Status", "Date" and "Type"; every column
-sorts. Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
+sorts. "Download in Excel", for whoever sees everyone's invoices, saves the list as it is filtered (INVOICE-F24).
+Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
 "Type", "Series", "Source", "Date" (between two days) and "Total" (between two amounts, in the business's
 currency). Unsorted, the latest issued comes on top. While the issuer is not set up, the bell's notice "You cannot
 issue invoices yet" says it once ("No ticket or invoice can be issued until this is set up: Your business details."
@@ -251,6 +254,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F20 | Give other apps the invoice of a sale | done |
 | INVOICE-F21 | Set up the issuer | done |
 | INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
+| INVOICE-F24 | Download the issued invoices in Excel | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
 Status: done — Sales asks for it within the same charge
@@ -682,7 +686,7 @@ any amount field of the Hub and as in the other lists ("1.000,50", "1,000.50", "
 an amount. Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000" in euros,
 "This amount can be read in two ways…"), and an end date before the start date, "The end date cannot be
 before the start date."; neither of the two filters.
-Involved: none
+Involved: INVOICE-F24
 
 ### INVOICE-F17 View an invoice
 Status: done
@@ -836,6 +840,31 @@ VeriFactu refusal undoes the whole invoice; in production with real filing with 
 does not charge.
 Involved: VERIFACTU-F13
 
+### INVOICE-F24 Download the issued invoices in Excel
+Status: done
+Actor: owner, administrator, manager, accountancy firm, assistant
+Screen: Invoices
+Steps:
+1. In **Invoicing → Invoices**, filter the list by what you want: usually the date, between the first and the last day
+   of the month or the quarter; also by status, type, series, source, total or a search.
+2. Tap "Download in Excel".
+3. An Excel file is downloaded, for example `invoices-2026-10.xlsx`, with the invoices the list keeps (all of them, not
+   only those of the page), from the oldest to the newest. One row per invoice and tax rate: "Number", "Date",
+   "Customer", "Tax ID", "Taxable base", "Rate %", "Tax" and "Total". An invoice with three rates has three rows, each
+   with its part; in the "Total" column, the rows of an invoice add up to its total, and the whole column adds up to the
+   total of what was downloaded. If any has an equivalence surcharge, "Surcharge rate %" and "Surcharge" come too. The
+   currency is the business's and the figures are numbers.
+4. A rectifying invoice comes with its amount in negative and the invoice it corrects with its own, as the list counts
+   them.
+5. The same can be asked of the assistant ("download the invoices of October in Excel for my accountant"): the file
+   stays under its answer, with "Download {name}".
+In: the invoices the person sees and the list filters.
+Out: the file; nothing changes. With no invoice, the button is off.
+If it fails: an employee does not have the button and the API answers that they have no permission; if the business is
+busy or another failure prevents it, a notice says "The invoices could not be downloaded: {reason}" and it can be tapped
+again.
+Involved: INVOICE-F16, BASE-F112
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
@@ -857,6 +886,7 @@ whole series'.
 |---|---|---|---|
 | The invoices, with search, filters, sorting and pages (up to 100) | view | F16 | `invoice.invoice.list` |
 | An invoice with its lines, breakdown and links, by its id or its number | view | F17 | `invoice.invoice.get` |
+| The invoices the list's search and filters keep, in an Excel (a row per invoice and tax rate) | view everyone's | F24 | `invoice.invoice.export` |
 | The ticket its code opens (number, date and total) and, if it has one, its full invoice with its VeriFactu QR | the public page | F04 | `invoice.public.ticket` |
 | The current invoice of a sale | view | F20 | `invoice.invoice.by_source` |
 | The printable document (A4 HTML) of an invoice | view | F18 | `invoice.invoice.document` |
@@ -874,7 +904,7 @@ whole series'.
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
 | Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
 
-All of them can be followed live.
+All of them but the Excel can be followed live.
 
 ### What it offers: actions (they change data)
 
@@ -974,6 +1004,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 |---|---|---|---|---|---|
 | View invoices, series, numbering and issuer; print | yes | yes | yes | yes | `invoice.view_invoice` |
 | View everyone's invoices (without it, only theirs: the ones they issued, the ones of their sales and what rectifies or replaces them) | yes | yes | yes | no | `invoice.view_all_invoices` |
+| Download the issued invoices in Excel | yes | yes | yes | no | `invoice.view_all_invoices` |
 | Issue by hand, invoice a sale, replace a ticket, mark as paid | yes | yes | yes | yes | `invoice.add_invoice` |
 | Rectify (by hand, by refund and by void) | yes | yes | yes | no | `invoice.rectify_invoice` |
 | Create and change series | yes | yes | yes | no | `invoice.manage_series` |
@@ -986,5 +1017,5 @@ the ticket's public page holds `invoice.public`, without a session and without a
 issues from it alone (high risk, as replacing a ticket at the counter).
 
 The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print" and "View
-everyone's invoices": it opens, prints and downloads everyone's invoices issued, without issuing, rectifying or setting
-up anything.
+everyone's invoices": it opens, prints and downloads in Excel (INVOICE-F24) everyone's invoices issued, without
+issuing, rectifying or setting up anything.
