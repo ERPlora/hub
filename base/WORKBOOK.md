@@ -1253,14 +1253,18 @@ Pasos:
      también los clientes) o «Plantilla para compartir» (nunca lleva clientes).
   4. Elige las apps y sus datos (BASE-F36) y pulsa «Exportar» («Exportando…»).
   5. El archivo baja con el navegador y sale «{file} descargado.».
+  6. Pedido al asistente («Voy a abrir otro bar y quiero llevarme la carta y los clientes»), dice que se hace aquí,
+     en Ajustes › Datos y copias › Exportar, con «Plantilla para compartir» o «Copia de seguridad de este negocio», y
+     qué lleva: los productos y los servicios van con sus fotos propias dentro. El archivo no lo saca él.
 Entra: el nombre, el idioma, para qué es y lo marcado.
-Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
-ni datos fiscales. En el negocio no se guarda nada.
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas, con las fotos propias de los
+productos y los servicios dentro (INVENTORY-F33); nunca las ventas, las personas, los PIN ni los datos fiscales. En el
+negocio no se guarda nada.
 Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
 exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
 restablecer (BASE-F37).
-Implicados: BASE-F112 (dentro de la app), BASE-F37
+Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho

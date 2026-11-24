@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7df417d3ca4c5978f30cb90616f93f6f3461ed17b2dccbe32fcd6b2a25cf3e5c -->
+<!-- generated from WORKBOOK.md sha256:90ba9a9e7862a2df63a6511fadb14118022bfd8b70f8ca452f803648616377aa -->
 
 ## What it is for and who it is for
 
@@ -1250,14 +1250,18 @@ Steps:
      or "Template to share" (it never takes customers).
   4. Choose the apps and their data (BASE-F36) and tap "Export" ("Exporting…").
   5. The file downloads with the browser and "{file} downloaded." shows.
+  6. Asked of the assistant ("I'm opening another bar and want to take the menu and the customers"), it says it is
+     done here, in Settings › Data and backups › Export, with "Template to share" or "Backup of this business", and
+     what it takes: the products and the services go with their own photos inside. It does not make the file itself.
 In: the name, the language, what it is for and what is ticked.
-Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows; never people,
-PINs nor fiscal data. Nothing is kept in the business.
+Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows, with the products' and
+the services' own photos inside (INVENTORY-F33); never the sales, people, PINs nor fiscal data. Nothing is kept in the
+business.
 If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
 administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset
 (BASE-F37).
-Involved: BASE-F112 (inside the app), BASE-F37
+Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F33
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
 Status: done
