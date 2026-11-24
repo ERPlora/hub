@@ -7,12 +7,6 @@ import { ACCOUNTANT, EMPLOYEE, flush } from '../__tests__/mount-invoice';
 import { EMPTY, PAGE, setup } from '../__tests__/invoices-page';
 import { browserDownloads, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
-vi.mock('@erplora/ui/components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
-  useConfirm: () => ({ confirm: mocks.confirm }),
-}));
-
 afterEach(() => {
   outOfTheApp();
   vi.restoreAllMocks();

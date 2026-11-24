@@ -8,6 +8,7 @@
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { row } from '../__tests__/invoice-row';
 import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice, OWNER } from '../__tests__/mount-invoice';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
@@ -34,28 +35,8 @@ const OP = 'invoice.invoice.get';
 const NO_PRINTER = { error: { code: 'invoice.no_printer', message: 'No system printer takes this invoice.' } };
 
 const INVOICE: InvoiceOut = {
+  ...row('FACT-2026-000001'),
   id: 'i1',
-  number: 'FACT-2026-000001',
-  invoice_type: 'F1',
-  series_code: 'FACT',
-  year: 2026,
-  issue_date: '2026-10-14',
-  issued_at: '2026-10-14T10:00:00Z',
-  customer_name: 'Talleres Pérez SL',
-  customer_tax_id: 'B12345674',
-  base_amount: 1000,
-  tax_amount: 210,
-  total_amount: 1210,
-  currency: 'EUR',
-  currency_decimals: 2,
-  status: 'issued',
-  source_type: 'manual',
-  rectifies_id: null,
-  rectifies_number: '',
-  substituted: false,
-  can_mark_paid: true,
-  can_rectify: true,
-  can_substitute: false,
   series_id: 's1',
   sequence: 1,
   operation_date: '2026-10-13',

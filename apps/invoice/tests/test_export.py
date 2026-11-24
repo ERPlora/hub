@@ -161,30 +161,18 @@ def test_an_exempt_line_shows_a_zero_rate_and_its_total_is_its_base(issuer):
     assert (row["Taxable base"], row["Rate %"], row["Tax"], row["Total"]) == (50, 0, 0, 50)
 
 
-def test_the_equivalence_surcharge_has_its_own_columns_only_in_a_file_that_has_one(issuer, charge, product):
-    from apps.tax.models import TaxRule
-
+def test_the_equivalence_surcharge_has_its_own_columns_only_in_a_file_that_has_one(
+    issuer, charge, product, equivalence_surcharge
+):
     manual()
     assert opened(export())[0] == HEADERS
     product()
-    root = TaxRule.objects.get(category__key="product.generic", country_code="ES", parent__isnull=True)
-    run(
-        "tax.rule.create",
-        {
-            "country_code": "ES",
-            "tax_category_key": "product.generic",
-            "rate_pct": "5.2",
-            "tax_type": "surcharge",
-            "parent_id": str(root.id),
-            "component_label": "Recargo de equivalencia",
-        },
-    )
     charge("inv-sale-2345")
 
     headers, rows = opened(export())
 
     assert headers == [*HEADERS[:7], "Surcharge rate %", "Surcharge", "Total"]
-    by_rate = {tuple(c.value for c in row)[5]: dict(zip(headers, [c.value for c in row], strict=True)) for row in rows}
+    by_rate = {row[5].value: dict(zip(headers, [cell.value for cell in row], strict=True)) for row in rows}
     surcharged = by_rate[21]
     assert surcharged["Surcharge rate %"] == 5.2
     assert surcharged["Total"] == pytest.approx(surcharged["Taxable base"] + surcharged["Tax"] + surcharged["Surcharge"])

@@ -3,11 +3,11 @@
 // PREFIX-YYYY-NNNNNN), Current no., Active and Default —, this year's first, search «Search code, name…»;
 // in cards under 1280 px. «+» opens «New numbering series» and «Edit» (or the row) «Edit series <code>», for
 // whoever keeps the series; anyone else only looks. Every state of the screen.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+import { EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
-import type { Component } from 'vue';
 
+import { liveTable } from '../__tests__/live-table';
 import { answerIssuer, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
 import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
 import SeriesFormModal from '../components/SeriesFormModal.vue';
@@ -44,15 +44,9 @@ const PAGE = {
 async function setup(options: MountOptions = {}) {
   const m = await mountInvoice(SeriesPage, { path: '/invoice/series', ...options });
   const call = await m.live();
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="invoice-series-row"]');
+  const list = liveTable(m, 'invoice-series-row');
   const show = (page: unknown) => m.result(OP, page);
-  async function emit(name: string, ...args: unknown[]) {
-    table().vm.$emit(name, ...args);
-    await flush();
-  }
-  return { ...m, call, table, prop, rows, show, emit };
+  return { ...m, ...list, call, show };
 }
 
 describe('SeriesPage', () => {

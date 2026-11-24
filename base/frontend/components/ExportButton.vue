@@ -37,7 +37,7 @@ async function exportFile(): Promise<void> {
 
 <template>
   <ion-button
-    class="export-button"
+    class="ion-no-margin"
     size="small"
     fill="outline"
     :data-testid="testid"
@@ -51,12 +51,3 @@ async function exportFile(): Promise<void> {
     {{ pending ? pendingLabel : label }}
   </ion-button>
 </template>
-
-<style scoped>
-/* As tall as the toolbar's other controls: a finger's target on a tablet and a phone. */
-.export-button {
-  margin: 0;
-  min-height: 44px;
-  --border-radius: 10px;
-}
-</style>
