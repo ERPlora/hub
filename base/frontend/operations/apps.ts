@@ -73,14 +73,11 @@ export interface AppRefIn {
   app: string;
 }
 
-/** `base.AppRefOut`: which app a name names, with what it is for and its state as the Apps screen says them. */
+/** `base.AppRefOut`: which app a name names, with its state as the Apps screen says it. */
 export interface AppRef {
   id: string;
   name: string;
-  summary: string;
   state: 'on' | 'off' | 'blocked' | 'creating' | 'failed';
-  /** The business's country requires it: once on, it never goes off. */
-  mandatory: boolean;
 }
 
 declare module '@erplora/ui/sdk' {
