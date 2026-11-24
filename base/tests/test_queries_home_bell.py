@@ -12,6 +12,7 @@ from live.meta import BellCounter, all_live_app_configs
 from live.models import OutboxEvent
 from live.operations import get
 
+from base.apps_on import active_apps
 from base.models.relay import EventDelivery
 from base.models import Hub
 from base.models.roles import BusinessRole
@@ -262,6 +263,20 @@ def test_nobody_else_is_told_of_the_roles_to_review(modules):
 def test_roles_saved_with_all_there_is_are_not_to_review(modules):
     modules(module("sale"))
     reviewed("Cashier")
+
+    assert to_review(ctx(MANAGE_ROLES)) == []
+
+
+def test_what_a_role_lacks_of_an_app_that_is_off_is_not_to_review(modules, monkeypatch):
+    """It is reviewed when the business turns that app on, not before."""
+    modules(module("sale"))
+    role = reviewed("Cashier")
+    role.states = {permission: state for permission, state in role.states.items() if not permission.startswith("sale.")}
+    role.save()
+    assert [row["count"] for row in to_review(ctx(MANAGE_ROLES))] == [1]
+
+    on = active_apps(A) - {"sale"}
+    monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: on)
 
     assert to_review(ctx(MANAGE_ROLES)) == []
 

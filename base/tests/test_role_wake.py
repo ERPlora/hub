@@ -7,7 +7,7 @@ from live.errors import OperationError
 from live.operations import get as get_operation
 
 from base import events
-from base.models import Membership
+from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
 from base.permissions import access_for
 from base.roles import ON
@@ -98,6 +98,17 @@ def test_a_role_that_is_not_given_wakes_nobody(ctx, cashier, listening):
         run(ctx, "base.role.assign", person="saas:1", role=str(cashier.pk))
 
     assert heard(here, timeout=0.5) == set()
+
+
+def test_a_role_given_that_is_rolled_back_wakes_nobody(ctx, cashier, eva, listening, monkeypatch):
+    here = listening(A)
+    monkeypatch.setattr("base.queries.roles.role_label", lambda held: 1 / 0)
+
+    with pytest.raises(ZeroDivisionError):
+        run(ctx, "base.role.assign", person="saas:3", role=str(cashier.pk))
+
+    assert heard(here, timeout=0.5) == set()
+    assert not HubUser.objects.filter(business_role__isnull=False).exists()
 
 
 def test_the_queries_of_the_roles_and_the_bell_follow_a_role_given():
