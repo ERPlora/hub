@@ -22,9 +22,9 @@ from live.models import OutboxEvent
 from apps.staff.queries import list_accounts
 from apps.staff.schemas.accounts import AccountListIn
 from apps.whatsapp_inbox.queries.agents import team_roles
-from base import auth, meter
+from base import auth, meter, queries
 from base.models import Hub, HubUser, Membership
-from base.models.access import TrustedDevice
+from base.models.access import Credential, TrustedDevice
 from base.models.sessions import SessionOwner
 from base.models.support_access import SupportAccess, SupportVisit
 from base.permissions import permissions_of_role
@@ -188,7 +188,11 @@ class TestWithTheAccessOn:
             assert HubUser.objects.filter(username=SUPPORT_COPY).exists()
             assert team_roles(ctx) == {"saas:1": "hub_owner"}
             rows = list_accounts(ctx, AccountListIn()).rows
+            Credential.objects.create(username="saas:1", pin_hash="x")
+            Credential.objects.create(username=SUPPORT_COPY, pin_hash="y")
+            on_the_pin_pad = [credential.username for credential, _ in queries.access.pin_people(A)]
         assert [row.name for row in rows] == ["Olga"]
+        assert on_the_pin_pad == ["saas:1"]
 
 
 @pytest.mark.usefixtures("access_on")
