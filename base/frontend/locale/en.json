@@ -319,7 +319,7 @@
         "versionValue": "Version {version}",
         "brings": "It brings",
         "readError": "The file could not be read: {reason}",
-        "tooBig": "the file is larger than 20 MB."
+        "fileTooBig": "The file could not be read: the file is larger than 20 MB."
       },
       "review": {
         "title": "Review what it brings",

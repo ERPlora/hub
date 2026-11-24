@@ -9,12 +9,30 @@ import {  } from 'node:child_process';
 
 import { expect, test } from '@playwright/test';
 
-import { answers, ask, box, freshPage, home, lastAnswer, lastAnswerAtEachSize, openPanel, openPanelAtTheDesk, panel, panelAtTheDesk, shots } from './assistant-panel';
+import {
+  answers,
+  ask,
+  askForACard,
+  box,
+  card,
+  confirmationReady,
+  confirmationSettled,
+  confirmedWithTheWord,
+  freshPage,
+  home,
+  lastAnswer,
+  lastAnswerAtEachSize,
+  openPanel,
+  openPanelAtTheDesk,
+  panel,
+  panelAtTheDesk,
+  shots,
+} from './assistant-panel';
 import { CLAIM_ANSWER, DICTATION, GREETING } from './assistant-provider';
 import { saasSql } from './assistant-real';
-import { A, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
+import { A, api, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
-import { panelSpec, spend } from './provider-helpers';
+import { chats, panelSpec, spend } from './provider-helpers';
 import { pressAssistant, topbarMore, topbarMoreMenu } from './topbar';
 
 const provider = panelSpec();
@@ -346,5 +364,41 @@ test.describe('dictation and files', () => {
     await expect(box(page)).toHaveValue(DICTATION);
     expect(await answers(page).count()).toBe(before);
     await shots(page, 'BASE-G112');
+  });
+});
+
+test.describe('a copy of a business attached in the panel', () => {
+  test('is offered by the attach button, loads with its card and the yes, and erplora.com only hears its name (BASE-F94)', async ({ page }) => {
+    await login(page, A, '/');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // A copy of this business as Settings › Data › Export gives it.
+    const copy = await api<{ content_base64: string }>(page.context(), A, 'GET', '/settings/data/export?name=Copia%20E2E&language=en&purpose=template');
+    expect(copy.status).toBe(200);
+    const name = 'copia-e2e.blueprint.zip';
+    await home(page);
+    await openPanel(page);
+    const input = panel(page).locator('[data-testid="assistant-attach-input"]');
+    expect((await input.getAttribute('accept'))?.split(',')).toEqual(expect.arrayContaining(['.zip', 'application/zip']));
+    const larger = Buffer.alloc(20 * 1024 * 1024 + 1);
+    await input.setInputFiles({ name: 'enorme.blueprint.zip', mimeType: 'application/zip', buffer: larger });
+    await expect(panel(page).locator('[data-testid="assistant-composer-problem"]')).toHaveText(
+      'The file could not be read: the file is larger than 20 MB.',
+    );
+    await input.setInputFiles({ name, mimeType: 'application/zip', buffer: Buffer.from(copy.data.content_base64, 'base64') });
+    await expect(panel(page).locator('[data-testid="assistant-file"]')).toHaveText([name]);
+    await shots(page, 'BASE-F94-copy-attached');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Sent alone, and asked for in the next message: the panel still has the file it attached.
+    await ask(page, '');
+    await expect(panel(page).locator('[data-testid="assistant-bubble-user"]').last()).toContainText(name);
+    await askForACard(page, `E2E-ASK base__blueprint__import {"file_base64":"${name}"}`);
+    await expect(card(page)).toContainText(name);
+    await shots(page, 'BASE-F94-copy-card', () => confirmationReady(page), () => confirmationSettled(page));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await confirmedWithTheWord(page);
+    const sent = JSON.stringify(chats(provider()).map((seen) => seen.body));
+    expect(sent).toContain(name);
+    expect(sent).not.toContain(copy.data.content_base64);
   });
 });

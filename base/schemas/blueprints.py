@@ -8,7 +8,7 @@ from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
-from base.schemas.assistant import names
+from base.schemas.assistant import AN_ATTACHED_FILE, names
 
 
 # ── Data: blueprints, imports and reset ───────────────
@@ -81,7 +81,8 @@ class BlueprintSourceIn(Schema):
         "",
         max_length=FILE_BASE64_MAX,
         title=gettext_noop("File"),
-        description="A .blueprint.zip in base64 (20 MB at most).",
+        description="A .blueprint.zip in base64 (20 MB at most); from the chat, the name of the one the person attached.",
+        json_schema_extra=AN_ATTACHED_FILE,
     )
 
 

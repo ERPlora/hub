@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8625a58a87973d786a08bcf9c7dd12c631152df300d91070f83f6ca011cbdcf4 -->
+<!-- generated from WORKBOOK.md sha256:57917909e35ebf1e9af745f6290cfdd9dba5e91fddfb5a58cc028066ced8d88a -->
 
 ## What it is for and who it is for
 
@@ -2522,23 +2522,32 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
-  1. To attach, they tap "Attach a file" and choose one or several: images, PDF, Word, Excel, text or CSV. Each one
-     shows over the box with its name and its "Remove attachment" ×.
+  1. To attach, they tap "Attach a file" and choose one or several: images, PDF, Word, Excel, text or CSV, or the
+     copy of a business (a .blueprint.zip, the same one Settings · Data and backups › Import takes, BASE-F30). Each
+     one shows over the box with its name and its "Remove attachment" ×.
   2. They go with the next message, with or without text, and stay in the person's bubble by their name. They travel
-     only once, with that question: afterwards the conversation only remembers what they were called.
-  3. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
+     with the conversation while the page stays open; once it is reloaded, the conversation only remembers what they
+     were called.
+  3. The assistant does not read the copy of a business: if the person asks it to load it, the assistant loads it
+     with its card, as Import does (BASE-F31, BASE-F97). If the page was reloaded before saying "yes", it loads
+     nothing and asks for it to be attached again.
+  4. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
      app, the device) asks for permission to use the microphone; while it asks, another tap does not open a second
      recording. While it records, the button turns red and is called "Stop recording"; after two minutes it stops by
      itself.
-  4. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
+  5. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
      itself**: the person reviews it and taps "Send", and what they ask goes through its card like any other request
      (BASE-F97).
-In: the files (8 MB each and 20 MB among all those of a question) or the recording.
-Out: the file travels with the question to erplora.com, which reads it; the recording goes through the business to
-erplora.com's transcription. The browser never talks to erplora.com directly.
+In: the files (8 MB each; the copy of a business, 20 MB as in Import; and 20 MB among all those of a question) or the
+recording.
+Out: the file travels with the question to erplora.com, which reads it; the copy of a business stays in the
+business: erplora.com only gets its name. The recording goes through the business to erplora.com's transcription.
+The browser never talks to erplora.com directly.
 If it fails: in one line over the box, and the file is not attached: "menu.pdf is too large: 8 MB at most per file.",
-"The files of one question add up to 20 MB at most.", "menu.zip cannot be attached: images, PDF, Word, Excel, text
-or CSV." or "menu.pdf could not be read.". With the microphone blocked, "Microphone access is blocked. Allow it in
+"The file could not be read: the file is larger than 20 MB." (the copy of a business, as in Import), "The files of
+one question add up to 20 MB at most.", "menu.rar cannot be attached: images, PDF, Word, Excel, text or CSV." or
+"menu.pdf could not be read.". A copy no longer in the conversation is not loaded: "There is no file
+«copia.blueprint.zip» attached to this conversation: attach it again.". With the microphone blocked, "Microphone access is blocked. Allow it in
 your browser to dictate." and, in the installed app (Android or Windows), where there is no browser, "Microphone
 access is blocked. Allow it in your device settings to dictate."; a recording too long, "The recording is too long:
 dictate a shorter message."; no voice, "Nothing was heard. Try again closer to the microphone."; and if it cannot be
