@@ -50,3 +50,26 @@ def test_each_datum_is_the_one_the_card_drew():
 def test_a_summary_that_only_puts_some_data_first():
     summary = card_order.said_first("whom", "invoice", "amount")
     assert summary(None, {}, CARD) == card_order.put_first(CARD, ("whom", "invoice", "amount"))
+
+
+def test_data_said_together_are_one_datum_in_the_order_named():
+    """A booking's service and who does it are one thing on its line («Corte · Ana»), which has room for three
+    (hub#2347): one datum whose value is theirs, by name, in the order named, as said; none not said."""
+    with_whom = card_order.together(CARD, "with", ("whom", "concept", "method"))
+    assert with_whom == {
+        "name": "with",
+        "label": "Whom",
+        "kind": "object",
+        "value": {"whom": "whom said", "method": "method said"},
+    }
+
+
+def test_an_amount_said_together_keeps_its_money():
+    price = {**datum("price"), "kind": "money", "value": 8500, "money": {"currency": "USD", "decimals": 2}}
+    shown = card_order.together([*CARD, price], "what", ("method", "price"))
+    assert shown["value"]["price"] == {"kind": "money", "value": 8500, "money": {"currency": "USD", "decimals": 2}}
+
+
+def test_nothing_said_together_is_no_datum_and_one_alone_is_itself():
+    assert card_order.together(CARD, "with", ("concept", "note")) is None
+    assert card_order.together(CARD, "with", ("concept", "day")) == datum("day")

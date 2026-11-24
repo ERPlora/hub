@@ -7,6 +7,7 @@ from live.errors import NotFound
 from live.operations import operation
 from live.outbox import record_event
 
+from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import BlockedTime
 from apps.appointment.queries import (
@@ -49,6 +50,7 @@ MANAGE_SCHEDULE = "appointment.manage_schedule"
         "description": "Block a period of the agenda (a holiday, a training, a professional's break): for the whole "
         "business or one professional (by name), between two wall-clock times or whole days (all_day). Nobody books it.",
         "risk": "normal",
+        "summary": assistant_cards.blocked_time,
     },
 )
 def create_blocked_time(ctx: OperationContext, data: BlockedTimeCreateIn) -> dict:

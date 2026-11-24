@@ -26,3 +26,25 @@ def said_first(*names: str) -> Summary:
         return put_first(fields, names)
 
     return summary
+
+
+def together(fields: list[dict], name: str, names: Sequence[str]) -> dict | None:
+    """The data of ``fields`` named in ``names`` as one datum ``name``, their values in that order (those not said,
+    skipped; an amount with its money): what says one thing on a line that has room for three (a booking's service
+    and who does it). ``None`` when none was said; one alone, as it is."""
+    said = sorted(
+        (field for field in fields if field["name"] in names and field["kind"] != "empty"),
+        key=lambda field: names.index(field["name"]),
+    )
+    if not said:
+        return None
+    if len(said) == 1:
+        return said[0]
+    return {"name": name, "label": said[0]["label"], "kind": "object", "value": {field["name"]: _value(field) for field in said}}
+
+
+def _value(field: dict) -> object:
+    """A datum's value inside another, as the card's screen reads one there: an amount with its kind and money."""
+    if field["kind"] == "money":
+        return {key: field[key] for key in ("kind", "value", "money") if key in field}
+    return field["value"]
