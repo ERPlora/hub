@@ -119,7 +119,20 @@ class CashRegisterConfig(LiveAppConfig):
             permission="cash_register.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "rqBH2VUFcko", "en": "IEzfwEgMXwM"},
+        flow_videos={
+            "CASH_REGISTER-F01": {"es": ["dgr-M9sxkV0"], "en": ["zrWOUH8Kb4s"]},
+            "CASH_REGISTER-F02": {"es": ["HoqsdW2qM-8"], "en": ["IjMK8xGz_T0"]},
+            "CASH_REGISTER-F03": {"es": ["Ftpqm8vFpHo"], "en": ["KOYwIoKqcw4"]},
+            "CASH_REGISTER-F05": {"es": ["8AHpbffKmlo"], "en": ["ZEo0EiJqlDU"]},
+            "CASH_REGISTER-F06": {"es": ["RCCtdEgyaV8"], "en": ["n4dY9lEBttg"]},
+            "CASH_REGISTER-F07": {"es": ["dgr-M9sxkV0"], "en": ["zrWOUH8Kb4s"]},
+            "CASH_REGISTER-F08": {"es": ["uaqdwweCK5Q"], "en": ["liCdrUnVem0"]},
+            "CASH_REGISTER-F09": {"es": ["uaqdwweCK5Q"], "en": ["liCdrUnVem0"]},
+            "CASH_REGISTER-F11": {"es": ["dO3Ju_an_fs"], "en": ["kMgq2HIRE8I"]},
+        },
+    )
     # The Home's step and panels, on the queries the drawer's own screens read. The factory values apply from the
     # start, so «Your cash drawer» waits for the business's own save (CASH_REGISTER-F01), even of the values as they
     # came.

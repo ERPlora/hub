@@ -115,7 +115,7 @@ def test_every_datum_of_the_card_is_named_in_the_persons_language():
 def test_a_datum_is_named_by_the_model_of_its_operation_before_another_of_its_app():
     """Two models of an app may name a field of the same name differently: the operation's entity says which."""
     assert labels(assistant.cards.card(get("base.device.mode_set"), {"mode": "kiosk"}, "es")) == ["Modo"]
-    assert labels(assistant.cards.card(get("base.api_key.create"), {"mode": "read"}, "es")) == ["Qué puede hacer"]
+    assert labels(assistant.cards.card(get("base.api_key.create"), {"scopes": {"*": ["read"]}}, "es")) == ["Qué puede hacer"]
 
 
 class TitledIn(Schema):

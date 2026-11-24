@@ -245,7 +245,7 @@
     },
     "series": {
       "title": "Series de numeración",
-      "intro": "Cada serie define el prefijo, el formato y el contador de la numeración de un tipo de factura y un año (PREFIX-YYYY-NNNNNN). El código, el tipo, el año y el contador no cambian nunca; el prefijo, el formato y el siguiente número, solo hasta que la serie emite su primera factura.",
+      "intro": "Cada serie define el prefijo, el formato y el contador de la numeración de un tipo de factura y un año (PREFIJO-AAAA-NNNNNN). El código, el tipo, el año y el contador no cambian nunca; el prefijo, el formato y el siguiente número, solo hasta que la serie emite su primera factura.",
       "search": "Buscar código, nombre…",
       "columns": {
         "code": "Código",
@@ -258,7 +258,7 @@
         "active": "Activa",
         "default": "Predet."
       },
-      "defaultFormat": "PREFIX-YYYY-NNNNNN",
+      "defaultFormat": "PREFIJO-AAAA-NNNNNN",
       "entity": {
         "one": "serie",
         "many": "series"
@@ -285,7 +285,7 @@
         "default": "Serie predeterminada",
         "codeHint": "Identificador interno de la serie (no cambia tras crearla). Las ventas numeran en TICKET, FACT y RECT.",
         "prefixHint": "Texto antepuesto al número (ej. FAC → FAC-2026-000001); vacío toma el código.",
-        "formatHint": "Marcadores: {'{prefix}'}, {'{code}'}, {'{year}'}, {'{seq}'} y {'{seq:01d}'}…{'{seq:09d}'}. El año y una secuencia son obligatorios, sin tildes ni símbolos como º. Déjalo vacío para PREFIX-AAAA-NNNNNN. Lo demás se escribe literal (p. ej. VFT{'{year}'}-A-{'{seq:04d}'}). La anchura es un mínimo: un número más largo nunca se recorta.",
+        "formatHint": "Marcadores: {'{prefix}'}, {'{code}'}, {'{year}'}, {'{seq}'} y {'{seq:01d}'}…{'{seq:09d}'}. El año y una secuencia son obligatorios, sin tildes ni símbolos como º. Déjalo vacío para PREFIJO-AAAA-NNNNNN. Lo demás se escribe literal (p. ej. VFT{'{year}'}-A-{'{seq:04d}'}). La anchura es un mínimo: un número más largo nunca se recorta.",
         "lockedHint": "Esta serie ya ha emitido facturas, así que su prefijo, su formato y su siguiente número ya no se pueden cambiar: el número forma parte de la cadena de VeriFactu. Crea una serie nueva si necesitas otros.",
         "preview": "Siguiente número",
         "create": "Crear serie",

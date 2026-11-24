@@ -1013,8 +1013,11 @@
       },
       "short": {
         "read": "R",
-        "write": "W"
+        "create": "C",
+        "update": "U",
+        "delete": "D"
       },
+      "allApps": "All apps",
       "states": {
         "active": "Active",
         "revoked": "Revoked"
@@ -1063,6 +1066,7 @@
         "gone": "That key no longer exists. Refresh the list and try again.",
         "scopesRequired": "Choose at least one app and what the key may do on it.",
         "scopeUnknown": "That app does not publish what the key would do on it.",
+        "beyondMaker": "A key may not do more than you may do yourself.",
         "denied": "Only whoever runs the business manages the API keys."
       },
       "docs": "API documentation"
@@ -1311,8 +1315,8 @@
           "archive": "Archive",
           "assign": "Assign",
           "attach": "Apply",
-          "auto_close": "Close",
-          "avatar_remove": "Remove",
+          "auto_close": "Close the sessions due to close by themselves",
+          "avatar_remove": "Remove the profile photo",
           "back_to_testing": "Go back to testing",
           "badge_remove": "Remove",
           "book": "Book",
@@ -1324,7 +1328,7 @@
           "charge": "Charge",
           "claim": "Take",
           "claim_call": "Take the call",
-          "cleanup_expired": "Clean up the expired",
+          "cleanup_expired": "Clean up the expired carts",
           "clear": "Clear",
           "clock_in": "Clock in",
           "clock_out": "Clock out",
@@ -1393,13 +1397,13 @@
           "pin_remove": "Remove",
           "place": "Set aside",
           "preferences_set": "Change",
-          "prepare": "Prepare",
+          "prepare": "Prepare the connection",
           "print": "Print",
           "print_bill": "Print the bill",
           "print_label": "Print the label",
-          "process": "Process",
+          "process": "Process the queue now",
           "propose": "Propose",
-          "prune": "Clean up",
+          "prune": "Remove the unused devices",
           "publish": "Publish",
           "query": "Ask the AEAT",
           "react": "Start",
@@ -1422,7 +1426,7 @@
           "release": "Release",
           "release_check": "Release",
           "release_member": "Release",
-          "release_unconfirmed": "Release",
+          "release_unconfirmed": "Release the unconfirmed reservations",
           "remove": "Remove",
           "remove_line": "Remove",
           "remove_voucher": "Remove",
@@ -1439,9 +1443,9 @@
           "resume_due": "Resume",
           "retire": "Retire",
           "retry": "Retry",
-          "retry_all": "Retry all",
+          "retry_all": "Retry all failed events",
           "return": "Give back",
-          "review_stale": "Flag for review",
+          "review_stale": "Flag forgotten days for review",
           "revoke": "Revoke",
           "run": "Run",
           "save": "Save",
@@ -1497,6 +1501,12 @@
           "other": "Do this"
         },
         "operations": {
+          "attendance": {
+            "break": {
+              "end": "End the break",
+              "start": "Start a break"
+            }
+          },
           "cart_checkout": {
             "cart": {
               "clear": "Clear"
@@ -1510,7 +1520,15 @@
               "add": "Register movement"
             }
           },
+          "schedule": {
+            "week": {
+              "confirm": "Confirm the weekly hours"
+            }
+          },
           "verifactu": {
+            "certificate": {
+              "remove": "Remove the certificate"
+            },
             "diagnostic": {
               "run": "Test the connection"
             },

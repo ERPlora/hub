@@ -101,8 +101,9 @@ class SalePaymentOut(Schema):
 
 class PaperOut(Schema):
     queued: bool = Field(
-        description="True: Printing queued it for its printer. False: Printing is not on, no printer takes it, its "
-        "fiscal document is still pending or Printing refused it — the device prints the screen's paper."
+        description="True: Printing queued it for its printer. False, only for the charge's own paper: Printing is "
+        "not on, no printer takes it, its fiscal document is still pending or Printing refused it — the device prints "
+        "the screen's paper. A reprint or a bill that is not queued fails and says why."
     )
     job_id: UUID | None = Field(description="Its job in the printing queue.")
     printer: str | None = Field(description="The printer it went to.")

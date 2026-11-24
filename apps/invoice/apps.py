@@ -77,7 +77,16 @@ class InvoiceConfig(LiveAppConfig):
         Nav("series", _("Series"), "ion:layers-outline", "/invoice/series", permission="invoice.manage_series"),
         Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer", permission="invoice.manage_issuer"),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "vPFvdGPA6uw", "en": "QeiQzDdtJng"},
+        flow_videos={
+            "INVOICE-F03": {"es": ["nORuR2xG4qs"], "en": ["TvR3mQZTxlo"]},
+            "INVOICE-F05": {"es": ["KtnQOADy0w4"], "en": ["5wsz2czzqbs"]},
+            "INVOICE-F08": {"es": ["bUVP4k5SZs8"], "en": ["b8EAicT5vjo"]},
+            "INVOICE-F17": {"es": ["Yc8UiKuP1s8"], "en": ["73SPPT0_dSY"]},
+            "INVOICE-F18": {"es": ["Yc8UiKuP1s8"], "en": ["73SPPT0_dSY"]},
+        },
+    )
     # The Home's steps: ⛔ «Your business details» (the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``)
     # and «Your invoice numbering», on the queries the Issuer and Series screens read. The first is done with what
     # issuing refuses to go without (``Issuer.configured``). The year's series are born with the first document, so the

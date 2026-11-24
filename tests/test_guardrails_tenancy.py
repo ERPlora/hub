@@ -413,7 +413,7 @@ ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
 #: payload}``. A business that still shares control's database (``db_name=""``, not cut yet) has nothing of them: it is
 #: not served at all, its host answers 503 maintenance to anyone until its cut gives it a database of its own.
 OWN_DATABASE_OPERATIONS: dict[str, dict] = {
-    "base.api_key.create": {"name": "Till", "mode": "full"},
+    "base.api_key.create": {"name": "Till", "scopes": {"*": ["read"]}},
     "base.api_key.rotate": {"id": ANY_KEY},
     "base.api_key.revoke": {"id": ANY_KEY},
     "base.api_key.detail": {"id": ANY_KEY},
