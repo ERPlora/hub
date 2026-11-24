@@ -48,9 +48,11 @@ class HubMaintenanceOut(Schema):
 
 
 class HubGetOut(HubOut):
-    """The signed status poll: the registry row plus the real maintenance state, never a guessed timeout."""
+    """The signed status poll: the registry row plus the real maintenance state, never a guessed timeout, and when the
+    business's move asked for its night starts (``None`` without one), never where it goes."""
 
     maintenance: HubMaintenanceOut | None
+    move_scheduled_for: dt.datetime | None
 
 
 class HubRegisterOut(HubOut):

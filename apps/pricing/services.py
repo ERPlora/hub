@@ -469,8 +469,8 @@ def _save_item(item: PriceItem) -> None:
                 "agrega el zumo de naranja a 1,80 para distribuidores desde diez",
             ),
         },
-        "description": "Put the price of a product (by its SKU or name) or a service (by its name) in a price list "
-        "(by its code or name), in cents, from a minimum quantity on (1 by default). Repeat the product with "
+        "description": "Put the price a price list (by its code or name) charges for a product (by its SKU or name) "
+        "or a service (by its name), in cents, from a minimum quantity on (1 by default). Repeat the product with "
         "another minimum quantity for volume prices.",
         "risk": "normal",
     },
