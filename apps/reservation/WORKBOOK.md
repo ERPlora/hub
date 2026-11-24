@@ -173,8 +173,8 @@ Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
   refresca sola cuando entra, cambia o se cancela una reserva. Vacía: «Sin servicio ese día (sin
   franjas).».
 - **Franjas horarias**: Día, Desde, Hasta, Máx (de reservas), Máx comensales; «Añadir franja» (Día,
-  Desde, Hasta, Máx, Máx comensales (opcional) → «Crear franja») y «Quitar» por fila. Vacía: «Sin
-  franjas horarias.».
+  Desde, Hasta, Máx, Máx comensales —con «Opcional» debajo— → «Crear franja») y «Quitar» por fila.
+  Vacía: «Sin franjas horarias.».
 - **Fechas bloqueadas**: Fecha, Motivo, Horas (Todo el día, o desde–hasta); «Añadir fecha bloqueada»
   (Fecha, Motivo, Todo el día, Desde, Hasta → «Bloquear fecha») y «Quitar». Vacía: «Sin fechas
   bloqueadas.».

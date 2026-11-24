@@ -94,7 +94,7 @@ Last name, Email and Phone (whoever sees the team's contact details), Role, Stat
 
 The **+** button opens **New**; a row opens **Edit · {name}**. Form: **First name, Last name, Email,
 Phone, Employee ID, Role** ("No role"), **Hub user** ("No Hub access"), **Status** (only when editing:
-Active, Inactive, On leave), **Bookable**, **Buffer between appointments (min)**, **Hire date**,
+Active, Inactive, On leave), **Bookable**, **Booking buffer (min)**, **Hire date**,
 **Color**, **Specialties**, **Bio** and, for whoever can see the pay, **Hourly rate** and **Commission
 (%)**. Row actions for the owner and the administrator: **Deactivate** and **Terminate**, both with a
 confirmation. The rate (in the column, in the form and in "My record") is in the business's currency, its
