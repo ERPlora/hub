@@ -1013,8 +1013,11 @@
       },
       "short": {
         "read": "L",
-        "write": "E"
+        "create": "C",
+        "update": "M",
+        "delete": "B"
       },
+      "allApps": "Todas las apps",
       "states": {
         "active": "Activa",
         "revoked": "Revocada"
@@ -1063,6 +1066,7 @@
         "gone": "Esa key ya no existe. Actualiza la lista y vuelve a intentarlo.",
         "scopesRequired": "Elige al menos una app y qué puede hacer la key en ella.",
         "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
+        "beyondMaker": "Una key no puede hacer más de lo que puedes hacer tú.",
         "denied": "Solo quien lleva el negocio gestiona las API keys."
       },
       "docs": "Documentación de la API"
@@ -1311,8 +1315,8 @@
           "archive": "Archivar",
           "assign": "Asignar",
           "attach": "Aplicar",
-          "auto_close": "Cerrar",
-          "avatar_remove": "Quitar",
+          "auto_close": "Cerrar las sesiones que debían cerrarse solas",
+          "avatar_remove": "Quitar la foto del perfil",
           "back_to_testing": "Volver a pruebas",
           "badge_remove": "Quitar",
           "book": "Reservar",
@@ -1324,7 +1328,7 @@
           "charge": "Cobrar",
           "claim": "Tomar",
           "claim_call": "Tomar la llamada",
-          "cleanup_expired": "Limpiar los caducados",
+          "cleanup_expired": "Limpiar los carritos caducados",
           "clear": "Quitar",
           "clock_in": "Fichar la entrada",
           "clock_out": "Fichar la salida",
@@ -1393,13 +1397,13 @@
           "pin_remove": "Quitar",
           "place": "Apartar",
           "preferences_set": "Cambiar",
-          "prepare": "Preparar",
+          "prepare": "Preparar la conexión",
           "print": "Imprimir",
           "print_bill": "Imprimir la cuenta",
           "print_label": "Imprimir la etiqueta",
-          "process": "Procesar",
+          "process": "Procesar la cola ahora",
           "propose": "Proponer",
-          "prune": "Limpiar",
+          "prune": "Quitar los dispositivos sin usar",
           "publish": "Publicar",
           "query": "Consultar a la AEAT",
           "react": "Iniciar",
@@ -1422,7 +1426,7 @@
           "release": "Liberar",
           "release_check": "Liberar",
           "release_member": "Liberar",
-          "release_unconfirmed": "Liberar",
+          "release_unconfirmed": "Liberar las reservas sin confirmar",
           "remove": "Quitar",
           "remove_line": "Quitar",
           "remove_voucher": "Quitar",
@@ -1439,9 +1443,9 @@
           "resume_due": "Reanudar",
           "retire": "Retirar",
           "retry": "Reintentar",
-          "retry_all": "Reintentar todo",
+          "retry_all": "Reintentar todos los eventos caídos",
           "return": "Devolver",
-          "review_stale": "Marcar para revisar",
+          "review_stale": "Marcar para revisar los días olvidados",
           "revoke": "Revocar",
           "run": "Ejecutar",
           "save": "Guardar",
@@ -1497,6 +1501,12 @@
           "other": "Hacer esto"
         },
         "operations": {
+          "attendance": {
+            "break": {
+              "end": "Terminar la pausa",
+              "start": "Empezar la pausa"
+            }
+          },
           "cart_checkout": {
             "cart": {
               "clear": "Vaciar"
@@ -1510,7 +1520,15 @@
               "add": "Registrar movimiento"
             }
           },
+          "schedule": {
+            "week": {
+              "confirm": "Confirmar el horario de la semana"
+            }
+          },
           "verifactu": {
+            "certificate": {
+              "remove": "Quitar el certificado"
+            },
             "diagnostic": {
               "run": "Probar la conexión"
             },

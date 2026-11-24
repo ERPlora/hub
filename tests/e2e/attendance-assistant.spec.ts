@@ -5,8 +5,9 @@
 // seeded with it (README of this folder, «El asistente»). The owner, in Spanish, asks to clock someone of the team in
 // (ATTENDANCE-F12) and to correct that person's day (ATTENDANCE-F08, dangerous): each card names her; cancelled, nothing
 // changes. What this file creates carries `E2EAac` and goes away; the apps it turns on are turned off again.
+// A break said with the person's first name says it is a break and names the person the clocking finds (hub#2297).
 // flow: attendance-assistant-card
-// flow: ATTENDANCE-F12 ATTENDANCE-F08 BASE-F97
+// flow: ATTENDANCE-F12 ATTENDANCE-F08 ATTENDANCE-F02 BASE-F97
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
@@ -94,5 +95,22 @@ test('attendance-assistant-card — in Spanish correcting a working day names it
   await cancelAtComputerSize(page);
   const [after] = await daysOf(context, bea);
   expect([after.clock_in_at, after.correction_count]).toEqual([day.clock_in_at, 0]);
+  await context.close();
+});
+
+test('attendance-assistant-card — a break asked for by the first name says it is a break and whose', async ({ browser }) => {
+  const [context, page, bea, name] = await ownerWithBea(browser);
+  const clockedIn = await api(context, A, 'POST', '/attendance/clock_in', { member_id: bea });
+  expect(clockedIn.status, JSON.stringify(clockedIn.data)).toBe(200);
+  await openPanelAtTheDesk(page);
+  await askForACard(page, `E2E-ASK attendance__break__start ${JSON.stringify({ member: `${TAG.toLowerCase()}bea` })}`);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(`Empezar la pausa en Control horario: ${name}`);
+    await untilStill(page);
+    await capture(page, `${KEY}-break-${vp.label}`);
+  }
+  await cancelAtComputerSize(page);
+  expect(psql(`select count(*) from attendance_break where record_id in (${RECORDS})`).trim()).toBe('0');
   await context.close();
 });
