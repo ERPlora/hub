@@ -9,10 +9,12 @@ name: deploy
 # The branch picks the environment (deploy-env.sh): main -> prod, pre -> pre, anything else nothing.
 # Manual run: on main with environment prod (and optionally a release -> redeploy that release's
 # image, without test nor build), or on pre with environment pre.
-# Only the deploy job waits for the one before it (its concurrency): the test and build of a newer
-# push run while an older one deploys. So an image whose tests failed may be in ECR, under its
-# commit, but nothing deploys it: deploy needs test and build to pass, a release is only cut by a
-# deploy that passed them, and rollback.yml only goes back to revisions that already ran.
+# The push runs of a branch go one at a time, and a newer push replaces the one waiting: it already
+# contains it, so the environment gets the newest commit of its branch without testing each one in
+# between, and a release may carry several commits. A rollback (rollback.yml) or a manual run waits
+# only for the deploy job, never for the tests of a push. An image whose tests failed may be in ECR,
+# under its commit, but nothing deploys it: deploy needs test and build to pass, a release is only
+# cut by a deploy that passed them, and rollback.yml only goes back to revisions that already ran.
 # Back to the previous revisions without a release: rollback.yml.
 # The release is created here on purpose: one made with GITHUB_TOKEN triggers no other workflow.
 
@@ -39,6 +41,11 @@ on:
         type: string
         required: false
         default: ""
+
+# A manual run (a release redeploy) is a group of its own: it waits for no push run.
+concurrency:
+  group: ${{ github.event_name == 'push' && format('deploy-push-{0}-{1}', github.repository, github.ref_name) || github.run_id }}
+  cancel-in-progress: false
 
 # Each job asks for what it needs: id-token only in build and deploy, because the OIDC token of any
 # job of a push to main (pre) carries the sub that gha-deploy-hub (gha-deploy-hub-pre) trusts
@@ -187,9 +194,9 @@ jobs:
       contents: write # the GitHub Release (prod)
       id-token: write # gha-deploy-hub or gha-deploy-hub-pre (OIDC)
     # Deploys and rollbacks (rollback.yml, same group) of one branch, and so of one environment, never
-    # overlap and none is cancelled halfway; prod and pre do not wait for each other. Only this job
-    # waits: deploy-order.sh keeps an older push that gets the lock after a newer one from moving the
-    # environment back.
+    # overlap and none is cancelled halfway; prod and pre do not wait for each other. GitHub does not
+    # promise the order of a group, and a manual run or a re-run has its own turn: deploy-order.sh
+    # keeps an older commit that gets the lock after a newer one from moving the environment back.
     concurrency:
       group: deploy-${{ github.repository }}-${{ github.ref_name }}
       cancel-in-progress: false
