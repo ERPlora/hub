@@ -147,6 +147,12 @@ class TestCreate:
             event = OutboxEvent.objects.get(name="base.api_key.created")
         assert token not in json.dumps(event.payload)
 
+    def test_its_event_says_what_it_may_do(self, admin_on_a, hub_a):
+        made = create(admin_on_a, hub_a, scopes={"inventory": [CREATE, READ]})["key"]
+        with use_hub(hub_a):
+            event = OutboxEvent.objects.get(name="base.api_key.created")
+        assert event.payload == {"id": made["id"], "scopes": {"inventory": [READ, CREATE]}}
+
     @pytest.mark.parametrize(
         ("fields", "field"),
         [
