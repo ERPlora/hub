@@ -20,6 +20,7 @@ from . import (
     reads as reads,
     records as records,
     recovery as recovery,
+    sale_numbers as sale_numbers,
     settings as settings,
     tender as tender,
 )

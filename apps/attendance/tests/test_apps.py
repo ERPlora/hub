@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, Help, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.attendance import events as E
 from apps.attendance import queries, services  # noqa: F401  (importing them registers the operations)
@@ -44,6 +44,10 @@ COMMANDS = {
     "attendance.record.review_stale",
     "attendance.record.close_for_terminated",
 }
+#: The read that only checks whom a clocking or a break is for before its card: no tool, no route (hub#2297).
+CARD_ONLY = {"attendance.person.check"}
+#: The writes that check the person they name with it before their card.
+CHECKED = {"attendance.record.clock_in", "attendance.record.clock_out", "attendance.break.start", "attendance.break.end"}
 
 
 def attendance():
@@ -122,7 +126,7 @@ def test_the_review_of_forgotten_days_is_a_scheduled_task():
 
 def test_the_operations_are_the_workbooks():
     ops = {name: op for name, op in registry.items() if name.startswith("attendance.")}
-    assert {name for name, op in ops.items() if op.kind == "query"} == QUERIES
+    assert {name for name, op in ops.items() if op.kind == "query"} == QUERIES | CARD_ONLY
     assert {name for name, op in ops.items() if op.kind == "command"} == COMMANDS
 
 
@@ -131,9 +135,13 @@ def test_every_operation_is_described_for_the_assistant():
     # operation, a write says how risky it is, and correcting a working day is high risk.
     ops = {name: op for name, op in registry.items() if name.startswith("attendance.")}
     for name, op in ops.items():
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name
         )
+        assert op.ai.get("check") == ("attendance.person.check" if name in CHECKED else None), name
         if op.kind == "command":
             assert op.ai.get("risk") in {"normal", "high"}, name
         else:

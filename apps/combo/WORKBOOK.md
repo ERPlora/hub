@@ -808,7 +808,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   y «del día», «euros» o «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario
   que lo dicen. «ordena» y «orden» ya no nombran los dispositivos: «ordenador» tiene raíz propia en `live`.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#669): nombra el registro que una escritura señala por su
-  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el menú por su `name` con
+  id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: el menú por su `name` con
   `combo.combo.get` (`A_MENU`: el `id` de `ComboRefIn` y el `combo_id` de `_ComboOfIn`), el plato por su `name` con
   `combo.group.get` (`A_COURSE`: el `id` de `GroupRefIn`, el `group_id` de `_GroupOfIn` y de `OptionRefIn` y cada
   elemento de `group_ids`), la elección por el `product_name` de `combo.option.get` (`A_CHOICE`: el `id` de

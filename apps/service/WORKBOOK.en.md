@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:64e34f1aaf09667ff38728c9c7e2618f630976a8c2fc1002b5f14c1f3e45ba2d -->
+<!-- generated from WORKBOOK.md sha256:f380576dee34efd089100e6bcf4a8dfd0d58c1b744142527494944fdc20048ea -->
 
 ## What it is for and who it is for
 
@@ -564,9 +564,11 @@ Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
 2. One row per purchase shows, the most recent first.
-3. **Load more** brings the next page; **Close** goes back to the table.
+3. A purchase charged with its sale names it by the number Sales names it by, "Sale: 20261124-0001".
+   Whoever cannot see that sale (Sales off, or a sale that is not theirs) sees the row without a sale.
+4. **Load more** brings the next page; **Close** goes back to the table.
 In: the purchases of that voucher and the name of each customer (Customers); for a deleted card, its
-identifier.
+identifier; the number of the sale of each purchase, from Sales' read of the sale.
 Out: nothing; read only. **Spend a session** (SERVICE-F21), **Adjust** and **Void** show where they apply and
 for whoever may.
 If it fails: empty, "Nobody has bought this voucher yet."; if it cannot be read, "Could not load the sold
