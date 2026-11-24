@@ -2,10 +2,12 @@
 TABLE-F34): the plan of Tables reads it from there. The note belongs to the check, says so with the check's own
 event in the same transaction, and only the check's end takes it away.
 
-Without Printing in the business the bill is not queued and the device prints it: the note is taken all the same.
+A bill no receipt printer takes is not printed and notes nothing; the device then prints the screen's paper and
+the screen notes it (``sale.order.note_bill``), the same note as the printer's.
 """
 
 import pytest
+from live.errors import Conflict
 from live.models import OutboxEvent
 
 from apps.sale.models import Order
@@ -24,7 +26,8 @@ def open_check(label: str = "Table 4"):
 
 
 def print_bill(order_id):
-    return run("sale.order.print_bill", {"order_id": str(order_id)})
+    """The bill printed on the device: the screen notes it."""
+    return run("sale.order.note_bill", {"order_id": str(order_id)})
 
 
 def printed_at(order_id):
@@ -42,6 +45,28 @@ def test_a_check_whose_bill_is_printed_is_noted_with_its_event(coffee):
     print_bill(order.id)
     assert printed_at(order.id) is not None
     assert changed(order.id) == 1
+
+
+def test_a_bill_the_receipt_printer_took_is_noted_too(coffee):
+    run("printing.printer.create", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"})
+    order = open_check()
+    assert run("sale.order.print_bill", {"order_id": str(order.id)}).queued is True
+    assert printed_at(order.id) is not None
+    assert changed(order.id) == 1
+
+
+def test_the_note_says_which_check_and_when(coffee):
+    order = open_check()
+    out = print_bill(order.id)
+    assert out.model_dump() == {"order_id": order.id, "bill_printed_at": printed_at(order.id)}
+
+
+def test_a_check_already_charged_is_not_noted(coffee):
+    order = open_check()
+    run("sale.sale.complete", {"idempotency_key": "sale-bill-closed", "order_id": str(order.id), "payments": [{"method": "card"}]})
+    with pytest.raises(Conflict):
+        print_bill(order.id)
+    assert printed_at(order.id) is None
 
 
 def test_printing_it_again_changes_nothing(coffee):

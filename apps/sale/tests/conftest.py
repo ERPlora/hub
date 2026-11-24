@@ -30,6 +30,7 @@ from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+from base.tests.test_services_assistant import answered, asked, call
 
 
 def ctx_for(
@@ -69,6 +70,19 @@ def charged_by_the_assistant(order):
     )
     assert outcome.outcome == "ok", outcome.content
     return outcome
+
+
+def confirmed_by_the_assistant(name: str, arguments: dict, ctx: OperationContext) -> dict:
+    """The receipt's row of the write ``name`` the assistant asked for with ``arguments``, once ``ctx``'s person said
+    yes to its card: its outcome, its code and why it was not done, in the person's language."""
+
+    def turn_of(*calls, decision=None):
+        data = {"messages": [{"role": "user", "content": "imprímelo"}, asked(*calls)], "pending": list(calls)}
+        return run("base.assistant.turn", {**data, "decision": decision}, ctx).model_dump(mode="json")
+
+    plan = answered(call(name, arguments), decision={"call_id": "c1", "accepted": True}, turn_of=turn_of)
+    [row] = plan["executed"]
+    return row
 
 
 #: Bogotá at 23:30 of 2 November 2026, already the 3rd in Madrid, the deployment's clock (hub#771).
