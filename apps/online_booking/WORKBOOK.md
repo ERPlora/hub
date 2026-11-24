@@ -581,7 +581,9 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
   clienta), la página de reservas. `PersonalBooking.vue` carga y anula la reserva del enlace personal;
   `PublicBookingHeader.vue` pinta la identidad del negocio, `PublicBookingSubmit.vue` el aviso de privacidad, el campo
   trampa y el envío, `BookingResult.vue` la confirmación y los datos de la reserva, y `CancelDialog.vue` la
-  confirmación de anular, tanto en la bandeja como en el enlace.
+  confirmación de anular, tanto en la bandeja como en el enlace. La de la clienta la abre `BookingResult.vue`, la
+  misma justo después de reservar y desde su enlace, y la anulación por el enlace es `composables/useCancelByLink.ts`
+  en las dos páginas.
 - Los estados permitidos y el reloj se leen de `apps/appointment/frontend/lib/states.ts` y `clock.ts`: las
   mismas reglas que la agenda, sin copiarlas.
 - Datos solo por `useLive`/`useCommand` (el recorrido de la clienta, por el cliente de la API o el de la puerta: lo

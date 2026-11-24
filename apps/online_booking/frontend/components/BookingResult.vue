@@ -1,23 +1,28 @@
 <script setup lang="ts">
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
+import type { ApiError } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
 import { STATUS_TONE } from '../../../appointment/frontend/lib/states';
 import { useLocale, useT } from '../composables/useT';
 import type { BookedOut, PublicBookingOut } from '../operations';
+import CancelDialog from './CancelDialog.vue';
 
 const props = withDefaults(defineProps<{
   booked: BookedOut | null;
   seen: PublicBookingOut | null;
   pending: boolean;
   error: string;
+  token: string;
+  cancelError?: ApiError | null;
   link?: string;
   personal?: boolean;
-}>(), { link: '', personal: false });
+}>(), { cancelError: null, link: '', personal: false });
 const emit = defineEmits<{
-  action: [op: 'online_booking.public.booking' | 'online_booking.public.cancel'];
+  view: [];
+  cancel: [reason: string];
   again: [];
 }>();
 const t = useT();
@@ -30,6 +35,22 @@ const startsAt = computed(() => {
   const start = props.seen?.start;
   return start ? `${formatDay(dayOf(start), locale.value)} · ${formatTime(timeOf(start), locale.value)}` : '';
 });
+
+// Cancelling asks first, as on her link's page; the confirmation has done its job once the booking shows as cancelled.
+// It opens without the last refusal: only what this attempt is refused with shows in it.
+const asking = ref(false);
+const refusal = ref<ApiError | null>(null);
+watch(() => props.cancelError, (error) => {
+  refusal.value = error;
+});
+watch(() => props.seen?.status, (status) => {
+  if (status === 'cancelled') asking.value = false;
+});
+
+function ask(): void {
+  refusal.value = null;
+  asking.value = true;
+}
 </script>
 
 <template>
@@ -88,7 +109,7 @@ const startsAt = computed(() => {
       data-testid="ob-preview-view"
       fill="outline"
       :disabled="pending"
-      @click="emit('action', 'online_booking.public.booking')"
+      @click="emit('view')"
     >
       {{ $t('online_booking.preview.view') }}
     </ion-button>
@@ -98,7 +119,7 @@ const startsAt = computed(() => {
       color="danger"
       fill="outline"
       :disabled="pending || (seen !== null && !seen.can_cancel)"
-      @click="emit('action', 'online_booking.public.cancel')"
+      @click="ask"
     >
       {{ $t('online_booking.preview.cancel') }}
     </ion-button>
@@ -118,6 +139,14 @@ const startsAt = computed(() => {
   >
     {{ error }}
   </InlineFeedback>
+  <CancelDialog
+    v-model:open="asking"
+    :booking="seen ?? booked"
+    :token="token"
+    :pending="pending"
+    :error="refusal"
+    @confirm="emit('cancel', $event)"
+  />
 </template>
 
 <style scoped>

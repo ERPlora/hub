@@ -5,10 +5,10 @@ import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, inject, onMounted, ref } from 'vue';
 
+import { useCancelByLink } from '../composables/useCancelByLink';
 import { PUBLIC_DOOR } from '../lib/door';
 import type { PublicBookingOut } from '../operations';
 import BookingResult from './BookingResult.vue';
-import CancelDialog from './CancelDialog.vue';
 import PublicBookingHeader from './PublicBookingHeader.vue';
 
 const props = defineProps<{ token: string }>();
@@ -19,9 +19,6 @@ const api = door.api;
 const seen = ref<PublicBookingOut | null>(null);
 const loading = ref(true);
 const loadError = ref<ApiError | null>(null);
-const dialogOpen = ref(false);
-const cancelling = ref(false);
-const cancelError = ref<ApiError | null>(null);
 const notFound = computed(() => loadError.value?.code === 'online_booking.booking_not_found');
 
 async function load(): Promise<void> {
@@ -37,25 +34,9 @@ async function load(): Promise<void> {
   }
 }
 
-function action(op: 'online_booking.public.booking' | 'online_booking.public.cancel'): void {
-  if (op === 'online_booking.public.cancel') {
-    cancelError.value = null;
-    dialogOpen.value = true;
-  }
-}
-
-async function cancel(reason: string): Promise<void> {
-  cancelling.value = true;
-  cancelError.value = null;
-  try {
-    seen.value = await api.call('online_booking.public.cancel', { token: props.token, reason });
-    dialogOpen.value = false;
-  } catch (failure) {
-    cancelError.value = failure instanceof ApiError ? failure : new ApiError(0, 'client_error', String(failure));
-  } finally {
-    cancelling.value = false;
-  }
-}
+const { pending: cancelling, error: cancelError, cancel } = useCancelByLink(api, () => props.token, (booking) => {
+  seen.value = booking;
+});
 
 onMounted(load);
 </script>
@@ -104,16 +85,10 @@ onMounted(load);
         :seen="seen"
         :pending="cancelling"
         error=""
-        personal
-        @action="action"
-      />
-      <CancelDialog
-        v-model:open="dialogOpen"
-        :booking="seen"
         :token="token"
-        :pending="cancelling"
-        :error="cancelError"
-        @confirm="cancel"
+        :cancel-error="cancelError"
+        personal
+        @cancel="cancel"
       />
     </div>
   </AppPage>

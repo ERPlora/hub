@@ -208,7 +208,10 @@ describe('PreviewPage', () => {
     expect(s.el('status')?.textContent).toContain('Cancel 24 h ahead.');
     await click(s.el('cancel'));
     await settle();
-    expect(s.sent().at(-1)).toMatchObject({ method: 'POST', path: '/api/online_booking/public/cancel', body: { token: 't'.repeat(43) } });
+    expect(s.sent().at(-1)?.path).not.toBe('/api/online_booking/public/cancel');
+    await click(s.inDoc('ob-cancel-submit'));
+    await settle();
+    expect(s.sent().at(-1)).toMatchObject({ method: 'POST', path: '/api/online_booking/public/cancel', body: { token: 't'.repeat(43), reason: '' } });
     expect(s.el('status')?.textContent).toContain('Cancelled');
     expect(s.el('status')?.textContent).not.toContain('It can no longer be cancelled online.');
   });
