@@ -950,7 +950,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `HOST_TTL_SECONDS`) puede sacar; `configured` (el paso del Inicio) y `unattended` del resumen siguen mirando solo
    el alta. Como esa cifra cambia sin evento, `bell_refresh_every = {"stalled_<función>": 30}` (`base.E007`): la
    campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
-   `tests/test_services.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
+   `tests/test_services_devices.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
    `tests/test_integration_home.py`.
 7. **El cliente del canal en el dispositivo**.
    `frontend/components/PrintHost.vue` es la pieza de fondo de Impresión: una ruta de
@@ -1002,8 +1002,8 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
   `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
   de su transacción (KITCHEN-F08, F09).
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
-  vocabulario y las comprobaciones del documento), `queries.py`, `services.py`, `events.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `documents.py` (el
+  vocabulario y las comprobaciones del documento), `queries/`, `services/`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `templates/printing/`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (una venta real de Ventas
   encolada por nombre) y `tests/test_integration_kitchen.py` (la comanda y la reimpresión reales de
