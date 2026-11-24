@@ -708,10 +708,6 @@
     "file_name": "hub_registry.py",
     "functions": [
       {
-        "name": "hub_register",
-        "complexity": 22
-      },
-      {
         "name": "hub_seed_local",
         "complexity": 23
       }

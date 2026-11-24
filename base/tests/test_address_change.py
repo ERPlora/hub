@@ -51,6 +51,8 @@ def control_gone(*args, **kwargs):
 def register(client, django_capture_on_commit_callbacks):
     """``register(hub_id, slug)``: erplora.com registers the business at that address, as after every change."""
 
+    client.raise_request_exception = False
+
     def put(hub_id, slug, **changes):
         business = {"name": "A", "country": "ES", "timezone": "Europe/Madrid", "language": "es", "vertical": None}
         with django_capture_on_commit_callbacks(execute=True):

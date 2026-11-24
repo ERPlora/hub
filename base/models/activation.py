@@ -13,8 +13,9 @@ class AppActivation(UUIDModel):
     ``chosen`` is what the plan's ``max_apps`` counts: an app the business turned on itself, never one the closure by
     ``requires`` brought along. A business without any row has every module off (the baseline): its first change
     writes them all down. The hubs made before that baseline have every module on, its roots chosen (migration 0017).
-    ``host`` is the business's slug (the scope's key, as ``Membership`` and the outbox keep it): the businesses used to
-    share one database, and their cut left one hub per database, where it is always the same.
+    ``host`` is the business's slug (the scope's key, as ``Membership`` and the outbox keep it). The rows of a business
+    that takes another address are written down under that one (``base.services.address_change``); its database may hold
+    those of its former ones, and of other businesses if its cut copied the database they shared: they are none of its.
 
     In a hub with its own database an app's tables are made the first time it is turned on: the row is
     ``creating`` until the worker made them (``on``), or ``failed`` with ``attempts``, ``last_error`` and
