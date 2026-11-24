@@ -140,6 +140,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             min="1"
             :value="maxCovers"
             :label="$t('reservation.availability.slotForm.maxCovers')"
+            :helper-text="$t('reservation.availability.slotForm.optional')"
             label-placement="floating"
             fill="outline"
             mode="md"

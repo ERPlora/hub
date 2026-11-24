@@ -17,7 +17,7 @@ from apps.flow.schemas.questions import QuestionListIn, QuestionOut, QuestionPag
 
 from .pinned import pinned_values
 from .reads import ANSWER, MANAGE, ROLE_PERMISSION, TURN
-from .reasons import action_label
+from apps.flow.phrasing import action_label
 
 QUESTION_NOT_FOUND = _("That question does not exist in this business.")
 QUESTION_NOT_YOURS = _("This question was asked of someone else: you cannot answer it.")

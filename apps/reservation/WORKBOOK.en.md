@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:911cce5d51e498a488532adf0e21a4c108ba54dce6dbaf07853b2a1f876c48cc -->
+<!-- generated from WORKBOOK.md sha256:1f7ec5a05a61f1c7039bcfa178a9db290a61783b99e7c2409de6b096250c6240 -->
 
 ## What it is for and who it is for
 
@@ -170,7 +170,7 @@ Menu **Reservations → Availability**. Three stacked sections:
   blocked, its reason. It refreshes by itself when a reservation comes in, changes or is cancelled.
   Empty: "No service that day (no time slots).".
 - **Time slots**: Day, From, To, Max (of reservations), Max guests; "Add slot" (Day, From, To, Max,
-  Max guests (optional) → "Create slot") and "Remove" per row. Empty: "No time slots.".
+  Max guests —with "Optional" below— → "Create slot") and "Remove" per row. Empty: "No time slots.".
 - **Blocked dates**: Date, Reason, Hours (Whole day, or from–to); "Add blocked date" (Date, Reason,
   Whole day, From, Until → "Block date") and "Remove". Empty: "No blocked dates.".
 Each section paints its own "Loading…" and its error with retry.

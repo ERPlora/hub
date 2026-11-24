@@ -10,7 +10,7 @@ from live.operations import operation
 from apps.invoice.queries.documents import render_document
 from apps.invoice.queries.ownership import INVOICES
 from apps.invoice.queries.rows import _page, document_of_sale, find_invoice, invoice_detail, invoice_row, with_links
-from apps.invoice.schemas import (
+from apps.invoice.schemas.invoices import (
     BySourceIn,
     BySourceOut,
     DocumentIn,
