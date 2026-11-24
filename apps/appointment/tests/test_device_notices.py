@@ -13,8 +13,7 @@ from live.operations import get
 
 from base.schemas.home import NoticeListIn
 
-from .conftest import HUB_DB, MONDAY, at, ctx_for, make_appointment, make_customer
-from .test_queries import TUESDAY, employee_linked_to
+from .conftest import HUB_DB, MONDAY, TUESDAY, at, ctx_for, employee_linked_to, make_appointment, make_customer
 
 pytestmark = HUB_DB
 
