@@ -33,11 +33,16 @@ class PricingConfig(LiveAppConfig):
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): the discount of something («el
     # descuento de los cafés», «the discount on coffees») is the rule that takes it off, as «la regla de descuento de
     # los cafés» is; a discount said by how much it takes off («un descuento de 5 €», «a 10 % discount on the wine»)
-    # names no rule.
+    # names no rule. What the business charges for something («la caña la cobro a 2,50») is its price; «I charge» is not
+    # one, because it also charges a check («should I charge again?»).
     assistant_synonyms = (
         (
             "regla", "rule", "el descuento de", "los descuentos de", "el descuento en", "los descuentos en",
             "the discount on", "the discounts on",
+        ),
+        (
+            "precio", "price", "la cobro a", "lo cobro a", "las cobro a", "los cobro a", "la cobramos a",
+            "lo cobramos a", "las cobramos a", "los cobramos a",
         ),
     )
     permissions = {
