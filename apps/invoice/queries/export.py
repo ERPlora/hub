@@ -48,6 +48,8 @@ TEXT, DAY, AMOUNT, PERCENT = "text", "day", "amount", "percent"
     output=InvoiceExportOut,
     expose_api=True,
     ai={
+        # Every customer's name and tax ID in a file for a person to download: no automation runs it alone.
+        "risk": "high",
         "asks": {
             "en": (
                 "download the invoices of October in Excel for my accountant",

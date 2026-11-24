@@ -1436,6 +1436,8 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     - **Los mismos filtros que la lista**: se descarga lo que la lista deja (fecha, estado, tipo, serie, búsqueda…), como
       exportan Clientes, Inventario y Control horario. Los filtros de la lista no se vuelven a escribir en la descarga.
     - **Recargo**: sus dos columnas salen solo si alguna factura de lo descargado lo lleva.
+    - **Fuera de Automatizaciones**: lleva el nombre y el NIF de todos los clientes y es para que lo baje una persona, como
+      el CSV de Clientes; ninguna automatización lo ejecuta sola.
 
     | Producto | Cómo lo resuelve | Fuente |
     |---|---|---|
