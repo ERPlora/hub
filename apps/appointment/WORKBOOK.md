@@ -245,6 +245,8 @@ Pasos:
 4. Pulsa **Añadir cita**. Si el negocio permite solapes y esa hora choca con otra cita del
    profesional, responde a «Cita solapada».
 5. La cita aparece como **Confirmada** con su número (por ejemplo, APT-20261116-0001).
+6. Por el asistente, la tarjeta de confirmación pone delante la clienta, el día y la hora y el servicio; después,
+   la profesional.
 Entra: la ficha de la clienta (Clientes), los servicios con su precio y duración (Servicios), el
 profesional y quién hace qué (Personal y Servicios), el horario del negocio (Horarios) y el turno y las
 ausencias del profesional (Personal).
@@ -459,6 +461,8 @@ Pasos:
    los minutos y, si quieres, «Termina el (opcional)» o «Número de citas (opcional)».
 3. Pulsa **Crear cita periódica**: se crea la serie y se reservan sus citas hasta la antelación máxima de
    los ajustes.
+4. Por el asistente, la tarjeta de confirmación pone delante la clienta, cuándo se repite (el primer día, la hora y
+   cada cuánto) y el servicio; después, la profesional.
 Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Personal) y los ajustes de
 Citas.
 Sale: la serie activa, sus citas y el aviso `appointment.recurring.created`.
@@ -510,6 +514,8 @@ Pasos:
 5. El aviso dice solo lo que ha pasado: cuántas citas se mueven, con quién y con qué servicios van ahora,
    cuántas fechas nuevas se reservan, cuántas se cancelan y cuáles se quedan a su hora, con su fecha;
    si no ha hecho falta cambiar ninguna, «Guardado: no ha hecho falta cambiar ninguna cita.».
+6. Por el asistente, la tarjeta de confirmación pone delante la serie, desde cuándo y lo que cambia de cuándo se
+   repite, y después la profesional y los servicios nuevos.
 Entra: una serie y la fecha desde la que cambia.
 Sale: la serie partida en dos (la vieja termina el día antes) o, si el cambio empieza en su primera
 fecha, la misma serie editada; el aviso `appointment.recurring.updated`.
@@ -548,6 +554,8 @@ Pasos:
 2. Desde ese momento nadie puede reservar en esa franja; sin profesional, bloquea todo el negocio. Un
    bloqueo de día entero cubre esos días enteros, en la reserva y en las horas libres.
 3. La rejilla de «Por profesional» lo pinta rayado en su fila (o en todas, si es del negocio).
+4. Por el asistente, la tarjeta de confirmación pone delante de quién es el bloqueo (si es de una persona), su
+   inicio y su fin como un periodo («26 nov 2026, 14:00–15:00») y qué es.
 Entra: el profesional (Personal), si el bloqueo es suyo.
 Sale: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
 Si falla: «El final no puede ser anterior al inicio.»; quitar uno que ya no está, «Ese bloqueo no existe en

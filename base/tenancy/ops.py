@@ -13,7 +13,8 @@ and closes it on the way out.
   template someone is connected to (``55006``) is waited for a bounded while (:data:`TEMPLATE_BUSY_WAITS`), then a
   readable failure. Every call then makes the database private: nothing to ``PUBLIC``, ``CONNECT`` and ``TEMPORARY`` to
   the environment's ``hub_app`` and ``hub_admin`` (``bootstrap.Names``, with pre's ``pre_`` prefix); a role the server
-  does not have (local development, the tests) is skipped and logged.
+  does not have (local development, the tests) is skipped and logged. And it writes the clone's counters in its own WAL
+  (``base.tenancy.sequences``): none hands out a value only its template's WAL holds.
 - :func:`drop_database` drops one hub's or demo's database, the sessions on it included (``WITH (FORCE)``); a
   template or any other name is refused before the server hears it.
 
@@ -29,7 +30,7 @@ from contextlib import contextmanager
 import psycopg
 from psycopg import errors, sql
 
-from base.tenancy import bootstrap, names
+from base.tenancy import bootstrap, names, sequences
 from base.tenancy import connections as tenancy_connections
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ def clone_database(  # noqa: PLR0913
         statement = sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(target, source)
         made = _create(conn, statement, name, template, waits, sleep)
         _make_private(conn, target, name, None if aside else roles)
+    _write_down_counters(checked, cluster)
     return made
 
 
@@ -152,6 +154,14 @@ def _make_private(conn, target: sql.Identifier, name: str, roles: bootstrap.Name
                 role,
                 name,
             )
+
+
+def _write_down_counters(name: str, cluster) -> None:
+    with connect_ops(name, cluster=cluster) as conn:
+        try:
+            sequences.write_down(conn)
+        except psycopg.Error as error:
+            raise DatabaseOpsError(f"The counters of {name!r} could not be written down: {reason(error)}") from error
 
 
 def drop_database(name: str, *, cluster=None) -> bool:

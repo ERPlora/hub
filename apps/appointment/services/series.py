@@ -9,6 +9,7 @@ from live.errors import Conflict, PermissionDenied
 from live.operations import operation
 from live.outbox import record_event
 
+from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import Appointment, Recurring, RecurringService, Settings
 from apps.appointment.queries import (
@@ -175,6 +176,7 @@ def _materialize_out(series: Recurring, report: dict) -> dict:
         "of appointments; it books the dates of the booking window at once and lists the dates that did not fit with "
         "their reason.",
         "risk": "normal",
+        "summary": assistant_cards.series,
     },
 )
 def create_series(ctx: OperationContext, data: RecurringCreateIn) -> dict:

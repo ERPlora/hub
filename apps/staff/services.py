@@ -20,15 +20,8 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import atomic, operation
 from live.outbox import record_event
 
-from apps.staff import events
-from apps.staff.models import (
-    Member,
-    Role,
-    Schedule,
-    ScheduleDay,
-    StaffSettings,
-    TimeOff,
-)
+from apps.staff import events, time_off_card
+from apps.staff.models import Member, Role, Schedule, ScheduleDay, StaffSettings, TimeOff
 from apps.staff.queries import (
     LIVE_TIME_OFF,
     ROLE_NOT_FOUND,
@@ -780,6 +773,7 @@ def _write_week(schedule: Schedule, days: list) -> None:
         "description": "Registers a time-off request (vacation, sick leave, personal, training or other) "
         "for a staff member, by id or by name; it starts pending.",
         "risk": "normal",
+        "summary": time_off_card.summary,
     },
 )
 def create_time_off(ctx: OperationContext, data: TimeOffIn) -> TimeOff | None:
