@@ -1,7 +1,7 @@
 // A voucher sold, as `service.grant.list` answers it, for the tests of the voucher sheets and dialogs.
-import type { GrantOut } from '../operations';
+import type { ListedGrantOut } from '../operations';
 
-export const GRANT: GrantOut = {
+export const GRANT: ListedGrantOut = {
   id: 'g1',
   package_id: 'p1',
   package_name: 'Bono 5 cortes',
@@ -11,6 +11,7 @@ export const GRANT: GrantOut = {
   granted_at: '2026-10-01T10:00:00Z',
   source: 'manual',
   sale_id: null,
+  sale_number: null,
   amount: 9000,
   net_amount: 0,
   tax_amount: 0,
@@ -31,4 +32,4 @@ export const GRANT: GrantOut = {
   can_adjust: true,
 };
 
-export const grant = (over: Partial<GrantOut> = {}): GrantOut => ({ ...GRANT, ...over });
+export const grant = (over: Partial<ListedGrantOut> = {}): ListedGrantOut => ({ ...GRANT, ...over });
