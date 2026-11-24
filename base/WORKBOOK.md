@@ -4808,8 +4808,10 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests:
   `control/tests/test_services_move_at_night.py::TestTheNight` y `::TestMoveAtNight`,
   `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
-  `control/tests/test_admin_move.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
-  le traslada no existe todavía (hub#1510).
+  `control/tests/test_admin_move.py::TestMoveToCluster` y `::TestCancelTheMove`. El sondeo firmado de erplora.com
+  (`base.hub.get`, `GET /internal/hubs/{id}`) dice cuándo empieza, en `move_scheduled_for` (un instante en UTC; `null`
+  sin traslado, una vez arrancado o cancelado), junto a la congelación de `maintenance` y sin decir adónde va ni cambiar
+  `state_version` (`base/tests/test_internal_scheduled_move.py`); erplora.com aún no se lo enseña al dueño (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
   (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` no rechaza por tamaño (solo
   comprueba que la base está en su servidor). El negocio está en mantenimiento mientras dura la copia, y por eso se

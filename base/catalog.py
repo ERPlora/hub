@@ -48,8 +48,8 @@ from shared.models import App, AppDoc
 
 logger = logging.getLogger(__name__)
 
-WORKBOOK = "WORKBOOK.md"
-WORKBOOK_EN = "WORKBOOK.en.md"
+WORKBOOK, WORKBOOK_TRANSLATION = "WORKBOOK.md", "WORKBOOK.{}.md"  # {}: the language of the translation
+WORKBOOK_EN = WORKBOOK_TRANSLATION.format("en")
 #: The line that ends the customer's part of a WORKBOOK; compared exactly, outside code blocks.
 MAINTAINERS_HEADING = "## Para quien lo mantiene"
 #: The images of a module's documentation, linked relatively from its WORKBOOK.
@@ -120,7 +120,7 @@ class RegistryError(CatalogError):
         return f"{len(self.problems)} problem(s) in the apps' registry:{lines}"
 
 
-# ── The WORKBOOK: its customer's part and its English translation ──────────────────────────────
+# ── The WORKBOOK: its customer's part and its translations ─────────────────────────────────────
 
 
 def user_part(text: str) -> str:
@@ -273,53 +273,53 @@ def source_hash(markdown: str) -> str:
 
 
 def en_header(digest: str) -> str:
-    """The first line of a ``WORKBOOK.en.md``: the hash of the Spanish part it was generated from."""
+    """The first line of a WORKBOOK's translation: the hash of the Spanish part it was generated from."""
     return _HEADER_FORMAT.format(digest)
 
 
-def translate_by_hand(label: str) -> str:
-    """How to bring app ``label``'s stale ``WORKBOOK.en.md`` up to date, for the errors that find it.
+def translate_by_hand(label: str, language: str = "en") -> str:
+    """How to bring app ``label``'s stale translation into ``language`` up to date, for the errors that find it.
 
     By hand: ERPlora uses no ``ANTHROPIC_API_KEY``, so no error sends to
     ``translate_workbooks`` without ``--check``, which calls the Claude API. The header the command
     prints (``en_header`` of the current Spanish part) is what makes the translation current.
     """
     return (
-        f"translate by hand the part of {WORKBOOK} that changed into {WORKBOOK_EN} and make its first "
-        f"line the header this prints: {_HEADER_COMMAND.format(label)}"
+        f"translate by hand the part of {WORKBOOK} that changed into {WORKBOOK_TRANSLATION.format(language)} "
+        f"and make its first line the header this prints: {_HEADER_COMMAND.format(label)}"
     )
 
 
 @dataclass(frozen=True)
 class Translation:
-    """A module's WORKBOOK and the state of its English translation."""
+    """A module's WORKBOOK and the state of its translation into one language."""
 
     label: str
     source: str  # the Spanish customer's part
-    en_path: Path
+    path: Path
     state: str  # "missing", "current" or "stale"
-    en_body: str = ""  # WORKBOOK.en.md without its header, when current
+    body: str = ""  # the translation without its header, when current
 
 
-def workbook_translation(config) -> Translation:
-    """The Spanish part of ``config``'s WORKBOOK and whether ``WORKBOOK.en.md`` is generated from it.
+def workbook_translation(config, language: str = "en") -> Translation:
+    """The Spanish part of ``config``'s WORKBOOK and whether its translation into ``language`` is generated from it.
 
     Raises ``WorkbookError`` (via ``user_part``) and ``FileNotFoundError`` without ``WORKBOOK.md``.
     """
     root = Path(config.path)
     source = user_part((root / WORKBOOK).read_text(encoding="utf-8"))
-    en_path = root / WORKBOOK_EN
-    if not en_path.is_file():
-        return Translation(config.label, source, en_path, "missing")
-    en_text = en_path.read_text(encoding="utf-8")
-    match = _HEADER_RE.match(en_text)
+    path = root / WORKBOOK_TRANSLATION.format(language)
+    if not path.is_file():
+        return Translation(config.label, source, path, "missing")
+    text = path.read_text(encoding="utf-8")
+    match = _HEADER_RE.match(text)
     if match is None or match.group(1) != source_hash(source):
-        return Translation(config.label, source, en_path, "stale")
-    return Translation(config.label, source, en_path, "current", en_text[match.end() :])
+        return Translation(config.label, source, path, "stale")
+    return Translation(config.label, source, path, "current", text[match.end() :])
 
 
 def workbook_configs(configs: Iterable | None = None) -> list:
-    """The apps whose ``WORKBOOK.en.md`` is generated: every module, and every platform app with a WORKBOOK
+    """The apps whose WORKBOOK is translated: every module, and every platform app with a WORKBOOK
     (``base``, which documents the Hub without being a module of the store: never in ``catalog_modules``)."""
     return [
         config
@@ -328,13 +328,13 @@ def workbook_configs(configs: Iterable | None = None) -> list:
     ]
 
 
-def stale_translations(configs: Iterable | None = None) -> list[str]:
-    """Labels of the apps (``workbook_configs``) whose ``WORKBOOK.en.md`` exists and no longer matches their WORKBOOK."""
+def stale_translations(configs: Iterable | None = None, language: str = "en") -> list[str]:
+    """Labels of the apps whose existing translation into ``language`` no longer matches their WORKBOOK (``workbook_configs``)."""
     stale = []
     for config in workbook_configs(configs):
         if (Path(config.path) / WORKBOOK).is_file():
             try:
-                if workbook_translation(config).state == "stale":
+                if workbook_translation(config, language).state == "stale":
                     stale.append(config.label)
             except WorkbookError:
                 # A module's: build_registry reports the WORKBOOK itself. A platform app's (base) no
@@ -471,11 +471,11 @@ def _documents(config, problems: list[str]) -> dict[str, str]:
         )
     elif state.state == "current":
         try:
-            check_anchors(state.en_body)
+            check_anchors(state.body)
         except WorkbookError as error:
             problems.append(f"{config.label}: {WORKBOOK_EN}: {error}")
         else:
-            docs["en"] = state.en_body
+            docs["en"] = state.body
     return docs
 
 

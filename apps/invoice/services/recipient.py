@@ -7,7 +7,7 @@ from live.errors import Conflict, InvalidPayload
 
 from apps.customer.queries import find_customer
 from apps.invoice.models import Invoice
-from apps.invoice.schemas import NAME_MAX, TAX_ID_MAX, check_tax_id
+from apps.invoice.schemas.fields import NAME_MAX, TAX_ID_MAX, check_tax_id
 from apps.invoice.services.writes import logger
 
 RECIPIENT_INCOMPLETE = _("A full invoice needs the customer's name, tax ID and address.")

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a92e3d07c7ee27b9a9a1a2199be9b3319378af6a1c032be16c1f7f4c2e7771f7 -->
+<!-- generated from WORKBOOK.md sha256:ee89ea7c80f7471ad62299ae5eeb09dcf1969908b21adabbe918ad4c2434716c -->
 
 ## What it is for and who it is for
 
@@ -970,7 +970,9 @@ Steps:
    grey), the categories, which categories each product has and the units. When charging, it asks for
    the whole sales catalog: price, cost, tax category, unit, allergens and whether each item has stock
    control.
-2. Kitchen asks for the products and the categories to choose what it sends to each station.
+2. Kitchen asks for the products and the categories to choose what it sends to each station. Website asks
+   for the same sales catalog for its menu, with each product's description, photo and allergens
+   (WEBSITE-F05).
 3. Menus asks for the products that can be set as a component: the active ones, also those sold out
    today (a menu is built with them); when selling, it does not offer a choice whose product is sold out.
 4. Without Inventory active, the till says so on the grid ("Inventory is not active, so there is no
@@ -987,7 +989,7 @@ that cannot be completed without that item leaves the till (COMBO-F12). The sale
 stock: the till neither shows nor checks how many units are left.
 If it fails: whoever asks decides. Sales refuses a catalog line if it cannot read the sales catalog and
 warns on the till if Inventory is active and does not answer; Kitchen is left without routing options.
-Involved: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
+Involved: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, WEBSITE-F05
 
 ### INVENTORY-F28 Complete the first step "Your catalog"
 Status: done
@@ -1117,11 +1119,12 @@ Steps:
    thumbnail (or the initials), and each card its "Photo" line; the product's card shows it at the top,
    larger.
 In: each item's photo, from the library or its own.
-Out: nothing: it is only shown. The library's images are kept on the device and are not asked for again;
-the own ones are only seen by whoever has signed in to the business.
+Out: nothing: it is only shown. The library's images are kept on the device and are not asked for again.
+The own ones, like the library's, can be opened by anyone who has their address, because the business's
+website shows them on its menu (WEBSITE-F05), as online shops do.
 If it fails: a photo that does not load (no connection, deleted or no longer in the library) leaves the
 initials, without a notice; the till sells all the same.
-Involved: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
+Involved: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29, WEBSITE-F05
 
 ### INVENTORY-F33 The photos travel in the blueprint
 Status: done
@@ -1263,7 +1266,7 @@ assistant says which one is not there (in a goods receipt, on which line) or ask
 |---|---|---|---|
 | The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29 | `inventory.product.list` |
 | A product's full card (by its id, its SKU or its name) | view products | F02, F25 | `inventory.product.get` |
-| The whole sales catalog: products on sale (active and not sold out) with price, cost (empty for whoever does not see the costs), tax category, unit, allergens and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
+| The whole sales catalog: products on sale (active and not sold out) with price, cost (empty for whoever does not see the costs), tax category, unit, allergens, description, photo and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |

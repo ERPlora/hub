@@ -17,7 +17,8 @@ from apps.invoice.queries.rectifying import rectifiable, rectification_figures, 
 from apps.invoice.queries.refunds import REFUND_NOT_FOUND
 from apps.invoice.queries.rows import document_of_sale, find_invoice, remaining_of
 from apps.invoice.queries.series import RECTIFYING
-from apps.invoice.schemas import FromRefundIn, FromVoidIn, IssueOut, RectifyIn
+from apps.invoice.schemas.invoices import IssueOut
+from apps.invoice.schemas.rectifying import FromRefundIn, FromVoidIn, RectifyIn
 from apps.invoice.services.from_sale import _sale_key, _tell_sales
 from apps.invoice.services.issuer import _issuer_of
 from apps.invoice.services.issuing import VERBATIM, _issue, _settle_rectified

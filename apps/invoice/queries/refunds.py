@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.invoice.schemas import RefundGetIn, RefundOut
+from apps.invoice.schemas.refunds import RefundGetIn, RefundOut
 from apps.sale.models import Refund
 from base.business import money_text
 

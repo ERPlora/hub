@@ -288,6 +288,7 @@ class SaleProductOut(AllergensOut):
 
     id: UUID = Field(description="The product's id.")
     name: str = Field(description="Name, as the ticket and the kitchen read it.")
+    description: str = Field(description="Description, as the website's catalog shows it under the name.")
     sku: str = Field(description="SKU.")
     product_type: ProductType = Field(description="physical or service.")
     price: int = Field(

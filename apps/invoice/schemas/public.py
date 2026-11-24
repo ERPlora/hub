@@ -5,7 +5,8 @@ import datetime as dt
 
 from ninja import Field, Schema
 
-from apps.invoice.schemas import InvoiceOut, RecipientFieldsIn
+from apps.invoice.schemas.fields import RecipientFieldsIn
+from apps.invoice.schemas.invoices import InvoiceOut
 
 CODE = "The code printed on the ticket (the end of the address that opens its page)."
 
