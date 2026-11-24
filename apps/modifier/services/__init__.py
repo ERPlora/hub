@@ -35,26 +35,18 @@ from apps.modifier.queries import (
     load_link,
     load_option,
 )
-from apps.modifier.schemas import (
+from apps.modifier.schemas.fields import DeletedOut
+from apps.modifier.schemas.groups import (
     MAX_BELOW_MIN,
-    DeletedOut,
-    DropIn,
-    DropOut,
     GroupIn,
     GroupOut,
     GroupPatchIn,
     GroupRecoveredOut,
     GroupRecoverIn,
     GroupRefIn,
-    LinkIn,
-    LinkOut,
-    LinkRefIn,
-    OptionIn,
-    OptionOut,
-    OptionPatchIn,
-    OptionRecoveredOut,
-    OptionRefIn,
 )
+from apps.modifier.schemas.links import DropIn, DropOut, LinkIn, LinkOut, LinkRefIn
+from apps.modifier.schemas.options import OptionIn, OptionOut, OptionPatchIn, OptionRecoveredOut, OptionRefIn
 from apps.tax.models import TaxCategory
 from apps.tax.queries import resolve_category_text
 from base.recovery import LeftOut
