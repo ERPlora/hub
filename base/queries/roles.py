@@ -4,7 +4,7 @@ A permission the role lacks is still done «with approval» when an app that is 
 approvable (``approvals``): a manager approves it on the spot with their PIN (BASE-F84).
 """
 
-from collections.abc import Collection, Iterable
+from collections.abc import Iterable
 
 from django.utils import translation
 from django.utils.translation import gettext, gettext_lazy as _
@@ -18,6 +18,7 @@ from base.apps_on import active_apps
 from base.approvals import approvable
 from base.models import Membership
 from base.permissions import VIEW_HOME, permissions_of_role
+from base.roles import basic_state
 from base.schemas.roles import RoleDetailIn, RoleDetailOut
 from base.sensitive import DATA_PERMISSIONS
 
@@ -56,7 +57,7 @@ def role_detail(ctx: OperationContext, data: RoleDetailIn) -> dict:
 
         def lines(permissions: Iterable[tuple[str, object]]) -> list[dict]:
             return [
-                {"permission": permission, "phrase": str(phrase), "state": _state(permission, given, approved)}
+                {"permission": permission, "phrase": str(phrase), "state": basic_state(permission, given, approved)}
                 for permission, phrase in permissions
             ]
 
@@ -95,9 +96,3 @@ def _approvable(configs: Iterable[LiveAppConfig]) -> frozenset[str]:
         for name in getattr(config, "approvals", {})
         if (found := approvable(name)) is not None
     )
-
-
-def _state(permission: str, given: Collection[str], approved: Collection[str]) -> str:
-    if permission in given:
-        return "on"
-    return "approval" if permission in approved else "off"

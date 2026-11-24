@@ -25,7 +25,7 @@ from live.operations import get as get_operation
 from base import access, services
 from base.services import sessions
 from base import people as people_rules
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.models.access import AccessSettings, Credential
 from base.models import Hub, Membership
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
@@ -402,7 +402,7 @@ class TestPermissions:
 
     def test_an_operation_refuses_whom_its_permission_is_not_given(self, eva, olga):
         op = get_operation("base.person.pin_remove")
-        employee = OperationContext(scope=A, actor=eva, permissions=permissions_for(eva, A))
+        employee = OperationContext(scope=A, actor=eva, permissions=access_for(eva, A))
         with pytest.raises(OperationError) as refused:
             op(employee, op.input(person="saas:1"))
         assert refused.value.code == "permission_denied"

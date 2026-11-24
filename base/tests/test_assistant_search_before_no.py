@@ -11,7 +11,7 @@ from live.context import OperationContext
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.assistant_context import owner_of_a
 from base.tests.test_assistant_tool_search import SEARCH, turn, user
@@ -66,7 +66,7 @@ def test_a_role_below_the_owner_searches_too_and_is_told_it_cannot_only_after_th
     """Their tools are offered as the owner's: only the nearest ones. What they may not do the search never finds
     (it reads only their own tools), so it is not available to them once the search finds none."""
     person = make_user("pepa", host=A.key, role=role)
-    context = OperationContext(scope=A, actor=person, permissions=permissions_for(person, A), language="en")
+    context = OperationContext(scope=A, actor=person, permissions=access_for(person, A), language="en")
     text = _plain(turn(context, user("Bump the QA cheesecake up to 6 euros."))["instructions"])
     assert SEARCH_FIRST in text
     assert "When they ask for something your tools do not do and your searches do not find, do not try other" in text

@@ -1,9 +1,9 @@
 // Words for what an automation does (WORKBOOK «Cómo son las páginas»): the events and actions of the
 // active apps, its trigger, its steps, a condition, a wait and each line of a run's history, never a
 // technical name where a phrase exists. Hand-written phrases for the known ones, composed for the rest.
-import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { phrasingIn } from '../__tests__/phrasing';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { CatalogOut, LogEntry, Step } from '../operations';
@@ -24,11 +24,8 @@ import {
   type Phrasing,
 } from './phrasing';
 
-function phrasing(locale: 'en' | 'es' = 'en'): Phrasing {
-  const i18n = createShellI18n({ locale, messages: { en, es } });
-  const g = i18n.global as unknown as { t: (key: string, named?: Record<string, unknown>) => string; te: (key: string) => boolean };
-  return { t: (key, named) => (named ? g.t(key, named) : g.t(key)), te: (key) => g.te(key), locale, timeZone: 'Europe/Madrid' };
-}
+const phrasing = (locale: 'en' | 'es' = 'en'): Phrasing => phrasingIn(locale, 'Europe/Madrid');
+
 
 const CATALOG = {
   off_apps: [],

@@ -8,7 +8,7 @@ from live.errors import InvalidPayload, PermissionDenied
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.flow import document, events, recipes
+from apps.flow import assistant_card, document, events, recipes
 from apps.flow.models import Draft, Flow, FlowRun, Question
 from apps.flow.queries.catalog import asked_first, grantable_operations
 from apps.flow.queries.flows import flow_row, live_flows, resolve_flow
@@ -49,6 +49,7 @@ NUMBERED = "%(name)s (%(n)s)"
         "(`draft_id`, which is marked as used in the same step). It is born paused and with no permission "
         "(`flow.flow.set_enabled` turns it on); prefer `flow.draft.propose` when somebody asks you for one.",
         "risk": "normal",
+        "summary": assistant_card.automation,
     },
 )
 def create_flow(ctx: OperationContext, data: CreateIn) -> dict:

@@ -12,7 +12,7 @@ from live.operations import AI, operation
 
 from base import access, approvals as approval_rules, blueprint, business
 from base.models.approvals import Approval
-from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_for
+from base.permissions import ADMINISTER_HUB, VIEW_HOME, access_for
 from base.schemas.approvals import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
 
 from .access import access_settings, pin_people
@@ -27,7 +27,7 @@ APPROVALS_SHOWN = 500
 
 def holds(user, scope, permission: str) -> bool:
     """Whether ``user`` holds ``permission`` on ``scope``, as ``@operation`` asks it (wildcards included)."""
-    return OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope)).has(permission)
+    return OperationContext(scope=scope, actor=user, permissions=access_for(user, scope)).has(permission)
 
 
 def approval_action(operation: str, figures: dict | None = None, currency: str | None = None) -> str:
