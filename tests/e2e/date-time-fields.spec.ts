@@ -27,20 +27,35 @@ async function onTimeField(browser: Browser, body: (page: Page, field: Locator) 
   }
 }
 
-/** The next hour tapped is let go at once for the one the wheel had, as Ionic does with a tap made while the wheel
- *  settles; as the wheel is on its way, it is the hour let go that still looks taken. */
+/** The next hour tapped is let go, as Ionic does with a tap made while the wheel settles: the wheel takes the hour but is
+ *  not there yet; then, at the next tap or half a second later, it is back at the hour it had while the option tapped is
+ *  the one that looks taken. */
 async function letTheNextHourGo(page: Page): Promise<void> {
   await page.evaluate(() => {
-    document.addEventListener('click', function letGo(event) {
+    document.addEventListener('click', function tapped(event) {
       const option = event.composedPath().find((node): node is HTMLElement =>
         node instanceof HTMLElement && node.matches('ion-picker-column[aria-label="Select an hour"] > ion-picker-column-option'));
       if (!option) return;
-      document.removeEventListener('click', letGo);
+      document.removeEventListener('click', tapped);
       const wheel = option.parentElement as HourWheel;
       const before = wheel.querySelector('.option-active') as HTMLElement & { value: number };
-      before.classList.remove('option-active');
-      option.classList.add('option-active');
-      void wheel.setValue(before.value);
+      const track = wheel.shadowRoot!.querySelector('.picker-opts')!;
+      const stay = () => track.scrollTo({ top: track.scrollTop, behavior: 'instant' });
+      const letGo = () => {
+        clearTimeout(timer);
+        document.removeEventListener('click', letGo, true);
+        void wheel.setValue(before.value);
+        stay();
+        const lookTaken = () => {
+          if (option.part.contains('active')) return requestAnimationFrame(lookTaken);
+          before.classList.remove('option-active');
+          option.classList.add('option-active');
+        };
+        lookTaken();
+      };
+      const timer = setTimeout(letGo, 500);
+      document.addEventListener('click', letGo, true);
+      stay();
     });
   });
 }
