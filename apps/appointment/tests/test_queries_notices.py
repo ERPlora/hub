@@ -5,7 +5,8 @@ import datetime as dt
 from django.utils import timezone
 
 from apps.appointment.models import Appointment
-from apps.appointment.queries.notices import NOTICES_WINDOW
+from apps.appointment.queries.notices import notices
+from apps.appointment.schemas import NoticesIn
 
 from .conftest import (
     HUB_DB,
@@ -13,6 +14,7 @@ from .conftest import (
     TUESDAY,
     as_ctx,
     at,
+    ctx_for,
     employee_linked_to,
     make_appointment,
     make_customer,
@@ -24,11 +26,11 @@ pytestmark = HUB_DB
 
 def test_a_booking_older_than_the_window_is_told_only_when_asked_from_before_it(salon):
     booked = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), source="whatsapp")
-    made = timezone.now() - NOTICES_WINDOW - dt.timedelta(minutes=1)
+    made = timezone.now() - dt.timedelta(hours=24, minutes=1)
     Appointment.objects.filter(pk=booked.id).update(created_at=made)
-    assert run("appointment.appointment.notices").rows == []
-    since = (made - dt.timedelta(minutes=1)).isoformat()
-    assert [notice.id for notice in run("appointment.appointment.notices", {"since": since}).rows] == [booked.id]
+    assert notices(ctx_for(), NoticesIn()).rows == []
+    since = made - dt.timedelta(minutes=1)
+    assert [notice.id for notice in notices(ctx_for(), NoticesIn(since=since)).rows] == [booked.id]
 
 
 # APPOINTMENT-F28 — what the hub tells the team as it happens: a booking or a
