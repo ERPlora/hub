@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:3e1b1525905d1b09986a72ea31da10355b40585148c2919629922ad469f6c785 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:e383045d4138 -->
 
 Tips keeps **the tip the customer leaves when paying**, by card or in cash, and **whose it is**.
 A tip is not a sale: it carries no VAT, does not change the ticket and does not reach the AEAT. It is recorded in
@@ -22,6 +21,7 @@ Tips does not charge (that is Sales), does not balance the cash register (that i
 in it what comes in and goes out) and does not do payroll.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:2254761acdba -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven (consulted on 2026-11-14).
 
@@ -63,6 +63,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven 
   and Ágora's blog ([should we declare tips?](https://www.agorapos.com/blog/debemos-declarar-las-propinas/)).
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:78f6f73dfa3b -->
 
 - **Sales & POS**, **Cash register**, **Staff** and **Time clock** are turned on with Tips: the tip goes with its
   sale, the cash one goes into the cash register, it belongs to a person of the team and the distribution by hours
@@ -84,11 +85,13 @@ Initial setup, step by step:
    (CASH_REGISTER-F18) and, in **Tips**, that they carry the name of whoever served.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:cbfa55a11cc6 -->
 
 Tips opens from the **Tips** menu and has four entries: **Tips**, **Distribution**, **Report** and
 **Settings**. Whoever cannot manage sees only **My tips**.
 
 ### "Tip" step in the Charge
+<!-- from WORKBOOK.md sha256:dcaa00b16a69 -->
 Inside the Sales **Charge** sheet (SALE-F39), only with tips turned on: the "Tip" row with
 the three suggestions of the chosen payment method ("3 %", "5 %", "10 %", each with its amount below),
 "Other amount" and "No tip"; the one marked by default is "No tip". Below, "For <name>" (whoever
@@ -96,6 +99,7 @@ serves). In cash, when what is tendered exceeds the total, the "Keep the change"
 set, the big amount says "<total> + <tip> tip".
 
 ### Tips
+<!-- from WORKBOOK.md sha256:328f530e757a -->
 Title "Tips", period ("Today", "7 days", "30 days"), table (Date, Sale, For, Payment method, Amount,
 Status) with the search "Search sale or person…", filters (person, payment method, status), table or
 card view, 50 per page. **+** "Record tip" and, per row, "Adjust" and "Void" (only while its day is not
@@ -103,22 +107,27 @@ distributed). At the top, "Declare shift tips" (TIP-F07). Empty: "No tips yet.";
 "Loading tips…".
 
 ### Distribution
+<!-- from WORKBOOK.md sha256:dfe9877e73a2 -->
 The distribution rules (TIP-F08, TIP-F09), one card per rule, with "Preview" (TIP-F10) and, below, the
 days and services to approve with "Approve" (TIP-F11) and the approved ones with "Pay" (TIP-F12). Without rules:
 "No distribution: each tip belongs to whoever served.".
 
 ### Report
+<!-- from WORKBOOK.md sha256:4b5061e307bf -->
 By person or by shift (TIP-F13): card, cash and declared tips, what they put into the pool and what
 they received, paid and pending. Export as CSV.
 
 ### My tips
+<!-- from WORKBOOK.md sha256:d458d6b48777 -->
 The person's own, today's and this week's (TIP-F14), with what is paid and what is pending.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:84b2cb16920f -->
 "Ask for a tip when charging" and, for each active payment method, its three suggestions (each one in "%" or as
 an amount), which one comes marked, "Allow other amount" and "Save".
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:16a45fbb24f4 -->
 
 | State | What the person sees |
 |---|---|
@@ -130,6 +139,7 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |
 
 ## Flows
+<!-- from WORKBOOK.md sha256:9c74f31355f9 -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -149,6 +159,7 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | TIP-F14 | See my tips | common | not done |
 
 ### TIP-F01 Set up tips
+<!-- from WORKBOOK.md sha256:d7fabd3afe4b -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: common
 Actor: owner, administrator, assistant
@@ -168,6 +179,7 @@ the screen shows locked with "You do not have permission to change these setting
 Involved: SALE-F37
 
 ### TIP-F02 Suggest the tip when charging
+<!-- from WORKBOOK.md sha256:d7df526d07a6 -->
 Status: not done — the app does not exist and the Charge sheet does not paint other apps' steps yet (hub#1498, hub#1500)
 Vertical: common
 Actor: employee, manager
@@ -191,6 +203,7 @@ assigned when it is adjusted (TIP-F06).
 Involved: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Record a card tip
+<!-- from WORKBOOK.md sha256:ad9a83bb746b -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: common
 Actor: employee, manager, assistant
@@ -209,6 +222,7 @@ a sale of a day already distributed, "That day is already distributed: reopen it
 Involved: CASH_REGISTER-F18
 
 ### TIP-F04 Record a cash tip
+<!-- from WORKBOOK.md sha256:9ea9b1eab9e0 -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: common
 Actor: employee, manager, assistant
@@ -228,6 +242,7 @@ tendered does not cover the total and the tip".
 Involved: SALE-F01, CASH_REGISTER-F18
 
 ### TIP-F05 Put a tip with no ticket into the pool
+<!-- from WORKBOOK.md sha256:99f498461f8b -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: restaurant
 Actor: manager
@@ -243,6 +258,7 @@ If it fails: with the cash register closed, the same notice as in TIP-F04.
 Involved: TIP-F08, CASH_REGISTER-F18
 
 ### TIP-F06 Adjust or void a tip
+<!-- from WORKBOOK.md sha256:a0015a78ba0c -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: common
 Actor: manager, assistant
@@ -261,6 +277,7 @@ distributed: reopen it to change its tips.".
 Involved: SALE-F30, SALE-F31, CASH_REGISTER-F18
 
 ### TIP-F07 Declare the cash tips when closing the shift
+<!-- from WORKBOOK.md sha256:1b058b0f9e12 -->
 Status: not done — the app does not exist yet (hub#1501)
 Vertical: restaurant
 Actor: employee
@@ -279,6 +296,7 @@ is said below its field.
 Involved: ATTENDANCE-F01
 
 ### TIP-F08 Define the distribution
+<!-- from WORKBOOK.md sha256:5d2804ac9798 -->
 Status: not done — the app does not exist yet (hub#1501)
 Vertical: restaurant
 Actor: manager, administrator
@@ -298,6 +316,7 @@ rule.".
 Involved: STAFF-F04, ATTENDANCE-F01
 
 ### TIP-F09 Share with another role (tip-out)
+<!-- from WORKBOOK.md sha256:3d8b5fb49211 -->
 Status: not done — the app does not exist yet (hub#1501)
 Vertical: restaurant
 Actor: manager, administrator
@@ -312,6 +331,7 @@ If it fails: a % over 100 or a negative one is said below its field.
 Involved: TIP-F08
 
 ### TIP-F10 See the distribution preview
+<!-- from WORKBOOK.md sha256:62c00bcc0d3d -->
 Status: not done — the app does not exist yet (hub#1501)
 Vertical: restaurant
 Actor: manager, administrator
@@ -325,6 +345,7 @@ If it fails: a day with no tips, "That day has no tips.".
 Involved: TIP-F08
 
 ### TIP-F11 Approve the distribution of a day or service
+<!-- from WORKBOOK.md sha256:38e73248187a -->
 Status: not done — the app does not exist yet (hub#1501)
 Vertical: restaurant
 Actor: manager, administrator, assistant
@@ -341,6 +362,7 @@ already paid out is not reopened: "That day already has tips paid out.".
 Involved: ATTENDANCE-F05, ATTENDANCE-F08
 
 ### TIP-F12 Pay out the tips
+<!-- from WORKBOOK.md sha256:5ed1a612463b -->
 Status: not done — the app does not exist yet (hub#1501)
 Vertical: common
 Actor: manager, administrator, assistant
@@ -357,6 +379,7 @@ cash."; a payout that would leave the cash register negative when that is not al
 Involved: CASH_REGISTER-F05, CASH_REGISTER-F18
 
 ### TIP-F13 See the report by person and by shift
+<!-- from WORKBOOK.md sha256:83a3c9225e33 -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: common
 Actor: manager, administrator
@@ -371,6 +394,7 @@ If it fails: the loading error with "Retry".
 Involved: ATTENDANCE-F01
 
 ### TIP-F14 See my tips
+<!-- from WORKBOOK.md sha256:c55b611a0087 -->
 Status: not done — the app does not exist yet (hub#1498)
 Vertical: common
 Actor: employee
@@ -386,12 +410,14 @@ in Staff.".
 Involved: STAFF-F03
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:dca180ea2f2f -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text) and the API, with the same
 rules and the same permissions. A tip is named by its sale ("the tip of 20261114-0007") and a person, by their
 name.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:96af67577a43 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -404,6 +430,7 @@ name.
 | The own tips of whoever asks | view tips | F14 | `tip.report.mine` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:d38b06cf1026 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -420,6 +447,7 @@ name.
 confirming.
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:046ef8541eff -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -432,12 +460,14 @@ confirming.
 | Tips paid out | Paying | The person, the amount and the way | `tip.payout.paid` |
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:d68b27d362b9 -->
 
 - `sale.sale.voided` and `sale.sale.refunded` (full refund): voids that sale's tip (F06).
 - `attendance.record.clocked_out` and `attendance.record.corrected`: the distribution and report screens
   refresh by themselves.
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:91602ef52b34 -->
 
 - **Sales & POS** (requirement): the tip's sale, who served and its payment methods; the **Charge** sheet paints
   the "Tip" step because Tips declares it (SALE-F39), without Sales knowing about tips.
@@ -447,6 +477,7 @@ confirming.
 - **Time clock** (requirement): the clocked hours, for the distribution by hours and the report by shift.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:307405264216 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

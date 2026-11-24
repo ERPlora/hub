@@ -1,12 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:32249bdb55e598bd6afd790e78105aea77b9b0a50fa70e808740a8d3d6ddbf02 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:1222088f1976 -->
 
 Tasks is the team's to-do list, such as "clean the storeroom" or "order blonde dye". Each task has a person who takes
 care of it, a priority and, if you want, a due date; they are grouped in projects, split into subtasks and carry
 comments. Each employee sees their own and the manager sees them all.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:f785359d9363 -->
 
 Tasks is the **team's to-do list**: "clean the storeroom", "order blonde dye", "check the cold room".
 Each task has a title, a priority, a due date and a team member who takes care of it; they are grouped
@@ -16,6 +16,7 @@ of **comments**.
 It is for the staff, not for the customers: a customer's complaint is not a task.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:45f9b7a44c0a -->
 
 - The **owner**, the **administrator** and the **manager** see and change **every** task, assign them,
   delete them and run the projects.
@@ -31,6 +32,7 @@ the storeroom for tomorrow and assign it to Ana", "what tasks do I have?", "comp
 storeroom", "what is left of the opening project?".
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:2e75bd8cabf4 -->
 
 **Who a task is assigned to and what the employee sees** (skill `market-decision`, 2026-10-14).
 
@@ -58,6 +60,7 @@ task (Square forum); several assignees per task complicates the list without any
 asking for it.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:cd159eb29520 -->
 
 1. Tasks needs **Staff**: tasks are assigned to team records. Add the people in **Staff** and, if they
    are going to sign in to the Hub, link their record to their account: that way each one sees "My
@@ -66,17 +69,20 @@ asking for it.
 3. "Today" (overdue, due today, the number of the day) is the business's day, in its time zone.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:46889545ef58 -->
 
 Tasks opens from the **Tasks** menu and has two tabs: **Tasks** and **Projects**. What a person cannot
 do does not show, and the app refuses it even if they try through the API or the assistant.
 
 ### Tasks
+<!-- from WORKBOOK.md sha256:ce30564fba97 -->
 Here is the team's task list. In **All**, the table with each task's number, title, status, priority, due date and
 assignee, which you can search and filter; in **My tasks**, the open ones assigned to you, those due soonest first.
 With **+** you create a task; from its row you start it or complete it, and tapping it opens it with its subtasks and
 its comments, where you also assign it, edit it or delete it. If you are an employee, you only see your own.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:1de5b4b7dd81 -->
 At the top, the **All / My tasks** selector ("My tasks" only shows to whoever has a linked record).
 
 **All**: table with the search box "Search no. or title…" (number, title, description, assignee or
@@ -103,6 +109,7 @@ card. The one I complete from its card stays in its place, as done and without a
 change tab.
 
 #### Task (sheet)
+<!-- from WORKBOOK.md sha256:a41b35b61f2c -->
 It opens over the list with: **TSK-YYYYMMDD-NNNN — Title**, its status and its priority; the description;
 **Due**, **Completed**, **Assigned to** ("Unassigned"), **Project**, **Created** and **Created by**.
 
@@ -117,12 +124,14 @@ It opens over the list with: **TSK-YYYYMMDD-NNNN — Title**, its status and its
   text stays next to the reason.
 
 ### Projects
+<!-- from WORKBOOK.md sha256:fb8195ec056b -->
 Here are the projects that group the tasks, such as "Opening the shop", with their code, their name, their colour and
 whether they are active. With **+** you create one; tapping it opens it with its tasks, where you change its name or
 its colour, deactivate it or delete it (its tasks stay, without a project). Creating, changing and deleting them is the
 manager's; the employee sees the list.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:c69c403df9b6 -->
 Table with the search box "Search code or name…", columns **Code, Name, Color** and **Active** (Yes /
 No, list filter; Code, Name and Color filter by "contains"; the filters, behind the funnel of the
 bar); sort by any column, 50 per page. A project's task counters count only the ones whoever is looking can see. **+** opens **New project**:
@@ -131,6 +140,7 @@ bar); sort by any column, 50 per page. A project's task counters count only the 
 manager; the employee sees the list.
 
 #### Project (sheet)
+<!-- from WORKBOOK.md sha256:9a588bed413b -->
 **Name** with its colour, **Active / Inactive** and the **Code**; **Name** and **Color** editable with
 **Save** (the code does not change: it is the project's key); **Deactivate / Activate** (does not send what was
 typed without saving); **Delete** with confirmation; **Tasks in this project ({n})**, the 50 most
@@ -138,6 +148,7 @@ recent with "Showing {x} of {n}. Find the rest in Tasks."; "New task…" and **A
 creates it inside the project.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:4f73f13499f1 -->
 
 | State | What the person sees |
 |---|---|
@@ -149,12 +160,14 @@ creates it inside the project.
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:a645bcc3867f -->
 
 In "New task", "Editing task" and "New project", the phone's Back button asks "Discard changes?" when something
 typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:c6ea6f310fea -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -175,6 +188,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TASK-F15 | When someone leaves the team | done |
 
 ### TASK-F01 Create a task
+<!-- from WORKBOOK.md sha256:55dc36961144 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, employee, assistant, an automation with permission
 Screen: Tasks
@@ -197,6 +211,7 @@ active in the team." or, by name, several people or projects that match (it says
 Involved: Staff (the assignee's record)
 
 ### TASK-F02 See and search the tasks
+<!-- from WORKBOOK.md sha256:3f4bb4af9b86 -->
 Status: done (server and screen)
 Actor: everyone; the employee sees only their own
 Screen: Tasks (All)
@@ -212,6 +227,7 @@ If it fails: "The tasks could not be loaded." with **Retry**; through the API, a
 Involved: Staff (the assignee's name)
 
 ### TASK-F03 See my tasks
+<!-- from WORKBOOK.md sha256:5e5505f4427e -->
 Status: done (server and screen)
 Actor: whoever has a record linked to their account, assistant
 Screen: Tasks (My tasks)
@@ -226,6 +242,7 @@ If it fails: nothing of its own.
 Involved: Staff (my record)
 
 ### TASK-F04 Open a task
+<!-- from WORKBOOK.md sha256:5804d8cac979 -->
 Status: done (server and screen)
 Actor: whoever sees it
 Screen: Task (sheet)
@@ -239,6 +256,7 @@ see it); several tasks that match the title: it says which.
 Involved: none
 
 ### TASK-F05 Start or change the status
+<!-- from WORKBOOK.md sha256:d2d81eb465bd -->
 Status: done (server and screen)
 Actor: whoever can change it (the employee, their own)
 Screen: Tasks (action **Start**), Task (selector **Status**)
@@ -254,6 +272,7 @@ whoever sees every task but can only change their own, "You can only change your
 Involved: none
 
 ### TASK-F06 Complete a task
+<!-- from WORKBOOK.md sha256:b425bcd6ede9 -->
 Status: done (server and screen)
 Actor: whoever can change it
 Screen: Tasks (action **Complete**), Task (button **Complete**)
@@ -269,6 +288,7 @@ the status is changed.
 Involved: none
 
 ### TASK-F07 Assign, reassign or unassign
+<!-- from WORKBOOK.md sha256:1a5cfda49648 -->
 Status: done (server and screen)
 Actor: whoever can change it
 Screen: Task
@@ -285,6 +305,7 @@ team.", "You have no staff record: you cannot be assigned tasks." (assign to me 
 Involved: Staff
 
 ### TASK-F08 Edit a task
+<!-- from WORKBOOK.md sha256:f92a3ac2f954 -->
 Status: done (server and screen)
 Actor: whoever can change it
 Screen: Task (**Edit**)
@@ -298,6 +319,7 @@ If it fails: the same refusals as when creating.
 Involved: none
 
 ### TASK-F09 Add a subtask
+<!-- from WORKBOOK.md sha256:c495d0d395c7 -->
 Status: done (server and screen)
 Actor: whoever can create tasks and sees the parent
 Screen: Task
@@ -311,6 +333,7 @@ If it fails: the reason inside the sheet; the typed title stays.
 Involved: none
 
 ### TASK-F10 Comment on a task
+<!-- from WORKBOOK.md sha256:bec3314e5cbb -->
 Status: done (server and screen)
 Actor: whoever can change it
 Screen: Task
@@ -324,6 +347,7 @@ If it fails: empty text; "That task does not exist in this business.".
 Involved: none
 
 ### TASK-F11 Delete a task
+<!-- from WORKBOOK.md sha256:2ade8dde4a2a -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant (with reinforced confirmation)
 Screen: Task (**Delete**)
@@ -338,6 +362,7 @@ card comes up.
 Involved: none
 
 ### TASK-F12 Create a project
+<!-- from WORKBOOK.md sha256:02a003e7d146 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Projects
@@ -352,6 +377,7 @@ If it fails: "There is already a project with that code." under the field; a col
 Involved: Staff (the owner)
 
 ### TASK-F13 Open and change a project
+<!-- from WORKBOOK.md sha256:24ef9a535d58 -->
 Status: done (server and screen)
 Actor: everyone opens it; the owner, the administrator and the manager change it
 Screen: Project (sheet)
@@ -367,6 +393,7 @@ name is not sent.
 Involved: none
 
 ### TASK-F14 Delete a project
+<!-- from WORKBOOK.md sha256:2e2478a3a0f6 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant (with reinforced confirmation)
 Screen: Project (**Delete**)
@@ -381,6 +408,7 @@ deleted and the new card comes up.
 Involved: none
 
 ### TASK-F15 When someone leaves the team
+<!-- from WORKBOOK.md sha256:ecb7108ed323 -->
 Status: done
 Actor: system
 Screen: none
@@ -396,6 +424,7 @@ does not change anything either.
 Involved: Staff (STAFF-F06), TASK-F07
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:f3a30b4ef4cd -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of whoever
 speaks) and the API, with the same rules and the same permissions. A task is named by its id, its number
@@ -421,6 +450,7 @@ name, which the action does not use; and when a task is moved to a project said 
 identifier that comes beside it, the card shows only that project (hub#1250).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
+<!-- from WORKBOOK.md sha256:ac768d73d223 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -433,6 +463,7 @@ identifier that comes beside it, the card shows only that project (hub#1250).
 | A project | view | F13 | `task.project.detail` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:c2c5247d73f1 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -449,6 +480,7 @@ identifier that comes beside it, the card shows only that project (hub#1250).
 | Unassigns the open tasks of whoever leaves the team | the platform only | F15 | `task.task.release_member` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:764dde5d849e -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -467,6 +499,7 @@ The notices carry no titles, descriptions or comments (free text that can name a
 customer or a colleague).
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:f6230f224239 -->
 - **Staff** (`requires = ["staff"]`): the assignee and a project's owner are Staff
   records; Tasks reads their names and, when someone is terminated (`staff.member.terminated`), unassigns
   their open tasks (TASK-F15: the notice is handed to it by the worker's outbox relay, once per
@@ -479,6 +512,7 @@ customer or a colleague).
   (FLOW-F33). Tasks knows nothing of them.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:dae32e69f10a -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
