@@ -33,15 +33,16 @@ KNOTTY = "".join(
 BREAKS = {
     "apps/demo/filler.py": "".join(f"# filler {line}\n" for line in range(501)),
     "apps/demo/unused.py": "import os\n",
-    # Spelled apart so that this file carries no noqa marker of its own.
-    "apps/demo/silenced.py": "import os  " + "#" + " noqa: F401\n",
+    # Spelled apart so that this file carries no noqa marker of its own. No other marker names B905, so a branch that
+    # removes markers cannot make up for this one.
+    "apps/demo/silenced.py": "PAIRS = list(zip([1], [2]))  " + "#" + " noqa: B905\n",
     "apps/demo/knotty.py": KNOTTY,
     "base/crossing.py": "import apps.demo\n\nDEMO = apps.demo\n",
 }
 REPORTS = {
     "size": "apps/demo/filler.py: 501 lines, over its cap of 500",
     "ruff": "apps/demo/unused.py:1:8: F401",
-    "frozen noqa markers": "A new noqa for these rules",
+    "frozen noqa markers": "B905: 1 exceptions, 0 where the branch left origin/main",
     "complexity": "apps/demo/knotty.py::knotty scores 21, over 15",
     "imports": "base.crossing -> apps.demo",
 }
