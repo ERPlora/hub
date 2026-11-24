@@ -9,6 +9,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.invoice import queries, services
+from apps.invoice.schemas.export import InvoiceExportIn
 from apps.invoice.schemas.invoices import (
     BySourceIn,
     DocumentIn,
@@ -34,6 +35,11 @@ router = Router(tags=["invoice"])
 @bind(router, "invoice.invoice.list", "/invoice/invoices")
 async def invoice_list(request, params: Query[InvoiceListIn]):
     return await run_operation(request, queries.invoices.list_invoices, params)
+
+
+@bind(router, "invoice.invoice.export", "/invoice/invoices/export")
+async def invoice_export(request, params: Query[InvoiceExportIn]):
+    return await run_operation(request, queries.export.export_invoices, params)
 
 
 @bind(router, "invoice.invoice.get", "/invoice/invoices/detail")

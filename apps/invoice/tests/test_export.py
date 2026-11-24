@@ -60,9 +60,11 @@ def totals(out):
     """``{number: (base, tax, total)}`` in cents: what each invoice's rows add up to in the file."""
     sums: dict[str, list[Decimal]] = {}
     for row in values(out):
-        parts = sums.setdefault(row["Number"], [Decimal(0), Decimal(0), Decimal(0)])
-        for i, header in enumerate(("Taxable base", "Tax", "Total")):
-            parts[i] += Decimal(str(row[header]))
+        parts = sums.setdefault(row["Number"], [Decimal(0)] * 3)
+        base, total = Decimal(str(row["Taxable base"])), Decimal(str(row["Total"]))
+        tax = Decimal(str(row["Tax"])) + Decimal(str(row.get("Surcharge") or 0))
+        for i, part in enumerate((base, tax, total)):
+            parts[i] += part
     return {number: tuple(int(part * 100) for part in parts) for number, parts in sums.items()}
 
 
@@ -177,7 +179,7 @@ def test_the_equivalence_surcharge_has_its_own_columns_only_in_a_file_that_has_o
             "component_label": "Recargo de equivalencia",
         },
     )
-    charge("sale-1")
+    charge("inv-sale-2345")
 
     headers, rows = opened(export())
 
@@ -189,17 +191,7 @@ def test_the_equivalence_surcharge_has_its_own_columns_only_in_a_file_that_has_o
     # The invoice without a surcharge leaves its cells empty.
     plain = [r for r in values(export()) if r["Number"].startswith("FACT")]
     assert [(r["Surcharge rate %"], r["Surcharge"]) for r in plain] == [(None, None)]
-    assert totals_with_surcharge(export()) == listed()
-
-
-def totals_with_surcharge(out):
-    sums: dict[str, list[Decimal]] = {}
-    for row in values(out):
-        parts = sums.setdefault(row["Number"], [Decimal(0)] * 3)
-        tax = Decimal(str(row["Tax"])) + Decimal(str(row["Surcharge"] or 0))
-        for i, part in enumerate((Decimal(str(row["Taxable base"])), tax, Decimal(str(row["Total"])))):
-            parts[i] += part
-    return {number: tuple(int(p * 100) for p in parts) for number, parts in sums.items()}
+    assert totals(export()) == listed()
 
 
 # What the list counts
@@ -213,7 +205,7 @@ def test_a_rectifying_invoice_is_negative_and_the_cancelled_original_still_count
 
     assert totals(out) == listed() != {}
     assert set(totals(out)) == {original.number, rectifying.number}
-    assert totals(out)[rectifying.number][2] == -3310 == -totals(out)[original.number][2]
+    assert totals(out)[rectifying.number][2] == -3410 == -totals(out)[original.number][2]
     assert Invoice.objects.get(number=original.number).status == Invoice.Status.CANCELLED
 
 

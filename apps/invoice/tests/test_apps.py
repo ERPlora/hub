@@ -127,6 +127,7 @@ def test_every_operation_is_described_for_the_assistant():
     ops = {name: op for name, op in registry.items() if name.startswith("invoice.")}
     assert set(ops) == {
         "invoice.invoice.list",
+        "invoice.invoice.export",
         "invoice.invoice.get",
         "invoice.invoice.by_source",
         "invoice.invoice.document",

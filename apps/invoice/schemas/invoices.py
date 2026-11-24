@@ -48,8 +48,8 @@ SourceType = Literal[*Invoice.Source.values]
 # ── Inputs: invoices ────────────────────────────────────────────────────────────────────────────
 
 
-class InvoiceListIn(PageIn):
-    """The invoices, newest first unless sorted otherwise."""
+class InvoiceFiltersIn(Schema):
+    """The invoice list's search and filters; the export takes the same."""
 
     search: str | None = Field(
         None, max_length=120, description=SEARCH + " Number, customer's name or tax ID."
@@ -82,6 +82,11 @@ class InvoiceListIn(PageIn):
     total_amount_to: int | None = Field(
         None, description="Total of at most this many cents.", json_schema_extra={"money": True}
     )
+
+
+class InvoiceListIn(InvoiceFiltersIn, PageIn):
+    """The invoices, newest first unless sorted otherwise."""
+
     sort: Literal[
         "issued_at",
         "issue_date",

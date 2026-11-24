@@ -32,6 +32,7 @@ from base.tests.test_assistant_asks import english_words_test, own_words_test, s
 #: ``INTERNAL``.
 TOOLS = {
     "invoice.invoice.list",
+    "invoice.invoice.export",
     "invoice.invoice.get",
     "invoice.invoice.document",
     "invoice.invoice.by_source",
@@ -57,11 +58,12 @@ TOOLS = {
     "invoice.series.create",
     "invoice.series.update",
 }
-#: What rectifies an invoice or decides how the documents are numbered and who issues them (``invoice.rectify_invoice``,
-#: ``invoice.manage_series``, ``invoice.manage_issuer``; WORKBOOK «Quién puede qué»), none of them a write a manager
-#: approves: an employee's assistant is never offered them, as the screens give an employee no «Rectificar», no series
-#: and no issuer.
+#: What rectifies an invoice, decides how the documents are numbered and who issues them, or downloads everyone's
+#: (``invoice.rectify_invoice``, ``invoice.manage_series``, ``invoice.manage_issuer``, ``invoice.view_all_invoices``;
+#: WORKBOOK «Quién puede qué»), none of them a write a manager approves: an employee's assistant is never offered them,
+#: as the screens give an employee no «Rectificar», no series, no issuer and no «Descargar en Excel».
 NOT_THE_EMPLOYEES = {
+    "invoice.invoice.export",
     "invoice.invoice.rectification_preview",
     "invoice.invoice.rectify",
     "invoice.invoice.rectify_from_refund",
@@ -127,6 +129,8 @@ PAID = (
 OWN_WORDS = [
     ("es", "invoice.invoice.list", "busca lo que le hemos emitido a Talleres Mercedes"),
     ("en", "invoice.invoice.list", "anything still pending from Talleres Mercedes?"),
+    ("es", "invoice.invoice.export", "mándale a la asesoría un Excel con lo emitido en marzo"),
+    ("en", "invoice.invoice.export", "my accountant needs a spreadsheet of the March billing"),
     ("es", "invoice.invoice.get", "quiero ver por dentro la FACT-2025-000412"),
     ("en", "invoice.invoice.get", "read me FACT-2025-000412 from top to bottom"),
     ("es", "invoice.invoice.document", "¿cómo se ve en hoja lo que le dimos a Talleres Mercedes?"),
