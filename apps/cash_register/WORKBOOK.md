@@ -602,8 +602,8 @@ Pasos:
    caja (Z)».
 3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
    se cerró sola), nombrado como en el detalle, el fondo, el esperado y, línea a línea, las ventas por forma de
-   pago, devoluciones, entradas, salidas, invitaciones (solo si quien imprime ve los costes), las propinas (F18), el
-   esperado y, en el Z, el contado y el descuadre.
+   pago, devoluciones, entradas, salidas, invitaciones (solo si quien imprime ve los costes), las propinas, el esperado
+   y, en el Z, el contado y el descuadre.
 4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
    dispositivo con el mismo informe (en la cola esperaría para siempre): el del navegador o, en la app
    instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»),

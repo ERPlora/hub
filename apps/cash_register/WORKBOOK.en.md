@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6667a934e7eb5d8052830b3ab97acb29c0d1e68e097c6c453ad390b3ccb63833 -->
+<!-- generated from WORKBOOK.md sha256:ca130035b7f67985e679b6123a145f9fc3f1f81f1d8468e437eedc1a31abe210 -->
 
 ## What it is for and who it is for
 
@@ -597,8 +597,8 @@ Steps:
    closing (Z)".
 3. The paper carries the session number with its X or its Z, who opened it (X) or closed it (Z; "Closed by
    itself" if it closed by itself), named as in the detail, the float, the expected cash and, line by line, the sales by payment
-   method, refunds, cash in, cash out, comps (only if whoever prints sees the costs), the tips (F18), the expected
-   cash and, in the Z, the counted cash and the discrepancy.
+   method, refunds, cash in, cash out, comps (only if whoever prints sees the costs), the tips, the expected cash
+   and, in the Z, the counted cash and the discrepancy.
 4. With Printing not on or with no active receipt printer, the device's print dialog shows with the same
    report (in the queue it would wait forever): the browser's or, in the installed app, its print screen
    (the system's dialog, with the printer or "Save as PDF"), titled with the report and the session ("Cash
