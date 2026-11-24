@@ -1,7 +1,11 @@
 """The payment app declares its module metadata, its menu, its permissions and what each role gets."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "payment.view_payment",
@@ -152,5 +156,19 @@ def test_every_input_field_says_what_it_is():
             assert info.description, f"{name}: {field}"
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert payment().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert payment().help.videos == {"es": "GLFTc6kYTk8", "en": "ajeaqIejNK0"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("PAYMENT-F01", "PAYMENT-F08"), "OK2ZK8gru1U", "SfCZrov4jeA"),
+    (("PAYMENT-F02", "PAYMENT-F03", "PAYMENT-F04"), "yorr2RF1IT0", "hZyk-TWJJ9g"),
+    (("PAYMENT-F05",), "zIv0o81BH58", "MMZbN9sJ6Eo"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("payment", language) == help_videos.by_task(TASK_VIDEOS, language)

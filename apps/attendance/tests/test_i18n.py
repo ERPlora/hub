@@ -12,6 +12,7 @@ from live.meta import Nav
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
+from apps.attendance.queries import people
 from base.tests.po import catalogue_key as source
 from base.tests.po import (
     compiled_differences,
@@ -36,7 +37,7 @@ def visible_texts() -> set[str]:
     lazies = [
         *config_texts(config),
         *(panel.title for panel in config.widgets),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, people, services, schemas),
     ]
     lazies += model_texts(MODELS)
     for choices in (Record.Status, Record.Source):

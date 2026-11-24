@@ -897,6 +897,7 @@
       "attendance__correction__list": "Look for working day corrections",
       "attendance__person__list": "Look for the people who clock",
       "attendance__person__detail": "Read a person who clocks",
+      "attendance__person__check": "Check whom a clock-in or a break is for",
       "attendance__presence__list": "Who is clocked in now",
       "attendance__presence__count": "Count the people clocked in now",
       "attendance__record__clock_in": "Clock in",

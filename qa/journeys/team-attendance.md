@@ -15,7 +15,7 @@ Para qué: el registro de jornada que pide la ley: fichar al llegar y al irse, l
 
 1. ATTENDANCE-F04 — la ubicación del local y cuándo se revisa una jornada olvidada.
 2. ATTENDANCE-F01 — la empleada ficha la entrada en la tableta.
-3. ATTENDANCE-F02 — una pausa para comer.
+3. ATTENDANCE-F02 — una pausa para comer, empezada y terminada pidiéndoselo al asistente; y otra de la empleada, que el propietario le pide al asistente con su nombre de pila.
 4. ATTENDANCE-F03 — al día siguiente ficha desde el móvil.
 5. ATTENDANCE-F11 — quién está fichado ahora.
 6. ATTENDANCE-F06 — la empleada ve sus jornadas del mes.

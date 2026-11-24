@@ -56,12 +56,16 @@ export async function pickDay(page: Page, field: Locator, day: string): Promise<
   await confirm(picker);
 }
 
-/** Taps the option of the wheel `column` that reads `text`, and waits until the wheel holds it. */
+/** Taps the option of the wheel `column` that reads `text` until the wheel holds it. A quarter of a second after a
+ *  wheel last scrolls it takes the option then in its middle, undoing a tap made meanwhile: AM or PM redraws the hours
+ *  and scrolls their wheel, so the hour tapped right after it is lost, and is tapped again as a person would. */
 async function spin(picker: Locator, column: string, text: string): Promise<void> {
   const wheel = picker.locator(`ion-picker-column[aria-label="${column}"]`);
   const option = wheel.locator('ion-picker-column-option').filter({ hasText: new RegExp(`^${text}$`) });
-  await option.click();
-  await expect(option).toHaveClass(/option-active/);
+  await expect(async () => {
+    await option.click();
+    await expect(option).toHaveClass(/option-active/, { timeout: 2_000 });
+  }).toPass();
 }
 
 /** Picks `time` (`HH:MM`, 24 hours) in the TimeField `field`: on a wheel with AM and PM (a page in English) or on the
