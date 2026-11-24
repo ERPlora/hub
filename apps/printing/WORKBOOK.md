@@ -1002,8 +1002,8 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
   `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
   de su transacción (KITCHEN-F08, F09).
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
-  vocabulario y las comprobaciones del documento), `queries.py`, `services/`, `events.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `documents.py` (el
+  vocabulario y las comprobaciones del documento), `queries/`, `services/`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `templates/printing/`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (una venta real de Ventas
   encolada por nombre) y `tests/test_integration_kitchen.py` (la comanda y la reimpresión reales de
