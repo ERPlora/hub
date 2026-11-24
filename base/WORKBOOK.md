@@ -4722,7 +4722,13 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   quien pregunta puede cambiarlo y las 10 últimas entradas, y se sigue en vivo con `base.support_access.changed`;
   `base.support_access.update` (`base/services/support_access.py`, con `base.administer_hub`) lo guarda y deja ese
   evento en el outbox en la misma transacción. Rutas en `base/api/access.py`; tests en
-  `base/tests/test_support_access.py`.
+  `base/tests/test_support_access.py`. La entrada de soporte (`base/services/support_entry.py`, tests en
+  `base/tests/test_support_entry.py`): erplora.com manda el rol `hub_support`, un valor de `Membership` que no es un rol
+  del negocio (`Membership.Role` no lo lleva); `/auth/callback` abre la sesión en la copia `saas-support:<id>` con la
+  forma de entrar `support`, y la operación interna `base.support_access.enter` anota la visita
+  (`base.support_access.entered`) o, apagado, la rechaza con `base/templates/base/support_access_off.html`. El equipo del
+  negocio es `Membership.objects.team(host)`, que deja fuera a soporte: quien liste personas lo usa. Al apagar, el mismo
+  `base.support_access.update` cierra sus sesiones.
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
   además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección
