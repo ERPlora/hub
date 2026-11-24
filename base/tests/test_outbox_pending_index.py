@@ -235,4 +235,6 @@ def test_a_hubs_database_keeps_its_own_index_and_no_statement_touches_it(hub_dat
 
         ddl.close()
         assert the_index(name) == index
-        assert not [query["sql"] for query in statements if " INDEX " in query["sql"].upper()]
+        # Stepping back also undoes what later migrations did to other tables, their indexes among it: only this one's.
+        touched = [query["sql"] for query in statements if " INDEX " in query["sql"].upper() and INDEX in query["sql"]]
+        assert not touched

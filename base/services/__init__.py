@@ -21,6 +21,7 @@ from . import (
     provisioning as provisioning,
     relay_runs as relay_runs,
     reset as reset,
+    roles as roles,
     sessions as sessions,
     single_row as single_row,
     support as support,

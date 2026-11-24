@@ -67,6 +67,7 @@ class BaseConfig(LiveAppConfig):
         "base.upload_files": _("Upload and rename files"),
         "base.delete_files": _("Delete files"),
         "base.open_management": _("Open this business on erplora.com"),
+        "base.manage_roles": _("Manage roles"),
         "base.view_costs": _("View costs"),
         "base.view_customer_contact": _("View customer contact details"),
         "base.view_team_contact": _("View team contact details"),

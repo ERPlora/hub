@@ -918,6 +918,7 @@
         "permissions": "Permissions"
       },
       "basic": "Basic",
+      "own": "Custom",
       "always": "Always available",
       "search": "Search role…",
       "empty": "This business has no roles.",
@@ -927,6 +928,7 @@
     "role": {
       "title": "What it allows",
       "intro": "What this role lets a person do in this business, app by app. It is given on erplora.com and is not changed here.",
+      "introOwn": "What this role lets a person do in this business, app by app.",
       "members": "People with this role: {n}",
       "loading": "Loading what this role allows…",
       "error": "Could not load what this role allows.",

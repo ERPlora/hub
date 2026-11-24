@@ -3011,6 +3011,18 @@
     "method": "get",
     "path": "/api/roles/detail"
   },
+  "base.role.create": {
+    "method": "post",
+    "path": "/api/roles"
+  },
+  "base.role.update": {
+    "method": "post",
+    "path": "/api/roles/update"
+  },
+  "base.role.delete": {
+    "method": "post",
+    "path": "/api/roles/delete"
+  },
   "base.api_key.list": {
     "method": "get",
     "path": "/api/keys"

@@ -257,11 +257,11 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan. Tocar uno abre
-«Qué permite».
+Los cinco roles de erplora.com y, debajo, los propios del negocio, con de dónde vienen, cuántas personas tienen y
+cuántos permisos dan. Tocar uno abre «Qué permite».
 
 ### Empleados · Roles · Qué permite
-Un rol básico, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
+Un rol, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
 y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
 
 ### Empleados · API keys
@@ -465,6 +465,9 @@ En la pantalla Archivos:
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
 | BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
+| BASE-F127 | Crear un rol propio a partir de otro | parcial |
+| BASE-F128 | Ajustar lo que permite un rol propio | parcial |
+| BASE-F129 | Borrar un rol propio | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -2279,7 +2282,8 @@ Pasos:
   2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
      «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son los roles básicos de erplora.com:
      cada app aporta lo que da a cada rol básico en ella, y una app puede traer un rol básico propio cuando su
-     funcionalidad lo pida.
+     funcionalidad lo pida. Debajo, por su nombre, los roles propios del negocio (BASE-F127), con «Propio»: quien
+     tiene uno cuenta en él y no en el de su invitación, salvo el propietario, que siempre es el propietario.
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
@@ -2289,13 +2293,16 @@ Pasos:
      «El negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la
      frase de cada permiso y su estado: «Permitido», «Con aprobación» (lo hace si un responsable lo aprueba con su PIN en ese
      momento, BASE-F84) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con
-     aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada.
+     aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada. En un rol propio pone «Lo que
+     este rol deja hacer en este negocio, app por app.» y sale lo que el negocio guardó; lo que no se puede dar en un
+     rol propio, ser el propietario del negocio, no sale.
   5. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles, las personas del negocio, las apps encendidas y lo que cada app da a cada rol.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; en «Qué permite», «No se pudo cargar lo que
-permite este rol.» con «Reintentar», y un rol que no es de los cinco, «Este rol no existe en este negocio.».
-Implicados: BASE-F83, BASE-F84
+permite este rol.» con «Reintentar», y un rol que no es de los cinco ni de los propios, «Este rol no existe en este
+negocio.».
+Implicados: BASE-F83, BASE-F84, BASE-F127, BASE-F128
 
 ### BASE-F83 Asignar un rol a una persona
 Estado: hecho
@@ -2312,6 +2319,62 @@ Entra: el rol que se elige en erplora.com.
 Sale: la persona con su rol nuevo, como lo manda erplora.com, y su sesión abierta.
 Si falla: lo que diga erplora.com.
 Implicados: BASE-F82, BASE-F13
+
+### BASE-F127 Crear un rol propio a partir de otro
+Estado: parcial — se crea pidiéndoselo al asistente o por la API del Hub; faltan su pantalla y dárselo a una persona
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide al asistente un rol a partir de otro, con su nombre: «crea el rol Cajero a partir de Empleado». Puede partir
+     de uno básico o de uno propio, y llevar una descripción.
+  2. La tarjeta dice «A partir de: Empleado» y «Nombre: Cajero» (BASE-F97). Al aceptarla, el rol queda creado con lo
+     mismo que permite el otro, app por app, menos ser el propietario del negocio, que ningún rol propio da.
+  3. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él. Lo que permite se ve al tocarlo (BASE-F82) y
+     se cambia con BASE-F128. Desde entonces no cambia con el rol del que salió.
+Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
+Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
+Si falla: sin nombre, «Ponle nombre al rol.»; con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
+con ese nombre. Elige otro.»; un rol que no está, «Este rol no existe en este negocio.». Nadie da lo que no tiene: si
+el rol del que parte permite algo que quien lo crea no puede hacer, «Un rol no puede permitir más de lo que puedes
+hacer tú.» y no se crea. A quien no gestiona roles el asistente no se lo ofrece, y la API contesta 403.
+Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129
+
+### BASE-F128 Ajustar lo que permite un rol propio
+Estado: parcial — se ajusta pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide el cambio al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
+  2. La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
+     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR
+     (BASE-F98).
+  3. Al aceptarla solo cambia lo que se pidió. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian
+     al momento en sus dispositivos, sin cerrar su sesión (BASE-F13).
+  4. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
+     añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos.
+Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
+Sale: el rol cambiado. Evento `base.role.updated`.
+Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
+tiene: «Un rol no puede permitir más de lo que puedes hacer tú.»; y ser el propietario no se da a nadie: «Eso es solo
+del propietario del negocio: ningún rol lo da.». Un permiso que no es de una app encendida, «Ese permiso no es de
+ninguna app encendida de este negocio.»; «Con aprobación» en algo que un responsable no puede aprobar con su PIN, «Eso
+no se puede aprobar con un PIN: elige permitido o no.». El nombre, como al crearlo.
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127
+
+### BASE-F129 Borrar un rol propio
+Estado: parcial — se borra pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide al asistente «borra el rol Cajero».
+  2. La tarjeta dice el rol y, bajo «Lo que va a pasar», cuántas personas lo tienen, y pide escribir CONFIRMAR
+     (BASE-F98). Al aceptarla, el rol desaparece de **Empleados › Roles**.
+  3. Quien salió del negocio con ese rol, si vuelve, entra con el de su invitación.
+Entra: el rol.
+Sale: el rol borrado. Evento `base.role.deleted`.
+Si falla: si alguien del negocio lo tiene, no se borra: «2 personas tienen este rol. Dales otro antes de borrarlo.». Un
+rol básico no se borra: «Este rol es de erplora.com. Duplícalo y cambia la copia.».
+Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127
 
 ### BASE-F84 Aprobar con el PIN de un responsable
 Estado: hecho
@@ -4628,8 +4691,18 @@ Implicados: BASE-F97, BASE-F100
 - Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
-  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail}` (rutas `/api/people…`,
-  `/api/roles`, `/api/roles/detail`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
+  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail,create,update,delete}`
+  (rutas `/api/people…`, `/api/roles`, `/api/roles/{detail,update,delete}`). El PIN y la placa son los de Acceso
+  (`Credential`): mismo hash, mismos frenos.
+- Roles propios (`base.models.roles.BusinessRole`, en la BD del negocio): `base/roles.py` dice sin ORM lo que permite
+  uno hoy y lo que queda por revisar; `base.permissions.permissions_of_business_role` es el único cálculo, el mismo de
+  quien lo tiene (`access_for`), y con él `base/services/roles.py` mide la escalada: solo lo que pasa a «Permitido» y
+  antes no lo estaba, en todas las apps de este despliegue, también las apagadas (una app que se encienda da lo de su
+  rol de origen). Guardar `states` escribe lo que llega; si llega algo de una app que el rol no había guardado, se
+  escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
+  despierta todas las consultas vivas del negocio tras el COMMIT (`_wake_open_apps`). El nombre es único sin contar
+  mayúsculas (`base_businessrole_name_unique`), como en Shopify POS, Lightspeed, Odoo, NetSuite, Business Central y
+  WordPress; y solo quien está en el negocio impide borrarlo, como en Square y Lightspeed.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
@@ -4945,8 +5018,11 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.person.detail` | F78, F79 |
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
-| `base.role.list` | F82, F83 |
-| `base.role.detail` | F82 |
+| `base.role.list` | F82, F83, F127, F129 |
+| `base.role.detail` | F82, F97, F128, F129 |
+| `base.role.create` | F127 |
+| `base.role.update` | F128 |
+| `base.role.delete` | F129 |
 | `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |
 | `base.approval.list`, `base.approval.export` | F85 |
 | `base.api_key.create` | F86 |
@@ -5015,9 +5091,9 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
-- No deja que el negocio cree, ajuste ni encienda o apague roles: tiene los roles básicos de erplora.com, que se dan
-  al invitar; cada app aporta lo que da a cada rol básico en ella y puede traer un rol básico propio cuando su
-  funcionalidad lo pida, y «Qué permite» lo enseña sin dejar cambiarlo (BASE-F82).
+- No cambia, borra ni apaga un rol básico: son los de erplora.com, que se dan al invitar; cada app aporta lo que da a
+  cada uno en ella y puede traer uno propio cuando su funcionalidad lo pida. Lo que un negocio quiere distinto lo hace
+  en un rol propio, a partir de otro (BASE-F127); ninguno da ser el propietario.
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

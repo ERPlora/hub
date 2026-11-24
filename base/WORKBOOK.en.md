@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0369462643bbf3cf188e62927926df0a8344d74edce20ff96982667cf8a22748 -->
+<!-- generated from WORKBOOK.md sha256:667387732386f109ac07a363c532361d05a2831cbed527d7b4e5d8f9d1df3b8a -->
 
 ## What it is for and who it is for
 
@@ -243,11 +243,11 @@ only for whoever runs the business, "API keys" and "Approvals"; each one in the 
 Employees.
 
 ### Employees · Roles
-The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
-give. Tapping one opens "What it allows".
+The five roles of erplora.com and, below them, the business's own, with where they come from, how many people have
+them and how many permissions they give. Tapping one opens "What it allows".
 
 ### Employees · Roles · What it allows
-A basic role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
+A role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
 and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
@@ -460,6 +460,9 @@ On the Employees screens and the API documentation:
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
 | BASE-F126 | Turn ERPlora's support access on or off | partial |
+| BASE-F127 | Make a role of your own from another | partial |
+| BASE-F128 | Adjust what a role of your own allows | partial |
+| BASE-F129 | Delete a role of your own | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2269,7 +2272,8 @@ Steps:
   2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
      available", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
      each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
-     features call for it.
+     features call for it. Below them, by their name, the business's own roles (BASE-F127), with "Custom": whoever
+     has one counts in it and not in the one of their invitation, save the owner, who is always the owner.
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
@@ -2280,13 +2284,15 @@ Steps:
      In each panel, the phrase of each permission and its state: "Allowed", "With approval" (the person does it if a
      manager approves it with their PIN there and then, BASE-F84) or "No". For example, the employee sees in "Sales
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
-     changed here.
+     changed here. A role of the business's own says "What this role lets a person do in this business, app by app."
+     and shows what the business saved; what no role of the business can give, owning the business, does not show.
   5. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles, the people of the business, the apps that are on and what each app gives each role.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
-allows." with "Retry", and a role that is not one of the five, "This role does not exist in this business.".
-Involved: BASE-F83, BASE-F84
+allows." with "Retry", and a role that is not one of the five nor one of the business's own, "This role does not exist
+in this business.".
+Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128
 
 ### BASE-F83 Give a person a role
 Status: done
@@ -2303,6 +2309,63 @@ In: the role chosen on erplora.com.
 Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
+
+### BASE-F127 Make a role of your own from another
+Status: partial — it is made by asking the assistant or through the Hub's API; its screen and giving it to a person are missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant for a role from another, with its name: "create the role Cashier from Employee". It can come
+     from a basic one or from one of your own, and carry a description.
+  2. The card says "Based on: Employee" and "Name: Cashier" (BASE-F97). Once accepted, the role is made with the same
+     the other one allows, app by app, save owning the business, which no role of your own gives.
+  3. It shows at once in **Employees › Roles**, with "Custom" and nobody in it. What it allows is seen by tapping it
+     (BASE-F82) and changed with BASE-F128. From then on it does not change with the role it came from.
+In: the role it comes from, the name (up to 80 letters) and, if wanted, the description.
+Out: the business's own role. Event `base.role.created`. It never leaves the business: erplora.com does not know it.
+If it fails: without a name, "Give the role a name."; with the name of another role of your own, capitals aside, "There
+is already a role with that name. Choose another."; a role that is not there, "This role does not exist in this
+business.". Nobody gives what they do not have: if the role it comes from allows something whoever makes it may not do,
+"A role may not allow more than you may do yourself." and it is not made. The assistant does not offer it to who does
+not manage roles, and the API answers 403.
+Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129
+
+### BASE-F128 Adjust what a role of your own allows
+Status: partial — it is adjusted by asking the assistant or through the Hub's API; its screen is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant for the change: "the Cashier role can't void sales", "call the Cashier role Evening till".
+  2. The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
+     "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM
+     (BASE-F98).
+  3. Once accepted, only what was asked for changes. If somebody has the role, what they see and what they may do change
+     at once on their devices, without ending their session (BASE-F13).
+  4. An app turned on after the role was saved gives what it gives the basic role it came from; a permission an app adds
+     later comes in as "No". In both cases the role is left to review until it is saved with them.
+In: the role and what changes: the name, the description or the state of each permission.
+Out: the role changed. Event `base.role.updated`.
+If it fails: a basic role is not changed: "This is one of erplora.com's roles. Duplicate it and change the copy.".
+Nobody gives what they do not have: "A role may not allow more than you may do yourself."; and owning the business is
+given to nobody: "That is only the owner's of the business: no role gives it.". A permission that is not of an app that
+is on, "That permission is not of any app that is on in this business."; "With approval" for something a manager cannot
+approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it.
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127
+
+### BASE-F129 Delete a role of your own
+Status: partial — it is deleted by asking the assistant or through the Hub's API; its screen is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant "delete the Cashier role".
+  2. The card says the role and, under "What will happen", how many people have it, and asks to type CONFIRM (BASE-F98).
+     Once accepted, the role disappears from **Employees › Roles**.
+  3. Whoever left the business with that role, if they come back, enters with the one of their invitation.
+In: the role.
+Out: the role deleted. Event `base.role.deleted`.
+If it fails: if somebody of the business has it, it is not deleted: "2 people have this role. Give them another before
+deleting it.". A basic role is not deleted: "This is one of erplora.com's roles. Duplicate it and change the copy.".
+Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127
 
 ### BASE-F84 Approve with a manager's PIN
 Status: done

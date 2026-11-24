@@ -1,9 +1,7 @@
-"""The business's people and roles (``base.person.*``, ``base.role.list``, ``base.hub_user.get``) and how a person is
-named in this hub."""
+"""The business's people (``base.person.*``, ``base.hub_user.get``) and how a person is named in this hub."""
 
 from typing import Any
 
-from django.utils import translation
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound
@@ -13,14 +11,14 @@ from base import access, people as people_rules
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
-from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_of_role
-from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
+from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
 from .usage import _is_count
 
 
-# ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
+# ── People and permissions: people ──────────────────────────────────────────────────────────────────────────────────
 
 
 def people_of(slug: str) -> list[dict[str, Any]]:
@@ -219,41 +217,6 @@ def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
 def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     """A person's page, for who runs the business."""
     return person_detail_out(ctx, person_of(ctx, data.person))
-
-
-@operation(
-    "base.role.list",
-    kind="query",
-    permission=VIEW_HOME,
-    input=RoleListIn,
-    output=RoleListOut,
-    ai=AI(
-        description=(
-            "Lists the roles of this business (owner, admin, manager, employee): how many people have each one and how "
-            "many permissions of the apps it gives. Roles are given on erplora.com."
-        ),
-        asks={
-            "en": ("how many managers do we have?", "what can a manager do here?"),
-            "es": ("¿qué roles hay en el negocio?", "¿cuántos encargados tenemos?"),
-        },
-    ),
-)
-def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
-    """Employees › Roles: erplora.com's, from the top, with their people and permissions."""
-    found = people_of(ctx.scope.key)
-    with translation.override(ctx.language):
-        return {
-            "roles": [
-                {
-                    "key": role.value,
-                    "label": str(role.label),
-                    "origin": "basic",
-                    "members": sum(1 for person in found if person["role"] == role),
-                    "permissions": len(permissions_of_role(role.value)),
-                }
-                for role in people_rules.ROLE_ORDER
-            ]
-        }
 
 
 def person_label(user) -> str:

@@ -2489,6 +2489,9 @@ msgstr "Borrar archivos"
 msgid "Open this business on erplora.com"
 msgstr "Abrir este negocio en erplora.com"
 
+msgid "Manage roles"
+msgstr "Gestionar roles"
+
 msgid "View costs"
 msgstr "Ver costes"
 
@@ -2512,6 +2515,78 @@ msgstr "Datos sensibles"
 
 msgid "This role does not exist in this business."
 msgstr "Este rol no existe en este negocio."
+
+#: schemas/roles.py
+msgid "Name"
+msgstr "Nombre"
+
+#: schemas/roles.py
+msgid "Description"
+msgstr "Descripción"
+
+#: schemas/roles.py
+msgid "Role"
+msgstr "Rol"
+
+#: schemas/roles.py
+msgid "Based on"
+msgstr "A partir de"
+
+#: schemas/roles.py
+msgid "What it allows"
+msgstr "Qué permite"
+
+#: schemas/roles.py
+msgid "People with this role"
+msgstr "Personas con este rol"
+
+#: services/roles.py
+msgid "Allowed"
+msgstr "Permitido"
+
+#: services/roles.py
+msgid "With approval"
+msgstr "Con aprobación"
+
+#: services/roles.py
+msgid "No"
+msgstr "No"
+
+#: services/roles.py
+msgid "Give the role a name."
+msgstr "Ponle nombre al rol."
+
+#: services/roles.py
+msgid "There is already a role with that name. Choose another."
+msgstr "Ya hay un rol con ese nombre. Elige otro."
+
+#: services/roles.py
+msgid "This is one of erplora.com's roles. Duplicate it and change the copy."
+msgstr "Este rol es de erplora.com. Duplícalo y cambia la copia."
+
+#: services/roles.py
+msgid "A role may not allow more than you may do yourself."
+msgstr "Un rol no puede permitir más de lo que puedes hacer tú."
+
+#: services/roles.py
+msgid "That is only the owner's of the business: no role gives it."
+msgstr "Eso es solo del propietario del negocio: ningún rol lo da."
+
+#: services/roles.py
+msgid "That permission is not of any app that is on in this business."
+msgstr "Ese permiso no es de ninguna app encendida de este negocio."
+
+#: services/roles.py
+msgid "That cannot be approved with a PIN: choose allowed or no."
+msgstr "Eso no se puede aprobar con un PIN: elige permitido o no."
+
+#: services/roles.py
+#, python-format
+msgid "%(n)s person has this role. Give them another before deleting it."
+msgid_plural "%(n)s people have this role. Give them another before deleting it."
+msgstr[0] "%(n)s persona tiene este rol. Dale otro antes de borrarlo."
+msgstr[1] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
+msgstr[2] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
 
 msgid "Last used"
 msgstr "Último uso"
