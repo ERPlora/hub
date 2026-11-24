@@ -8,7 +8,6 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
-    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -21,6 +20,8 @@ from live.operations import INTERNAL, registry
 from apps.invoice import events as E
 from base import home
 from base.queries import app_help
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "invoice.view_invoice",
@@ -338,8 +339,23 @@ def test_the_app_brings_no_panels_nor_counters_to_the_home():
     assert (list(invoice().widgets), list(invoice().bell)) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert invoice().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert invoice().help.videos == {"es": "vPFvdGPA6uw", "en": "QeiQzDdtJng"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("INVOICE-F03",), "nORuR2xG4qs", "TvR3mQZTxlo"),
+    (("INVOICE-F05",), "KtnQOADy0w4", "5wsz2czzqbs"),
+    (("INVOICE-F17", "INVOICE-F18"), "Yc8UiKuP1s8", "73SPPT0_dSY"),
+    (("INVOICE-F08",), "bUVP4k5SZs8", "b8EAicT5vjo"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("invoice", language) == help_videos.by_task(TASK_VIDEOS, language)
 
 
 @pytest.mark.parametrize("language", ["es", "en"])
