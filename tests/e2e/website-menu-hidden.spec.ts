@@ -5,7 +5,7 @@
 // specs expect `/` of `a` to jump to the login.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, shown } from './helpers';
+import { A, api, capture } from './helpers';
 import {
   createProduct,
   dialog,
@@ -16,7 +16,7 @@ import {
   searchProducts,
   stamp,
 } from './inventory-helpers';
-import { rowAction } from './service-helpers';
+import { PAINTED, rowAction, rowActionIcon } from './service-helpers';
 import { atRest, menuSpecDone, ownerOfTheSite, PUBLIC_SIZES, publishWithMenuOf, type Site, WIDE } from './website-helpers';
 
 const KEY = 'WEBSITE-MENU-HIDDEN';
@@ -55,7 +55,8 @@ test(`${KEY}: a dish hidden from the website in Products is not on the public me
   await expect(productRow(page, staffMeal.sku)).toBeVisible();
   for (const size of PUBLIC_SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
-    await shown(page).getByTestId(`inventory-products-row-${staffMeal.id}-menu`).first().click();
+    // The action lives in «⋮» alone: the first read opens it and the next ones read its entry there.
+    await expect.poll(() => rowActionIcon(page, 'inventory-products', staffMeal.id, 'hide_from_website', 'globe-outline')).toEqual(PAINTED);
     const hide = page.locator(`ion-popover [data-testid=inventory-products-row-${staffMeal.id}-hide_from_website]`);
     await expect(hide).toBeVisible();
     await capture(page, `${KEY}-ROW-MENU-${size.name}`);

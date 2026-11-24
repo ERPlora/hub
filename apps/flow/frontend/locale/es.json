@@ -2634,6 +2634,7 @@
       "previous_staff_id": "Profesional anterior",
       "on_behalf_of": "En nombre del cliente",
       "is_sold_out": "Agotado",
+      "show_on_website": "Mostrar en la página web",
       "sold_out": "Agotado",
       "include_sold_out": "Incluir agotados",
       "reference_label": "Referencia, en texto",
