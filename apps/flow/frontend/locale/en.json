@@ -1170,6 +1170,7 @@
       "reservation__waitlist__get": "Read somebody on the waiting list",
       "sale__business_day__get": "Read the business day",
       "sale__checkout__preview": "Work out a check's total",
+      "sale__checkout__steps": "Read the steps other apps add to a charge",
       "sale__department__create": "Create a sales section",
       "sale__department__delete": "Delete a sales section",
       "sale__department__list": "Look for sales sections",

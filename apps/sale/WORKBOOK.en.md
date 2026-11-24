@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:340f9def7c7208907f56ab4d8931327e2d50746c9313267b6baa40a132e1e51d -->
+<!-- generated from WORKBOOK.md sha256:12fab51748c484a44054381f8e3a414d3e8c8de05faa512f271cdad40bb9ec26 -->
 
 ## What it is for and who it is for
 
@@ -1427,7 +1427,8 @@ charged notice carries it apart; the **Sales** figures (SALE-F28) do not add it.
 (TIP-F02).
 If it fails: with no app turned on that adds a step to the charge of whoever charges, a charge that brings an added
 amount (through the API or the assistant) does not charge: "This business has no app that adds anything to a charge, such as a tip:
-charge the sale alone.". If the step's app is turned off with the sheet open, the row goes away and it charges without
+charge the sale alone."; if the app is turned on but whoever charges has no permission for its step, "You have no
+permission to add anything to a charge, such as a tip: charge the sale alone.". If the step's app is turned off with the sheet open, the row goes away and it charges without
 it.
 If the sale is charged and the step cannot save its own, the sale stays charged and the sheet says the step's
 notice with "Retry" (TIP-F02); the retry uses the same attempt key and never charges twice (SALE-F06), and that

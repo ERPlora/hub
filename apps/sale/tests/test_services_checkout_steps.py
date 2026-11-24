@@ -4,6 +4,7 @@ never hold money nobody accounts for. The reference app stands for one that decl
 
 import pytest
 from django.apps import apps
+from django.utils import translation
 from live.context import system_context
 from live.errors import Conflict
 from live.meta import CheckoutStep
@@ -71,3 +72,19 @@ def test_each_business_takes_what_is_added_only_with_a_step_of_its_own_apps(stea
         assert not Sale.objects.exists()
     complete(tipped("card", 700))
     assert [(leg.amount, leg.extra) for leg in SalePayment.objects.all()] == [(1800, 700)]
+
+
+def test_the_refusal_says_whether_the_business_has_no_step_or_its_person_may_not_use_it(steak, monkeypatch):
+    with pytest.raises(Conflict) as no_step:
+        complete(tipped("card", 200))
+    assert no_step.value.message.startswith("This business has no app that adds anything to a charge")
+
+    step = CheckoutStep(key="tip", component="TipStep", permission="demo.manage")
+    monkeypatch.setattr(apps.get_app_config("demo"), "checkout", [step])
+    with pytest.raises(Conflict) as not_theirs:
+        complete(*SPLIT, ctx=ctx_for("hub_employee"))
+    assert not_theirs.value.code == REFUSED
+    assert not_theirs.value.message.startswith("You have no permission to add anything to a charge")
+    with translation.override("es"), pytest.raises(Conflict) as in_spanish:
+        complete(*SPLIT, ctx=ctx_for("hub_employee", language="es"))
+    assert in_spanish.value.message.startswith("No tienes permiso para añadir nada al cobro")

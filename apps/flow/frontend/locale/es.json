@@ -1170,6 +1170,7 @@
       "reservation__waitlist__get": "Leer a alguien de la lista de espera",
       "sale__business_day__get": "Leer el día de negocio",
       "sale__checkout__preview": "Calcular el total de una cuenta",
+      "sale__checkout__steps": "Leer los pasos que otras apps añaden al cobro",
       "sale__department__create": "Crear una sección de ventas",
       "sale__department__delete": "Borrar una sección de ventas",
       "sale__department__list": "Buscar secciones de ventas",

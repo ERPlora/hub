@@ -17,7 +17,7 @@ from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, 
 from apps.sale import pricing
 from apps.sale.models import OrderLine, PaymentMethod, Settings
 from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, business_country, money_text
-from apps.sale.queries.checkout_steps import steps_at_the_charge
+from apps.sale.queries.checkout_steps import declared_steps, steps_at_the_charge
 from apps.sale.queries.line_parts import ratio_of
 from apps.sale.queries.other_apps import call_app
 from apps.sale.queries.payment_methods import METHOD_NOT_AVAILABLE, allowed_types, find_method, held_methods
@@ -41,6 +41,9 @@ CASH_REGISTER_CLOSED = _(
 )
 ADDED_AMOUNT_NOT_ACCEPTED = _(
     "This business has no app that adds anything to a charge, such as a tip: charge the sale alone."
+)
+ADDED_AMOUNT_NOT_ALLOWED = _(
+    "You have no permission to add anything to a charge, such as a tip: charge the sale alone."
 )
 
 
@@ -163,9 +166,11 @@ def _legs(ctx: OperationContext, data: CompleteIn, total: int, settings: Setting
 def _refuse_added_amounts(ctx: OperationContext, payments: list[PaymentIn]) -> None:
     """An amount added to a tender is only taken when an app on adds a step to the charge of this person, which
     records it in its own app too (SALE-F39): otherwise the drawer, the card total and the receipt would hold money
-    nobody accounts for."""
-    if any(leg.extra for leg in payments) and not steps_at_the_charge(ctx):
-        raise Conflict(str(ADDED_AMOUNT_NOT_ACCEPTED), code="sale.added_amount_not_accepted")
+    nobody accounts for. The refusal says whether the business has no such step or this person may not use it."""
+    if not any(leg.extra for leg in payments) or steps_at_the_charge(ctx):
+        return
+    reason = ADDED_AMOUNT_NOT_ALLOWED if declared_steps(ctx.scope) else ADDED_AMOUNT_NOT_ACCEPTED
+    raise Conflict(str(reason), code="sale.added_amount_not_accepted")
 
 
 def _resolved(sent: list[PaymentIn], settings: Settings) -> list[dict]:
