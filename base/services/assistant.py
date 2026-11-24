@@ -5,6 +5,7 @@ import base64
 import contextlib
 import dataclasses
 import json
+from collections.abc import Iterator
 
 from django.conf import settings
 from django.utils import timezone, translation
@@ -17,7 +18,7 @@ from live.operations import operation
 from pydantic import ValidationError
 
 from base import approvals as approval_rules
-from base import assistant, queries
+from base import activation, assistant, queries
 from base.models import Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.assistant import (
@@ -285,10 +286,10 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
     rounds = shared.rounds(messages)
     last = rounds >= shared.MAX_ROUNDS
-    offered = [] if last else assistant.relevance.relevant(
-        tools, _assistant_asked(still_open), ctx.language, searched=_assistant_searched(still_open)
-    )
-    text = _assistant_instructions(ctx, business, offered, setup=data.setup, last=last)
+    with _assistant_switched(ctx, executed) as switched:
+        tools = assistant.tools.catalog(ctx) if switched else tools
+        offered, off = _assistant_offer(ctx, tools, still_open, last=last)
+        text = _assistant_instructions(ctx, business, offered, setup=data.setup, off=off)
     stop = "assistant.too_many_steps" if rounds > shared.MAX_ROUNDS + 1 else ""
     return {
         # A file for a tool goes to the gateway by its name alone: the model never reads it.
@@ -314,10 +315,34 @@ def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
     return [{"role": "tool", "tool_call_id": call.call_id, "content": told} for call in pending]
 
 
-def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:
+@contextlib.contextmanager
+def _assistant_switched(ctx: OperationContext, executed: list[dict]) -> Iterator[bool]:
+    """Whether a write of this turn turned an app on or off (``assistant.apps_not_on.SWITCHES``): then the round that
+    follows reads the apps on from their rows, not committed yet, where the cache still keeps what was before
+    (``activation.changing``), so an app just turned on brings its tools to what was asked."""
+    if not any(ran["name"] in assistant.apps_not_on.SWITCHES and ran["outcome"] == "ok" for ran in executed):
+        yield False
+        return
+    with activation.changing(ctx.scope.key):
+        yield True
+
+
+def _assistant_offer(ctx: OperationContext, tools: dict, still_open: list[dict], *, last: bool) -> tuple[list, list]:
+    """What the round offers: the tools of what was asked in the request still open, by relevance, with the switch for
+    the apps not on whose tools would do it, and those apps (``assistant.apps_not_on``); nothing on the last round."""
+    if last:
+        return [], []
+    words, searched = _assistant_asked(still_open), _assistant_searched(still_open)
+    off = assistant.apps_not_on.named(ctx, words, searched)
+    offered = assistant.relevance.relevant(tools, words, ctx.language, searched=searched)
+    return assistant.apps_not_on.with_switch(offered, tools, off), off
+
+
+def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, off: list) -> str:
     """The model's instructions for this round, with what it knows of the business (``assistant.business_facts``):
-    to search before it says something cannot be done when the round offers the search (``prompt.SEARCH_FIRST``), with
-    the checklist, read again, in ``setup``, and with ``LAST_ROUND`` on the last round of the request."""
+    to search before it says something cannot be done when the round offers the search (``prompt.SEARCH_FIRST``), the
+    apps not on whose tools would do what was asked (``off``), the checklist, read again, in ``setup``, and
+    ``LAST_ROUND`` on the last round of the request, the one that offers no tool."""
     apps = assistant.tools.active_apps(ctx.scope)
     text = assistant.prompt.instructions(
         language=ctx.language,
@@ -332,9 +357,11 @@ def _assistant_instructions(ctx: OperationContext, business: dict, offered: list
     if any(op.name == assistant.relevance.FIND_TOOLS for op in offered):
         text += "\n" + assistant.prompt.SEARCH_FIRST
     text += "\n\n" + assistant.business_facts.block(ctx, business, apps, now=timezone.now())
+    if off:
+        text += "\n\n" + assistant.apps_not_on.said(ctx, off)
     if setup:
         text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
-    if last:
+    if not offered:
         text += "\n\n" + LAST_ROUND
     return text
 

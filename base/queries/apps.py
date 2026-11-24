@@ -214,6 +214,7 @@ def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
         return {
             "id": config.label,
             "name": str(config.verbose_name),
+            "summary": str(config.summary),
             "state": state,
             "mandatory": home.mandatory_in(config, hub.country if hub else ""),
         }
