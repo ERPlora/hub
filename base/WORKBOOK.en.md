@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:34a1b212bb22c2927f8ad75b457c0837ed195b9babfffb7941874201078244b5 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:293a7969e5b1 -->
 
 The Home is the first thing anyone in the business sees on coming in. At a glance:
 
@@ -32,6 +31,7 @@ Who uses it:
   why invoicing is not possible, but without a button.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:77b62328977f -->
 
 The Home has this structure: greeting and date, app launcher, setup list with a progress bar, board of panels and the "Summary" and "Activity"
 tabs. It follows what the market does: the "Setup guide" list of Shopify and Square (steps with their
@@ -43,6 +43,7 @@ System's
 against what the plan includes and, like Google Workspace, the yellow notice at 80 % and the red one when full.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:8572c671b188 -->
 
 - You come in with your ERPlora account; the Hub has no sign-in of its own. On a shared till, after that, each
   person enters with their PIN or their badge.
@@ -53,8 +54,10 @@ against what the plan includes and, like Google Workspace, the yellow notice at 
   the Home only in development, in the tests and in a demo business: never in a customer's.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Home · Summary
+<!-- from WORKBOOK.md sha256:4d554b656fdc -->
 On top, the business's name and "Today" with the long date; while the business has no name, a greeting
 by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this order:
 
@@ -71,11 +74,13 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
 - **The board of panels**, with "Customize panel" (⋮) at the top right.
 
 ### Home · Activity
+<!-- from WORKBOOK.md sha256:c518a2841f2f -->
 The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" and "Status", with
 "Search activity…", the filters funnel (method and status), the order, the cards view and "Columns". It
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
+<!-- from WORKBOOK.md sha256:da35e3c96625 -->
 At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
 "Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
 until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
@@ -100,6 +105,7 @@ print… No notice is dismissed: it goes by itself once it is solved.
   it goes.
 
 ### The side menu
+<!-- from WORKBOOK.md sha256:28a6376e1cd8 -->
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
 "Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever holds the
 permission its screen opens with, as in Square or Toast: "System", to whoever runs the business; "API", besides, while
@@ -109,12 +115,14 @@ address, says "No access" (BASE-F118). At the bottom, the QR code, "Upgrade plan
 only) and "Manage on erplora.com".
 
 ### "Upgrade plan"
+<!-- from WORKBOOK.md sha256:ead81da17fe8 -->
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
 erplora.com, in a new tab and already signed in with their account, without typing the password again. Only the
 owner sees it, the only one who changes the plan on erplora.com, and only in the browser: the installed app does not
 have it.
 
 ### "Manage on erplora.com"
+<!-- from WORKBOOK.md sha256:33b47443add4 -->
 At the foot of the side menu, right below "Upgrade plan" (if there is one), with the external link icon; with the menu folded to its
 icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
 erplora.com's panel, already signed in with their account: in a new tab in the browser and, in the installed app, in
@@ -123,6 +131,7 @@ the administrator and the manager have it, and only if they came in with their a
 with a PIN or with the badge. It does not sell, so the installed app has it too, except the Google Play one.
 
 ### The user menu
+<!-- from WORKBOOK.md sha256:9800cf1641ae -->
 It opens by tapping the person, at the top of the side menu. First "Profile" and, on a shared till of a business
 that asks for a PIN, "Switch user"; then, only if they entered with the account (never in a PIN session), "My
 account", which opens that page on erplora.com (in a new tab; in the installed app, in the device's browser), and
@@ -130,6 +139,7 @@ account", which opens that page on erplora.com (in a new tab; in the installed a
 or the system's) and "Sign out". Both also show in the installed app: neither sells anything.
 
 ### The "You cannot issue invoices yet" notice
+<!-- from WORKBOOK.md sha256:506c454662c8 -->
 While a step that stops invoicing is missing, the bell carries the urgent notice "You cannot issue invoices yet", on
 any screen (the Home too) and taking room on none: "No ticket or invoice can be issued until this is set up: Your
 business details.", with "Set up your business details" and, if another step is missing, a second button with its
@@ -137,6 +147,7 @@ own ("Set up VeriFactu"). To whoever cannot set it up it says, with no buttons, 
 up.". It goes by itself as soon as the step is done, on any device.
 
 ### Apps
+<!-- from WORKBOOK.md sha256:7251980958b0 -->
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
 apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business has
 turned on (those in "My apps", also the ones born on, like Taxes, and the ones that came along with another) and how
@@ -149,16 +160,19 @@ when it applies, the notice of the plan's limit or the one saying why an app was
 "Paid" and "Price" only show if some app is subscribed to separately; today none is: every app comes with every plan.
 
 ### The screen of an app that does not open
+<!-- from WORKBOOK.md sha256:8097e7649eb4 -->
 In the same address as the app's screen, the reason: "Subscription needed" or "This app is not available in
 this business", with "Go to Apps" (and "Upgrade plan" for the owner, in the
 browser).
 
 ### No access
+<!-- from WORKBOOK.md sha256:7a4d947bc180 -->
 In the same address as a screen the person's role does not open, a padlock with "You do not have access to this
 screen" — "Your role in this business does not open it.", the names of who can give them access, each with their
 avatar, and "Go to Home".
 
 ### Settings · Business
+<!-- from WORKBOOK.md sha256:1a0de23672c9 -->
 The second of the tabs at the bottom of "Settings" ("General", "Business", "Printing" and "Data and backups").
 The "Your business" card shows, with no fields to fill in, "Business name", "Country", "Time
 zone" (with the time it is there), "Currency" and "Business language", each with a line that says what it is
@@ -166,9 +180,11 @@ for. Below, where they are changed and, for the owner and the administrator, "Ch
 down, "Fiscal data", which opens Invoicing's issuer.
 
 ### Settings · Printing
+<!-- from WORKBOOK.md sha256:35026ff0c1c7 -->
 The "Printing" tab: a single row, "Printers and ticket", which opens the Printing app.
 
 ### Settings · Data and backups
+<!-- from WORKBOOK.md sha256:770c39732050 -->
 The "Data and backups" tab of "Settings", the last one, after "General", "Business" and "Printing". On top, a
 selector with "Import" (what opens), "Export" and "Reset";
 the one chosen stays in the link, so it can be shared and Back leaves Settings.
@@ -182,48 +198,59 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
   each section has, and "Copies of the data", with the copies kept and their "Download".
 
 ### System · Usage and plan
+<!-- from WORKBOOK.md sha256:fe93f034b679 -->
 From "System" in the side menu, which only whoever runs the business has. Four tabs at the bottom: "Usage and plan",
 "Updates", "Failed events" and "Logs"; "Usage and plan" opens: their plan with "Upgrade plan" (for the owner), a line that says whether
 it is enough or they have to upgrade and why, "What your plan includes", from the fullest down, with its bar, and "For
 your information", with the figures no plan limits.
 
 ### System · Updates
+<!-- from WORKBOOK.md sha256:b89fb9d2bf20 -->
 "What we have updated": the version running, when it was published and that the hub updates itself.
 
 ### System · Failed events
+<!-- from WORKBOOK.md sha256:e905914173b2 -->
 One card per notice between apps that ran out of retries, with "Resend" and "Discard"; on top, "Resend all".
 
 ### System · Logs
+<!-- from WORKBOOK.md sha256:37864d197fa7 -->
 "Event log": the "Time", "Level" and "Event" table (on a phone, one card per event), with "Search event…" and the
 level filter.
 
 ### Access
+<!-- from WORKBOOK.md sha256:bb130961b87e -->
 The way in of a shared till, or of a device whose session another entry closed, with no menu or bar: the logo,
 "Enter your business", the notice of what happened if there is one and a card with two tabs, "PIN" (the faces,
 the keypad and the badge) and "Account" ("Enter with your account", which leads to erplora.com). In the footer,
 "ERPlora · trusted device"; at the top right, the switch between light and dark.
 
 ### Create your PIN
+<!-- from WORKBOOK.md sha256:22fcccd522da -->
 After entering with the account on a till: the keypad of circles to choose the PIN and repeat it, and "Not now".
 
 ### Switch user
+<!-- from WORKBOOK.md sha256:79f247886a70 -->
 Over the screen in use, with no menu: "The sale stays open. From now on it is in the name of whoever enters
 here.", "Who is taking over?" with the faces, the keypad and "Cancel".
 
 ### My profile
+<!-- from WORKBOOK.md sha256:b91362c5379d -->
 From "Profile" in the user menu. At the top, the person (face, name and role); below, "Account details" (with the
 photo), "Preferences" (language and appearance: palette, theme and interface size from 80 to 120%, default 100%) and
 "PIN".
 
 ### Settings · General
+<!-- from WORKBOOK.md sha256:a6d9e7ca4e48 -->
 What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device" (in the
 ERPlora app on a computer, also "Start on login"), "PIN pad", for whoever runs the business "Devices" and, at the
 end, "API documentation".
 
 ### Your business is being prepared
+<!-- from WORKBOOK.md sha256:d89dba046a9c -->
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
 ### Files
+<!-- from WORKBOOK.md sha256:26d174fa1ff9 -->
 From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
 which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
 "Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
@@ -236,6 +263,7 @@ the name, in grey. Tapping a file opens it in the viewer, with
 its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
 
 ### Employees · Staff
+<!-- from WORKBOOK.md sha256:976a92f8783f -->
 What "Employees" in the side menu opens: the first tab at the bottom, "Staff", with the plan's places, "Invite on
 erplora.com" for whoever runs the business (in the installed app, in the device's browser; the Google Play copy does not have it), "People are invited, given a role and removed on erplora.com, in
 “Members” of the business." and the table of people (on a phone, a card per person). The other tabs: "Roles" and,
@@ -243,32 +271,40 @@ only for whoever runs the business, "API keys" and "Approvals"; each one in the 
 Employees.
 
 ### Employees · Roles
+<!-- from WORKBOOK.md sha256:75bff4edda7b -->
 The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
 give. Tapping one opens "What it allows".
 
 ### Employees · Roles · What it allows
+<!-- from WORKBOOK.md sha256:a821154de0ac -->
 A basic role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
 and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
+<!-- from WORKBOOK.md sha256:c4cd502dadae -->
 The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
 "API documentation".
 
 ### Employees · Approvals
+<!-- from WORKBOOK.md sha256:5b086a34c109 -->
 The record of what was approved with a manager's PIN, read only.
 
 ### A person's page
+<!-- from WORKBOOK.md sha256:b88b0da10ded -->
 From a row of **Employees › Staff**, for whoever runs the business, with the back button: "Their details" (with
 "Open on erplora.com"), "PIN" and "Badge".
 
 ### An approval is needed
+<!-- from WORKBOOK.md sha256:df4d17e11e2b -->
 Over the screen where the action was tried: what is approved, "Who approves it?" with the faces and the PIN pad
 (whole and without scrolling on a phone, a tablet and a desk), and "Cancel".
 
 ### API documentation
+<!-- from WORKBOOK.md sha256:a1d061a673e3 -->
 With the back button: how the API is called, "Download the OpenAPI file" and a section per app with its calls.
 
 ### Assistant
+<!-- from WORKBOOK.md sha256:e9ef01811fd3 -->
 The panel the "Assistant" sparkles of the top bar open (on a phone, inside "⋮", beside "My apps"), on the right. On a tablet
 or a computer it stays beside the screen and pushes it, so they keep working with it open; on a phone it covers it,
 over a dark veil. At the top, "Assistant", "New conversation" once there is one and the "Close" ×. In the middle, the
@@ -278,11 +314,13 @@ connection, the messages left this month, a plan without the assistant) and the 
 file", "Dictate by voice" and "Send".
 
 ### Assistant confirmation card
+<!-- from WORKBOOK.md sha256:38e32d8b2db8 -->
 It shows over everything, also with the panel closed, when the assistant wants to change something: "Run this
 action?", what it will do, in which app and with which data, and "Run it" and "Cancel" ("Cancel all" when more wait
 behind it). In a dangerous action, each datum on its own line and a box to type what it asks before "Run it".
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:293e79bed433 -->
 
 | State | What the person sees |
 |---|---|
@@ -337,6 +375,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
+<!-- from WORKBOOK.md sha256:84611fd0ea52 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -461,6 +500,7 @@ On the Employees screens and the API documentation:
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
 
 ### BASE-F01 See what the business still has to set up
+<!-- from WORKBOOK.md sha256:b63e81f97d68 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary, The "You cannot issue invoices yet" notice
@@ -498,6 +538,7 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
+<!-- from WORKBOOK.md sha256:f492b0bb2912 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
@@ -530,6 +571,7 @@ whole row cannot be read: "We couldn't check how your business is working." with
 Involved: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
+<!-- from WORKBOOK.md sha256:54ce0c62eceb -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Home · Summary
@@ -546,6 +588,7 @@ leads to "not found" is worse than none).
 Involved: BASE-F38
 
 ### BASE-F04 See which steps of the list an administrator has to set up
+<!-- from WORKBOOK.md sha256:57e6efc7c08c -->
 Status: done
 Actor: manager, employee
 Screen: Home · Summary, The "You cannot issue invoices yet" notice
@@ -560,6 +603,7 @@ If it fails: if that step cannot be checked, it does not show.
 Involved: none
 
 ### BASE-F05 Open an app from "My apps"
+<!-- from WORKBOOK.md sha256:f14ceaafe8af -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary · the top bar of any screen
@@ -604,6 +648,7 @@ the server does not answer (offline or on a flaky network), the person stays whe
 Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 See the apps' panels on the Home
+<!-- from WORKBOOK.md sha256:2bb6b7c4c67b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
@@ -643,6 +688,7 @@ session closed without a count, shows a dash (—) and no bar, never a zero; a r
 Involved: BASE-F119
 
 ### BASE-F07 Customize the board of panels
+<!-- from WORKBOOK.md sha256:e02760696dae -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
@@ -659,6 +705,7 @@ app offering panels: "No active app offers widgets yet.".
 Involved: none
 
 ### BASE-F08 Keep the panels up to date without reloading
+<!-- from WORKBOOK.md sha256:eb3d104180ba -->
 Status: done
 Actor: system
 Screen: Home · Summary
@@ -675,6 +722,7 @@ If it fails: if the new data does not come, the panel says "Unavailable" (a figu
 Involved: none
 
 ### BASE-F09 Look at the recent activity
+<!-- from WORKBOOK.md sha256:b45c42b18437 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Activity
@@ -697,6 +745,7 @@ already sales on screen, they stay under the notice.
 Involved: SALE-F28
 
 ### BASE-F10 See in the bell the notices between apps that were not delivered
+<!-- from WORKBOOK.md sha256:9dc8306fec6e -->
 Status: done
 Actor: owner, administrator
 Screen: The bell
@@ -715,6 +764,7 @@ knew: "Could not load notifications" with "Retry".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
+<!-- from WORKBOOK.md sha256:9fbc88603bd0 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
@@ -746,6 +796,7 @@ a PIN or with the badge and the Google Play app do not have "Manage on erplora.c
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
+<!-- from WORKBOOK.md sha256:c95a59546413 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
@@ -763,6 +814,7 @@ If it fails: without the assistant, the steps keep leading to their screen from 
 Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
+<!-- from WORKBOOK.md sha256:ed7f6dfad3c8 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: any screen of the hub
@@ -790,6 +842,7 @@ arrives then. A device without a connection gets it when it reconnects.
 Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
 
 ### BASE-F14 See the business's apps
+<!-- from WORKBOOK.md sha256:de8a48d10c48 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -815,6 +868,7 @@ apps). With no app at all: "You have no apps yet. Open “Add apps” to see the
 Involved: none
 
 ### BASE-F15 Open an app from Apps
+<!-- from WORKBOOK.md sha256:4c5a5aa521a5 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -829,6 +883,7 @@ nothing opens.
 Involved: none
 
 ### BASE-F16 Look for an app in the catalogue
+<!-- from WORKBOOK.md sha256:b70e9862b317 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -847,6 +902,7 @@ If it fails: as in "My apps" (BASE-F14). A search without results: "No apps matc
 Involved: APPS-F01
 
 ### BASE-F17 Know how much an app costs before having it
+<!-- from WORKBOOK.md sha256:aff9d3b5dd14 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -865,6 +921,7 @@ If it fails: without the list, as in "My apps" (BASE-F14).
 Involved: APPS-F01, APPS-F07
 
 ### BASE-F18 Turn on an app
+<!-- from WORKBOOK.md sha256:f1ab50597d8a -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -888,6 +945,7 @@ in a notice with the app's name and the reason, which stays until it is closed.
 Involved: APPS-F07, VERIFACTU-F01
 
 ### BASE-F19 Know what else comes with an app
+<!-- from WORKBOOK.md sha256:78edf5456e80 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -908,6 +966,7 @@ together: until then, "Needs a subscription". With "Cancel", nothing changes.
 Involved: none
 
 ### BASE-F20 Try to use an app that needs a subscription
+<!-- from WORKBOOK.md sha256:81cae1b00a28 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -927,6 +986,7 @@ opened says why (BASE-F27).
 Involved: APPS-F07
 
 ### BASE-F21 See why an app could not be turned on and try again
+<!-- from WORKBOOK.md sha256:69949ae66fc6 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -948,6 +1008,7 @@ until it is closed. From the assistant, a name that fits several apps, or none, 
 Involved: BASE-F32
 
 ### BASE-F22 Follow an app being turned on while moving around
+<!-- from WORKBOOK.md sha256:fecbceacbfbe -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -968,6 +1029,7 @@ hub#930), the app stays "Turning on…" and finishes by itself as soon as the fr
 Involved: BASE-F31, BASE-F32
 
 ### BASE-F23 Turn an app off
+<!-- from WORKBOOK.md sha256:f5bebca8e639 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -996,6 +1058,7 @@ If it fails: if another running app needs it, nothing changes; if it cannot be t
 Involved: VERIFACTU-F32
 
 ### BASE-F24 Turn an app back on
+<!-- from WORKBOOK.md sha256:64c4463a2030 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -1026,6 +1089,7 @@ on: the assistant asks which one, naming them; one that is no app's: "No app has
 Involved: BASE-F97
 
 ### BASE-F25 See an app refuse to be turned off
+<!-- from WORKBOOK.md sha256:99a1a5598bfb -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -1054,6 +1118,7 @@ what the hub answered.
 Involved: VERIFACTU-F32, BASE-F01
 
 ### BASE-F26 Understand why an app does not open
+<!-- from WORKBOOK.md sha256:2509089cfe30 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The screen of an app that does not open
@@ -1072,6 +1137,7 @@ business, this reason rules, since it holds for everyone.
 Involved: BASE-F118
 
 ### BASE-F27 See a paid app blocked
+<!-- from WORKBOOK.md sha256:4c8d806e2c59 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The screen of an app that does not open
@@ -1092,6 +1158,7 @@ passes. A demo business has every app, the paid ones too, to try them.
 Involved: APPS-F07
 
 ### BASE-F29 Choose a template of the catalogue to import
+<!-- from WORKBOOK.md sha256:0cf49f8f40c0 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Import
@@ -1119,6 +1186,7 @@ templates.".
 Involved: INVENTORY-F12
 
 ### BASE-F30 Upload a file to import
+<!-- from WORKBOOK.md sha256:ad29ae05157a -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Import
@@ -1134,6 +1202,7 @@ damaged, a newer version of ERPlora made it or it is larger than 20 MB) and it s
 Involved: none
 
 ### BASE-F31 Review and load what the file brings
+<!-- from WORKBOOK.md sha256:0cb55b80f119 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Import
@@ -1168,6 +1237,7 @@ this business. Upload the file again in a minute to bring its data.".
 Involved: BASE-F22, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F32 Read the import report
+<!-- from WORKBOOK.md sha256:6013a852308a -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Import
@@ -1196,6 +1266,7 @@ wrong loading this part; nothing else was affected.", with "Retry what is missin
 Involved: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Come back to the report of an import that did not go in whole and retry
+<!-- from WORKBOOK.md sha256:71d7e60e03a0 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Import
@@ -1218,6 +1289,7 @@ If it fails: "The retry failed: {reason}" and the report stays in sight.
 Involved: BASE-F32
 
 ### BASE-F34 Undo an import
+<!-- from WORKBOOK.md sha256:993404044eba -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Reset
@@ -1238,6 +1310,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
+<!-- from WORKBOOK.md sha256:4a93be6f88d4 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Export
@@ -1260,6 +1333,7 @@ administrator exports just like the owner: what is the owner's alone are the ful
 Involved: BASE-F112 (inside the app), BASE-F37
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
+<!-- from WORKBOOK.md sha256:87d90fd8e515 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Export
@@ -1279,6 +1353,7 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
+<!-- from WORKBOOK.md sha256:35f60cfc25a7 -->
 Status: done
 Actor: owner
 Screen: Settings · Data and backups › Reset
@@ -1313,6 +1388,7 @@ is the owner's alone, also through the API and from the assistant, which answer 
 Involved: BASE-F34, BASE-F35
 
 ### BASE-F38 See the Home up to date after importing a template
+<!-- from WORKBOOK.md sha256:25827a9e9e1f -->
 Status: done
 Actor: owner, administrator
 Screen: Home · Summary
@@ -1346,6 +1422,7 @@ could not be loaded." with "Retry" and "Not now".
 Involved: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Open System and move between its tabs
+<!-- from WORKBOOK.md sha256:3fa28d3bd8da -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -1367,6 +1444,7 @@ of the tab goes on; a card that does not load is left out and the others show.
 Involved: BASE-F40, BASE-F118, PRINTING-F21
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
+<!-- from WORKBOOK.md sha256:f19c17ea973b -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -1430,6 +1508,7 @@ does not know the plan: "We do not know this business's plan yet: it shows up as
 Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Know which version is running and when it was updated
+<!-- from WORKBOOK.md sha256:93231d294774 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Updates
@@ -1448,6 +1527,7 @@ try again." with "Retry".
 Involved: BASE-F116
 
 ### BASE-F42 See the log of what happened in the system
+<!-- from WORKBOOK.md sha256:26d21a9b6230 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Logs
@@ -1467,6 +1547,7 @@ If it fails: "The log could not be loaded. Check the connection and try again." 
 Involved: none
 
 ### BASE-F43 See the failed events
+<!-- from WORKBOOK.md sha256:14246f994509 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1490,6 +1571,7 @@ connection and try again." with "Retry" in sight: a failure never shows as "All 
 Involved: none
 
 ### BASE-F44 Resend a failed event
+<!-- from WORKBOOK.md sha256:89f57c907252 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1507,6 +1589,7 @@ resend it." or "only the owner or an administrator can do it.".
 Involved: none
 
 ### BASE-F45 Resend all the failed events
+<!-- from WORKBOOK.md sha256:5311742cbab3 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1525,6 +1608,7 @@ If it fails: "Could not resend:" and the reason, as in BASE-F44.
 Involved: none
 
 ### BASE-F46 Discard a failed event
+<!-- from WORKBOOK.md sha256:d10767772685 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1543,6 +1627,7 @@ If it fails: "Could not discard:" and the reason, as in BASE-F44.
 Involved: none
 
 ### BASE-F47 Report an error of the screen without anyone asking
+<!-- from WORKBOOK.md sha256:d43fcf749b1e -->
 Status: done
 Actor: system
 Screen: none
@@ -1562,6 +1647,7 @@ with more than 30 reports a minute from the same person, the hub does not note i
 Involved: none
 
 ### BASE-F48 Open Settings and move through its tabs
+<!-- from WORKBOOK.md sha256:e19f0083066d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings, Settings · Printing
@@ -1585,6 +1671,7 @@ BASE-F29).
 Involved: PRINTING-F06, BASE-F29, BASE-F49, BASE-F62
 
 ### BASE-F49 See the business's country
+<!-- from WORKBOOK.md sha256:7afac51ac547 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business
@@ -1602,6 +1689,7 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 See the business's currency
+<!-- from WORKBOOK.md sha256:d35b0e87a24a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business; Home · Summary and Home · Activity
@@ -1622,6 +1710,7 @@ If it fails: as in BASE-F49.
 Involved: BASE-F49
 
 ### BASE-F51 Change the business's language on erplora.com
+<!-- from WORKBOOK.md sha256:a65f62342ad3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Business
@@ -1644,6 +1733,7 @@ on erplora.com: its data does not change.".
 Involved: HUBS-F15, HUBS-F08, BASE-F64
 
 ### BASE-F52 Enter with the erplora.com account
+<!-- from WORKBOOK.md sha256:7bece8ed6387 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1665,6 +1755,7 @@ hub"); the business keeps nothing until it comes back with the person identified
 Involved: BASE-F13
 
 ### BASE-F53 Enter from the erplora.com panel without typing the password again
+<!-- from WORKBOOK.md sha256:2e95f6ff2428 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1678,6 +1769,7 @@ If it fails: an expired or already used pass opens nothing: the business asks fo
 Involved: BASE-F52
 
 ### BASE-F54 Choose the PIN the first time one enters a till
+<!-- from WORKBOOK.md sha256:b447aa48f50c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Create your PIN
@@ -1699,6 +1791,7 @@ entering: the first one is chosen in **My profile**.
 Involved: BASE-F52, BASE-F65
 
 ### BASE-F55 Enter with a PIN
+<!-- from WORKBOOK.md sha256:7c8ec3f06d4d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1726,6 +1819,7 @@ still enter with your account.".
 Involved: BASE-F54, BASE-F67
 
 ### BASE-F56 Enter by passing the badge
+<!-- from WORKBOOK.md sha256:02f7b0bae2a8 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1742,6 +1836,7 @@ or ask an administrator."; it counts as a failed attempt. The PIN pad stays avai
 Involved: BASE-F55
 
 ### BASE-F57 Lose the session because it was opened on another device
+<!-- from WORKBOOK.md sha256:28a72686e4b4 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1760,6 +1855,7 @@ If it fails: with no limit in the plan nothing ends.
 Involved: BASE-F11, BASE-F40
 
 ### BASE-F58 The session ends while working
+<!-- from WORKBOOK.md sha256:9b2c63c0a89a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1778,6 +1874,7 @@ If it fails: without a network, the screen does not take the session as ended.
 Involved: BASE-F13, BASE-F70
 
 ### BASE-F59 Close the session of a till nobody touches
+<!-- from WORKBOOK.md sha256:c212f35c2ffd -->
 Status: done
 Actor: system
 Screen: Access
@@ -1793,6 +1890,7 @@ screen hangs, a session opened while the business always asks for the PIN lasts 
 Involved: BASE-F67
 
 ### BASE-F60 Switch user without losing the sale
+<!-- from WORKBOOK.md sha256:f422c0e62b90 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Switch user
@@ -1816,6 +1914,7 @@ try again.".
 Involved: BASE-F55, BASE-F56
 
 ### BASE-F61 Sign out
+<!-- from WORKBOOK.md sha256:b623040eecce -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
@@ -1832,6 +1931,7 @@ Involved: BASE-F113 (in the Android app, it stops listening before leaving); HUB
 app, "Change business" in the bar signs out the same way and only then forgets the business)
 
 ### BASE-F62 Decide whether this device is shared or personal
+<!-- from WORKBOOK.md sha256:817b601438cc -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1852,6 +1952,7 @@ connection: "Could not change this device. Check the connection and try again.".
 Involved: BASE-F55
 
 ### BASE-F63 Open a hub that is not set up yet
+<!-- from WORKBOOK.md sha256:07cd646f0aa9 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
@@ -1868,6 +1969,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
+<!-- from WORKBOOK.md sha256:640c21db2c07 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1899,6 +2001,7 @@ connection and try again.".
 Involved: BASE-F51
 
 ### BASE-F65 Change my PIN from My profile
+<!-- from WORKBOOK.md sha256:987920ad098c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1917,6 +2020,7 @@ to change the PIN." and the minutes they have to wait.
 Involved: BASE-F54
 
 ### BASE-F66 Choose how many digits the business's PIN has
+<!-- from WORKBOOK.md sha256:19fc60cddc4c -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1932,6 +2036,7 @@ If it fails: "Could not change it. Check the connection and try again.".
 Involved: BASE-F67
 
 ### BASE-F67 Decide whether the till asks for a PIN and when it asks again
+<!-- from WORKBOOK.md sha256:9b35fde7b3b1 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1965,6 +2070,7 @@ inactivity" without its minutes does not reach the card: it goes back to the ass
 Involved: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 See the devices someone has entered on
+<!-- from WORKBOOK.md sha256:c1c40d93e2a3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1984,6 +2090,7 @@ with no list. If it does not arrive: "Could not load the devices. Check the conn
 Involved: BASE-F69, BASE-F70, BASE-F71
 
 ### BASE-F69 Name a device
+<!-- from WORKBOOK.md sha256:31e9751c299c -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1998,6 +2105,7 @@ a shorter one and save again.".
 Involved: BASE-F68
 
 ### BASE-F70 Remove a device that was lost
+<!-- from WORKBOOK.md sha256:169ee9584f66 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2019,6 +2127,7 @@ registered here. Refresh the list."; what was refused never stays as done.
 Involved: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Remove at once the devices nobody uses
+<!-- from WORKBOOK.md sha256:bfe672ece425 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2040,6 +2149,7 @@ If it fails: "Could not remove the unused devices. Check the connection and try 
 Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
+<!-- from WORKBOOK.md sha256:18495725379e -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
@@ -2063,6 +2173,7 @@ moment." or "Check the connection and try again.") and "Retry"; a failure never 
 Involved: BASE-F40
 
 ### BASE-F73 Upload files and make folders
+<!-- from WORKBOOK.md sha256:0b029538bf19 -->
 Status: done
 Actor: owner, administrator
 Screen: Files
@@ -2090,6 +2201,7 @@ administrator can change the files.".
 Involved: BASE-F40, BASE-F94
 
 ### BASE-F74 Preview and download a file
+<!-- from WORKBOOK.md sha256:f2b225123734 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
@@ -2127,6 +2239,7 @@ large to preview" with "The preview opens files of up to 10 MB. Download it to o
 Involved: BASE-F112 (inside the app)
 
 ### BASE-F75 Move and rename a file or a folder
+<!-- from WORKBOOK.md sha256:7ce92779ba75 -->
 Status: done
 Actor: owner, administrator
 Screen: Files
@@ -2148,6 +2261,7 @@ reads "Only an administrator can change the files.".
 Involved: none
 
 ### BASE-F76 Delete a file or a folder
+<!-- from WORKBOOK.md sha256:39cd05d2591f -->
 Status: done
 Actor: owner, administrator
 Screen: Files
@@ -2166,6 +2280,7 @@ session has expired. Sign in again and try once more.". Whoever does not adminis
 Involved: none
 
 ### BASE-F77 Reach the plan's limit of people
+<!-- from WORKBOOK.md sha256:c748e49f2144 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Staff
@@ -2184,6 +2299,7 @@ yet.".
 Involved: BASE-F81, BASE-F83
 
 ### BASE-F78 Remove a person's PIN
+<!-- from WORKBOOK.md sha256:9555147ca661 -->
 Status: done
 Actor: owner, administrator
 Screen: A person's page
@@ -2201,6 +2317,7 @@ the owner's way in.".
 Involved: BASE-F81, BASE-F55
 
 ### BASE-F79 Give a person a badge or take it away
+<!-- from WORKBOOK.md sha256:6a0450d8a9d0 -->
 Status: done
 Actor: owner, administrator
 Screen: A person's page
@@ -2220,6 +2337,7 @@ and try again.", "The badge could not be saved." or "The badge could not be remo
 Involved: BASE-F56, BASE-F81
 
 ### BASE-F80 Bring back a person who left the business
+<!-- from WORKBOOK.md sha256:c83ff036864d -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Staff
@@ -2235,6 +2353,7 @@ If it fails: until they accept, they show as "Not in yet".
 Involved: BASE-F77, BASE-F81
 
 ### BASE-F81 Understand how each person gets in
+<!-- from WORKBOOK.md sha256:481c06c6304a -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff
@@ -2253,6 +2372,7 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles and what each one allows
+<!-- from WORKBOOK.md sha256:92addcfa0da0 -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles; Employees · Roles · What it allows
@@ -2282,6 +2402,7 @@ allows." with "Retry", and a role that is not one of the five, "This role does n
 Involved: BASE-F83, BASE-F84
 
 ### BASE-F83 Give a person a role
+<!-- from WORKBOOK.md sha256:e0c7ae2348e6 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles
@@ -2298,6 +2419,7 @@ If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
 
 ### BASE-F84 Approve with a manager's PIN
+<!-- from WORKBOOK.md sha256:05dd4133812d -->
 Status: done
 Actor: employee, manager
 Screen: An approval is needed
@@ -2331,6 +2453,7 @@ with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the a
 Involved: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
 
 ### BASE-F85 Look up who approved what
+<!-- from WORKBOOK.md sha256:a356799e6ecb -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Approvals
@@ -2354,6 +2477,7 @@ so with its reason and nothing is downloaded.
 Involved: BASE-F84, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
+<!-- from WORKBOOK.md sha256:344d74567f12 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2381,6 +2505,7 @@ app does not publish what the key would do on it.", "A key may not do more than 
 Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
+<!-- from WORKBOOK.md sha256:3b83ac4d580c -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2396,6 +2521,7 @@ longer exists. Refresh the list and try again.".
 Involved: BASE-F86, BASE-F89
 
 ### BASE-F88 Revoke an API key
+<!-- from WORKBOOK.md sha256:42b0d5b61a05 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2410,6 +2536,7 @@ If it fails: "The API key could not be revoked.".
 Involved: BASE-F89
 
 ### BASE-F89 See the API keys and what each one may do
+<!-- from WORKBOOK.md sha256:07e6020cc165 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2427,6 +2554,7 @@ another system can read or write your business's data.".
 Involved: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Read the API documentation
+<!-- from WORKBOOK.md sha256:06bbdedbe93f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: API documentation
@@ -2446,6 +2574,7 @@ nothing published, "None of this business’s apps publishes its API yet.".
 Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation
+<!-- from WORKBOOK.md sha256:00fe8590da8a -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2462,6 +2591,7 @@ it.".
 Involved: BASE-F90
 
 ### BASE-F92 Open and close the assistant's panel
+<!-- from WORKBOOK.md sha256:7a761cb0f856 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2486,6 +2616,7 @@ shows over whatever screen is there (BASE-F97).
 Involved: BASE-F93, BASE-F97, BASE-F103, BASE-F104
 
 ### BASE-F93 Ask the assistant and read how it writes
+<!-- from WORKBOOK.md sha256:2b5705b66a7c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2537,6 +2668,7 @@ again.".
 Involved: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Attach a file or dictate by voice
+<!-- from WORKBOOK.md sha256:e4f9686d9ed8 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2577,6 +2709,7 @@ transcribed, "The audio could not be transcribed. Try again.".
 Involved: BASE-F73, BASE-F93, BASE-F97
 
 ### BASE-F95 Read the answer: text, lists, tables and links
+<!-- from WORKBOOK.md sha256:a3d37589da50 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2593,6 +2726,7 @@ If it fails: a badly written answer reads as text: it is never lost nor breaks t
 Involved: BASE-F96
 
 ### BASE-F96 Go to a screen from an answer
+<!-- from WORKBOOK.md sha256:dad0c85c76a7 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2612,6 +2746,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
+<!-- from WORKBOOK.md sha256:63406cec4761 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2720,6 +2855,7 @@ the card open nothing is done, and the answer ends in "The answer was cut off." 
 Involved: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Dangerous actions: type to confirm, or not from the chat
+<!-- from WORKBOOK.md sha256:e9288e7fa947 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2749,6 +2885,7 @@ allowed: …" and the assistant tells why.
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did
+<!-- from WORKBOOK.md sha256:adbd1b0cc182 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2778,6 +2915,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
+<!-- from WORKBOOK.md sha256:ecc553290c6d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2809,6 +2947,7 @@ failed: …" and the assistant tells it.
 Involved: BASE-F13, BASE-F84, BASE-F97
 
 ### BASE-F101 Ask it for several things in a row
+<!-- from WORKBOOK.md sha256:d13d6abe2da3 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2833,6 +2972,7 @@ the network cut half way, BASE-F106.
 Involved: BASE-F97, BASE-F106
 
 ### BASE-F102 The conversation: what is kept, where and when it is deleted
+<!-- from WORKBOOK.md sha256:173ed0b9e97e -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2855,6 +2995,7 @@ conversation that is too long says "This conversation is too long: start a new o
 Involved: BASE-F59, BASE-F60, BASE-F61
 
 ### BASE-F103 The assistant in the setup
+<!-- from WORKBOOK.md sha256:6bedff7bf9d6 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2878,6 +3019,7 @@ nobody is left without a way out.
 Involved: BASE-F01, BASE-F12, BASE-F97
 
 ### BASE-F104 See the assistant's plan, the usage limit and extend it
+<!-- from WORKBOOK.md sha256:32b0692c70b1 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2907,6 +3049,7 @@ answering is what counts. If the pass of "Upgrade plan" does not arrive, the usu
 Involved: BASE-F11, BASE-F40, BASE-F106
 
 ### BASE-F105 Report a bad answer
+<!-- from WORKBOOK.md sha256:273686eb94da -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2930,6 +3073,7 @@ If it fails: "The report could not be sent. Try again.", and the window stays op
 Involved: ASSISTANT-F23
 
 ### BASE-F106 The assistant without a connection, with the service down or without a plan
+<!-- from WORKBOOK.md sha256:b1eaa70683f3 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2953,6 +3097,7 @@ If it fails: a failure with nothing written leaves no empty bubble: only the sen
 Involved: BASE-F93, BASE-F102, BASE-F104
 
 ### BASE-F107 Pass the master QA of the Hub
+<!-- from WORKBOOK.md sha256:b261e41b4306 -->
 Status: done
 Actor: ERPlora's QA team
 Screen: every screen of the hub's platform
@@ -2977,6 +3122,7 @@ have the business types or the test assistant yet, the QA does not start and say
 Involved: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48, BASE-F92
 
 ### BASE-F108 Report a problem to support
+<!-- from WORKBOOK.md sha256:c25e6271691a -->
 Status: done
 Actor: owner, administrator, manager, employee (whoever entered with their erplora.com account)
 Screen: The user menu
@@ -2999,6 +3145,7 @@ write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Delete a deleted business after its 90 days
+<!-- from WORKBOOK.md sha256:d96eeeea1106 -->
 Status: done
 Actor: nobody: the Hub does it by itself, nobody presses anything
 Screen: None; the business's address goes on saying "This hub is no longer available."
@@ -3046,6 +3193,7 @@ Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, 
 (each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
+<!-- from WORKBOOK.md sha256:70c3053e9c2d -->
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
 Actor: anyone, without an account
 Screen: The business's public page (WEBSITE-F10), on its domain
@@ -3063,6 +3211,7 @@ published page, the domain says there is nothing there. A business being prepare
 Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
+<!-- from WORKBOOK.md sha256:1fae342a6c05 -->
 Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
@@ -3097,6 +3246,7 @@ Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes 
 business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
 
 ### BASE-F112 Save a downloaded file inside the app
+<!-- from WORKBOOK.md sha256:61e01340cee3 -->
 Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
@@ -3125,6 +3275,7 @@ Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VER
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
 ### BASE-F113 Keep warning with the screen off (Android app)
+<!-- from WORKBOOK.md sha256:5be0188aa434 -->
 Status: done
 Actor: system
 Screen: none; on Android, the ongoing notification "ERPlora is listening"
@@ -3151,6 +3302,7 @@ to ask.
 Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
+<!-- from WORKBOOK.md sha256:0b102c454f7a -->
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments, the price list prices, the modifier groups the business deleted, with their
@@ -3433,6 +3585,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of a module's screen
+<!-- from WORKBOOK.md sha256:cd0e69a5291e -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
@@ -3470,6 +3623,7 @@ Spanish.
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
+<!-- from WORKBOOK.md sha256:73eed8448b68 -->
 Status: done
 Actor: owner, administrator; through the assistant, anyone of the business
 Screen: System · Updates
@@ -3490,6 +3644,7 @@ If it fails: "Could not load what's new" with "Retry"; the version and its date 
 Involved: BASE-F41
 
 ### BASE-F117 See in the bell that the plan has an unpaid invoice
+<!-- from WORKBOOK.md sha256:51c6d2d30239 -->
 Status: done
 Actor: owner, administrator
 Screen: The bell
@@ -3517,6 +3672,7 @@ If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
 ### BASE-F118 Open a screen without permission: "No access" and whom to ask
+<!-- from WORKBOOK.md sha256:6aed37103d8d -->
 Status: done
 Actor: manager, employee
 Screen: No access
@@ -3542,6 +3698,7 @@ only spares a screen of errors.
 Involved: BASE-F26, HUBS-F26 (erplora.com)
 
 ### BASE-F119 What each person sees by their data permissions
+<!-- from WORKBOOK.md sha256:161d81320fe2 -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff, Home · Summary, Sales · Sales, Customers
@@ -3570,6 +3727,7 @@ nothing.
 Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
 
 ### BASE-F125 A key stops working when whoever made it no longer may
+<!-- from WORKBOOK.md sha256:c7040bbe5159 -->
 Status: done
 Actor: API (another program), owner, administrator
 Screen: none (it shows in what the API answers the other program)
@@ -3599,6 +3757,7 @@ do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_
 Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
+<!-- from WORKBOOK.md sha256:ae3493013f65 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · General
