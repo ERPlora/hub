@@ -23,6 +23,7 @@ def line_row(line: Line) -> dict:
         "method_type": line.method_type,
         "method_name": line.method_name,
         "description": line.description,
+        "app": line.app,
         "sale_id": line.sale_id,
         "sale_number": line.sale_number,
         "document_type": line.document_type,

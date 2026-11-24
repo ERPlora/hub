@@ -1,6 +1,6 @@
 """Events of the printing app (``printing.<entity>.<fact>``) and its reactions: none.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids only, never the document (it may hold a customer's name or tax id).
 ``printing.job.queued`` is also the nudge base's ``/ws/print`` turns into a ``wake`` for the devices
 (WORKBOOK «Contrato con la plataforma»).
