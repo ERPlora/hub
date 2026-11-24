@@ -24,7 +24,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 from apps.task import events
 from apps.task.models import Comment, Project, Task, TaskCounter
 from apps.task.queries import (
