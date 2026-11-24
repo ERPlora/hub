@@ -31,7 +31,7 @@ class CustomerConfig(LiveAppConfig):
     # customer.order.link does. Only as phrases: «asigna», «pon» or «set» alone assign or set anything.
     assistant_synonyms = (
         (
-            "link", "enlaza", "enlazar", "assign customer", "assign a customer", "assign the customer", "set the customer",
+            "link", "enlaza", "assign customer", "assign a customer", "assign the customer", "set the customer",
             "set a customer", "set customer", "in her name", "in his name", "in their name", "asignar cliente",
             "asigna cliente", "asignar un cliente", "asigna un cliente", "asignar el cliente", "asigna el cliente",
             "poner un cliente", "pon un cliente", "poner el cliente", "pon el cliente", "a su nombre",
