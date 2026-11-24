@@ -1369,8 +1369,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`service.assignment`). Así ver, vender, gastar, anular y ajustar bonos, retener y soltar sesiones,
   restaurar un servicio y asignar, cambiar o quitar un profesional desde el chat (SERVICE-F04, F05, F14 a
   F20, F31 y F32) llegan a su operación: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-service-2026-11-08.json`) quedan entre las 20 primeras herramientas del
-  turno, cada herramienta tiene una frase propia que solo llega a ella por sus `asks`, y ni las `asks` ni
+  (`tests/e2e/qa/probes/owner-es-service-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el
+  turno o, las de quitar un profesional y ver el estado del catálogo, las encuentra la búsqueda de su tarea, cada herramienta tiene una frase propia que solo llega a ella por sus `asks`, y ni las `asks` ni
   los grupos de Servicios adelantan sus bonos, sesiones o asignaciones a una petición de Citas o de las
   cuentas de Ventas (`tests/test_assistant_asks.py`). Lo que solo se toma por su
   id (un bono vendido, una sesión, una asignación) dice en su descripción qué lectura lo encuentra

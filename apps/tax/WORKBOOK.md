@@ -732,7 +732,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las herramientas que ofrece un turno y el
   asistente manda a la pantalla o busca una automatización. `tests/test_assistant_asks.py` mide con las
   frases reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-tax-2026-11-08.json` y la del
-  empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 20 primeras, y lo que el
+  empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 15 que ofrece el turno, y lo que el
   empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
   herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
   las de cualquier herramienta lo ve un test. live lee «activar» y «desactivar» como las acciones `activate` y
