@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8ef2bb9a7edbd12b330e40878545983c08b06a45fc7bcb0ef7cdd3f8d83b636b -->
+<!-- generated from WORKBOOK.md sha256:0f59556c749d6f4508d11dcbf253bf106e409b685b51e67616c8b3ab91a55f22 -->
 
 ## What it is for and who it is for
 
@@ -320,7 +320,8 @@ Steps:
    catalog's (if the catalog says "€0.37 per 100 ud", the price list's is also per 100 ud).
 5. Tap **Add**.
 In: the price list (active), the item and its price. The assistant names the price list by its code or its
-name and the item by its name or its SKU.
+name and the item by its name or its SKU, and takes what is charged for something in a price list as its price
+there ("On the terrace I charge 2.50 for a draught beer", with the Terrace price list), not as charging a check.
 Out: the price and `pricing.price_item.added`.
 If it fails: under its field and without saving anything: "That price list is not available: it does not exist in this
 business or it is deactivated.", "That article already has a price in this list from that quantity.", a

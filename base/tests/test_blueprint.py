@@ -26,7 +26,7 @@ from live.operations import get
 
 from base import blueprint, catalog
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A, B, in_business_a
 
@@ -43,7 +43,7 @@ def owner():
 
 @pytest.fixture
 def ctx(owner):
-    return OperationContext(scope=A, actor=owner, permissions=permissions_for(owner, A), language="es")
+    return OperationContext(scope=A, actor=owner, permissions=access_for(owner, A), language="es")
 
 
 def call(ctx, operation, /, **data):
@@ -488,7 +488,7 @@ def test_an_export_of_business_b_carries_its_rows_and_none_of_business_a_s(ctx, 
     with use_hub(hub_b):
         user = get_user_model().objects.create_user(username="bea", password="pw")
         Membership.objects.create(user=user, host=B.key, role=Membership.Role.OWNER)
-        theirs = OperationContext(scope=B, actor=user, permissions=permissions_for(user, B), language="es")
+        theirs = OperationContext(scope=B, actor=user, permissions=access_for(user, B), language="es")
         blueprint.loading.apply(theirs, blueprint.archive.Bundle(manifest=manifest(), data={"table.zone": [patio]}), apps=None)
 
         exported = blueprint.export.export_data(theirs, blueprint.export.selection_of(restaurant_bundle().data), purpose="backup")

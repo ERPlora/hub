@@ -9,7 +9,14 @@ from live.operations import operation
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.queries.rows import _page
-from apps.invoice.schemas import AllocationPage, AllocationsIn, GapPage, GapsIn, NumberingStatusIn, NumberingStatusOut
+from apps.invoice.schemas.numbering import (
+    AllocationPage,
+    AllocationsIn,
+    GapPage,
+    GapsIn,
+    NumberingStatusIn,
+    NumberingStatusOut,
+)
 from apps.tax.queries import business_today
 
 

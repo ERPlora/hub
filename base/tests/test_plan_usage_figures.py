@@ -16,7 +16,7 @@ from live.operations import AI, get
 from base import meter
 from base.models.activation import AppActivation
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import limits
 from base.tenancy.context import use_hub
@@ -50,7 +50,7 @@ def admin_of(hub, role="hub_owner", username="olga") -> OperationContext:
     user, _ = get_user_model().objects.get_or_create(username=f"saas:{username}-{hub.slug}")
     with use_hub(hub):
         Membership.objects.get_or_create(user=user, host=hub.slug, defaults={"role": role})
-        permissions = permissions_for(user, Scope("host", hub.slug))
+        permissions = access_for(user, Scope("host", hub.slug))
     return OperationContext(scope=Scope("host", hub.slug), actor=user, permissions=permissions, language="en")
 
 

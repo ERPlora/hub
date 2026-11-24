@@ -1,17 +1,14 @@
 """Why a run stopped, said when it is read, in the reader's language (FLOW-F16), and an action as the
 History names it (``flow.operation.get``)."""
 
-import functools
-import json
-from pathlib import Path
 
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
-from live.operations import INTERNAL, Operation, operation, registry
+from live.operations import INTERNAL, operation, registry
 
-from base import assistant as hub_assistant
+from apps.flow.phrasing import action_label
 from apps.flow.schemas.catalog import OperationNameOut, OperationRefIn
 
 from .problems import HIGH_RISK, HIGH_RISK_CODE, UNKNOWN_ACTION
@@ -117,28 +114,6 @@ REASONS = {
     "flow.assistant_refused": ASSISTANT_REFUSED,
     ASSISTANT_GONE_KEY: ASSISTANT_GONE,
 }
-#: The words of the app's screens, by language: how the History names an action («Create a task»).
-LOCALES = Path(__file__).resolve().parent.parent / "frontend" / "locale"
-
-
-@functools.cache
-def _screen_words(language: str) -> dict:
-    path = LOCALES / f"{language}.json"
-    return json.loads((path if path.exists() else LOCALES / "en.json").read_text(encoding="utf-8"))["flow"]
-
-
-def action_label(op: Operation, language: str) -> str:
-    """``op`` as the History names it: its own words or, without them, its verb, app and thing (``actionLabel`` of
-    ``frontend/lib/phrasing.ts``)."""
-    words = _screen_words(language)
-    curated = words["actions"].get(op.name.replace(".", "__"))
-    if curated:
-        return curated
-    _app, entity, verb = ([*op.name.split(".", 2), "", ""])[:3]
-    verb_word = words["verbs"].get(verb) or verb.replace("_", " ")
-    return f"{verb_word} · {hub_assistant.cards.app_name(op)} ({entity.replace('_', ' ')})"
-
-
 @operation(
     "flow.operation.get",
     kind="query",

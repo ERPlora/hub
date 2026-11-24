@@ -5,7 +5,7 @@ from live.context import OperationContext
 from live.operations import get
 
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import A
 
 MANAGER = frozenset({"base.view_home", "demo.*"})
@@ -19,7 +19,7 @@ def ctx(permissions=MANAGER, *, actor="ana", language="en", scope=A):
 def owner_of_a(make_user, language: str = "es") -> OperationContext:
     """The owner of business A talking to the assistant in ``language``, with the permissions their role holds."""
     user = make_user("olga", host=A.key, role=Membership.Role.OWNER)
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
 
 
 def offered(ctx: OperationContext, *messages: dict) -> list[str]:

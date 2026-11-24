@@ -1,17 +1,20 @@
 """What a user may do on a host.
 
-Exception to "only services.py and queries.py touch the ORM": the context builder needs the
-Membership (and a fresh copy of the user) before any operation runs, so it cannot go through one.
-This module only reads.
+Exception to "only services.py and queries.py touch the ORM": the context builder needs the Membership, the role the
+business gave the person (in the business's own database) and a fresh copy of the user before any operation runs, so it
+cannot go through one. This module only reads.
 """
 
+from collections.abc import Iterable
 from typing import Any
 
 from django.contrib.auth import get_user_model
 from live.context import Scope
-from live.meta import all_live_app_configs, permissions_for_role
+from live.meta import LiveAppConfig, all_live_app_configs, permissions_for_role
 
+from base import roles
 from base.models import Membership
+from base.models.roles import BusinessRole
 from base.tenancy.context import PLATFORM_SCOPE_KIND
 
 
@@ -29,13 +32,16 @@ OWN_BUSINESS = "base.own_business"
 OWNER_ONLY = frozenset({OWN_BUSINESS})
 
 
-def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
-    """``{"*"}`` for an active superuser on the platform's scope; else the permissions of its role on ``scope``; else
-    none.
+def access_for(user: Any, scope: Scope) -> frozenset[str]:
+    """What ``user`` may do on ``scope``: ``{"*"}`` for an active superuser on the platform's scope; else what the role
+    the business gave them allows, or without one, what the role of their invitation there gives; else nothing.
 
     A superuser is ERPlora's staff, whose place is the Hub admin on the platform host: on a
     business's host it holds only what a ``Membership`` there gives it, like anyone (the staff copy ``saas-staff:<id>``
-    never has one). What each role gets, ``permissions_of_role``.
+    never has one). What each basic role gets, ``permissions_of_role``. The owner keeps the role of their invitation
+    whatever role of the business their row names: nobody takes owning the business from them. The role of the business
+    is read from the business's own database, the one at work (``use_hub``); outside one it fails, as any model of a
+    business does.
     """
     if user is None or not user.is_authenticated or not user.is_active:
         return frozenset()
@@ -44,7 +50,21 @@ def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
     role = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
     if role is None:
         return frozenset()
-    return permissions_of_role(role)
+    own = None
+    if role != Membership.Role.OWNER:
+        own = BusinessRole.objects.filter(people__username=user.get_username()).first()
+    if own is None:
+        return permissions_of_role(role)
+    allowed = roles.effective(own.states, grantable(all_live_app_configs()), given=permissions_of_role(own.origin))
+    return frozenset(permission for permission, state in allowed.items() if state == roles.ON)
+
+
+def grantable(configs: Iterable[LiveAppConfig]) -> dict[str, tuple[str, ...]]:
+    """Each app's permissions a role of the business may hold: all it declares but what is the owner's alone."""
+    return {
+        config.label: tuple(permission for permission in config.permissions if permission not in OWNER_ONLY)
+        for config in configs
+    }
 
 
 def permissions_of_role(role: str) -> frozenset[str]:
