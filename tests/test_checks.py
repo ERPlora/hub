@@ -1,7 +1,8 @@
 """``scripts/checks.sh fast``: what a change passes before it is pushed (.githooks/pre-push runs it on the pushed commit).
 
-It runs the guardrail tests of the size of each file, ruff, the import contracts and the cognitive complexity, the
-lists that only shrink included, in seconds, without the network or a database. Then it checks what the change touches:
+It runs the guardrail tests of the size of each file, ruff, the import contracts, the cognitive complexity and a test
+named after each module the branch adds, the lists that only shrink included, in seconds, without the network or a
+database. Then it checks what the change touches:
 ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them, and pytest
 on its test files and on each touched module's ``tests/test_<module>.py``, on Postgres; a touched WORKBOOK runs the
 tests that read the WORKBOOKs. A tree that breaks any of them fails the command, and its output names the file and the
@@ -297,6 +298,21 @@ def test_fast_fails_on_a_change_to_a_workbook_alone_that_its_tests_refuse(head_t
     assert done.returncode == 1, output[-6000:]
     assert "FAILED tests/test_help_workbooks.py::" in output, output[-6000:]
     assert "has a flow id: 'INVENTORY-F14'" in output, output[-6000:]
+
+
+UNSEEN = {"apps/demo/unseen.py": "X = 1\n"}
+UNSEEN_TEST = {"apps/demo/tests/test_unseen.py": "from apps.demo.unseen import X\n\n\ndef test_x():\n    assert X == 1\n"}
+
+
+@pytest.mark.parametrize("files, returncode", [(UNSEEN, 1), ({**UNSEEN, **UNSEEN_TEST}, 0)], ids=["alone", "with-test"])
+def test_fast_fails_on_a_committed_module_without_a_test_named_after_it(head_tree, files, returncode):
+    """However the module was written: a shell redirection or a script never passes through an editor's hook."""
+    commit(head_tree, files)
+    done = checks(head_tree, "fast", "HEAD")
+    output = done.stdout + done.stderr
+    assert done.returncode == returncode, output[-6000:]
+    named = "apps/demo/unseen.py has no test named after it: apps/demo/tests/test_unseen.py" in output
+    assert named == (returncode == 1), output[-6000:]
 
 
 @pytest.mark.parametrize("args", [(), ("slow",)])

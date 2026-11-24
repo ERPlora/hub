@@ -33,7 +33,9 @@ scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, so
 
 `scripts/checks.sh fast` pasa primero, en unos segundos y sin red ni base de datos, los tests de guardarraíles del
 tamaño de cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de
-excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Después
+excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`), y el que
+exige que cada módulo de Python que añade la rama traiga su test con su nombre, el mismo que se corre cuando el módulo
+cambia (abajo); no cuentan los ficheros solo movidos ni un `__init__.py` que solo importa. Después
 comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `origin/main` (en `origin/main`, del commit
 anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
 
