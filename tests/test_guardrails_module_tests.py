@@ -130,6 +130,12 @@ def test_an_uncommitted_module_counts_too(branch, staged):
     assert untested(branch) == [UNSEEN]
 
 
+def test_on_origin_main_itself_the_commit_that_reached_it_is_checked(branch):
+    save(branch, {"apps/shop/unseen.py": "X = 1\n"})
+    run(branch, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert untested(branch) == [UNSEEN]
+
+
 def test_a_test_of_the_same_name_in_another_app_does_not_count(branch):
     save(branch, {"apps/shop/schemas/images.py": "X = 1\n"})
     assert untested(branch) == [
@@ -156,12 +162,14 @@ INIT_ONLY_IMPORTS = '"""The shop\'s writes: importing each module registers its 
         {"apps/shop/services/orders.py": "X = 1\n", "apps/shop/tests/test_services_orders.py": ""},
         {"apps/shop/services/__init__.py": INIT_ONLY_IMPORTS, "apps/shop/services/orders.py": "X = 1\n"}
         | {"apps/shop/tests/test_orders.py": ""},
+        {"apps/shop/services/__init__.py": "import apps.shop.services.orders\n", "apps/shop/services/orders.py": "X = 1\n"}
+        | {"apps/shop/tests/test_orders.py": ""},
         {"apps/shop/pricing/__init__.py": "RATE = 21\n", "apps/shop/tests/test_pricing.py": ""},
         {"apps/shop/old.py": OLD + "STEPS = 8\n"},
         {"apps/shop/tests/helpers.py": "X = 1\n", "apps/shop/tests/conftest.py": "", "tests/e2e/stack.py": "X = 1\n"}
         | {"apps/shop/migrations/0002_more.py": "X = 1\n", "apps/shop/frontend/unseen.ts": "export const x = 1;\n"},
     ],
-    ids=["its-test", "package-test", "init-only-imports", "init-with-its-test", "changed", "no-modules"],
+    ids=["its-test", "package-test", "init-only-imports", "init-plain-import", "init-with-its-test", "changed", "no-modules"],
 )
 def test_a_module_with_its_test_a_changed_one_and_what_is_no_module_pass(branch, files):
     save(branch, files)
