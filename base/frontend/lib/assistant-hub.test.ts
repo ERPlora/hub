@@ -23,7 +23,7 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations/home';
 import { approvalPass, withApproval } from './approval';
-import { MAX_FILE_BYTES } from './data';
+import { BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
 import {
   actionKey,
   HUB_ASSISTANT,
@@ -175,9 +175,9 @@ describe("«Read aloud» in the server's voice", () => {
 
 describe('HUB_ASSISTANT: the files its tools take whole', () => {
   it("a copy of a business (.blueprint.zip), with Settings › Data › Import's limit and its words when one is larger", () => {
-    expect(HUB_ASSISTANT.toolFiles).toEqual([
-      { extension: '.zip', mime: 'application/zip', maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' },
-    ]);
+    // The same file Import's own picker offers.
+    expect(BLUEPRINT_FILE).toEqual({ extension: '.zip', mime: 'application/zip' });
+    expect(HUB_ASSISTANT.toolFiles).toEqual([{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }]);
     expect(MAX_FILE_BYTES).toBe(20 * 1024 * 1024);
     expect(said(en)('base.data.import.fileTooBig')).toBe('The file could not be read: the file is larger than 20 MB.');
     expect(said(es)('base.data.import.fileTooBig')).toBe('No se pudo leer el fichero: el fichero pasa de 20 MB.');

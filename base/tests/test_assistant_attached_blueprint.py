@@ -53,6 +53,9 @@ def test_the_copy_goes_to_the_gateway_by_its_name_only(owner):
     sent = json.dumps(plan["messages"])
     assert NAME in sent
     assert copy not in sent
+    # Nor in the rounds after: the panel sends the whole conversation again with each question.
+    later = [attaching(copy), {"role": "assistant", "content": "¿La cargo?"}, {"role": "user", "content": "sí, cárgala"}]
+    assert copy not in json.dumps(turn(owner, later, [])["messages"])
 
 
 def test_a_copy_attached_in_the_chat_loads_with_its_card_and_the_persons_yes(owner):

@@ -4,6 +4,7 @@ import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtu
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { ImportRow } from '../../operations/blueprints';
 import { SESSION_CHANGED } from '../../lib/access';
+import { BLUEPRINT_FILE } from '../../lib/data';
 import ImportPanel from './ImportPanel.vue';
 
 afterEach(() => {
@@ -151,6 +152,8 @@ describe('ImportPanel', () => {
   it('a file: reads it in base64 and reviews it; one over 20 MB is refused before it is sent', async () => {
     const m = await panel({ '/api/settings/data/blueprints/inspect': () => Response.json(summary({ source: 'file' })) });
     const input = m.wrapper.get('[data-testid="import-file"]').element as HTMLInputElement;
+    // The file the assistant's panel also takes (HUB_ASSISTANT.toolFiles): one list for both.
+    expect(input.accept.split(',')).toEqual([BLUEPRINT_FILE.extension, BLUEPRINT_FILE.mime]);
     // What the page writes in the input's value: a file input only takes '' (emptied for the same file again).
     const written: string[] = [];
     Object.defineProperty(input, 'value', { get: () => 'C:\\fakepath\\chosen.zip', set: (value: string) => void written.push(value), configurable: true });

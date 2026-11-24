@@ -21,7 +21,7 @@ import { parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 import type { SetupStatus } from '../operations/home';
 import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
-import { MAX_FILE_BYTES } from './data';
+import { BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
 import { type HubHome, readJsonBlock } from './home';
 import { OWN_BUSINESS } from './plan-link';
 import { useSaasPass } from './saas-pass';
@@ -131,7 +131,7 @@ const planUrl = () => readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
  *  `approval` without `approvalPass`) still loads this file through a helper that configures it. */
 export const HUB_ASSISTANT: AssistantConfig = {
   turnUrl: '/api/assistant/turn',
-  toolFiles: [{ extension: '.zip', mime: 'application/zip', maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }],
+  toolFiles: [{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }],
   elevationToken: () => approvalPass(),
   approval: hubApproval(),
   usage: (client) => client.api.call('base.assistant.usage', {}),

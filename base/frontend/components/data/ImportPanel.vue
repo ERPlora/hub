@@ -9,7 +9,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { sessionChanged } from '../../lib/access';
-import { bytesToBase64, MAX_FILE_BYTES, somethingPending } from '../../lib/data';
+import { BLUEPRINT_FILE, bytesToBase64, MAX_FILE_BYTES, somethingPending } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
 import type { BlueprintSource, BlueprintSummary, ImportRow, Template } from '../../operations/blueprints';
 import BlueprintReview from './BlueprintReview.vue';
@@ -212,7 +212,7 @@ function toCatalogue(): void {
         ref="fileInput"
         class="import-file"
         type="file"
-        accept=".zip,application/zip"
+        :accept="`${BLUEPRINT_FILE.extension},${BLUEPRINT_FILE.mime}`"
         data-testid="import-file"
         :aria-label="t('base.data.import.upload')"
         @change="onFile"
