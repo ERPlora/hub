@@ -2,6 +2,7 @@
 
 from . import (
     activation as activation,
+    address_change as address_change,
     api_keys as api_keys,
     approvals as approvals,
     apps as apps,
@@ -23,6 +24,8 @@ from . import (
     relay_runs as relay_runs,
     reset as reset,
     sessions as sessions,
+    single_row as single_row,
     support as support,
+    support_access as support_access,
     usage as usage,
 )

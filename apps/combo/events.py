@@ -7,7 +7,7 @@ Reaction: a product deleted from Inventory leaves every menu (COMBO-F13), throug
 app run as the system, in its own transaction. The worker's outbox relay (``base/relay.py``, every tick)
 hands each delivered event to ``react``; the operation is idempotent, so a repeated delivery changes
 nothing. Until the tick, and always, a choice whose product is deactivated or deleted is not offered nor
-charged (``queries.offer_status``).
+charged (``queries.offers.offer_status``).
 """
 
 from typing import Any

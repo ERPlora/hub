@@ -64,7 +64,7 @@ def test_spanish_texts():
     with translation.override("es"):
         assert str(apps.get_app_config("printing").verbose_name) == "Impresión"
         assert str(models.PrintJob.Status.FAILED.label) == "Fallido"
-        assert str(services.PRINTER_EXISTS) == "Ya hay una impresora con ese nombre."
+        assert str(services.printers.PRINTER_EXISTS) == "Ya hay una impresora con ese nombre."
 
 
 @HUB_DB

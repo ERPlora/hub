@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:761158ec7d5bd60694a06f322a3c5ccaa122b31eae721b7f089015e74a902fcb -->
+<!-- generated from WORKBOOK.md sha256:d02c987744fb700ce18dcfe49a8b446f91bfbee042e00be5a191c949473bf95f -->
 
 ## What it is for and who it is for
 
@@ -459,6 +459,7 @@ On the Employees screens and the API documentation:
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
+| BASE-F126 | Turn ERPlora's support access on or off | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2074,6 +2075,9 @@ Steps:
      name." shows.
   3. For a new folder, tap "New folder", type the "Folder name" (up to 100 characters) and tap "Create folder".
      "Folder created." shows and the folder appears in the tree and in the open folder.
+  4. From the assistant, a file attached in the chat is kept the same way: the person asks it to keep it in a folder,
+     the assistant uploads it with its card, which says it by its name, and after the "yes" it is in the folder, with
+     the same rules (BASE-F94).
 In: the files, up to 25 MB each, or the folder's name; the open folder.
 Out: the file or the folder, in the business's files (`base.file.uploaded`, `base.file.folder_created`).
 If it fails: each refused file says why, without stopping the others: "Could not upload “{name}”: {reason}", with
@@ -2084,7 +2088,7 @@ at a time and the new one closes the one before, never one on top of another. Wh
 valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
 Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
 administrator can change the files.".
-Involved: BASE-F40
+Involved: BASE-F40, BASE-F94
 
 ### BASE-F74 Preview and download a file
 Status: done
@@ -2545,7 +2549,9 @@ Steps:
      with the conversation while the page stays open; once it is reloaded, the conversation only remembers what they
      were called.
   3. The assistant does not read the copy of a business: if the person asks it to load it, the assistant loads it
-     with its card, as Import does (BASE-F31, BASE-F97). If the page was reloaded before saying "yes", it loads
+     with its card, as Import does (BASE-F31, BASE-F97). Any attachment, a photo or a PDF too, it keeps in Files when
+     asked: it uploads it to the folder with its card, which says it by its name, and the very same file is in the
+     folder, as with "Upload file" (BASE-F73). If the page was reloaded before saying "yes", it loads and keeps
      nothing and asks for it to be attached again.
   4. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
      app, the device) asks for permission to use the microphone; while it asks, another tap does not open a second
@@ -2557,18 +2563,19 @@ Steps:
 In: the files (8 MB each; the copy of a business, 20 MB as in Import; and 20 MB among all those of a question) or the
 recording.
 Out: the file travels with the question to erplora.com, which reads it; the copy of a business stays in the
-business: erplora.com only gets its name. The recording goes through the business to erplora.com's transcription.
+business: erplora.com only gets its name. What is loaded or kept in Files is the file the person attached, as it
+is. The recording goes through the business to erplora.com's transcription.
 The browser never talks to erplora.com directly.
 If it fails: in one line over the box, and the file is not attached: "menu.pdf is too large: 8 MB at most per file.",
 "The file could not be read: the file is larger than 20 MB." (the copy of a business, as in Import), "The files of
 one question add up to 20 MB at most.", "menu.rar cannot be attached: images, PDF, Word, Excel, text or CSV." or
-"menu.pdf could not be read.". A copy no longer in the conversation is not loaded: "There is no file
+"menu.pdf could not be read.". A file no longer in the conversation is neither loaded nor kept: "There is no file
 «copia.blueprint.zip» attached to this conversation: attach it again.". With the microphone blocked, "Microphone access is blocked. Allow it in
 your browser to dictate." and, in the installed app (Android or Windows), where there is no browser, "Microphone
 access is blocked. Allow it in your device settings to dictate."; a recording too long, "The recording is too long:
 dictate a shorter message."; no voice, "Nothing was heard. Try again closer to the microphone."; and if it cannot be
 transcribed, "The audio could not be transcribed. Try again.".
-Involved: BASE-F93, BASE-F97
+Involved: BASE-F73, BASE-F93, BASE-F97
 
 ### BASE-F95 Read the answer: text, lists, tables and links
 Status: done
@@ -3608,3 +3615,23 @@ Out: the system's start-up of this computer, not of the business. Nothing is sav
 If it fails: below it, "Could not change the start on login setting.", and the switch goes back to what the
 system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
+
+### BASE-F126 Turn ERPlora's support access on or off
+Status: partial — it is changed and read through the API and with the assistant; its card in Settings › General is
+still missing, and so is the support staff's way into the business with the access on
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. When the business wants ERPlora's support staff to come in and help set it up (loading the products, adjusting
+     its apps), the owner or an administrator turns support access on. It comes off. Today it is turned on and off
+     through the API or by asking the assistant, which confirms it before changing it (BASE-F97).
+  2. The change is saved at once, with who made it and when. It does not expire: it stays on until someone of the
+     business turns it off, because getting started can take several days.
+  3. Anyone of the business can read whether it is on, who changed it last and when, whether they may change it
+     themselves and the last 10 entries of support (who and when), the most recent first. While nobody of support has
+     come in, the list is empty.
+In: on or off.
+Out: the business's setting, with who changed it and when. Event `base.support_access.changed`.
+If it fails: whoever does not run the business has the change refused (403 `permission_denied`) and the setting stays
+as it was; reading it, they see they cannot change it.
+Involved: BASE-F97, BASE-F100

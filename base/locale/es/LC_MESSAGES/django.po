@@ -2612,3 +2612,43 @@ msgstr "roles propios"
 #: models/__init__.py
 msgid "role in this business"
 msgstr "rol en este negocio"
+
+msgctxt "support access"
+msgid "support may come in"
+msgstr "soporte puede entrar"
+
+msgctxt "support access"
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "support access"
+msgid "updated by"
+msgstr "actualizado por"
+
+msgctxt "support access"
+msgid "support access"
+msgstr "acceso de soporte"
+
+msgctxt "support visit"
+msgid "person"
+msgstr "persona"
+
+msgctxt "support visit"
+msgid "name"
+msgstr "nombre"
+
+msgctxt "support visit"
+msgid "email"
+msgstr "email"
+
+msgctxt "support visit"
+msgid "entered at"
+msgstr "entró el"
+
+msgctxt "support visit"
+msgid "support entry"
+msgstr "entrada de soporte"
+
+msgctxt "support visit"
+msgid "support entries"
+msgstr "entradas de soporte"

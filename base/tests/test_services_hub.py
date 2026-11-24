@@ -131,16 +131,13 @@ class TestRegister:
         assert "X-Erplora-Signature-V2" in headers and "X-Erplora-Signature" in headers
 
     def test_registering_a_ready_one_again_updates_it_and_says_nothing(
-        self, django_capture_on_commit_callbacks, fake_saas
+        self, hub_a, django_capture_on_commit_callbacks, fake_saas
     ):
         fake = fake_saas()
         with django_capture_on_commit_callbacks(execute=True):
-            register()
-        Hub.objects.filter(pk=HUB_ID).update(status="ready")
-        with django_capture_on_commit_callbacks(execute=True):
-            answer = register(name="Acme Café", slug="acme-cafe", vertical=None)
+            answer = register(id=hub_a.pk, name="Acme Café", slug="acme-cafe", vertical=None)
         assert (answer.created, answer.status) == (False, "ready")
-        hub = Hub.objects.get(pk=HUB_ID)
+        hub = Hub.objects.get(pk=hub_a.pk)
         assert (hub.name, hub.slug, hub.vertical) == ("Acme Café", "acme-cafe", "")
         assert fake.calls == []
 

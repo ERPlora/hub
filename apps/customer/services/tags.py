@@ -7,7 +7,7 @@ from live.outbox import record_event
 
 from apps.customer import events
 from apps.customer.models import CustomerTag
-from apps.customer.queries import find_tag
+from apps.customer.queries.reads import find_tag
 from apps.customer.schemas.fields import DeletedOut, TagRefIn
 from apps.customer.schemas.tags import TagIn, TagPatchIn, TagRow
 from apps.customer.services.writes import _patched, _save_named, _with_count

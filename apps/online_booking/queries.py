@@ -30,7 +30,7 @@ from apps.appointment.queries.ownership import APPOINTMENTS
 from apps.appointment.schemas import SlotsIn
 from apps.customer.models import Customer
 from apps.customer.phones import candidates
-from apps.customer.queries import business_country
+from apps.customer.queries.reads import business_country
 from apps.customer.queries.contact import searched, sees_contact
 from apps.customer.search import normalize
 from apps.online_booking.models import Booking, Settings
