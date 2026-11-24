@@ -28,6 +28,11 @@ class CatalogIn(In):
         max_length=30,
         description="These events and actions, by name (`cash_register.session.closed`, `task.task.create`).",
     )
+    only_names: bool = Field(
+        False,
+        description="The events and only the names of the actions (`action_names`), to choose which to read whole "
+        "by `names`.",
+    )
 
 
 class CatalogEventOut(Schema):
@@ -70,5 +75,7 @@ class CatalogAppOut(Schema):
 class CatalogOut(Schema):
     events: list[CatalogEventOut]
     actions: list[CatalogActionOut]
+    #: With ``only_names``, the actions by name alone, instead of whole in ``actions``.
+    action_names: list[str] = []
     #: The installed apps that are off in the business: what a saved automation may still name (hub#1054).
     off_apps: list[CatalogAppOut]
