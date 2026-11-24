@@ -40,7 +40,9 @@ comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `orig
 anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
 
 - ESLint sobre sus ficheros TypeScript, JavaScript y Vue y, si toca alguno, la comprobación de tipos (`pnpm typecheck`)
-  y las pruebas de Vitest relacionadas (`vitest related`).
+  y las pruebas de Vitest relacionadas (`vitest related`). Un `.json` que no esté en la raíz (los textos, el mapa de
+  rutas de `frontend/generated/`) pasa solo a `vitest related`: ESLint no lo lee, y los de la raíz configuran las
+  herramientas (con `package.json`, Vitest correría su suite entera).
 - pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
   `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
   contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia). Un
