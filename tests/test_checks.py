@@ -1,7 +1,8 @@
 """``scripts/checks.sh fast``: what a change passes before it is pushed (.githooks/pre-push runs it on the pushed commit).
 
-It runs the guardrail tests of the size of each file, ruff, the import contracts and the cognitive complexity, the
-lists that only shrink included, in seconds, without the network or a database. Then it checks what the change touches:
+It runs the guardrail tests of the size of each file, ruff, the import contracts, the cognitive complexity and a test
+named after each module the branch adds, the lists that only shrink included, in seconds, without the network or a
+database. Then it checks what the change touches:
 ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them, and pytest
 on its test files and on each touched module's ``tests/test_<module>.py``, on Postgres; a touched WORKBOOK runs the
 tests that read the WORKBOOKs. A tree that breaks any of them fails the command, and its output names the file and the
