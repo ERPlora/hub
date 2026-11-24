@@ -141,4 +141,16 @@ describe('SeriesList', () => {
     await settle();
     expect(s.wrapper.findComponent(SeriesFormModal).props()).toMatchObject({ open: true, series: null });
   });
+
+  it.each([
+    ['en', 'Keep it'],
+    ['es', 'No borrar'],
+  ] as const)('in %s, leaving «Delete» without deleting the series says so', async (locale, keep) => {
+    const s = await setup();
+    await s.setLocale(locale);
+    await s.result(OP, page([series('r1')], 1, 100));
+    s.table().vm.$emit('action', { actionId: 'delete', row: series('r1') });
+    await settle();
+    expect(s.inDoc('appointment-series-delete-cancel')?.textContent?.trim()).toBe(keep);
+  });
 });
