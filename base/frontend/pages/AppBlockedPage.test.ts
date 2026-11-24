@@ -2,29 +2,23 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent } from 'vue';
 
+import { app as appRow } from '../__tests__/app-row';
 import { ADMIN, EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations/apps';
 import AppBlockedPage from './AppBlockedPage.vue';
 
+/** A paid app the business has no right to: blocked, off and nowhere to open. */
 function app(id: string, fields: Partial<AppRow> = {}): AppRow {
-  return {
-    id,
-    name: id[0].toUpperCase() + id.slice(1),
-    icon: 'ion:cube-outline',
+  return appRow(id, {
     category: 'catalog',
     category_label: 'Catalog and stock',
-    summary: '',
     premium: true,
     right: 'missing',
     state: 'blocked',
     chosen: false,
     path: null,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
     ...fields,
-  };
+  });
 }
 
 const STORE = 'https://erplora.com/store/modules?business=h1';

@@ -623,7 +623,12 @@ Pasos:
    más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
 3. Una sesión gastada diciendo quién la hizo la nombra junto a la clienta, «Profesional: Ana
    López»; si cambia su nombre en Personal, la fila lo dice al momento.
-Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal).
+4. Una sesión cobrada en el TPV dice su venta por el número con que la nombra Ventas, «Venta:
+   20261123-0003», también la devuelta, y la profesional de su línea (o la de la cuenta, si la línea no
+   dice ninguna), como cuenta Ventas lo que hizo cada una. Quien no puede ver esa venta (Ventas apagada,
+   o una venta que no es suya) ve la fila sin venta.
+Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal); el
+número y la profesional de la venta de cada sesión del TPV, de la lectura de la venta de Ventas.
 Sale: nada; solo lectura.
 Si falla: vacía, «Este bono aún no se ha usado.»; si no se puede leer, «No se han podido cargar los
 movimientos» con el motivo.
@@ -1173,6 +1178,11 @@ con la sesión de quien vende, como hace con Inventario.
   sesión de quien pregunta, a `sale.sale.get` (el número de la venta), a `sale.record.get` (una línea de la venta con
   `sale_line_id`, una de la cuenta con `line_id` y una devolución con `refund_id`, «Devolución de la venta …») y a
   `appointment.appointment.get` (la `label` de la cita). Una `reference` que no es una devolución es la venta anulada.
+- **Lo que los movimientos de un bono dicen de Ventas** (F19): `service.movement.list` llama por su nombre, con la
+  sesión de quien mira, a `sale.sale.get`, una vez por cada venta de la página: su `number` y quién sirvió la línea de
+  la sesión, la de su `order_line_id` (su `staff_id` o, vacío, el de la venta, como cuenta Ventas la producción).
+  Nada se copia en Servicios. Sin Ventas, sin permiso de ver ventas o con una venta que no es suya, `sale_number`
+  va nulo y la lista sale igual.
 
 ### Quién puede qué
 
