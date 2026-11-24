@@ -83,7 +83,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     // The document by the queue's word for it, never as the model sent it.
-    await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · ${product}`);
+    await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · Documento: ${product}`);
     await expect(card(page)).not.toContainText(jobKey);
     await captureStill(page, `${KEY}-${vp.label}`);
   }
@@ -151,7 +151,7 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
   await askForACard(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
+    await expect(card(page)).toContainText(/Cafés del Sur · Importe: 15,00\s€ · Método: Caja/);
     await expect(card(page)).not.toContainText('1500');
     await captureStill(page, `${KEY}-${vp.label}`);
   }
@@ -170,14 +170,14 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
   await askForACard(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
+    await expect(card(page)).toContainText(/Cafés del Sur · Importe: 15,00\s\$ · Método: Caja/);
     await expect(card(page)).not.toContainText('€');
     await captureStill(page, `${KEY}-${vp.label}`);
   }
   await cancelAtComputerSize(page);
   // In yen, without decimals: 1500 is ¥1,500, never «15,00».
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
-  await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1\.500\s¥/); // Its thousands grouped, as every amount of the Hub (hub#734).
+  await expect(card(page)).toContainText(/Cafés del Sur · Importe: 1\.500\s¥ · Método: Caja/); // Its thousands grouped, as every amount of the Hub (hub#734).
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   await leave(context, turnedOn);
@@ -203,14 +203,14 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
   await askForAPriceInDollars(page, 'pricing__price_item__add', price);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`));
+    await expect(card(page)).toContainText(new RegExp(`Tarifa: ${PRICING_CODE}USD · Precio: 15,00\\s\\$`));
     await expect(card(page)).not.toContainText('€');
     await captureStill(page, `${KEY}-${vp.label}`);
   }
   await cancelAtComputerSize(page);
   // In zlotys, the list's, never the business's euros.
   await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify({ ...price, price_list: `${PRICING_CODE}PLN` })}`, { settle: false });
-  await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}PLN · 15,00\\szł`));
+  await expect(card(page)).toContainText(new RegExp(`Tarifa: ${PRICING_CODE}PLN · Precio: 15,00\\szł`));
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   cleanPricing();

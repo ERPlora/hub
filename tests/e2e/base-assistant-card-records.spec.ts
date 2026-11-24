@@ -62,7 +62,7 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
 test('assistant-card — in Spanish a booking whose service comes by its name says that name, never how many', async ({ browser }) => {
   const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
-  const line = 'Crear en Citas: Tinte · 2 nov 2026, 10:00 · Mostrador';
+  const line = 'Crear en Citas: Tinte · Empieza a las: 2 nov 2026, 10:00 · Reservada por: Mostrador';
   await bookingCardSays(page, [{ service: 'Tinte' }], line, ['elemento', CUSTOMER_ID, MEMBER_ID], 'hub-860-service-by-name');
   await cancelAtComputerSize(page);
   await leave(context, turnedOn);
@@ -165,7 +165,7 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   await askForACard(page, `E2E-ASK reservation__reservation__update ${JSON.stringify({ id: booked.id, table_id: table.id })}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · 7 (E2E Card ${stamp})`);
+    await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · Mesa: 7 (E2E Card ${stamp})`);
     for (const raw of [date, ...ids]) await expect(card(page)).not.toContainText(raw);
     await captureStill(page, `${KEY}-${vp.label}`);
   }

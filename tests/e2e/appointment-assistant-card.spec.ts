@@ -172,7 +172,7 @@ for (const language of ['es', 'en'] as const) {
     expect([handedOver.label, handedOver.value]).toEqual([words.professional, diary.other.full_name]);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await expect(card(page)).toContainText(`${detail.data.label} · ${diary.other.full_name}`);
+      await expect(card(page)).toContainText(`${detail.data.label} · ${words.professional}: ${diary.other.full_name}`);
       await expect(card(page)).not.toContainText(AN_ID);
       await capture(page, `hub-635-update-staff-${language}-${vp.label}`);
     }

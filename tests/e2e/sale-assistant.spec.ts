@@ -132,7 +132,7 @@ test('SALE-F35 — in Spanish deleting a section names it, as the Sections scree
     expect(section.status, JSON.stringify(section.data)).toBe(201);
 
     expect(await asked(page, 'sale__department__delete', { id: section.data.id })).toMatchObject({ id: ['Sección', name] });
-    // A normal write is one line, of values with no titles (`cardLine`, BASE-F97): the title goes in what the server sent.
+    // A normal write is one line (`cardLine`, BASE-F97): what it touches goes by its value, the title in what the server sent.
     await expect(card(page)).toContainText(name);
     await untilStill(page);
     await capture(page, `${KEY}-section-1440`);
