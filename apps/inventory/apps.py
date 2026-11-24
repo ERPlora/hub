@@ -50,8 +50,8 @@ class InventoryConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # Each product and category points at a tax category (tax.TaxCategory).
     requires = ["tax"]
-    # The products' own photos (base.images): served by /p/media/ to the hub's sessions only.
-    members_media = ["inventory/products/"]
+    # The products' own photos (base.images): served by /p/media/ to anyone, as the website's catalog shows them.
+    public_media = ["inventory/products/"]
     default_auto_field = "django.db.models.BigAutoField"
     # The allergens by their names: no field of the models labels them, so the assistant's card would say their codes.
     choices = {"allergens": ALLERGENS}

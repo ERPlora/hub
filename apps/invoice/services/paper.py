@@ -17,7 +17,7 @@ from apps.invoice.models import Invoice
 from apps.invoice.queries.documents import render_document
 from apps.invoice.queries.platform_invoices import VERIFACTU_BY_INVOICE
 from apps.invoice.queries.rows import find_invoice
-from apps.invoice.schemas import DocumentIn, PaperOut
+from apps.invoice.schemas.invoices import DocumentIn, PaperOut
 from apps.invoice.services.writes import logger
 
 PRINT_JOB = "printing.job.create"

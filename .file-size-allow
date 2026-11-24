@@ -5,7 +5,6 @@
 # fits its cap, and no path or higher number is ever added.
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
-1633 apps/appointment/queries/__init__.py ERPlora/erplora-next#74
 1122 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 821 apps/attendance/queries/__init__.py ERPlora/erplora-next#74
@@ -14,7 +13,7 @@
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 758 apps/cart_checkout/services.py ERPlora/erplora-next#74
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
-622 apps/cash_register/schemas.py ERPlora/erplora-next#74
+622 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
 742 apps/cash_register/services.py ERPlora/erplora-next#74
 301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
 1047 apps/combo/queries/__init__.py ERPlora/erplora-next#74
@@ -30,14 +29,13 @@
 555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1057 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
 462 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
-1027 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
 830 apps/modifier/queries/__init__.py ERPlora/erplora-next#74
 665 apps/modifier/schemas/__init__.py ERPlora/erplora-next#74
 686 apps/modifier/services/__init__.py ERPlora/erplora-next#74
-732 apps/online_booking/queries.py ERPlora/erplora-next#74
+726 apps/online_booking/queries.py ERPlora/erplora-next#74
 515 apps/online_booking/schemas.py ERPlora/erplora-next#74
 565 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
 597 apps/payment/services.py ERPlora/erplora-next#74
@@ -82,13 +80,13 @@
 977 apps/tax/queries.py ERPlora/erplora-next#74
 696 apps/tax/schemas.py ERPlora/erplora-next#74
 627 apps/tax/services.py ERPlora/erplora-next#74
-1032 apps/tax/tests/test_services.py ERPlora/erplora-next#74
+1031 apps/tax/tests/test_services.py ERPlora/erplora-next#74
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
 401 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
 742 apps/verifactu/models.py ERPlora/erplora-next#74
 1978 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
-576 apps/website/queries.py ERPlora/erplora-next#74
+567 apps/website/queries.py ERPlora/erplora-next#74
 558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74

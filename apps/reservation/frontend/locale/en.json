@@ -239,7 +239,8 @@
         "from": "From",
         "to": "To",
         "max": "Max",
-        "maxCovers": "Max guests (optional)",
+        "maxCovers": "Max guests",
+        "optional": "Optional",
         "submit": "Create slot"
       },
       "blockedForm": {

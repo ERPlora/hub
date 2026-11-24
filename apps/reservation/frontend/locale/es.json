@@ -239,7 +239,8 @@
         "from": "Desde",
         "to": "Hasta",
         "max": "Máx",
-        "maxCovers": "Máx comensales (opcional)",
+        "maxCovers": "Máx comensales",
+        "optional": "Opcional",
         "submit": "Crear franja"
       },
       "blockedForm": {

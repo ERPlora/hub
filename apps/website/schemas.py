@@ -21,6 +21,7 @@ from pydantic import AfterValidator, ConfigDict, StringConstraints, field_valida
 
 from apps.website import reviews
 from apps.website.palettes import own_colours
+from base.allergens import AllergensOut
 from base.schemas.public_images import ImageType
 
 
@@ -311,12 +312,15 @@ class Content(Strict):
 # The catalog, as the page paints it
 
 
-class CatalogItemOut(Schema):
+class CatalogItemOut(AllergensOut):
     name: str
     price: int | None = Field(description="In cents; none = no price shown.")
     price_kind: PriceKind = Field(description="fixed, from, hourly, free or none.")
     minutes: int | None = Field(None, description="A service's duration.")
     price_label: str = Field("", description="The price as the page prints it, in the visitor's language.")
+    description: str = Field("", description="A product's description; empty for a service.")
+    image_url: str = Field("", description="Where its photo is served; empty: none (the page shows its initial).")
+    allergens_label: str = Field("", description="«Allergens: Gluten, Milk» in the visitor's language; empty: none.")
 
 
 class CatalogGroupOut(Schema):
@@ -393,6 +397,9 @@ class CategoryIn(Schema):
 
 class QrIn(Schema):
     format: Literal["png", "svg"] = Field("png", description="png (to print) or svg (to scale).")
+    target: Literal["page", "catalog"] = Field(
+        "page", description="page (the website's address) or catalog (that address, right at its catalog)."
+    )
 
 
 # Outputs

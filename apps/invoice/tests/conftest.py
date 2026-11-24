@@ -18,6 +18,7 @@ from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
+from pydantic import ValidationError
 
 from base import assistant
 from base.models import Membership
@@ -58,6 +59,10 @@ def ctx_for(
     return OperationContext(
         scope=scope, actor=actor, permissions=permissions, language=language
     )
+
+
+def fields(error: ValidationError) -> set[str]:
+    return {".".join(str(part) for part in item["loc"]) for item in error.errors()}
 
 
 def run(name: str, data: dict | None = None, ctx: OperationContext | None = None):
