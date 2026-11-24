@@ -12,7 +12,7 @@ import re
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
-from django.urls import clear_script_prefix, reverse, set_script_prefix
+from django.urls import clear_script_prefix, set_script_prefix
 
 from base import health
 from base.tenancy.tests.business import HOST, HUB_DB, A, B

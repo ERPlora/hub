@@ -17,6 +17,7 @@ from . import (
     offboarding as offboarding,
     people as people,
     photo as photo,
+    platform_hub as platform_hub,
     profile as profile,
     provisioning as provisioning,
     relay_runs as relay_runs,
