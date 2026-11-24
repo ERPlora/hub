@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8b7e47f7f141aca9e24a3d7b5f88454b242a10776f79d54762614ca61cea5f3e -->
+<!-- generated from WORKBOOK.md sha256:9abfe5a926a37ac6bdc0a16a5144bc5c53150a7fa27073561292dd7bd742649b -->
 
 ## What it is for and who it is for
 
@@ -2074,6 +2074,9 @@ Steps:
      name." shows.
   3. For a new folder, tap "New folder", type the "Folder name" (up to 100 characters) and tap "Create folder".
      "Folder created." shows and the folder appears in the tree and in the open folder.
+  4. From the assistant, a file attached in the chat is kept the same way: the person asks it to keep it in a folder,
+     the assistant uploads it with its card, which says it by its name, and after the "yes" it is in the folder, with
+     the same rules (BASE-F94).
 In: the files, up to 25 MB each, or the folder's name; the open folder.
 Out: the file or the folder, in the business's files (`base.file.uploaded`, `base.file.folder_created`).
 If it fails: each refused file says why, without stopping the others: "Could not upload “{name}”: {reason}", with
@@ -2084,7 +2087,7 @@ at a time and the new one closes the one before, never one on top of another. Wh
 valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
 Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
 administrator can change the files.".
-Involved: BASE-F40
+Involved: BASE-F40, BASE-F94
 
 ### BASE-F74 Preview and download a file
 Status: done
@@ -2534,7 +2537,9 @@ Steps:
      with the conversation while the page stays open; once it is reloaded, the conversation only remembers what they
      were called.
   3. The assistant does not read the copy of a business: if the person asks it to load it, the assistant loads it
-     with its card, as Import does (BASE-F31, BASE-F97). If the page was reloaded before saying "yes", it loads
+     with its card, as Import does (BASE-F31, BASE-F97). Any attachment, a photo or a PDF too, it keeps in Files when
+     asked: it uploads it to the folder with its card, which says it by its name, and the very same file is in the
+     folder, as with "Upload file" (BASE-F73). If the page was reloaded before saying "yes", it loads and keeps
      nothing and asks for it to be attached again.
   4. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
      app, the device) asks for permission to use the microphone; while it asks, another tap does not open a second
@@ -2546,18 +2551,19 @@ Steps:
 In: the files (8 MB each; the copy of a business, 20 MB as in Import; and 20 MB among all those of a question) or the
 recording.
 Out: the file travels with the question to erplora.com, which reads it; the copy of a business stays in the
-business: erplora.com only gets its name. The recording goes through the business to erplora.com's transcription.
+business: erplora.com only gets its name. What is loaded or kept in Files is the file the person attached, as it
+is. The recording goes through the business to erplora.com's transcription.
 The browser never talks to erplora.com directly.
 If it fails: in one line over the box, and the file is not attached: "menu.pdf is too large: 8 MB at most per file.",
 "The file could not be read: the file is larger than 20 MB." (the copy of a business, as in Import), "The files of
 one question add up to 20 MB at most.", "menu.rar cannot be attached: images, PDF, Word, Excel, text or CSV." or
-"menu.pdf could not be read.". A copy no longer in the conversation is not loaded: "There is no file
+"menu.pdf could not be read.". A file no longer in the conversation is neither loaded nor kept: "There is no file
 «copia.blueprint.zip» attached to this conversation: attach it again.". With the microphone blocked, "Microphone access is blocked. Allow it in
 your browser to dictate." and, in the installed app (Android or Windows), where there is no browser, "Microphone
 access is blocked. Allow it in your device settings to dictate."; a recording too long, "The recording is too long:
 dictate a shorter message."; no voice, "Nothing was heard. Try again closer to the microphone."; and if it cannot be
 transcribed, "The audio could not be transcribed. Try again.".
-Involved: BASE-F93, BASE-F97
+Involved: BASE-F73, BASE-F93, BASE-F97
 
 ### BASE-F95 Read the answer: text, lists, tables and links
 Status: done
