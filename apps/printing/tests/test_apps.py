@@ -142,7 +142,7 @@ def test_the_homes_step_is_set_up_your_printer_done_once_a_device_prints_the_rec
         False,
     )
     assert "configured" in registry[step.operation].output.model_fields
-    assert home.level_of(f"printing.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"printing.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
@@ -241,7 +241,7 @@ def test_its_card_of_system_is_your_printer_for_everybody_with_printing_and_base
         "printing.view_settings" in permissions_for_role([config()], role)
         for role in ("hub_owner", "hub_admin", "hub_manager", "hub_employee")
     )
-    assert home.system_card_errors([config()]) == []
+    assert home.system_cards.system_card_errors([config()]) == []
     assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == []
 
 
