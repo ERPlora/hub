@@ -62,14 +62,10 @@ def named(ctx: OperationContext, texts: Iterable[str], searched: Iterable[str]) 
 
 @cache
 def _names(label: str, language: str) -> frozenset[str]:
-    """The stems of app ``label``'s name in English and in ``language``, as the menu says it: compared with the words as
-    they are said, never with what they also mean («precio» is no Price Lists; «reservas» is Reservations)."""
-    config = django_apps.get_app_config(label)
-    found: set[str] = set()
-    for code in ("en", language):
-        with translation.override(code):
-            found |= stems(str(config.verbose_name))
-    return frozenset(found)
+    """The stems of app ``label``'s name in ``language``, as the person's menu says it: compared with the words as they
+    are said, never with what they also mean («precio» is no Price Lists; «reservas» is Reservations)."""
+    with translation.override(language):
+        return frozenset(stems(str(django_apps.get_app_config(label).verbose_name)))
 
 
 def said(ctx: OperationContext, apps: list[dict]) -> str:
