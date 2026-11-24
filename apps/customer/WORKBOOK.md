@@ -638,7 +638,8 @@ Actor: sistema (lo pide Venta)
 Pantalla: ninguna
 Pasos:
 1. Con un cliente asignado, Venta abre o guarda el pedido (la cuenta de la mesa, el carrito) y le
-   pide a Clientes que lo enlace.
+   pide a Clientes que lo enlace. Citas hace lo mismo con la cuenta que abre al cobrar una cita, con la
+   clienta de la cita (APPOINTMENT-F17).
 2. Clientes anota qué cliente tiene ese pedido. Reasignar otro cliente al mismo pedido sustituye el
    anterior (un pedido, como mucho un cliente); el mismo cliente otra vez no reescribe nada.
 3. Al soltar el cliente (quitarlo, dejar la cuenta en la mesa, eliminar la cuenta), Venta pide el
@@ -649,7 +650,7 @@ Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17) y, al cobrar un
 cliente (por el asistente o la API), para que la venta sea suya (SALE-F01).
 Si falla: la venta sigue; Venta avisa «No se ha podido unir el cliente a la cuenta. Vuelve a
 elegirlo.» (o con el motivo que dé Clientes). Un cliente que ya no está disponible no se enlaza.
-Implicados: SALE-F01, SALE-F17
+Implicados: SALE-F01, SALE-F17, APPOINTMENT-F17
 
 ### CUSTOMER-F20 Sumar la compra a la ficha al cobrar
 Estado: hecho

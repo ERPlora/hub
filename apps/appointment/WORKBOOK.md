@@ -572,9 +572,12 @@ Pasos:
    línea **de servicio** por cada servicio de la cita (como si se tocara en «Servicios» del TPV),
    con el profesional que lo hizo y **al precio con que se reservó** (el propio de la
    profesional incluido), aunque el catálogo haya cambiado desde entonces, y lleva a **Venta** con esa
-   cuenta en pantalla.
+   cuenta en pantalla. La cuenta ya lleva **asignada a la clienta** de la cita, como si se hubiera
+   elegido en «Asignar cliente» (CUSTOMER-F19).
 3. En el TPV se añaden productos o descuentos, un servicio se
-   puede pagar con un **bono** de la clienta y se cobra como cualquier venta.
+   puede pagar con un **bono** de la clienta y se cobra como cualquier venta: la venta es de la clienta y
+   la compra suma en su ficha (CUSTOMER-F20). Si en el TPV se le quita o se cambia la clienta, volver con
+   **Ir a la cuenta** la deja como la dejó el TPV.
 4. Una cita tiene **una sola cuenta**: mientras sigue abierta, el botón se llama **Ir a la cuenta** y
    vuelve a ella (nunca abre otra, aunque se pulse a la vez en dos dispositivos); si se anula la cuenta
    en el TPV, **Cobrar** abre una nueva. Con la cuenta abierta, la cita no se cancela, ni se marca como
@@ -589,8 +592,10 @@ Si falla: «Una cita cancelada o no presentada no se cobra.»; ya cobrada, tambi
 cobrar y el aviso aún no ha llegado, «Esta cita ya está cobrada.»; un servicio sin categoría fiscal, el aviso de que
 hay que ponérsela en Servicios antes de cobrar; con Venta apagada, «El TPV (Venta) no está activo en este
 negocio: la cita no se puede cobrar allí.»; un servicio que ya no se ofrece o un precio que no es el de la cita, la
-frase de Venta; sin permiso de vender, el aviso de Venta.
-Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38
+frase de Venta; sin permiso de vender, el aviso de Venta. Si la ficha de la clienta ya no está disponible
+(eliminada, unida a otra o con los datos borrados) o quien cobra no tiene permiso para asignar clientes, la
+cuenta se abre igual, sin cliente, y el TPV sigue ofreciendo «Asignar cliente».
+Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38, CUSTOMER-F19, CUSTOMER-F20
 
 ### APPOINTMENT-F18 Cita que reserva la clienta
 Estado: hecho
