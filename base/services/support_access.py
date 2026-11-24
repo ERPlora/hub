@@ -21,8 +21,8 @@ from base.services.single_row import locked_single_row
     output=SupportAccessOut,
     ai=AI(
         description=(
-            "Turns on or off ERPlora's support access: on, ERPlora's support staff may come into this business to help "
-            "set it up, until someone of the business turns it off; it comes off."
+            "Turns on or off ERPlora's support access: on, ERPlora's support staff may enter this business to help set "
+            "it up, until someone of the business turns it off; off by default."
         ),
         asks={
             "en": ("let ERPlora support in to help us set up", "turn off ERPlora's support access"),

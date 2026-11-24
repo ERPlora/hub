@@ -293,6 +293,7 @@ BASE_SCREENS = {
     "role": "employees",
     "setup": "home",
     "support": "report",
+    "support_access": "settings",
     "system": "system",
 }
 

@@ -19,11 +19,11 @@ RECENT_VISITS = 10
     output=SupportAccessOut,
     ai=AI(
         description=(
-            "Says whether ERPlora's support staff may come into this business to help set it up, who changed that "
-            "last, whether who asks may change it, and the last entries of support (who and when)."
+            "Says whether ERPlora's support staff may enter this business to help set it up, who changed that last, "
+            "whether who asks may change it, and the last times support entered (who and when)."
         ),
         asks={
-            "en": ("can ERPlora support get into our business?", "who from ERPlora support has come in?"),
+            "en": ("can ERPlora support get into our business?", "who from ERPlora support has entered?"),
             "es": ("¿puede entrar el soporte de ERPlora en el negocio?", "¿quién de soporte de ERPlora ha entrado?"),
         },
     ),

@@ -10,16 +10,16 @@ class SupportAccessIn(Schema):
 
 
 class SupportVisitOut(Schema):
-    person: str = Field(description="Who of ERPlora's support came in: their name, else their email.")
+    person: str = Field(description="Who of ERPlora's support entered: their name, else their email.")
     entered_at: dt.datetime
 
 
 class SupportAccessOut(Schema):
-    enabled: bool = Field(description="Whether ERPlora's support may come into the business; it comes off.")
+    enabled: bool = Field(description="Whether ERPlora's support may enter the business; off by default.")
     can_change: bool = Field(description="Whether who asks may change it (who runs the business).")
     updated_by: str = Field(description="Who changed it last; empty if nobody has.")
     updated_at: dt.datetime | None
-    visits: list[SupportVisitOut] = Field(description="The last entries of support, the most recent first.")
+    visits: list[SupportVisitOut] = Field(description="The last times support entered, the most recent first.")
 
 
 class SupportAccessUpdateIn(Schema):
