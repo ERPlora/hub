@@ -913,14 +913,17 @@ Pasos:
 Entra: la cuenta abierta y su total calculado por el servidor.
 Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta. Imprimirla
 deja la cuenta marcada como pedida, salga por la impresora de tiques o por el diálogo del dispositivo, hasta que
-se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita.
+se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita. Pedida al
+asistente («imprime la cuenta de la mesa 4»), solo sale por la impresora de tiques: si ninguna la recibe, no se
+imprime ni se marca, y su recibo dice que no se hizo, con el motivo: «Ninguna impresora de tiques recibe esta
+cuenta: ábrela en Ventas para imprimirla en este dispositivo.».
 Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
 papel nunca sale con una cifra supuesta; si la moneda no se puede leer, lo dice con «Reintentar», como si falla
 el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; si la app instalada no abre su
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09, TABLE-F34, INVOICE-F21
+Implicados: PRINTING-F09, TABLE-F34, INVOICE-F21, BASE-F97
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho
@@ -1168,8 +1171,13 @@ abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir 
 «Emitir ahora» rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.». Una venta que la persona no ve (la
 de otro, para un empleado) no se abre, no se reimprime ni se emite: la ventana dice «Error cargando el
-documento» y la API o el asistente, «Esa venta no existe.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+documento» y la API o el asistente, «Esa venta no existe.». Si se le pide al asistente («reimprime el último
+tique»), solo se hace si una impresora de tiques recibe el papel; si no, no se imprime nada y su recibo dice que no se
+hizo, con el motivo: «Ninguna impresora de tiques recibe el papel de esta venta: abre la venta para imprimirlo en este
+dispositivo.»; con su documento fiscal pendiente, «Su documento fiscal sigue pendiente: abre la venta para
+emitirlo.», y si no se puede leer su registro de VeriFactu, «No se pudo leer su registro de VeriFactu, y su papel
+nunca se imprime sin su QR.».
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho
@@ -1594,7 +1602,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | El mismo cobro, con un descuento por encima del máximo | descuento sin tope | F14 | `sale.sale.complete_over_limit` |
 | Anula una venta cobrada con motivo (y devuelve sus sesiones de bono); con su rectificativa en la misma anulación (y antes su tique, si estaba pendiente) | anular | F30, F32 | `sale.sale.void` |
 | Emite ahora los documentos fiscales de una venta que esperan («Emitir ahora»): su tique o factura y las rectificativas de su anulación y de sus devoluciones | cobrar (y el permiso de Facturación de cada documento) | F29 | `sale.sale.issue_documents` |
-| Vuelve a imprimir el tique o la factura de una venta, con «DUPLICADO», por la impresora de tiques; si no se puede encolar, lo dice y lo imprime el dispositivo | ver ventas | F29 | `sale.sale.print` |
+| Vuelve a imprimir el tique o la factura de una venta, con «DUPLICADO», por la impresora de tiques; si ninguna lo recibe (o su documento fiscal está pendiente, o no se puede leer su QR), falla y dice por qué, y la pantalla lo imprime en el dispositivo | ver ventas | F29 | `sale.sale.print` |
 | Devuelve dinero de una venta por cobro, y las líneas que vuelven (las pagadas con bono devuelven su sesión); con su rectificativa en la misma devolución | devolver | F31, F32 | `sale.sale.refund` |
 | Abre una cuenta, con o sin líneas (artículos, servicios —a su precio reservado o al de la profesional— o precio libre); la de una cita que ya tiene una abierta devuelve esa (`already`) | montar la cuenta | F01, F17, F26, F38 | `sale.order.open` |
 | Añade un artículo del catálogo a una cuenta | montar la cuenta | F01, F10 | `sale.order.add_line` |
@@ -1619,7 +1627,8 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Pone el descuento de una línea (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Pone el título de una cuenta (aparcar) | montar la cuenta | F17 | `sale.order.set_label` |
 | Enlaza una cuenta a su cita | montar la cuenta | F26 | `sale.order.set_appointment` |
-| Imprime la cuenta de una mesa (no es factura: sin número ni cobro) por la impresora de tiques, o dice que no se encoló y la imprime el dispositivo; la mesa queda «Cuenta pedida» hasta cobrarla entera | ver ventas | F21 | `sale.order.print_bill` |
+| Imprime la cuenta de una mesa (no es factura: sin número ni cobro) por la impresora de tiques; si ninguna la recibe, falla y dice por qué, y la pantalla la imprime en el dispositivo; la mesa queda «Cuenta pedida» hasta cobrarla entera | ver ventas | F21 | `sale.order.print_bill` |
+| Apunta que el dispositivo imprimió la cuenta de una mesa porque ninguna impresora de tiques la recibió: la mesa queda «Cuenta pedida»; solo la pantalla (el asistente no imprime en el dispositivo) | ver ventas | F21 | `sale.order.note_bill` |
 | Crea un medio de pago | crear medios de pago | F37 | `sale.payment_method.create` |
 | Guarda los ajustes del TPV | ajustes | F34 | `sale.settings.update` |
 | Crea, cambia y elimina secciones | ajustes | F35 | `sale.department.create`, `.update`, `.delete` |

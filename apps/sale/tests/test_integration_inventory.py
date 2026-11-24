@@ -208,7 +208,8 @@ def test_an_article_that_sells_out_after_ordering_is_still_split_merged_printed_
     shampoo = next(line for line in first.lines if line.sku == "SHA")
     split = run("sale.order.split", {"order_id": str(first.id), "line_ids": [str(shampoo.id)]}).new_order
     run("sale.order.merge", {"from_order_id": str(second.id), "to_order_id": str(split.id)})
-    run("sale.order.print_bill", {"order_id": str(split.id)})
+    run("printing.printer.create", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"})
+    assert run("sale.order.print_bill", {"order_id": str(split.id)}).queued is True
     assert run("sale.checkout.preview", {"order_id": str(split.id)}).total == 2400
     sale = run(
         "sale.sale.complete",

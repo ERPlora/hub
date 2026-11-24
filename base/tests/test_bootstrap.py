@@ -26,7 +26,7 @@ import pytest
 from django.conf import settings as django_settings
 from psycopg import errors, sql
 
-from base.tenancy import bootstrap
+from base.tenancy import bootstrap, sequences
 
 #: The contract with the aws repo (``stacks/prod/apps.tf``, task ``db-bootstrap``): role → variable.
 VARIABLES = {
@@ -331,6 +331,21 @@ def hub_from_template(cluster: Cluster) -> str:
             )
         )
     return hub
+
+
+def test_hub_migrator_writes_down_the_counters_of_a_hub_it_cloned(cluster):
+    with cluster.connect("hub_migrator", cluster.names.template) as conn:
+        conn.execute("INSERT INTO django_migrations (app, name, applied) VALUES ('base', '0001_initial', now())")
+    hub = hub_from_template(cluster)
+    credit = "SELECT log_cnt FROM django_migrations_id_seq"
+    try:
+        with cluster.connect("hub_migrator", hub) as conn:
+            assert conn.execute(credit).fetchone()[0] > 0
+            sequences.write_down(conn)
+            assert conn.execute(credit).fetchone()[0] == 0
+    finally:
+        with cluster.connect("hub_migrator", "postgres") as conn:
+            conn.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(hub)))
 
 
 @pytest.mark.parametrize("database", ["control", "a hub cloned from the template"])

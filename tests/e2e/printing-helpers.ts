@@ -27,6 +27,22 @@ export async function flowShots(page: Page, key: string, ready: (page: Page) => 
   await page.setViewportSize(restore);
 }
 
+/** The sizes the fleet checks a screen at: desktop, tablet and a low phone. */
+const FLEET_SIZES = [
+  { width: 1440, height: 900 },
+  { width: 820, height: 1180 },
+  { width: 375, height: 667 },
+] as const;
+
+/** Screenshots `<key>-<width>x<height>` at the fleet's sizes, each once `ready` says what it shows is there. */
+export async function fleetShots(page: Page, key: string, ready: (page: Page) => Promise<void>): Promise<void> {
+  for (const size of FLEET_SIZES) {
+    await page.setViewportSize(size);
+    await ready(page);
+    await capture(page, `${key}-${size.width}x${size.height}`);
+  }
+}
+
 interface Claimed {
   job: { id: string; attempts: number } | null;
 }

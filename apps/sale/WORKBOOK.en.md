@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d982ec32d11d708995f04794a1597d2ac0585310490e2fc6279d0103d79d82da -->
+<!-- generated from WORKBOOK.md sha256:42ef32bbd0ecd68a80faaa4ceb80b634c673de172be98eedc2f0afba9a22f7c6 -->
 
 ## What it is for and who it is for
 
@@ -913,13 +913,16 @@ In: the open check and its total worked out by the server.
 Out: a paper with no fiscal number; it uses up no numbering and creates no sale. Each press, one bill. Printing it
 leaves the check marked as requested, whether it comes out on the receipt printer or through the device's dialog,
 until it is charged in full or deleted; printing it again, adding lines or charging part of it does not remove it.
+Asked of the assistant ("print the bill for table 4"), it only comes out on the receipt printer: if none takes it,
+it is neither printed nor marked, and its receipt says it was not done, with the reason: "No receipt printer takes
+this bill: open it in Sales to print it on this device.".
 If it fails: while the business has not yet said its currency, "Bill" keeps loading and the printer stays grey:
 the paper never goes out with a supposed figure; if the currency cannot be read, it says so with "Retry", as
 when the bill cannot be worked out. If it does not print, "Bill could not be printed"; if the installed app does
 not open its print screen, the notice says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
 another business".
-Involved: PRINTING-F09, TABLE-F34, INVOICE-F21
+Involved: PRINTING-F09, TABLE-F34, INVOICE-F21, BASE-F97
 
 ### SALE-F22 Charge only part of the check
 Status: done
@@ -1169,8 +1172,12 @@ not open its print screen, with the reason after a colon, as when printing the b
 refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes nothing; with no reason,
 "The documents could not be issued. Try again.". A sale the person does not see (someone else's, for an
 employee) is not opened, reprinted or issued: the window says "Error loading the document" and the API or
-the assistant, "That sale does not exist.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+the assistant, "That sale does not exist.". If the assistant is asked ("reprint the last ticket"), it is only done
+if a receipt printer takes the paper; if not, nothing is printed and its receipt says it was not done, with the
+reason: "No receipt printer takes this sale's paper: open the sale to print it on this device."; with its fiscal
+document pending, "Its fiscal document is still pending: open the sale to issue it.", and if its VeriFactu record
+cannot be read, "Its VeriFactu record could not be read, and its paper never prints without its QR.".
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
 Status: done
@@ -1596,7 +1603,7 @@ the quick notes and what is refundable can be followed live.
 | The same charge, with a discount above the maximum | uncapped discount | F14 | `sale.sale.complete_over_limit` |
 | Voids a charged sale with a reason (and gives back its voucher sessions); with its corrective invoice in the same void (and its ticket first, if it was pending) | void | F30, F32 | `sale.sale.void` |
 | Issues now a sale's fiscal documents that are waiting ("Issue now"): its ticket or invoice and the corrective invoices of its void and its refunds | charge (and Invoicing's permission for each document) | F29 | `sale.sale.issue_documents` |
-| Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if it cannot be queued, it says so and the device prints it | see sales | F29 | `sale.sale.print` |
+| Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if none takes it (or its fiscal document is pending, or its QR cannot be read), it fails and says why, and the screen prints it on the device | see sales | F29 | `sale.sale.print` |
 | Refunds money from a sale per payment, and the lines that go back (the ones paid with a voucher give back their session); with its corrective invoice in the same refund | refund | F31, F32 | `sale.sale.refund` |
 | Opens a check, with or without lines (articles, services —at their booked price or at the professional's— or open price); that of an appointment that already has an open one returns that one (`already`) | build the check | F01, F17, F26, F38 | `sale.order.open` |
 | Adds a catalog article to a check | build the check | F01, F10 | `sale.order.add_line` |
@@ -1621,7 +1628,8 @@ the quick notes and what is refundable can be followed live.
 | Sets a line's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Sets a check's title (parking) | build the check | F17 | `sale.order.set_label` |
 | Links a check to its appointment | build the check | F26 | `sale.order.set_appointment` |
-| Prints the bill of a table (not an invoice: no number, no payment) on the receipt printer, or says it was not queued and the device prints it; the table shows "Bill requested" until it is charged in full | see sales | F21 | `sale.order.print_bill` |
+| Prints the bill of a table (not an invoice: no number, no payment) on the receipt printer; if none takes it, it fails and says why, and the screen prints it on the device; the table shows "Bill requested" until it is charged in full | see sales | F21 | `sale.order.print_bill` |
+| Notes that the device printed a table's bill because no receipt printer took it: the table shows "Bill requested"; the screen only (the assistant does not print on the device) | see sales | F21 | `sale.order.note_bill` |
 | Creates a payment method | create payment methods | F37 | `sale.payment_method.create` |
 | Saves the POS settings | settings | F34 | `sale.settings.update` |
 | Creates, changes and deletes sections | settings | F35 | `sale.department.create`, `.update`, `.delete` |
