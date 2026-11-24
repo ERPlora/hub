@@ -30,6 +30,9 @@ export interface AppRow {
   required_by: string[];
   /** Why turning it on (when off) or off (when on) is refused, in the reader's language: neither is offered. */
   refusal: string | null;
+  /** What else flipping its switch turns on or off, as its question says it before the yes (`base.app_switch`, the
+   *  assistant's card says the same): «Mesas se desactiva con ella: solo la necesitaba Reservas.»; empty: nothing else. */
+  along_said: string;
   /** The business's country requires it on (hub#997): «Mandatory in {country}»; once on, it never goes off there. */
   mandatory: boolean;
 }
