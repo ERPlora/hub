@@ -27,6 +27,7 @@ from base.permissions import OWN_BUSINESS
 from base.registry import internal_only
 from base.schemas.reset import HubResetApplyIn, HubResetApplyOut, HubResetIn, HubResetOut
 from base.services.blueprints import _stop_waiting, _waiting_loads, _who
+from base.services.platform_hub import refuse_platform_hub
 from base.services.provisioning import LEASE_OWNER, ProvisioningStopped, _control_transaction, _leased, ring
 from control.models import HubDue
 
@@ -68,11 +69,13 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
     a copy of its database first, by the worker, and only then the sections emptied («The reset of a business»,
     below).
 
-    Without a bucket for its copy it is unavailable (503); while one runs, a second one waits for it (409)."""
+    Without a bucket for its copy it is unavailable (503); while one runs, a second one waits for it (409). ERPlora's own
+    hub is never emptied (409)."""
     from base.tenancy import dumps
 
     with translation.override(ctx.language):
         hub = Hub.objects.get(slug=ctx.scope.key)
+        refuse_platform_hub(hub)
         confirm_with = hub.name.strip() or ctx.scope.key
         sections = blueprint.removal.reset_plan(ctx)
         answer = {

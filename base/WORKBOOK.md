@@ -4097,7 +4097,8 @@ Implicados: BASE-F97, BASE-F100
   `base.blueprint.list` (con `empty`, viva), `base.blueprint.export` (GET, el fichero en base64),
   `base.import.list` (con `unfinished`, viva) y `base.dataset.list`; órdenes `base.blueprint.inspect` (no escribe;
   orden porque su entrada es un fichero), `base.blueprint.import` (plantilla, fichero o `retry_of`),
-  `base.import.undo` y `base.hub.reset` (`dry_run` = el plan). Eventos `base.blueprint.imported`,
+  `base.import.undo` y `base.hub.reset` (`dry_run` = el plan; en el negocio propio de ERPlora, 409
+  `base.platform_hub_kept`: no se vacía nunca). Eventos `base.blueprint.imported`,
   `base.import.undone` y `base.hub.data_reset`, tras los que se re-ejecutan las consultas vivas del Inicio.
 - `base.ImportBatch` (modelo de hub, migración `0009`) guarda cada importación: informe, filas creadas por parte
   (lo que deshace), origen y versión de la plantilla (lo que reintenta).
@@ -4180,9 +4181,9 @@ Implicados: BASE-F97, BASE-F100
   ERPlora (`Hub.is_platform`) no tiene plan ni foto, y no la tendrá porque el SaaS no lo conoce: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Esta pantalla no se abre en ese hub: su slug es reservado y su host da 404 antes de
-  mirar el registro (`test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready`), y si algún día se
-  abriera, el aviso de plan desconocido le prometería uno que nunca llega. Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
+  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`), donde nadie tiene acceso
+  todavía: queda por decidir qué enseña aquí, porque el aviso de plan desconocido le prometería uno que nunca llega.
+  Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
   `test_plan_usage_figures.py`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
   `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
@@ -4308,8 +4309,9 @@ Implicados: BASE-F97, BASE-F100
   propio de ERPlora (`PLATFORM_HUB_SLUG`; una fila del registro con BD propia, de `create_platform_hub`)
   contesta el negocio de ERPlora, su emisor:
   `PLATFORM_ISSUER_LEGAL_NAME` y `PLATFORM_ISSUER_COUNTRY` con la moneda de ese país, la zona y el idioma del despliegue,
-  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host no sirve
-  pantallas (`erplora` es un slug reservado: 404). La moneda que cobra cada app es
+  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host es el de
+  `PLATFORM_HUB_SLUG` (`erp`), el único nombre reservado que se sirve (`base/tests/test_platform_hub_host.py`). La moneda
+  que cobra cada app es
   `base.operations.business_currency(scope)`: la de `base.business.get` leída como la plataforma (`system_context`;
   una API key solo tiene los permisos de lo que cobra) y, en un ámbito que no es de ningún hub, su `NotFound`, nunca un
   `EUR` por defecto (`base/tests/test_business_currency.py`). Un importe con su moneda lo escribe el servidor solo con
@@ -5161,6 +5163,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.location.list` | ninguno: solo el asistente y la API |
 | `base.hub.cut_finish` | ninguno: `manage.py cut_shared_hubs` y el migrador, al dar a un negocio su propia base de datos |
 | `base.hub.by_slugs`, `base.hub.seed_local` | ninguno: `manage.py seed_local_hubs`, solo en desarrollo |
+| `base.hub.platform_rename` | ninguno: `manage.py create_platform_hub --rename`, el nombre del negocio propio de ERPlora |
 
 ## Lo que queda fuera
 

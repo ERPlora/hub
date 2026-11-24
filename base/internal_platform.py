@@ -2,16 +2,16 @@
 rest of ``/internal`` (``base.internal``): ``GET …/health`` (200 ``{"status": "ok"}`` or 503 ``{"status":
 "unconfigured", "detail"}``), ``POST …`` (the body of the SaaS's ``platform_payload()``; 201, or 200 when it was issued before), ``GET …/{id}`` (its
 status) and ``GET …/{id}/pdf`` (its PDF, printed after the read, outside any transaction). Each runs its operation of
-Invoicing as the system on ``PLATFORM_HUB_SLUG`` and answers ``{"status", "qr", "error"}``.
+Invoicing as the system on the platform hub and answers ``{"status", "qr", "error"}``.
 
-They run in the platform hub's own database (its registry row, made by ``create_platform_hub``).
+They run in the platform hub's own database (its registry row, made by ``create_platform_hub``), under the name that row
+has (``base.platform_hub``).
 """
 
 import json
 import logging
 from uuid import UUID
 
-from django.conf import settings
 from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -24,10 +24,6 @@ from base.tenancy.identity import HubIdentityMismatch
 
 # Every door of /internal logs as one: the alarms and the tests read ``base.internal``.
 logger = logging.getLogger("base.internal")
-
-
-def _platform_context():
-    return system_context(Scope("host", settings.PLATFORM_HUB_SLUG))
 
 
 def _issue_answer(answer) -> dict:
@@ -43,10 +39,10 @@ def _platform_call(name: str, payload: dict):
     """Runs ``name`` as the system on the platform hub, in its own database: its output, or the response of its
     refusal.
 
-    The platform hub is the registry's row of ``PLATFORM_HUB_SLUG`` with a database of its own, as any business
+    The platform hub is the registry's row ``registry.platform_hub_row`` with a database of its own, as any business
     (``manage.py create_platform_hub --execute`` makes both): without it, 503 ``base.platform_hub_missing``, saying
     so; a database that is not its own or cannot be reached now, 503 as for any business."""
-    hub = registry.hub_by_slug(settings.PLATFORM_HUB_SLUG)
+    hub = registry.platform_hub_row()
     if hub is None or registry.refusal(hub) is not None:
         return None, refuse(
             503,
@@ -55,7 +51,7 @@ def _platform_call(name: str, payload: dict):
         )
     try:
         with use_hub(hub):
-            return _operation_call(name, payload, _platform_context())
+            return _operation_call(name, payload, system_context(Scope("host", hub.slug)))
     except HubIdentityMismatch:
         logger.critical("base.hub_unavailable hub=%s: its database is not its own; %s refused.", hub.slug, name)
         return None, _unavailable()
