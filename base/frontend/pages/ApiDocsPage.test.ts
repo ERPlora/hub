@@ -14,7 +14,7 @@ const DOCUMENT = {
   paths: { '/api/tax/categories': { get: { ...TAX_CATEGORY_LIST, responses: {} } } },
   components: { securitySchemes: { ApiKey: { type: 'http', scheme: 'bearer' } } },
 };
-const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', read: true, write: false }] };
+const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', actions: ['read', 'update'] }] };
 
 const SHOWN = { docs_enabled: true, can_change: true };
 const HIDDEN = { docs_enabled: false, can_change: true };

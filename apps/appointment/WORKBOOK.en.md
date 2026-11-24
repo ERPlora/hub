@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5f7398f817d2d7dc1d6d8ae68b1f331c100cfdb1702260443c762fae64f60d3f -->
+<!-- generated from WORKBOOK.md sha256:6a4a9449a480652dd7d13b6d93e1a9a8e2ff759739f67d461d10aeb44eb00947 -->
 
 ## What it is for and who it is for
 
@@ -244,6 +244,8 @@ Steps:
 4. Tap **Add appointment**. If the business allows overlaps and that time clashes with another appointment
    of the professional, answer "Overlapping appointment".
 5. The appointment shows as **Confirmed** with its number (for example, APT-20261116-0001).
+6. Through the assistant, the confirmation card puts first the customer, the day and the time and the service; then
+   the professional.
 In: the customer's card (Customers), the services with their price and duration (Services), the
 professional and who does what (Staff and Services), the business's opening hours (Schedules) and the
 professional's shift and time off (Staff).
@@ -464,6 +466,8 @@ Steps:
    time, the minutes and, if you want, "Ends on (optional)" or "Number of appointments (optional)".
 3. Tap **Create repeating appointment**: the series is created and its appointments are booked up to the
    maximum booking notice of the settings.
+4. Through the assistant, the confirmation card puts first the customer, when it repeats (the first day, the time
+   and how often) and the service; then the professional.
 In: the customer, the services and the professional (Customers, Services and Staff) and the Appointments
 settings.
 Out: the active series, its appointments and the `appointment.recurring.created` event.
@@ -517,6 +521,8 @@ Steps:
 5. The notice says only what happened: how many appointments move, with whom and with which services they
    go now, how many new dates are booked, how many are cancelled and which stay at their time, with their
    date; if no appointment had to change, "Saved: no appointment had to change.".
+6. Through the assistant, the confirmation card puts first the series, from when and what changes of when it
+   repeats, and then the new professional and services.
 In: a series and the date from which it changes.
 Out: the series split in two (the old one ends the day before) or, if the change starts on its first date,
 the same series edited; the `appointment.recurring.updated` event.
@@ -555,6 +561,8 @@ Steps:
 2. From that moment nobody can book in that slot; without a professional, it blocks the whole business. An
    all-day block covers those whole days, in the booking and in the free times.
 3. The "By professional" grid paints it striped on its row (or on all of them, if it is the business's).
+4. Through the assistant, the confirmation card puts first whose the block is (if it is a person's), its start and
+   its end as one period ("Nov 26, 2026, 2:00 – 3:00 PM") and what it is.
 In: the professional (Staff), if the block is theirs.
 Out: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
 If it fails: "The end cannot be before the start."; removing one that is no longer there, "That blocked period
