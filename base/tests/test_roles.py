@@ -285,3 +285,4 @@ class TestHowItIsReached:
 
         assert op.permission == "base.view_home"
         assert description(op)
+        assert get_operation("base.role.list").permission == "base.view_home"

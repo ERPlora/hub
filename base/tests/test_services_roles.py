@@ -145,6 +145,20 @@ class TestCreate:
 
         assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
 
+    def test_nor_what_it_was_saved_with_of_an_app_that_is_off(self, client, rosa, monkeypatch):
+        """An app that is off gives nothing today, but what the role keeps of it comes back when it is turned on."""
+        held = a_role("Shelves", base__view_home=ON, sale__view_sale=ON, inventory__view_product=ON)
+        beyond = a_role("Stock", base__view_home=ON, sale__view_sale=ON, inventory__adjust_stock=ON)
+        client.force_login(rosa)
+        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: frozenset({"base", "sale"}))
+
+        given = post(client, "/roles", {"based_on": str(held.pk), "name": "Shelves too"})
+        refused = post(client, "/roles", {"based_on": str(beyond.pk), "name": "Stock too"})
+
+        assert given.status_code == 200, given.content
+        assert (refused.status_code, code(refused)) == (403, "base.role_beyond_editor")
+        assert not BusinessRole.objects.filter(name="Stock too").exists()
+
     @pytest.mark.parametrize("name", ["", "   "])
     def test_a_role_has_a_name(self, client, olga, name):
         client.force_login(olga)
@@ -294,6 +308,18 @@ class TestUpdate:
         assert (refused.status_code, code(refused)) == (403, "base.role_beyond_editor")
         role.refresh_from_db()
         assert role.states == {"sale.view_sale": ON, "sale.void_sale": OFF}
+
+    def test_nor_what_the_role_it_came_from_gives_if_they_do_not_hold_it(self, client, rosa):
+        """The employee's role takes payments; Rosa's own does not, so she cannot turn it back on in a copy of it."""
+        role = a_role(sale__view_sale=ON, sale__take_payment=OFF)
+        assert "sale.take_payment" in permissions_of_role(role.origin)
+        client.force_login(rosa)
+
+        response = post(client, "/roles/update", {"role": str(role.pk), "states": {"sale.take_payment": "on"}})
+
+        assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
+        role.refresh_from_db()
+        assert role.states == {"sale.view_sale": ON, "sale.take_payment": OFF}
 
     def test_not_even_to_the_role_they_hold_themselves(self, client, rosa):
         mine = BusinessRole.objects.get(name="People")
