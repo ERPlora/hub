@@ -6,7 +6,7 @@ commit, in a temporary worktree.
 2. What the change touches: what differs from <since>, uncommitted and untracked files included; by default, where HEAD
    left origin/main, or HEAD's parent on origin/main itself (the point the guardrails' exception lists compare with).
    - ESLint on its TypeScript, JavaScript and Vue files, the typecheck when it touches any, and the Vitest tests related
-     to them.
+     to them and to its .json files (``frontend_data``).
    - pytest on its test files and on each touched module's ``test_<module>.py``, on the Postgres of compose.yaml, in a
      test database of this checkout's own unless TEST_DB_NAME names one. A touched WORKBOOK runs its module's
      ``test_workbook.py`` and the tests that read every WORKBOOK.
@@ -137,19 +137,22 @@ def run(command: list[str], **env: str) -> bool:
     return subprocess.run(command, env={**os.environ, **env}, check=False).returncode != 0
 
 
-def frontend_failed(files: list[str]) -> bool:
+def frontend_data(path: str) -> bool:
+    """A .json a frontend module may import: no linter reads it, but the tests related to it pin what it says. Those of
+    the root configure the tools, and Vitest would run its whole suite for package.json."""
+    return path.endswith(".json") and "/" in path
+
+
+def frontend_failed(code: list[str], data: list[str]) -> bool:
     if lender := os.environ.get(LENDER):
         borrow(Path(lender))
     missing = [f"{name}: run {fix}" for name, (shown_by, fix) in NEEDED.items() if not shown_by.exists()]
     if missing:
         print(f"checks: ESLint, the typecheck and Vitest need {'; '.join(missing)}", flush=True)
         return True
-    steps = (
-        ["pnpm", "exec", "eslint", "--no-warn-ignored", *files],
-        ["pnpm", "typecheck"],
-        ["pnpm", "exec", "vitest", "related", "--run", "--passWithNoTests", *files],
-    )
-    return any([run(step) for step in steps])
+    linted = [["pnpm", "exec", "eslint", "--no-warn-ignored", *code], ["pnpm", "typecheck"]] if code else []
+    related = ["pnpm", "exec", "vitest", "related", "--run", "--passWithNoTests", *code, *data]
+    return any([run(step) for step in (*linted, related)])
 
 
 def tests_failed(tests: list[Path]) -> bool:
@@ -166,10 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     files = touched(comparison_point(args.since))
     frontend = [path for path in files if path.endswith(FRONTEND)]
+    data = [path for path in files if frontend_data(path)]
     tests = sorted({test for path in files for test in tests_of(Path(path))})
     failed = run([sys.executable, "-m", "pytest", "-q", "--tb=short", *GUARDRAILS])
-    if frontend:
-        failed = frontend_failed(frontend) or failed
+    if frontend or data:
+        failed = frontend_failed(frontend, data) or failed
     if tests:
         failed = tests_failed(tests) or failed
     return 1 if failed else 0
