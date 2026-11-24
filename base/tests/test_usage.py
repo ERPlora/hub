@@ -425,11 +425,11 @@ def test_an_unsigned_call_is_refused(db):
 def admin_of(slug: str) -> OperationContext:
     from django.contrib.auth import get_user_model
 
-    from base.permissions import permissions_for
+    from base.permissions import access_for
 
     user = get_user_model().objects.create_user(username=f"olga-{slug}", password="pw")
     Membership.objects.create(user=user, host=slug, role=Membership.Role.OWNER)
-    return OperationContext(scope=Scope("host", slug), actor=user, permissions=permissions_for(user, Scope("host", slug)), language="en")
+    return OperationContext(scope=Scope("host", slug), actor=user, permissions=access_for(user, Scope("host", slug)), language="en")
 
 
 def plan_usage(hub: Hub):

@@ -26,7 +26,7 @@ from live.operations import get
 from base import blueprint, services, worker_data
 from base.services import provisioning
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import dumps, provision
 from base.tenancy.context import HubWithoutDatabase, use_control, use_hub
@@ -55,7 +55,7 @@ def call(ctx, name, /, **data):
 def owner_of(hub: Hub) -> OperationContext:
     user = get_user_model().objects.create_user(username=f"olga-{hub.slug}", password="pw", first_name="Olga")
     Membership.objects.create(user=user, host=hub.slug, role=Membership.Role.OWNER)
-    return OperationContext(scope=Scope("host", hub.slug), actor=user, permissions=permissions_for(user, Scope("host", hub.slug)), language="es")
+    return OperationContext(scope=Scope("host", hub.slug), actor=user, permissions=access_for(user, Scope("host", hub.slug)), language="es")
 
 
 def ready(hub: Hub) -> Hub:

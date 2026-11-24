@@ -18,7 +18,7 @@ from live.operations import get
 from apps.tax.models import TaxCategory
 from base import assistant
 from base.models import Hub, Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 from .conftest import A, HUB_DB
@@ -33,7 +33,7 @@ ASKED = "ponle foto al café con leche"
 def owner() -> OperationContext:
     user = get_user_model().objects.create_user(username="olga", password="pw")
     Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language="es")
 
 
 @pytest.fixture

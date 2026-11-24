@@ -17,7 +17,7 @@ from live.operations import registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 __all__ = ["in_business_a"]
@@ -60,7 +60,7 @@ def test_the_asks_come_in_the_language_asked():
 @pytest.mark.parametrize("role", sorted(ROLES))
 def test_each_role_exports_exactly_the_catalogue_a_member_with_it_has_in_a_turn(make_user, role):
     user = make_user(f"qa-{role}", host=A.key, role=ROLES[role])
-    ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="en")
+    ctx = OperationContext(scope=A, actor=user, permissions=access_for(user, A), language="en")
     assert names(export("--role", role, "--language", "en")) == list(assistant.tools.catalog(ctx))
 
 
