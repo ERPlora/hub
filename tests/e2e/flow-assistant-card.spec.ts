@@ -37,7 +37,7 @@ test('flow-assistant-card — a draft says when it starts and its steps in words
   await askForACard(page, `E2E-ASK flow__draft__propose ${JSON.stringify(draft)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Proponer en Automatizaciones: ${draft.name} · Cuando se cierra una caja · Crear una tarea`);
+    await expect(card(page)).toContainText(`Proponer en Automatizaciones: ${draft.name} · Arranca con: Cuando se cierra una caja · Pasos: Crear una tarea`);
     for (const code of ['cash_register.session.closed', 'task.task.create', 'command', 'medium']) await expect(card(page)).not.toContainText(code);
     await untilStill(page);
     await capture(page, `${KEY}-${vp.label}`);
