@@ -55,9 +55,7 @@ def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps:
 
 def last_event(ctx: OperationContext, name: str) -> OutboxEvent | None:
     return (
-        OutboxEvent.objects.filter(
-            scope_kind=ctx.scope.kind, scope_key=ctx.scope.key, name=name
-        )
+        OutboxEvent.objects.filter(scope_kind=ctx.scope.kind, name=name)
         .order_by("-created_at", "-id")
         .first()
     )

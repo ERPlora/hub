@@ -77,10 +77,6 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
         "It is part of LIVE['operation_database']: it opens the operation's own transaction on the alias the tenancy "
         "gave it (APPROVAL_SPEND_REASON of tests/test_guardrails.py), before live.operations runs the operation."
     ),
-    "base/services/hub_registry.py::hub_register": (
-        "base.hub.register is the platform's operation (use_control): its writes (control.Hub) and its two savepoints "
-        "are control's, the alias of its own transaction. The registry block is left as it is here."
-    ),
     "base/services/sessions.py::open_session_from_saas": CONTROL_LOGIN,
     "base/services/devices.py::open_session_on_device": CONTROL_LOGIN,
     "base/services/sessions.py::open_admin_session_from_saas": (
