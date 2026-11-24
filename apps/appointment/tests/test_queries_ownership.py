@@ -91,7 +91,7 @@ def test_an_employee_cannot_touch_a_colleagues_appointment_nor_series_and_they_s
 
 def test_an_api_key_reads_every_appointment_its_permission_opens(client, make_user, two_agendas):
     admin = signed_in(client, make_user, "hub_admin")
-    created = post(admin, "/keys", {"name": "Booking site", "rate_per_minute": 60, "mode": "read", "scopes": {}})
+    created = post(admin, "/keys", {"name": "Booking site", "rate_per_minute": 60, "scopes": {"*": ["read"]}})
     key = Client(HTTP_AUTHORIZATION=f"Bearer {created.json()['token']}")
     assert whose_are_read(key) == (EVERYONE, EVERYONE)
     assert opened(key, two_agendas) == [200, 200, 200]

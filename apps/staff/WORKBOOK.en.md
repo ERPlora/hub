@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e0b2588ffd05f74d0eb6a8b13824c8156b4e2fc38f3755c8b24474780c0cd50b -->
+<!-- generated from WORKBOOK.md sha256:5f0f57700dece543b64215d62b372b48f89130935487efe96c1469ad0dc2dcca -->
 
 ## What it is for and who it is for
 
@@ -453,6 +453,8 @@ Steps:
 1. In **Time Off**, tap **+**, choose the Member, the Type (Vacation comes), From and To, "Full day" (or
    its hours) and, if you want, the Reason.
 2. Tap Save: the time off shows as **Pending**.
+3. Through the assistant, the confirmation card puts first whose it is, the kind and its days as one period ("Dec
+   21 – 31, 2026"; with its hours if it is part of the day).
 In: the person (any record that is not terminated, an Inactive one too; by id or by name) and the time
 off, with optional reason and notes. With hours, the same ones apply each day of the range.
 Out: the Pending time off (`staff.time_off.created`; the notice does not carry the reason). It does not
