@@ -18,12 +18,17 @@ class ApiKeyListIn(Schema):
     """No input: the keys of the business of the request."""
 
 
+#: What a key may do on an app (``base.api_actions``).
+Action = Literal["read", "create", "update", "delete"]
+#: Per app (its id), or ``"*"`` for every app of the business, also the ones it adds later: the actions given there.
+Scopes = dict[str, list[Action]]
+
+
 class ApiKeyOut(Schema):
     id: UUID
     name: str
     prefix: str = Field(description="The token's first characters, to tell it apart; never the whole token.")
-    mode: Literal["full", "read", "write", "per_app"]
-    scopes: dict[str, list[Literal["read", "write"]]] = Field(description="Per app: what it may do on each app.")
+    scopes: Scopes = Field(description='What it may do: per app, or "*" for every app, the actions given there.')
     rate_per_minute: int
     created_by: str
     created_at: dt.datetime
@@ -33,24 +38,28 @@ class ApiKeyOut(Schema):
 
 
 class ApiAppOut(Schema):
-    """An app this business has that publishes operations: what a key per app may be given on it."""
+    """An app this business has that publishes operations, and what a key may do on it."""
 
     id: str
     name: str
-    read: bool = Field(description="It publishes queries.")
-    write: bool = Field(description="It publishes commands.")
+    actions: list[Action] = Field(description="What it publishes: read for its queries; create, update and delete.")
 
 
 class ApiKeyListOut(Schema):
     keys: list[ApiKeyOut]
     apps: list[ApiAppOut]
+    grantable: Scopes = Field(
+        description='The most who asks may give a key: per app, and on "*" (every app), what they may do there.'
+    )
 
 
 class ApiKeyCreateIn(Schema):
     name: str = Field(max_length=80)
     rate_per_minute: int = Field(60, ge=1, le=10_000)
-    mode: Literal["full", "read", "write", "per_app"]
-    scopes: dict[str, list[Literal["read", "write"]]] = Field(default_factory=dict)
+    scopes: Scopes = Field(
+        description='What it may do: per app, or "*" for every app, the actions given there; never more than who '
+        "makes it may do."
+    )
 
 
 class ApiKeyIdIn(Schema):

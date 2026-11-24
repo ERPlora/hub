@@ -153,7 +153,7 @@ def new_key(hub) -> str:
     """A key of ``hub``, made in its own database as its Employees › API keys screen makes one: its token."""
     op = get_operation("base.api_key.create")
     with context.use_hub(hub):
-        return op(as_hub(hub), op.input.model_validate({"name": "Till", "mode": "full"})).token
+        return op(as_hub(hub), op.input.model_validate({"name": "Till", "scopes": {"*": ["read"]}})).token
 
 
 @HUB_DB
