@@ -267,7 +267,8 @@ Actor: propietario, administrador, asistente, API
 Pantalla: Página web
 Pasos:
 1. Despliega **Catálogo** y enciende **Mostrar**.
-2. En **Qué mostrar**, elige **Productos** (los de Inventario a la venta: activos y no agotados) o **Servicios** (los
+2. En **Qué mostrar**, elige **Productos** (los de Inventario a la venta: activos, no agotados y sin ocultar de la página
+   web) o **Servicios** (los
    ofrecidos); solo salen los de las apps activas en el negocio.
 3. Si quieres, elige las **Categorías** (ninguna = **Todas las categorías**) y si se ven los precios con **Mostrar
    precios**. Se guarda solo, como el resto del borrador.
@@ -284,7 +285,7 @@ Si falla: sin Inventario ni Servicios activos, la nota «Activa Inventario o Ser
 o servicios.»; si la fuente guardada es de una app que se ha apagado, «Inventario no está activa en este negocio: tu
 página no muestra el catálogo hasta que la actives o elijas otra fuente.» (o Servicios) y la página no lleva catálogo,
 nunca un error; si las categorías no se pueden leer, «No se pudieron cargar las categorías» bajo el selector.
-Implicados: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
+Implicados: INVENTORY-F27, INVENTORY-F36, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 Ver la vista previa
 Estado: hecho (servidor, pantalla y e2e)
@@ -481,7 +482,8 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 ### A qué reacciona y lo que necesita de otras apps
 - No reacciona a avisos de otras apps y no requiere ninguna (`requires = []`).
 - **Inventario** y **Servicios**, solo si están activas en el negocio: el catálogo los lee por el nombre de sus
-  consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`,
+  consultas (`inventory.product.list_for_sale` con `show_on_website=true`, `inventory.category.list`,
+  `inventory.product_category.list`,
   `service.service.list_for_sale`, `service.category.list`; INVENTORY-F27 y SERVICE-F10), con un contexto que solo
   puede leerlos; con la app apagada o sin ella, el catálogo sale vacío, nunca un error, y el editor lo dice. Cada
   elemento lo arma `catalog_items` (`product_item`, `service_item`): del producto, su `description`, su `image_url` y

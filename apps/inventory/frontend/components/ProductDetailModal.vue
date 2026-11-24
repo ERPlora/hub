@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The product sheet (WORKBOOK «Ficha del producto»), the old detail modal: its photo on top, larger (or its initials,
 // INVENTORY-F32), SKU, Price, Allergens, Stock («—» for
-// an article without stock control) and Status, and, with the permission to move stock and on a
+// an article without stock control), Status and whether the website shows it (INVENTORY-F36), and, with the permission to move stock and on a
 // physical product, «Receive stock», «Count stock» and, when it tracks its stock, «Write off stock»
 // (the page opens their dialog). For whoever can change products, «Mark sold out» or «Put back on sale»
 // (INVENTORY-F29): the sheet shows the live row, so the button turns once the stream brings it; a
@@ -162,6 +162,12 @@ async function setSoldOut(value: boolean): Promise<void> {
           :color="product.needs_tax_setup ? 'warning' : 'medium'"
         >
           {{ status }}
+        </ion-note>
+      </ion-item>
+      <ion-item data-testid="inventory-product-detail-website">
+        <ion-label>{{ $t('inventory.products.website') }}</ion-label>
+        <ion-note slot="end">
+          {{ product.show_on_website ? $t('inventory.products.websiteShown') : $t('inventory.products.websiteHidden') }}
         </ion-note>
       </ion-item>
     </ion-list>

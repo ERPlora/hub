@@ -10,22 +10,10 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.modifier import queries, services
-from apps.modifier.schemas import (
-    CategoryRefIn,
-    GroupIn,
-    GroupListIn,
-    GroupPatchIn,
-    GroupRefIn,
-    LinkIn,
-    LinkListIn,
-    LinkRefIn,
-    OptionIn,
-    OptionListIn,
-    OptionPatchIn,
-    OptionRefIn,
-    ResolveIn,
-    TargetIn,
-)
+from apps.modifier.schemas.groups import GroupIn, GroupListIn, GroupPatchIn, GroupRefIn
+from apps.modifier.schemas.links import CategoryRefIn, LinkIn, LinkListIn, LinkRefIn
+from apps.modifier.schemas.options import OptionIn, OptionListIn, OptionPatchIn, OptionRefIn
+from apps.modifier.schemas.till import ResolveIn, TargetIn
 
 router = Router(tags=["modifier"])
 

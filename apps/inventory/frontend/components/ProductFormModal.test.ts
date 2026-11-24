@@ -117,6 +117,7 @@ describe('ProductFormModal: new product', () => {
       track_stock: null,
       category_ids: ['c2'],
       allergens: [],
+      show_on_website: true,
     });
     expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
   });
