@@ -1410,8 +1410,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   recepción entre las herramientas que se le ofrecen. Un pedido que llega sí es mercancía, porque «pedido» y «order»
   solos son la cuenta de una mesa: «ha llegado el pedido de bebidas», «acaba de llegar el pedido», «el pedido ha
   llegado», «the drinks order just came in», «the order has arrived». El pedido de un cliente se toma, se manda a cocina
-  o se sirve, pero no llega: «pon el pedido de bebidas en la mesa 4» no ofrece la recepción. Lo comprueba
-  `tests/test_assistant_asks.py`.
+  o se sirve, pero no llega: «pon el pedido de bebidas en la mesa 4» no ofrece la recepción. Con un pedido de bebidas que
+  llega, el turno ofrece la recepción y, por si al final era de una mesa, añadir la línea a su cuenta: en inglés se ofrece
+  también y en español la encuentra la búsqueda de su tarea. Lo comprueba `tests/test_assistant_asks.py`.
 
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
