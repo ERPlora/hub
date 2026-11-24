@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2213ab742a6b900a0fecdc2eac3de2c77e89bdd2467f3dddb5bd9f1d472283a5 -->
+<!-- generated from WORKBOOK.md sha256:0faf39702f97184daa89cb83e079c3b97a067869da93f1bc5b98d7b2e63ababe -->
 
 ## What it is for and who it is for
 
@@ -190,8 +190,9 @@ method is given by its id or by its name, the amount goes in the currency's mino
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
 recorded instead of recording another. The assistant's card says on its line who is paid, the supplier
 invoice and the amount ("Create in Payments: Pescados QA · F-2611 · €180.00"); without an invoice, the
-method it leaves from goes after the amount ("Pescados QA · €180.00 · BBVA"), and the other data follow,
-each one once.
+method it leaves from goes after the amount ("Pescados QA · €180.00 · Cuenta BBVA"), and the other data
+follow, each one once. The method shows as the payment finds it, even when it was said in other words
+("Cuenta BBVA" when "the BBVA one" was said).
 Out: a draft payment with reference `PAY-YYYYMMDD-NNNN` — the date is that of the business day on which
 it is recorded, not the payment's; the number counts per day and never repeats — and the notice
 `payment.payment.created` (it carries the reference, the beneficiary, the amount and the currency).
@@ -203,7 +204,8 @@ not an amount. Type a figure, for example 12.50."; also an amount with another c
 IBAN is not valid: check the country, the check digits and the length."); a method that does not exist
 ("That payment method does not exist in this business.") or is deactivated ("That payment method is
 deactivated: pick an active one."). Through the assistant, a method name that matches several says
-which ones ("“Till” matches several payment methods: …"). An attempt key that already recorded another
+which ones ("“Till” matches several payment methods: …"); that one, one that does not exist or one that is
+deactivated draw no card: the assistant hears it and asks. An attempt key that already recorded another
 payment is refused ("That attempt key already recorded another payment. Make a new key for each
 payment.") and nothing is saved.
 Involved: FLOW-F11, FLOW-F21
@@ -309,11 +311,15 @@ Steps:
    what has not been touched.
 3. To stop using it, tap **Deactivate** in its row: it moves to **Deactivated** and no longer shows in
    "New payment". **Activate** brings it back.
-In: the method (through the assistant, by its name) and what changes.
+In: the method (through the assistant, by its name) and what changes. The assistant's card says the
+method it is going to change as it finds it, even when it was said in other words ("Change in Payments:
+Cuenta BBVA 4821 · BBVA QA proveedores" when "the BBVA one" was said).
 Out: the changed method (`payment.method.updated`, `.deactivated`, `.activated`). The payments that
 already used it keep it and show its new name.
 If it fails: a name that another method already has is refused under Name. Deactivating a deactivated
-one or activating an active one changes nothing and says why. A method is never deleted.
+one or activating an active one changes nothing and says why. A method is never deleted. Through the
+assistant, a name that matches several methods or none draws no card: the assistant says which ones fit
+and asks which one.
 Involved: FLOW-F11, FLOW-F21
 
 ## Payments: what goes in and what comes out
@@ -326,6 +332,7 @@ Involved: FLOW-F11, FLOW-F21
 | `payment.payment.get` | A whole payment, by its id or its reference, with its full IBAN | `payment.view_payment` | F06 |
 | `payment.method.list` | The methods, paginated, with search (name or account), type, status and sorting | `payment.view_payment` | F01, F02, F08 |
 | `payment.method.get` | A method, by its id or its name, with its full account | `payment.view_payment` | F08 |
+| `payment.payment.check` | The active method a new payment leaves from, as recording it finds it: what the assistant checks before its card; not a tool of the assistant and with no route in the API | `payment.add_payment` | F02 |
 
 ### What it offers: actions (they change data)
 

@@ -88,7 +88,7 @@ def test_spanish_texts_of_the_workbook():
             "Otro",
         ]
         assert str(services.NOT_CANCELLABLE) == "El pago ya no admite cancelación."
-        assert str(services.METHOD_INACTIVE) == (
+        assert str(queries.METHOD_INACTIVE) == (
             "Ese método de pago está desactivado: elige uno activo."
         )
         assert str(services.METHOD_NAME_TAKEN) == (

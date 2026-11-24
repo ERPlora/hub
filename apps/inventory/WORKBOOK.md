@@ -1041,14 +1041,18 @@ Pasos:
 4. Cuando vuelve a haber, toca «Volver a poner a la venta» en el menú «⋮» o en la ficha: la insignia
    desaparece y el TPV lo vuelve a vender.
 Entra: el artículo (por la pantalla, o por su SKU o su nombre desde el asistente o la API) y si está
-agotado o vuelve a la venta.
+agotado o vuelve a la venta. La tarjeta del asistente dice el artículo que va a cambiar tal como lo
+encuentra, aunque se dijera con otras palabras («Cambiar en Inventario: Tarta de queso QA · Agotado: Sí»
+cuando se dijo «la tarta de queso»).
 Sale: el artículo marcado o desmarcado; Inventario avisa del cambio (`inventory.product.updated`).
 Marcarlo dos veces no cambia nada. Desactivarlo, activarlo o editarlo no le quita la marca. Un
 artículo agotado sigue contando en su categoría, porque el TPV lo sigue enseñando en gris
 (INVENTORY-F27), y no sale en el catálogo de venta.
 Si falla: el motivo sale encima de la tabla o dentro de la ficha («No se pudo cambiar si el producto
 está agotado» o el que dé la app). Quien no puede cambiar productos ve la insignia, pero no las
-acciones. Un artículo que ya no existe da «Este producto no existe en este hub».
+acciones. Un artículo que ya no existe da «Este producto no existe en este hub». Por el asistente,
+unas palabras que valen para varios artículos o para ninguno no sacan tarjeta: el asistente dice
+cuáles encajan y pregunta cuál.
 Implicados: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Elegir la imagen de un artículo desde la librería
