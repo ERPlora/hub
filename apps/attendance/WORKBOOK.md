@@ -185,14 +185,14 @@ Pasos:
 5. En «Hoy», «Pausas» suma el tiempo de pausa y «Trabajado» ya lo descuenta.
 6. También se le puede pedir al asistente («pon que estoy en pausa», «ya he vuelto»): antes de hacerlo pide
    confirmación con «Empezar la pausa en Control horario.» o «Terminar la pausa en Control horario.», y el
-   recibo repite lo mismo. Si se nombra a otra persona, la tarjeta dice cuál por su nombre (ATTENDANCE-F12).
+   recibo repite lo mismo. Si se nombra a otra persona, la tarjeta dice cuál por su nombre.
 Entra: la jornada abierta de la persona (ATTENDANCE-F01).
 Sale: cada pausa guardada dentro de su jornada; los avisos de pausa empezada y terminada.
 Si falla: sin jornada abierta, «No hay ninguna jornada abierta: ficha la entrada primero.»; con una
 pausa ya en curso, «Ya hay una pausa en curso.»; terminar una pausa que no existe, «No hay ninguna
 pausa en curso que terminar.»; en una jornada olvidada, abierta más horas de las fijadas en Ajustes, «Esta
 jornada lleva abierta más de 12 horas y está por revisar…».
-Implicados: ATTENDANCE-F01, ATTENDANCE-F05
+Implicados: ATTENDANCE-F01, ATTENDANCE-F05, ATTENDANCE-F12
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
 Estado: hecho (servidor y pantalla)

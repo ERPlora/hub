@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:81be05bb964917e4d62ed54696ea9643a2eb405b2471437e2a51d0a6b911b5da -->
+<!-- generated from WORKBOOK.md sha256:0154df0798949b3eb04e9f72a35d7d913fd367594f3ad0ea54c8f99116beadee -->
 
 ## What it is for and who it is for
 
@@ -178,14 +178,14 @@ Steps:
 5. In "Today", "Breaks" adds up the break time and "Worked" already discounts it.
 6. You can also ask the assistant ("put me on a break", "I'm back"): before doing it, it asks for confirmation
    with "Start a break in Time clock." or "End the break in Time clock.", and the receipt says the same. If
-   someone else is named, the card says who by their name (ATTENDANCE-F12).
+   someone else is named, the card says who by their name.
 In: the person's open working day (ATTENDANCE-F01).
 Out: each break saved inside its working day; the break started and ended notices.
 If it fails: without an open working day, "There is no open working day: clock in first."; with a break
 already running, "A break is already running."; ending a break that does not exist, "There is no running
 break to end."; on a forgotten working day, open more hours than set in Settings, "This working day has been open
 more than 12 hours and is waiting for review…".
-Involved: ATTENDANCE-F01, ATTENDANCE-F05
+Involved: ATTENDANCE-F01, ATTENDANCE-F05, ATTENDANCE-F12
 
 ### ATTENDANCE-F03 Clock in from a phone when the business asks for the location
 Status: done (server and screen)
