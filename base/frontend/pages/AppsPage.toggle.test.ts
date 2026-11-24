@@ -30,8 +30,7 @@ vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/a
 
 freshEachTest();
 
-// sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off). What else
-// each switch changes is the list's to say (`along_said`), as the assistant's card says it.
+// sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off).
 const SALE = app('sale', { name: 'Sales', requires: ['customer'], along_said: 'Customers turns off with it: only Sales needed it.' });
 const CUSTOMER = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
 const TASK = app('task', { name: 'Tasks' });
