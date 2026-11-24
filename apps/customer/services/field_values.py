@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import InvalidPayload
 
 from apps.customer.models import Customer, CustomField, CustomFieldValue
-from apps.customer.queries import FIELD_UNAVAILABLE
+from apps.customer.queries.reads import FIELD_UNAVAILABLE
 from apps.customer.schemas.cards import FieldValueIn
 from apps.customer.services.writes import lock_rows
 

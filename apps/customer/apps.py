@@ -135,18 +135,18 @@ class CustomerConfig(LiveAppConfig):
         they go to the fiscal archive first (``fiscal_archive_models``)."""
         from apps.customer import queries  # the models are not loaded yet when this module is
 
-        return queries.keeps_fiscal_documents()
+        return queries.purchases.keeps_fiscal_documents()
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
-        recovers from it: of the copy's live cards (``queries.cards_in_copy``), each the business still holds deleted
-        comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
+        recovers from it: of the copy's live cards (``queries.recovery.cards_in_copy``), each the business still holds
+        deleted comes back the same, with all that hangs from it (``queries.recovery.cards_deleted_in_business``,
         ``customer.customer.restore``, CUSTOMER-F33) and the groups, tags and custom field values the business deleted
-        since (hub#1356), and each it no longer has is made again by
-        ``customer.customer.recover`` (``queries.cards_not_in_business``): as ``customer.customer.create``, the till's
-        and the card's own, makes it, with its groups, tags and custom field values there
-        (``queries.recoverable_cards_in_copy``, hub#1285), each by the screen's own operation. Never one merged into
-        another or whose personal data was erased."""
+        since (hub#1356), and each it no longer has is made again by ``customer.customer.recover``
+        (``queries.recovery.cards_not_in_business``): as ``customer.customer.create``, the till's and the card's own,
+        makes it, with its groups, tags and custom field values there (``queries.recovery.recoverable_cards_in_copy``,
+        hub#1285), each by the screen's own operation. Never one merged into another or whose personal data was
+        erased."""
         from apps.customer import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -154,10 +154,10 @@ class CustomerConfig(LiveAppConfig):
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0001_initial",
-                read=queries.recoverable_cards_in_copy,
-                missing=queries.cards_not_in_business,
+                read=queries.recovery.recoverable_cards_in_copy,
+                missing=queries.recovery.cards_not_in_business,
                 create="customer.customer.recover",
-                deleted=queries.cards_deleted_in_business,
+                deleted=queries.recovery.cards_deleted_in_business,
                 restore="customer.customer.restore",
             )
         ]
