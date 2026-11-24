@@ -7,6 +7,8 @@ from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
+from base.schemas.assistant import AN_ATTACHED_FILE
+
 
 # ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -103,7 +105,10 @@ class FileUploadIn(Schema):
     folder: str = file_path(gettext_noop("Folder"))
     name: str = Field(max_length=1000, description="The file's name, «marzo.pdf»; a taken one becomes «marzo (1).pdf».")
     content_base64: str = Field(
-        max_length=FILE_UPLOAD_BASE64_MAX, title=gettext_noop("File"), description="The file, in base64; 25 MB at most."
+        max_length=FILE_UPLOAD_BASE64_MAX,
+        title=gettext_noop("File"),
+        description="The file in base64, 25 MB at most; from the chat, the name of the one the person attached.",
+        json_schema_extra=AN_ATTACHED_FILE,
     )
 
 
