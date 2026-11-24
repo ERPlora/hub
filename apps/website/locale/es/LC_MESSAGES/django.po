@@ -224,6 +224,11 @@ msgstr "Gratis"
 msgid "From %(price)s"
 msgstr "Desde %(price)s"
 
+#, python-format
+msgctxt "website"
+msgid "Allergens: %(names)s"
+msgstr "Alérgenos: %(names)s"
+
 msgid "%(price)s / hour"
 msgstr "%(price)s / hora"
 

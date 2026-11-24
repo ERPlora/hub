@@ -896,14 +896,14 @@ agenda tuya que enseñar.».
 
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1284): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.tenancy.recovery`) con las citas de la copia que aún no han llegado y siguen
-  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.appointments_in_copy`, por SQL sobre los
+  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.recovery.appointments_in_copy`, por SQL sobre los
   nombres de los modelos: la copia no es un negocio y no tiene alias). La que el negocio aún guarda borrada vuelve la
-  misma por `appointment.appointment.restore` (`queries.appointments_deleted_in_business`, por su id, salvo que se
+  misma por `appointment.appointment.restore` (`queries.recovery.appointments_deleted_in_business`, por su id, salvo que se
   volviera a reservar: otra viva de su clienta a su hora, o de su serie en su fecha, según lo que el negocio guarda de
   ella y no lo que dice la copia; hub#1326). La restauración bloquea primero su serie (como toda escritura: una pasada
   de la serie no reserva esa fecha a la vez) y juzga, si sigue reservada, como una reserva: ficha viva, servicios y
   profesional reservables y la hora libre, con las reglas de una automatización. La que el negocio no tiene
-  (`queries.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
+  (`queries.recovery.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
   crea por `appointment.appointment.create`. La clienta se casa por la regla de
   Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
   la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
@@ -918,8 +918,8 @@ agenda tuya que enseñar.».
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
-  `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
-  `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
+  (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
 - **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo de la skill
@@ -928,7 +928,7 @@ agenda tuya que enseñar.».
   `staff.Member`; `AppointmentService.service` y `RecurringService.service` → `service.Service`. Los
   nombres se resuelven con `find_customer`, `find_service` y `resolve_member` de esas apps. La venta es
   un identificador opaco (`sale_id`): Venta no es requisito.
-- **Disponibilidad = Horarios ∩ Personal ∩ citas**: `queries.py` lee `schedule.hours.for_range` y
+- **Disponibilidad = Horarios ∩ Personal ∩ citas**: `queries/agenda.py` lee `schedule.hours.for_range` y
   `staff.availability.for_member` (sus operaciones, con un contexto de lectura que añade `schedule.view`
   y `staff.view` a quien reserva: reservar no exige permisos de esas apps), los bloqueos y las citas, y
   `engine.py` decide. Orden de los motivos (el primero gana): `invalid_start`, `in_past`, `too_soon`,
@@ -1013,7 +1013,7 @@ agenda tuya que enseñar.».
   Horarios. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
   reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
   pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
-  del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
+  del día de 25 h, las 09:00), y `queries.business.now()` da el instante en UTC para que la suma sea de tiempo real.
   La **duración** de una cita también cuenta tiempo real (`engine.ends_at`, en crear, lote, mover, series, horas
   libres y `availability.check`): 60 minutos son 60 minutos también la noche del cambio de hora, y lo que cambia
   es la hora de pared en que acaba (el 25/10/2026, las 01:37 + 90 min acaban a las 02:07 de la segunda vuelta; el

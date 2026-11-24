@@ -989,7 +989,9 @@ Pasos:
    gris), las categorías, qué categorías tiene cada producto y las unidades. Al cobrar, pide el
    catálogo de venta entero: precio, coste, categoría fiscal, unidad, alérgenos y si cada artículo lleva
    control de stock.
-2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
+2. Cocina pide los productos y las categorías para elegir qué envía a cada estación. La Página web pide el
+   mismo catálogo de venta para su carta, con la descripción, la foto y los alérgenos de cada producto
+   (WEBSITE-F05).
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
 4. Sin Inventario activo, el TPV lo dice en la rejilla («Inventario no está activa, así que no hay
@@ -1006,7 +1008,7 @@ enseña ni comprueba cuántas unidades quedan.
 Si falla: lo decide quien pide. Ventas rechaza una línea de catálogo si no puede leer el catálogo de
 venta y avisa en el TPV si Inventario está activo y no contesta; Cocina se queda sin opciones de
 reparto.
-Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
+Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, WEBSITE-F05
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
 Estado: hecho
@@ -1139,10 +1141,11 @@ Pasos:
    más grande.
 Entra: la foto de cada artículo, de la librería o propia.
 Sale: nada: solo se enseña. Las imágenes de la librería se guardan en el dispositivo y no se vuelven a
-pedir; las propias solo las ve quien ha entrado en el negocio.
+pedir. Las propias, como las de la librería, las puede abrir cualquiera que tenga su dirección, porque la
+página web del negocio las enseña en su carta (WEBSITE-F05), como hacen las tiendas en línea.
 Si falla: una foto que no carga (sin conexión, borrada o que la librería ya no tiene) deja las iniciales,
 sin aviso; el TPV vende igual.
-Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
+Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29, WEBSITE-F05
 
 ### INVENTORY-F33 Las fotos viajan en el blueprint
 Estado: hecho
@@ -1281,7 +1284,7 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 |---|---|---|---|
 | Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
-| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste (vacío para quien no ve los costes), categoría fiscal, unidad, alérgenos y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
+| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste (vacío para quien no ve los costes), categoría fiscal, unidad, alérgenos, descripción, foto y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
@@ -1591,8 +1594,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs
     (`shared/catalog/…`, de solo lectura para los hubs) con caché inmutable, la misma vista genérica que
     `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por
-    `/p/media/<hub>/inventory/products/…`: inventory declara `members_media` con esa carpeta (hoy no declara
-    ninguna).
+    `/p/media/<hub>/inventory/products/…`: inventory declara esa carpeta en `public_media`, porque la carta de la
+    página web las enseña a sus visitantes, sin sesión (WEBSITE-F05).
   - TPV: `apps/sale/frontend/components/pos/ProductTile.vue`, `ServiceTile.vue` y `ComboTiles.vue` pintan la foto con
     `ItemImage` de base (`base/frontend/components/ItemImage.vue`): `image_url` entera (`fit="contain"`: las fotos de
     la librería son recortes sobre blanco y una baldosa ancha solo enseñaría una franja), cargada en diferido, con

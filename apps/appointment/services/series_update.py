@@ -12,20 +12,12 @@ from live.outbox import record_event
 from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import Appointment, Recurring, RecurringService
-from apps.appointment.queries import (
-    CHANGE_OWN,
-    MOVABLE,
-    business_zone,
-    check_member,
-    find_series,
-    lines_for,
-    load_series,
-    may_change,
-    now,
-    pattern_of,
-    resolve_services,
-    verdict_message,
-)
+from apps.appointment.queries.access import CHANGE_OWN, may_change
+from apps.appointment.queries.agenda import verdict_message
+from apps.appointment.queries.booking import check_member, lines_for, resolve_services
+from apps.appointment.queries.business import now
+from apps.appointment.queries.reads import MOVABLE
+from apps.appointment.queries.series import find_series, load_series, pattern_of
 from apps.appointment.schemas import (
     END_BEFORE_START,
     RecurringUpdatedOut,
@@ -47,6 +39,7 @@ from apps.appointment.services.writes import (
     lock_appointments,
 )
 from apps.staff.queries import resolve_member
+from base.business import business_zone
 
 PATTERN_CHANGED = _("The repeating appointment changed its pattern")
 

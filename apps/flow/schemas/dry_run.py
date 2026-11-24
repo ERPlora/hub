@@ -9,7 +9,7 @@ from ninja import Field, Schema
 
 from apps.flow import document
 from apps.flow.models import EVENT_MAX_LENGTH
-from apps.flow.schemas.fields import D_STEPS, D_TRIGGER, In
+from apps.flow.schemas.fields import D_STEPS, D_TRIGGER, D_TRIGGER_IN_WORDS, In
 from apps.flow.schemas.steps import Step
 from apps.flow.schemas.triggers import Trigger
 from base.schemas.assistant import AssistantFieldOut
@@ -25,7 +25,7 @@ class TestIn(In):
     document: str = Field(
         max_length=200_000,
         description="The automation to try, saved or not, as JSON text: `{\"trigger\": …, \"steps\": […]}`. "
-        + D_TRIGGER,
+        + D_TRIGGER_IN_WORDS,
     )
 
 

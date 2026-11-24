@@ -18,11 +18,11 @@ Para qué: montar la página pública con su diseño, sus fotos, la carta o los 
 3. WEBSITE-F03 — la sección de reseñas, oculta y vuelta a mostrar.
 4. WEBSITE-F04 — la foto de portada.
 5. WEBSITE-F11 — una galería de fotos del local.
-6. WEBSITE-F05 — la carta o los servicios.
+6. WEBSITE-F05 — la carta o los servicios; en la carta, un plato con foto propia, otro con foto de la librería, descripción y alérgenos.
 7. WEBSITE-F12 — las reseñas de Google.
 8. WEBSITE-F06 — la vista previa.
 9. WEBSITE-F07 — la página, publicada.
-10. WEBSITE-F09 — la dirección y el QR, compartidos.
-11. WEBSITE-F10 — un cliente abre la página desde el QR.
-12. BASE-F110 — la misma página, por el dominio propio.
+10. WEBSITE-F09 — la dirección y el QR, compartidos, y el QR del catálogo para las mesas.
+11. WEBSITE-F10 — un cliente abre la página desde el QR, y otro escanea el de la mesa y llega directo a la carta.
+12. BASE-F110 — la misma página, por el dominio propio, con las fotos de la carta.
 13. WEBSITE-F08 — la página, desconectada.
