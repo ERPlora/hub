@@ -375,7 +375,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:84611fd0ea52 -->
+<!-- from WORKBOOK.md sha256:98efb2b95b30 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -498,6 +498,7 @@ On the Employees screens and the API documentation:
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
+| BASE-F126 | Turn ERPlora's support access on or off | partial |
 
 ### BASE-F01 See what the business still has to set up
 <!-- from WORKBOOK.md sha256:b63e81f97d68 -->
@@ -3773,3 +3774,24 @@ Out: the system's start-up of this computer, not of the business. Nothing is sav
 If it fails: below it, "Could not change the start on login setting.", and the switch goes back to what the
 system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
+
+### BASE-F126 Turn ERPlora's support access on or off
+<!-- from WORKBOOK.md sha256:16613d121921 -->
+Status: partial — it is changed and read through the API and with the assistant; its card in Settings › General is
+still missing, and so is the support staff's way into the business with the access on
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. When the business wants ERPlora's support staff to come in and help set it up (loading the products, adjusting
+     its apps), the owner or an administrator turns support access on. It comes off. Today it is turned on and off
+     through the API or by asking the assistant, which confirms it before changing it (BASE-F97).
+  2. The change is saved at once, with who made it and when. It does not expire: it stays on until someone of the
+     business turns it off, because getting started can take several days.
+  3. Anyone of the business can read whether it is on, who changed it last and when, whether they may change it
+     themselves and the last 10 entries of support (who and when), the most recent first. While nobody of support has
+     come in, the list is empty.
+In: on or off.
+Out: the business's setting, with who changed it and when. Event `base.support_access.changed`.
+If it fails: whoever does not run the business has the change refused (403 `permission_denied`) and the setting stays
+as it was; reading it, they see they cannot change it.
+Involved: BASE-F97, BASE-F100

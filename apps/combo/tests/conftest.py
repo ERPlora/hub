@@ -13,6 +13,7 @@ import psycopg
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope
+from live.errors import Conflict
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from live.outbox import channel_for
@@ -135,3 +136,51 @@ def make_option(group, product, **fields):
 
     fields.setdefault("sort_order", group.options.count())
     return ChoiceOption.objects.create(group=group, product=product, **fields)
+
+
+def menu_of_the_day():
+    """«Menu of the day», 13,50 € eaten in: Starters (lentils, salad −0,50 €), Mains (hake +2 €, chicken),
+    Drink (water, wine), each one compulsory pick."""
+    combo = make_combo("Menu of the day", price=1350, kitchen_name="MENU")
+    starters = make_group(combo, "Starters")
+    mains = make_group(combo, "Mains")
+    drink = make_group(combo, "Drink")
+    products = {
+        "lentils": make_product("Lentils", price=700, sku="LEN"),
+        "salad": make_product("Salad", price=650, sku="SAL"),
+        "hake": make_product("Hake", price=1400, sku="HAK"),
+        "chicken": make_product("Chicken", price=1100, sku="CHI"),
+        "water": make_product("Water", price=200, sku="WAT", tax=DRINK),
+        "wine": make_product("House wine", price=300, sku="WIN", tax=ALCOHOL),
+    }
+    options = {
+        "lentils": make_option(starters, products["lentils"]),
+        "salad": make_option(starters, products["salad"], price_delta=-50),
+        "hake": make_option(mains, products["hake"], price_delta=200),
+        "chicken": make_option(mains, products["chicken"]),
+        "water": make_option(drink, products["water"]),
+        "wine": make_option(drink, products["wine"]),
+    }
+    return (
+        combo,
+        {"starters": starters, "mains": mains, "drink": drink},
+        products,
+        options,
+    )
+
+
+def sandwich_and_beer(supply_kind="goods", **fields):
+    combo = make_combo("Sandwich pack", price=600, supply_kind=supply_kind, **fields)
+    make_option(make_group(combo, "Sandwich"), make_product("Ham sandwich", price=450, tax=FOOD))
+    make_option(make_group(combo, "Drink"), make_product("Beer", price=200, tax=ALCOHOL))
+    return combo
+
+
+def pick(*options, quantity=1):
+    return [{"option_id": str(option.id), "quantity": quantity} for option in options]
+
+
+def refusal(combo, choices, **extra) -> Conflict:
+    with pytest.raises(Conflict) as caught:
+        run("combo.combo.resolve", {"id": str(combo.id), "choices": choices, **extra})
+    return caught.value
