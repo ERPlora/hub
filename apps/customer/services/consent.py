@@ -7,7 +7,7 @@ from live.outbox import record_event
 
 from apps.customer import events
 from apps.customer.models import Activity, Consent, Customer
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.customer.schemas.consent import ConsentGrantIn, ConsentRow, ConsentWithdrawIn
 from apps.customer.services.writes import _actor, _occurred_at
 

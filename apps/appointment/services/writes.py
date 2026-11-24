@@ -25,7 +25,7 @@ from apps.appointment.queries.agenda import conflicts_of, load_agenda, verdict_m
 from apps.appointment.queries.booking import check_member, lines_for, resolve_services
 from apps.appointment.queries.business import now, today
 from apps.appointment.queries.reads import CUSTOMER_SOURCES
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.service.models import Service
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member

@@ -25,6 +25,7 @@ from . import (
     reset as reset,
     sessions as sessions,
     support as support,
+    support_access as support_access,
     system as system,
     usage as usage,
 )

@@ -24,6 +24,7 @@ from . import (
     release_notes as release_notes,
     roles as roles,
     sessions as sessions,
+    support_access as support_access,
     system as system,
     usage as usage,
 )

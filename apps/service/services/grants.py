@@ -9,7 +9,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.service import grant_card
 from apps.service import events
 from apps.service.models import Assignment, Grant, GrantAdjustment, Redemption, Service

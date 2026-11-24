@@ -22,7 +22,7 @@ from live.context import OperationContext
 from live.errors import Conflict
 from live.operations import operation
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.inventory import queries as inventory_queries
 from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
 from apps.pricing.models import DiscountRule, PriceItem, PriceList

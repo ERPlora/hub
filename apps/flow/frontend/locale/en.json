@@ -2737,6 +2737,8 @@
       "total_gifts": "Comps",
       "total_refunds": "Refunds",
       "total_sales": "Total sales",
+      "app": "App",
+      "app_lines": "What other apps recorded",
       "incomplete": "Review incomplete",
       "open_checks": "Open checks",
       "open_check_labels": "Names of the open checks",

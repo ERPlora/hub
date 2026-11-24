@@ -11,7 +11,7 @@ from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, OperationError
 from live.operations import UnknownOperation, get
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.customer.queries.orders import linked_customer_id
 from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, normalize_country, normalize_tax_id
 from apps.sale import pricing

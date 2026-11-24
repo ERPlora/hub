@@ -23,6 +23,8 @@ from . import (
     reset as reset,
     roles as roles,
     sessions as sessions,
+    single_row as single_row,
     support as support,
+    support_access as support_access,
     usage as usage,
 )

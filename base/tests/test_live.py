@@ -22,6 +22,7 @@ from base.events import (
     HUB_USAGE_MEASURED,
     IMPORT_UNDONE,
     ROLE_EVENTS,
+    SUPPORT_ACCESS_CHANGED,
 )
 
 #: What Settings › Data does to the business: the Home reads itself again after each.
@@ -79,6 +80,8 @@ def test_the_three_queries_and_their_events():
         "base.file.list": sorted({HUB_STATE_APPLIED, *FILE_EVENTS}),
         # The person's own access: the photo brings the roles (their sessions stay open when one changes).
         "base.session.access": [HUB_STATE_APPLIED],
+        # Support access: turned on or off by whoever runs the business.
+        "base.support_access.get": [SUPPORT_ACCESS_CHANGED],
     }
 
 

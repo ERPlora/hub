@@ -1,17 +1,20 @@
-"""Fixtures of the customer tests: contexts per role and scope, users with a role on a host, a raw DSN, and what
-other apps' tests ask of the Hub admin's «Delete» of a card landing in the middle of their writes.
+"""Fixtures of the customer tests: contexts per role and scope, users with a role on a host, a raw DSN, a card and the
+moment the reads' facts happen at, and what other apps' tests ask of the Hub admin's «Delete» of a card landing in the
+middle of their writes.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
 of B asks for ``hub_b`` and enters it."""
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.operations import get
 
+from apps.customer.models import Customer
 from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.sale.tests.conftest import db_dsn, make_user, night_elsewhere
 from base.permissions import permissions_of_role
@@ -59,6 +62,14 @@ def run(
 ):
     """Run the operation ``name`` as ``role`` on ``scope``."""
     return get(name)(ctx_for(role, scope, actor), data)
+
+
+#: The moment the facts of the read tests happen at.
+NOW = datetime(2026, 10, 14, 10, 0, tzinfo=UTC)
+
+
+def card(name="Ana García", **fields):
+    return Customer.objects.create(name=name, **fields)
 
 
 # ── The Hub admin's «Delete» of a card in the middle of a write that links it ──────────────────────

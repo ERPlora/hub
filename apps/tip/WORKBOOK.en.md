@@ -202,7 +202,7 @@ Steps:
    **+** "Record tip", choose the sale by its number, "Card" and the amount the card terminal charged on top, and
    "Save".
 In: the sale and what the card terminal charged on top (ERPlora does not talk to the card terminal).
-Out: the card tip. In the open cash session it shows as "Card tips", without touching the expected cash
+Out: the card tip. In the open cash session it shows as "Tips by card", without touching the expected cash
 (CASH_REGISTER-F18).
 If it fails: recording it on a voided or fully refunded sale, "That sale is voided: it does not accept a tip."; on
 a sale of a day already distributed, "That day is already distributed: reopen it to add tips." (TIP-F11).
@@ -220,7 +220,7 @@ Steps:
    the customer leaves the change: the tip is the change and the change stays at 0.
 3. After the charge, in **Tips**, **+** "Record tip", the sale, "Cash" and the amount.
 In: the sale, what is tendered and the tip.
-Out: the cash tip, which goes into the drawer: in the open cash session it shows as "Cash tips" and raises
+Out: the cash tip, which goes into the drawer: in the open cash session it shows as "Tips in cash" and raises
 the expected cash (CASH_REGISTER-F18).
 If it fails: with "Turn on the cash register" on and the cash register closed, "The cash register is closed: open a
 cash session to record a cash tip."; when what is tendered does not cover the total plus the tip, "The amount

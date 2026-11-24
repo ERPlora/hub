@@ -1133,7 +1133,7 @@ asistente.
 ## Para quien lo mantiene
 
 - Anatomía completa de una app, copiada de `apps/demo`: `apps.py`, `models.py`, `schemas/` (un módulo por tema),
-  `queries.py`, `services/` (un módulo por tema), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `queries/`, `services/` (un módulo por tema), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
 - **Orden de las listas** (`_ordered`, con `base.ordering.list_order`): fichas,
@@ -1142,7 +1142,7 @@ asistente.
   y el CSV sale en el mismo orden. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - `phones.py` lee el teléfono con `phonenumbers` (el port de Python de libphonenumber) y exige un
   número válido de su país. Los países se validan con `pycountry` (ISO 3166). El país del negocio
-  para un teléfono sin prefijo es el que erplora.com registró (`queries.business_country(ctx)` →
+  para un teléfono sin prefijo es el que erplora.com registró (`queries.reads.business_country(ctx)` →
   `base.operations.business_country`, que lee `base.business.get` como la moneda y, sin país, España
   por `base.business.country_or_market`). Guardar y buscar lo leen igual: `find_customer(ctx, …)`
   exige el contexto de quien busca, así que ninguna app (Citas, Ventas, Facturas, Servicios, Tarifas,
@@ -1156,14 +1156,14 @@ asistente.
   `customer.manage`; `tests/test_approvals.py` es el contrato.
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1257, hub#1306, hub#1285): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: de sus fichas
-  vivas con lo que colgaba de cada una (`queries.recoverable_cards_in_copy`: `cards_in_copy` más sus grupos y etiquetas,
+  vivas con lo que colgaba de cada una (`queries.recovery.recoverable_cards_in_copy`: `cards_in_copy` más sus grupos y etiquetas,
   activos o no, y sus valores de los campos activos, por nombre; por SQL sobre los nombres del modelo: la copia no es
   un negocio y no tiene alias), las que el negocio aún guarda eliminadas vuelven las mismas por
-  `customer.customer.restore` (`queries.cards_deleted_in_business`: ni unidas a otra, ni con los datos borrados, ni
+  `customer.customer.restore` (`queries.recovery.cards_deleted_in_business`: ni unidas a otra, ni con los datos borrados, ni
   hechas otra vez, con `has_live_twin`, la misma regla que la importación; CUSTOMER-F33), y las que ya no tiene se
-  vuelven a crear por `customer.customer.recover` (`queries.cards_not_in_business`), todo o nada por ficha: encadena
+  vuelven a crear por `customer.customer.recover` (`queries.recovery.cards_not_in_business`), todo o nada por ficha: encadena
   `customer.customer.create`, `customer.group.create`/`update`, `customer.tag.create`/`update`,
-  `customer.field.create`, `set_groups` y `set_tags`, con lo del negocio del mismo nombre (`queries.named`, la misma
+  `customer.field.create`, `set_groups` y `set_tags`, con lo del negocio del mismo nombre (`queries.reads.named`, la misma
   regla que `set_groups` por nombre: el activo primero), y los valores con la comprobación de la ficha
   (`_validated_field_values`) sin pedir los obligatorios, como el alta del TPV; un valor de un campo desactivado o que
   su campo ya no admite (`_why_left_out`, con `_field_problem`) no deja fuera la ficha: la salida de `recover` y de
@@ -1174,7 +1174,7 @@ asistente.
   hecha la ficha, una creada por la recuperación no se distingue de una que el negocio rehízo a mano, que se queda
   como está. A una ficha eliminada, `customer.customer.restore` le devuelve lo que el negocio borró después (hub#1356):
   la plataforma le da del registro de la copia lo que declara su entrada (`CustomerRestoreIn`: el `id` y los grupos,
-  etiquetas y valores, cada uno con su id en la copia), `queries.lost_since_copy` deja lo que el negocio ya no tiene
+  etiquetas y valores, cada uno con su id en la copia), `queries.reads.lost_since_copy` deja lo que el negocio ya no tiene
   por ese id y `_hang_from_copy`, el mismo camino que `recover`, lo cuelga otra vez de la ficha, sin quitarle nada ni
   pisar un valor que ya tenga; todo dentro del bloqueo de la ficha (`tests/test_concurrency.py`, una supresión de
   datos que llega a la vez espera y no deja la ficha viva). `customer.customer.restore` y `customer.customer.recover` no tienen ruta ni son herramientas del
@@ -1199,7 +1199,7 @@ asistente.
   (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta
   entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas/` lleva su
   descripción: son la herramienta del asistente. Las referencias humanas
-  (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
+  (nombre, teléfono, email) las resuelve `queries.reads.find_customer`, solo entre fichas vivas.
 - **Palabras del asistente** (`assistant_synonyms`, en `apps.py`): para el Hub, un cliente asignado a una cuenta, como
   lo dice el botón del TPV («Asignar cliente», «Assign customer»), o una cuenta puesta «a su nombre» es lo que hace
   `customer.order.link` (F19). Solo dicho en frase: «asigna», «pon» o «set» solos asignan o ponen cualquier cosa, y

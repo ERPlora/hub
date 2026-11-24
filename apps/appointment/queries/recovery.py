@@ -7,7 +7,7 @@ from django.utils import timezone
 from psycopg import sql
 
 from apps.appointment.models import Appointment, AppointmentService, Recurring, RecurringService
-from apps.customer.queries import card_in_business, cards_in_copy
+from apps.customer.queries.recovery import card_in_business, cards_in_copy
 from apps.service.queries import recovery
 
 from .business import today
