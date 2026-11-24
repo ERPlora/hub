@@ -127,6 +127,8 @@ DEMO_ENTRY_PATH = "/auth/login"
 PROBE_PATH = "/.well-known/erplora-hub"
 #: The shared library's images (``base.image_catalog``), the same for every business: a product's photo may be one.
 LIBRARY_IMAGES = "/p/catalog/"
+#: The name of their route (``config.urls``).
+LIBRARY_ROUTE = "catalog-image"
 
 
 class CustomDomainMiddleware(MiddlewareMixin):
@@ -173,7 +175,10 @@ class CustomDomainMiddleware(MiddlewareMixin):
             with tenancy_context.use_hub(hub):
                 _count_the_request(request)
                 if request.path_info.startswith(LIBRARY_IMAGES):
+                    # The apps' public pages share the prefix for a business called «catalog»: only the images here.
                     match = resolve(request.path_info)
+                    if match.url_name != LIBRARY_ROUTE:
+                        raise Http404("No such image.")
                     return match.func(request, **match.kwargs)
                 if request.path_info != "/":
                     return media(request, hub.id.hex, image)
