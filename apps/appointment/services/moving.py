@@ -28,7 +28,7 @@ from apps.appointment.services.writes import (
     _wall_text,
 )
 from apps.customer.phones import InvalidPhone, to_e164
-from apps.customer.queries import business_country, find_customer
+from apps.customer.queries.reads import business_country, find_customer
 from apps.staff.queries import resolve_member
 
 PHONE_INVALID = _(
