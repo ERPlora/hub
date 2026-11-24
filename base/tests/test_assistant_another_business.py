@@ -89,7 +89,7 @@ def test_what_the_tool_says_of_the_export_is_what_the_export_does(name):
     assert dataset("customer.customer").personal
     assert "never the customers" in said
     assert "sale" not in {part.app for part in DATASETS}
-    assert "never the sales" in said
+    assert "never the business's history" in said
 
 
 def test_the_products_csv_says_it_takes_no_photos_as_it_has_no_photo_column():
