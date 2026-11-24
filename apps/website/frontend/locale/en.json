@@ -182,6 +182,11 @@
       "qr": "QR code of your website",
       "downloadPng": "Download PNG",
       "downloadSvg": "Download SVG",
+      "catalog": {
+        "url": "Your catalog's address",
+        "qr": "QR code of your catalog",
+        "hint": "Opens your website right at the catalog: print its QR for your tables or your counter."
+      },
       "signedIn": "On this device you are signed in, so this address opens the app. Open it on your phone or in a private window to see your website.",
       "notLive": "Your website is not online: until you publish it, this address opens your team's sign-in page.",
       "close": "Close"

@@ -416,6 +416,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
     assert page.rows[0].model_dump() == {
         "id": coffee.id,
         "name": "Coffee",
+        "description": "",
         "sku": "CAF",
         "product_type": "physical",
         "price": 150,
@@ -429,8 +430,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
         "allergens": [],
         "tracks_stock": True,
         # INVENTORY-F32: the till's tile shows it, or its initials without one.
-        "image": "",
-        "image_url": "",
+        "image": "", "image_url": "",
     }
     assert [row.tracks_stock for row in page.rows] == [True, False, True]
     assert page.rows[2].needs_tax_setup is True

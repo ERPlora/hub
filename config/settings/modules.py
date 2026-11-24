@@ -9,7 +9,7 @@ from config.settings.web import SPA_DIST
 APP_VERSION = config("APP_VERSION", default="")
 APP_RELEASED_AT = config("APP_RELEASED_AT", default="")
 # translate_workbooks (development only: the anthropic client is a dev dependency; ANTHROPIC_API_KEY
-# in the local .env) writes each module's WORKBOOK.en.md with this model.
+# in the local .env) writes each module's WORKBOOK.<language>.md with this model.
 WORKBOOK_TRANSLATION_MODEL = config(
     "WORKBOOK_TRANSLATION_MODEL", default="claude-haiku-5-5"
 )

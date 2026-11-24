@@ -1,5 +1,6 @@
 // ShareDialog: the website's address to copy, its QR to download (PNG to print, SVG to scale) and, honestly, why
-// the address opens the app on the owner's own device.
+// the address opens the app on the owner's own device; with a catalog on the page, a second address and QR that open
+// it right at the catalog (to print for the tables).
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
@@ -112,6 +113,48 @@ describe('ShareDialog', () => {
     await wrapper.get('[data-testid="website-share-copy"]').trigger('click');
     await settle();
     expect(wrapper.get('[data-testid="website-share-copy-error"]').text()).toContain('copy it by hand');
+  });
+
+  it('without a catalog on the page, there is only the website’s address', async () => {
+    const { wrapper } = await dialog();
+    expect(wrapper.find('[data-testid="website-share-catalog-url"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="website-share-catalog-qr"]').exists()).toBe(false);
+  });
+
+  it('with a catalog, a second address and QR open the page right at it', async () => {
+    const { wrapper } = await dialog({ catalog: true }, 'es');
+    expect(wrapper.get('[data-testid="website-share-catalog-label"]').text()).toBe('La dirección de tu catálogo');
+    expect(wrapper.get('[data-testid="website-share-catalog-url"]').text()).toBe(`${URL}#catalog`);
+    expect(wrapper.get('[data-testid="website-share-catalog-hint"]').text()).toContain('mesas');
+    const qr = wrapper.get('[data-testid="website-share-catalog-qr"]');
+    expect(qr.attributes('src')).toBe('/api/website/qr?format=svg&target=catalog');
+    expect(qr.attributes('alt')).toBe('Código QR de tu catálogo');
+    expect(wrapper.get('[data-testid="website-share-url"]').text()).toBe(URL);
+  });
+
+  it('the catalog’s link is copied and its QR downloaded, each its own', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const fetch = servesTheQr();
+    const saved = browserDownloads();
+    const { wrapper } = await dialog({ catalog: true });
+    await wrapper.get('[data-testid="website-share-catalog-copy"]').trigger('click');
+    await settle();
+    expect(writeText).toHaveBeenCalledWith(`${URL}#catalog`);
+    await wrapper.get('[data-testid="website-share-catalog-png"]').trigger('click');
+    await settle();
+    await wrapper.get('[data-testid="website-share-catalog-svg"]').trigger('click');
+    await settle();
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/website/qr?format=png&target=catalog',
+      '/api/website/qr?format=svg&target=catalog',
+    ]);
+    expect(saved).toHaveLength(2);
+    writeText.mockRejectedValueOnce(new Error('denied'));
+    await wrapper.get('[data-testid="website-share-catalog-copy"]').trigger('click');
+    await settle();
+    expect(wrapper.get('[data-testid="website-share-catalog-copy-error"]').text()).toContain('copy it by hand');
+    expect(wrapper.find('[data-testid="website-share-copy-error"]').exists()).toBe(false);
   });
 
   it('closing it tells the page', async () => {

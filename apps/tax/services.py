@@ -311,7 +311,7 @@ def _coherent_parent(data: RuleIn, category: TaxCategory) -> TaxRule:
         "reverse charge, which charge no tax and take rate 0; exempt_reason, regime_key). With parent_id it is "
         "a component, such as the equivalence surcharge, of that root rule. Two active rules of the same country, "
         "region and category cannot apply on the same day: end the old one the day before (tax.rule.end).",
-        "risk": "high",
+        "risk": "high", "does": ("set", "update"),  # A rule is never changed: creating one sets or changes a rate.
     },
 )
 def create_rule(ctx: OperationContext, data: RuleIn) -> dict:

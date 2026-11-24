@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Decides whether a run of deploy.yml still deploys: an environment never goes back to an older
-# commit. Tests and image build run outside the deploy lock (only the deploy job holds it), so the
-# deploy job of an older push may get the lock after a newer push has deployed; it then deploys
-# nothing (the newer commit already contains it). A release redeploy goes back on purpose.
+# commit. A manual run, a re-run of an older push or GitHub's own order of a concurrency group may
+# give the deploy lock to an older commit after a newer one has deployed; it then deploys nothing
+# (the newer commit already contains it). A release redeploy goes back on purpose.
 # Reads the tag the environment runs (/erplora/<environment>/<project>/image_tag, which ecs_deploy.py
 # and ecs_rollback.py record) and writes to $GITHUB_OUTPUT:
 #   deploy=false  IMAGE_TAG is an ancestor of the running commit, and not that commit itself;

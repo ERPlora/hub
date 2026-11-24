@@ -13,11 +13,14 @@ from django.core.files.storage import InMemoryStorage, storages
 from django.db import OperationalError
 from django.db.backends.utils import CursorWrapper
 
-from base import custom_domains, registry
+from base import activation, custom_domains, registry
 from base.models import Hub
+from base.models.activation import AppActivation
 from base.storage import hub_prefix
+from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import HOST, HUB_DB, A
+from base.tests.test_image_catalog import write_library
 from base.tests.test_internal import code, signed
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("spa_manifest", "hub_a")]
@@ -205,7 +208,6 @@ CLOSED = [
     "/csp-report/",
     "/favicon.ico",
     "/robots.txt",
-    "/p/catalog/food/cafe.webp",
     "/.well-known/acme-challenge/x",
     "/.well-known/erplora-hub/",
 ]
@@ -382,6 +384,25 @@ class TestTheImages:
         assert b"".join(response.streaming_content) == PNG
         assert response["Cache-Control"] == "public, max-age=31536000, immutable"
         assert not response.cookies
+
+    def test_an_image_of_the_shared_library_is_served_too(self, client, acme, settings, tmp_path):
+        settings.CATALOG_DIR = str(write_library(tmp_path / "img"))
+        response = visit(client, "/p/catalog/hospitality/cafe_solo.webp")
+        assert (response.status_code, response["Content-Type"]) == (200, "image/webp")
+        assert response["Cache-Control"] == "public, max-age=31536000, immutable"
+        assert visit(client, "/p/catalog/hospitality/nothing.webp").status_code == 404
+        assert visit(client, "/p/catalog/hospitality").status_code == 404
+
+    @pytest.mark.parametrize("path", ["/p/catalog/book", "/p/catalog/book/abc123", "/p/catalog/invoice/abc123"])
+    def test_a_business_called_catalog_opens_no_page_of_its_apps_by_the_librarys_prefix(self, client, acme, path):
+        # /p/<slug>/<page> are the apps' public pages: under the library's prefix, only its images are served here.
+        with use_hub(acme):
+            AppActivation.objects.filter(host=acme.slug).update(host="catalog")
+        Hub.objects.filter(pk=HUB_ID).update(slug="catalog")
+        activation.forget("catalog")
+        response = visit(client, path)
+        assert response.status_code == 404
+        assert b"session-me" not in response.content
 
     def test_another_business_never_serves_its_images_here(self, client, acme, hub_b, hub_files, statements):
         other = hub_b

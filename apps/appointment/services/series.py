@@ -12,22 +12,11 @@ from live.outbox import record_event
 from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import Appointment, Recurring, RecurringService, Settings
-from apps.appointment.queries import (
-    ADD_OWN,
-    SERIES_DEFAULT_WINDOW,
-    business_zone,
-    current_settings,
-    find_series,
-    lines_for,
-    load_agenda,
-    load_series,
-    may_book_for,
-    now,
-    pattern_of,
-    resolve_services,
-    today,
-    verdict_message,
-)
+from apps.appointment.queries.access import ADD_OWN, may_book_for
+from apps.appointment.queries.agenda import load_agenda, verdict_message
+from apps.appointment.queries.booking import lines_for, resolve_services
+from apps.appointment.queries.business import current_settings, now, today
+from apps.appointment.queries.series import SERIES_DEFAULT_WINDOW, find_series, load_series, pattern_of
 from apps.appointment.schemas import MaterializeIn, MaterializeOut, RecurringCreateIn
 from apps.appointment.services.writes import (
     BOOK_OWN_ONLY,
@@ -38,6 +27,7 @@ from apps.appointment.services.writes import (
     _member_for_booking,
 )
 from apps.service.models import Service
+from base.business import business_zone
 
 #: The most a series books in one run (the current product's 50).
 MATERIALIZE_PER_RUN = 50

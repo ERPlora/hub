@@ -299,86 +299,126 @@ def _assistant_message(text: str, calls: list[dict]) -> dict:
     return message
 
 
-async def stream_turn(  # noqa: C901, PLR0912, PLR0915
+@dataclasses.dataclass
+class _Round:
+    """What the gateway's frames of one round of a turn said, read in order, for its closing ``done``."""
+
+    hub: str
+    text: list[str] = dataclasses.field(default_factory=list)
+    calls: list[dict] = dataclasses.field(default_factory=list)
+    token: str | None = None
+    web: bool = False
+    sources: list[str] = dataclasses.field(default_factory=list)
+    finished: bool = False
+    failed: bool = False
+
+    def read(self, frame: dict) -> dict | None:
+        """The Hub's frame of the gateway's ``frame``: a piece of ``text``, the ``usage`` or the provider's ``error``;
+        None for the rest, which only the closing ``done`` carries."""
+        kind = frame.get("type")
+        if kind == "text_delta" and frame.get("text"):
+            self.text.append(str(frame["text"]))
+            return {"type": "text", "text": str(frame["text"])}
+        if kind == "usage":
+            return {"type": "usage", **{key: frame.get(key) for key in ("used", "limit", "resets_at", "demo")}}
+        if kind == "error":
+            self.failed = True
+            logger.warning(
+                "base.assistant.gateway_failed path=%s hub=%s code=%s retriable=%s",
+                TURN_PATH, self.hub, frame.get("code") or "-", bool(frame.get("retriable")),
+            )
+            return {"type": "error", "code": "assistant.provider_failed", "retriable": bool(frame.get("retriable"))}
+        self._keep(kind, frame)
+        return None
+
+    def _keep(self, kind: Any, frame: dict) -> None:
+        if kind == "function_call":
+            self.calls.append(
+                {"call_id": str(frame.get("call_id")), "name": str(frame.get("name")), "arguments": str(frame.get("arguments") or "{}")}
+            )
+        elif kind == "response":
+            self.token = frame.get("continuation") or None
+        elif kind == "web":
+            self.web = True
+        elif kind == "sources":
+            self.sources += frame.get("sources") or []
+
+    def cut(self, kind: str) -> dict:
+        """The error of a round whose frames stopped before their end: what was said stays."""
+        self.failed = True
+        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=%s", TURN_PATH, self.hub, kind)
+        return {"type": "error", "code": "assistant.cut", "retriable": True}
+
+    def done(self) -> dict:
+        said = "".join(self.text)
+        closed = {"web": self.web, "sources": self.sources}
+        if self.failed:
+            kept = [_assistant_message(said, [])] if said else []
+            return {"type": "done", "append": kept, "pending": [], "continuation": None, **closed}
+        return {"type": "done", "append": [_assistant_message(said, self.calls)], "pending": self.calls, "continuation": self.token, **closed}
+
+
+async def _frames(response: httpx.Response, said: _Round) -> AsyncIterator[dict]:
+    """The gateway's frames as they come, up to its ``[DONE]``; a line that is no frame is skipped."""
+    async for line in response.aiter_lines():
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if data == "[DONE]":
+            said.finished = True
+            return
+        try:
+            frame = json.loads(data)
+        except ValueError:
+            continue
+        if isinstance(frame, dict):
+            yield frame
+
+
+async def _refused(response: httpx.Response, hub: str) -> dict:
+    """The lone ``error`` of a turn the gateway did not take, logged."""
+    await response.aread()
+    try:
+        error = _error_of(response.status_code, response.json())
+    except ValueError:
+        error = {}
+    _log_refused(TURN_PATH, hub, response.status_code, error)
+    return _refusal(response.status_code, error, response.headers.get("Retry-After"))
+
+
+async def stream_turn(
     scope: Scope, *, messages: list[dict], tools: list[dict], instructions: str, continuation: str | None
 ) -> AsyncIterator[dict]:
     """A turn through the gateway, as the Hub's frames: ``text`` piece by piece, ``usage``, an ``error``, and ``done``
-    with what the browser keeps (``append``), the tools the model asked for (``pending``), their ``continuation`` and
+    with what the browser keeps (``append``), the tools the model asked for (``pending``), their ``continuation``,
     whether the turn brought pages of the web (``web``: the gateway's ``{type: web}``, also before a failure; the
-    browser sends it back with a report of the answer). A refusal of the gateway is a lone ``error``; a
-    failure half way keeps what was said."""
+    browser sends it back with a report of the answer) and the web addresses erplora.com's own tools consulted
+    (``sources``, which the panel checks the answer's addresses against). A refusal of the gateway is a lone ``error``;
+    a failure half way keeps what was said."""
     payload = {"hub": scope.key, "messages": messages, "instructions": instructions, "tools": tools}
     if continuation:
         payload["continuation"] = continuation
     url, body, headers = _signed(TURN_PATH, payload)
-    text: list[str] = []
-    calls: list[dict] = []
-    token: str | None = None
-    finished = failed = web = False
+    said = _Round(scope.key)
     try:
         async with httpx.AsyncClient(timeout=TURN_TIMEOUT) as client:
             async with client.stream("POST", url, content=body, headers=headers) as response:
                 if response.status_code != 200:
-                    await response.aread()
-                    try:
-                        error = _error_of(response.status_code, response.json())
-                    except ValueError:
-                        error = {}
-                    _log_refused(TURN_PATH, scope.key, response.status_code, error)
-                    yield _refusal(response.status_code, error, response.headers.get("Retry-After"))
+                    yield await _refused(response, scope.key)
                     return
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        finished = True
-                        break
-                    try:
-                        frame = json.loads(data)
-                    except ValueError:
-                        continue
-                    kind = frame.get("type") if isinstance(frame, dict) else None
-                    if kind == "text_delta" and frame.get("text"):
-                        text.append(str(frame["text"]))
-                        yield {"type": "text", "text": str(frame["text"])}
-                    elif kind == "function_call":
-                        calls.append(
-                            {"call_id": str(frame.get("call_id")), "name": str(frame.get("name")), "arguments": str(frame.get("arguments") or "{}")}
-                        )
-                    elif kind == "response":
-                        token = frame.get("continuation") or None
-                    elif kind == "web":
-                        web = True
-                    elif kind == "usage":
-                        yield {"type": "usage", **{key: frame.get(key) for key in ("used", "limit", "resets_at", "demo")}}
-                    elif kind == "error":
-                        failed = True
-                        logger.warning(
-                            "base.assistant.gateway_failed path=%s hub=%s code=%s retriable=%s",
-                            TURN_PATH, scope.key, frame.get("code") or "-", bool(frame.get("retriable")),
-                        )
-                        yield {"type": "error", "code": "assistant.provider_failed", "retriable": bool(frame.get("retriable"))}
+                async for frame in _frames(response, said):
+                    shown = said.read(frame)
+                    if shown is not None:
+                        yield shown
     except httpx.HTTPError as problem:
-        if not text and not calls:
+        if not said.text and not said.calls:
             _log_unreachable(TURN_PATH, scope.key, problem)
             yield {"type": "error", "code": "assistant.unreachable", "retriable": True}
             return
-        failed = True
-        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=%s", TURN_PATH, scope.key, type(problem).__name__)
-        yield {"type": "error", "code": "assistant.cut", "retriable": True}
-    if not finished and not failed:
-        failed = True
-        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=no_done", TURN_PATH, scope.key)
-        yield {"type": "error", "code": "assistant.cut", "retriable": True}
-    said = "".join(text)
-    if failed:
-        kept = [_assistant_message(said, [])] if said else []
-        yield {"type": "done", "append": kept, "pending": [], "continuation": None, "web": web}
-        return
-    yield {
-        "type": "done", "append": [_assistant_message(said, calls)], "pending": calls, "continuation": token, "web": web
-    }
+        yield said.cut(type(problem).__name__)
+    if not said.finished and not said.failed:
+        yield said.cut("no_done")
+    yield said.done()
 
 
 async def turn_frames(scope: Scope, plan: dict) -> AsyncIterator[bytes]:
