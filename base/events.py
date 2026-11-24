@@ -65,7 +65,10 @@ PERSON_EVENTS = (PERSON_PIN_REMOVED, PERSON_BADGE_SET, PERSON_BADGE_REMOVED)
 ROLE_CREATED = "base.role.created"
 ROLE_UPDATED = "base.role.updated"
 ROLE_DELETED = "base.role.deleted"
-ROLE_EVENTS = (ROLE_CREATED, ROLE_UPDATED, ROLE_DELETED)
+#: A person was given a role of the business, or returned to the one of their invitation (``person``: their id in the
+#: hub; ``id``: the role's, none for their invitation's).
+ROLE_ASSIGNED = "base.role.assigned"
+ROLE_EVENTS = (ROLE_CREATED, ROLE_UPDATED, ROLE_DELETED, ROLE_ASSIGNED)
 #: An API key made, rotated (a new token) or revoked; its token never travels in an event.
 API_KEY_CREATED = "base.api_key.created"
 API_KEY_ROTATED = "base.api_key.rotated"

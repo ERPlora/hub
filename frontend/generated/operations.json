@@ -3027,6 +3027,10 @@
     "method": "post",
     "path": "/api/roles/delete"
   },
+  "base.role.assign": {
+    "method": "post",
+    "path": "/api/roles/assign"
+  },
   "base.api_key.list": {
     "method": "get",
     "path": "/api/keys"

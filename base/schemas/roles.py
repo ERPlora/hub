@@ -7,6 +7,7 @@ from ninja import Schema
 from pydantic import Field
 
 from base.schemas.assistant import names
+from base.schemas.people import PersonIn
 
 #: What a role does with a permission, as ``base.roles`` keeps it.
 State = Literal["on", "approval", "off"]
@@ -83,3 +84,21 @@ class RoleUpdateIn(RoleIn):
 
 class RoleDeleteOut(Schema):
     key: str
+
+
+class RoleAssignIn(PersonIn):
+    role: str = Field(
+        title=gettext_noop("Role"),
+        description=(
+            "The id of a role of the business (base.role.list) to give it to the person; the role of their invitation "
+            "(``role`` in base.person.list) to return them to it. Any other basic role is given on erplora.com."
+        ),
+        json_schema_extra=NAMED,
+    )
+
+
+class RoleAssignOut(Schema):
+    person: str = Field(description="The ``id`` of the person in base.person.list.")
+    name: str
+    role: str = Field(description="The key of the role they have now, as base.role.list names it.")
+    label: str = Field(description="Its name.")

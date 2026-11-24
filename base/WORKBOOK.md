@@ -104,8 +104,8 @@ Se abre también con el enlace del Inicio terminado en #actividad.
 Arriba a la derecha, la última de la barra, después de «Mis apps», de los destellos del asistente y, en la aplicación
 instalada, de «Cambiar de negocio» (HUB_APP-F04 de ERPlora/app), también en el móvil. Reúne lo que pide una acción
 y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», una factura del plan sin pagar, los
-eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp esperando respuesta, una
-impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
+eventos caídos, los límites del plan, los roles por revisar, las citas por confirmar, los clientes de WhatsApp
+esperando respuesta, una impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
 
 - **La campana.** Sin nada pendiente, solo la campana. Con algo, pasa a una píldora con la campana y el número, en el
   color y con el icono del aviso más grave (urgente, atención o información). Si un aviso tiene plazo, como la hora de
@@ -483,6 +483,8 @@ En la pantalla Archivos:
 | BASE-F127 | Crear un rol propio a partir de otro | parcial |
 | BASE-F128 | Ajustar lo que permite un rol propio | parcial |
 | BASE-F129 | Borrar un rol propio | parcial |
+| BASE-F130 | Dar un rol propio a una persona | parcial |
+| BASE-F131 | Ver en la campana los roles por revisar | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -792,7 +794,7 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: cualquier pantalla del hub
 Pasos:
   1. En erplora.com, quien gestiona el negocio le cambia el rol a una persona, la quita del negocio o le
-     traspasa la propiedad.
+     traspasa la propiedad; o en el Hub le da un rol propio o cambia lo que permite el suyo (BASE-F130, BASE-F128).
   2. Si le ha cambiado el rol, su sesión sigue abierta y lo que tiene abierto, en todos sus dispositivos,
      pasa en ese momento a lo que permite el rol nuevo, sin recargar ni volver a entrar: el menú, «Mis apps»
      y las pestañas enseñan solo lo que puede abrir; la pantalla que tiene delante pasa a «Sin acceso» si el
@@ -810,7 +812,7 @@ Sale: su rol en el negocio, al día, y lo que tiene abierto con lo que ese rol p
 ya no está en el negocio, cerradas.
 Si falla: si el hub no responde en ese momento, erplora.com se lo vuelve a pasar al poco y el cambio llega
 entonces. Un dispositivo sin conexión lo recibe al reconectar.
-Implicados: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
+Implicados: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118, BASE-F128, BASE-F130
 
 ### BASE-F14 Ver las apps del negocio
 Estado: hecho
@@ -2325,7 +2327,7 @@ Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; en «Qué permite», «No se pudo cargar lo que
 permite este rol.» con «Reintentar», y un rol que no es de los cinco ni de los propios, «Este rol no existe en este
 negocio.».
-Implicados: BASE-F83, BASE-F84, BASE-F127, BASE-F128
+Implicados: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131
 
 ### BASE-F83 Asignar un rol a una persona
 Estado: hecho
@@ -2344,7 +2346,7 @@ Si falla: lo que diga erplora.com.
 Implicados: BASE-F82, BASE-F13
 
 ### BASE-F127 Crear un rol propio a partir de otro
-Estado: parcial — se crea pidiéndoselo al asistente o por la API del Hub; faltan su pantalla y dárselo a una persona
+Estado: parcial — se crea pidiéndoselo al asistente o por la API del Hub; falta su pantalla
 Actor: propietario, administrador
 Pantalla: Asistente
 Pasos:
@@ -2353,14 +2355,14 @@ Pasos:
   2. La tarjeta dice «A partir de: Empleado» y «Nombre: Cajero» (BASE-F97). Al aceptarla, el rol queda creado con lo
      mismo que permite el otro, app por app, menos ser el propietario del negocio, que ningún rol propio da.
   3. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él. Lo que permite se ve al tocarlo (BASE-F82) y
-     se cambia con BASE-F128. Desde entonces no cambia con el rol del que salió.
+     se cambia con BASE-F128; se da a una persona con BASE-F130. Desde entonces no cambia con el rol del que salió.
 Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
 Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
 Si falla: sin nombre, «Ponle nombre al rol.»; con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
 con ese nombre. Elige otro.»; un rol que no está, «Este rol no existe en este negocio.». Nadie da lo que no tiene: si
 el rol del que parte permite algo que quien lo crea no puede hacer, «Un rol no puede permitir más de lo que puedes
 hacer tú.» y no se crea. A quien no gestiona roles el asistente no se lo ofrece, y la API contesta 403.
-Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129
+Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Ajustar lo que permite un rol propio
 Estado: parcial — se ajusta pidiéndoselo al asistente o por la API del Hub; falta su pantalla
@@ -2374,7 +2376,8 @@ Pasos:
   3. Al aceptarla solo cambia lo que se pidió. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian
      al momento en sus dispositivos, sin cerrar su sesión (BASE-F13).
   4. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
-     añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos.
+     añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos, y la campana
+     lo dice (BASE-F131).
 Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
 Sale: el rol cambiado. Evento `base.role.updated`.
 Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
@@ -2382,7 +2385,7 @@ tiene: «Un rol no puede permitir más de lo que puedes hacer tú.»; y ser el p
 del propietario del negocio: ningún rol lo da.». Un permiso que no es de una app encendida, «Ese permiso no es de
 ninguna app encendida de este negocio.»; «Con aprobación» en algo que un responsable no puede aprobar con su PIN, «Eso
 no se puede aprobar con un PIN: elige permitido o no.». El nombre, como al crearlo.
-Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Borrar un rol propio
 Estado: parcial — se borra pidiéndoselo al asistente o por la API del Hub; falta su pantalla
@@ -2397,7 +2400,49 @@ Entra: el rol.
 Sale: el rol borrado. Evento `base.role.deleted`.
 Si falla: si alguien del negocio lo tiene, no se borra: «2 personas tienen este rol. Dales otro antes de borrarlo.». Un
 rol básico no se borra: «Este rol es de erplora.com. Duplícalo y cambia la copia.».
-Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127
+Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
+
+### BASE-F130 Dar un rol propio a una persona
+Estado: parcial — se da pidiéndoselo al asistente o por la API del Hub; falta su sitio en la ficha de la persona
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide al asistente «dale a Luis el rol Cajero» o «quítale a Luis el rol Cajero».
+  2. La tarjeta dice la persona y el rol por sus nombres y, bajo «Lo que va a pasar», cuántas personas tienen ese rol.
+     Pide escribir CONFIRMAR (BASE-F98).
+  3. Al aceptarla, la persona queda con ese rol, que manda sobre el de su invitación: lo que ve y lo que puede hacer
+     cambian al momento en sus dispositivos, sin cerrar su sesión (BASE-F13), y quien ahora puede hacer algo con ese rol
+     lo aprueba también con su PIN (BASE-F84). Cada persona tiene un solo rol.
+  4. Para devolverla al de su invitación se le pide ese rol («Empleado»): es el que tiene desde entonces.
+  5. El asistente de esa persona sabe con qué rol habla: el propio, por el nombre que le puso el negocio (BASE-F100).
+Entra: la persona y el rol, uno propio del negocio o el de su invitación.
+Sale: la persona con ese rol. Evento `base.role.assigned`. erplora.com no lo sabe: allí sigue con el de su invitación.
+Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; nadie
+se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está por
+debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
+permite más de lo que puede hacer él, tampoco el de la invitación al devolverla ni lo que daría una app apagada: «Un rol
+no puede permitir más de lo que puedes hacer tú.». Otro rol básico, «Ese rol se da en erplora.com. Aquí se da uno propio
+del negocio.»; un rol que no está, «Este rol no existe en este negocio.»; una persona que no es del negocio, «Esa
+persona no está en este negocio.». Si alguien borra el rol a la vez, o se borra o se da, nunca las dos cosas: se oye el
+«Este rol no existe en este negocio.» o el «2 personas tienen este rol. Dales otro antes de borrarlo.».
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+
+### BASE-F131 Ver en la campana los roles por revisar
+Estado: parcial — la campana los cuenta y lleva a los roles; falta la pantalla donde se revisan
+Actor: propietario, administrador
+Pantalla: La campana
+Pasos:
+  1. Se enciende una app, o una app gana un permiso, después de guardar un rol propio: ese rol queda por revisar
+     (BASE-F128).
+  2. La campana de quien gestiona los roles sube sin recargar con el aviso «2 roles por revisar» y su frase: «Hay una
+     app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol.».
+  3. «Revisar los roles» abre **Empleados › Roles**.
+  4. Al guardar un rol con lo que le faltaba (BASE-F128), deja de contar; sin ninguno, el aviso desaparece.
+Entra: los roles propios del negocio y las apps encendidas.
+Sale: nada guardado.
+Si falla: quien no gestiona los roles no ve el aviso. Si no se pueden leer los avisos, la campana se queda con lo último
+que supo, como en BASE-F10.
+Implicados: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Aprobar con el PIN de un responsable
 Estado: hecho
@@ -2901,7 +2946,8 @@ Pasos:
      botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
      al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
      pantalla. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado, dicho en el
-     idioma de la conversación) y que sus herramientas son las de ese rol: si le piden algo que ninguna hace, no busca
+     idioma de la conversación, o el propio que el negocio le dio, por su nombre, BASE-F130) y que sus herramientas son
+     las de ese rol: si le piden algo que ninguna hace, no busca
      otro camino ni cuenta el estado de otra cosa, sino que dice en una frase que no lo tiene disponible aquí, porque
      su rol no puede o porque esa app no está encendida, y quién puede (al empleado, un encargado o el propietario; al
      encargado, el propietario o un administrador) o en qué pantalla se hace.
@@ -2919,7 +2965,7 @@ vez y durante dos minutos, y se gasta junto con la acción (BASE-F84).
 Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Una
 aprobación ya usada o caducada no deja pasar la acción: el recibo dice «No se hizo, falló: …» y el asistente lo
 cuenta.
-Implicados: BASE-F13, BASE-F84, BASE-F97
+Implicados: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Pedirle varias cosas seguidas
 Estado: hecho
@@ -4032,7 +4078,8 @@ Implicados: BASE-F97, BASE-F100
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Un rol nuevo cambia la `Membership` y no cierra nada: tras el COMMIT también se
   despierta el host, cada stream re-ejecuta con los permisos del rol nuevo (`refresh` los relee) y
-  `base.session.access` (una huella de los permisos, con `base.view_home`, que tienen todos los roles) cambia.
+  `base.session.access` (una huella de los permisos, del nombre del rol y de lo aprobable, con `base.view_home`, que
+  tienen todos los roles) cambia.
   `AccessFollower` (en `BackgroundChrome`, junto a `AppsFollower`) llama entonces a `sessionChanged()` y, si la
   sesión releída abre o cierra la pantalla de delante, la vuelve a pasar por la guarda (`gateAgain`,
   `lib/app-gate.ts`). Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
@@ -4743,8 +4790,8 @@ Implicados: BASE-F97, BASE-F100
 - Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
-  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail,create,update,delete}`
-  (rutas `/api/people…`, `/api/roles`, `/api/roles/{detail,update,delete}`). El PIN y la placa son los de Acceso
+  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail,create,update,delete,assign}`
+  (rutas `/api/people…`, `/api/roles`, `/api/roles/{detail,update,delete,assign}`). El PIN y la placa son los de Acceso
   (`Credential`): mismo hash, mismos frenos.
 - Roles propios (`base.models.roles.BusinessRole`, en la BD del negocio): `base/roles.py` dice sin ORM lo que permite
   uno hoy y lo que queda por revisar; `base.permissions.permissions_of_business_role` es el único cálculo, el mismo de
@@ -4754,7 +4801,13 @@ Implicados: BASE-F97, BASE-F100
   escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
   despierta todas las consultas vivas del negocio tras el COMMIT (`_wake_open_apps`). El nombre es único sin contar
   mayúsculas (`base_businessrole_name_unique`), como en Shopify POS, Lightspeed, Odoo, NetSuite, Business Central y
-  WordPress; y solo quien está en el negocio impide borrarlo, como en Square y Lightspeed.
+  WordPress; y solo quien está en el negocio impide borrarlo, como en Square y Lightspeed. `base.role.assign` escribe
+  `HubUser.business_role` (nulo es el rol de la invitación) con la regla de rangos de `base.people.role_refusal`, mide
+  lo que el rol da con la misma vara y bloquea la fila del rol hasta el COMMIT, para que borrarlo a la vez espere
+  (`base/tests/test_role_assign_race.py`). `base.permissions.role_held` dice el rol de la invitación y el propio que
+  manda: lo leen `access_for`, `base.session.me` (el nombre del rol y los permisos que un responsable puede aprobar),
+  la huella de `base.session.access` y el asistente. Los «Roles por revisar» los cuenta
+  `base.queries.roles.roles_to_review` en `base.bell.counters`.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
@@ -5070,11 +5123,12 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.person.detail` | F78, F79 |
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
-| `base.role.list` | F82, F83, F127, F129 |
-| `base.role.detail` | F82, F97, F128, F129 |
+| `base.role.list` | F82, F83, F127, F129, F130 |
+| `base.role.detail` | F82, F97, F128, F129, F130 |
 | `base.role.create` | F127 |
 | `base.role.update` | F128 |
 | `base.role.delete` | F129 |
+| `base.role.assign` | F130 |
 | `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |
 | `base.approval.list`, `base.approval.export` | F85 |
 | `base.api_key.create` | F86 |

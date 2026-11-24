@@ -514,6 +514,7 @@ class TestHowTheyAreReached:
         ("POST", "/roles", "base.role.create"),
         ("POST", "/roles/update", "base.role.update"),
         ("POST", "/roles/delete", "base.role.delete"),
+        ("POST", "/roles/assign", "base.role.assign"),
     }
 
     def test_their_routes_are_the_ones_the_spa_calls(self):
@@ -522,7 +523,7 @@ class TestHowTheyAreReached:
         assert self.ROUTES <= bound_routes(router)
         assert self.ROUTES <= spa_routes("base.role.")
 
-    @pytest.mark.parametrize("name", ["base.role.create", "base.role.update", "base.role.delete"])
+    @pytest.mark.parametrize("name", sorted(op for _, _, op in ROUTES))
     def test_an_api_key_does_not_reach_them(self, name):
         op = get_operation(name)
 
@@ -530,7 +531,7 @@ class TestHowTheyAreReached:
 
     def test_a_role_may_be_created_twice_after_a_cut(self):
         """Only their own database, so a cut before the COMMIT runs them again."""
-        assert all(get_operation(f"base.role.{action}").repeatable for action in ("create", "update", "delete"))
+        assert all(get_operation(f"base.role.{action}").repeatable for action in ("create", "update", "delete", "assign"))
 
     def test_they_are_run_by_the_platform_as_an_operation_too(self, olga):
         op = get_operation("base.role.create")

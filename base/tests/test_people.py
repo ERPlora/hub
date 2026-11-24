@@ -440,6 +440,7 @@ PEOPLE_ROUTES = {
     ("POST", "/roles", "base.role.create"),
     ("POST", "/roles/update", "base.role.update"),
     ("POST", "/roles/delete", "base.role.delete"),
+    ("POST", "/roles/assign", "base.role.assign"),
     ("GET", "/access/grantors", "base.access.grantors"),
 }
 

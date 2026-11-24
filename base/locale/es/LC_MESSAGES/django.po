@@ -2818,3 +2818,39 @@ msgstr "entrada de soporte"
 msgctxt "support visit"
 msgid "support entries"
 msgstr "entradas de soporte"
+
+#: people.py
+msgid "The owner is always the owner: nobody gives them another role."
+msgstr "El propietario siempre es el propietario: nadie le da otro rol."
+
+#: people.py
+msgid "Nobody changes their own role: ask somebody above you."
+msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
+
+#: people.py
+msgid "You may only give a role to people below you in the business."
+msgstr "Solo puedes dar un rol a quien está por debajo de ti en el negocio."
+
+#: services/roles.py
+msgid "That role is given on erplora.com. Here you give one of the business's own."
+msgstr "Ese rol se da en erplora.com. Aquí se da uno propio del negocio."
+
+#: bell.py
+msgid "Roles to review"
+msgstr "Roles por revisar"
+
+#: bell.py
+#, python-format
+msgid "%(count)d role to review"
+msgid_plural "%(count)d roles to review"
+msgstr[0] "%(count)d rol por revisar"
+msgstr[1] "%(count)d roles por revisar"
+msgstr[2] "%(count)d roles por revisar"
+
+#: bell.py
+msgid "An app turned on or a new permission is not in them yet: look at what each role allows."
+msgstr "Hay una app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol."
+
+#: bell.py
+msgid "Review the roles"
+msgstr "Revisar los roles"

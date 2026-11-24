@@ -7,7 +7,7 @@ from live.errors import OperationError
 from live.operations import get as get_operation
 
 from base import events
-from base.models import Membership
+from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
 from base.permissions import access_for
 from base.roles import ON
@@ -74,3 +74,46 @@ def test_a_role_made_or_deleted_reaches_the_list_of_roles_of_its_business(ctx, c
     assert events.ROLE_DELETED in heard(here)
 
     assert heard(there, timeout=0.5) == set()
+
+
+@pytest.fixture
+def eva(make_user):
+    return make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE)
+
+
+@pytest.mark.parametrize("role", ["the business's own", "hub_employee"])
+def test_a_role_given_or_taken_away_wakes_every_open_device_of_its_business(ctx, cashier, eva, listening, role):
+    here, there = listening(A), listening(B)
+
+    run(ctx, "base.role.assign", person="saas:3", role=role if role.startswith("hub_") else str(cashier.pk))
+
+    assert {"*", events.ROLE_ASSIGNED} <= heard(here)
+    assert heard(there, timeout=0.5) == set()
+
+
+def test_a_role_that_is_not_given_wakes_nobody(ctx, cashier, listening):
+    here = listening(A)
+
+    with pytest.raises(OperationError):
+        run(ctx, "base.role.assign", person="saas:1", role=str(cashier.pk))
+
+    assert heard(here, timeout=0.5) == set()
+
+
+def test_a_role_given_that_is_rolled_back_wakes_nobody(ctx, cashier, eva, listening, monkeypatch):
+    here = listening(A)
+    monkeypatch.setattr("base.queries.roles.role_label", lambda held: 1 / 0)
+
+    with pytest.raises(ZeroDivisionError):
+        run(ctx, "base.role.assign", person="saas:3", role=str(cashier.pk))
+
+    assert heard(here, timeout=0.5) == set()
+    assert not HubUser.objects.filter(business_role__isnull=False).exists()
+
+
+def test_the_queries_of_the_roles_and_the_bell_follow_a_role_given():
+    from live.live_registry import live_registry
+
+    assert {"base.role.list", "base.role.detail", "base.bell.counters"} <= set(
+        live_registry.affected([events.ROLE_ASSIGNED])
+    )

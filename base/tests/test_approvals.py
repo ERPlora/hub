@@ -416,7 +416,7 @@ class TestFollowedLive:
         on = live_registry.subscribable
         assert on["base.approval.list"] == sorted({events.APPROVAL_GRANTED, events.APPROVAL_USED})
         assert on["base.approval.approvers"] == sorted(
-            {events.PIN_SET, events.PROFILE_UPDATED, events.HUB_STATE_APPLIED, *events.PERSON_EVENTS}
+            {events.PIN_SET, events.PROFILE_UPDATED, events.HUB_STATE_APPLIED, *events.PERSON_EVENTS, *events.ROLE_EVENTS}
         )
 
 

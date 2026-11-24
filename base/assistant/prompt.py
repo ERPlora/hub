@@ -100,6 +100,26 @@ def _language_name(language: str) -> str:
         return language
 
 
+def own_role(name: str, invitation: str) -> str:
+    """What a caller adds after the instructions for a person whose role is one the business made, ``name``, in place of
+    naming the role of their ``invitation``: who can do what it cannot goes by the rank of that invitation; above an
+    administrator there is only the owner."""
+    return "\n".join(_served(name, ABOVE.get(invitation, "the owner")))
+
+
+def _served(name: str, who_can: str | None) -> list[str]:
+    """The lines on the role «name» whom the assistant serves and, with ``who_can``, on what it cannot do."""
+    lines = [f"- You talk to the «{name}» of this business: your tools are the ones this role may use, no more."]
+    if who_can:
+        lines.append(
+            "  When they ask for something your tools do not do and your searches do not find, do not try other\n"
+            "  tools for it and never tell the state of something else instead: say plainly that it is not\n"
+            "  available to them here, because their role cannot do it or because its app is not on, and that "
+            f"{who_can} can, or on which screen it is done."
+        )
+    return lines
+
+
 def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> str:
     """The lines of the instructions on whom the assistant serves (hub#585, BASE-F100): their role as the screens name
     it, in the chat's language, whose tools these are; for a role below the owner's, that what no tool of theirs does
@@ -111,16 +131,7 @@ def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> s
     if role in Membership.Role.values:
         with translation.override(language):
             name = str(Membership.Role(role).label)
-        lines.append(
-            f"- You talk to the «{name}» of this business: your tools are the ones this role may use, no more."
-        )
-        if role in ABOVE:
-            lines.append(
-                "  When they ask for something your tools do not do and your searches do not find, do not try other\n"
-                "  tools for it and never tell the state of something else instead: say plainly that it is not\n"
-                "  available to them here, because their role cannot do it or because its app is not on, and that "
-                f"{ABOVE[role]} can, or on which screen it is done."
-            )
+        lines += _served(name, ABOVE.get(role))
     if approvable:
         tools = ", ".join(f"`{tool_name(name)}`" for name in approvable)
         lines.append(

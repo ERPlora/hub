@@ -14,10 +14,14 @@ export interface SessionDemo {
   expires_at: string;
 }
 
-/** `base.SessionMeOut`: what the shell reads (`SessionMe`) plus the scope it was resolved for and, on a demo's hub,
- * when the demo ends (`null` on a business's). */
+/** `base.SessionMeOut`: what the shell reads (`SessionMe`) plus the scope it was resolved for, the role of the person
+ * with what a manager may approve for them and, on a demo's hub, when the demo ends (`null` on a business's). */
 export interface SessionMeOut extends SessionMe {
   scope: { kind: string; key: string };
+  /** The name of the role that rules what they may do here; `null` without one. */
+  role: string | null;
+  /** The permissions they lack whose commands a manager may approve with their PIN. */
+  approvable: string[];
   demo: SessionDemo | null;
 }
 
