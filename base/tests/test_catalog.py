@@ -551,6 +551,13 @@ def test_stale_translations_lists_the_modules_to_translate_again(tmp_path):
     assert stale_translations(configs) == {"stale": by_hand("## Para qué sirve")}
 
 
+def test_a_workbook_that_cannot_be_read_is_told_once_by_the_registry_for_a_module(tmp_path):
+    broken = WORKBOOK.replace("(#cómo-se-usa)", "(#no-existe)")
+    things, base = module(tmp_path, workbook=broken), module(tmp_path, "base", kind="platform", workbook=broken)
+    assert stale_translations([things]) == {}
+    assert stale_translations([base]) == {"base": "WORKBOOK.md: links to no heading of the published part: #no-existe."}
+
+
 # ── AppImagesFinder ────────────────────────────────────────────────────────────────────────────
 
 
