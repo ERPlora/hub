@@ -49,7 +49,7 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
   const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
   const raw = ['2026-11-02', '+01:00', 'counter', CUSTOMER_ID, SERVICE_ID, MEMBER_ID];
-  const line = 'Crear en Citas: 1 elemento · 2 nov 2026, 10:00 · Mostrador';
+  const line = 'Crear en Citas: 1 elemento · Empieza a las: 2 nov 2026, 10:00 · Reservada por: Mostrador';
   await bookingCardSays(page, [{ service_id: SERVICE_ID }], line, raw, 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES');
   await cancelAtComputerSize(page);
   await leave(context, turnedOn);
@@ -135,17 +135,21 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   // 2026 · 21:30»): what the card must say of it.
   const label = await labelRead(context, `/reservation/reservations/detail?id=${booked.id}`, name);
   const ids = [customer.id, table.id, booked.id];
+  // A new booking's card says the same three, its day and time by their names: «Ana García 1234 · Fecha: 6 nov 2026 ·
+  // Hora: 21:30».
+  const [who, day, hour] = label.split(' · ');
+  const created = `Crear en Reservas: ${who} · Fecha: ${day} · Hora: ${hour}`;
 
   await openPanelAtTheDesk(page);
   // Booking: for whom (the customer's card by its name), the day and the time; the table goes among its data, with its
   // zone (hub#550).
   const booking = { customer_id: customer.id, date, time: '21:30:00', party_size: 2, table_id: table.id, source: 'in_person' };
   await askForACard(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`);
-  await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
+  await expect(card(page)).toContainText(created);
   for (const raw of [date, 'in_person', ...ids]) await expect(card(page)).not.toContainText(raw);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
+    await expect(card(page)).toContainText(created);
     await captureStill(page, `${KEY}-create-${vp.label}`);
   }
   await cancelAtComputerSize(page);
@@ -155,7 +159,7 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   await askForACard(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(said)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
+    await expect(card(page)).toContainText(created);
     await captureStill(page, `${KEY}-create-said-${vp.label}`);
   }
   await cancelAtComputerSize(page);
