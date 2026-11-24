@@ -14,42 +14,17 @@ import json
 import zipfile
 
 import pytest
-from django.contrib.auth import get_user_model
-from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound, PermissionDenied
-from live.operations import get
 
 from base import blueprint
 from base.models.activation import AppActivation
 from base.models import Hub, Membership
 from base.models.blueprints import ImportBatch
-from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
-from base.tests.test_services_data import born
+from base.tests.test_services_data import born, call, manager, owner, person
 
-__all__ = ["born", "in_business_a"]
+__all__ = ["born", "in_business_a", "manager", "owner"]
 pytestmark = HUB_DB
-
-
-def person(role, username="olga", language="es"):
-    user = get_user_model().objects.create_user(username=username, password="pw")
-    Membership.objects.create(user=user, host=A.key, role=role)
-    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
-
-
-@pytest.fixture
-def owner():
-    return person(Membership.Role.OWNER)
-
-
-@pytest.fixture
-def manager():
-    return person(Membership.Role.MANAGER, "mario")
-
-
-def call(ctx, operation, /, **data):
-    op = get(operation)
-    return op(ctx, op.input(**data))
 
 
 def a_file(purpose="backup", apps=("table", "customer"), data=None):
