@@ -10,16 +10,16 @@ from pathlib import Path
 
 from django.apps import apps
 
+from base.workbook_sections import MARK
+
 WORKBOOK_EN = Path(apps.get_app_config("cart_checkout").path) / "WORKBOOK.en.md"
 SPANISH_DATE = re.compile(r"[\w/:-]*(?:AAAA|aaaa)[\w/:-]*")
-# Line 1 carries the source's sha256, whose hex digits may spell «aaaa»: it is not the customer's part.
-HEADER = "<!-- generated from WORKBOOK.md sha256:"
 
 
 def user_part_lines() -> list[tuple[int, str]]:
+    """The lines a customer reads: a mark's hash may spell «aaaa»."""
     lines = WORKBOOK_EN.read_text(encoding="utf-8").splitlines()
-    assert lines and lines[0].startswith(HEADER), f"{WORKBOOK_EN.name} does not start with its header"
-    return list(enumerate(lines, start=1))[1:]
+    return [(number, line) for number, line in enumerate(lines, start=1) if not MARK.fullmatch(line)]
 
 
 def test_the_english_workbook_has_no_spanish_date_marker():

@@ -243,7 +243,7 @@ function onUpdated(outcome: RecurringUpdatedOut, change: SeriesChange): void {
       :title="t('appointment.series.deleteDialog.title', { name: deleting?.customer_name || t('appointment.list.erasedCustomer') })"
       :message="t('appointment.series.deleteDialog.message')"
       :confirm-label="t('appointment.series.deleteDialog.confirm')"
-      :cancel-label="t('appointment.cancelDialog.keep')"
+      :cancel-label="t('appointment.series.deleteDialog.keep')"
       :pending="remove.pending.value"
       :error="remove.error.value"
       @confirm="confirmDelete"

@@ -19,10 +19,10 @@ from base.tests.help_workbooks import (
     ES,
     ES_TABS,
     ES_WORDS,
-    header_of,
     write_workbooks,
 )
 from base.workbook_help import SOURCE_LANGUAGE, Draft, Flow, Screen, flow_fields, is_done, parse, workbook, words
+from base.workbook_sections import marked
 
 
 def spanish():
@@ -269,9 +269,9 @@ class TestWhichFile:
         write_workbooks(tmp_path, {"en": EN})
         assert workbook(tmp_path, SOURCE_LANGUAGE) == (SOURCE_LANGUAGE, user_part(ES))
 
-    @pytest.mark.parametrize(("language", "body"), [("en", EN), ("eo", EO)])
+    @pytest.mark.parametrize(("language", "body"), [("en", EN), ("eo", EN.replace("Flows", "Fluoj"))])
     def test_another_language_reads_its_own_file_while_it_is_current(self, tmp_path, language, body):
-        write_workbooks(tmp_path, {"en": EN, "eo": EO})
+        write_workbooks(tmp_path, {"en": EN, "eo": EN.replace("Flows", "Fluoj")})
         assert workbook(tmp_path, language) == (language, body)
 
     def test_a_regional_language_reads_its_own_file_else_its_base_language_s(self, tmp_path):
@@ -289,11 +289,11 @@ class TestWhichFile:
         assert workbook(tmp_path, "eo") == (SOURCE_LANGUAGE, user_part(ES))
 
     @pytest.mark.parametrize(
-        "first_line",
-        [header_of(ES.replace("sus zonas", "sus salas")), "## What it is for and who it is for", ""],
-        ids=["another-hash", "no-header", "empty"],
+        "text",
+        [marked(user_part(ES.replace("sus zonas", "sus salas")), EN), EN, ""],
+        ids=["another-source", "no-marks", "empty"],
     )
-    def test_a_file_that_is_not_current_with_the_source_reads_the_source(self, tmp_path, first_line):
+    def test_a_file_that_is_not_current_with_the_source_reads_the_source(self, tmp_path, text):
         write_workbooks(tmp_path, {})
-        (tmp_path / "WORKBOOK.en.md").write_text(f"{first_line}\n\n{EN}", encoding="utf-8")
+        (tmp_path / "WORKBOOK.en.md").write_text(text, encoding="utf-8")
         assert workbook(tmp_path, "en") == (SOURCE_LANGUAGE, user_part(ES))

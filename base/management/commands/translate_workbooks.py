@@ -1,22 +1,21 @@
 """``manage.py translate_workbooks [--app <id>] [--check]``: each app's ``WORKBOOK.<language>.md``.
 
 The WORKBOOK is written in Spanish (it is the specification); its translation into each other language of
-``settings.LANGUAGES`` is made from its user part (``base.catalog.user_part``), versioned next to it and headed by
-``<!-- generated from WORKBOOK.md sha256:<hash> -->``. The hash is the user part's, so editing
-«Para quien lo mantiene» never asks for a new translation.
+``settings.LANGUAGES`` is made from its user part (``base.catalog.user_part``), versioned next to it and marked section
+by section (``base.workbook_sections``). The marks are the user part's, so editing «Para quien lo mantiene» never asks
+for a new translation.
 
 ERPlora uses no ``ANTHROPIC_API_KEY``: whoever edits a WORKBOOK translates the
-change by hand, with the header ``base.catalog.translate_by_hand`` names. ``--check`` is what runs (in
+change by hand, with the marks ``base.catalog.translate_by_hand`` names. ``--check`` is what runs (in
 CI, through the tests): it never reaches the network nor needs the key, and fails listing, by language, the apps
-whose translation exists and is out of date (a missing one is no error), telling to translate
-each by hand, and every Spanish date placeholder (``AAAA``, ``aaaa``) a current one keeps outside its
+whose translation exists and is out of date (a missing one is no error), telling the sections to translate
+by hand, and every Spanish date placeholder (``AAAA``, ``aaaa``) a current one keeps outside its
 fenced code blocks, by file and line: a translation writes the year ``YYYY``.
 
 Without ``--check`` it translates through the Claude API, for whoever has a key; no error sends there.
 The ``anthropic`` client is a development dependency, the key lives in the local ``.env`` (or the
 environment) and the model is ``settings.WORKBOOK_TRANSLATION_MODEL``. Without the key, a module to
-translate stops the command before any call, naming the key; an up-to-date one needs none, and an
-unchanged hash costs no call.
+translate stops the command before any call, naming the key; an up-to-date one needs none and costs no call.
 """
 
 import re
@@ -28,6 +27,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from base import catalog
 from base.workbook_help import SOURCE_LANGUAGE
+from base.workbook_sections import MARK, marked, prose_lines
 
 #: The fixed instructions of every translation, but for its language (``instructions``).
 INSTRUCTIONS = """\
@@ -72,9 +72,9 @@ def spanish_dates(configs, language: str) -> list[str]:
     """``<app>: <file>:<line>: <pattern>`` of each Spanish date placeholder in a current translation into ``language``.
 
     Its fenced code blocks are left as they are (the translation's own rule), so a pattern there is
-    quoted on purpose and does not count; inline code does, as in ``OS-AAAAMMDD-NNNN``. Nor does the
-    header (line 1 of a current one): its hash is hex, and may spell ``aaaa``. A stale or unreadable
-    translation is ``stale_translations``'s.
+    quoted on purpose and does not count; inline code does, as in ``OS-AAAAMMDD-NNNN``. Nor does a
+    mark: its hash is hex, and may spell ``aaaa``. A stale or unreadable translation is
+    ``stale_translations``'s.
     """
     found = []
     for config in configs:
@@ -86,8 +86,8 @@ def spanish_dates(configs, language: str) -> list[str]:
             continue
         if state.state != "current":
             continue
-        for number, line in catalog.prose_lines(state.path.read_text(encoding="utf-8")):
-            if number == 1:
+        for number, line in prose_lines(state.path.read_text(encoding="utf-8")):
+            if MARK.fullmatch(line):
                 continue
             found += [
                 f"{config.label}: {state.path.name}:{number}: {pattern}"
@@ -170,7 +170,7 @@ class Command(BaseCommand):
             stale = catalog.stale_translations(configs, language)
             if stale:
                 problems += [f"Out of date {file}: {', '.join(stale)}."]
-                problems += [f"{label}: {catalog.translate_by_hand(label, language)}" for label in stale]
+                problems += [f"{label}: {what_to_do}" for label, what_to_do in stale.items()]
             dates = spanish_dates(configs, language)
             if dates:
                 problems += [f"Spanish date placeholders left in {file} (a translation writes the year YYYY, or yyyy):"]
@@ -215,8 +215,10 @@ class Command(BaseCommand):
             raise CommandError(
                 f"{file}: the translation {error} Nothing written."
             ) from error
-        header = catalog.en_header(catalog.source_hash(state.source))
-        state.path.write_text(f"{header}\n\n{translated}", encoding="utf-8")
+        text = marked(state.source, translated)
+        if text is None:
+            raise CommandError(f"{file}: the translation has other headings than {catalog.WORKBOOK}: nothing written.")
+        state.path.write_text(text, encoding="utf-8")
         self.stdout.write(
             f"{config.label}: wrote {state.path.name}; review the diff before committing it."
         )
