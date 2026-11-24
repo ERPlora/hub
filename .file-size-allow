@@ -22,7 +22,7 @@
 916 apps/combo/services/__init__.py ERPlora/erplora-next#74
 542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
-1081 apps/customer/queries/__init__.py ERPlora/erplora-next#74
+1064 apps/customer/queries/__init__.py ERPlora/erplora-next#74
 1082 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
 2641 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74

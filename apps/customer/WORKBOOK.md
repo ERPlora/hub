@@ -981,9 +981,12 @@ agenda (F25).
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien lo
 usa) y la API, con las mismas reglas y los mismos permisos. Las listas van por páginas de hasta 100 y
-todas tienen buscador. Para hablar con naturalidad, un cliente se puede nombrar por su id o por su
-nombre exacto, su teléfono o su email («añade una nota a Ana García»), y un grupo, una etiqueta o un
-campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el email. Antes de cambiar nada, el
+todas tienen buscador. Para hablar con naturalidad, un cliente se puede nombrar por su id, su teléfono, su
+email o su nombre, entero o una parte, con tildes o sin ellas («añade una nota a Ana García», «las citas de
+Lucía»), y un grupo, una etiqueta o un campo, por su nombre. Cuenta primero la ficha cuyo email, teléfono o nombre
+es exactamente lo dicho; si no hay ninguna, las que encuentra el buscador de la lista con esas palabras (F02). Si
+encajan varias fichas, la respuesta dice cuáles, hasta cinco por su nombre, para elegir una o dar su id, su
+teléfono o su email. Antes de cambiar nada, el
 asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por
 su id: la ficha («Cliente: Ana García»), la ficha duplicada de una unión, los grupos y las etiquetas que se le ponen,
 el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el pedido abierto como lo nombra Venta
@@ -1233,7 +1236,8 @@ asistente.
   sin acentos) y `search_text_without_contact` (lo mismo sin email ni teléfono), recalculados en `Customer.save()`;
   así no hace falta la extensión `unaccent`. La lista, la exportación y la auditoría de cifras buscan en el segundo a
   quien no tiene `base.view_customer_contact` (`queries/contact.py`), y `find_customer` solo lee una referencia como
-  teléfono o email exactos con ese permiso.
+  teléfono o email exactos con ese permiso. Cuando nada encaja exactamente, `find_customer` busca como la lista, con
+  `search_term` y `contact.searched` (`queries/naming.py`): una sola forma de buscar una ficha por sus palabras.
 - Contacto (BASE-F119): la marca `CUSTOMER_CONTACT` (`base/sensitive.py`) va en `email` y `phone` de `CustomerRow` (y
   lo que hereda), de `PhoneMatch` y de la fila de la exportación (`schemas/exports.py`, que escribe solo las columnas
   de `visible_columns`), en el `contact_point` de los consentimientos, en los filtros `email` y `phone` y en la
