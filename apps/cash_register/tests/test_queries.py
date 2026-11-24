@@ -199,6 +199,7 @@ def test_a_session_is_read_by_its_number_with_its_summary_and_notes():
         "total_cash_in": 2000,
         "total_cash_out": 1400,
         "total_gifts": 0,
+        "app_lines": [],
         "expected_cash": 11500,
         "counted": None,
         "difference": None,

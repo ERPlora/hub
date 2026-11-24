@@ -13,6 +13,7 @@ from uuid import uuid7
 import pytest
 from live.errors import Conflict
 
+from apps.combo.queries.dish_options import TAKEAWAY_CATEGORY
 from apps.tax.models import TaxCategory
 
 from .conftest import (
@@ -166,3 +167,7 @@ def test_two_picks_naming_one_dish_carry_the_options_of_both():
     coffee = line.components[1]
     assert (coffee.quantity, [o.name for o in coffee.options]) == (2, ["Milk", "Sugar"])
     assert line.amount == 1500 + 200 + 2 * 20
+
+
+def test_the_takeaway_map_is_explicit():
+    assert TAKEAWAY_CATEGORY == {"restaurant.alcohol": "retail.alcohol"}
