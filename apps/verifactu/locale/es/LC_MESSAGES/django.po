@@ -944,6 +944,30 @@ msgctxt "assistant card"
 msgid "VAT"
 msgstr "IVA"
 
+#: apps/verifactu/services/config.py
+msgctxt "assistant card"
+msgid "Issuer"
+msgstr "Emisor"
+
+#: apps/verifactu/services/config.py
+msgctxt "assistant card"
+msgid "Issuer tax ID"
+msgstr "NIF del emisor"
+
+#: apps/verifactu/services/config.py
+msgctxt "assistant card"
+msgid "AEAT environment"
+msgstr "Entorno AEAT"
+
+#: apps/verifactu/services/config.py
+msgctxt "assistant card"
+msgid ""
+"From now on every record goes to the real AEAT. As soon as the first one is sealed you can no longer go back to "
+"testing."
+msgstr ""
+"A partir de ahora cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a "
+"pruebas."
+
 #: apps/verifactu/queries/going_live.py
 msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."

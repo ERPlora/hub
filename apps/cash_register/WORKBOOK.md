@@ -786,7 +786,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_sale.py` (ventas reales de Ventas) y
   `tests/test_concurrency.py` (sesiones reales en hilos).
@@ -897,7 +897,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien
   la usa: Caja está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`, hub#1087) y cada campo de
-  `schemas.py` su `description`. `tests/test_assistant_asks.py` comprueba con las frases reales de la QA
+  `schemas/` su `description`. `tests/test_assistant_asks.py` comprueba con las frases reales de la QA
   del asistente (hub#1087) que cada una llega a su herramienta y, si nombra «el turno abierto», también
   a `session.current`, que da su número; para el Hub, «arqueo», «recuento» y «conteo» son el arqueo
   (`count`), «moneda» o «divisa», la del negocio (`currency`), y «una entrada», «una salida» o «un

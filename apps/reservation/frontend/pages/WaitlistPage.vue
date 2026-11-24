@@ -25,7 +25,7 @@ import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
+import { formatDay, formatDayInSentence, formatShortDate, formatTime, todayIn } from '../lib/clock';
 import { CUSTOMER_CONTACT, phoneColumns } from '../lib/guestContact';
 import type { WaitlistOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
@@ -170,7 +170,7 @@ async function convertEntry(row: WaitlistOut, overbook: boolean): Promise<void> 
     const booked = done.reservation;
     outcome.value = t('reservation.waitlist.converted', {
       guest: guestOf(booked),
-      when: `${formatDay(booked.date, locale.value)} · ${formatTime(booked.time, locale.value)}`,
+      when: `${formatDayInSentence(booked.date, locale.value)} · ${formatTime(booked.time, locale.value)}`,
     });
   } catch (caught) {
     const failure = caught as { code?: string; message?: string; fields?: Record<string, string> };

@@ -10,18 +10,10 @@ from live.operations import operation
 
 from apps.appointment import engine, events
 from apps.appointment.models import Appointment
-from apps.appointment.queries import (
-    APPOINTMENT_NOT_FOUND,
-    CHANGE_OWN,
-    MOVABLE,
-    check_member,
-    find_appointment,
-    lines_for,
-    load_detail,
-    may_change,
-    read_moment,
-    resolve_services,
-)
+from apps.appointment.queries.access import CHANGE_OWN, may_change
+from apps.appointment.queries.booking import check_member, lines_for, resolve_services
+from apps.appointment.queries.business import read_moment
+from apps.appointment.queries.reads import APPOINTMENT_NOT_FOUND, MOVABLE, find_appointment, load_detail
 from apps.appointment.schemas import AppointmentOut, RescheduleIn, UpdateIn
 from apps.appointment.services.writes import (
     CANNOT,

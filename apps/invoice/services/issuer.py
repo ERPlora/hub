@@ -11,7 +11,7 @@ from live.outbox import record_event
 from apps.invoice import events
 from apps.invoice.models import Invoice, Issuer
 from apps.invoice.queries.issuer import issuer_row
-from apps.invoice.schemas import IssuerIn, IssuerOut, IssuerSyncIn, IssuerSyncOut
+from apps.invoice.schemas.issuer import IssuerIn, IssuerOut, IssuerSyncIn, IssuerSyncOut
 from apps.invoice.services.writes import _now, actor
 
 ISSUER_MISSING = _(

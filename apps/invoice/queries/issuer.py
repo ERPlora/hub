@@ -5,7 +5,7 @@ from live.operations import operation
 
 from apps.invoice.document_issuer import printed_issuer
 from apps.invoice.models import Issuer
-from apps.invoice.schemas import IssuerGetIn, IssuerOut
+from apps.invoice.schemas.issuer import IssuerGetIn, IssuerOut
 
 
 def issuer_row(issuer: Issuer | None) -> dict:

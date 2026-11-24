@@ -743,6 +743,11 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Sin sinónimos propios
   (`assistant_synonyms`): «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.
+  Como una regla no se edita (TAX-F04 y TAX-F07), `tax.rule.create` dice además que pone y cambia
+  (`does`: `set` y `update`): «ponle el IVA a la comida para llevar» o «sube el IVA de los libros al 10 %»
+  la ofrecen, y la búsqueda de herramientas la encuentra por «poner el IVA de una categoría»
+  (`tests/test_assistant_rate_rule.py`). Con una palabra propia para «regla» en «el IVA de…» subiría la regla de
+  descuento de Tarifas, que también es una regla.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
   con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
   (`ai=INTERNAL`, sin API ni consulta viva): solo nombra la regla en la tarjeta; el modelo encuentra las reglas en

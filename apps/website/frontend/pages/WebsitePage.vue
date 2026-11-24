@@ -105,6 +105,15 @@ const sourceOff = computed(() => {
   const source = draft.value?.content.catalog.source ?? null;
   return source && !sources.value.includes(source) ? source : null;
 });
+/** What «Share and QR» shares: the page's address and, while the draft shows a catalog, the catalog's own. */
+const share = computed(() => {
+  const catalog = draft.value?.content.catalog;
+  return {
+    url: site.value?.public_url ?? '',
+    isLive: site.value?.is_live ?? false,
+    catalog: Boolean(catalog?.source && !catalog.hidden && !sourceOff.value),
+  };
+});
 
 watch(
   site,
@@ -788,8 +797,7 @@ function setHoursShown(shown: boolean): void {
       </template>
       <ShareDialog
         v-model:open="sharing"
-        :url="site.public_url"
-        :is-live="site.is_live"
+        v-bind="share"
       />
     </div>
     <p

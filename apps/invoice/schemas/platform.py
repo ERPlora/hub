@@ -6,7 +6,7 @@ from uuid import UUID
 from ninja import Field, Schema
 from pydantic import ConfigDict, model_validator
 
-from apps.invoice.schemas import MAX_AMOUNT, _text
+from apps.invoice.schemas.fields import MAX_AMOUNT, _text
 
 # ── ERPlora's own invoices, posted by the SaaS to its platform hub ──────────────────────────────────────────
 # The body of ``POST /internal/platform/invoices``: ``platform_payload()`` of the SaaS's billing/services.py, field by

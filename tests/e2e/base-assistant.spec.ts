@@ -28,7 +28,7 @@ import {
   panelAtTheDesk,
   shots,
 } from './assistant-panel';
-import { CLAIM_ANSWER, DICTATION, GREETING } from './assistant-provider';
+import { CLAIM_ANSWER, DICTATION, GREETING, LINK_ANSWER } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { A, api, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
@@ -204,6 +204,16 @@ test('an answer that says it changed something nothing changed is flagged, outsi
   await shots(page, 'BASE-G117');
 });
 
+test('an answer with a web address that nothing of the turn looked up is flagged, outside the answer', async ({ page }) => {
+  await panelAtTheDesk(page);
+  await ask(page, 'E2E-LINK ¿sube el IVA de la comida para llevar?');
+  await expect(lastAnswer(page)).toHaveText(LINK_ANSWER.en);
+  await expect(panel(page).locator('[data-testid="assistant-notice-unread_link"]')).toContainText(
+    'This answer shows a web address the assistant did not really look up. Do not trust it.',
+  );
+  await shots(page, 'BASE-G153');
+});
+
 test('the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
   await panelAtTheDesk(page);
   await ask(page, 'Hola');
@@ -260,7 +270,7 @@ test('from 80 % the foot says what is left and each answer moves it; a spent mon
   await openPanel(employee);
   await ask(employee, 'Hola');
   const theirs = panel(employee).locator('[data-testid="assistant-failure"]').last();
-  await expect(theirs).toContainText('Ask whoever runs the business to upgrade the plan.');
+  await expect(theirs).toContainText("Ask the business's owner to upgrade the plan.");
   await expect(theirs.locator('[data-testid="assistant-upgrade"]')).toHaveCount(0);
   await employee.context().close();
 });

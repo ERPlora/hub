@@ -16,7 +16,7 @@ from live.operations import get as get_operation
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
 from apps.invoice.queries.series import FULL, TICKET
-from apps.invoice.schemas import FromSaleIn, IssueOut
+from apps.invoice.schemas.invoices import FromSaleIn, IssueOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import AUDIT_MESSAGES, GENERAL_REGIME, _issue, _issued_notice, _line_values
 from apps.invoice.services.numbering import series_of_year

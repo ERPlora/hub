@@ -22,6 +22,14 @@ export async function ownerOfTheSite(
   return { owner, found: site.data };
 }
 
+/** The three sizes the public page is seen at: a small phone, a tall tablet and a computer. */
+export const PUBLIC_SIZES = [
+  { name: '375', width: 375, height: 667 },
+  { name: '820', width: 820, height: 1180 },
+  { name: '1440', width: 1440, height: 900 },
+] as const;
+export const WIDE = { width: 1440, height: 900 };
+
 /**
  * The page at rest for its capture: no focus ring (the website's own step), then the harness's one wait, `settled`
  * (helpers.ts): nothing moving, in the document or in any shadow root (Bootstrap's buttons fade 150 ms, the dev server
