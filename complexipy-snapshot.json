@@ -242,8 +242,8 @@
     ]
   },
   {
-    "path": "apps/printing/services.py",
-    "file_name": "services.py",
+    "path": "apps/printing/services/printers.py",
+    "file_name": "printers.py",
     "functions": [
       {
         "name": "_connection",
@@ -252,7 +252,13 @@
       {
         "name": "update_printer",
         "complexity": 19
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/printing/services/queueing.py",
+    "file_name": "queueing.py",
+    "functions": [
       {
         "name": "create_job",
         "complexity": 24
