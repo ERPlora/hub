@@ -1,4 +1,6 @@
 // Sales & POS → Sell: the table of the check, with Tables on.
+// The shell is loaded first, as in the till's other tests: it hooks Ionic's form controls before `@ionic/vue` defines them.
+import '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, MANAGER, settle } from '../__tests__/mount-sale';
