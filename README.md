@@ -539,6 +539,10 @@ sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/k
    (release `hub-v…`).
 5. Después, `git push origin main:pre` (fast-forward) para que `pre` no se separe de `main`.
 
+Los push de una rama se despliegan de uno en uno: si entran varios seguidos, corre uno y espera solo el más nuevo,
+que ya lleva a los demás. Los intermedios salen cancelados en Actions y la release siguiente incluye sus commits. Una
+vuelta atrás o un relanzamiento a mano solo esperan a que acabe el paso de desplegar, nunca a las pruebas de un push.
+
 La rama decide el entorno (`.github/scripts/deploy-env.sh`): `main` → prod, `pre` → pre; cualquier
 otra no despliega. Relanzar o volver atrás, siempre desde la rama del entorno:
 
