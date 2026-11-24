@@ -19,7 +19,7 @@ MAX_CENTS = 9_999_999_999_999
 #: Lines of one check, legs of one charge, lines of one refund.
 MAX_LINES = 200
 MAX_PAYMENTS = 10
-#: Options of Modifiers one line may carry (Modifiers' own ceiling, ``modifier.schemas.MAX_PICKS``).
+#: Options of Modifiers one line may carry (Modifiers' own ceiling, ``modifier.schemas.till.MAX_PICKS``).
 MAX_OPTIONS = 100
 
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
