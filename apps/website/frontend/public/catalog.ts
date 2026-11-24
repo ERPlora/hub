@@ -23,12 +23,13 @@ const anchor = (index: number): string => `ws-cat-${index + 1}`;
 
 type Item = CatalogOut['groups'][number]['items'][number];
 
-/** An item's photo, loaded only when it comes into view; without one, a gradient with its initial. */
+/** An item's photo, whole on white as the till shows it, loaded only when it comes into view; without one, a gradient
+ * with its initial. */
 function thumbnail(item: Item): HTMLElement {
   const thumb = element('div', 'ratio ratio-21x9 ws-thumb');
   thumb.setAttribute('aria-hidden', 'true');
   if (item.image_url) {
-    const photo = element('img', 'object-fit-contain');
+    const photo = element('img', 'object-fit-contain bg-white');
     for (const [name, value] of [['src', item.image_url], ['alt', ''], ['width', '512'], ['height', '512'], ['loading', 'lazy']]) {
       photo.setAttribute(name, value);
     }
