@@ -14,6 +14,8 @@ import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '.
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
 import type { Business } from '../../../../base/frontend/operations/business';
+import type { AppLine } from '../operations/app-lines';
+import { TIPS } from './__tests__/session';
 import CloseSessionForm from './CloseSessionForm.vue';
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
@@ -25,12 +27,7 @@ const KITCHEN = 'kitchen.ticket.board';
 const PRINTS = 'printing.job.summary';
 
 const detail = (expected: number | null) => ({ id: 's1', number: 'S-261014-0001', status: 'open', summary: { expected_cash: expected } });
-const TIPS = [
-  { app: 'tip', label: 'Tips in cash', amount: 500 },
-  { app: 'tip', label: 'Tips by card', amount: 700 },
-  { app: 'tip', label: 'Tips paid out', amount: -200 },
-];
-const withTips = (expected: number | null, lines: typeof TIPS | null = TIPS) => {
+const withTips = (expected: number | null, lines: AppLine[] | null = TIPS) => {
   const answer = detail(expected);
   return { ...answer, summary: { ...answer.summary, app_lines: lines } };
 };
