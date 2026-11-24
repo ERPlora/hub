@@ -897,6 +897,7 @@
       "attendance__correction__list": "Buscar correcciones de jornadas",
       "attendance__person__list": "Buscar a las personas que fichan",
       "attendance__person__detail": "Leer a una persona que ficha",
+      "attendance__person__check": "Comprobar para quién es un fichaje o una pausa",
       "attendance__presence__list": "Quién ha fichado ahora",
       "attendance__presence__count": "Contar cuántas personas han fichado ahora",
       "attendance__record__clock_in": "Fichar la entrada",
