@@ -13,7 +13,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.customer.phones import InvalidPhone, candidates, to_e164
-from apps.customer.queries import business_country
+from apps.customer.queries.reads import business_country
 from apps.customer.queries.contact import holds, sees_contact
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock

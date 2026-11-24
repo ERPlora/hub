@@ -8,7 +8,7 @@ reads its own country, never another's."""
 import pytest
 from live.operations import get
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from base.models import Hub
 from base.tenancy.context import use_hub
 
