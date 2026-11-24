@@ -459,6 +459,18 @@ describe('WebsitePage', () => {
     expect(s.testid('website-share-url').text()).toBe('https://a.erplora.com/');
   });
 
+  // flow: WEBSITE-F09 — the catalog's own address and QR, only while the draft shows a catalog from an app that is on.
+  it.each([['service', false, true], ['service', true, false], ['inventory', false, false], [null, false, false]] as const)(
+    'with the catalog from %s (hidden: %s), «Share and QR» offers the catalog’s QR: %s',
+    async (source, hidden, offered) => {
+      const s = await setup();
+      await s.show({ ...SITE, content: { ...SITE.content, catalog: { ...SITE.content.catalog, source, hidden } } });
+      await s.wrapper.get('[data-testid="website-share"]').trigger('click');
+      await settle();
+      expect(s.testid('website-share-catalog-url').exists()).toBe(offered);
+    },
+  );
+
   it('switches between editing and the preview on a phone or a tablet', async () => {
     const s = await setup();
     await s.show();
