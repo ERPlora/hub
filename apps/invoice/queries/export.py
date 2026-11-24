@@ -61,9 +61,9 @@ TEXT, DAY, AMOUNT, PERCENT = "text", "day", "amount", "percent"
             ),
         },
         "description": "Writes an Excel file of the issued invoices for the accountant, as the invoice list shows them "
-        "for the same search and filters (issue dates, status, type, series, source, total), cancelled and rectifying "
-        "ones included: number, date, customer, tax ID, taxable base, tax rate, tax, equivalence surcharge if any, and "
-        "total, with a row per tax rate.",
+        "for the same search and filters (issue dates, status, type, series, source), cancelled and rectifying ones "
+        "included: a row per invoice and tax rate with its number, date, customer, tax ID, taxable base, rate, tax and "
+        "equivalence surcharge if any.",
     },
 )
 def export_invoices(ctx: OperationContext, params: InvoiceExportIn) -> dict:
