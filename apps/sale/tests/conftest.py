@@ -15,12 +15,13 @@ import json
 from decimal import Decimal
 
 import pytest
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.test import Client
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
-from live.meta import all_live_app_configs, permissions_for_role
+from live.meta import CheckoutStep, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import get, registry
 from psycopg.conninfo import make_conninfo
@@ -113,11 +114,16 @@ def without_cash_register(monkeypatch):
     )
 
 
+#: The step the reference app declares at the charge in ``a_step_at_the_charge``, as ``sale.checkout.steps`` gives it.
+DECLARED_STEP = {"key": "demo.tip", "app": "demo", "component": "TipStep"}
+
+
 @pytest.fixture
 def a_step_at_the_charge(monkeypatch):
-    """An active app adds a step to the charge (the tip of Tips), so what it adds to a tender is taken (SALE-F39). No
-    app can declare such a step yet, so without this fixture the charge refuses any added amount."""
-    monkeypatch.setattr("apps.sale.services.charge_validation._refuse_added_amounts", lambda payments: None)
+    """An app on adds a step to the charge, as Tips does with its tip, so what it adds to a tender is taken (SALE-F39):
+    the reference app declares one, seen by everyone who charges. Without it no app on declares one, and the charge
+    refuses any added amount."""
+    monkeypatch.setattr(django_apps.get_app_config("demo"), "checkout", [CheckoutStep(key="tip", component="TipStep")])
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:42ef32bbd0ecd68a80faaa4ceb80b634c673de172be98eedc2f0afba9a22f7c6 -->
+<!-- generated from WORKBOOK.md sha256:340f9def7c7208907f56ab4d8931327e2d50746c9313267b6baa40a132e1e51d -->
 
 ## What it is for and who it is for
 
@@ -1402,9 +1402,9 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-Status: not done — the sale knows how to keep apart, in each payment, what another app adds, and an app can already
-declare its step at the charge, but Sales does not ask for those steps yet and always refuses what is added, the
-Charge sheet does not paint them and the Sale document does not show what was added (hub#1497, hub#1500, hub#1502)
+Status: not done — the sale knows how to keep apart, in each payment, what another app adds, and Sales already says
+which steps the apps turned on add to the charge and takes what is added only when whoever charges has one, but the
+Charge sheet does not paint them yet and the Sale document does not show what was added (hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager
 Screen: Charge, Sale document
@@ -1425,8 +1425,8 @@ VAT (see "Why the tip is not on the ticket" in the Tips manual). The sale keeps 
 charged on top and its name, to square the amount tendered and the change and for the paper, and the sale
 charged notice carries it apart; the **Sales** figures (SALE-F28) do not add it. The step's app keeps its own
 (TIP-F02).
-If it fails: with no app turned on that adds a step to the charge, a charge that brings an added amount (through
-the API or the assistant) does not charge: "This business has no app that adds anything to a charge, such as a tip:
+If it fails: with no app turned on that adds a step to the charge of whoever charges, a charge that brings an added
+amount (through the API or the assistant) does not charge: "This business has no app that adds anything to a charge, such as a tip:
 charge the sale alone.". If the step's app is turned off with the sheet open, the row goes away and it charges without
 it.
 If the sale is charged and the step cannot save its own, the sale stays charged and the sheet says the step's
@@ -1578,6 +1578,7 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | What was sold on each of the last 7 days | see sales | F28 | `sale.sale.last_7_days` |
 | What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | see sales | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
+| The steps the apps turned on add to the charge, those whoever charges sees and in their order: which app each one is of and which part of it paints it; with none, the charge takes nothing added | charge | F39 | `sale.checkout.steps` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
 | The active payment methods, with the ones the business allows today | see payment methods | F02, F03 | `sale.payment_method.list` |

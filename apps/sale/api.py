@@ -131,6 +131,11 @@ async def checkout_preview(request, params: Query[PreviewIn]):
     return await run_operation(request, queries.checkout.preview, params)
 
 
+@bind(router, "sale.checkout.steps", "/sale/checkout/steps")
+async def checkout_steps(request):
+    return await run_operation(request, queries.checkout_steps.checkout_steps)
+
+
 # Open checks
 
 
