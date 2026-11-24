@@ -49,7 +49,7 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
   const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
   const raw = ['2026-11-02', '+01:00', 'counter', CUSTOMER_ID, SERVICE_ID, MEMBER_ID];
-  const line = 'Crear en Citas: 1 elemento · Empieza a las: 2 nov 2026, 10:00 · Reservada por: Mostrador';
+  const line = 'Crear en Citas: 2 nov 2026, 10:00 · Servicios: 1 elemento · Reservada por: Mostrador';
   await bookingCardSays(page, [{ service_id: SERVICE_ID }], line, raw, 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES');
   await cancelAtComputerSize(page);
   await leave(context, turnedOn);
@@ -62,7 +62,7 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
 test('assistant-card — in Spanish a booking whose service comes by its name says that name, never how many', async ({ browser }) => {
   const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
-  const line = 'Crear en Citas: Tinte · Empieza a las: 2 nov 2026, 10:00 · Reservada por: Mostrador';
+  const line = 'Crear en Citas: 2 nov 2026, 10:00 · Servicios: Tinte · Reservada por: Mostrador';
   await bookingCardSays(page, [{ service: 'Tinte' }], line, ['elemento', CUSTOMER_ID, MEMBER_ID], 'hub-860-service-by-name');
   await cancelAtComputerSize(page);
   await leave(context, turnedOn);
