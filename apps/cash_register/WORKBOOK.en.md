@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ca130035b7f67985e679b6123a145f9fc3f1f81f1d8468e437eedc1a31abe210 -->
+<!-- generated from WORKBOOK.md sha256:f23b5f31defd6f62747c82767517273f4875bdf89de0b8539ba1916a12b927a0 -->
 
 ## What it is for and who it is for
 
@@ -105,7 +105,8 @@ be read in two ways…"). Per row: "Detail" always and, in the open session,
   coin under "Bills" and "Coins", and "Total counted" live; with no table for the currency, a single
   "Total counted" field. "Register count" and "Cancel".
 - **Close session · S-…**: the shift review, "Expected in the drawer" and "Difference" live (if whoever
-  closes may see them), "Counted cash", "Closing notes", "Close session" and "Cancel".
+  closes may see them, and just above them the tip lines, if there are any: CASH_REGISTER-F18), "Counted
+  cash", "Closing notes", "Close session" and "Cancel".
 
 The amounts ("Opening float", "Amount", the "Total counted" typed by hand and "Counted cash") are typed in the same
 field as a price everywhere else in the Hub, and read the same way (hub#1160): the label floats inside the field, on
@@ -135,9 +136,10 @@ itself"), Movements (how many), Opening float, Sales (all payment methods) and, 
 sales and Sales with other payment methods (this one only if there were any), Refunds, Cash in, Cash out,
 Comps, Expected, Counted and Difference, and the opening and closing notes. Comps go at their cost: whoever does not
 see the costs sees them as "—". With the Tips app turned on, also
-"Tips in cash", "Tips by card" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
+"Tips in cash", "Tips by card" and "Tips paid out", just before Expected (CASH_REGISTER-F18). In an open session Counted
 and Difference show "—". Below, two tables, from the most recent to the oldest, 50 per page and as cards
-on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept) and **Counts** (When,
+on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept; the Type of a line another app
+records is the name of that app, "Tips") and **Counts** (When,
 Count type, Total counted, Notes). Empty: "No movements in this session." and "No counts in this
 session.". The "Print" button prints the report on paper: "Partial report (X)" if the session is open,
 "Cash closing (Z)" if it is closed (CASH_REGISTER-F16).
@@ -198,7 +200,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
-| CASH_REGISTER-F18 | See the tips in the cash register | common | partial — showing them in the Session detail and in the "Close session" window is missing |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | done |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 Status: done
@@ -640,31 +642,30 @@ If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
-Status: partial — the Cash register already tells what another app records and the X or Z report prints it apart;
-showing it in the Session detail and in the "Close session" window is missing (hub#1499)
+Status: done
 Vertical: common
 Actor: system, employee, manager
 Screen: Cash register, Session detail
 Steps:
-1. With the Tips app turned on, the cashier takes a tip (TIP-F02 to TIP-F05) or a manager pays it out
-   (TIP-F12).
+1. With the Tips app turned on, the cashier takes a tip or a manager pays it out.
 2. Without anyone typing anything, the open session gets its line: "Tip" in cash or by card, or "Tips paid
    out" in cash, with the sale or the person in the concept.
 3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Tips in
    cash", "Tips by card" (and with other payment methods, if there were any) and "Tips paid out". A tip by card or
    with another payment method that is lowered comes off its line; "Tips paid out" is what left the drawer in cash.
-   With the blind count, whoever does not see the expected cash does not see them, as the other figures (F07).
+   With the blind count, whoever does not see the expected cash does not see them, as the other figures.
+   In **Movements**, each of those lines says "Tips" as its type, not "Cash in" or "Cash out".
 4. Only cash touches the expected cash: a cash tip raises it (it is in the drawer) and a tip paid out in cash
-   lowers it (it left the drawer); a card tip does not. That way the count squares at closing (F09).
-5. The X or Z report (F16) carries the same lines, just before the expected cash, and the "Close session" window
-   counts the cash tips in "Expected in the drawer".
+   lowers it (it left the drawer); a card tip does not. That way the count squares at closing.
+5. The X or Z report carries the same lines, just before the expected cash, and the "Close session" window
+   shows them just above "Expected in the drawer", which counts the cash tips.
 In: the cash in and cash out that Tips records in the open session, marked as its own
 (`cash_register.movement.add`).
 Out: the lines in the session (announces: `cash_register.movement.added`), with the name of the app that
 records them. The sales figures do not change: a tip is never a sale.
-If it fails: with no open session, Tips does not record a cash tip and refuses it with its notice (TIP-F04); a
+If it fails: with no open session, Tips does not record a cash tip and refuses it with its notice; a
 card tip is kept in Tips and goes into no session. A tip line is not corrected with a movement by hand: it is
-adjusted or voided in Tips (TIP-F06), which records the difference in the open session; the closed one is never
+adjusted or voided in Tips, which records the difference in the open session; the closed one is never
 touched.
 Involved: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
 

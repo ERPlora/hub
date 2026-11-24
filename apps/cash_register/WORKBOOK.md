@@ -112,7 +112,8 @@ abre su ventana:
   por billete y por moneda bajo «Billetes» y «Monedas» y «Total contado» en vivo; sin tabla para la
   moneda, un solo campo «Total contado». «Registrar arqueo» y «Cancelar».
 - **Cerrar sesión · S-…**: la revisión del turno, «Esperado en el cajón» y «Diferencia» en vivo (si
-  quien cierra puede verlos), «Efectivo contado», «Notas de cierre», «Cerrar sesión» y «Cancelar».
+  quien cierra puede verlos, y justo encima las líneas de propinas, si las hay: CASH_REGISTER-F18), «Efectivo
+  contado», «Notas de cierre», «Cerrar sesión» y «Cancelar».
 
 Los importes («Fondo de apertura», «Importe», el «Total contado» escrito a mano y «Efectivo contado») se escriben
 en el mismo campo que un precio en el resto del Hub, y se leen igual (hub#1160): la etiqueta flota dentro del campo,
@@ -142,11 +143,11 @@ Movimientos (cuántos), Fondo de apertura, Ventas (todas las formas de pago) y, 
 efectivo, Ventas con tarjeta y Ventas con otras formas de pago (esta solo si hubo), Devoluciones,
 Entradas, Salidas, Invitaciones, Esperado, Contado y Diferencia, y las notas de apertura y de cierre. Las
 invitaciones van a su coste: quien no ve los costes las ve «—». Con la app
-Propinas encendida, además, «Propinas en efectivo», «Propinas con tarjeta» y «Propinas pagadas»
-(CASH_REGISTER-F18).
+Propinas encendida, además, «Propinas en efectivo», «Propinas con tarjeta» y «Propinas pagadas», justo antes
+del Esperado (CASH_REGISTER-F18).
 En una sesión abierta Contado y Diferencia salen «—». Debajo, dos tablas, de lo más reciente a lo más
 antiguo, 50 por página y en tarjetas en el móvil: **Movimientos** (Cuándo, Tipo, Importe con su signo,
-Método, Concepto) y **Arqueos** (Cuándo, Tipo de arqueo, Total contado, Notas). Vacías: «Sin
+Método, Concepto; el Tipo de una línea que apunta otra app es el nombre de esa app, «Propinas») y **Arqueos** (Cuándo, Tipo de arqueo, Total contado, Notas). Vacías: «Sin
 movimientos en esta sesión.» y «Sin arqueos en esta sesión.». El botón «Imprimir» saca el informe en
 papel: «Informe parcial (X)» si la sesión está abierta, «Cierre de caja (Z)» si está cerrada
 (CASH_REGISTER-F16).
@@ -206,7 +207,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
 | CASH_REGISTER-F16 | Imprimir el informe de la sesión (X o Z) | común | hecho |
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
-| CASH_REGISTER-F18 | Ver las propinas en la caja | común | parcial — falta enseñarlas en el Detalle de la sesión y en la ventana «Cerrar sesión» |
+| CASH_REGISTER-F18 | Ver las propinas en la caja | común | hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
 Estado: hecho
@@ -643,31 +644,30 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-Estado: parcial — Caja ya distingue lo que apunta otra app y el informe X o Z las saca aparte; falta enseñarlas en el
-Detalle de la sesión y en la ventana «Cerrar sesión» (hub#1499)
+Estado: hecho
 Vertical: común
 Actor: sistema, empleado, responsable
 Pantalla: Caja, Detalle de la sesión
 Pasos:
-1. Con la app Propinas encendida, el cajero cobra una propina (TIP-F02 a TIP-F05) o un responsable la paga
-   (TIP-F12).
+1. Con la app Propinas encendida, el cajero cobra una propina o un responsable la paga.
 2. Sin que nadie teclee nada, la sesión abierta recibe su línea: «Propina» en efectivo o con tarjeta, o
    «Propinas pagadas» en efectivo, con la venta o la persona en el concepto.
 3. En el **Detalle de la sesión**, el resumen las enseña aparte de las ventas, de las entradas y de las salidas:
    «Propinas en efectivo», «Propinas con tarjeta» (y con otras formas de pago, si las hubo) y «Propinas pagadas».
    La propina con tarjeta o con otra forma de pago que se rebaja se resta de su línea; «Propinas pagadas» es lo que
-   salió del cajón en efectivo. Con el arqueo ciego, quien no ve el esperado no las ve, como las demás cifras (F07).
+   salió del cajón en efectivo. Con el arqueo ciego, quien no ve el esperado no las ve, como las demás cifras.
+   En **Movimientos**, cada una de esas líneas dice «Propinas» como su tipo, no «Entrada» ni «Salida».
 4. Solo el efectivo toca el esperado: la propina en efectivo lo sube (está en el cajón) y la pagada en efectivo
-   lo baja (salió del cajón); la de tarjeta no. Así el arqueo cuadra al cerrar (F09).
-5. El informe X o Z (F16) lleva las mismas líneas, justo antes del esperado, y la ventana «Cerrar sesión» cuenta la
-   propina en efectivo en el «Esperado en el cajón».
+   lo baja (salió del cajón); la de tarjeta no. Así el arqueo cuadra al cerrar.
+5. El informe X o Z lleva las mismas líneas, justo antes del esperado, y la ventana «Cerrar sesión» las enseña
+   justo encima del «Esperado en el cajón», que cuenta la propina en efectivo.
 Entra: las entradas y salidas que Propinas apunta en la sesión abierta, marcadas como suyas
 (`cash_register.movement.add`).
 Sale: las líneas en la sesión (avisa: `cash_register.movement.added`), con el nombre de la app que las apunta.
 Las cifras de ventas no cambian: la propina nunca es venta.
-Si falla: sin sesión abierta, Propinas no apunta la propina en efectivo y la rechaza con su aviso (TIP-F04); la de
+Si falla: sin sesión abierta, Propinas no apunta la propina en efectivo y la rechaza con su aviso; la de
 tarjeta se guarda en Propinas y no entra en ninguna sesión. Una línea de propina no se corrige con un movimiento a
-mano: se ajusta o se anula en Propinas (TIP-F06), que apunta la diferencia en la sesión abierta; la cerrada no se
+mano: se ajusta o se anula en Propinas, que apunta la diferencia en la sesión abierta; la cerrada no se
 toca.
 Implicados: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
 
@@ -925,7 +925,11 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `requires`. `queries/app_lines.py` agrupa esas líneas por app y las nombra con el nombre de la app en el idioma de
   quien lee (`base.system.app_name`): lo que entra, por forma de pago; lo que sale con tarjeta u otra forma de pago,
   restado de su línea (ningún cajón paga con tarjeta); lo que sale en efectivo, «pagadas». No cuentan en
-  «Entradas» ni en «Salidas», y el esperado es el de siempre (solo el efectivo).
+  «Entradas» ni en «Salidas», y el esperado es el de siempre (solo el efectivo). Las pantallas no calculan nada:
+  el resumen del detalle, su papel y la ventana de cierre pintan `summary.app_lines` tal como llegan
+  (`appLineItems` de `frontend/lib/summary.ts`, con `FigureList.vue`), y cada fila de `cash_register.movement.list`
+  trae `app_name`, el nombre de la app en el idioma de quien lee, que la tabla enseña como su tipo. Los tipos de
+  `app`, `app_name` y `app_lines` están en `frontend/operations/app-lines.d.ts`.
 - **El cierre por el asistente** (F09; PLAN §30): la
   descripción de `session.close` le pide leer antes `session.closing_summary` con el mismo contado,
   decir su resumen y cerrar nombrando la sesión por el número que dio (así nunca cierra otra que se
