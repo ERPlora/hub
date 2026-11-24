@@ -729,7 +729,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero (`test_queries_<módulo>.py` los de `queries/`), más
+  `tests/test_<fichero>.py` por fichero (los que comparten nombre con otra puerta, `test_queries_<módulo>.py`), más
   `test_integration_inventory.py`,
   `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
   reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y
