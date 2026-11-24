@@ -261,13 +261,14 @@ anyway.
 Involved: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Show the catalog
-<!-- from WORKBOOK.md sha256:8a23fc0b9e05 -->
+<!-- from WORKBOOK.md sha256:f69bcbafce2d -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
 Steps:
 1. Unfold **Catalog** and turn **Show** on.
-2. In **What to show**, choose **Products** (Inventory's on sale: active and not sold out) or **Services** (those
+2. In **What to show**, choose **Products** (Inventory's on sale: active, not sold out and not hidden from the
+   website) or **Services** (those
    offered); only those of the apps on in the business are offered.
 3. If you want, choose the **Categories** (none = **All categories**) and whether prices show with **Show prices**.
    It saves by itself, like the rest of the draft.
@@ -284,7 +285,7 @@ If it fails: without Inventory or Services on, the note «Turn on Inventory or S
 services here.»; if the saved source is an app that was turned off, «Inventory is not on in this business: your page
 shows no catalog until you turn it on or choose another source.» (or Services) and the page has no catalog, never an
 error; if the categories cannot be read, «The categories could not be loaded» under the selector.
-Involved: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
+Involved: INVENTORY-F27, INVENTORY-F36, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 See the preview
 <!-- from WORKBOOK.md sha256:d7153d07ee3b -->
@@ -490,10 +491,11 @@ names, the other sections whose content changes («Content: Header, Contact»). 
 | Image uploaded | Uploading an image | `id` | `website.image.uploaded` |
 
 ### What it reacts to and what it needs from other apps
-<!-- from WORKBOOK.md sha256:94d844d009fe -->
+<!-- from WORKBOOK.md sha256:a8d202255df0 -->
 - It reacts to no notice of other apps and requires none (`requires = []`).
 - **Inventory** and **Services**, only if they are on in the business: the catalog reads them by the name of their
-  queries (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`,
+  queries (`inventory.product.list_for_sale` with `show_on_website=true`, `inventory.category.list`,
+  `inventory.product_category.list`,
   `service.service.list_for_sale`, `service.category.list`; INVENTORY-F27 and SERVICE-F10), with a context that can
   only read them; with the app off or without it, the catalog comes out empty, never an error, and the editor says
   so.

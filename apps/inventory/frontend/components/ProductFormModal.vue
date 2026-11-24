@@ -3,8 +3,8 @@
 // panel as a dialog (FormModal; UI-REQUESTS.md asks for DataTable's side panel). New: Name, SKU,
 // Price, «Cost (<currency>)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Allergens», «Type»,
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
-// «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
-// the server, TaxCategorySelect and ProductCategoriesField), saved in one go. «Save» waits in grey until the business
+// «Tax category» (required, none chosen in advance), «Categories» (when there are any; both search
+// the server, TaxCategorySelect and ProductCategoriesField) and «Show on website» (INVENTORY-F36), saved in one go. «Save» waits in grey until the business
 // has answered its money (the price and the cost are read in it; hub#918), and says so with «Retry» if that read fails
 // (hub#938). Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
@@ -53,6 +53,7 @@ interface Fields {
   tax: string;
   categories: string[];
   allergens: AllergenCode[];
+  website: boolean;
 }
 
 /** The threshold a product gets when the field is left empty (WORKBOOK INVENTORY-F01). */
@@ -87,22 +88,43 @@ const editing = computed(() => props.product !== null);
 /** A decimal from the API («10.000») as the field shows it («10»). */
 const quantityText = (value: string): string => value.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 
+/** What a new product's form opens with. */
+const NEW_PRODUCT: Readonly<Fields> = {
+  name: '',
+  sku: '',
+  price: '',
+  cost: '',
+  initialStock: '',
+  threshold: '',
+  ean13: '',
+  description: '',
+  type: 'physical',
+  track: null,
+  unit: 'ud',
+  tax: '',
+  categories: [],
+  allergens: [],
+  website: true,
+};
+
 function fieldsOf(product: Product | null): Fields {
+  if (!product) return { ...NEW_PRODUCT, categories: [], allergens: [] };
   return {
-    name: product?.name ?? '',
-    sku: product?.sku ?? '',
-    price: product ? moneyFieldText(product.price, locale.value, business.value) : '',
-    cost: product ? moneyFieldText(product.cost, locale.value, business.value) : '',
+    name: product.name,
+    sku: product.sku,
+    price: moneyFieldText(product.price, locale.value, business.value),
+    cost: moneyFieldText(product.cost, locale.value, business.value),
     initialStock: '',
-    threshold: product ? quantityText(product.low_stock_threshold) : '',
-    ean13: product?.ean13 ?? '',
-    description: product?.description ?? '',
-    type: product?.product_type ?? 'physical',
-    track: product?.track_stock ?? null,
-    unit: product?.unit ?? 'ud',
-    tax: product?.tax_category_key ?? '',
-    categories: [...(product?.category_ids ?? [])],
-    allergens: [...(product?.allergens ?? [])],
+    threshold: quantityText(product.low_stock_threshold),
+    ean13: product.ean13 ?? '',
+    description: product.description,
+    type: product.product_type,
+    track: product.track_stock,
+    unit: product.unit,
+    tax: product.tax_category_key ?? '',
+    categories: [...product.category_ids],
+    allergens: [...product.allergens],
+    website: product.show_on_website,
   };
 }
 
@@ -186,6 +208,28 @@ function read(money: Money) {
   return { price: price.cents ?? 0, cost: cost.cents ?? 0, initial: initial.value ?? '0', threshold: threshold.value ?? DEFAULT_THRESHOLD };
 }
 
+/** What an edit of `product` sends: only what changed. */
+function patchOf(product: Product, values: NonNullable<ReturnType<typeof read>>): InputOf<'inventory.product.update'> {
+  const now = form.value;
+  const was = original.value;
+  const wasRead = { price: product.price, cost: product.cost, threshold: quantityText(product.low_stock_threshold) };
+  return {
+    id: product.id,
+    ...(now.name.trim() !== was.name ? { name: now.name.trim() } : {}),
+    ...(values.price !== wasRead.price ? { price: values.price } : {}),
+    ...(values.cost !== wasRead.cost ? { cost: values.cost } : {}),
+    ...(values.threshold !== wasRead.threshold ? { low_stock_threshold: values.threshold } : {}),
+    ...(now.ean13.trim() !== was.ean13 ? { ean13: now.ean13.trim() } : {}),
+    ...(now.description !== was.description ? { description: now.description } : {}),
+    ...(now.tax !== was.tax ? { tax_category_key: now.tax } : {}),
+    ...(now.unit !== was.unit ? { unit: now.unit } : {}),
+    ...(now.track !== was.track && now.track !== null ? { track_stock: now.track } : {}),
+    ...(now.categories.join() !== was.categories.join() ? { category_ids: now.categories } : {}),
+    ...(now.allergens.join() !== was.allergens.join() ? { allergens: now.allergens } : {}),
+    ...(now.website !== was.website ? { show_on_website: now.website } : {}),
+  };
+}
+
 /** The photo's step for the saved product; the dialog closes once the photo is as the form says. */
 async function savePhoto(id: string): Promise<void> {
   if (await photo.save(id, props.product?.image ?? '', image.value)) open.value = false;
@@ -203,23 +247,7 @@ async function save(): Promise<void> {
   let saved: { id: string };
   try {
     if (props.product) {
-      const was = original.value;
-      const wasRead = { price: props.product.price, cost: props.product.cost, threshold: quantityText(props.product.low_stock_threshold) };
-      const patch: InputOf<'inventory.product.update'> = {
-        id: props.product.id,
-        ...(now.name.trim() !== was.name ? { name: now.name.trim() } : {}),
-        ...(values.price !== wasRead.price ? { price: values.price } : {}),
-        ...(values.cost !== wasRead.cost ? { cost: values.cost } : {}),
-        ...(values.threshold !== wasRead.threshold ? { low_stock_threshold: values.threshold } : {}),
-        ...(now.ean13.trim() !== was.ean13 ? { ean13: now.ean13.trim() } : {}),
-        ...(now.description !== was.description ? { description: now.description } : {}),
-        ...(now.tax !== was.tax ? { tax_category_key: now.tax } : {}),
-        ...(now.unit !== was.unit ? { unit: now.unit } : {}),
-        ...(now.track !== was.track && now.track !== null ? { track_stock: now.track } : {}),
-        ...(now.categories.join() !== was.categories.join() ? { category_ids: now.categories } : {}),
-        ...(now.allergens.join() !== was.allergens.join() ? { allergens: now.allergens } : {}),
-      };
-      saved = await update.run(patch);
+      saved = await update.run(patchOf(props.product, values));
     } else {
       saved = await create.run({
         name: now.name.trim(),
@@ -236,6 +264,7 @@ async function save(): Promise<void> {
         track_stock: now.type === 'service' ? null : now.track,
         category_ids: now.categories,
         allergens: now.allergens,
+        show_on_website: now.website,
       });
     }
   } catch {
@@ -402,7 +431,7 @@ function retryPhoto(): void {
       </ion-select>
       <div
         v-if="form.type !== 'service'"
-        class="product-form__track"
+        class="product-form__check"
       >
         <ion-checkbox
           data-testid="inventory-product-track-stock"
@@ -453,6 +482,23 @@ function retryPhoto(): void {
         :error-text="fields.category_ids"
         @update:model-value="set('categories', $event)"
       />
+      <div class="product-form__check">
+        <ion-checkbox
+          data-testid="inventory-product-show-on-website"
+          label-placement="end"
+          justify="start"
+          :model-value="form.website"
+          @update:model-value="set('website', !!$event)"
+        >
+          <span>{{ $t('inventory.form.showOnWebsite') }}</span>
+        </ion-checkbox>
+        <ion-note
+          v-if="!form.website"
+          data-testid="inventory-product-show-on-website-note"
+        >
+          {{ $t('inventory.form.showOnWebsiteOff') }}
+        </ion-note>
+      </div>
       <ImageField
         v-if="canChangePhoto"
         v-model="image"
@@ -470,12 +516,12 @@ function retryPhoto(): void {
   gap: 16px;
 }
 
-.product-form__track {
+.product-form__check {
   display: grid;
   gap: 4px;
 }
 
-.product-form__track ion-note {
+.product-form__check ion-note {
   font-size: 0.8rem;
 }
 </style>

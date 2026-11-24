@@ -460,6 +460,7 @@ def restored_payload(product_id, sku, name, **fields):
         "tax_category_key": TAX,
         "is_active": True,
         "is_sold_out": False,
+        "show_on_website": True,
         "track_stock": None,
         **fields,
     }

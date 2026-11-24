@@ -616,7 +616,7 @@ run yet.".
 Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Ask the assistant for an automation
-<!-- from WORKBOOK.md sha256:484a72b823e0 -->
+<!-- from WORKBOOK.md sha256:cc79aff52021 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: assistant
@@ -624,13 +624,13 @@ Steps:
 1. Open the Hub's assistant and ask it for something that happens on its own, speaking or typing ("create a
    flow that creates a task for me when a sale over €100 is completed").
 2. The assistant writes a **draft**: name, when it starts, from one to eight "do something", "only continue
-   if" or "wait" steps, and the notes of what it could not decide. To write it, it reads only what it needs of
-   what the automations can use (the apps involved, or the notices and actions by their name), whole and with
-   the data of each action: in a business with many apps too, it uses the real names and data, without warning
-   you that it could not check them. Before leaving it, it shows you its card and waits for your yes, like any
-   change it asks you for. The card says the name, when it starts and each step with the same phrases as the
-   list and the editor ("When a till is closed", "Every day at 10:00", "Create a task", "Wait 1 hour"), never
-   the codes of its definition; the same if you ask it to create the automation directly.
+   if" or "wait" steps, and the notes of what it could not decide. To write it, it first looks at the names of
+   the notices and actions of the apps involved, and then reads whole, with the data each action asks for, only
+   the ones it will use: in a business with many apps too, it reaches any action and uses the real names and
+   data, without warning you that it could not check them. Before leaving it, it shows you its card and waits
+   for your yes, like any change it asks you for. The card says the name, when it starts and each step with the
+   same phrases as the list and the editor ("When a till is closed", "Every day at 10:00", "Create a task",
+   "Wait 1 hour"), never the codes of its definition; the same if you ask it to create the automation directly.
 3. It tells you it has left it waiting in Automations and repeats its doubts; you review it in **Proposed by
    the assistant** (FLOW-F18).
 In: what is asked for, in words, and what the business's automations can use.
@@ -1289,7 +1289,7 @@ what it asks. A record the person confirming cannot see (a run, for whoever only
 question asked of another role) does not show on the card.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:b21d9b3cbaac -->
+<!-- from WORKBOOK.md sha256:c9a5198ff978 -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -1299,7 +1299,7 @@ question asked of another role) does not show on the card.
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
 | The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object); all of them, or only those of some apps or some names | see | F10, F11, F17 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object); all of them, or only those of some apps or some names, whole or only their names | see | F10, F11, F17 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |

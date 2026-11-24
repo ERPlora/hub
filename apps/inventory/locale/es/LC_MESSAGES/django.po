@@ -184,6 +184,9 @@ msgstr "activo"
 msgid "sold out"
 msgstr "agotado"
 
+msgid "show on website"
+msgstr "mostrar en la página web"
+
 msgid "product"
 msgstr "producto"
 
@@ -458,6 +461,9 @@ msgstr "Categoría"
 
 msgid "Sold out"
 msgstr "Agotado"
+
+msgid "Show on website"
+msgstr "Mostrar en la página web"
 
 msgid "Initial stock"
 msgstr "Stock inicial"
