@@ -17,6 +17,7 @@ export function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    along_said: '',
     mandatory: false,
     ...fields,
   };

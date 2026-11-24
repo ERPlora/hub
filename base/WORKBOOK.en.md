@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e2407351402253b6c06386d02fc967d8b7075199ce7112c4e5d508d0f62850bd -->
+<!-- generated from WORKBOOK.md sha256:8b7e47f7f141aca9e24a3d7b5f88454b242a10776f79d54762614ca61cea5f3e -->
 
 ## What it is for and who it is for
 
@@ -984,8 +984,10 @@ Steps:
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
   5. From the assistant ("Turn off the reservations app", or without saying "app": "take Reservations off the menu",
-     "I don't want to see Reservations in the menu") the app is named as in BASE-F24, the high-risk card shows its
-     whole name and, if it was off already, the assistant says so and nothing changes.
+     "I don't want to see Reservations in the menu") the app is named as in BASE-F24 and the high-risk card shows its
+     whole name. Before the yes it also names the ones that go with it, by the same rule and in the same words as
+     step 2: "Other apps: Schedules and Tables turn off with it: only Reservations needed them.". If it was off
+     already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
 If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off"
@@ -1007,8 +1009,10 @@ Steps:
      menu") the app is named as the person says it: by its name in any
      language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
-     even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
-     already the assistant says so ("Customers was on already") instead of "turned on".
+     even though it starts the same. The card shows its whole name (BASE-F97), never its id, and before the yes it
+     names the ones it needs that are off, as the notice of step 2 does: "Turn on in Apps: Reservations ·
+     Reservations needs Schedules and Tables: they turn on with it.". If it was on already the assistant says so
+     ("Customers was on already") instead of "turned on".
   5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
      longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
      businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.

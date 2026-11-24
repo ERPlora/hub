@@ -355,7 +355,9 @@ def test_turning_an_app_on_or_off_names_it_on_its_card(name):
     """hub#539: «Activa la app de reservas» showed «online_booking», and Reservas online was the one confirmed."""
     admin = {"base.view_home", "base.administer_hub"}
     plan = turn(call(name, {"app": "online_booking"}), permissions=admin)
-    assert [(field["name"], field["value"]) for field in plan["confirm"]["fields"]] == [("app", "Reservas online")]
+    along = {"base.app.disable": [("along", "Citas y Servicios se desactivan con ella: solo las necesitaba Reservas online.")]}
+    shown = [(field["name"], field["value"]) for field in plan["confirm"]["fields"]]
+    assert shown == [("app", "Reservas online"), *along.get(name, [])]
     assert plan["executed"] == []
 
 

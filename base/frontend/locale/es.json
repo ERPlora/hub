@@ -189,14 +189,12 @@
       "alsoOff": "También se ha desactivado: {apps}.",
       "confirmOn": {
         "title": "¿Activar {app}?",
-        "message": "{app} necesita {apps}: se activa con ella. | {app} necesita {apps}: se activan con ella.",
         "confirm": "Activar",
         "cancel": "Cancelar"
       },
       "confirmOff": {
         "title": "¿Desactivar {app}?",
         "message": "Sale del menú de todos en este negocio. No se borra nada: al volver a activarla, tiene sus datos.",
-        "along": "{apps} se desactiva con ella: solo la necesitaba {app}. | {apps} se desactivan con ella: solo las necesitaba {app}.",
         "confirm": "Desactivar",
         "cancel": "Cancelar"
       },

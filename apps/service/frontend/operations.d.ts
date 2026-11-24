@@ -625,7 +625,7 @@ export interface MovementOut {
   customer_name: string | null;
   service_id: string | null;
   service_name: string | null;
-  /** The professional who did a session (hub#1236); null = nobody said, and on an adjustment. */
+  /** Who did a session: said outside the till, or who served its sale line; null = nobody said, or an adjustment. */
   member_id: string | null;
   member_name: string | null;
   sale_id: string | null;
