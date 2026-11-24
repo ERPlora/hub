@@ -173,7 +173,7 @@ def _readable_sale(ctx: OperationContext, sale_id: UUID):
         return None
 
 
-def _served_by(sale, check_line_id: UUID | None) -> UUID | None:
+def _served_by(sale, check_line_id: UUID) -> UUID | None:
     """Who served the line of ``sale`` that spent the session: its own professional, else the check's, as Sales
     counts each line's production."""
     line = next((line for line in sale.lines if line.order_line_id == check_line_id), None)
@@ -181,15 +181,18 @@ def _served_by(sale, check_line_id: UUID | None) -> UUID | None:
 
 
 def _name_the_sales(ctx: OperationContext, rows: list[dict], check_lines: dict[UUID, UUID | None]) -> None:
-    """A session spent in a sale says it by the number Sales names it by and the professional who served its line
-    (one of the till never says its own: its line does); each sale is read once."""
+    """A session spent in a sale says it by the number Sales names it by; one of the till (it has a check line and
+    never says its own professional) also says who served that line. One spent by hand keeps the professional it
+    said. Each sale is read once."""
     sales = {sale_id: _readable_sale(ctx, sale_id) for sale_id in {row["sale_id"] for row in rows} - {None}}
     for row in rows:
         sale = sales.get(row["sale_id"])
         if sale is None:
             continue
         row["sale_number"] = sale.number
-        row["member_id"] = _served_by(sale, check_lines.get(row["id"]))
+        check_line_id = check_lines.get(row["id"])
+        if check_line_id:
+            row["member_id"] = _served_by(sale, check_line_id)
 
 
 def _name_the_members(rows: list[dict]) -> None:

@@ -339,3 +339,17 @@ def test_with_sales_off_the_movements_still_read_without_the_sale(haircut, lucia
         monkeypatch.delitem(registry, name)
     [movement] = movements(grant)
     assert said_of_the_sale(movement) == (sale.id, None, None, None)
+
+
+def test_a_session_spent_outside_the_till_on_a_sale_keeps_the_professional_it_said(haircut, lucia, grant, ana, bea):
+    # Spent by hand saying its sale and who did it: the sale's check is served by someone else, and the session
+    # still says its own professional, id and name.
+    other = run("sale.order.open", {"staff_id": str(ana.id), "service_lines": [{"service_id": str(haircut.id)}]}, "hub_employee")
+    sale = run(
+        "sale.sale.complete",
+        {"idempotency_key": "svc-num-00007", "order_id": str(other.id), "payments": [{"method": "card"}]},
+        "hub_employee",
+    )
+    system("service.grant.redeem", {"id": str(grant.id), "member_id": str(bea.id), "sale_id": str(sale.id)})
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (sale.id, sale.number, bea.id, "Bea Martín")
