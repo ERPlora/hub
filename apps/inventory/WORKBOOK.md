@@ -1404,7 +1404,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   «apúntame», «anota» y «registra que…». Nunca «llegan» ni «llegado» sueltos, que dice también la gente que llega («han
   llegado dos más para la mesa 7», «ya llegan los de la reserva», «ha llegado la clienta de la cita»), ni «arrived» en
   inglés. Quien apunta que ha llegado gente («apunta que han llegado los de la reserva de Luis») ve también la
-  recepción entre las herramientas que se le ofrecen. Lo comprueba `tests/test_assistant_asks.py`.
+  recepción entre las herramientas que se le ofrecen. Un pedido que llega sí es mercancía, porque «pedido» y «order»
+  solos son la cuenta de una mesa: «ha llegado el pedido de bebidas», «acaba de llegar el pedido», «el pedido ha
+  llegado», «the drinks order just came in», «the order has arrived». El pedido de un cliente se toma, se manda a cocina
+  o se sirve, pero no llega: «pon el pedido de bebidas en la mesa 4» no ofrece la recepción. Lo comprueba
+  `tests/test_assistant_asks.py`.
 
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
