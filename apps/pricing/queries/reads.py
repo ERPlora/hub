@@ -1,4 +1,4 @@
-"""What the reads of the pricing app share, and services.py too: how a person names a price list or a discount
+"""What the reads of the pricing app share, and services/ too: how a person names a price list or a discount
 rule, the prices that count and how a list pages.
 """
 
