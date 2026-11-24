@@ -701,7 +701,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `asks` del Hub y las 857 sondas de la capa 2: ningún ask de otra app pierde puesto.
   `tests/test_assistant_asks.py` mide con las frases reales de la QA
   (`tests/e2e/qa/probes/owner-es-pricing-2026-11-08.json`), nunca con los propios `asks`: cada una ofrece su
-  herramienta entre las 19 que ofrece un turno antes de la búsqueda, la de reactivar una regla antes que `payment.method.activate`, y
+  herramienta entre las 15 que ofrece un turno antes de la búsqueda, la de reactivar una regla antes que `payment.method.activate`, y
   una frase propia por herramienta (ni `ask` ni sonda, con `assert_its_asks_bring` de la plataforma) la trae
   entre las diez primeras solo con sus `asks`; el empleado no recibe ninguna escritura. Reactivar una
   tarifa o una regla sale antes que `base.app.enable`: live lee «activar» también como la acción `activate`

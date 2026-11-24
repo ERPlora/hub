@@ -290,7 +290,7 @@ papel en ningún negocio.
   acciones, su `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace). Los
   `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
   tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
+  (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno
   (`tests/test_assistant_asks.py`), y las que nombran el elemento solo por su nombre («elimina Ejemplo QA…») llegan a
   una herramienta que lo toma por ese nombre (hub#1162).
 - Un elemento por su id o por su nombre (hub#1162): `ItemRefIn` (`id` o `called`; el id gana), del que heredan

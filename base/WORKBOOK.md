@@ -2698,7 +2698,8 @@ Pasos:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». El de
      un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su pantalla («No se hizo, falló:
      Quitar en Empleados. Esa persona no está en este negocio.»); si lo que no valía eran los datos que envió el
-     asistente, cuáles, con el nombre que les da la tarjeta («El asistente envió datos que no valen: Productos.»). Si
+     asistente, cuáles, con el nombre que les da la tarjeta («El asistente envió datos que no valen: Productos.»), y si
+     pidió un cambio sin decir qué cambiar, eso («El asistente no dijo qué cambiar.»). Si
      la persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app; el
      motivo, que se dijo en el otro idioma, ya no sale.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
@@ -2708,7 +2709,10 @@ alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asi
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
-llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. «Ejecutar» vale solo
+llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Tampoco llega un
+cambio que solo nombra su registro, sin ningún dato que cambiar (nunca «Cambiar en Clientes: Lucía QA» a secas): el
+asistente oye que no hay nada que cambiar y sigue con lo que se le pidió, con la acción que lo hace, o pregunta qué
+quiere cambiar; si el registro no está, oye eso. «Ejecutar» vale solo
 para lo que enseña la tarjeta: si antes de pulsarlo cambia —la acción encuentra por su nombre otro registro, porque
 alguien ha creado uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4»), el registro cambia de
 nombre o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
@@ -4308,7 +4312,7 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
-  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras y como mucho `MAX_TOOLS` = 20 por turno, la última la búsqueda `base.assistant.find_tools`, por las
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras, en los `PLACES` = 15 puestos de un turno, y la búsqueda `base.assistant.find_tools` al final, por las
   palabras de la petición que sigue abierta: lo que la persona escribió desde que el modelo pidió su última escritura,
   con sus respuestas a las preguntas del asistente, y nunca menos de sus dos últimos mensajes; `base.setup.status` y
   `base.business.get` siempre; `ranking` lo ordena con las palabras propias del Hub: las de la plataforma, `SYNONYMS`

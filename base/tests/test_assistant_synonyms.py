@@ -144,7 +144,7 @@ def test_a_turn_ranks_with_the_words_that_count_for_its_tools():
     name, phrase = ELEMENT_REQUESTS[0]
     turn = [op.name for op in assistant.relevance.relevant(tools, [phrase], "es")]
     ranked = [op.name for op in shared.relevant(tools, [phrase], "es", **assistant.relevance.ranking(tools))]
-    assert turn == [*ranked[: shared.MAX_TOOLS - 1], assistant.relevance.FIND_TOOLS]
+    assert turn == [*ranked[: assistant.relevance.PLACES], assistant.relevance.FIND_TOOLS]
     every = {**assistant.relevance.ranking(tools), "synonyms": assistant.relevance.synonyms()}
     assert turn != [op.name for op in shared.relevant(tools, [phrase], "es", **every)]  # positive control
 

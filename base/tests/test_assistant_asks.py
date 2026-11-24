@@ -172,9 +172,9 @@ def probe_phrases() -> dict[str, str]:
 # ── What an app's own test of its asks ranks with (``apps/<app>/tests/test_assistant_asks.py`` imports them) ────────
 
 
-#: The places a turn gives the person's tools: ``MAX_TOOLS`` but the last, which is the search of the rest
-#: (``base.assistant.find_tools``). How far down a person's own words may bring their tool and still have it offered.
-WITH_ROOM = shared.MAX_TOOLS - 1
+#: The places a turn gives the person's tools, before the search of the rest (``base.assistant.find_tools``): how far
+#: down a person's own words may bring their tool and still have it offered.
+WITH_ROOM = assistant.relevance.PLACES
 
 
 def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
@@ -677,7 +677,7 @@ REPORTED = [
 
 
 #: The task the model searches for when a reported request brings its tool past the places of a turn.
-SEARCHED = {"base.device.remove": "quitar un dispositivo"}
+SEARCHED = {"base.device.remove": "quitar un dispositivo", "base.file.read": "ver un archivo"}
 
 
 def test_the_hub_reads_a_placa_as_a_badge_and_an_employee_as_a_person():
