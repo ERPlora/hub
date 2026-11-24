@@ -35,7 +35,7 @@ def host(hub) -> str:
 
 def api_key(client, hub) -> str:
     """A key made as its screen makes it (Employees › API keys)."""
-    body = {"name": "Tienda online", "rate_per_minute": 60, "mode": "full", "scopes": {}}
+    body = {"name": "Tienda online", "rate_per_minute": 60, "scopes": {"*": ["read", "create", "update", "delete"]}}
     made = client.post("/api/keys", json.dumps(body), content_type="application/json", HTTP_HOST=host(hub))
     assert made.status_code == 200, made.content
     return made.json()["key"]["id"]

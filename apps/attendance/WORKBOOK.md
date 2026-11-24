@@ -173,9 +173,9 @@ salida sí se ficha); sin conexión, el error y «Reintentar».
 Implicados: STAFF-F03, ATTENDANCE-F05, ATTENDANCE-F11
 
 ### ATTENDANCE-F02 Hacer una pausa sin salir de la jornada
-Estado: hecho (servidor y pantalla)
+Estado: hecho (servidor, pantalla y asistente)
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Fichar
+Pantalla: Fichar (o el asistente)
 Pasos:
 1. Con la jornada abierta, pulsa «Empezar pausa». Ve «Pausa iniciada a las 13:00.» y «En pausa desde
    las 13:00»; el botón pasa a «Terminar pausa».
@@ -183,13 +183,16 @@ Pasos:
 3. Puede hacer tantas pausas como quiera, una detrás de otra.
 4. Si pulsa «Fichar salida» en plena pausa, la pausa se termina en ese mismo momento.
 5. En «Hoy», «Pausas» suma el tiempo de pausa y «Trabajado» ya lo descuenta.
+6. También se le puede pedir al asistente («pon que estoy en pausa», «ya he vuelto»): antes de hacerlo pide
+   confirmación con «Empezar la pausa en Control horario.» o «Terminar la pausa en Control horario.», y el
+   recibo repite lo mismo. Si se nombra a otra persona, la tarjeta dice cuál por su nombre.
 Entra: la jornada abierta de la persona (ATTENDANCE-F01).
 Sale: cada pausa guardada dentro de su jornada; los avisos de pausa empezada y terminada.
 Si falla: sin jornada abierta, «No hay ninguna jornada abierta: ficha la entrada primero.»; con una
 pausa ya en curso, «Ya hay una pausa en curso.»; terminar una pausa que no existe, «No hay ninguna
 pausa en curso que terminar.»; en una jornada olvidada, abierta más horas de las fijadas en Ajustes, «Esta
 jornada lleva abierta más de 12 horas y está por revisar…».
-Implicados: ATTENDANCE-F01, ATTENDANCE-F05
+Implicados: ATTENDANCE-F01, ATTENDANCE-F05, ATTENDANCE-F12
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
 Estado: hecho (servidor y pantalla)
@@ -395,7 +398,8 @@ Pasos:
 1. El responsable le dice al asistente «ficha la entrada de Ana» o «ficha la salida de Ana» (o llama a
    la API con la persona por su id o su nombre).
 2. Antes de fichar, el asistente pide confirmación y dice a quién, en «Persona», por su nombre (Ana López),
-   nunca por un código; el responsable confirma.
+   nunca por un código; también si se dijo con otras palabras («Ana», «ana lópez»): sale la persona que
+   encuentra la misma búsqueda que hará el fichaje, no las palabras dichas. El responsable confirma.
 3. El Hub ficha a Ana con la hora del servidor, como si lo hiciera ella, y guarda quién lo hizo. Nunca
    pide la ubicación, aunque el negocio la pida y el responsable esté en su móvil personal: el
    responsable responde por ella, y su posición no se guarda en la jornada de Ana.
@@ -403,7 +407,8 @@ Entra: la ficha de Personal de esa persona.
 Sale: lo mismo que ATTENDANCE-F01 y ATTENDANCE-F02.
 Si falla: un empleado no puede fichar a otra persona («Solo puedes fichar tu propia entrada y
 salida.»); si el nombre vale para
-varias, se dice cuáles y se pide que elija; si no existe, «Esa persona no existe en Personal.».
+varias, se dice cuáles y se pide que elija; si no existe, «Esa persona no existe en Personal.». En el asistente,
+ninguno de esos casos llega a la tarjeta: lo oye antes y pregunta.
 Implicados: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Cerrar la jornada abierta de quien se da de baja
@@ -442,6 +447,7 @@ y la API, con las mismas reglas y los mismos permisos. Una persona se nombra por
 | Cuántos están fichados ahora (el panel «Fichados ahora» del Inicio) | ver el equipo | F11 | `attendance.presence.count` |
 | Las personas que se pueden filtrar (fichas de Personal, también las dadas de baja con jornadas), con búsqueda | ver el equipo | F07 | `attendance.person.list` |
 | Una de esas personas por su id, con su nombre y el estado de su ficha: la propia para quien ficha; cualquiera para quien ve el equipo, ficha a otros o corrige | fichar | F01, F02, F12, F13 | `attendance.person.detail` |
+| La persona a la que va un fichaje o una pausa (la propia, o la nombrada por su id o con palabras), tal como la encuentra el fichaje: lo que el asistente comprueba antes de su tarjeta y el nombre que dice; no es herramienta del asistente ni tiene ruta en la API | fichar | F01, F02, F12 | `attendance.person.check` |
 | Los ajustes | fichar | F03, F04 | `attendance.settings.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
