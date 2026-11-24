@@ -219,6 +219,11 @@ async def order_print_bill(request, data: OrderRefIn):
     return await run_operation(request, services.printouts.print_bill, data)
 
 
+@bind(router, "sale.order.note_bill", "/sale/orders/note_bill")
+async def order_note_bill(request, data: OrderRefIn):
+    return await run_operation(request, services.printouts.note_bill, data)
+
+
 @bind(router, "sale.order.split", "/sale/orders/split")
 async def order_split(request, data: OrderSplitIn):
     return await run_operation(request, services.order_actions.split, data)

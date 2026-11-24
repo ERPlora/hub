@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:096a889813dba2cd36bdb7287a634218a42d09f4c6c2d7cd803d8aa5bcd4c9e3 -->
+<!-- generated from WORKBOOK.md sha256:a2954083095cbfc9f486d71349bf58b2efc02605962b140c0185b7f882bfa90c -->
 
 ## What it is for and who it is for
 
@@ -2362,15 +2362,22 @@ Steps:
      this business's data through its API." and "New API key".
   2. In "New API key", the "Name" ("Accountant — invoices"), the "Requests per minute" ("From 1 to 10,000.") and
      "What this key may do": "Full access", "Read only", "Write only" or "Per app", ticking "Read" and "Write" on
-     each app.
+     each app; only the box of what whoever makes it may do on that app shows.
   3. They tap "Create key": "API key created" shows with "Copy the token now", "This is the only time the whole
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
+  4. What a key may do is four actions, on every app (also the ones added later) or app by app: read, create,
+     update and delete. "Read" is reading and "Write" creating, updating and deleting, of what whoever makes it may
+     give; "Full access", the four on every app. Through the API each action is chosen on its own: a key that only
+     reads and creates in Inventory.
+  5. A key is never given more than whoever makes it may do: on an app, an action they may do in none of its calls;
+     on every app, an action they may not do on some app that publishes it.
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
 (BASE-F125). Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
-app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
+app does not publish what the key would do on it.", "A key may not do more than you may do yourself." (403
+`base.api_key_beyond_maker`) or "It could not be copied to the clipboard.".
 Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
@@ -2409,7 +2416,9 @@ Screen: Employees · API keys
 Steps:
   1. In **Employees › API keys** (the tab exists only for whoever runs the business), a row per key: "Name",
      "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created", "Last use" ("Never" if
-     unused) and "Limit".
+     unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so on every
+     app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U (update) and
+     D (delete), as "Online shop R/C · Taxes R".
   2. They search with "Search API key…". At the bottom, "API documentation" leads to the documentation.
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.

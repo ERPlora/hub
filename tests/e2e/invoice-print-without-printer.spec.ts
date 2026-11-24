@@ -9,9 +9,9 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { askForACard, card, decide, lastAnswer, openPanelAtTheDesk, panel } from './assistant-panel';
-import { A, api, capture, login, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
 import { cleanInvoices, issuedIds, readyToInvoice } from './invoice-helpers';
-import { printersBackOn, printersOff } from './printing-helpers';
+import { fleetShots, printersBackOn, printersOff } from './printing-helpers';
 import { panelSpec } from './provider-helpers';
 import { stamp } from './sale-helpers';
 import { toasts } from './toast-helpers';
@@ -19,12 +19,6 @@ import { toasts } from './toast-helpers';
 const KEY = 'FIX-HUB-INVOICE-PRINT-WITHOUT-PRINTER';
 const RUN = stamp();
 const OFFICE = `e2e Office ${RUN}`;
-/** The sizes the fleet checks a screen at. */
-const SIZES = [
-  { width: 1440, height: 900 },
-  { width: 820, height: 1180 },
-  { width: 375, height: 667 },
-] as const;
 const NOT_PRINTED =
   'No se hizo, falló: Imprimir en Facturación. Ninguna impresora del sistema recibe esta factura: ábrela para imprimirla o ' +
   'guardarla en PDF.';
@@ -79,11 +73,7 @@ test('INVOICE-F18 from the assistant: with no system printer the receipt says it
   const invoice = await anInvoice(context);
   await printedFromTheAssistant(page, invoice.id);
   await expect(lastReceipt(page)).toHaveText(NOT_PRINTED);
-  for (const size of SIZES) {
-    await page.setViewportSize(size);
-    await expect(lastReceipt(page)).toBeVisible();
-    await capture(page, `${KEY}-RECEIPT-${size.width}x${size.height}`);
-  }
+  await fleetShots(page, `${KEY}-RECEIPT`, (shown) => expect(lastReceipt(shown)).toBeVisible());
   const jobs = await api<{ rows: { reference: string }[] }>(context, A, 'GET', '/printing/jobs?limit=100');
   expect(jobs.data.rows.filter((job) => job.reference === invoice.number)).toEqual([]);
 });
@@ -122,9 +112,5 @@ test('INVOICE-F18 on its page: with no system printer «Print / PDF» opens the 
   await expect(toasts(page)).toHaveCount(0);
   // The dialog closed, as the browser's does once it prints or is cancelled.
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
-  for (const size of SIZES) {
-    await page.setViewportSize(size);
-    await expect(detail.locator('[data-testid=invoice-detail-print]')).toBeVisible();
-    await capture(page, `${KEY}-PAGE-${size.width}x${size.height}`);
-  }
+  await fleetShots(page, `${KEY}-PAGE`, () => expect(detail.locator('[data-testid=invoice-detail-print]')).toBeVisible());
 });
