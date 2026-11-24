@@ -27,7 +27,7 @@ Para qué: lo que mira el dueño de vez en cuando: el uso del plan, la versión 
 12. BASE-F72 — los archivos del negocio.
 13. BASE-F73 — la carpeta «Facturas de proveedores» y dos archivos dentro.
 14. BASE-F74 — un archivo, previsualizado y descargado.
-15. BASE-F112 — en la app de ERPlora, el archivo descargado se guarda dentro de la app.
+15. BASE-F112 — en la app de ERPlora, el archivo descargado se guarda dentro de la app, también el CSV que da el asistente.
 16. BASE-F75 — un archivo, renombrado y movido.
 17. BASE-F76 — una carpeta, borrada.
 18. BASE-F117 — en la campana, la factura del plan sin pagar.

@@ -3092,7 +3092,8 @@ Estado: hecho
 Actor: cualquier persona del negocio que descarga un archivo en el Hub
 Pantalla: las que descargan un archivo que la pantalla ya tiene: VeriFactu › Configuración (el modelo del
 otorgamiento), Ajustes · Datos y copias › Exportar, Archivos, Empleados › Aprobaciones, la documentación de la API,
-Fichajes, Inventario (Productos y Categorías), Clientes y «Compartir y QR» de la web
+Fichajes, Inventario (Productos y Categorías), Clientes, «Compartir y QR» de la web y el asistente (la exportación que
+se le pide)
 Pasos:
   1. La persona pulsa descargar: el modelo del otorgamiento, una exportación, un archivo, un CSV, el fichero OpenAPI o
      el QR.
@@ -3100,6 +3101,9 @@ Pasos:
   3. Dentro de la app de ERPlora (ordenador o Android 10 o posterior), el Hub le da el archivo a la app, que lo guarda
      en la carpeta Descargas, y sale «Guardado en {ruta}» (en Android, «Guardado en Download/<nombre>»): dentro de la
      app no hay barra de descargas ni otro aviso.
+  4. En el asistente, al pedirle una exportación («Sácame la carta entera en un CSV»), bajo su respuesta sale
+     «Descargar <nombre>»: el mismo archivo que da el botón de exportar de esa pantalla, que baja como en los pasos 2 y
+     3. El asistente dice que lo tiene ahí, sin pegar su contenido en el chat.
 Entra: el archivo que la pantalla ya tiene, con su nombre.
 Sale: el archivo en Descargas y, dentro de la app, el aviso con su ruta. En el Hub no se guarda nada.
 Si falla: dentro de la app el botón nunca se queda sin respuesta. Sin una carpeta de descargas que la persona pueda
@@ -3107,7 +3111,9 @@ abrir (Android 9 o anterior, iOS): «Esta app no puede guardar archivos en un m�
 navegador para descargarlo.»; con la app enlazada a otro negocio: «No se ha podido guardar el archivo: esta app está
 vinculada a otro negocio.»; una versión de la app sin esta función: «Esta versión de la app de ERPlora no puede guardar
 archivos. Actualízala para descargar.»; cualquier otro fallo (un nombre que la app rechaza, sin espacio):
-«No se ha podido descargar el archivo.». En esos casos la pantalla no dice que se descargó. Las copias que guarda
+«No se ha podido descargar el archivo.». En esos casos la pantalla no dice que se descargó. El archivo que dio el
+asistente vive en esa pestaña: tras recargar la página, en su lugar dice «El fichero «<nombre>» ya no está aquí: pídelo
+otra vez para descargarlo.». Las copias que guarda
 ERPlora (Datos y copias › Copias) bajan por un enlace firmado y no pasan por aquí.
 Implicados: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
@@ -4310,7 +4316,7 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
-  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras y como mucho `MAX_TOOLS` = 20 por turno, la última la búsqueda `base.assistant.find_tools`, por las
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (solo las que nombran las palabras, en los `PLACES` = 15 puestos de un turno, y la búsqueda `base.assistant.find_tools` al final, por las
   palabras de la petición que sigue abierta: lo que la persona escribió desde que el modelo pidió su última escritura,
   con sus respuestas a las preguntas del asistente, y nunca menos de sus dos últimos mensajes; `base.setup.status` y
   `base.business.get` siempre; `ranking` lo ordena con las palabras propias del Hub: las de la plataforma, `SYNONYMS`

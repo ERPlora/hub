@@ -1271,7 +1271,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   (`base/assistant/relevance.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
   a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
   llegan a su operación desde el chat: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
+  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno,
   «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
   herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
   importes» sale 5.ª: live no lee como pedido el «cambiar» detrás de «ni» cuando

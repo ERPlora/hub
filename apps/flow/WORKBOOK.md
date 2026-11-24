@@ -1721,7 +1721,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   Bandeja de WhatsApp), «pasos» es «pasó» sin tilde («¿qué pasó con…?») y «pregunta» también es verbo («se les
   pregunta»); «borra» y «bórralo» tienen otra raíz que «borrador». `tests/test_assistant_asks.py` mide con las 30 frases
   reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-flow-2026-11-08.json`), nunca con los propios `asks`: cada
-  una se ofrece, y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
+  una se ofrece (o, las del último evento real, el recuento por evento y los permisos, las encuentra la búsqueda de
+  su tarea), y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
   ejecución, la receta; sin ella el modelo pedía el id). También cuando la automatización se nombra solo por su
   nombre propio: `live` da el peso del verbo pedido a la acción que lo hace dicho de otra forma, «activa X» a
   `flow.flow.set_enabled`, «renombra X» a `flow.flow.update` (recibe `name`) y «permite a X…» a `flow.flow.grant`.
