@@ -145,6 +145,7 @@ def test_every_operation_is_described_for_the_assistant():
     internal = {name for name, op in ops.items() if op.ai is INTERNAL}
     assert internal == {
         "sale.customer.reassign",
+        "sale.order_line.check",
         "sale.record.get",
         "sale.sale.record_invoice",
         "sale.sale.voucher_sold",

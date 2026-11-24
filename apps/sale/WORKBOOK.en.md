@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c4b157bf8a163956de373475bd8460fa664abe453dc933dfa6e8a9b97a33f96d -->
+<!-- generated from WORKBOOK.md sha256:d70b7a83d686f1ba4726b44298039f57d17316e53490a248efb064b586ba1ed3 -->
 
 ## What it is for and who it is for
 
@@ -886,7 +886,7 @@ longer be removed: it was sent to the kitchen (void it with a reason), it is cha
 an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Through the assistant: its confirmation card says the check (a table's, by its table as Tables says it and in the reader's language, "4 (Dining room)"; any other, or without access to Tables, by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97). A product asked for in words shows as the one that will be added: "two coffees" with "Espresso" and "White coffee" on the menu says "2 · White coffee · 4 (Dining room)"; if the words fit several products or none, they show as they were said and confirming adds nothing: the assistant asks which one.
+Through the assistant: its confirmation card says the check (a table's, by its table as Tables says it and in the reader's language, "4 (Dining room)"; any other, or without access to Tables, by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97). A product asked for in words shows as the one that will be added: "two coffees" with "Espresso" and "White coffee" on the menu says "2 · White coffee · 4 (Dining room)"; if the words fit several products or none ("two cafés con leche" with "White coffee" on the menu), no card shows: the assistant hears which products fit or that none has those words, and looks it up on the menu or asks which one. Should the refusal come on confirming (the menu changed between the card and the yes, or through the API), nothing is added and it says "There is no product “café con leche”. Say which one.".
 Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
@@ -1580,6 +1580,7 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
+| The product of a new line as the write that adds it finds it, to check it before the assistant's card; words that are no product, or fit several, draw no card | build the check | F20 | `sale.order_line.check` |
 | The name of a record a write of Sales touches, by its id, and that of a refund, by its sale ("Refund of sale 20261014-0007"), by which Services names the one that gives sessions back (SERVICE-F26): only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F32, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
