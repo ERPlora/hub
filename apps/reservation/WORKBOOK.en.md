@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6f48d4655ca204dbb967ef1ced447a8cee99154466913bb8bbea299b40e474a7 -->
+<!-- generated from WORKBOOK.md sha256:911cce5d51e498a488532adf0e21a4c108ba54dce6dbaf07853b2a1f876c48cc -->
 
 ## What it is for and who it is for
 
@@ -326,7 +326,7 @@ Steps:
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
    assistant's card first says who it is for, by the name of their card (also when it was named by its phone)
    or, without a card, by the name that was said, and only once; then the day and the time, before the phone
-   ("Create in Reservations: Ana García · Oct 15, 2026 · 9:00 PM"). It carries the table with its zone, as
+   ("Create in Reservations: Ana García · Date: Oct 15, 2026 · Time: 9:00 PM"). It carries the table with its zone, as
    Tables names it ("5 (Terrace)": the number repeats across zones), never by a code.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
@@ -385,7 +385,7 @@ Steps:
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
 4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
    says the reservation by its customer, its day and its time and the new table with its zone, as Tables
-   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
+   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · Table: 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
 same number written another way (with spaces or without the prefix) is not a change. Whoever does not see the
 customers' contact details (BASE-F119) does not see the phone nor the email and does not change them: saving keeps

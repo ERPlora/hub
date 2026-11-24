@@ -329,7 +329,7 @@ Pasos:
 4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5». Antes de apuntarla, la
    tarjeta del asistente dice primero para quién, por el nombre de su ficha (también si se la nombró por su
    teléfono) o, sin ficha, por el nombre que se dijo, y una sola vez; después, el día y la hora, antes que el
-   teléfono («Crear en Reservas: Ana García · 15 oct 2026 · 21:00»). Lleva la mesa con su zona, como la nombra
+   teléfono («Crear en Reservas: Ana García · Fecha: 15 oct 2026 · Hora: 21:00»). Lleva la mesa con su zona, como la nombra
    Mesas («5 (Terraza)»: el número se repite entre zonas), nunca por un código.
 Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
@@ -387,7 +387,7 @@ Pasos:
 3. Una reserva sentada, completada, cancelada o no presentada solo cambia sus notas.
 4. Por voz: «pasa la reserva de Ana a la 7 de la terraza». Antes de cambiarla, la tarjeta del asistente
    dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona, como la nombra Mesas
-   («Cambiar en Reservas: Ana García · 15 oct 2026 · 21:00 · 7 (Terraza)»), nunca por un código.
+   («Cambiar en Reservas: Ana García · 15 oct 2026 · 21:00 · Mesa: 7 (Terraza)»), nunca por un código.
 Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
 mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio. Quien no ve el contacto de los
 clientes (BASE-F119) no ve el teléfono ni el correo y no los cambia: guardar los conserva.

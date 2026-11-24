@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5aa05709589510c0e397182bfa6b48d8a3f6ecf460e27fcce98e106c3b4e6399 -->
+<!-- generated from WORKBOOK.md sha256:fe25941264d3c46d44d181e619e9bf99af89ed66dd974aec19136e5c3210a75f -->
 
 ## What it is for and who it is for
 
@@ -309,7 +309,7 @@ Steps:
    also created from the "+" of the plan in "Edit plan" (Zone field and "Add zone"): it goes last and
    stays chosen.
 5. With the assistant: "I want another zone, Bar, for people eating at the counter, and it should come
-   first". The card carries only what was asked for, the name and the order ("Create in Tables: Bar · 0"):
+   first". The card carries only what was asked for, the name and the order ("Create in Tables: Bar · Order: 0"):
    what the zone is for is not kept as its description. The description goes in only if it is asked for
    ("with the description…").
 In: the name, the description, the colour and the order.
