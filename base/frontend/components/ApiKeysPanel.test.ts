@@ -65,6 +65,24 @@ async function nameAndTick(): Promise<void> {
   await flush();
 }
 
+/** The panel with its keys and «New API key» open. */
+async function newKeyForm(options: Parameters<typeof mountBase>[1] = {}) {
+  const m = await open(options);
+  await m.result(m.call, 'base.api_key.list', LIST);
+  await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+  await flush();
+  return m;
+}
+
+/** «Create key» named `name`, with a general mode. */
+async function createInMode(name: string, mode: 'full' | 'read' | 'write'): Promise<void> {
+  type(byTestId('api-key-form-name')!, name);
+  (byTestId(`api-key-form-mode-${mode}`) as HTMLElement).click();
+  await flush();
+  (byTestId('api-key-form-submit') as HTMLButtonElement).click();
+  await flush();
+}
+
 beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn(() => Promise.resolve()) }, configurable: true });
 });
@@ -142,10 +160,7 @@ describe('ApiKeysPanel', () => {
   });
 
   it('«New API key» per app: the apps that publish their API, «Create key» only with a name and a box ticked', async () => {
-    const m = await open({ onApi: () => Response.json({ key: key({ name: 'Tienda' }), token: TOKEN }) });
-    await m.result(m.call, 'base.api_key.list', LIST);
-    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
-    await flush();
+    const m = await newKeyForm({ onApi: () => Response.json({ key: key({ name: 'Tienda' }), token: TOKEN }) });
     const submit = () => byTestId('api-key-form-submit') as HTMLButtonElement;
     expect(byTestId('api-key-form-apps')?.textContent).toContain('Online shop');
     expect(submit().hasAttribute('disabled') || submit().getAttribute('disabled') === 'true').toBe(true);
@@ -158,10 +173,7 @@ describe('ApiKeysPanel', () => {
   });
 
   it('per app, «Write» gives the creating, changing and deleting who asks may give there', async () => {
-    const m = await open({ onApi: () => Response.json({ key: key({ name: 'Tienda' }), token: TOKEN }) });
-    await m.result(m.call, 'base.api_key.list', LIST);
-    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
-    await flush();
+    const m = await newKeyForm({ onApi: () => Response.json({ key: key({ name: 'Tienda' }), token: TOKEN }) });
     type(byTestId('api-key-form-name')!, 'Tienda');
     (byTestId('api-key-form-cart_checkout-write') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
     await flush();
@@ -171,53 +183,29 @@ describe('ApiKeysPanel', () => {
   });
 
   it('a box is there only for what who asks may give on that app', async () => {
-    const m = await open();
-    await m.result(m.call, 'base.api_key.list', LIST);
-    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
-    await flush();
+    await newKeyForm();
     expect([byTestId('api-key-form-tax-read'), byTestId('api-key-form-tax-write')].map(Boolean)).toEqual([true, false]);
   });
 
   it('a general mode is given on every app', async () => {
-    const m = await open({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
-    await m.result(m.call, 'base.api_key.list', LIST);
-    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
-    await flush();
-    type(byTestId('api-key-form-name')!, 'Gestoría');
-    (byTestId('api-key-form-mode-write') as HTMLElement).click();
-    await flush();
-    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
-    await flush();
+    const m = await newKeyForm({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
+    await createInMode('Gestoría', 'write');
     expect(posted(m)).toEqual([['/api/keys', { name: 'Gestoría', rate_per_minute: 60, scopes: { '*': ['create', 'update', 'delete'] } }]]);
   });
 
   it('more than who asks may do is refused in words', async () => {
     const reason = 'Una key no puede hacer más de lo que puedes hacer tú.';
-    const m = await open({
+    await newKeyForm({
       locale: 'es',
       onApi: () => Response.json({ error: { code: 'base.api_key_beyond_maker', message: reason, fields: { scopes: reason } } }, { status: 403 }),
     });
-    await m.result(m.call, 'base.api_key.list', LIST);
-    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
-    await flush();
-    type(byTestId('api-key-form-name')!, 'Gestoría');
-    (byTestId('api-key-form-mode-full') as HTMLElement).click();
-    await flush();
-    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
-    await flush();
+    await createInMode('Gestoría', 'full');
     expect(byTestId('api-key-form-error')?.textContent?.trim()).toBe(reason);
   });
 
   it('the token once, with «Copy» that says «Copied» for two seconds', async () => {
-    const m = await open({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
-    await m.result(m.call, 'base.api_key.list', LIST);
-    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
-    await flush();
-    type(byTestId('api-key-form-name')!, 'Gestoría');
-    (byTestId('api-key-form-mode-read') as HTMLElement).click();
-    await flush();
-    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
-    await flush();
+    await newKeyForm({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
+    await createInMode('Gestoría', 'read');
     expect(byTestId('api-key-token-value')?.textContent).toBe(TOKEN);
     expect(document.body.textContent).toContain('This is the only time the whole secret is shown.');
     // Fake timers only from here: `flush` waits on real zero-delay timeouts.
