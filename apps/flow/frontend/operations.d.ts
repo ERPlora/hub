@@ -568,7 +568,7 @@ declare module '@erplora/ui/sdk' {
     'flow.draft.get': { input: DraftRefIn; output: DraftOut };
     'flow.draft.propose': { input: DraftProposeIn; output: DraftOut };
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };
-    'flow.catalog.read': { input: Record<string, never>; output: CatalogOut };
+    'flow.catalog.read': { input: { apps?: string[]; names?: string[] }; output: CatalogOut };
     'flow.event.sample': { input: SampleIn; output: SampleOut };
     'flow.recipe.list': { input: Record<string, never>; output: RecipeListOut };
     'flow.recipe.enable': { input: RecipeRefIn; output: RecipeEnabledOut };

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a9ddb3c5c90c914e155a8d83f4e3070bcd0c4762409607e984cbfeb0ecaff7ee -->
+<!-- generated from WORKBOOK.md sha256:17766d06b143c25bb82d1e81ac9517cca2e47a956e364331a7077d97347f1e3a -->
 
 ## What it is for and who it is for
 
@@ -596,8 +596,11 @@ Steps:
 1. Open the Hub's assistant and ask it for something that happens on its own, speaking or typing ("create a
    flow that creates a task for me when a sale over €100 is completed").
 2. The assistant writes a **draft**: name, when it starts, from one to eight "do something", "only continue
-   if" or "wait" steps, and the notes of what it could not decide. Before leaving it, it shows you its card
-   and waits for your yes, like any change it asks you for.
+   if" or "wait" steps, and the notes of what it could not decide. To write it, it reads only what it needs of
+   what the automations can use (the apps involved, or the notices and actions by their name), whole and with
+   the data of each action: in a business with many apps too, it uses the real names and data, without warning
+   you that it could not check them. Before leaving it, it shows you its card and waits for your yes, like any
+   change it asks you for.
 3. It tells you it has left it waiting in Automations and repeats its doubts; you review it in **Proposed by
    the assistant** (FLOW-F18).
 In: what is asked for, in words, and what the business's automations can use.
@@ -1242,7 +1245,7 @@ question asked of another role) does not show on the card.
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
 | The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object) | see | F10, F11 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object); all of them, or only those of some apps or some names | see | F10, F11, F17 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |
