@@ -1017,6 +1017,12 @@ Pasos:
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
      desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
      España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
+  6. Si al asistente se le pide algo que hace una app desactivada, sin nombrarla («quiero gestionar reservas», «apunta
+     una cita»), dice qué app lo hace, para qué sirve como lo dice Apps y que está desactivada, en vez de decir que no
+     puede o de intentarlo con otra cosa. A quien administra le pone la tarjeta de activarla del paso 4; con el sí, sigue
+     con lo que se le pidió en la misma conversación, ya con lo que hace esa app. A quien no puede activar apps le dice
+     que la activa quien administra el negocio; de una de pago sin contratar, que se contrata en erplora.com, sin
+     ofrecer activarla; de una que se está preparando o que no se pudo activar, su estado, como Apps.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
@@ -1024,7 +1030,7 @@ contratar no se puede activar (BASE-F20). Bajar de plan no apaga nada: con más 
 todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo. Desde el asistente, un nombre que vale
 para varias apps («reserva»: Reservas y Reservas online) no saca tarjeta ni activa ninguna: el asistente pregunta
 cuál, nombrándolas; uno que no es de ninguna: «Ninguna app tiene ese nombre o identificador.».
-Implicados: BASE-F97
+Implicados: BASE-F93, BASE-F97
 
 ### BASE-F25 Ver que una app se niega a desactivarse
 Estado: hecho
@@ -2530,7 +2536,8 @@ Pasos:
      2,50 €»), el asistente lo hace con las mismas acciones que esa persona tiene en las pantallas de sus apps, y lo
      que cambia algo, con la confirmación de BASE-F97. Si entre las que tiene a mano para ese mensaje no está la que
      hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
-     pantalla se hace.
+     pantalla se hace. Si lo pedido lo hace una app que el negocio no tiene activada, dice qué app es y ofrece
+     activarla (BASE-F24).
   10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
      hora de ese momento, el idioma del negocio y el que la persona eligió en «Mi perfil», su sector, las apps que
      tiene encendidas, a quien lo administra su plan y cuántas apps le cuenta (solo las que eligió el negocio, como
@@ -2545,7 +2552,7 @@ Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F
 se puede consultar en ese momento, el asistente lo dice y no contesta de memoria. «Detener» no deshace una acción que
 ya se había hecho. Si la voz de ERPlora no puede leer la respuesta en ese momento, la lee la del dispositivo; si
 tampoco hay, bajo la respuesta dice «No se ha podido leer la respuesta en voz alta. Inténtalo de nuevo.».
-Implicados: BASE-F102, BASE-F104, BASE-F106
+Implicados: BASE-F24, BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Adjuntar un archivo o dictar por voz
 Estado: hecho
@@ -3962,8 +3969,8 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
   `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
-  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide), `state` como lo
-  dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
+  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` y `summary` (en el idioma de quien pide; para
+  qué sirve, el `summary` de su config, como en Apps), `state` como lo dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
   del hub recibe sus tablas), y `mandatory`, como `base.app.list`: el país del negocio la exige y, una vez activada,
   no se desactiva. La tarjeta de `base.app.enable` de una así añade el dato `mandatory` con el motivo de Apps
   (`activation.mandatory_off`, el mismo `MANDATORY_OFF`). Tests: `base/tests/test_assistant_mandatory_apps.py`. Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
@@ -3973,6 +3980,18 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   de ninguna no saca tarjeta, vuelve al modelo, que pregunta cuál. `AppChangeIn.app` la marca `REFERS`, así que la
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
+- Las apps no activadas en el asistente (BASE-F24 paso 6, hub#2178; `base/assistant/apps_not_on.py`): el catálogo de
+  un turno sigue siendo solo de las apps activas, así que `named` clasifica las palabras de la petición abierta y las
+  búsquedas del modelo con el mismo `relevance.relevant`, contra el catálogo que la persona tendría con todas las apps
+  de `home.shown_modules` encendidas; las no activadas con una herramienta en los `PLACES` puestos de ese turno, como
+  mucho `NAMED` = 3 y la mejor primero, van a las instrucciones con lo que lee `base.app.get` (nombre, estado y
+  `summary`), tras lo que se sabe del negocio. Nada se añade si todas están activas. A quien tiene el permiso de
+  `base.app.enable` se le ofrece esa herramienta antes de la búsqueda (`with_switch`, solo si alguna está `off`), sin
+  mover ninguna de las ofrecidas. Tras una escritura de `SWITCHES` que sale bien, el resto del turno lee las apps de sus
+  filas, aún sin COMMIT (`activation.changing`), y la ronda siguiente ya ofrece las herramientas de la app encendida.
+  Medido con el tokenizador o200k_base sobre las 760 sondas del propietario: con muchas apps apagadas, unos 400-480
+  tokens más por llamada de media (la mitad, la herramienta de activar); con todas activas, ninguno. Tests:
+  `base/tests/test_apps_not_on.py`.
 - «Uso y plan» (BASE-F40, hub#603). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin

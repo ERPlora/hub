@@ -9,7 +9,8 @@ Para qué: usar el asistente como lo usa el dueño: preguntar, pedir varias cosa
 ## Punto de partida
 
 - Un negocio con varias apps y datos de unas semanas, con el plan del asistente.
-- Una empleada con su propia sesión, para el paso 10.
+- Reservas desactivada, para el paso 10.
+- Una empleada con su propia sesión, para el paso 11.
 
 ## Recorrido
 
@@ -22,8 +23,9 @@ Para qué: usar el asistente como lo usa el dueño: preguntar, pedir varias cosa
 7. BASE-F98 — una acción peligrosa.
 8. BASE-F99 — lo que dice que hizo, contra lo que de verdad hizo.
 9. BASE-F101 — varias cosas seguidas en un solo mensaje.
-10. BASE-F100 — la empleada pide algo que su rol no puede hacer.
-11. BASE-F102 — la conversación: qué se guarda y cuándo se borra.
-12. BASE-F104 — el plan del asistente y su límite de uso; «¿cuántos mensajes me quedan este mes?», contra «Uso y plan».
-13. BASE-F105 — una respuesta mala, informada.
-14. BASE-F106 — sin conexión.
+10. BASE-F24 — «quiero gestionar reservas», con Reservas desactivada.
+11. BASE-F100 — la empleada pide algo que su rol no puede hacer.
+12. BASE-F102 — la conversación: qué se guarda y cuándo se borra.
+13. BASE-F104 — el plan del asistente y su límite de uso; «¿cuántos mensajes me quedan este mes?», contra «Uso y plan».
+14. BASE-F105 — una respuesta mala, informada.
+15. BASE-F106 — sin conexión.

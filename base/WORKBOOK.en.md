@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:071060c365b77163e378778e3812528097d614703eff05946236ae76ee495094 -->
+<!-- generated from WORKBOOK.md sha256:49055b4ac1e7812e2b33b42be657dd4aa482222ee20153e29e26baab882aee91 -->
 
 ## What it is for and who it is for
 
@@ -1016,6 +1016,13 @@ Steps:
   5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
      longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
      businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
+  6. If the assistant is asked for something an app that is off does, without naming it ("I want to manage
+     reservations", "book an appointment"), it says which app does it, what it is for as Apps says it and that it is
+     off, instead of saying it cannot or trying it with something else. To whoever runs the business it shows the card
+     of turning it on from step 4; with the yes, it goes on with what was asked in the same conversation, now with what
+     that app does. To whoever cannot turn apps on it says that whoever runs the business turns it on; of a paid one not
+     subscribed to, that it is subscribed to on erplora.com, without offering to turn it on; of one being set up or that
+     could not be turned on, its state, as Apps does.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
@@ -1023,7 +1030,7 @@ subscribed to cannot be turned on (BASE-F20). Moving to a lower plan turns nothi
 the new plan has, all of them keep running and only no other can be turned on until it is below. From the
 assistant, a name that fits several apps ("reserva": Reservations and Online booking) shows no card and turns none
 on: the assistant asks which one, naming them; one that is no app's: "No app has that name or id.".
-Involved: BASE-F97
+Involved: BASE-F93, BASE-F97
 
 ### BASE-F25 See an app refuse to be turned off
 Status: done
@@ -2512,7 +2519,8 @@ Steps:
      €2.50"), the assistant does it with the same actions that person has on the screens of their apps, and what
      changes something with the confirmation of BASE-F97. If the one it needs is not among those it has at hand for
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
-     it say on which screen it is done.
+     it say on which screen it is done. If what was asked is done by an app the business does not have on, it says
+     which app it is and offers to turn it on (BASE-F24).
   10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
      with the date and time at that moment, the business's language and the one the person chose in "My profile", its
      sector, the apps it has on, to whoever runs it its plan and how many apps it counts (only those the business
@@ -2529,7 +2537,7 @@ If the documentation cannot be searched at that moment, the assistant says so an
 does not undo an action that had already been done. If ERPlora's voice cannot read the answer at that moment, the
 device's voice reads it; if there is none either, below the answer it says "The answer could not be read aloud. Try
 again.".
-Involved: BASE-F102, BASE-F104, BASE-F106
+Involved: BASE-F24, BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Attach a file or dictate by voice
 Status: done
