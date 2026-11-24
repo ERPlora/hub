@@ -2771,7 +2771,8 @@
       "running": "In progress",
       "issued": "Issued now",
       "aeat_proof": "AEAT test environment",
-      "aeat_proof_detail": "Why the AEAT test environment refused it"
+      "aeat_proof_detail": "Why the AEAT test environment refused it",
+      "steps": "Steps"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

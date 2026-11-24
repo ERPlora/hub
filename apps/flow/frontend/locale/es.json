@@ -2771,7 +2771,8 @@
       "running": "En curso",
       "issued": "Emitida ahora",
       "aeat_proof": "AEAT de pruebas",
-      "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas"
+      "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas",
+      "steps": "Pasos"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {
