@@ -986,8 +986,10 @@ Pasos:
      eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
   5. Desde el asistente («Desactiva la app de reservas», o sin decir «app»: «quita Reservas del menú», «no quiero ver
-     Reservas en el menú») la app se nombra como en BASE-F24, la tarjeta de riesgo alto la pone con su nombre entero
-     y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
+     Reservas en el menú») la app se nombra como en BASE-F24 y la tarjeta de riesgo alto la pone con su nombre entero.
+     Antes del sí nombra también las que se van con ella, con la misma regla y las mismas palabras que el paso 2:
+     «Otras apps: Horarios y Mesas se desactivan con ella: solo las necesitaba Reservas.». Si ya estaba desactivada,
+     el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
 Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desactivar, no ofrece «Desactivar»
@@ -1008,8 +1010,10 @@ Pasos:
      se nombra como la dice la persona: por su nombre en
      cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
-     aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
-     estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
+     aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y antes del
+     sí nombra las que necesita y están desactivadas, como el aviso del paso 2: «Activar en Apps: Reservas · Reservas
+     necesita Horarios y Mesas: se activan con ella.». Si ya estaba activada el asistente lo dice («Clientes ya estaba
+     activada») en vez de «activada».
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
      desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
      España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
@@ -3756,10 +3760,12 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.apps.app_off_refusal` pone el motivo
   propio de la app por delante del de las que la necesitan, porque desactivarlas no la apagaría. `base.app.list` trae
   `mandatory` por app y `country_name` (CLDR, `business.country_name`), y Apps pinta «Obligatoria en {país}» con un
-  `StatusPill` de `@erplora/ui` junto al estado; `lib/apps.ts` `goesOffWith` deja fuera la obligatoria encendida,
-  como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
-  reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
-  `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
+  `StatusPill` de `@erplora/ui` junto al estado. Lo que se va o llega con una app lo dice cada fila de `base.app.list`
+  (`along_said`, de `base/app_switch.py`, la misma frase que la tarjeta del asistente), que deja fuera la obligatoria
+  encendida. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs reales),
+  `test_app_switch.py`, `test_assistant_app_cascade.py`, `test_queries_apps.py`,
+  `apps/verifactu/tests/test_app_disable.py`, `pages/AppsPage.test.ts` y las e2e
+  `tests/e2e/base-app-activation.spec.ts` y `tests/e2e/base-assistant-app-card.spec.ts`.
   Al alta nacen encendidas (hub#997, parte 3; BASE-F63, F14, F01): `activation.born_on(país)` da las obligatorias del
   país que dicen `platform_turns_on`, y `activation.born_apps(país)` les suma lo que necesitan. `provision._prepare` hace
   sus tablas en `migrating` (junto a las del vertical) y, en `seeding`, tras la semilla y antes de la foto del SaaS

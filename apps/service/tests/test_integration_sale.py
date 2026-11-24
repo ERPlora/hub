@@ -7,12 +7,14 @@ queries.
 """
 
 import datetime as dt
+from uuid import uuid7
 
 import pytest
 from django.utils import timezone
 from live.context import system_context
 from live.errors import Conflict
-from live.operations import get
+from live.meta import all_live_app_configs, permissions_for_role
+from live.operations import get, registry
 
 from apps.service.models import Redemption
 
@@ -45,6 +47,16 @@ def lucia(db):
 
 
 @pytest.fixture
+def bea(db):
+    return system("staff.member.create", {"first_name": "Bea", "last_name": "Martín"})
+
+
+@pytest.fixture
+def ana(db):
+    return system("staff.member.create", {"first_name": "Ana", "last_name": "López"})
+
+
+@pytest.fixture
 def grant(haircut, lucia):
     package = system(
         "service.package.create",
@@ -73,14 +85,19 @@ def sold(grant):
     return row
 
 
-def movements(grant):
-    return run("service.movement.list", {"package_id": str(grant.package_id)}).rows
+def movements(grant, permissions: set[str] | None = None):
+    op = get("service.movement.list")
+    ctx = ctx_for("hub_admin", permissions=permissions)
+    return op(ctx, op.input.model_validate({"package_id": str(grant.package_id)})).rows
 
 
-def till_check(haircut, grant, role="hub_employee"):
-    """A check with one haircut paid with the voucher, as the till leaves it."""
+def till_check(haircut, grant, role="hub_employee", line=None, check=None):
+    """A check with one haircut paid with the voucher, as the till leaves it; ``line`` and ``check`` add what the
+    till lets say of the haircut's line and of the check (who serves them)."""
     order = run(
-        "sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]}, role
+        "sale.order.open",
+        {**(check or {}), "service_lines": [{"service_id": str(haircut.id), **(line or {})}]},
+        role,
     )
     return run(
         "sale.order.apply_voucher",
@@ -147,10 +164,11 @@ def test_the_whole_life_of_a_session_of_the_till_in_the_movements(
         "hub_manager",
     )
     [movement] = movements(grant)
-    assert (movement.kind, movement.reason, movement.uses_delta) == (
+    assert (movement.kind, movement.reason, movement.uses_delta, movement.sale_number) == (
         "returned",
         "charged twice",
         0,
+        sale.number,
     )
     assert (sold(grant).remaining, sold(grant).can_void) == (3, True)
 
@@ -261,3 +279,77 @@ def test_the_last_session_spent_at_the_till_leaves_no_option(haircut, lucia):
     with pytest.raises(Conflict) as refusal:
         till_check(haircut, single)
     assert refusal.value.code == "service.grant_no_uses_left"
+
+
+def charge(order, lucia, key: str):
+    return run(
+        "sale.sale.complete",
+        {"idempotency_key": key, "order_id": str(order.id), "customer_id": str(lucia.id)},
+        "hub_employee",
+    )
+
+
+def said_of_the_sale(movement) -> tuple:
+    return (movement.sale_id, movement.sale_number, movement.member_id, movement.member_name)
+
+
+def test_a_session_charged_at_the_till_names_its_sale_by_number_and_who_served_its_line(
+    haircut, lucia, grant, ana, bea
+):
+    # The sale as Sales names it (its id says nothing to a person) and the professional of the line that spent it,
+    # before the one who serves the check.
+    order = till_check(haircut, grant, line={"staff_id": str(bea.id)}, check={"staff_id": str(ana.id)})
+    sale = charge(order, lucia, "svc-num-00001")
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (sale.id, sale.number, bea.id, "Bea Martín")
+
+
+def test_a_line_that_says_nobody_is_of_whoever_serves_the_check(haircut, lucia, grant, ana):
+    order = till_check(haircut, grant, check={"staff_id": str(ana.id)})
+    sale = charge(order, lucia, "svc-num-00002")
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (sale.id, sale.number, ana.id, "Ana López")
+
+
+def test_a_sale_nobody_served_names_only_its_number(haircut, lucia, grant):
+    sale = charge(till_check(haircut, grant), lucia, "svc-num-00003")
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (sale.id, sale.number, None, None)
+
+
+def test_whoever_may_not_see_sales_reads_the_movement_without_its_sale(haircut, lucia, grant, bea):
+    sale = charge(till_check(haircut, grant, line={"staff_id": str(bea.id)}), lucia, "svc-num-00004")
+    allowed = permissions_for_role(all_live_app_configs(), "hub_admin") - {"sale.view_sale"}
+    [movement] = movements(grant, allowed)
+    assert said_of_the_sale(movement) == (sale.id, None, None, None)
+
+
+def test_a_sale_sales_does_not_find_for_the_reader_is_not_named(haircut, lucia, grant):
+    # Sales answers «does not exist» as well for a sale the reader may not see (someone else's, to an employee).
+    charge(till_check(haircut, grant), lucia, "svc-num-00005")
+    unknown = uuid7()
+    Redemption.objects.update(sale_id=unknown)
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (unknown, None, None, None)
+
+
+def test_with_sales_off_the_movements_still_read_without_the_sale(haircut, lucia, grant, bea, monkeypatch):
+    sale = charge(till_check(haircut, grant, line={"staff_id": str(bea.id)}), lucia, "svc-num-00006")
+    for name in [name for name in registry if name.startswith("sale.")]:
+        monkeypatch.delitem(registry, name)
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (sale.id, None, None, None)
+
+
+def test_a_session_spent_outside_the_till_on_a_sale_keeps_the_professional_it_said(haircut, lucia, grant, ana, bea):
+    # Spent by hand saying its sale and who did it: the sale's check is served by someone else, and the session
+    # still says its own professional, id and name.
+    other = run("sale.order.open", {"staff_id": str(ana.id), "service_lines": [{"service_id": str(haircut.id)}]}, "hub_employee")
+    sale = run(
+        "sale.sale.complete",
+        {"idempotency_key": "svc-num-00007", "order_id": str(other.id), "payments": [{"method": "card"}]},
+        "hub_employee",
+    )
+    system("service.grant.redeem", {"id": str(grant.id), "member_id": str(bea.id), "sale_id": str(sale.id)})
+    [movement] = movements(grant)
+    assert said_of_the_sale(movement) == (sale.id, sale.number, bea.id, "Bea Martín")

@@ -1,17 +1,22 @@
 """The movements of the vouchers sold: each session spent or given back and each adjustment, with who
-made it."""
+made it and, for a session of the till, the sale it was spent in."""
 
 import datetime as dt
+from uuid import UUID
 
 from django.db.models import Case, DateTimeField, F, Q, When
 from django.utils import timezone
 from live.context import OperationContext
-from live.operations import operation
+from live.errors import AppInactive, NotFound, PermissionDenied
+from live.operations import UnknownOperation, operation
 
 from apps.service.models import Grant, GrantAdjustment, Redemption
 from apps.service.queries.packages import find_package
 from apps.service.queries.reads import CUSTOMER_VIEW
+from apps.service.queries.records import SALE_GET
 from apps.service.schemas.movements import MovementListIn, MovementPage
+from apps.staff.models import Member
+from base.operations import call
 
 
 @operation(
@@ -42,17 +47,18 @@ def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
         "grant__customer"
     )
     take = params.offset + params.limit
-    rows = [
-        _session_row(ctx, session, now)
-        for session in sessions.order_by("-at", "-id")[:take]
-    ]
+    latest = list(sessions.order_by("-at", "-id")[:take])
+    rows = [_session_row(ctx, session, now) for session in latest]
     rows += [
         _adjustment_row(ctx, adjustment)
         for adjustment in adjustments.order_by("-created_at", "-id")[:take]
     ]
     rows.sort(key=lambda row: (row["at"], row["id"]), reverse=True)
+    shown = rows[params.offset : take]
+    _name_the_sales(ctx, shown, {session.id: session.order_line_id for session in latest})
+    _name_the_members(shown)
     return {
-        "rows": rows[params.offset : take],
+        "rows": shown,
         "total": sessions.count() + adjustments.count(),
         "limit": params.limit,
         "offset": params.offset,
@@ -126,6 +132,7 @@ def _session_row(ctx: OperationContext, session: Redemption, now: dt.datetime) -
         "member_id": session.member_id,
         "member_name": session.member.full_name if session.member else None,
         "sale_id": session.sale_id,
+        "sale_number": None,
         "appointment_id": session.appointment_id,
         "note": session.note,
         "actor": _session_actor(session, kind, ended),
@@ -146,6 +153,7 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "member_id": None,
         "member_name": None,
         "sale_id": None,
+        "sale_number": None,
         "appointment_id": None,
         "note": "",
         "actor": adjustment.actor,
@@ -153,3 +161,44 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "days_delta": adjustment.days_delta,
         "reason": adjustment.reason,
     }
+
+
+def _readable_sale(ctx: OperationContext, sale_id: UUID):
+    """Sales' read of the sale a session was spent in, as the caller reads it (Services does not require Sales);
+    ``None`` when they cannot: Sales off or absent, no permission to see sales, or a sale not theirs to see, which
+    Sales answers as one that does not exist."""
+    try:
+        return call(ctx, SALE_GET, {"sale_id": str(sale_id)})
+    except (UnknownOperation, AppInactive, PermissionDenied, NotFound):
+        return None
+
+
+def _served_by(sale, check_line_id: UUID) -> UUID | None:
+    """Who served the line of ``sale`` that spent the session: its own professional, else the check's, as Sales
+    counts each line's production."""
+    line = next((line for line in sale.lines if line.order_line_id == check_line_id), None)
+    return (line.staff_id if line else None) or sale.staff_id
+
+
+def _name_the_sales(ctx: OperationContext, rows: list[dict], check_lines: dict[UUID, UUID | None]) -> None:
+    """A session spent in a sale says it by the number Sales names it by; one of the till (it has a check line and
+    never says its own professional) also says who served that line. One spent by hand keeps the professional it
+    said. Each sale is read once."""
+    sales = {sale_id: _readable_sale(ctx, sale_id) for sale_id in {row["sale_id"] for row in rows} - {None}}
+    for row in rows:
+        sale = sales.get(row["sale_id"])
+        if sale is None:
+            continue
+        row["sale_number"] = sale.number
+        check_line_id = check_lines.get(row["id"])
+        if check_line_id:
+            row["member_id"] = _served_by(sale, check_line_id)
+
+
+def _name_the_members(rows: list[dict]) -> None:
+    """The name of the professional a session of the till got from its sale, as Staff says it now."""
+    unnamed = {row["member_id"] for row in rows if row["member_id"] and row["member_name"] is None}
+    names = {member.id: member.full_name for member in Member.objects.filter(pk__in=unnamed)}
+    for row in rows:
+        if row["member_name"] is None and row["member_id"] in names:
+            row["member_name"] = names[row["member_id"]]

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:11670c4d843feac0f8d792ce1064bad8046cb3baad5c8f20892197f424c3f7fe -->
+<!-- generated from WORKBOOK.md sha256:ae0ff600ab8bb7f82bd38b26d054e08e35f5db7b9b679e0b9a547822c219dac5 -->
 
 ## What it is for and who it is for
 
@@ -624,7 +624,12 @@ Steps:
    more** brings the next ones, each movement only once even if several carry the same time.
 3. A session spent saying who did it names her beside the customer, "Professional: Ana
    López"; if her name changes in Staff, the row says it at once.
-In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff).
+4. A session charged at the till says its sale by the number Sales names it by, "Sale:
+   20261123-0003", also one given back, and the professional of its line (or the check's, when the line
+   says nobody), as Sales counts what each one did. Whoever cannot see that sale (Sales off, or a sale
+   that is not theirs) sees the row without a sale.
+In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff); the
+number and the professional of the sale of each session of the till, from Sales' read of the sale.
 Out: nothing; read only.
 If it fails: empty, "This voucher has not been used yet."; if it cannot be read, "Could not load the
 movements" with the reason.
@@ -1182,6 +1187,11 @@ with the session of whoever sells, as it does with Inventory.
   session of whoever asks, `sale.sale.get` (the sale's number), `sale.record.get` (a line of the sale with
   `sale_line_id`, one of the check with `line_id` and a refund with `refund_id`, "Refund of sale …") and
   `appointment.appointment.get` (the appointment's `label`). A `reference` that is no refund is the sale voided.
+- **What a voucher's movements say of Sales** (F19): `service.movement.list` calls by its name, with the session of
+  whoever looks, `sale.sale.get`, once for each sale of the page: its `number` and who served the session's line, the
+  one of its `order_line_id` (its `staff_id` or, empty, the sale's, as Sales counts production). Nothing is copied
+  into Services. Without Sales, without permission to see sales or with a sale that is not theirs, `sale_number` is
+  null and the list comes all the same.
 
 ### Who can do what
 

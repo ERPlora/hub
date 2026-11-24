@@ -5,14 +5,16 @@
 // voucher applied and then charged to another customer is refused in the sheet (409); taking the line
 // off gives the session back; a voucher with no session left offers nothing; a sale paid with a voucher
 // gives its session back from «Refund» with no money. Screenshots of the charge sheet in three
-// viewports. What this file creates is deleted after it.
+// viewports. «Movements» of the voucher in Services then says that sale by its number, never by its id
+// (SERVICE-F19), captured at the fleet's three sizes. What this file creates is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { AN_ID, VIEWPORTS as FLEET_SIZES } from './assistant-card-helpers';
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanDocumentsOf, shots } from './sale-helpers';
-import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
+import { capturedAtSizes, cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
 
 interface Service {
   id: string;
@@ -153,9 +155,14 @@ test('SALE-F38, F27: a haircut from «Services» paid with Lucía’s voucher is
   await page.screenshot({ path: shot('sale-voucher-ticket-1440') });
 
   // Server-side: the session is spent and linked to a sale of 0,00 € whose line the voucher paid.
-  const moves = await api<{ rows: { kind: string; sale_id: string | null }[] }>(context, A, 'GET', `/service/movements?package_id=${lucias.package_id}`);
+  const moves = await api<{ rows: { kind: string; sale_id: string | null; sale_number: string | null }[] }>(
+    context,
+    A,
+    'GET',
+    `/service/movements?package_id=${lucias.package_id}`,
+  );
   expect(moves.data.rows[0].kind).toBe('consumed');
-  const sale = await api<{ total: number; payments: unknown[]; lines: { paid_by_voucher: boolean; voucher_name: string }[] }>(
+  const sale = await api<{ number: string; total: number; payments: unknown[]; lines: { paid_by_voucher: boolean; voucher_name: string }[] }>(
     context,
     A,
     'GET',
@@ -163,6 +170,17 @@ test('SALE-F38, F27: a haircut from «Services» paid with Lucía’s voucher is
   );
   expect([sale.data.total, sale.data.payments, sale.data.lines.map((line) => [line.paid_by_voucher, line.voucher_name])]).toEqual([0, [], [[true, lucias.name]]]);
   expect(await remainingOf(context, lucias)).toBe(1);
+  expect(moves.data.rows[0].sale_number).toBe(sale.data.number);
+
+  // SERVICE-F19: in Services, the voucher's «Movements» says that sale as Sales names it.
+  await page.goto(`${A}/service/packages`);
+  await rowAction(page, 'service-packages', lucias.package_id, 'movements');
+  const session = page.locator('ion-modal[data-testid=service-movements] [data-testid^=service-movements-row-]').first();
+  await expect(session).toContainText(new RegExp(`(Sale|Venta): ${sale.data.number}`));
+  await expect(session).not.toContainText(AN_ID);
+  await capturedAtSizes(page, 'service-movements-sale-number', FLEET_SIZES, async () => {
+    await expect(session).toBeInViewport();
+  });
 });
 
 test('SALE-F27, SERVICE-F23: charged to another customer it is refused in the sheet; taking the line off gives the session back', async ({ page, context }) => {
