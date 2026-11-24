@@ -19,7 +19,7 @@ from apps.service.schemas.assignments import (
 )
 from apps.service.schemas.fields import ByIdIn
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 
 ASSIGNMENT_NOT_FOUND = _("That assignment does not exist in this business.")
 

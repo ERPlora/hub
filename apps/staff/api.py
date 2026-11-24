@@ -33,32 +33,32 @@ router = Router(tags=["staff"])
 
 @bind(router, "staff.member.list", "/staff/members")
 async def member_list(request, params: Query[MemberListIn]):
-    return await run_operation(request, queries.list_members, params)
+    return await run_operation(request, queries.members.list_members, params)
 
 
 @bind(router, "staff.member.detail", "/staff/members/detail")
 async def member_detail(request, params: Query[MemberRefIn]):
-    return await run_operation(request, queries.member_detail, params)
+    return await run_operation(request, queries.members.member_detail, params)
 
 
 @bind(router, "staff.member.mine", "/staff/members/mine")
 async def member_mine(request):
-    return await run_operation(request, queries.my_record)
+    return await run_operation(request, queries.members.my_record)
 
 
 @bind(router, "staff.member.current", "/staff/members/current")
 async def member_current(request):
-    return await run_operation(request, queries.current_record)
+    return await run_operation(request, queries.members.current_record)
 
 
 @bind(router, "staff.member.compensation", "/staff/members/compensation")
 async def member_compensation(request, params: Query[CompensationListIn]):
-    return await run_operation(request, queries.compensation, params)
+    return await run_operation(request, queries.members.compensation, params)
 
 
 @bind(router, "staff.member.stats", "/staff/members/stats")
 async def member_stats(request):
-    return await run_operation(request, queries.member_stats)
+    return await run_operation(request, queries.members.member_stats)
 
 
 @bind(router, "staff.member.create", "/staff/members", status=201)
@@ -88,12 +88,12 @@ async def member_terminate(request, data: TerminateIn):
 
 @bind(router, "staff.commission.summary", "/staff/commissions")
 async def commission_summary(request, params: Query[CommissionSummaryIn]):
-    return await run_operation(request, queries.commission_summary, params)
+    return await run_operation(request, queries.commissions.commission_summary, params)
 
 
 @bind(router, "staff.commission.report", "/staff/commissions/report")
 async def commission_report(request, params: Query[CommissionReportIn]):
-    return await run_operation(request, queries.commission_report, params)
+    return await run_operation(request, queries.commissions.commission_report, params)
 
 
 # Accounts (the «Hub user» selector)
@@ -101,7 +101,7 @@ async def commission_report(request, params: Query[CommissionReportIn]):
 
 @bind(router, "staff.account.list", "/staff/accounts")
 async def account_list(request, params: Query[AccountListIn]):
-    return await run_operation(request, queries.list_accounts, params)
+    return await run_operation(request, queries.accounts.list_accounts, params)
 
 
 # Roles
@@ -109,7 +109,7 @@ async def account_list(request, params: Query[AccountListIn]):
 
 @bind(router, "staff.role.list", "/staff/roles")
 async def role_list(request, params: Query[RoleListIn]):
-    return await run_operation(request, queries.list_roles, params)
+    return await run_operation(request, queries.roles.list_roles, params)
 
 
 @bind(router, "staff.role.create", "/staff/roles", status=201)
@@ -127,12 +127,12 @@ async def role_update(request, data: RolePatchIn):
 
 @bind(router, "staff.schedule.list", "/staff/schedules")
 async def schedule_list(request, params: Query[ScheduleListIn]):
-    return await run_operation(request, queries.list_schedules, params)
+    return await run_operation(request, queries.schedules.list_schedules, params)
 
 
 @bind(router, "staff.schedule.detail", "/staff/schedules/detail")
 async def schedule_detail(request, params: Query[ByIdIn]):
-    return await run_operation(request, queries.schedule_detail, params)
+    return await run_operation(request, queries.schedules.schedule_detail, params)
 
 
 @bind(router, "staff.schedule.create", "/staff/schedules", status=201)
@@ -157,7 +157,7 @@ async def schedule_delete(request, data: ScheduleRefIn):
 
 @bind(router, "staff.availability.for_member", "/staff/availability")
 async def availability(request, params: Query[AvailabilityIn]):
-    return await run_operation(request, queries.member_availability, params)
+    return await run_operation(request, queries.availability.member_availability, params)
 
 
 # Time off
@@ -165,22 +165,22 @@ async def availability(request, params: Query[AvailabilityIn]):
 
 @bind(router, "staff.time_off.list", "/staff/time_off")
 async def time_off_list(request, params: Query[TimeOffListIn]):
-    return await run_operation(request, queries.list_time_off, params)
+    return await run_operation(request, queries.time_off.list_time_off, params)
 
 
 @bind(router, "staff.time_off.detail", "/staff/time_off/detail")
 async def time_off_detail(request, params: Query[ByIdIn]):
-    return await run_operation(request, queries.time_off_detail, params)
+    return await run_operation(request, queries.time_off.time_off_detail, params)
 
 
 @bind(router, "staff.time_off.today", "/staff/time_off/today")
 async def time_off_today(request, params: Query[TodayIn]):
-    return await run_operation(request, queries.away_today, params)
+    return await run_operation(request, queries.time_off.away_today, params)
 
 
 @bind(router, "staff.time_off.mine", "/staff/time_off/mine")
 async def time_off_mine(request, params: Query[MyTimeOffIn]):
-    return await run_operation(request, queries.my_time_off, params)
+    return await run_operation(request, queries.time_off.my_time_off, params)
 
 
 @bind(router, "staff.time_off.create", "/staff/time_off", status=201)
@@ -213,7 +213,7 @@ async def time_off_cancel(request, data: TimeOffRefIn):
 
 @bind(router, "staff.settings.get", "/staff/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "staff.settings.update", "/staff/settings")
