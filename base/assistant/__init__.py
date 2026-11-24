@@ -4,10 +4,12 @@ without the ORM.
 The mechanics that do not depend on the gateway are ``live.assistant``'s, shared with the SaaS's panel; these modules
 give them the Hub's own: what a turn offers (``relevance``), the tools (``tools``), the card of a write (``cards``), the
 checks at start of what the operations declare for it (``checks``), the system message (``prompt``) with what it knows of
-the business (``business_facts``), why a write failed, for its receipt (``failure_reason``), the files attached for a
-tool (``attachments``), the files a read hands the person (``handed_files``), and erplora.com's gateway with the turn's answer as it comes (``gateway``). Importing the package loads them all, and with them their checks.
+the business (``business_facts``), why a write failed, for its receipt (``failure_reason``), an edit with nothing to
+change (``edits``), the files attached for a tool (``attachments``), the files a read hands the person
+(``handed_files``), and erplora.com's gateway with the turn's answer as it comes (``gateway``). Importing the package
+loads them all, and with them their checks.
 """
 
 from . import relevance as relevance, tools as tools, cards as cards, checks as checks, prompt as prompt
 from . import gateway as gateway, business_facts as business_facts, failure_reason as failure_reason
-from . import attachments as attachments, handed_files as handed_files
+from . import attachments as attachments, edits as edits, handed_files as handed_files

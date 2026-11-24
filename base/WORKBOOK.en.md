@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4eaa24e15735320502305dfbebbe57784d3a0cd665e31ea01a6e702d1cd6f03f -->
+<!-- generated from WORKBOOK.md sha256:ac2c7abb1c774b98c806a970d2d18ead406686fc5aa3485bb1fb34079926a68d -->
 
 ## What it is for and who it is for
 
@@ -2680,7 +2680,8 @@ Steps:
      of a failure says the reason in one sentence: if its app refuses it, the same one its screen would give ("Not
      done, it failed: Remove in Employees. That person is not in this business."); if what did not fit was the data
      the assistant sent, which, with the name the card gives them ("The assistant sent data that does not fit:
-     Products."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
+     Products."), and if it asked for a change without saying what to change, that ("The assistant did not say what
+     to change."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
      too; the reason, said in the other language, no longer shows.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
 done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
@@ -2690,7 +2691,10 @@ Out: if accepted, the action done in its app, with the same event as if its butt
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". Data the action does not take (a country or a currency that does not exist, a value
 outside its list) never reach the card: they go back to the assistant, which corrects them, and the person confirms
-only once. "Run it" holds only for what the card shows: if it changes before it is tapped — the action finds another
+only once. Neither does a change that only names its record, with no data to change (never "Change in Customers:
+Lucía QA" alone): the assistant hears there is nothing to change and goes on with what it was asked, with the action
+that does it, or asks what to change; if the record is not there, it hears that. "Run it" holds only for what the card
+shows: if it changes before it is tapped — the action finds another
 record by its name, because someone created one that fits what was said better ("Mesa" when the card said "Mesa 4"),
 the record is renamed, or what "What will happen" says is no longer the same —, nothing is done and the new card
 shows, to be confirmed again; if what it found is no longer there, no card shows and the assistant tells it as its
