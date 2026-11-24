@@ -350,7 +350,7 @@ def turn_on_born_apps(hub: Hub) -> list[str]:
     every app on; or a preparation run again). Outside any operation, before the hub serves anything: what was kept of
     its apps is forgotten at once. What went on."""
     host = hub.slug
-    if AppActivation.objects.exists():
+    if AppActivation.objects.filter(host=host).exists():
         return []
     states = activation.born(activation.born_apps(hub.country), activation.module_graph())
     AppActivation.objects.bulk_create(
@@ -366,7 +366,7 @@ def _every_app_on(host: str, *, then: Callable[[Callable[[], None]], object] | N
     (``seed_local_hubs``).
 
     Its activations' cache is forgotten after the operation's COMMIT, or by ``then`` outside one (a hub's seeding)."""
-    if AppActivation.objects.exists():
+    if AppActivation.objects.filter(host=host).exists():
         return
     AppActivation.objects.bulk_create(
         AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)

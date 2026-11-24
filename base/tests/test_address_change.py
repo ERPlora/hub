@@ -249,12 +249,14 @@ class TestItsApps:
         change_address(change_address(hub_a, C), D)
         with use_hub(hub_b):
             AppActivation.objects.all().delete()
+            AppActivation.objects.create(host=C.key, app=APP, state=activation.ON, chosen=True)
         Hub.objects.filter(pk=hub_b.pk).update(slug=A.key, country="ES")
         new = Hub.objects.get(pk=hub_b.pk)
 
         with use_hub(new):
             born = hub_registry.turn_on_born_apps(new)
 
+        assert "tax" in born
         assert off_in(new) == frozenset(activation.module_graph()) - set(born)
 
     def test_another_business_at_the_address_it_left_has_its_own(self, hub_a, hub_b, change_address):
