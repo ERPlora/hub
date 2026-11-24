@@ -17,6 +17,7 @@ from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, 
 from apps.sale import pricing
 from apps.sale.models import OrderLine, PaymentMethod, Settings
 from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, business_country, money_text
+from apps.sale.queries.checkout_steps import declared_steps, steps_at_the_charge
 from apps.sale.queries.line_parts import ratio_of
 from apps.sale.queries.other_apps import call_app
 from apps.sale.queries.payment_methods import METHOD_NOT_AVAILABLE, allowed_types, find_method, held_methods
@@ -40,6 +41,9 @@ CASH_REGISTER_CLOSED = _(
 )
 ADDED_AMOUNT_NOT_ACCEPTED = _(
     "This business has no app that adds anything to a charge, such as a tip: charge the sale alone."
+)
+ADDED_AMOUNT_NOT_ALLOWED = _(
+    "You have no permission to add anything to a charge, such as a tip: charge the sale alone."
 )
 
 
@@ -140,11 +144,11 @@ def _check_discounts(  # noqa: PLR0913
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
 
 
-def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
+def _legs(ctx: OperationContext, data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
     """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
     no cash at all when the whole ``operation`` reaches the cash limit. What another app adds to a tender (a tip)
     is charged with it, on top of its amount, but never counts as the sale's."""
-    _refuse_added_amounts(data.payments)
+    _refuse_added_amounts(ctx, data.payments)
     if total == 0:
         if any(leg.amount or leg.extra for leg in data.payments):
             raise Conflict(
@@ -159,12 +163,14 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
     return legs
 
 
-def _refuse_added_amounts(payments: list[PaymentIn]) -> None:
-    """An amount added to a tender is only taken when an active app adds a step to the charge, which records it in
-    its own app too (SALE-F39): otherwise the drawer, the card total and the receipt would hold money nobody accounts
-    for. No app can declare such a step yet, so every added amount is refused."""
-    if any(leg.extra for leg in payments):
-        raise Conflict(str(ADDED_AMOUNT_NOT_ACCEPTED), code="sale.added_amount_not_accepted")
+def _refuse_added_amounts(ctx: OperationContext, payments: list[PaymentIn]) -> None:
+    """An amount added to a tender is only taken when an app on adds a step to the charge of this person, which
+    records it in its own app too (SALE-F39): otherwise the drawer, the card total and the receipt would hold money
+    nobody accounts for. The refusal says whether the business has no such step or this person may not use it."""
+    if not any(leg.extra for leg in payments) or steps_at_the_charge(ctx):
+        return
+    reason = ADDED_AMOUNT_NOT_ALLOWED if declared_steps(ctx.scope) else ADDED_AMOUNT_NOT_ACCEPTED
+    raise Conflict(str(reason), code="sale.added_amount_not_accepted")
 
 
 def _resolved(sent: list[PaymentIn], settings: Settings) -> list[dict]:

@@ -18,7 +18,7 @@ from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.models import OutboxEvent
-from live.operations import INTERNAL, on_commit, on_commit as after_commit, operation
+from live.operations import INTERNAL, atomic, on_commit, on_commit as after_commit, operation
 from live.outbox import notify, record_event
 from live.slugs import validate_hub_slug
 
@@ -39,6 +39,7 @@ from base.schemas.hub_registry import (
     HubStateIn,
     HubStateOut,
 )
+from base.services.address_change import address_changed, forget_address
 from base.services.photo import _sync_verifactu, _sync_whatsapp
 from base.services.provisioning import holds_hub_lease, offboarding_due
 from base.services.sessions import _apply_members, _sync_hub_users, _wake_open_apps
@@ -82,7 +83,7 @@ def _slug_taken() -> Conflict:
     output=HubRegisterOut,
     ai=INTERNAL,
 )
-def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:  # noqa: C901
+def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
     """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``requested``, with a database of
     its own to make (never control's), due in the worker's ``hub_due``.
 
@@ -91,20 +92,13 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:  # noqa: C
     never comes back (``hub_purged``). The worker clones its database (``base.tenancy.provision``) and the SaaS hears
     ``ready`` from it; an update of a hub still being prepared keeps it due (a failed one is tried again now), and
     one of a ready hub, idempotent, says nothing.
+
+    At another slug, the business opens there as it was (``base.services.address_change``).
     """
     internal_only(ctx)
-    try:
-        slug = validate_hub_slug(data.slug)
-    except ValueError as invalid:
-        raise InvalidPayload(
-            gettext("This address cannot name a business (%(reason)s).") % {"reason": invalid},
-            code="base.slug_invalid",
-        ) from None
-    if Hub.objects.filter(slug=slug).exclude(pk=data.id).exists():
-        raise _slug_taken()
     now = timezone.now()
     fields = {
-        "slug": slug,
+        "slug": _free_slug(data),
         "name": data.name,
         "country": data.country,
         "timezone": data.timezone,
@@ -114,24 +108,12 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:  # noqa: C
     hub = Hub.objects.select_for_update().filter(pk=data.id).first()
     created = hub is None
     if created:
-        try:
-            with transaction.atomic():
-                hub = Hub.objects.create(
-                    id=data.id,
-                    status=Hub.Status.REQUESTED,
-                    db_name=database_names.hub_db_name(control_name(), data.id),
-                    **fields,
-                )
-        except IntegrityError:
-            # A concurrent call took the slug, or registered this same id first (then it is an update).
-            hub = Hub.objects.select_for_update().filter(pk=data.id).first()
-            if hub is None:
-                raise _slug_taken() from None
-            created = False
+        hub, created = _requested(data.id, fields)
     if not created:
         _refuse_purged(hub)
         if hub.status in LEFT_STATUSES:
             raise Conflict(gettext("This hub was cancelled: restore it first."), code="base.hub_cancelled")
+        former = hub.slug
         for field, value in fields.items():
             setattr(hub, field, value)
         if hub.status in registry.PREPARING_STATUSES and not hub.db_name:
@@ -140,11 +122,7 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:  # noqa: C
         if hub.status == Hub.Status.FAILED:
             # The SaaS asks again: the next attempt is now, not at the end of its wait.
             hub.next_attempt_at = now
-        try:
-            with transaction.atomic():
-                hub.save()
-        except IntegrityError:
-            raise _slug_taken() from None
+        _save_at_its_address(hub, former)
     if hub.status in registry.PREPARING_STATUSES:
         HubDue.mark_due(hub, now)
     record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": hub.slug, "created": created})
@@ -152,6 +130,49 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:  # noqa: C
     # name, zone or language changed on erplora.com shows without reloading, after the COMMIT as the photo's.
     transaction.on_commit(partial(notify, Scope("host", hub.slug), [events.HUB_REGISTERED]), robust=True)
     return {**hub_answer(hub), "created": created}
+
+
+def _free_slug(data: HubRegistryIn) -> str:
+    """The slug ``data`` asks for, one a business may have and no other hub has."""
+    try:
+        slug = validate_hub_slug(data.slug)
+    except ValueError as invalid:
+        raise InvalidPayload(
+            gettext("This address cannot name a business (%(reason)s).") % {"reason": invalid},
+            code="base.slug_invalid",
+        ) from None
+    if Hub.objects.filter(slug=slug).exclude(pk=data.id).exists():
+        raise _slug_taken()
+    return slug
+
+
+def _requested(hub_id: UUID, fields: dict) -> tuple[Hub, bool]:
+    """The new hub ``hub_id``, ``requested``, and that it is new; its row and that it is not, if a concurrent call
+    registered it first."""
+    try:
+        with atomic():
+            hub = Hub.objects.create(
+                id=hub_id,
+                status=Hub.Status.REQUESTED,
+                db_name=database_names.hub_db_name(control_name(), hub_id),
+                **fields,
+            )
+    except IntegrityError:
+        hub = Hub.objects.select_for_update().filter(pk=hub_id).first()
+        if hub is None:
+            raise _slug_taken() from None
+        return hub, False
+    forget_address(hub.slug)
+    return hub, True
+
+
+def _save_at_its_address(hub: Hub, former: str) -> None:
+    try:
+        with atomic():
+            hub.save()
+    except IntegrityError:
+        raise _slug_taken() from None
+    address_changed(hub, former)
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
