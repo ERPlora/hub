@@ -9,7 +9,7 @@ from live.context import OperationContext
 from live.errors import Conflict, OperationError
 from live.operations import atomic, operation
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.sale.models import Order
 from apps.table import events
 from apps.table.models import SessionMove, TableSession

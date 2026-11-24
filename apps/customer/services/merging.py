@@ -19,13 +19,9 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.queries import (
-    CUSTOMER_UNAVAILABLE,
-    CUSTOMER_UNAVAILABLE_CODE,
-    find_customer,
-    health_consent,
-    load_detail,
-)
+from apps.customer.queries.cards import load_detail
+from apps.customer.queries.health import health_consent
+from apps.customer.queries.reads import CUSTOMER_UNAVAILABLE, CUSTOMER_UNAVAILABLE_CODE, find_customer
 from apps.customer.schemas.cards import CustomerDetailOut
 from apps.customer.schemas.merging import MergeIn
 from apps.customer.services.writes import _actor, lock_rows
