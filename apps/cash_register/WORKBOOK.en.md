@@ -143,7 +143,7 @@ itself"), Movements (how many), Opening float, Sales (all payment methods) and, 
 sales and Sales with other payment methods (this one only if there were any), Refunds, Cash in, Cash out,
 Comps, Expected, Counted and Difference, and the opening and closing notes. Comps go at their cost: whoever does not
 see the costs sees them as "—". With the Tips app turned on, also
-"Cash tips", "Card tips" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
+"Tips in cash", "Tips by card" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
 and Difference show "—". Below, two tables, from the most recent to the oldest, 50 per page and as cards
 on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept) and **Counts** (When,
 Count type, Total counted, Notes). Empty: "No movements in this session." and "No counts in this
@@ -190,7 +190,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05); the drawer chosen by itself and the cash the closing proposes from the last count are no change.
 
 ## Flows
-<!-- from WORKBOOK.md sha256:eb92de5f16db -->
+<!-- from WORKBOOK.md sha256:6091833ffd8f -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -211,7 +211,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
-| CASH_REGISTER-F18 | See the tips in the cash register | common | not done |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | partial — showing them in the Session detail and in the "Close session" window is missing |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 <!-- from WORKBOOK.md sha256:0654bfa2fb50 -->
@@ -317,7 +317,7 @@ sales) and the charge appears in F17.
 Involved: SALE-F08
 
 ### CASH_REGISTER-F05 Record cash in or cash out
-<!-- from WORKBOOK.md sha256:7e43b0410fbc -->
+<!-- from WORKBOOK.md sha256:157ae90e7a17 -->
 Status: done
 Vertical: common
 Actor: employee, manager, administrator, assistant
@@ -331,7 +331,8 @@ Steps:
    out as negative) and the expected cash goes up or down.
 In: type, amount and concept. From the screen the method is always cash; the assistant or the API can
 also record card, transfer or other, which show in the list and in "Cash in" or "Cash out" but do not
-count towards the expected cash.
+count towards the expected cash. What another app records as its own (Tips) shows in the list, but not in
+"Cash in" or "Cash out": it has lines of its own (F18).
 Out: the movement, in the name of whoever records it (announces: `cash_register.movement.added`). The
 sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
@@ -612,7 +613,7 @@ If it fails: with no open session, the refund shows in "Sale lines in no shift".
 Involved: SALE-F31
 
 ### CASH_REGISTER-F16 Print the session report (X or Z)
-<!-- from WORKBOOK.md sha256:034601860eab -->
+<!-- from WORKBOOK.md sha256:442b1d12b7cf -->
 Status: done
 Vertical: common
 Actor: manager, administrator, employee
@@ -625,8 +626,8 @@ Steps:
    closing (Z)".
 3. The paper carries the session number with its X or its Z, who opened it (X) or closed it (Z; "Closed by
    itself" if it closed by itself), named as in the detail, the float, the expected cash and, line by line, the sales by payment
-   method, refunds, cash in, cash out, comps (only if whoever prints sees the costs), the expected cash and, in
-   the Z, the counted cash and the discrepancy.
+   method, refunds, cash in, cash out, comps (only if whoever prints sees the costs), the tips, the expected cash
+   and, in the Z, the counted cash and the discrepancy.
 4. With Printing not on or with no active receipt printer, the device's print dialog shows with the same
    report (in the queue it would wait forever): the browser's or, in the installed app, its print screen
    (the system's dialog, with the printer or "Save as PDF"), titled with the report and the session ("Cash
@@ -669,8 +670,9 @@ If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
-<!-- from WORKBOOK.md sha256:e8dd3e436ba3 -->
-Status: not done — the Cash register does not tell yet what another app records (hub#1499)
+<!-- from WORKBOOK.md sha256:c92c3b506b37 -->
+Status: partial — the Cash register already tells what another app records and the X or Z report prints it apart;
+showing it in the Session detail and in the "Close session" window is missing (hub#1499)
 Vertical: common
 Actor: system, employee, manager
 Screen: Cash register, Session detail
@@ -679,12 +681,14 @@ Steps:
    (TIP-F12).
 2. Without anyone typing anything, the open session gets its line: "Tip" in cash or by card, or "Tips paid
    out" in cash, with the sale or the person in the concept.
-3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Cash
-   tips", "Card tips" (and with other payment methods, if there were any) and "Tips paid out".
+3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Tips in
+   cash", "Tips by card" (and with other payment methods, if there were any) and "Tips paid out". A tip by card or
+   with another payment method that is lowered comes off its line; "Tips paid out" is what left the drawer in cash.
+   With the blind count, whoever does not see the expected cash does not see them, as the other figures (F07).
 4. Only cash touches the expected cash: a cash tip raises it (it is in the drawer) and a tip paid out in cash
    lowers it (it left the drawer); a card tip does not. That way the count squares at closing (F09).
-5. The X or Z report (F16) carries the same three lines, and the "Close session" window counts the cash tips
-   in "Expected in the drawer".
+5. The X or Z report (F16) carries the same lines, just before the expected cash, and the "Close session" window
+   counts the cash tips in "Expected in the drawer".
 In: the cash in and cash out that Tips records in the open session, marked as its own
 (`cash_register.movement.add`).
 Out: the lines in the session (announces: `cash_register.movement.added`), with the name of the app that
@@ -707,7 +711,7 @@ changes, by its name, never by its internal code; it reads them with the permiss
 it names none to whoever may not see the sessions.
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:2caeb35b290a -->
+<!-- from WORKBOOK.md sha256:2a8dc68f31c7 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -716,7 +720,7 @@ it names none to whoever may not see the sessions.
 | One drawer by its id, active or not: its name (the one the assistant's confirmation says) | view sessions | F02, F03 | `cash_register.register.get` |
 | The sessions, from the most recent to the oldest (or by when they were closed), with search by number, filters (status, number, drawer, dates and amounts) and pages | view sessions | F03, F09, F12 | `cash_register.session.list` |
 | The open session with its expected cash (if whoever asks may see it), whether the cash register is turned on and the sale lines in no shift (how many and their cash) | view sessions | F04, F10, F12, F17 | `cash_register.session.current` |
-| A session (by id or number) with its summary: sales by payment method, refunds, cash in, cash out, comps, expected, counted and difference | view sessions | F11, F16 | `cash_register.session.get` |
+| A session (by id or number) with its summary: sales by payment method, refunds, cash in, cash out, what other apps record (tips), comps, expected, counted and difference | view sessions | F11, F16, F18 | `cash_register.session.get` |
 | The movements of a session (or the sale lines in no shift), with search, filters and pages; with the blind count, to whoever cannot see the expected cash, only those recorded by hand in the open session | view movements | F07, F11, F17 | `cash_register.movement.list` |
 | The counts of a session, with pages | view counts | F06, F09, F11 | `cash_register.count.list` |
 | The close's summary of a session (the open one if none is said) with the counted cash: its number, the counted cash and, if whoever asks may see it, the expected cash and the difference, and what the shift review finds open; it closes nothing | close | F08, F09 | `cash_register.session.closing_summary` |
@@ -740,7 +744,7 @@ All of them can be followed live.
 | Prints the X or Z report of a session on the receipt printer; without an active receipt printer, it fails and says why, and the screen prints it on the device | view sessions | F16 | `cash_register.session.print` |
 
 ### What it announces
-<!-- from WORKBOOK.md sha256:d492c957ba53 -->
+<!-- from WORKBOOK.md sha256:4ac960fe41ee -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -749,7 +753,7 @@ All of them can be followed live.
 | Drawer changed | Renaming, deactivating or activating it | Which one | `cash_register.register.updated` |
 | Session opened | Opening | The session, its number, the float and who | `cash_register.session.opened` |
 | Session closed | Closing (by hand or by itself) | The session, its number, expected, counted, difference and whether it closed by itself | `cash_register.session.closed` |
-| Movement recorded | Recording cash in or cash out | The session, the type, the amount and the method | `cash_register.movement.added` |
+| Movement recorded | Recording cash in or cash out | The session, the type, the amount, the method and the app that records it (empty if by hand) | `cash_register.movement.added` |
 | Count registered | Registering a count | The session, the type and the total | `cash_register.count.added` |
 
 ### What it reacts to
