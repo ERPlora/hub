@@ -135,7 +135,7 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:75aa08a8a0a6 -->
+<!-- from WORKBOOK.md sha256:26c3f8b6b683 -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
@@ -151,15 +151,16 @@ The table's buttons: **+** (create), import CSV and export CSV, each one only fo
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
 physical products) and "Edit". In the "⋮" menu: "Details" (the same card that tapping the row
 opens), "Write off stock" (also, only on items with stock control), "Mark sold out" or, if it already
-is, "Put back on sale" (for whoever can change products) and "Delete". Tapping the row opens the
+is, "Put back on sale", "Hide from website" or, if it already is, "Show on website" (these two pairs, for whoever
+can change products) and "Delete". Tapping the row opens the
 product's card. If the row has no room, the ones in sight go to the "⋮" too.
 
 The **+** and "Edit" open the form's side panel: Name, SKU (locked when editing: "The SKU is the
 product's identity: it is not edited"), Price, "Cost (<currency>)", "Initial stock" (only when
 creating), "Low stock threshold", "EAN-13", "Description", "Type" ("Physical" or "Service", only when
 creating), the "Track stock for this item" box with its note, "Unit of measure", "Tax category"
-("Pick a tax category") and "Categories" (if there are any), and "Save" / "Save changes"
-("Saving…").
+("Pick a tax category"), "Categories" (if there are any) and the "Show on website" box (ticked when
+creating), and "Save" / "Save changes" ("Saving…").
 
 The item's photo (INVENTORY-F30 to F32): the table has the "Photo" column, before the name, with the
 photo's thumbnail or the initials over its colour, and the cards their "Photo" line; the product's card
@@ -175,8 +176,9 @@ Empty: "No products". Loading: "Loading…". Error: the table's notice with "Ret
 form shows inside the panel; that of a row action, above the table.
 
 #### Product card
-<!-- from WORKBOOK.md sha256:4e298c94e5ab -->
-Window with the product's name: SKU, Price, Stock and Status ("Yes · Sold out" if it is sold out); the
+<!-- from WORKBOOK.md sha256:8b09d28b06ff -->
+Window with the product's name: SKU, Price, Stock, Status ("Yes · Sold out" if it is sold out) and "Website"
+("Shown" or "Hidden"); the
 SKU's barcode on a white plate with the SKU below; "Print barcode" and, with stock permission and on a
 physical product, "Receive stock" and "Count stock", and "Write off stock" if the item tracks its
 stock; with permission to change products, "Mark sold out" or "Put back on sale". A failure when
@@ -285,7 +287,7 @@ When creating and editing a product, "Cancel" ("Cancel editing"), the panel's "�
 same, in the browser too (hub#1023).
 
 ## Flows
-<!-- from WORKBOOK.md sha256:72a7dd0f66f5 -->
+<!-- from WORKBOOK.md sha256:ee1afee5af32 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -301,6 +303,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
 | INVENTORY-F35 | Declare a product's allergens | done |
+| INVENTORY-F36 | Show or hide a product on the website | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -1009,7 +1012,7 @@ The unit of a product with stock is not changed.
 Involved: SALE-F10
 
 ### INVENTORY-F27 Hand the catalog to the till, to Kitchen and to Menus
-<!-- from WORKBOOK.md sha256:057801b104fd -->
+<!-- from WORKBOOK.md sha256:be8537894c61 -->
 Status: done
 Actor: system
 Screen: none
@@ -1019,8 +1022,8 @@ Steps:
    the whole sales catalog: price, cost, tax category, unit, allergens and whether each item has stock
    control.
 2. Kitchen asks for the products and the categories to choose what it sends to each station. Website asks
-   for the same sales catalog for its menu, with each product's description, photo and allergens
-   (WEBSITE-F05).
+   for the same sales catalog for its menu, with each product's description, photo and allergens, and only
+   the ones the business shows there (INVENTORY-F36, WEBSITE-F05).
 3. Menus asks for the products that can be set as a component: the active ones, also those sold out
    today (a menu is built with them); when selling, it does not offer a choice whose product is sold out.
 4. Without Inventory active, the till says so on the grid ("Inventory is not active, so there is no
@@ -1037,7 +1040,7 @@ that cannot be completed without that item leaves the till (COMBO-F12). The sale
 stock: the till neither shows nor checks how many units are left.
 If it fails: whoever asks decides. Sales refuses a catalog line if it cannot read the sales catalog and
 warns on the till if Inventory is active and does not answer; Kitchen is left without routing options.
-Involved: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, WEBSITE-F05
+Involved: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, INVENTORY-F36, WEBSITE-F05
 
 ### INVENTORY-F28 Complete the first step "Your catalog"
 <!-- from WORKBOOK.md sha256:43a7d50e4571 -->
@@ -1278,6 +1281,32 @@ of the form.
 Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
 KITCHEN-F32
 
+### INVENTORY-F36 Show or hide a product on the website
+<!-- from WORKBOOK.md sha256:b47ee2758a6e -->
+Status: done
+Actor: administrator, manager, assistant, API
+Screen: Products, Product card
+Steps:
+1. A product is sold at the till but must not appear on the menu of the business's website (the staff meal, a dish
+   only offered at the bar). In **Products**, in its row's "⋮" menu, tap "Hide from website", or open "Edit" and
+   untick the "Show on website" box: under it the note "Your website’s catalog leaves it out; the till still sells
+   it." appears. Press "Save changes".
+2. When creating a product the box comes ticked: it shows on the website unless you untick it.
+3. The product's card says "Website: Shown" or "Hidden".
+4. To bring it back, tap "Show on website" in its row's "⋮" or tick the box again.
+In: the product (by the screen, or by its SKU or its name from the assistant or the API, which do it with the same
+change of the product, INVENTORY-F02, and the same permissions: "hide the product Coffee from the website" asks for
+the confirmation card first) and whether it shows or not.
+Out: the product with the mark; Inventory announces the change (`inventory.product.updated`, with `show_on_website`).
+The website's menu (WEBSITE-F05) leaves the hidden products out, also in the preview, and they take no room among its
+200 items; the published page shows it on the next visit, within a minute at most. The till, Kitchen and Menus do not
+change: a hidden product is still sold, and selling it out or turning it off does not remove the mark. The products
+that already existed show on the website, as before. Recovering the business from a separate copy (BASE-F114) gives
+each product back with its mark.
+If it fails: the reason shows above the table or inside the form ("The product could not be updated" or the one the
+app gives). Whoever cannot change products sees the card's line, but not the actions nor the form.
+Involved: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F114
+
 ## What the verticals share
 <!-- from WORKBOOK.md sha256:ddaf4af257f8 -->
 
@@ -1367,12 +1396,12 @@ assistant says which one is not there (in a goods receipt, on which line) or ask
 | Saves the settings | manage settings | one tap | F19 | `inventory.config.update` |
 
 ### What it announces (for the apps that want to react)
-<!-- from WORKBOOK.md sha256:6219e046ba2b -->
+<!-- from WORKBOOK.md sha256:2567a13b12b4 -->
 
 | Notice | When | What it carries | Who uses it | Service |
 |---|---|---|---|---|
 | New product | Created on screen, import, template, assistant or API | The product and its categories | Flows; Home's panels | `inventory.product.created` |
-| Product changed | Change, turn on or off, mark sold out or put back on sale | The product as it is left, also whether it is sold out | Flows; Home's panels; the till, Kitchen and Menus | `inventory.product.updated` |
+| Product changed | Change, turn on or off, mark sold out or put back on sale, show or hide on the website | The product as it is left, also whether it is sold out and whether the website shows it | Flows; Home's panels; the till, Kitchen and Menus | `inventory.product.updated` |
 | Product deleted | Delete | Which one it was (SKU and name) | Flows; Home's panels | `inventory.product.deleted` |
 | Product recovered | Recover a deleted product (also its repetition) | The product as it comes back | Flows; Home's panels | `inventory.product.restored` |
 | Product added to a category | Creation, change or a single link | Product and category | Flows | `inventory.product.categorized` |

@@ -52,6 +52,8 @@ ProductCost = Annotated[
     int | None,
     Field(description="Cost in cents; null for whoever does not see the costs.", json_schema_extra={"money": True, **COSTS}),
 ]
+SHOW_ON_WEBSITE = gettext_noop("Show on website")
+SHOWN_ON_WEBSITE = "Whether the website's catalog shows it; off, the till still sells it."
 Name = _text(200, 1)
 Sku = _text(64, 1)
 Ean13 = _text(13)
@@ -126,6 +128,9 @@ class ProductListIn(PageIn, ProductFiltersIn):
 
 class ForSaleListIn(PageIn):
     search: ProductSearch = None
+    show_on_website: bool | None = Field(
+        None, description="Only the ones the business shows (true) or hides (false) on its website; the till asks none."
+    )
 
 
 class ProductIn(AllergensIn):
@@ -184,6 +189,7 @@ class ProductIn(AllergensIn):
     is_active: bool = Field(
         True, description="Whether it is on sale; one created inactive stays out of the till until it is activated."
     )
+    show_on_website: bool = Field(True, title=SHOW_ON_WEBSITE, description=SHOWN_ON_WEBSITE)
 
 
 class ProductRecoverIn(ProductIn, ImageInCopyIn):
@@ -229,6 +235,7 @@ class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     track_stock: bool | None = Field(
         None, description="Track (true) or stop tracking (false) its stock."
     )
+    show_on_website: bool | None = Field(None, title=SHOW_ON_WEBSITE, description=SHOWN_ON_WEBSITE)
     category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] | None = Field(
         None,
         max_length=MAX_BATCH,
@@ -266,6 +273,7 @@ class ProductOut(AllergensOut):
     is_sold_out: bool = Field(
         description="Sold out («86»): still active, but the till does not offer it until it is back on sale."
     )
+    show_on_website: bool = Field(description=SHOWN_ON_WEBSITE)
     category_ids: list[UUID] = Field(description="Its categories.")
     image: str = Field(
         description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
@@ -304,6 +312,7 @@ class SaleProductOut(AllergensOut):
     price_quantity: Decimal = Field(description="Quantity the price refers to.")
     pricing_unit: UnitCode = Field(description="Unit the price refers to.")
     tracks_stock: bool = Field(description="Whether a sale lowers its stock.")
+    show_on_website: bool = Field(description=SHOWN_ON_WEBSITE)
     image: str = Field(
         description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
         "or empty."

@@ -18,6 +18,7 @@ from live.operations import get
 from base import events, relay
 from base.services import relay_runs
 from base.models.relay import EventDelivery
+from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tests.routes import assert_bound
 from base.tests.test_queries_home import listen
@@ -39,8 +40,7 @@ def run(name, context=None, **data):
 
 
 def dead(scope=A, app="invoice", name="sale.sale.completed", status=EventDelivery.Status.DEAD):
-    """A delivery the relay gave up on, in the business at work; one with another business's scope stands for a row no
-    command of this business may touch."""
+    """A delivery the relay gave up on, in the business at work."""
     outbox_event = OutboxEvent.objects.create(
         scope_kind=scope.kind, scope_key=scope.key, name=name, delivered_at=timezone.now()
     )
@@ -114,15 +114,17 @@ def test_only_a_failed_event_is_resent(status):
         run("base.failed_event.retry", id=str(delivery.id))
 
 
-def test_another_hubs_failed_event_is_not_found_and_left_alone():
-    delivery = dead(B)
+def test_another_hubs_failed_event_is_not_found_and_left_alone(hub_b):
+    with use_hub(hub_b):
+        delivery = dead(B)
 
     with pytest.raises(NotFound):
         run("base.failed_event.retry", id=str(delivery.id))
     with pytest.raises(NotFound):
         run("base.failed_event.discard", id=str(delivery.id))
 
-    delivery.refresh_from_db()
+    with use_hub(hub_b):
+        delivery.refresh_from_db()
     assert delivery.status == "dead"
 
 
@@ -157,21 +159,25 @@ def test_a_cashier_cannot_resend_nor_discard():
 # ── Resend all ───────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_resending_all_resends_every_failed_event_of_this_hub_that_can_be(monkeypatch):
+def test_resending_all_resends_every_failed_event_of_this_hub_that_can_be(monkeypatch, hub_b):
     monkeypatch.setattr("base.entitlement.blocked_apps", lambda scope: frozenset({"kitchen"}))
     mine = [dead() for _ in range(120)]  # more than the list shows
     stuck = dead(app="kitchen")
     discarded = dead(status=EventDelivery.Status.DISCARDED)
-    theirs = dead(B)
+    with use_hub(hub_b):
+        theirs = dead(B)
 
     assert run("base.failed_event.retry_all") == {"count": 120}
 
     assert set(EventDelivery.objects.filter(pk__in=[d.pk for d in mine]).values_list("status", flat=True)) == {
         "pending"
     }
-    for delivery, status in ((stuck, "dead"), (discarded, "discarded"), (theirs, "dead")):
+    for delivery, status in ((stuck, "dead"), (discarded, "discarded")):
         delivery.refresh_from_db()
         assert delivery.status == status
+    with use_hub(hub_b):
+        theirs.refresh_from_db()
+    assert theirs.status == "dead"
     assert recorded(events.FAILED_EVENT_RETRIED) == [(A.key, {"count": 120})]
 
 

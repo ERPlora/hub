@@ -23,7 +23,7 @@
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 468 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
-555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
+521 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1057 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
 462 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -38,7 +38,6 @@
 597 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
 699 apps/pricing/schemas/__init__.py ERPlora/erplora-next#74
-1015 apps/pricing/services.py ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
 742 apps/printing/queries/__init__.py ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74

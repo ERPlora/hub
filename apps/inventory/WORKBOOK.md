@@ -154,15 +154,16 @@ Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno 
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
 solo en productos físicos) y «Editar». En el menú «⋮»: «Detalles» (la misma ficha que abre tocar la
 fila), «Dar de baja stock» (además, solo en artículos con control de stock), «Marcar agotado» o, si
-ya lo está, «Volver a poner a la venta» (para quien puede cambiar productos) y «Eliminar». Tocar la
+ya lo está, «Volver a poner a la venta», «Ocultar de la página web» o, si ya lo está, «Mostrar en la página web»
+(estos dos pares, para quien puede cambiar productos) y «Eliminar». Tocar la
 fila abre la ficha. Si la fila no tiene sitio, también los de la vista pasan al «⋮».
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
 SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
 crear), «Umbral stock bajo», «EAN-13», «Descripción», «Tipo» («Físico» o «Servicio», solo al
 crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad de medida», «Categoría
-fiscal» («Elige una categoría fiscal») y «Categorías» (si hay alguna), y «Guardar» / «Guardar
-cambios» («Guardando…»).
+fiscal» («Elige una categoría fiscal»), «Categorías» (si hay alguna) y la casilla «Mostrar en la página web»
+(marcada en un alta), y «Guardar» / «Guardar cambios» («Guardando…»).
 
 La foto del artículo (INVENTORY-F30 a F32): la tabla lleva la columna «Foto», delante del nombre, con la
 miniatura de la foto o las iniciales sobre su color, y las tarjetas su línea «Foto»; la ficha la enseña
@@ -177,7 +178,8 @@ Vacía: «Sin productos». Cargando: «Cargando…». Error: el aviso de la tabl
 rechazo del formulario sale dentro del panel; el de una acción de fila, encima de la tabla.
 
 #### Ficha del producto
-Ventana con el nombre del producto: SKU, Precio, Stock y Estado («Sí · Agotado» si está agotado); el
+Ventana con el nombre del producto: SKU, Precio, Stock, Estado («Sí · Agotado» si está agotado) y «Página web»
+(«Visible» u «Oculto»); el
 código de barras del SKU en una placa blanca con el SKU debajo; «Imprimir código de barras» y, con
 permiso de stock y en un producto físico, «Recibir stock» y «Contar stock», y «Dar de baja stock» si
 el artículo controla su stock; con permiso para cambiar productos, «Marcar agotado» o «Volver a poner
@@ -292,6 +294,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
 | INVENTORY-F35 | Declarar los alérgenos de un producto | hecho |
+| INVENTORY-F36 | Mostrar u ocultar un producto en la página web | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -990,8 +993,8 @@ Pasos:
    catálogo de venta entero: precio, coste, categoría fiscal, unidad, alérgenos y si cada artículo lleva
    control de stock.
 2. Cocina pide los productos y las categorías para elegir qué envía a cada estación. La Página web pide el
-   mismo catálogo de venta para su carta, con la descripción, la foto y los alérgenos de cada producto
-   (WEBSITE-F05).
+   mismo catálogo de venta para su carta, con la descripción, la foto y los alérgenos de cada producto, y solo
+   los que el negocio enseña en ella (INVENTORY-F36, WEBSITE-F05).
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
 4. Sin Inventario activo, el TPV lo dice en la rejilla («Inventario no está activa, así que no hay
@@ -1008,7 +1011,7 @@ enseña ni comprueba cuántas unidades quedan.
 Si falla: lo decide quien pide. Ventas rechaza una línea de catálogo si no puede leer el catálogo de
 venta y avisa en el TPV si Inventario está activo y no contesta; Cocina se queda sin opciones de
 reparto.
-Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, WEBSITE-F05
+Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, INVENTORY-F36, WEBSITE-F05
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
 Estado: hecho
@@ -1240,6 +1243,31 @@ resto del formulario.
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
 KITCHEN-F32
 
+### INVENTORY-F36 Mostrar u ocultar un producto en la página web
+Estado: hecho
+Actor: administrador, responsable, asistente, API
+Pantalla: Productos, Ficha del producto
+Pasos:
+1. Un producto se vende en el TPV pero no tiene que salir en la carta de la página web del negocio (la comida del
+   personal, un plato que solo se ofrece en la barra). En **Productos**, en el menú «⋮» de su fila, toca «Ocultar de
+   la página web», o abre «Editar» y desmarca la casilla «Mostrar en la página web»: debajo sale la nota «El
+   catálogo de tu página web no lo enseña; el TPV lo sigue vendiendo.». Pulsa «Guardar cambios».
+2. Al dar de alta un producto la casilla sale marcada: se ve en la página web salvo que la desmarques.
+3. La ficha del producto dice «Página web: Visible» u «Oculto».
+4. Para que vuelva a salir, toca «Mostrar en la página web» en el «⋮» de su fila o marca otra vez la casilla.
+Entra: el producto (por la pantalla, o por su SKU o su nombre desde el asistente o la API, que lo hacen con el mismo
+cambio del producto, INVENTORY-F02, y los mismos permisos: «oculta el producto Café de la página web» pide antes la
+tarjeta de confirmación) y si se muestra o no.
+Sale: el producto con la marca; Inventario avisa del cambio (`inventory.product.updated`, con `show_on_website`). La
+carta de la página web (WEBSITE-F05) deja fuera los productos ocultos, también en la vista previa, y no ocupan sitio
+en sus 200 elementos; la página publicada lo refleja en la siguiente visita, como mucho al minuto. El TPV, Cocina y
+Menús no cambian: un producto oculto se sigue vendiendo, y agotarlo o desactivarlo no le quita la marca. Los productos
+que ya existían salen en la página web, como hasta ahora. Recuperar el negocio desde una copia aparte (BASE-F114)
+devuelve cada producto con su marca.
+Si falla: el motivo sale encima de la tabla o dentro del formulario («No se pudo actualizar el producto» o el que dé
+la app). Quien no puede cambiar productos ve la línea de la ficha, pero no las acciones ni el formulario.
+Implicados: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F114
+
 ## Qué comparten los verticales
 
 El restaurante usa Inventario para la carta y la peluquería para los productos de venta, con las
@@ -1329,7 +1357,7 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 | Aviso | Cuándo | Qué lleva | Quién lo usa | Servicio |
 |---|---|---|---|---|
 | Producto nuevo | Alta por pantalla, importación, plantilla, asistente o API | El producto y sus categorías | Flujos; paneles del Inicio | `inventory.product.created` |
-| Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta | El producto como queda, también si está agotado | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
+| Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta, mostrar u ocultar en la página web | El producto como queda, también si está agotado y si la página web lo enseña | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
 | Producto eliminado | Eliminar | Cuál era (SKU y nombre) | Flujos; paneles del Inicio | `inventory.product.deleted` |
 | Producto recuperado | Recuperar un producto eliminado (también la repetición) | El producto como vuelve | Flujos; paneles del Inicio | `inventory.product.restored` |
 | Producto añadido a una categoría | Alta, cambio o enlace suelto | Producto y categoría | Flujos | `inventory.product.categorized` |
@@ -1451,9 +1479,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
   rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
   productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
-  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, no suben esa migración: están en
-  `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo si la tabla de la copia tiene su columna (`pg_attribute`), así
-  que una copia anterior devuelve sus productos sin ellos. Una migración que añada, quite o renombre una columna que
+  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, y si la página web los enseña, de
+  `0007_product_show_on_website`, no suben esa migración: están en `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo
+  si la tabla de la copia tiene su columna (`pg_attribute`), así que una copia anterior devuelve sus productos sin
+  ellos (visibles en la página web). Una migración que añada, quite o renombre una columna que
   se lee cambia también la lectura y su `reads_since`, salvo una columna nueva que pueda faltar en la copia, que va a
   `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
   contrato de `base/tenancy/tests/test_recovery.py`.
@@ -1551,6 +1580,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   (permiso de cambiar productos) reutiliza `inventory.product.updated`, con `is_sold_out` en la carga:
   el TPV, Cocina y Menús re-ejecutan sus consultas sin tocar `live.py`. La ficha (`inventory.product.get`)
   sigue dando el artículo, marcado: es lo que lee Ventas al congelar una línea.
+- **Mostrar en la página web (INVENTORY-F36)**: `Product.show_on_website` (encendido por defecto, también en la base,
+  `db_default`) se cambia con `inventory.product.create` y `inventory.product.update`, sin operación propia, y viaja en
+  `inventory.product.updated`. `list_for_sale` lo devuelve y admite `show_on_website=true|false`: la Página web pide
+  `true`, así que lo oculto no ocupa sitio en su tope de elementos; el TPV no lo pide. Las acciones de la fila, con las
+  de agotado, salen de `frontend/composables/useFlagActions.ts`. No entra en el CSV de importación y exportación, que no
+  lleva ninguna otra marca del producto salvo «Activo» en la exportación, ni en el fichero de «Datos y copias».
 - **Referencia de una venta (INVENTORY-F16, 2026-10-21)**: la nota por venta (`SaleStock`) guarda
   `sale_number` (del aviso `sale.sale.completed`) y `document_number` (el `invoice_number` que da
   `sale.sale.get`, leído como sistema al bajar el stock; vacío si Ventas no lo sabe). `inventory.movement.list`

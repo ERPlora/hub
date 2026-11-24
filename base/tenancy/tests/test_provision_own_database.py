@@ -159,7 +159,7 @@ def test_the_scanner_sees_a_hub_made_with_and_without_its_database():
 def test_every_hub_the_services_make_names_its_own_database_but_the_listed_ones():
     found = [one for module in (HUB_DIR / "base" / "services").glob("*.py") for one in hub_creates(module.read_text())]
 
-    assert {"hub_register", "demo_create", "hub_seed_local"} <= {function for function, _named in found}
+    assert {"_requested", "demo_create", "hub_seed_local"} <= {function for function, _named in found}
     offenders = sorted({function for function, named in found if not named} - set(SHARED_HUB_CREATES))
     assert offenders == [], (
         "A new hub is born with its own database: name its db_name "

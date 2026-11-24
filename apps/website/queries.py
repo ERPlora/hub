@@ -10,7 +10,7 @@
   429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version, language and currency; the
   reviews are those kept (``apps.website.reviews``: a read never asks Google).
 - **The catalog** (``read_catalog``, each item as ``catalog_items`` makes it): Inventory's products on sale (with their
-  photo, description and allergens) or Services' offered services, read by their
+  photo, description and allergens; only those it shows on the website) or Services' offered services, read by their
   operations' names with a context that may read them (as ``apps.flow`` does), only while that app is on in the hub
   (``base.apps_on.active_apps``, the website's own guard); an app that is off or not there leaves the catalog empty,
   never an error.
@@ -546,7 +546,7 @@ def _service_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
 
 
 def _product_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
-    """Inventory's products on sale under each of their categories, in the categories' order; those without one last."""
+    """Inventory's products on sale that it shows on the website, by category in their order; without one, last."""
     categories = _product_categories(ctx)
     order = {str(row.id): position for position, row in enumerate(categories)}
     names = {str(row.id): row.name for row in categories}
@@ -554,7 +554,7 @@ def _product_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
     for link in _rows(ctx, "inventory.product_category.list", limit=MAX_ITEMS * 5):
         links.setdefault(str(link.product_id), []).append(str(link.category_id))
     grouped: dict[str, tuple[str, list[dict]]] = {}
-    for row in _rows(ctx, "inventory.product.list_for_sale"):
+    for row in _rows(ctx, "inventory.product.list_for_sale", show_on_website=True):
         item = product_item(row)
         for category_id in [cid for cid in links.get(str(row.id), []) if cid in names] or [""]:
             grouped.setdefault(category_id, (names.get(category_id, ""), []))[1].append(item)

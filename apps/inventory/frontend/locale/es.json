@@ -77,6 +77,8 @@
         "edit": "Editar",
         "soldOut": "Marcar agotado",
         "backOnSale": "Volver a poner a la venta",
+        "hideFromWebsite": "Ocultar de la página web",
+        "showOnWebsite": "Mostrar en la página web",
         "delete": "Eliminar",
         "printLabel": "Imprimir código de barras"
       },
@@ -93,7 +95,10 @@
       },
       "photo": "Foto",
       "allergens": "Alérgenos",
-      "noAllergens": "Sin alérgenos declarados"
+      "noAllergens": "Sin alérgenos declarados",
+      "website": "Página web",
+      "websiteShown": "Visible",
+      "websiteHidden": "Oculto"
     },
     "form": {
       "newTitle": "Nuevo producto",
@@ -116,6 +121,8 @@
       "trackStock": "Controlar stock de este artículo",
       "trackInherit": "Sigue el ajuste del hub",
       "trackOff": "Solo catálogo: las ventas no mueven su stock",
+      "showOnWebsite": "Mostrar en la página web",
+      "showOnWebsiteOff": "El catálogo de tu página web no lo enseña; el TPV lo sigue vendiendo.",
       "unit": "Unidad de medida",
       "categories": "Categorías",
       "categoriesSearch": "Busca una categoría para añadirla",

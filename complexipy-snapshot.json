@@ -202,13 +202,19 @@
     ]
   },
   {
-    "path": "apps/pricing/services.py",
-    "file_name": "services.py",
+    "path": "apps/pricing/services/price_lists.py",
+    "file_name": "price_lists.py",
     "functions": [
       {
         "name": "update_price_list",
         "complexity": 21
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/pricing/services/rules.py",
+    "file_name": "rules.py",
+    "functions": [
       {
         "name": "update_rule",
         "complexity": 22
@@ -713,10 +719,6 @@
     "path": "base/services/hub_registry.py",
     "file_name": "hub_registry.py",
     "functions": [
-      {
-        "name": "hub_register",
-        "complexity": 22
-      },
       {
         "name": "hub_seed_local",
         "complexity": 23
