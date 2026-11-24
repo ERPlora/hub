@@ -498,7 +498,11 @@ names, the other sections whose content changes («Content: Header, Contact»). 
   `inventory.product_category.list`,
   `service.service.list_for_sale`, `service.category.list`; INVENTORY-F27 and SERVICE-F10), with a context that can
   only read them; with the app off or without it, the catalog comes out empty, never an error, and the editor says
-  so.
+  so. Each item is put together by `catalog_items` (`product_item`, `service_item`): of the product, its `description`,
+  its `image_url` and the codes of its `allergens`, which the published copy keeps as they are; `render.catalog_view`
+  writes `allergens_label` when painting («Allergens: Gluten, Milk», with the names of `base.allergens` in the visitor's
+  language). A copy published before the photos is painted without them until the next live read. A product's own photo
+  is served to anyone by `/p/media/` (Inventory's `public_media`).
 - From the platform: the hub's registry (its id, for the file store; `base.operations.hub_id`), the store
   `storages["hub_files"]` and the `/p/media/…` view (`base.storage`, `base.media`), the per-visitor limit
   (`base.throttle`) and the `/` entry (`base.public_home`, which calls the app's provider).

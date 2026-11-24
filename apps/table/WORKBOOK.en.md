@@ -751,7 +751,7 @@ Out: the table check "Closed" with its time (announces: `table.session.closed`).
 If it fails: "This table's bill is still open in Sales: charge it, move it to another table or delete it
 from the till."; "This table's bill has changed. Reload the list and try again." (another device
 changed its check); "That check is not open…" (someone else already closed it).
-Involved: TABLE-F18, TABLE-F20
+Involved: TABLE-F15, TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Look up the checks of the room (open and closed)
 <!-- from WORKBOOK.md sha256:16f65a1f7e79 -->
@@ -1116,7 +1116,7 @@ What Reservations sends when it calls (the same names as its notices `status_cha
   (`sale.order.set_label`), splits it (`sale.order.split`), joins it (`sale.order.merge`) and voids the
   empty check of a table that is closed (`sale.order.void`), always calling its operations with the
   session of whoever is in the room and in the same transaction. It reads from its models the status of
-  each check, its lines and what was charged.
+  each check, its lines, who serves it and what was charged.
 - **Customers** (requirement): the customer of the check (`customer.order.link`, its model `OrderLink`
   to paint it) and the search by name or phone (`find_customer`).
 
