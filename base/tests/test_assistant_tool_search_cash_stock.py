@@ -1,8 +1,8 @@
 """Phrases about the till, the stock and the devices that the assistant once left without the tool they asked for.
 
-Each one reaches its tool now: either among the twenty tools a turn offers for the phrase's own words, or once the model
-searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what it
-found.
+Each one reaches its tool now: either among the fifteen tools a turn offers for the phrase's own words, or once the
+model searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what
+it found.
 """
 
 import pytest
@@ -23,9 +23,8 @@ MOVEMENT = "cash_register.movement.add"
 RECEIVE = "inventory.stock.receive"
 DEVICE = "printing.device.register"
 
-#: The tools a phrase's own words already bring into the twenty a turn offers.
+#: The tools a phrase's own words already bring into the fifteen a turn offers.
 OFFERED = [
-    pytest.param("es", "retira 50 € de la caja para el banco", (MOVEMENT,), id="live-128-es"),
     pytest.param(
         "es", "saca 2 € de la caja para el pan y saca 2 copias del tique", (MOVEMENT, "sale.sale.print"), id="live-131"
     ),
@@ -48,6 +47,7 @@ OFFERED = [
 
 #: What a phrase's own words leave out, and the task the model searches for then, in English and in Spanish.
 CASH_IN = ("record a cash movement", "apuntar un movimiento de caja")
+TAKE_OUT = ("take money out of the cash register", "sacar dinero de la caja")
 GOODS_IN = ("receive goods", "recibir mercancía")
 NEW_DEVICE = ("register a device", "registrar un dispositivo")
 OPEN_THE_TILL = ("open the cash register", "abrir la caja")
@@ -78,13 +78,8 @@ SEARCHED = [
     ),
     pytest.param("es", "pon una entrada de 50 € de cambio", CASH_IN, MOVEMENT, id="live-162"),
     pytest.param("en", "record that 100 € came in during the shift", CASH_IN, MOVEMENT, id="live-135"),
-    pytest.param(
-        "en",
-        "withdraw 50 € from the register for the bank",
-        ("take money out of the cash register", "sacar dinero de la caja"),
-        MOVEMENT,
-        id="live-128-en",
-    ),
+    pytest.param("es", "retira 50 € de la caja para el banco", TAKE_OUT, MOVEMENT, id="live-128-es"),
+    pytest.param("en", "withdraw 50 € from the register for the bank", TAKE_OUT, MOVEMENT, id="live-128-en"),
     pytest.param(
         "en",
         "put 20 € in the register from this tablet",
