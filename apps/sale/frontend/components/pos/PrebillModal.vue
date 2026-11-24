@@ -6,7 +6,8 @@
 // not an invoice…». No number, no QR, no payment: it consumes nothing. «Print» asks the printing queue
 // first (`sale.order.print_bill`, PRINTING-F09): queued, a toast names the printer; not queued (Printing
 // off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`: inside the
-// installed app, its print screen, hub#455); a failure says so, with the app's reason when it gives one. Its amounts
+// installed app, its print screen, hub#455) and the check notes its bill as asked for (`sale.order.note_bill`,
+// TABLE-F34); a failure says so, with the app's reason when it gives one. Its amounts
 // are the business's money: no paper is painted or printed before the business says it, and a failure to read it
 // says so like the others (hub#936). It values the check while it is mounted: the page mounts it only while the bill
 // is open.
@@ -65,6 +66,7 @@ const taxes = computed(() =>
 const lineName = (line: OrderLineOut) => (line.is_gift ? `${line.name} ${t('sale.pos.giftSuffix')}` : line.name);
 
 const queue = useCommand('sale.order.print_bill');
+const note = useCommand('sale.order.note_bill');
 /** A print on its way: a second press waits for it. */
 const sending = shallowRef(false);
 
@@ -76,10 +78,20 @@ async function print(): Promise<void> {
     if (await queued()) return;
     // Not queued: the device prints the screen's paper (inside the app, its print screen, hub#455).
     await printPaper(element, { title: t('sale.pos.prebillTitle') });
+    await noted();
   } catch (failure) {
     toastError(withReason(t('sale.pos.prebillPrintFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
+  }
+}
+
+/** The device printed the bill: its table shows «Bill requested», as with a printer's bill. */
+async function noted(): Promise<void> {
+  try {
+    await note.run({ order_id: props.order.id });
+  } catch {
+    // Not noted (out of reach, or the check closed meanwhile): the table is marked when the bill is printed again.
   }
 }
 

@@ -85,6 +85,13 @@ class OrderRefIn(Closed):
     order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 
 
+class BillNoteOut(Schema):
+    order_id: UUID = Field(description="The open check.")
+    bill_printed_at: datetime = Field(
+        description="When its bill was first printed: its table shows «Bill requested» until the check is closed."
+    )
+
+
 class OrderAddLineIn(ProductLineIn):
     order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 

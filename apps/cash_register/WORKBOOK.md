@@ -615,7 +615,10 @@ instalada no abre su pantalla de impresión, con el suyo («…: esta versión d
 imprimir; actualízala», «…: el servicio de impresión del dispositivo no se abrió»…). Con el arqueo ciego,
 quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el esperado); en una
 cerrada sí. El informe de una sesión que no ve (la de otro empleado) no se imprime: «Esa sesión de caja no existe.»
-Implicados: CASH_REGISTER-F11, PRINTING-F17
+Si se le pide al asistente («saca el informe X de cómo va la caja»), solo se hace si una impresora de recibos activa
+lo recibe; si no, no se imprime nada y su recibo dice que no se hizo, con el motivo: «Ninguna impresora de recibos
+recibe este informe: abre la sesión para imprimirlo en este dispositivo.».
+Implicados: CASH_REGISTER-F11, PRINTING-F17, BASE-F97
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
 Estado: hecho
@@ -703,7 +706,7 @@ Todas se pueden seguir en vivo.
 | Cierra las sesiones olvidadas al corte del día | cerrar | F10 | `cash_register.session.auto_close` |
 | Apunta una entrada o una salida (también la que apunta otra app, como Propinas, marcada como suya) | apuntar | F05, F18 | `cash_register.movement.add` |
 | Registra un arqueo | contar | F06 | `cash_register.count.add` |
-| Imprime el informe X o Z de una sesión en la impresora de recibos | ver sesiones | F16 | `cash_register.session.print` |
+| Imprime el informe X o Z de una sesión en la impresora de recibos; sin una impresora de recibos activa, falla y dice por qué, y la pantalla lo imprime en el dispositivo | ver sesiones | F16 | `cash_register.session.print` |
 
 ### Lo que avisa
 

@@ -7,6 +7,7 @@ from live.context import OperationContext
 from live.errors import Conflict
 from live.operations import operation
 
+from apps.appointment import assistant_cards
 from apps.appointment import engine
 from apps.appointment.models import Appointment
 from apps.appointment.queries import (
@@ -54,6 +55,7 @@ BATCH_AT = _("%(time)s: %(reason)s")
         "another appointment of the professional, ask the person and send confirm_overlap=true to book anyway. "
         "source=online or whatsapp when the customer books herself.",
         "risk": "normal",
+        "summary": assistant_cards.booking,
     },
 )
 def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict:

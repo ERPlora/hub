@@ -1,6 +1,7 @@
 """Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's
 schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``), a file the person attaches in
-the chat (``AN_ATTACHED_FILE``) and the names it reads (``exactly_one``, ``RecordNameOut``)."""
+the chat (``AN_ATTACHED_FILE``), a file a read hands the person (``A_HANDED_FILE``) and the names it reads
+(``exactly_one``, ``RecordNameOut``)."""
 
 from typing import Annotated, Any, Literal
 
@@ -43,6 +44,11 @@ def unless_given(mark: dict, *data: str) -> dict:
 #: The mark of a datum that takes a whole file in base64 (base/assistant/attachments.py): from the chat, the model gives
 #: the name of a file the person attached, and the turn gives the operation that file.
 AN_ATTACHED_FILE: dict = {"attached_file": True}
+
+#: The mark of the datum of a read's output that holds a whole file for the person (a CSV export), beside its
+#: ``filename`` and ``content_type`` (base/assistant/handed_files.py): in the chat, the panel offers it to download and
+#: the model hears its name.
+A_HANDED_FILE: dict = {"handed_file": True}
 
 
 def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
@@ -109,6 +115,12 @@ class AssistantTurnIn(Schema):
     setup: bool = False
 
 
+class AssistantHandedFileOut(Schema):
+    filename: str
+    content_type: str
+    content: str = Field(description="The whole file, as its screen's button saves it.")
+
+
 class AssistantExecutedOut(Schema):
     call_id: str
     name: str = Field(description="The operation («demo.item.create»), or the tool's name when there was none.")
@@ -128,6 +140,9 @@ class AssistantExecutedOut(Schema):
     reason: dict[str, str] = Field(
         default_factory=dict,
         description="Why it failed, for its receipt, keyed by the language it is said in («es»); empty unless it failed.",
+    )
+    file: AssistantHandedFileOut | None = Field(
+        default=None, description="The file a read hands the person (a CSV export), to download under the answer."
     )
 
 

@@ -2368,15 +2368,22 @@ Pasos:
      escriba datos de este negocio por su API.» y «Nueva API key».
   2. En «Nueva API key», el «Nombre» («Gestoría — facturas»), las «Peticiones por minuto» («De 1 a 10.000.») y
      «Qué puede hacer esta key»: «Acceso total», «Solo lectura», «Solo escritura» o «Por app», marcando en cada app
-     «Lectura» y «Escritura».
+     «Lectura» y «Escritura»; solo sale la casilla de lo que quien la crea puede hacer en esa app.
   3. Pulsa «Crear key»: sale «API key creada» con «Copia el token ahora», «Este es el único momento en que se
      muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
      dice «Copiado»). «Hecho» la cierra.
+  4. Lo que puede hacer una llave son cuatro acciones, en todas las apps (también las que se añadan después) o app
+     por app: leer, crear, modificar y borrar. «Lectura» es leer y «Escritura», crear, modificar y borrar de lo que
+     quien la crea puede dar; «Acceso total», las cuatro en todas las apps. Por la API se elige cada acción por
+     separado: una llave que solo lee y crea en Inventario.
+  5. Una llave nunca recibe más de lo que puede hacer quien la crea: en una app, una acción que no puede hacer en
+     ninguna de sus llamadas; en todas las apps, una acción que no puede hacer en alguna app que la publica.
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla, y quién la creó, que pone su techo
 (BASE-F125). Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
+publica lo que la key haría en ella.», «Una key no puede hacer más de lo que puedes hacer tú.» (403
+`base.api_key_beyond_maker`) o «No se pudo copiar al portapapeles.».
 Implicados: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotar una llave de API
@@ -2415,7 +2422,9 @@ Pantalla: Empleados · API keys
 Pasos:
   1. En **Empleados › API keys** (la pestaña solo existe para quien administra), una fila por llave: «Nombre»,
      «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada», «Último uso» («Nunca» si
-     no se ha usado) y «Límite».
+     no se ha usado) y «Límite». «Permisos» dice «Acceso total», «Solo lectura» o «Solo escritura» si la llave lo es
+     en todas las apps; si no, sus acciones en «Todas las apps» y app por app, con su inicial: L (leer), C (crear),
+     M (modificar) y B (borrar), como «Tienda online L/C · Impuestos L».
   2. Busca con «Buscar API key…». Al pie, «Documentación de la API» lleva a la documentación.
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
@@ -3092,7 +3101,8 @@ Estado: hecho
 Actor: cualquier persona del negocio que descarga un archivo en el Hub
 Pantalla: las que descargan un archivo que la pantalla ya tiene: VeriFactu › Configuración (el modelo del
 otorgamiento), Ajustes · Datos y copias › Exportar, Archivos, Empleados › Aprobaciones, la documentación de la API,
-Fichajes, Inventario (Productos y Categorías), Clientes y «Compartir y QR» de la web
+Fichajes, Inventario (Productos y Categorías), Clientes, «Compartir y QR» de la web y el asistente (la exportación que
+se le pide)
 Pasos:
   1. La persona pulsa descargar: el modelo del otorgamiento, una exportación, un archivo, un CSV, el fichero OpenAPI o
      el QR.
@@ -3100,6 +3110,9 @@ Pasos:
   3. Dentro de la app de ERPlora (ordenador o Android 10 o posterior), el Hub le da el archivo a la app, que lo guarda
      en la carpeta Descargas, y sale «Guardado en {ruta}» (en Android, «Guardado en Download/<nombre>»): dentro de la
      app no hay barra de descargas ni otro aviso.
+  4. En el asistente, al pedirle una exportación («Sácame la carta entera en un CSV»), bajo su respuesta sale
+     «Descargar <nombre>»: el mismo archivo que da el botón de exportar de esa pantalla, que baja como en los pasos 2 y
+     3. El asistente dice que lo tiene ahí, sin pegar su contenido en el chat.
 Entra: el archivo que la pantalla ya tiene, con su nombre.
 Sale: el archivo en Descargas y, dentro de la app, el aviso con su ruta. En el Hub no se guarda nada.
 Si falla: dentro de la app el botón nunca se queda sin respuesta. Sin una carpeta de descargas que la persona pueda
@@ -3107,7 +3120,9 @@ abrir (Android 9 o anterior, iOS): «Esta app no puede guardar archivos en un m�
 navegador para descargarlo.»; con la app enlazada a otro negocio: «No se ha podido guardar el archivo: esta app está
 vinculada a otro negocio.»; una versión de la app sin esta función: «Esta versión de la app de ERPlora no puede guardar
 archivos. Actualízala para descargar.»; cualquier otro fallo (un nombre que la app rechaza, sin espacio):
-«No se ha podido descargar el archivo.». En esos casos la pantalla no dice que se descargó. Las copias que guarda
+«No se ha podido descargar el archivo.». En esos casos la pantalla no dice que se descargó. El archivo que dio el
+asistente vive en esa pestaña: tras recargar la página, en su lugar dice «El fichero «<nombre>» ya no está aquí: pídelo
+otra vez para descargarlo.». Las copias que guarda
 ERPlora (Datos y copias › Copias) bajan por un enlace firmado y no pasan por aquí.
 Implicados: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041

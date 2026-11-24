@@ -9,6 +9,7 @@ from live.errors import Conflict, InvalidPayload, PermissionDenied
 from live.operations import operation
 from live.outbox import record_event
 
+from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import Appointment, Recurring, RecurringService
 from apps.appointment.queries import (
@@ -73,6 +74,7 @@ PATTERN_CHANGED = _("The repeating appointment changed its pattern")
         "is split); appointments already charged, in progress or completed are left alone; the booked ones that still "
         "fall on the pattern move, the others are cancelled, and the ones that do not fit stay and are listed.",
         "risk": "normal",
+        "summary": assistant_cards.series_change,
     },
 )
 def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:  # noqa: C901, PLR0912, PLR0915

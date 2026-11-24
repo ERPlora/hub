@@ -303,7 +303,7 @@ def test_someone_without_a_session_is_nobody(client, hub_a):
 @HUB_DB
 def test_an_api_key_is_no_person(client, hub_a):
     client.force_login(member(hub_a.slug))
-    token = create(client, hub_a, mode="read")["token"]
+    token = create(client, hub_a, scopes={"*": ["read"]})["token"]
     client.logout()
     monkeypatched_seen = dict(meter._seen)
     meter._seen.clear()

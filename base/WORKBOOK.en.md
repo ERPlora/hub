@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a8a6b2508a04b065b16d2d3245e074029106c09d7e2799d4ca449e51ea9e7595 -->
+<!-- generated from WORKBOOK.md sha256:071060c365b77163e378778e3812528097d614703eff05946236ae76ee495094 -->
 
 ## What it is for and who it is for
 
@@ -2359,15 +2359,22 @@ Steps:
      this business's data through its API." and "New API key".
   2. In "New API key", the "Name" ("Accountant — invoices"), the "Requests per minute" ("From 1 to 10,000.") and
      "What this key may do": "Full access", "Read only", "Write only" or "Per app", ticking "Read" and "Write" on
-     each app.
+     each app; only the box of what whoever makes it may do on that app shows.
   3. They tap "Create key": "API key created" shows with "Copy the token now", "This is the only time the whole
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
+  4. What a key may do is four actions, on every app (also the ones added later) or app by app: read, create,
+     update and delete. "Read" is reading and "Write" creating, updating and deleting, of what whoever makes it may
+     give; "Full access", the four on every app. Through the API each action is chosen on its own: a key that only
+     reads and creates in Inventory.
+  5. A key is never given more than whoever makes it may do: on an app, an action they may do in none of its calls;
+     on every app, an action they may not do on some app that publishes it.
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
 (BASE-F125). Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
-app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
+app does not publish what the key would do on it.", "A key may not do more than you may do yourself." (403
+`base.api_key_beyond_maker`) or "It could not be copied to the clipboard.".
 Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
@@ -2406,7 +2413,9 @@ Screen: Employees · API keys
 Steps:
   1. In **Employees › API keys** (the tab exists only for whoever runs the business), a row per key: "Name",
      "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created", "Last use" ("Never" if
-     unused) and "Limit".
+     unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so on every
+     app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U (update) and
+     D (delete), as "Online shop R/C · Taxes R".
   2. They search with "Search API key…". At the bottom, "API documentation" leads to the documentation.
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
@@ -3079,13 +3088,16 @@ Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
 Settings · Data and copies › Export, Files, Employees › Approvals, the API documentation, Attendance, Inventory
-(Products and Categories), Customers and the website's "Share and QR"
+(Products and Categories), Customers, the website's "Share and QR" and the assistant (the export it is asked for)
 Steps:
   1. The person presses download: the authorisation's form, an export, a file, a CSV, the OpenAPI file or the QR.
   2. In a browser, the file goes with its name to the browser's downloads, which already say so.
   3. Inside the ERPlora app (computer, or Android 10 or later), the Hub hands the file to the app, which saves it in the
      Downloads folder, and "Saved to {path}" appears (on Android, "Saved to Download/<name>"): inside the app there is
      no downloads bar nor any other notice.
+  4. In the assistant, when asked for an export ("Give me the whole menu as a CSV"), "Download <name>" comes under its
+     answer: the same file the export button of that screen gives, which comes down as in steps 2 and 3. The assistant
+     says it is there, without pasting its content into the chat.
 In: the file the screen already holds, with its name.
 Out: the file in Downloads and, inside the app, the notice with its path. Nothing is kept in the Hub.
 If it fails: inside the app the button is never left without an answer. With no downloads folder the person can open
@@ -3093,7 +3105,8 @@ If it fails: inside the app the button is never left without an answer. With no 
 download it."; with the app linked to another business: "The file could not be saved: this app is linked to another
 business."; a version of the app without this feature: "This version of the ERPlora app cannot save files. Update it
 to download."; any other failure (a name the app refuses, no space left): "The file could not be downloaded.". In
-those cases the screen does not say it was downloaded. The copies ERPlora keeps (Data and copies › Copies) come down
+those cases the screen does not say it was downloaded. The file the assistant gave lives in that tab: after the page
+reloads, in its place it says "The file «<name>» is no longer here: ask for it again to download it.". The copies ERPlora keeps (Data and copies › Copies) come down
 through a signed link and do not go through here.
 Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041

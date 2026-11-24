@@ -18,7 +18,7 @@ from ninja import Field, Schema
 from pydantic import AfterValidator, StringConstraints, ValidationInfo, field_validator
 
 from base.business import business_zone
-from base.schemas.assistant import names
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 
@@ -88,6 +88,8 @@ D_SEARCH_PEOPLE = "Text to look for in the person's name."
 # asks, never by its id; and each datum by the name the screens give it: «Person», as the Records column, and «Working
 # day», as «Correct working day» says it.
 A_PERSON = names("attendance.person.detail")
+#: A person said in the person's words: the card names the one the write's own search finds.
+A_PERSON_SAID = names("attendance.person.check", by="member", as_said=True)
 A_WORKING_DAY = names("attendance.record.detail")
 PERSON = gettext_noop("Person")
 WORKING_DAY = gettext_noop("Working day")
@@ -134,7 +136,9 @@ class PersonRefIn(Schema):
 
 class MemberRefIn(Schema):
     member_id: UUID | None = Field(None, title=PERSON, description=D_MEMBER_ID, json_schema_extra=A_PERSON)
-    member: MemberName | None = Field(None, title=PERSON, description=D_MEMBER)
+    member: MemberName | None = Field(
+        None, title=PERSON, description=D_MEMBER, json_schema_extra=unless_given(A_PERSON_SAID, "member_id")
+    )
 
 
 class PositionIn(MemberRefIn):

@@ -12,7 +12,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0026_api_key_owner'),
+        ('base', '0027_api_key_actions'),
     ]
 
     operations = [

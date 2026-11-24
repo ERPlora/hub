@@ -17,26 +17,24 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from geopy.distance import geodesic
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.attendance import events
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
 from apps.attendance.queries import (
-    MEMBER_NOT_FOUND,
     RECORD_NOT_FOUND,
     TERMINATED_REASON_SOURCE,
     business_date,
-    find_member,
     is_stale,
     load_record,
-    own_member,
     review_hours,
     saved_settings,
     settings_values,
     user_name,
 )
+from apps.attendance.queries.people import MEMBER_NOT_FOUND, clocked
 from apps.attendance.schemas import (
     BOTH_COORDINATES,
     BreakIn,
@@ -58,10 +56,6 @@ from base import access
 from base.queries.devices import device_of
 from base.services.sessions import acting_hub_user
 
-NO_MEMBER_RECORD = _(
-    "Your user is not linked to any staff record: ask a manager to link it in Staff."
-)
-OTHERS_DENIED = _("You can only clock yourself in and out.")
 MEMBER_NOT_ACTIVE = _(
     "That staff record is not active (inactive or on leave), so it cannot clock in."
 )
@@ -95,7 +89,6 @@ DAY_NEEDS_REVIEW = _(
     "corrects it. Clock in to start a new day."
 )
 
-CLOCK_OTHERS = "attendance.clock_others"
 #: A clock-out never lands on its own clock-in (the database keeps «after»): the smallest step after it.
 TICK = dt.timedelta(microseconds=1)
 
@@ -104,21 +97,9 @@ TICK = dt.timedelta(microseconds=1)
 
 
 def _target(ctx: OperationContext, data: MemberRefIn) -> tuple[Member, bool]:
-    """The staff record the command acts on, locked, and whether it is the caller's own.
-
-    None named: the caller's own (409 ``attendance.no_member_record`` without one). Someone else needs
-    ``attendance.clock_others``. A record terminated meanwhile is ``NotFound``.
-    """
-    own = own_member(ctx)
-    if data.member_id is not None or data.member:
-        member = find_member(data.member_id, data.member)
-        mine = own is not None and member.pk == own.pk
-        if not mine and not ctx.has(CLOCK_OTHERS):
-            raise PermissionDenied(str(OTHERS_DENIED))
-    elif own is None:
-        raise Conflict(str(NO_MEMBER_RECORD), code="attendance.no_member_record")
-    else:
-        member, mine = own, True
+    """The staff record the command acts on (``clocked``), locked, and whether it is the caller's own. A record
+    terminated meanwhile is ``NotFound``."""
+    member, mine = clocked(ctx, data)
     locked = (
         Member.objects.select_for_update(no_key=True)
         .filter(pk=member.pk)
@@ -275,6 +256,7 @@ def _end_break(ctx: OperationContext, record: Record, at: dt.datetime) -> bool:
         "description": "Clocks in («clock me in», «ficha la entrada de Ana»): opens the working day of the "
         "caller, or of the person named, at the server's time. Refused when the person already has an "
         "open day or, from a personal device, when it is outside the workplace radius.",
+        "check": "attendance.person.check",
         "risk": "normal",
     },
 )
@@ -348,6 +330,7 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
         "description": "Clocks out («clock me out», «ficha la salida de Ana»): closes the open working day "
         "of the caller, or of the person named, at the server's time, ending the running break. Never "
         "blocked by the location.",
+        "check": "attendance.person.check",
         "risk": "normal",
     },
 )
@@ -398,6 +381,7 @@ def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
         },
         "description": "Starts a break inside the open working day of the caller, or of the person named "
         "(«I'm going on a break»).",
+        "check": "attendance.person.check",
         "risk": "normal",
     },
 )
@@ -447,6 +431,7 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
             ),
         },
         "description": "Ends the running break of the caller, or of the person named («I'm back»).",
+        "check": "attendance.person.check",
         "risk": "normal",
     },
 )
