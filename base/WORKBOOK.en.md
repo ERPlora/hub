@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f0ef1281ce5225b83284c8581cfc3a1881f7f7a29f8d111d036061f399dbab08 -->
+<!-- generated from WORKBOOK.md sha256:7c525c2679a085cdef7a2f5f2b6f59ee1a70e820e49f18f53eef435c745416cc -->
 
 ## What it is for and who it is for
 
@@ -79,8 +79,8 @@ also opens with the Home's link ending in `#actividad`.
 At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
 "Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
 until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
-plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
-print… No notice is dismissed: it goes by itself once it is solved.
+plan's limits, the roles to review, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer
+that does not print… No notice is dismissed: it goes by itself once it is solved.
 
 - **The bell.** With nothing pending, just the bell. With something, it becomes a pill with the bell and the number,
   in the colour and with the icon of the gravest notice (urgent, attention or information). If a notice has a
@@ -463,6 +463,8 @@ On the Employees screens and the API documentation:
 | BASE-F127 | Make a role of your own from another | partial |
 | BASE-F128 | Adjust what a role of your own allows | partial |
 | BASE-F129 | Delete a role of your own | partial |
+| BASE-F130 | Give a person a role of your own | partial |
+| BASE-F131 | See in the bell the roles to review | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -772,7 +774,8 @@ Actor: owner, administrator, manager, employee
 Screen: any screen of the hub
 Steps:
   1. At erplora.com, whoever manages the business changes a person's role, removes them from the business
-     or hands the ownership over to them.
+     or hands the ownership over to them; or in the Hub gives them a role of your own or changes what theirs allows
+     (BASE-F130, BASE-F128).
   2. If their role changed, their session stays open and what they have open, on all their devices, moves
      at that moment to what the new role allows, without reloading or signing in again: the menu, "My apps"
      and the tabs show only what they may open; the screen in front of them turns into "No access" if the
@@ -791,7 +794,7 @@ Out: their role in the business, up to date, and what they have open with what t
 sessions of whoever is no longer in the business, ended.
 If it fails: if the hub does not answer at that moment, erplora.com passes it again shortly and the change
 arrives then. A device without a connection gets it when it reconnects.
-Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
+Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118, BASE-F128, BASE-F130
 
 ### BASE-F14 See the business's apps
 Status: done
@@ -2286,7 +2289,7 @@ Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
 allows." with "Retry", and a role that is not one of the five nor one of the business's own, "This role does not exist
 in this business.".
-Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128
+Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131
 
 ### BASE-F83 Give a person a role
 Status: done
@@ -2305,7 +2308,7 @@ If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
 
 ### BASE-F127 Make a role of your own from another
-Status: partial — it is made by asking the assistant or through the Hub's API; its screen and giving it to a person are missing
+Status: partial — it is made by asking the assistant or through the Hub's API; its screen is missing
 Actor: owner, administrator
 Screen: Assistant
 Steps:
@@ -2314,7 +2317,8 @@ Steps:
   2. The card says "Based on: Employee" and "Name: Cashier" (BASE-F97). Once accepted, the role is made with the same
      the other one allows, app by app, save owning the business, which no role of your own gives.
   3. It shows at once in **Employees › Roles**, with "Custom" and nobody in it. What it allows is seen by tapping it
-     (BASE-F82) and changed with BASE-F128. From then on it does not change with the role it came from.
+     (BASE-F82) and changed with BASE-F128; it is given to a person with BASE-F130. From then on it does not change with
+     the role it came from.
 In: the role it comes from, the name (up to 80 letters) and, if wanted, the description.
 Out: the business's own role. Event `base.role.created`. It never leaves the business: erplora.com does not know it.
 If it fails: without a name, "Give the role a name."; with the name of another role of your own, capitals aside, "There
@@ -2322,7 +2326,7 @@ is already a role with that name. Choose another."; a role that is not there, "T
 business.". Nobody gives what they do not have: if the role it comes from allows something whoever makes it may not do,
 "A role may not allow more than you may do yourself." and it is not made. The assistant does not offer it to who does
 not manage roles, and the API answers 403.
-Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129
+Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
 Status: partial — it is adjusted by asking the assistant or through the Hub's API; its screen is missing
@@ -2336,7 +2340,8 @@ Steps:
   3. Once accepted, only what was asked for changes. If somebody has the role, what they see and what they may do change
      at once on their devices, without ending their session (BASE-F13).
   4. An app turned on after the role was saved gives what it gives the basic role it came from; a permission an app adds
-     later comes in as "No". In both cases the role is left to review until it is saved with them.
+     later comes in as "No". In both cases the role is left to review until it is saved with them, and the bell says so
+     (BASE-F131).
 In: the role and what changes: the name, the description or the state of each permission.
 Out: the role changed. Event `base.role.updated`.
 If it fails: a basic role is not changed: "This is one of erplora.com's roles. Duplicate it and change the copy.".
@@ -2344,7 +2349,7 @@ Nobody gives what they do not have: "A role may not allow more than you may do y
 given to nobody: "That is only the owner's of the business: no role gives it.". A permission that is not of an app that
 is on, "That permission is not of any app that is on in this business."; "With approval" for something a manager cannot
 approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it.
-Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Delete a role of your own
 Status: partial — it is deleted by asking the assistant or through the Hub's API; its screen is missing
@@ -2359,7 +2364,52 @@ In: the role.
 Out: the role deleted. Event `base.role.deleted`.
 If it fails: if somebody of the business has it, it is not deleted: "2 people have this role. Give them another before
 deleting it.". A basic role is not deleted: "This is one of erplora.com's roles. Duplicate it and change the copy.".
-Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127
+Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
+
+### BASE-F130 Give a person a role of your own
+Status: partial — it is given by asking the assistant or through the Hub's API; its place in the person's page is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant "give Luis the Cashier role" or "take the Cashier role away from Luis".
+  2. The card says the person and the role by their names and, under "What will happen", how many people have that role.
+     It asks to type CONFIRM (BASE-F98).
+  3. Once accepted, the person has that role, which rules over the one of their invitation: what they see and what they
+     may do change at once on their devices, without ending their session (BASE-F13), and whoever may now do something
+     with that role approves it with their PIN too (BASE-F84). Each person has a single role.
+  4. To return them to the one of their invitation, ask for that role ("Employee"): it is the one they have from then on.
+  5. That person's assistant knows the role it talks to: the role of your own, by the name the business gave it
+     (BASE-F100).
+In: the person and the role, one of the business's own or the one of their invitation.
+Out: the person with that role. Event `base.role.assigned`. erplora.com does not know: there they keep the one of their
+invitation.
+If it fails: nobody gives the owner another role, "The owner is always the owner: nobody gives them another role.";
+nobody changes their own, "Nobody changes their own role: ask somebody above you."; nor the one of somebody who is not
+below them by their invitation, "You may only give a role to people below you in the business.". Nobody gives a role that
+allows more than they may do themselves, the one of the invitation when returning a person to it and what an app that is
+off would give included: "A role may not allow more than you may do yourself.". Another basic role, "That role is given
+on erplora.com. Here you give one of the business's own."; a role that is not there, "This role does not exist in this
+business."; a person who is not of the business, "That person is not in this business.". If somebody deletes the role at
+the same time, it is either deleted or given, never both: one hears "This role does not exist in this business." or "2
+people have this role. Give them another before deleting it.".
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+
+### BASE-F131 See in the bell the roles to review
+Status: partial — the bell counts them and leads to the roles; the screen where they are reviewed is missing
+Actor: owner, administrator
+Screen: The bell
+Steps:
+  1. An app is turned on, or an app gains a permission, after a role of your own was saved: that role is left to review
+     (BASE-F128).
+  2. The bell of whoever manages the roles goes up without reloading with the notice "2 roles to review" and its
+     sentence: "An app turned on or a new permission is not in them yet: look at what each role allows.".
+  3. "Review the roles" opens **Employees › Roles**.
+  4. Once a role is saved with what it lacked (BASE-F128), it stops counting; with none left, the notice goes away.
+In: the business's own roles and the apps that are on.
+Out: nothing is saved.
+If it fails: whoever does not manage the roles does not see the notice. If the notices cannot be read, the bell keeps
+the last it knew, as in BASE-F10.
+Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
 Status: done
@@ -2850,7 +2900,8 @@ Steps:
      and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
      permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
      its button on the screen is. The assistant knows the role it talks to (owner, administrator, manager or
-     employee, said in the language of the conversation) and that its tools are that role's: asked for something none
+     employee, said in the language of the conversation, or the role of your own the person was given, by its name,
+     BASE-F130) and that its tools are that role's: asked for something none
      of them does, it neither looks for another way nor tells the state of something else, but says in one sentence
      that it is not available to them here, because their role cannot do it or because that app is not on, and who
      can (to an employee, a manager or the owner; to a manager, the owner or an administrator) or on which screen it
@@ -2870,7 +2921,7 @@ and for two minutes, and it is spent together with the action (BASE-F84).
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
 says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
 failed: …" and the assistant tells it.
-Involved: BASE-F13, BASE-F84, BASE-F97
+Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
 Status: done
