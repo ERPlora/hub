@@ -4,8 +4,6 @@
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
-git config merge.workbook-translation.driver \
-  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
@@ -40,7 +38,9 @@ comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `orig
 anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
 
 - ESLint sobre sus ficheros TypeScript, JavaScript y Vue y, si toca alguno, la comprobación de tipos (`pnpm typecheck`)
-  y las pruebas de Vitest relacionadas (`vitest related`).
+  y las pruebas de Vitest relacionadas (`vitest related`). Un `.json` que no esté en la raíz (los textos, el mapa de
+  rutas de `frontend/generated/`) pasa solo a `vitest related`: ESLint no lo lee, y los de la raíz configuran las
+  herramientas (con `package.json`, Vitest correría su suite entera).
 - pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
   `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
   contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia). Un

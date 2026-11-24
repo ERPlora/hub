@@ -29,12 +29,11 @@ from base.catalog import (
     register_apps,
     source_hash,
 )
-from base.tests.test_catalog import ICONS, USER_PART, WORKBOOK, module, translated
+from base.tests.test_catalog import ENGLISH, ICONS, USER_PART, WORKBOOK, module, translated
 from shared.models import App, AppDoc
 
 RELEASE = {"APP_VERSION": "4da2a10", "APP_RELEASED_AT": "2026-10-13T20:50:00+02:00"}
 RELEASED_AT = datetime.fromisoformat(RELEASE["APP_RELEASED_AT"])
-EN_BODY = "## What it is for\n\nKeeps **things**.\n"
 SHARED_DB = [pytest.mark.django_db(databases=["default", "shared"]), pytest.mark.usefixtures("shared_schema")]
 
 
@@ -51,7 +50,7 @@ def release(settings):
 def modules(tmp_path):
     """Two modules on disk: ``things`` translated, ``stock`` premium and only in Spanish."""
     return [
-        module(tmp_path, "things", en=translated(USER_PART, EN_BODY), verticals=["restaurant"]),
+        module(tmp_path, "things", en=translated(USER_PART, ENGLISH), verticals=["restaurant"]),
         module(tmp_path, "stock", premium=True, requires=["things"]),
     ]
 
@@ -93,7 +92,7 @@ class TestWrite:
         docs = {(doc.app_id, doc.lang): doc for doc in AppDoc.objects.all()}
         assert set(docs) == {("things", "es"), ("things", "en"), ("stock", "es")}
         assert docs["things", "es"].markdown == USER_PART
-        assert (docs["things", "en"].markdown, docs["things", "en"].source_hash) == (EN_BODY, source_hash(EN_BODY))
+        assert (docs["things", "en"].markdown, docs["things", "en"].source_hash) == (ENGLISH, source_hash(ENGLISH))
         assert docs["things", "es"].id.version == 7
 
     def test_the_same_release_twice_changes_nothing(self, modules):
@@ -108,7 +107,7 @@ class TestWrite:
     def test_a_changed_document_changes_its_hash_and_its_time_and_nothing_else(self, tmp_path, modules):
         register_apps(registry(modules))
         before = {(doc.app_id, doc.lang): doc for doc in AppDoc.objects.all()}
-        changed = rewritten(tmp_path, "Guarda **objetos**.", en=translated(USER_PART.replace("**cosas**", "**objetos**"), EN_BODY))
+        changed = rewritten(tmp_path, "Guarda **objetos**.", en=translated(USER_PART.replace("**cosas**", "**objetos**"), ENGLISH))
 
         result = register_apps(registry([changed, modules[1]]))
 
