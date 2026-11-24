@@ -372,6 +372,10 @@ msgstr "La petición puede pesar %(mb)s MB como máximo."
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
 
+#: services/platform_hub.py:31
+msgid "ERPlora's own business is never changed, closed or emptied here."
+msgstr "El negocio propio de ERPlora no se cambia, no se cierra ni se vacía aquí."
+
 #: services.py:417
 msgid "Another hub has this address."
 msgstr "Otro hub ya tiene esta dirección."

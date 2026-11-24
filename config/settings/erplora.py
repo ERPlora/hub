@@ -5,7 +5,10 @@ from config.settings.core import DEBUG
 # ERPlora's own hub: it issues ERPlora's invoices to its customers, which the SaaS posts to
 # /internal/platform/invoices (base.internal). A reserved slug, so no business can ever take it; it files in the
 # AEAT's environment of the deployment (prod: production; pre: testing), never by its own switch.
-PLATFORM_HUB_SLUG = config("PLATFORM_HUB_SLUG", default="erplora")
+PLATFORM_HUB_SLUG = config("PLATFORM_HUB_SLUG", default="erp")
+# The name its row had before, and keeps until `manage.py create_platform_hub --rename`: the same hub under both
+# (base.platform_hub), so tasks and row agree whichever of them changes first.
+PLATFORM_HUB_FORMER_SLUG = "erplora"
 # Its issuer, set by `manage.py create_platform_hub`: ERPlora's tax identity (the old SaaS's seed_company_036).
 PLATFORM_ISSUER_LEGAL_NAME = config("PLATFORM_ISSUER_LEGAL_NAME", default="ERPLORA CLOUD SL")
 PLATFORM_ISSUER_TAX_ID = config("PLATFORM_ISSUER_TAX_ID", default="B27593136")

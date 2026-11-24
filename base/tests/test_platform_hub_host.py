@@ -137,7 +137,7 @@ def test_the_platform_s_hub_and_a_business_never_cross(client, erp, hub_a, make_
     client.force_login(ana)
 
     def names(host):
-        return [row["name"] for row in client.get(CUSTOMERS, HTTP_HOST=host).json()["items"]]
+        return [row["name"] for row in client.get(CUSTOMERS, HTTP_HOST=host).json()["rows"]]
 
     assert names(ERP) == ["Customer of ERPlora"]
     assert names(A_HOST) == ["Customer of A"]

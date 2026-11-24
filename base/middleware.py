@@ -91,7 +91,7 @@ from live.api_errors import DEFAULT_API_PREFIX
 from live.database_cut import cut_of, marked
 from live.errors import NotFound
 
-from base import custom_domains, meter, public_home, registry
+from base import custom_domains, meter, platform_hub, public_home, registry
 from base.auth import admin_hubs_url, saas_url
 from base.health import READYZ_PATH
 from base.media import media
@@ -202,7 +202,7 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         except Http404:
             return _not_found(request)
         hub = registry.hub_by_slug(scope.key)
-        if hub is None:
+        if hub is None or not platform_hub.may_be_served(hub):
             return _not_found(request)
         refusal = registry.refusal(hub, ended=not (hub.is_demo and path == DEMO_ENTRY_PATH))
         if refusal is not None:

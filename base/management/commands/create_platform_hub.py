@@ -1,11 +1,11 @@
-"""``manage.py create_platform_hub [--execute]``: bring up ERPlora's own hub, repeatably.
+"""``manage.py create_platform_hub [--rename] [--execute]``: bring up ERPlora's own hub, repeatably.
 
 ERPlora's platform hub issues ERPlora's invoices to its customers, posted by the SaaS to
 ``/internal/platform/invoices`` (``base.internal``). Ported from the old SaaS's ``ensure_platform_hub``: idempotent and a
 dry run unless ``--execute``; it names what it finds, and it refuses rather than guesses, because one hub is one
 issuer is one VeriFactu chain: it never writes over another identity.
 
-The platform hub is its reserved slug, ``PLATFORM_HUB_SLUG`` (``erplora``, in ``live.slugs``' reserved list, so no
+The platform hub is its reserved slug, ``PLATFORM_HUB_SLUG`` (``erp``, in ``live.slugs``' reserved list, so no
 business can ever take it and the SaaS's normal sign-up never creates it), and a row of the registry
 (``is_platform``) with a database of its own, as every business: with ``--execute``, a missing one is made as a sign-up
 is (``base.services.provisioning.platform_hub_register``, then ``base.tenancy.provision``), never as a business of the
@@ -13,6 +13,12 @@ SaaS's. Then, inside that database, it gives the hub its issuer, ERPlora's tax i
 (``invoice.issuer.update``), and pins VeriFactu to the deployment's environment (``verifactu.config.follow_deployment``;
 prod: production, pre: testing), always through their operations, as the system on that slug. Invoicing and
 VeriFactu are always active on it.
+
+A row already there is never made twice, whatever its name: one under the name it had before (``erplora``,
+``PLATFORM_HUB_FORMER_SLUG``) keeps it and works under it, and ``--rename`` gives it ``PLATFORM_HUB_SLUG``. Only its name
+in the registry changes; run with ``PLATFORM_HUB_SLUG`` set to the former name, ``--rename`` undoes it. It is a step of
+its own, for when every task runs a release that knows both names and erplora.com's gateway takes both (the hub is named
+to it by its slug, and a record it refuses is not sent again by itself).
 
 In AWS it runs once per environment as a one-off ECS task of the ``worker`` family, which has the migrator's credentials
 to make the database (WORKBOOK of invoice; runbook ``knowledge/wiki/runbooks/cut-shared-hubs-prod.md``). The command
@@ -27,7 +33,7 @@ from live.context import Scope, system_context
 from live.errors import OperationError
 from live.operations import get as get_operation
 
-from base.services import provisioning
+from base.services import platform_hub, provisioning
 from base.tenancy import provision
 from base.tenancy.context import use_control, use_hub
 
@@ -62,13 +68,16 @@ class Command(BaseCommand):
             action="store_true",
             help="Write. Without it the command only says what it would do.",
         )
+        parser.add_argument(
+            "--rename",
+            action="store_true",
+            help="Give its row the name PLATFORM_HUB_SLUG, if it still has the one before. Only once erplora.com's "
+            "gateway takes its records under both.",
+        )
 
-    def handle(self, *args, execute: bool = False, **options):
+    def handle(self, *args, execute: bool = False, rename: bool = False, **options):
         slug = settings.PLATFORM_HUB_SLUG
-        with use_control():
-            hub = provisioning.registry_row_by_slug(slug)
-        if hub is not None and not hub.is_platform:
-            raise CommandError(f"The row {slug} of the registry is no platform hub's: nothing was written.")
+        hub = self._found(slug)
         if hub is None or hub.status != hub.Status.READY:
             if not execute:
                 self.stdout.write(f"ERPlora's own hub: {slug} ({settings.ERPLORA_ENVIRONMENT})")
@@ -76,9 +85,35 @@ class Command(BaseCommand):
                 self.stdout.write("- would make its registry row and its own database, then set its issuer")
                 return None
             hub = self._made(slug)
+        if hub.slug != slug:
+            hub = self._named(hub, slug, execute=execute, rename=rename)
         self.stdout.write(f"- the platform hub works on its own database {hub.db_name}")
         with use_hub(hub):
-            return self._handle(*args, execute=execute, **options)
+            return self._handle(hub, execute=execute)
+
+    def _found(self, slug: str):
+        """Its row, whatever its name; ``None`` without one."""
+        with use_control():
+            found = platform_hub.platform_rows()
+            taken = provisioning.registry_row_by_slug(slug)
+        if len(found) > 1:
+            rows = ", ".join(hub.slug for hub in found)
+            raise CommandError(f"The registry has more than one platform hub ({rows}): nothing was written.")
+        if taken is not None and not taken.is_platform:
+            raise CommandError(f"The row {slug} of the registry is no platform hub's: nothing was written.")
+        return found[0] if found else None
+
+    def _named(self, hub, slug: str, *, execute: bool, rename: bool):
+        """Its row under ``slug`` with ``--rename``; as it is, and says so, without it."""
+        if not rename:
+            self.stdout.write(f"- its row is still named {hub.slug}: --rename names it {slug}")
+            return hub
+        if not execute:
+            self.stdout.write(f"- would rename its row from {hub.slug} to {slug}")
+            return hub
+        renamed = platform_hub.platform_hub_renamed(hub.pk, slug)
+        self.stdout.write(f"- its row was renamed from {hub.slug} to {slug}")
+        return renamed
 
     def _made(self, slug: str):
         """Its row (``is_platform``) and its own database, made now as a sign-up's (the SaaS is not told)."""
@@ -103,8 +138,8 @@ class Command(BaseCommand):
             )
         return found
 
-    def _handle(self, *args, execute: bool = False, **options):
-        ctx = system_context(Scope("host", settings.PLATFORM_HUB_SLUG))
+    def _handle(self, hub, *, execute: bool):
+        ctx = system_context(Scope("host", hub.slug))
         wanted = {
             field: str(getattr(settings, name, "")).strip()
             for field, name in ISSUER_SETTINGS.items()
@@ -123,7 +158,7 @@ class Command(BaseCommand):
             else "testing"
         )
         self.stdout.write(
-            f"ERPlora's own hub: {settings.PLATFORM_HUB_SLUG} ({settings.ERPLORA_ENVIRONMENT})"
+            f"ERPlora's own hub: {hub.slug} ({settings.ERPLORA_ENVIRONMENT})"
         )
         if not execute:
             self.stdout.write("Dry run: nothing is written without --execute.")
