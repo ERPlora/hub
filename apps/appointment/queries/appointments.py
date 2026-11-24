@@ -18,7 +18,7 @@ from apps.appointment.schemas import (
     NoIn,
     VisitPage,
 )
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.service.queries import catalog
 from apps.staff.queries import resolve_member
 from base.business import business_zone, zone_name

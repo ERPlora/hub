@@ -10,7 +10,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 
 from apps.customer import queries as customer_queries
 from apps.customer.models import CustomerGroup
-from apps.customer.queries import find_group
+from apps.customer.queries.reads import find_group
 from apps.inventory import queries as inventory_queries
 from apps.inventory.models import Product
 from apps.inventory.queries.reads import find_product, held
@@ -56,7 +56,7 @@ def _group_id(group_id: UUID | None, said: str | None) -> UUID | None:
     try:
         group = find_group(group_id, said)
         # Customers' own refusal (its text, in its catalog), as for one deleted before.
-        return _held_one(CustomerGroup.objects.filter(pk=group.pk), customer_queries.GROUP_UNAVAILABLE).id
+        return _held_one(CustomerGroup.objects.filter(pk=group.pk), customer_queries.reads.GROUP_UNAVAILABLE).id
     except (NotFound, Conflict) as error:
         raise _field_error(error, "customer_group_id" if group_id is not None else "customer_group") from None
 

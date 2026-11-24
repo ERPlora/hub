@@ -33,7 +33,7 @@ from apps.appointment.services.writes import (
     lock_appointments,
     lock_series,
 )
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 
 DELETE = "appointment.delete_appointment"
 OCCURRENCE_BOOKED = _("Its repeating appointment has booked that date again since.")

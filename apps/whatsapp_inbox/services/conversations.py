@@ -9,7 +9,7 @@ from live.operations import get, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.queries.agents import team

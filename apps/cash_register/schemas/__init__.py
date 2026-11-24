@@ -15,6 +15,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
+from apps.cash_register.schemas.app_lines import AppLine
 from base.schemas.assistant import names
 from base.sensitive import COSTS
 
@@ -336,6 +337,8 @@ class SessionSummary(Schema):
     total_gifts: int | None = Field(
         description="Comps of the shift at cost, in cents, not cash (empty when hidden or without the costs).",
         json_schema_extra={"money": True, **COSTS})
+    app_lines: list[AppLine] | None = Field(description="What other apps recorded (tips), apart from cash in and out: by app, "
+        "what came in by payment method and what was paid out; only cash counts for the expected (empty when hidden).")
     expected_cash: int | None = Field(
         description="Expected cash, in cents (empty when hidden).", json_schema_extra={"money": True}
     )
@@ -519,6 +522,7 @@ class MovementRow(Schema):
     )
     method_name: str = Field(description="The payment method's name as Sales calls it.")
     description: str = Field(description="The concept written by hand.")
+    app: str = Field(description="The app that recorded it as its own (tip); empty = by hand, or a sale's.")
     sale_id: UUID | None = Field(description="The sale of a sale, void or refund line.")
     sale_number: str = Field(description="That sale's number.")
     document_type: str = Field(description="That sale's document: ticket or invoice.")
@@ -531,19 +535,12 @@ MovementPage = Page[MovementRow]
 
 
 class MovementAddIn(SessionRefIn):
-    type: ManualType = Field(
-        description="in (cash brought in) or out (cash taken out)."
-    )
-    amount: PositiveCents = Field(
-        description="How much, in cents, always positive: the type gives the sign."
-    )
-    method_type: MethodType = Field(
-        "cash",
-        description="cash by default; card, transfer or other do not count for the drawer.",
-    )
-    description: _text(255) = Field(
-        "", description="Why: a supplier paid, change brought in…"
-    )
+    type: ManualType = Field(description="in (cash brought in) or out (cash taken out).")
+    amount: PositiveCents = Field(description="How much, in cents, always positive: the type gives the sign.")
+    method_type: MethodType = Field("cash", description="cash by default; card, transfer or other do not count for the drawer.")
+    description: _text(255) = Field("", description="Why: a supplier paid, change brought in…")
+    app: _text(32) | None = Field(None, description="Only another app that records its own lines (tip), by its registry "
+        "name: they show apart from cash in and out. Empty when a person records it.")
 
 
 # ── Counts ────────────────────────────────────────────────────────────────────────────────────────
