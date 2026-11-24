@@ -29,7 +29,7 @@ from base.catalog import template_apps
 from base.models.activation import AppActivation
 from base.models import Hub, Membership
 from base.models.blueprints import ImportBatch
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.context import HubWithoutDatabase, current_alias, use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from control.models import HubDue
@@ -41,7 +41,7 @@ pytestmark = HUB_DB
 def person(role, username="olga"):
     user = get_user_model().objects.create_user(username=username, password="pw")
     Membership.objects.create(user=user, host=A.key, role=role)
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language="es")
 
 
 @pytest.fixture

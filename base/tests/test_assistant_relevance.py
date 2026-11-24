@@ -13,7 +13,7 @@ from live.context import OperationContext
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 __all__ = ["in_business_a"]
@@ -24,7 +24,7 @@ def owner(make_user):
     user = make_user("olga", host=A.key, role=Membership.Role.OWNER)
 
     def of(language: str) -> OperationContext:
-        return OperationContext(scope=A, actor="olga", permissions=permissions_for(user, A), language=language)
+        return OperationContext(scope=A, actor="olga", permissions=access_for(user, A), language=language)
 
     return of
 

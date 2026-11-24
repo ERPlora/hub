@@ -31,7 +31,7 @@ from live.operations import registry
 
 from base.auth import RedeemedUser
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.registry import REGISTRY_SCOPE
 from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
 from base.tenancy.context import use_hub
@@ -309,24 +309,25 @@ def test_a_staff_session_on_a_business_s_host_is_anonymous_and_never_holds_every
     assert (page.status_code, b'id="hub-jump"' in page.content) == (200, True)  # the jump to the SaaS's login
 
 
-@pytest.mark.django_db
-def test_on_a_business_s_host_a_superuser_holds_only_what_its_membership_there_gives():
+@HUB_DB
+def test_on_a_business_s_host_a_superuser_holds_only_what_its_membership_there_gives(hub_a):
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
-    assert permissions_for(staff, A) == frozenset()
+    assert access_for(staff, A) == frozenset()
 
     raised = get_user_model().objects.create_user("saas:7", is_staff=True, is_superuser=True)
     Membership.objects.create(user=raised, host=A.key, role=Membership.Role.EMPLOYEE)
     plain = get_user_model().objects.create_user("saas:8")
     Membership.objects.create(user=plain, host=A.key, role=Membership.Role.EMPLOYEE)
-    assert permissions_for(raised, A) == permissions_for(plain, A)
-    assert "*" not in permissions_for(raised, A)
+    with use_hub(hub_a):
+        assert access_for(raised, A) == access_for(plain, A)
+        assert "*" not in access_for(raised, A)
 
 
 @pytest.mark.django_db
 def test_the_superuser_s_wildcard_is_the_platform_s_alone():
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
-    assert permissions_for(staff, REGISTRY_SCOPE) == {"*"}
-    assert permissions_for(get_user_model().objects.create_user("saas:8"), REGISTRY_SCOPE) == frozenset()
+    assert access_for(staff, REGISTRY_SCOPE) == {"*"}
+    assert access_for(get_user_model().objects.create_user("saas:8"), REGISTRY_SCOPE) == frozenset()
 
 
 @on_hub_a

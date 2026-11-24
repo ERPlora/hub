@@ -21,6 +21,7 @@ from base.models import Membership
 from base.operations import HubContextBuilder
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, limits
+from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_api_keys import CARTS, bearer, create, get, host
 from base.tests.test_internal import signed
@@ -333,7 +334,8 @@ def test_the_context_builder_of_a_request_with_no_hub_notes_nobody(hub_a, rf):
     request = rf.get(ITEMS, HTTP_HOST=host(hub_a))
     request.user = member(hub_a.slug)
 
-    HubContextBuilder().from_request(request)
+    with use_hub(hub_a):
+        HubContextBuilder().from_request(request)
 
     assert meter._seen == {}
 

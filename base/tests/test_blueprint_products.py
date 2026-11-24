@@ -12,7 +12,7 @@ from apps.inventory.models import Product
 from apps.tax.models import TaxCategory
 from base import blueprint
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, B, in_business_a
 from base.tests.test_blueprint import call, ctx, manifest, owner
@@ -80,7 +80,7 @@ def test_what_a_backup_carries_loads_into_another_business_with_the_same_allerge
         TaxCategory.objects.get_or_create(key="restaurant.food", defaults={"name": "Comida"})
         user = get_user_model().objects.create_user(username="bea", password="pw")
         Membership.objects.create(user=user, host=B.key, role=Membership.Role.OWNER)
-        theirs = OperationContext(scope=B, actor=user, permissions=permissions_for(user, B), language="es")
+        theirs = OperationContext(scope=B, actor=user, permissions=access_for(user, B), language="es")
         result = load(theirs, exported)
         assert products_report(result)["created"] == 1
         assert Product.objects.get(sku="HAM-01").allergens == ["gluten", "milk"]

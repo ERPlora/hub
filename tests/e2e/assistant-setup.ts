@@ -141,7 +141,7 @@ export function missingFor(probe: Probe, run: SetupRun): string[] {
 export const SETUP_PY = `
 import json, os
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.operations import get
@@ -151,7 +151,7 @@ member = Membership.objects.filter(host="a", role=Membership.Role.OWNER).select_
 if member is None:
     raise SystemExit("the setup runs as the owner of a, who has not signed in to it yet")
 owner = member.user
-ctx = OperationContext(scope=scope, actor=owner, permissions=permissions_for(owner, scope), language="es")
+ctx = OperationContext(scope=scope, actor=owner, permissions=access_for(owner, scope), language="es")
 with open(os.environ["QA_SETUP_FILE"], encoding="utf-8") as handle:
     steps = json.load(handle)
 results = []

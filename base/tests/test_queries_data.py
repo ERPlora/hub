@@ -23,7 +23,7 @@ from base import blueprint
 from base.models.activation import AppActivation
 from base.models import Hub, Membership
 from base.models.blueprints import ImportBatch
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.test_services_data import born
 
@@ -34,7 +34,7 @@ pytestmark = HUB_DB
 def person(role, username="olga", language="es"):
     user = get_user_model().objects.create_user(username=username, password="pw")
     Membership.objects.create(user=user, host=A.key, role=role)
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
 
 
 @pytest.fixture
