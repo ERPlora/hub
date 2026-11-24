@@ -1,8 +1,7 @@
 """Turning ERPlora's support access to the business on or off (``base.support_access.update``)."""
 
-from django.db import IntegrityError
 from live.context import OperationContext
-from live.operations import AI, atomic, operation
+from live.operations import AI, operation
 from live.outbox import record_event
 
 from base import events, queries
@@ -10,6 +9,7 @@ from base.models.support_access import SupportAccess
 from base.permissions import ADMINISTER_HUB
 from base.schemas.support_access import SupportAccessIn, SupportAccessOut, SupportAccessUpdateIn
 from base.services.devices import _actor_label
+from base.services.single_row import locked_single_row
 
 
 @operation(
@@ -32,13 +32,7 @@ from base.services.devices import _actor_label
 )
 def support_access_update(ctx: OperationContext, data: SupportAccessUpdateIn) -> dict:
     """«Support access»: saved at once, with who changed it."""
-    row = SupportAccess.objects.select_for_update().first()
-    if row is None:
-        try:
-            with atomic():
-                row = SupportAccess.objects.create()
-        except IntegrityError:
-            row = SupportAccess.objects.select_for_update().get()
+    row = locked_single_row(SupportAccess)
     row.enabled = data.enabled
     row.updated_by = _actor_label(ctx)
     row.save()
