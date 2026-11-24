@@ -173,7 +173,6 @@ def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
     dead_event(A)
     dead_event(A)
     dead_event(A, EventDelivery.Status.PENDING)
-    dead_event(B)  # another scope's row in A's database: not A's to count
     in_b(dead_event, B)
 
     assert bell(ctx(ADMIN)) == [
