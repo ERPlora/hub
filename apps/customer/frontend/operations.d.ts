@@ -48,13 +48,13 @@ interface PageIn {
   offset?: number;
 }
 
-/** A card by its id, or by its name (or a part of it), phone or email. */
+/** A card by its id, or by its exact name, phone or email. */
 export interface CustomerRefIn {
   id?: string;
   customer?: string;
 }
 
-/** What a card belongs to: `customer_id`, or the card's name (or a part of it), phone or email. */
+/** What a card belongs to: `customer_id`, or the card's exact name, phone or email. */
 export interface CustomerOfIn {
   customer_id?: string;
   customer?: string;
