@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:1f78a90f193fce33a16cf04547d4491c8569f07d810f363e2302ff9f56aaf595 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:bbc6ad7ac4a4 -->
 
 The WhatsApp inbox puts the business's WhatsApp inside the Hub: each customer who writes to your number has a
 conversation, and your team reads it and answers from here, without picking up the phone. It links it to their
@@ -8,6 +7,7 @@ Customers card and lets you assign it to someone, mark it open, pending or close
 hours have passed since the customer's last message, you can only write to them with a template approved by Meta.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:728306f7ac0e -->
 
 The WhatsApp inbox puts the business's WhatsApp inside the Hub: each customer who writes to the business's number
 has **one conversation**, with all their messages, and the team reads it and **answers from the Hub**, without
@@ -32,6 +32,7 @@ The owner can keep answering from the WhatsApp Business app on their phone: what
 conversation as a message from the business (Meta's coexistence).
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:0581491e6162 -->
 
 | Product | How it solves it | Source |
 |---|---|---|
@@ -58,6 +59,7 @@ assigning by typing an identifier is used by nobody; sending the owner to WhatsA
 create the templates takes them out of the app for something they do every day.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:34081be3e1f0 -->
 
 1. Turn on **Customers**: the inbox does not turn on without it (it links each conversation to its card).
 2. Connect the business's WhatsApp Business number in **WhatsApp inbox → Settings → Connect WhatsApp**: Meta's
@@ -68,8 +70,10 @@ create the templates takes them out of the app for something they do every day.
 4. Write to the number from another phone and check that the conversation shows up in the inbox.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Inbox
+<!-- from WORKBOOK.md sha256:3c134a11dd62 -->
 Here are the conversations with your customers, the most recent activity first, with their status, who they are
 assigned to and how many messages are unread. Search by contact or phone (by phone, only whoever sees the customers'
 contact details), or filter by status, assignment or unread.
@@ -78,6 +82,7 @@ it, change its status or leave an internal note. Above the list, the warnings ab
 messages.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:271a055ccbf7 -->
 Menu **WhatsApp inbox → Inbox** (title "WhatsApp inbox"). Every role sees it. Table with **Contact** (the card's
 name, or the WhatsApp one, or the number), **Phone**, **Status** (Open, Pending, Closed), **Assigned to**,
 **Unread** and **Last message** (the time if it is from today, "Yesterday", or the date, on the business's clock);
@@ -116,12 +121,14 @@ the conversation"; a photo or a voice note that does not load: "The image could 
 could not be loaded.", with **Open the attachment**.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:2677dfc12bd6 -->
 For the owner and the administrator only. In **Your number** you connect, reconnect or disconnect the business's
 WhatsApp; in **This month** you see the messages sent against your plan's; in **What do you use it for?** (with
 Appointments or Reservations) you turn on the automatic answers that book appointments or tables; and in **Meta
 templates** you create, edit and delete the templates and see what Meta says about each one.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:8521ab1192ea -->
 Menu **WhatsApp inbox → Settings** (title "Channel settings"), owner and administrator only. Three blocks: **Your
 number** ("Connected" with the number and the business's name, "Not connected" or "Needs reconnecting"; not
 connected or to be reconnected, "Checking with erplora.com…" and then **Connect WhatsApp** or **Reconnect**, or the
@@ -139,6 +146,7 @@ there or was not accepted) and **Delete**. Empty: "No templates." with "Create o
 it. The ones made in WhatsApp Manager appear here too.".
 
 #### Template (sheet)
+<!-- from WORKBOOK.md sha256:151ca89ff8cf -->
 It opens with **Add template** ("New template") or **Edit** ("Edit template — name"), on top of Settings. Fields:
 **Name** ("Lowercase letters, numbers and underscores. It cannot be changed later."), **Language** and **Category**
 (Utility or Marketing), **Header type** (Text, Photo, Video or Document) with **Header (optional)** if it is text or,
@@ -152,6 +160,7 @@ approves the changes, the approved one keeps being sent."; the category of one M
 touched ("Meta only lets you change the category of a template it rejected.").
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:e7bb1752fd09 -->
 
 | Screen | Loading | Empty | Error | No permission / app off |
 |---|---|---|---|---|
@@ -161,12 +170,14 @@ touched ("Meta only lets you change the category of a template it rejected.").
 | Template (sheet) | the final button busy while it saves | — | the reason under its field, or at the top the one the Hub gives | only the owner and the administrator open it |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:c61b243d5a8c -->
 
 In "New template", "Edit template" and "Send a template", the phone's Back button asks "Discard changes?" when
 something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window
 without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:441111ec234b -->
 
 | ID | Flow | Status | Vertical |
 |---|---|---|---|
@@ -210,6 +221,7 @@ without saving. With the window as it opened, Back closes it without asking (BAS
 | WHATSAPP_INBOX-F38 | Know which question what the customer taps answers | done | common |
 
 ### WHATSAPP_INBOX-F01 Connect the business's WhatsApp number
+<!-- from WORKBOOK.md sha256:f6bc71a32f90 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -235,6 +247,7 @@ does not confirm, in a moment **Your number** says whether it ended up connected
 Involved: erplora.com (the business's WhatsApp Business account), Meta
 
 ### WHATSAPP_INBOX-F02 Disconnect or reconnect the number
+<!-- from WORKBOOK.md sha256:6b97cd52fc33 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings, Inbox
@@ -256,6 +269,7 @@ not go out ("The number needs reconnecting in Settings to send.") and a message 
 Involved: erplora.com
 
 ### WHATSAPP_INBOX-F03 Receive a message in the inbox
+<!-- from WORKBOOK.md sha256:f412247d031e -->
 Status: done
 Actor: customer, system
 Screen: Inbox
@@ -276,6 +290,7 @@ number is not saved.
 Involved: erplora.com, Customers (recognises the customer, F04)
 
 ### WHATSAPP_INBOX-F04 Recognise the customer by their number
+<!-- from WORKBOOK.md sha256:82f0b0cd9276 -->
 Status: done
 Actor: system
 Screen: none
@@ -297,6 +312,7 @@ If it fails: if two cards have the same number, it is linked to neither and the 
 Involved: Customers, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Read a conversation
+<!-- from WORKBOOK.md sha256:6403c268d017 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -319,6 +335,7 @@ If it fails: the reason inside the panel; the list stays available. While the li
 Involved: Customers (the card's name), BASE-F119
 
 ### WHATSAPP_INBOX-F06 See a photo, a voice note or a document
+<!-- from WORKBOOK.md sha256:d020659c9b65 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -340,6 +357,7 @@ if erplora.com no longer keeps it, the tab says so.
 Involved: erplora.com (keeps the attachments)
 
 ### WHATSAPP_INBOX-F07 Assign a conversation to someone on the team
+<!-- from WORKBOOK.md sha256:f148b8b5ea5c -->
 Status: done
 Actor: employee (to themselves), manager, administrator, owner
 Screen: Inbox
@@ -357,6 +375,7 @@ me** does not override anyone either.
 Involved: the business's team (the people with access to the inbox)
 
 ### WHATSAPP_INBOX-F08 Answer from the WhatsApp Business app on the phone
+<!-- from WORKBOOK.md sha256:bdafdefa0bd4 -->
 Status: done
 Actor: owner
 Screen: Inbox
@@ -370,6 +389,7 @@ If it fails: if it does not arrive, the thread does not show it; the phone still
 Involved: erplora.com, the WhatsApp Business app on the phone
 
 ### WHATSAPP_INBOX-F09 See who is waiting for an answer
+<!-- from WORKBOOK.md sha256:f6b317b309c6 -->
 Status: done
 Actor: everyone
 Screen: Inbox
@@ -394,6 +414,7 @@ If it fails: the reason with **Retry**.
 Involved: the bell in the top bar, the installed app's notifications, BASE-F119
 
 ### WHATSAPP_INBOX-F10 Erase the data of a number with no card
+<!-- from WORKBOOK.md sha256:abe82f87bcd5 -->
 Status: done
 Actor: owner, administrator
 Screen: Inbox
@@ -414,6 +435,7 @@ pressing it twice erases nothing more.
 Involved: erplora.com
 
 ### WHATSAPP_INBOX-F11 Erase a customer's data from their card
+<!-- from WORKBOOK.md sha256:ada7972dbbe9 -->
 Status: done
 Actor: system
 Screen: none (it is erased from the card, in Customers)
@@ -426,6 +448,7 @@ If it fails: the notice is retried; repeating it changes nothing.
 Involved: Customers, erplora.com
 
 ### WHATSAPP_INBOX-F12 Merge two cards of the same customer
+<!-- from WORKBOOK.md sha256:2f5ed3dff5b3 -->
 Status: done
 Actor: system
 Screen: none (they are merged from Customers)
@@ -438,6 +461,7 @@ If it fails: the notice is retried; repeating it changes nothing.
 Involved: Customers
 
 ### WHATSAPP_INBOX-F13 See the month's usage and reach the cap
+<!-- from WORKBOOK.md sha256:f06d59d641f2 -->
 Status: done
 Actor: everyone (notice), owner and administrator (Settings)
 Screen: Inbox, Settings
@@ -471,6 +495,7 @@ the account and goes on to the plans.
 Involved: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Turn on "Book appointments"
+<!-- from WORKBOOK.md sha256:27543b1f8112 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -505,6 +530,7 @@ Involved: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F33, FLOW-F34, FL
 WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F22, WHATSAPP_INBOX-F23
 
 ### WHATSAPP_INBOX-F15 Turn on "Book a table"
+<!-- from WORKBOOK.md sha256:56b00a139f07 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -539,6 +565,7 @@ Involved: RESERVATION-F17, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37,
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F16 Decide whether WhatsApp bookings confirm by themselves
+<!-- from WORKBOOK.md sha256:482afd63833b -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -563,6 +590,7 @@ Involved: APPOINTMENT-F18, APPOINTMENT-F19, RESERVATION-F04, WHATSAPP_INBOX-F14,
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F17 Turn off an automatic answer
+<!-- from WORKBOOK.md sha256:ee563d6a7cd1 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -577,6 +605,7 @@ If it fails: the card says the reason and is painted again with what is really s
 Involved: FLOW-F34, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F18 Update an automatic answer to its improved version
+<!-- from WORKBOOK.md sha256:9e8097c6f9d2 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -594,6 +623,7 @@ notice stays while something is left without updating.
 Involved: FLOW-F35, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F19 Choose the slot by writing instead of tapping
+<!-- from WORKBOOK.md sha256:d8e786da41e1 -->
 Status: done
 Actor: customer
 Screen: WhatsApp: the customer's chat
@@ -612,6 +642,7 @@ offered to them again.
 Involved: APPOINTMENT-F02, RESERVATION-F05, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F38
 
 ### WHATSAPP_INBOX-F20 When the assistant cannot answer
+<!-- from WORKBOOK.md sha256:67824fb1a277 -->
 Status: done
 Actor: system
 Screen: WhatsApp: the customer's chat; Inbox
@@ -632,6 +663,7 @@ If it fails: if the mark cannot be set, the apology goes out all the same and th
 Involved: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F21 The customer asks for an appointment on WhatsApp
+<!-- from WORKBOOK.md sha256:cd6e25206104 -->
 Status: done
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
@@ -660,6 +692,7 @@ Involved: APPOINTMENT-F02, APPOINTMENT-F18, CUSTOMER-F10, CUSTOMER-F26, FLOW-F37
 WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 The customer cancels or moves her appointment on WhatsApp
+<!-- from WORKBOOK.md sha256:0321258f4598 -->
 Status: done
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
@@ -680,6 +713,7 @@ nothing is cancelled or moved, she gets no answer and the conversation is left w
 Involved: APPOINTMENT-F04, APPOINTMENT-F06, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F23 The customer gets the notice when the salon confirms
+<!-- from WORKBOOK.md sha256:094e81974886 -->
 Status: done
 Actor: owner, manager, customer
 Screen: Automations; WhatsApp: the customer's chat
@@ -712,6 +746,7 @@ Involved: APPOINTMENT-F03, APPOINTMENT-F18, CUSTOMER-F11, FLOW-F31, FLOW-F33, WH
 WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F24 The guest asks for a table on WhatsApp
+<!-- from WORKBOOK.md sha256:03606fb83cd0 -->
 Status: done
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
@@ -742,6 +777,7 @@ Involved: RESERVATION-F05, RESERVATION-F14, RESERVATION-F17, CUSTOMER-F10, FLOW-
 WHATSAPP_INBOX-F16, WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F25 The guest cancels or changes their table on WhatsApp
+<!-- from WORKBOOK.md sha256:5631909743e5 -->
 Status: done
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
@@ -765,6 +801,7 @@ nothing is changed or cancelled, they get no answer and the conversation is left
 Involved: RESERVATION-F09, RESERVATION-F18, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F20, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F26 The guest gets the notice when the restaurant confirms
+<!-- from WORKBOOK.md sha256:ac9c9e0326ce -->
 Status: done
 Actor: owner, manager, customer
 Screen: Automations; Reservations; WhatsApp: the customer's chat
@@ -797,6 +834,7 @@ Involved: RESERVATION-F07, RESERVATION-F19, FLOW-F31, FLOW-F33, WHATSAPP_INBOX-F
 WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F27 See the templates and what Meta says about each one
+<!-- from WORKBOOK.md sha256:7a47c3cd7fb2 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -811,6 +849,7 @@ one it sent stays.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Bring in the templates created in WhatsApp Manager
+<!-- from WORKBOOK.md sha256:d00c7c7f081c -->
 Status: done
 Actor: system
 Screen: Settings
@@ -829,6 +868,7 @@ If it fails: it never overwrites a Hub template still on its way to Meta nor bri
 Involved: erplora.com, WhatsApp Manager
 
 ### WHATSAPP_INBOX-F29 Create a template and send it for review
+<!-- from WORKBOOK.md sha256:ace7dec5f369 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings, Template (sheet)
@@ -869,6 +909,7 @@ be created all the same.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F30 Edit a template
+<!-- from WORKBOOK.md sha256:df6b55feb9ac -->
 Status: done
 Actor: owner, administrator
 Screen: Settings, Template (sheet)
@@ -891,6 +932,7 @@ again**; the rest, as when creating it.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F31 Delete a template
+<!-- from WORKBOOK.md sha256:d6b728183f79 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -909,6 +951,7 @@ back, even if it keeps listing it until deleting it; a new one with the same nam
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F32 Answer from the inbox
+<!-- from WORKBOOK.md sha256:467f9e4f1b24 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -932,6 +975,7 @@ through the business's number, whoever retries it.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Send a template
+<!-- from WORKBOOK.md sha256:64403805bfc4 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -968,6 +1012,7 @@ never blames ERPlora); the rest, as when answering from the inbox.
 Involved: Customers (the marketing consent), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Know whether a message got there and was read
+<!-- from WORKBOOK.md sha256:7b1b4aac82d3 -->
 Status: done
 Actor: everyone
 Screen: Inbox
@@ -986,6 +1031,7 @@ If it fails: a status of a message the Hub does not know is ignored without an e
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F35 Change a conversation's status
+<!-- from WORKBOOK.md sha256:6b1174a07b73 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -999,6 +1045,7 @@ If it fails: the reason inside the panel; the status does not change.
 Involved: no other app
 
 ### WHATSAPP_INBOX-F36 Leave an internal note
+<!-- from WORKBOOK.md sha256:ac78ca728f84 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -1012,6 +1059,7 @@ If it fails: the reason in the panel; the employee does not delete someone else'
 Involved: no other app
 
 ### WHATSAPP_INBOX-F37 Link the conversation to a card or create the card
+<!-- from WORKBOOK.md sha256:05803ef83de4 -->
 Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
@@ -1027,6 +1075,7 @@ If it fails: Customers' reasons (for example, a number that is not valid).
 Involved: Customers, BASE-F119
 
 ### WHATSAPP_INBOX-F38 Know which question what the customer taps answers
+<!-- from WORKBOOK.md sha256:cd0912ede8ff -->
 Status: done
 Actor: customer, system
 Screen: Inbox
@@ -1043,6 +1092,7 @@ If it fails: if it answers a message this Hub did not send (or quotes one of its
 Involved: erplora.com; Appointments and Reservations, when they notify by WhatsApp
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:c13fabced482 -->
 
 The customer's number only reaches whoever sees the customers' contact details (BASE-F119): anyone else gets it empty
 in the conversations and in a message, and where whoever wrote without a name is named, masked ("+346••••2333"). The
@@ -1053,6 +1103,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 (FLOW-F12), so its notices and answers by WhatsApp keep reading the number.
 
 ### What it offers: reads (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:a1b29bfbc584 -->
 
 | Operation | What it returns | Flows |
 |---|---|---|
@@ -1074,6 +1125,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 | `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to | F07 |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:f8295e14bd8d -->
 
 | Operation | What it does | Flows |
 |---|---|---|
@@ -1113,6 +1165,7 @@ The system's (with no public route):
 | `whatsapp_inbox.conversation.erase_for_customer` | the reactions to Customers | F11 |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:e9fd3da5a500 -->
 
 `whatsapp_inbox.message.received` (with the Hub's message it answers and the option tapped, F38),
 `whatsapp_inbox.message.sent`, `whatsapp_inbox.message.status_changed`, `whatsapp_inbox.conversation.read`,
@@ -1124,6 +1177,7 @@ The system's (with no public route):
 They carry identifiers, never a number, a name or a text of the conversation.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:c76430a21229 -->
 
 - **Customers** (required): `customer.customer.created` and `customer.customer.updated` link the conversations with no
   card of that number (F04); `customer.customer.merged` moves them to the card that stays (F12);
@@ -1133,6 +1187,7 @@ They carry identifiers, never a number, a name or a text of the conversation.
   creates cards only with `customer.customer.create`.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:670e49f2135c -->
 
 - **Automations**: this app's recipe "Tell the customer by WhatsApp when their appointment is confirmed" (F23) reads
   the card, looks up the conversation with `conversation.by_phone` and notifies with `message.notify`; the business's
@@ -1151,6 +1206,7 @@ They carry identifiers, never a number, a name or a text of the conversation.
   it and it said it could not). For the assistant, a "template" and a "message" are this inbox's.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:de3054abf3ce -->
 
 | Permission | Owner | Administrator | Manager | Employee |
 |---|---|---|---|---|

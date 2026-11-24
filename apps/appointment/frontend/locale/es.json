@@ -152,7 +152,8 @@
     "deleteDialog": {
       "title": "Borrar la cita",
       "message": "¿Borrar la cita {number}? En el día a día es mejor Cancelar, que conserva el registro.",
-      "confirm": "Borrar"
+      "confirm": "Borrar",
+      "keep": "No borrar"
     },
     "history": {
       "title": "Historial de la cita",
@@ -211,7 +212,8 @@
       "deleteDialog": {
         "title": "¿Borrar las citas periódicas de {name}?",
         "message": "Las citas ya reservadas se conservan. Esta serie dejará de reservar citas nuevas.",
-        "confirm": "Borrar"
+        "confirm": "Borrar",
+        "keep": "No borrar"
       },
       "form": {
         "titleNew": "Nueva cita periódica",

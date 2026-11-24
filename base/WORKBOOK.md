@@ -4554,10 +4554,12 @@ Implicados: BASE-F97, BASE-F100
   `base/frontend/components/`); `base/frontend/lib/help.ts` guarda lo leído por módulo e idioma hasta que se recarga la
   página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños (`tests/e2e/base-help-video.spec.ts`, con el
   vídeo de Inventario en el reproductor de YouTube de verdad). El idioma es `ctx.language`:
-  el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
-  primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
-  y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
-  idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. De la primera
+  el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si
+  lleva, bajo cada encabezado, la marca con la huella del mismo apartado de la parte española
+  (`base/workbook_sections.py`; `manage.py translate_workbooks --check` dice cuáles faltan); si no, el de su idioma base
+  (`en` para `en-gb`), y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en
+  memoria por módulo e idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada
+  llamada. De la primera
   sección («Para qué sirve») se publica solo lo que va antes de su primer `###` (toda la sección, si no tiene ninguno):
   dos o tres frases; desde el primer `###` (quién lo usa, lo que no hace) se queda en el fichero y nunca se publica.
   Cada `###` bajo el encabezado de las pantallas es

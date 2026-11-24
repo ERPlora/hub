@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:0f59556c749d6f4508d11dcbf253bf106e409b685b51e67616c8b3ab91a55f22 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:2e7b715169dd -->
 
 Price Lists keeps other prices for your products and services, and the automatic discounts. A price list is a price
 other than the catalog's: for a customer group, between some dates or from a quantity on. A discount rule lowers
@@ -9,6 +8,7 @@ the lowest, with the best discount. Today the assistant and the API ask for it; 
 price.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:81066b3fa15a -->
 
 Price Lists keeps **other prices** for your products and services and the **automatic discounts**:
 
@@ -34,6 +34,7 @@ Who uses it:
 - The **employee** sees the price lists and the rules and looks up prices.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:6c8a73c0e040 -->
 
 **Which price list wins, how many automatic discounts add up and when the price is set** (skill
 `market-decision`, 2026-10-15).
@@ -97,6 +98,7 @@ counting each line as one unit is the failure the forums complain about; leaving
 does on purpose, and it leaves a delicatessen without promotions.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:9c07fa17b08e -->
 
 1. Price Lists needs **Inventory** (the products and their categories) and **Customers** (the groups):
    turning it on turns both on. **Services** is not needed: if it is there, services also get prices
@@ -109,11 +111,13 @@ does on purpose, and it leaves a delicatessen without promotions.
    says (the euro in Spain, the zloty in Poland).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:a85d140987da -->
 
 Price Lists opens from the **Price Lists** menu (tags icon). What a person cannot do does not
 show, and the app refuses it even if they try through the API or the assistant.
 
 ### Price Lists
+<!-- from WORKBOOK.md sha256:03c660f0c4cc -->
 Two tables, one above the other. At the top, the **Price lists**, with their code, name, currency, customer group,
 validity, how many prices they have and whether they are active; below, the **Discount rules**, with their type,
 their value, what they apply to and their priority. On opening the active ones show, and the toolbar's funnel also
@@ -121,6 +125,7 @@ shows the inactive ones. **+** in each table creates a price list or a rule, and
 detail with its prices.
 
 #### Price lists
+<!-- from WORKBOOK.md sha256:262e86ebf9d4 -->
 
 **Price lists**: search box "Search code or name…", columns **Code** (with the tag
 **General** if it is the general price list), **Name**, **Currency**, **Customer group** ("Everybody" if it is
@@ -141,6 +146,7 @@ name before it ("Code QA-TERRAZA", "Currency EUR", "Prices 1").
   **Open**.
 
 #### Discount rules
+<!-- from WORKBOOK.md sha256:975a3c739438 -->
 
 **Discount rules**: search box "Search code or name…", columns **Code**, **Name**, **Type**
 (Percentage, Amount per unit, Buy X, get Y, Tiered), **Value** ("10%", "€0.50 per
@@ -155,6 +161,7 @@ Code, Name, Type, Applies to and Status (as in the price lists: **Active** on op
   **Activate** (on the inactive ones). The employee has no actions.
 
 #### Price list (detail)
+<!-- from WORKBOOK.md sha256:87b132cd9811 -->
 It opens from the row and has **Back**; its title is the price list's name. At the top, the price list:
 **Code** with the tag **General**, **Customer group** ("Everybody" on the general one), **Currency**,
 **Tax**, **Validity** and **Status**, and in the bar **Edit**, **Make general** and **Deactivate /
@@ -173,6 +180,7 @@ by Item, From and Price; filtered by Type, with the funnel; 50 per page.
   confirmation).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:13a232756554 -->
 
 | State | What the person sees |
 |---|---|
@@ -185,12 +193,14 @@ by Item, From and Price; filtered by Type, with the funnel; 50 per page.
 | Price list that does not exist | The detail says "This price list does not exist" with **Back**. |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:abbfb5021605 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); the currency proposed by itself and an amount rewritten in the business's are no change.
 
 ## Flows
+<!-- from WORKBOOK.md sha256:a14eff0e9166 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -211,6 +221,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the curr
 | PRICING-F15 | Recover the price list prices from a separate copy | done |
 
 ### PRICING-F01 See the price lists
+<!-- from WORKBOOK.md sha256:f015a50d781f -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, employee, assistant
 Screen: Price Lists
@@ -223,6 +234,7 @@ If it fails: the table's notice with "Retry".
 Involved: Customers (the group's name)
 
 ### PRICING-F02 Create a price list
+<!-- from WORKBOOK.md sha256:32e5ee1ced31 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
@@ -246,6 +258,7 @@ toggle turns off by itself with a group or with another currency).
 Involved: Customers
 
 ### PRICING-F03 Edit a price list
+<!-- from WORKBOOK.md sha256:6a94c5d3d5de -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
@@ -260,6 +273,7 @@ until it is removed or another one is chosen.
 Involved: Customers
 
 ### PRICING-F04 Choose the general price list
+<!-- from WORKBOOK.md sha256:b59b06b28d95 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
@@ -278,6 +292,7 @@ in a moment.", never a server error.
 Involved: none
 
 ### PRICING-F05 Deactivate or reactivate a price list
+<!-- from WORKBOOK.md sha256:7ef7851fc9fc -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
@@ -292,6 +307,7 @@ deactivating it.", "That price list is already deactivated.", "That price list i
 Involved: none
 
 ### PRICING-F06 See the prices of a price list
+<!-- from WORKBOOK.md sha256:35198fb76c6c -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, employee, assistant
 Screen: Price list (detail)
@@ -306,6 +322,7 @@ If it fails: "This price list does not exist" with **Back**.
 Involved: Inventory, Services
 
 ### PRICING-F07 Put the price of a product or a service in a price list
+<!-- from WORKBOOK.md sha256:169b39fd05cf -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price list (detail)
@@ -331,6 +348,7 @@ business.".
 Involved: Inventory, Services
 
 ### PRICING-F08 Change or remove a price
+<!-- from WORKBOOK.md sha256:d7e2c31486e6 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price list (detail)
@@ -349,6 +367,7 @@ available…"): the detail offers neither **+** nor **Edit**, only **Remove**.
 Involved: none
 
 ### PRICING-F09 See the discount rules
+<!-- from WORKBOOK.md sha256:f9bdda571ab2 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, employee, assistant
 Screen: Price Lists
@@ -361,6 +380,7 @@ If it fails: the table's notice with "Retry".
 Involved: Inventory, Customers
 
 ### PRICING-F10 Create a discount rule
+<!-- from WORKBOOK.md sha256:cd0731a1a764 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
@@ -394,6 +414,7 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, **Cr
 Involved: Inventory, Services, Customers
 
 ### PRICING-F11 Edit a rule
+<!-- from WORKBOOK.md sha256:a8a9718e0ccb -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
@@ -407,6 +428,7 @@ If it fails: the same refusals as when creating.
 Involved: Inventory, Services, Customers, Sales
 
 ### PRICING-F12 Deactivate or reactivate a rule
+<!-- from WORKBOOK.md sha256:1f58495485dd -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
@@ -421,6 +443,7 @@ before activating it.": without a group it would apply to everybody.
 Involved: Customers
 
 ### PRICING-F13 Look up the price of a line
+<!-- from WORKBOOK.md sha256:25ef0c00ab5d -->
 Status: done (it has no screen of its own: whoever sells or the assistant asks for it; Sales does not ask for it yet, see "Contract with Sales")
 Actor: system (Sales), assistant, employee through the API
 Screen: none
@@ -455,6 +478,7 @@ quantity that is not greater than 0.
 Involved: Inventory, Services, Customers, Sales
 
 ### PRICING-F14 When a product is deleted or comes back, a category or a group is deleted, or a service changes
+<!-- from WORKBOOK.md sha256:cc0e88b71e3a -->
 Status: done (it has no screen: the app does it by itself, a few seconds after the other app's change)
 Actor: system
 Screen: none
@@ -481,6 +505,7 @@ deleted again before the notice arrives, none is switched on.
 Involved: Inventory, Customers, Services, INVENTORY-F34, PRICING-F15
 
 ### PRICING-F15 Recover the price list prices from a separate copy
+<!-- from WORKBOOK.md sha256:21a4b6567131 -->
 Status: done
 Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
 Screen: none of Price Lists: in the Hubs admin, Separate copies › "Recover into the business…", with **Price list
@@ -515,6 +540,7 @@ service an earlier recovery brought back before this rule does not keep it, and 
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:4917ebf7a5bc -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of whoever speaks)
 and the API, with the same rules and the same permissions. A price list is named by its id, its code or its
@@ -524,6 +550,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 (`pricing.ambiguous_price_list`, `pricing.ambiguous_rule` or the owning app's).
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:524f6a414507 -->
 
 | What it gives | Who can | Flows | Service | Live |
 |---|---|---|---|---|
@@ -537,6 +564,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | The name of the service, the category or the customer group a price list, a price or a rule points at, by its id (a service's, with the Services permission of whoever asks) | view | F02, F03, F07, F08, F10, F11 | `pricing.catalog.get` | no |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:64aa464ad656 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -563,6 +591,7 @@ putting, changing and removing prices (to sync prices from another system); choo
 deactivating and the rules, only from the Hub or the assistant.
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:fa0d66ddfcaa -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -583,6 +612,7 @@ line, and use the Price Lists actions that do not ask for confirmation (FLOW-F11
 put or change a price and create, change or reactivate a rule.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:e7612a790173 -->
 - **Inventory** (`requires`): the prices and the rules point at its products and categories; Price Lists reads
   their name, SKU, unit, step and catalog price. It reacts to `inventory.product.deleted`,
   `inventory.product.restored` and `inventory.category.deleted` (F14).
@@ -597,6 +627,7 @@ put or change a price and create, change or reactivate a rule.
   (BASE-F114), to which Price Lists says which prices it gives back (F15).
 
 ### Contract with Sales
+<!-- from WORKBOOK.md sha256:2b0e5490a83c -->
 Sales does **not** require Price Lists and Price Lists does not touch Sales. What is asked of Sales (this app does not do it):
 
 1. In `sale.order.add_line` and `sale.order.add_service_line`, if Price Lists is active, call **by
@@ -620,6 +651,7 @@ Sales does **not** require Price Lists and Price Lists does not touch Sales. Wha
    ruling.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:7550af69dcc5 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
