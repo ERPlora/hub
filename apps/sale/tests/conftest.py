@@ -11,6 +11,7 @@ by hand: the integration with ``tax``, ``inventory``, ``customer`` and ``service
 """
 
 import datetime as dt
+import json
 from decimal import Decimal
 
 import pytest
@@ -24,6 +25,7 @@ from live.models import OutboxEvent
 from live.operations import get, registry
 from psycopg.conninfo import make_conninfo
 
+from base import activation, assistant
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
@@ -55,6 +57,18 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
+
+
+def charged_by_the_assistant(order):
+    """The assistant's charge of the open check ``order`` in cash, said in Spanish, once its card was confirmed: what
+    the model hears back from ``sale.sale.complete``, which is ``ok``."""
+    outcome = assistant.tools.run(
+        ctx_for(language="es"),
+        get("sale.sale.complete"),
+        json.dumps({"order_id": str(order.id), "idempotency_key": "assistant-0001", "payments": [{"method": "cash"}]}),
+    )
+    assert outcome.outcome == "ok", outcome.content
+    return outcome
 
 
 #: Bogotá at 23:30 of 2 November 2026, already the 3rd in Madrid, the deployment's clock (hub#771).
@@ -299,6 +313,12 @@ def refund(sale, *, lines=(), allocations=(), key=None, ctx=None):
         },
         ctx,
     )
+
+
+@pytest.fixture
+def without_kitchen(monkeypatch):
+    """A business without Kitchen, as a shop or a salon sells: a charge sends nothing to it first."""
+    monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"kitchen"}))
 
 
 @pytest.fixture

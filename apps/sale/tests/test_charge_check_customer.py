@@ -6,13 +6,11 @@ import json
 
 import pytest
 from live.models import OutboxEvent
-from live.operations import get
 
 from apps.customer import events as customer_events
 from apps.customer.models import Customer
 from apps.sale.models import Sale
-from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
-from base import assistant
+from apps.sale.tests.conftest import HUB_DB, A, charged_by_the_assistant, run
 
 pytestmark = HUB_DB
 
@@ -45,12 +43,7 @@ def delivered_purchase():
 
 def test_the_assistant_charging_a_check_with_a_customer_leaves_the_sale_and_the_purchase_hers(coffee, lucia):
     order = open_check(lucia)
-    outcome = assistant.tools.run(
-        ctx_for(language="es"),
-        get("sale.sale.complete"),
-        json.dumps({"order_id": str(order.id), "idempotency_key": "assistant-0001", "payments": [{"method": "cash"}]}),
-    )
-    assert outcome.outcome == "ok", outcome.content
+    outcome = charged_by_the_assistant(order)
     sale = Sale.objects.get(order_id=order.id)
     assert (sale.customer_id, sale.customer_name) == (lucia.id, "Lucía Martín")
     assert json.loads(outcome.content)["customer_id"] == str(lucia.id)
