@@ -11,10 +11,10 @@ import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/front
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useLocale, useT } from '../composables/useT';
-import type { BookingRow, PublicBookingOut } from '../operations';
+import type { BookedOut, BookingRow, PublicBookingOut } from '../operations';
 
 const props = withDefaults(defineProps<{
-  booking: BookingRow | PublicBookingOut | null;
+  booking: BookingRow | PublicBookingOut | BookedOut | null;
   token?: string;
   pending?: boolean;
   error?: ApiError | null;

@@ -202,6 +202,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
 
       // ONLINE_BOOKING-F11: she cancels it with her link, within the policy: «the customer asked» in the diary.
       await view.locator('[data-testid=ob-preview-cancel]').click();
+      await expect(page.locator('[data-testid=ob-cancel]')).toContainText(`Cancel booking ${number}`);
+      await page.locator('[data-testid=ob-cancel-submit]').click();
       await expect(status).toContainText('Cancelled');
       await expect(view.locator('[data-testid=ob-preview-cancel]')).toHaveClass(/button-disabled/);
       expect(psql(`select status || ' ' || cancelled_by_customer from appointment_appointment where id = '${appointment.id}'`)).toBe('cancelled true');
