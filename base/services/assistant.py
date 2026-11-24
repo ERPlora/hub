@@ -288,7 +288,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     last = rounds >= shared.MAX_ROUNDS
     with _assistant_switched(ctx, executed) as switched:
         tools = assistant.tools.catalog(ctx) if switched else tools
-        offered, off = _assistant_offer(ctx, tools, still_open, last=last)
+        offered, off = _assistant_offer(ctx, tools, still_open, last=last, switched=switched)
         text = _assistant_instructions(ctx, business, offered, setup=data.setup, off=off)
     stop = "assistant.too_many_steps" if rounds > shared.MAX_ROUNDS + 1 else ""
     return {
@@ -317,23 +317,24 @@ def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
 
 @contextlib.contextmanager
 def _assistant_switched(ctx: OperationContext, executed: list[dict]) -> Iterator[bool]:
-    """Whether a write of this turn turned an app on or off (``assistant.apps_not_on.SWITCHES``): then the round that
-    follows reads the apps on from their rows, not committed yet, where the cache still keeps what was before
+    """Whether a write of this turn asked to turn an app on or off (``assistant.apps_not_on.SWITCHES``): then the round
+    that follows reads the apps on from their rows, not committed yet, where the cache still keeps what was before
     (``activation.changing``), so an app just turned on brings its tools to what was asked."""
-    if not any(ran["name"] in assistant.apps_not_on.SWITCHES and ran["outcome"] == "ok" for ran in executed):
+    if not any(ran["name"] in assistant.apps_not_on.SWITCHES for ran in executed):
         yield False
         return
     with activation.changing(ctx.scope.key):
         yield True
 
 
-def _assistant_offer(ctx: OperationContext, tools: dict, still_open: list[dict], *, last: bool) -> tuple[list, list]:
+def _assistant_offer(ctx: OperationContext, tools: dict, still_open: list, *, last: bool, switched: bool) -> tuple:
     """What the round offers: the tools of what was asked in the request still open, by relevance, with the switch for
-    the apps not on whose tools would do it, and those apps (``assistant.apps_not_on``); nothing on the last round."""
+    the apps not on it names, and those apps (``assistant.apps_not_on``); none of them right after an app went on or
+    off (``switched``: what is on was just decided), and nothing on the last round."""
     if last:
         return [], []
     words, searched = _assistant_asked(still_open), _assistant_searched(still_open)
-    off = assistant.apps_not_on.named(ctx, words, searched)
+    off = [] if switched else assistant.apps_not_on.named(ctx, words, searched)
     offered = assistant.relevance.relevant(tools, words, ctx.language, searched=searched)
     return assistant.apps_not_on.with_switch(offered, tools, off), off
 

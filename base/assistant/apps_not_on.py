@@ -1,23 +1,26 @@
-"""The business's apps that are not on whose tools would do what a request asks (``named``), what the model hears of
-them (``said``) and the switch a turn offers for them (``with_switch``).
+"""The business's apps that are not on that a request names (``named``), what the model hears of them (``said``) and
+the switch a turn offers for them (``with_switch``).
 
 A turn offers only the tools of the apps on (``base.assistant.tools.catalog``), so the model never knew that an app off
-did what was asked: it said it could not, or did something else with the tools it had. The person's words and the
-model's searches are ranked here as a turn ranks them, against the tools the person would have with every app on; an
-app not on with a tool among the places a turn gives is named as ``base.app.get`` reads it (its name, its state and what
-it is for), best first and ``NAMED`` at most, and whoever may turn apps on is offered ``base.app.enable``, whose card asks
-before it does. Its own tools stay out until it is on.
+did what was asked: it said it could not, or did something else with the tools it had. An app not on is named when the
+person's words, or the model's searches, say its name (``_names``) and it has a tool among the places a turn gives with
+every app on: as ``base.app.get`` reads it (its name, its state and what it is for), best first and ``NAMED`` at most.
+Whoever may turn apps on is offered ``base.app.enable``, whose card asks before it does. Its own tools stay out until it
+is on. What the apps on do names none: «¿cuántos servicios tengo?» says no app off, though one of their tools may rank
+among those places.
 """
 
 from collections.abc import Iterable
+from functools import cache
 
-from live.assistant import tool_name
+from django.apps import apps as django_apps
+from django.utils import translation
+from live.assistant import stems, tool_name
 from live.context import OperationContext
 from live.operations import Operation, get
 
 from base import home
 from base.assistant import relevance, tools
-from base.tenancy.context import current_hub
 
 #: The apps not on a turn names at most: the ones whose tools rank first say which does it, and each one more is
 #: tokens in every call of the request.
@@ -32,28 +35,41 @@ DOES_IT = (
     "another tool."
 )
 TURN_ON = (
-    f" Off: offer to turn it on with `{tool_name(ENABLE)}`, whose card asks the person, then go on with what they asked."
-    " Blocked: a paid app the business has no right to, bought on erplora.com. Creating: on in a moment. Failed: it is"
-    " tried again in Apps."
+    f" Off: offer to turn it on with `{tool_name(ENABLE)}`, whose card asks the person, then go on with what they"
+    " asked. Blocked: a paid app the business has no right to, bought on erplora.com. Creating: on in a moment. Failed:"
+    " it is tried again in Apps."
 )
 ASK_WHO_RUNS_IT = " Whoever runs the business turns it on in Apps."
 
 
 def named(ctx: OperationContext, texts: Iterable[str], searched: Iterable[str]) -> list[dict]:
-    """The apps not on whose tools rank among a turn's places for ``texts`` and the model's ``searched`` tasks, against
-    what ``ctx``'s person would hold with every app on, best first and ``NAMED`` at most, as ``base.app.get`` reads each.
-    None when every app the business may see is on."""
-    hub = current_hub()
+    """The apps not on whose name ``texts`` or the model's ``searched`` tasks say, with a tool among a turn's places for
+    them against what ``ctx``'s person would hold with every app on: best first and ``NAMED`` at most, as
+    ``base.app.get`` reads each. None when no app off is said."""
+    texts, searched = list(texts), list(searched)
+    words = set().union(*(stems(text) for text in [*texts, *searched]))
     on = tools.active_apps(ctx.scope)
-    shown = {config.label for config in home.shown_modules(demo_hub=hub is not None and hub.is_demo)}
-    not_on = shown - set(on)
-    if not not_on:
+    not_on = {config.label for config in home.shown_modules()} - set(on)
+    called = {label for label in not_on if not words.isdisjoint(_names(label, ctx.language))}
+    if not called:
         return []
     every = tools.catalog(ctx, active_labels={*on, *not_on})
-    ranked = relevance.relevant(every, list(texts), ctx.language, searched=list(searched))
-    labels = list(dict.fromkeys(op.app_label for op in ranked if op.app_label in not_on))[:NAMED]
+    ranked = relevance.relevant(every, texts, ctx.language, searched=searched)
+    labels = list(dict.fromkeys(op.app_label for op in ranked if op.app_label in called))[:NAMED]
     read = get("base.app.get")
     return [read(ctx, read.input(app=label)).model_dump(mode="json") for label in labels]
+
+
+@cache
+def _names(label: str, language: str) -> frozenset[str]:
+    """The stems of app ``label``'s name in English and in ``language``, as the menu says it: compared with the words as
+    they are said, never with what they also mean («precio» is no Price Lists; «reservas» is Reservations)."""
+    config = django_apps.get_app_config(label)
+    found: set[str] = set()
+    for code in ("en", language):
+        with translation.override(code):
+            found |= stems(str(config.verbose_name))
+    return frozenset(found)
 
 
 def said(ctx: OperationContext, apps: list[dict]) -> str:

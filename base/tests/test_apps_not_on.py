@@ -193,11 +193,11 @@ def test_once_the_yes_turns_the_app_off_the_round_that_follows_offers_none_of_it
     """What the person just turned off is no app to offer back, and its tools run no more."""
     set_rows(**{label: "on" for label in activation.module_graph()})
     context = owner_of_a(make_user, "es")
-    said = "quita Citas del menú"
-    assert of_app(offered(turn(context, user(said))), "appointment") != []  # positive control: on, they are offered
-    plan = said_yes(context, said, "base.app.disable", "appointment")
+    said = "quita Tareas del menú"
+    assert of_app(offered(turn(context, user(said))), "task") != []  # positive control: on, they are offered
+    plan = said_yes(context, said, "base.app.disable", "task")
     assert json.loads(plan["append"][0]["content"])["state"] == "off"
-    assert of_app(offered(plan), "appointment") == []
+    assert of_app(offered(plan), "task") == []
     assert HEADER not in plan["instructions"]
 
 
@@ -257,13 +257,13 @@ def test_at_most_three_apps_not_on_are_named_the_best_first(make_user):
     are enough to say which does it, and each one more costs tokens in every call of the request."""
     set_rows(tax="on")
     context = owner_of_a(make_user, "es")
-    said = "quiero llevar las ventas, la caja, la cocina y las mesas"
-    called = {"sale", "cash_register", "kitchen", "table"}  # the apps this says by their names
+    said = "crea una reserva, una cita, una tarea y una factura"
+    called = {"reservation", "online_booking", "appointment", "task", "invoice"}  # the apps it says by their names
     shown = {config.label for config in home.shown_modules()}
     every = assistant.tools.catalog(context, active_labels={*shown, "base"})
     ranked = assistant.relevance.relevant(every, [said], "es")
     best = list(dict.fromkeys(op.app_label for op in ranked if op.app_label in called))
-    assert len(best) == 4  # positive control: all four have a tool among the places
+    assert len(best) > 3  # positive control: more than three have a tool among the places
     text = turn(context, user(said))["instructions"]
     assert [app for app in best if said_off(context, app) in text] == best[:3]
 
