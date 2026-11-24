@@ -241,6 +241,7 @@ def test_the_period_is_the_issue_date_of_the_business_s_clock(issuer, monkeypatc
     [
         ({"issue_date_from": "2026-10-01", "issue_date_to": "2026-10-31"}, "invoices-2026-10.xlsx"),
         ({"issue_date_from": "2026-10-05", "issue_date_to": "2026-10-12"}, "invoices-2026-10-05_2026-10-12.xlsx"),
+        ({"issue_date_from": "2026-10-05", "issue_date_to": "2026-10-31"}, "invoices-2026-10-05_2026-10-31.xlsx"),
         ({"issue_date_from": "2026-10-05"}, "invoices.xlsx"),
     ],
 )
