@@ -307,7 +307,6 @@ def _product_row(product: Product, urls: images.Urls) -> dict:
     """What the till reads of the product (``_sale_row``) and what only the back office does."""
     fields = (
         "ean13",
-        "description",
         "stock",
         "low_stock_threshold",
         "track_stock",
@@ -327,6 +326,7 @@ def _sale_row(product: Product, urls: images.Urls) -> dict:
     fields = (
         "id",
         "name",
+        "description",
         "sku",
         "product_type",
         "price",

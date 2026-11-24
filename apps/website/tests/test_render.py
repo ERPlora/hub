@@ -812,7 +812,12 @@ def catalog_block_tokens(html: str) -> list[str]:
 
 def test_the_catalog_block_is_the_markup_the_public_bundle_rebuilds():
     fixture = json.loads(CATALOG_FIXTURE.read_text(encoding="utf-8"))
-    assert {case["name"] for case in fixture["cases"]} == {"two categories", "one category", "empty"}
+    assert {case["name"] for case in fixture["cases"]} == {
+        "two categories",
+        "one category",
+        "products with a photo, a description and allergens",
+        "empty",
+    }
     for case in fixture["cases"]:
         assert catalog_block_tokens(render(catalog=case["catalog"])) == tokens(case["html"]), case["name"]
 

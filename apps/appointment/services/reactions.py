@@ -10,7 +10,8 @@ from live.outbox import record_event
 
 from apps.appointment import events
 from apps.appointment.models import Appointment, History, Recurring
-from apps.appointment.queries import BUSY, MOVABLE, now
+from apps.appointment.queries.business import now
+from apps.appointment.queries.reads import BUSY, MOVABLE
 from apps.appointment.schemas import (
     CustomerEventIn,
     MemberEventIn,

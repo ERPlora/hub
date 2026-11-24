@@ -38,6 +38,7 @@ from live.markdown import render_markdown
 from apps.website.choices import DAY_LABELS
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
 from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
+from base.allergens import names as allergen_names
 from base.business import money_text, zone_of
 
 #: The sections between the hero and the footer, in their order.
@@ -179,6 +180,10 @@ def catalog_view(catalog: dict | None, currency: str) -> dict:
                     "price_kind": item.get("price_kind", "none") if show_prices else "none",
                     "minutes": item.get("minutes"),
                     "price_label": price_label(item, currency) if show_prices else "",
+                    "description": item.get("description", ""),
+                    "image_url": item.get("image_url", ""),
+                    "allergens": item.get("allergens", []),
+                    "allergens_label": allergens_label(item.get("allergens", [])),
                 }
                 for item in group.get("items", [])
             ],
@@ -186,6 +191,12 @@ def catalog_view(catalog: dict | None, currency: str) -> dict:
         for group in catalog.get("groups", [])
     ]
     return {"source": catalog["source"], "show_prices": show_prices, "groups": groups}
+
+
+def allergens_label(codes: list[str]) -> str:
+    """«Allergens: Gluten, Milk» in the active language, as the till's screens say them; nothing without one."""
+    named = allergen_names(codes)
+    return pgettext("website", "Allergens: %(names)s") % {"names": named} if named else ""
 
 
 def price_label(item: dict, currency: str) -> str:

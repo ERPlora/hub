@@ -26,6 +26,7 @@ from apps.website.tests.conftest import (
     page_names,
     with_language,
 )
+from apps.website.tests.test_qr import expected_dark, png_dark, svg_dark
 from apps.website.tests.test_services import run
 from base.models import Hub
 from base.tenancy.context import use_hub
@@ -128,6 +129,17 @@ def test_the_qr_is_the_hubs_address_as_png_or_svg():
     assert base64.b64decode(svg.content_base64).startswith(b"<svg")
 
 
+def test_the_catalogs_qr_opens_the_page_right_at_its_catalog():
+    request = RequestFactory().get("/api/website/qr", HTTP_HOST=f"{HOST}:8000")
+    catalog = f"http://{HOST}:8000/#catalog"
+    png = run("website.qr.get", {"format": "png", "target": "catalog"}, ctx_for("hub_manager", request=request))
+    assert (png.url, png.filename) == (catalog, f"website-catalog-qr-{A.key}.png")
+    assert png_dark(base64.b64decode(png.content_base64)) == expected_dark(catalog)
+    svg = run("website.qr.get", {"format": "svg", "target": "catalog"}, ctx_for(request=request))
+    assert (svg.url, svg.filename) == (catalog, f"website-catalog-qr-{A.key}.svg")
+    assert svg_dark(base64.b64decode(svg.content_base64)) == expected_dark(catalog)
+
+
 # The catalog, by the other apps' operations
 
 
@@ -151,13 +163,14 @@ def test_the_services_catalog_is_grouped_by_category_in_their_order(services_cat
 
 def test_the_products_catalog_lists_what_is_on_sale_by_category(products_catalog):
     snapshot = read_catalog(ctx_for(None), CatalogSection(source="inventory", show_prices=False))
+    bare = {"minutes": None, "description": "", "image_url": "", "allergens": []}
     assert snapshot == {
         "source": "inventory",
         "show_prices": False,
         "groups": [
-            {"name": "Food", "items": [{"name": "Bocata", "price": 550, "price_kind": "fixed", "minutes": None}]},
-            {"name": "Drinks", "items": [{"name": "Cola", "price": 250, "price_kind": "fixed", "minutes": None}]},
-            {"name": "", "items": [{"name": "Loose", "price": 0, "price_kind": "none", "minutes": None}]},
+            {"name": "Food", "items": [{"name": "Bocata", "price": 550, "price_kind": "fixed", **bare}]},
+            {"name": "Drinks", "items": [{"name": "Cola", "price": 250, "price_kind": "fixed", **bare}]},
+            {"name": "", "items": [{"name": "Loose", "price": 0, "price_kind": "none", **bare}]},
         ],
     }
 

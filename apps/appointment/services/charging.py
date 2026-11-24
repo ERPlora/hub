@@ -9,7 +9,8 @@ from live.operations import UnknownOperation, get, operation
 
 from apps.appointment import events
 from apps.appointment.models import Appointment
-from apps.appointment.queries import CHANGE_OWN, find_appointment, may_change
+from apps.appointment.queries.access import CHANGE_OWN, may_change
+from apps.appointment.queries.reads import find_appointment
 from apps.appointment.schemas import AppointmentRefIn, ChargeOut
 from apps.appointment.services.writes import (
     ALREADY_CHARGED,
