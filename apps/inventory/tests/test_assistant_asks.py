@@ -204,8 +204,12 @@ QA_ORDER_ARRIVED = [
 @HUB_DB
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
 @pytest.mark.parametrize(("language", "phrase"), QA_ORDER_ARRIVED)
-def test_the_drinks_order_told_as_arrived_is_offered_the_reception(catalog_of, role, language, phrase):
-    assert_offered_or_found(catalog_of(role, language), "inventory.stock.receive", phrase, language=language)
+def test_the_drinks_order_told_as_arrived_is_offered_the_reception_and_still_a_check(catalog_of, role, language, phrase):
+    """The reception is offered and adding a line to a table's check still is: should the order be a table's after all,
+    the model can still take it as one."""
+    tools = catalog_of(role, language)
+    assert_offered_or_found(tools, "inventory.stock.receive", phrase, language=language)
+    assert "sale.order.add_line" in offered_to(tools, phrase, language)
 
 
 #: An order told as arrived or come in, each with the words that name it as goods: a customer's order is taken, sent to

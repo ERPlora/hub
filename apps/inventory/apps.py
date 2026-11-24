@@ -61,9 +61,8 @@ class InventoryConfig(LiveAppConfig):
     # de» a product, and what is noted down as arrived, which are also its stock (inventory.stock); not the bottles, cans
     # or units a sale line or a cart counts too. A restaurant's «carta» is its products, in the very group live says for
     # them (with fewer words it would be a second concept, and «los productos de la carta» would count the products
-    # twice). What broke is the breakage
-    # a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem is a staff member's break), and
-    # told as broken («se han roto», «got broken») it is stock too, so beside a count it still brings the write-off;
+    # twice). What broke is the breakage a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem
+    # is a staff member's break), and told as broken («se han roto», «got broken») it is stock too, so beside a count it still brings the write-off;
     # not «rota» nor «rotas», which say what the business's own things are («la cadena está rota»).
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
