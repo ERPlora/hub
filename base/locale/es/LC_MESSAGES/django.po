@@ -2578,6 +2578,9 @@ msgstr "El asistente envió datos que no valen."
 msgid "The assistant sent data that does not fit: {names}."
 msgstr "El asistente envió datos que no valen: {names}."
 
+msgid "The assistant did not say what to change."
+msgstr "El asistente no dijo qué cambiar."
+
 #: models/roles.py
 msgid "description"
 msgstr "descripción"
