@@ -11,20 +11,13 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 import { A, api, capture, psql } from './helpers';
 import { keepPhotoOfA, type PhotoOfA } from './saas-photo';
 import { STACK } from './stack';
-import { atRest, ownerOfTheSite, photo, type Site } from './website-helpers';
+import { atRest, ownerOfTheSite, photo, PUBLIC_SIZES, type Site, siteBackOffline, WIDE } from './website-helpers';
 
 const KEY = 'HUBS-F17-CUSTOM-DOMAIN';
 const DOMAIN = 'www.minegocio.test';
 const UNKNOWN = 'scanner.example.test';
 const ON_DOMAIN = `http://${DOMAIN}:${STACK.hubPort}`;
 const TITLE = 'Our own domain, in the browser';
-const SIZES = [
-  { name: '375', width: 375, height: 667 },
-  { name: '820', width: 820, height: 1180 },
-  { name: '1440', width: 1440, height: 900 },
-] as const;
-const WIDE = { width: 1440, height: 900 };
-
 
 test.describe.configure({ mode: 'serial' });
 test.use({ launchOptions: { args: [`--host-resolver-rules=MAP ${DOMAIN} 127.0.0.1, MAP ${UNKNOWN} 127.0.0.1`] } });
@@ -74,12 +67,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   try {
     await pushPhoto(null);
-    if (owner && found) {
-      const restored = await api(owner.context, A, 'POST', '/website/site', { template: found.template, theme: found.theme, content: found.content });
-      expect(restored.status, JSON.stringify(restored.data)).toBe(200);
-      const offline = await api(owner.context, A, 'POST', '/website/site/unpublish');
-      expect(offline.status, JSON.stringify(offline.data)).toBe(200);
-    }
+    if (owner && found) await siteBackOffline(owner.context, found);
   } finally {
     saasPhoto?.putBack();
     await owner?.context.close();
@@ -87,7 +75,7 @@ test.afterAll(async () => {
 });
 
 test(`${KEY}: the published page opens on the domain with its bundle, its image and no call to the API, at 375, 820 and 1440`, async ({ browser }) => {
-  for (const size of SIZES) {
+  for (const size of PUBLIC_SIZES) {
     const { context, page } = await visitor(browser, { width: size.width, height: size.height });
     const failures: string[] = [];
     const asked: string[] = [];

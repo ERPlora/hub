@@ -11,17 +11,11 @@ import { A, api, capture, psql } from './helpers';
 import { cleanInventory, createProduct, stamp } from './inventory-helpers';
 import { keepPhotoOfA, type PhotoOfA } from './saas-photo';
 import { STACK } from './stack';
-import { atRest, ownerOfTheSite, photo, type Site } from './website-helpers';
+import { atRest, ownerOfTheSite, photo, PUBLIC_SIZES, type Site, siteBackOffline, WIDE } from './website-helpers';
 
 const KEY = 'WEBSITE-MENU';
 const DOMAIN = 'www.micarta.test';
 const ON_DOMAIN = `http://${DOMAIN}:${STACK.hubPort}`;
-const SIZES = [
-  { name: '375', width: 375, height: 667 },
-  { name: '820', width: 820, height: 1180 },
-  { name: '1440', width: 1440, height: 900 },
-] as const;
-const WIDE = { width: 1440, height: 900 };
 const RUN = stamp();
 const CATEGORY = `E2E Tapas ${RUN}`;
 const TOAST = 'E2E Tostada';
@@ -97,12 +91,7 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async () => {
   try {
-    if (owner && found) {
-      const restored = await api(owner.context, A, 'POST', '/website/site', { template: found.template, theme: found.theme, content: found.content });
-      expect(restored.status, JSON.stringify(restored.data)).toBe(200);
-      const offline = await api(owner.context, A, 'POST', '/website/site/unpublish');
-      expect(offline.status, JSON.stringify(offline.data)).toBe(200);
-    }
+    if (owner && found) await siteBackOffline(owner.context, found);
   } finally {
     saasPhoto?.putBack();
     cleanInventory();
@@ -113,7 +102,7 @@ test.afterAll(async () => {
 test(`${KEY}: the catalog's address opens the page at the menu, each dish with its photo, description and allergens, at 375, 820 and 1440`, async ({
   browser,
 }) => {
-  for (const size of SIZES) {
+  for (const size of PUBLIC_SIZES) {
     const { context, page, failures } = await visitor(browser, { width: size.width, height: size.height });
     const response = await page.goto(`${A}/#catalog`);
     expect(response?.status()).toBe(200);
@@ -158,7 +147,7 @@ test(`${KEY}: «Share and QR» gives the catalog's own address and QR, to print 
   const download = page.waitForEvent('download');
   await page.getByTestId('website-share-catalog-png').click();
   expect((await download).suggestedFilename()).toBe('website-catalog-qr-a.png');
-  for (const size of SIZES) {
+  for (const size of PUBLIC_SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await qr.scrollIntoViewIfNeeded();
     await atRest(page);
