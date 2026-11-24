@@ -413,6 +413,8 @@ Pasos:
 1. Con la búsqueda y los filtros que se quieran, pulsa **Exportar CSV**.
 2. El navegador descarga el fichero «customers.csv» con TODAS las fichas que cumplen la búsqueda, no solo la
    página que se ve.
+3. Pedido al asistente («Sácame todos los clientes en un CSV»), bajo su respuesta sale «Descargar customers.csv», el
+   mismo fichero que da el botón; el asistente no pega las fichas en el chat.
 Entra: la búsqueda y los filtros de la tabla.
 Sale: un fichero con las columnas `name`, `email`, `phone`, `tax_id`, `company_name`, `address`,
 `city`, `postal_code`, `country`, `lifecycle_stage`, `notes`, `source`, `is_active`,
@@ -423,7 +425,7 @@ un apóstrofo delante para que la hoja de cálculo no lo lea como una fórmula; 
 ve el contacto de los clientes (BASE-F119) le sale sin las columnas `email` ni `phone`.
 Si falla: sin permiso de exportar, el servidor lo rechaza aunque se llame por la API. Sin fichas,
 sale un fichero solo con las cabeceras.
-Implicados: BASE-F112 (dentro de la app)
+Implicados: BASE-F112 (dentro de la app y desde el asistente)
 
 ### CUSTOMER-F10 Reconocer a una persona por su número de teléfono
 Estado: hecho

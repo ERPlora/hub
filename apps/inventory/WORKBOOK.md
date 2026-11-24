@@ -601,6 +601,9 @@ Pasos:
    filtros, no solo la página que se ve.
 3. En **Categorías**, el mismo botón descarga «inventario-categorias.csv» (Nombre, Slug y número de
    productos).
+4. Pedido al asistente («Sácame la carta entera en un CSV»), bajo su respuesta sale «Descargar
+   inventario-productos.csv», el mismo fichero que da el botón; el asistente no pega su contenido en el
+   chat.
 Entra: los productos o las categorías que cumplen la búsqueda y los filtros.
 Sale: el fichero, con las mismas cabeceras que reconoce la importación (Nombre, SKU, Precio, Coste,
 Stock, Umbral, EAN-13, Descripción, Alérgenos, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
@@ -609,7 +612,7 @@ la lleva el fichero de quien ve los costes; el de quien no los ve sale sin ella.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
 sale y la app no lo entrega por ninguna otra puerta. Un texto que una hoja de cálculo ejecutaría como
 fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la importación quita.
-Implicados: BASE-F112 (dentro de la app), BASE-F119
+Implicados: BASE-F112 (dentro de la app y desde el asistente), BASE-F119
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
 Estado: hecho
