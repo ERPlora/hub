@@ -46,15 +46,6 @@ def lines(job: PrintJob) -> list[tuple[str, float]]:
 
 
 @pytest.fixture
-def till(db):
-    """The business's receipt printer, made by Printing."""
-    return run(
-        "printing.printer.create",
-        {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"},
-    )
-
-
-@pytest.fixture
 def shift(coffee, till):
     """A shift of 100.00 € with a 1.50 € coffee charged in cash and 0.50 € taken out, and a receipt printer."""
     session = open_session(10000)

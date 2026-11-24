@@ -15,7 +15,7 @@ CASH = "cash"
 
 @dataclass(frozen=True)
 class Line:
-    """A line of a shift: a movement written by hand, or a charge, void or refund of sale."""
+    """A line of a shift: a movement written by hand or by another app (``app``), or a charge, void or refund of sale."""
 
     key: str
     session_id: UUID | None
@@ -26,6 +26,7 @@ class Line:
     created_at: dt.datetime
     created_by: str
     description: str = ""
+    app: str = ""
     sale_id: UUID | None = None
     sale_number: str = ""
     document_type: str = ""
@@ -65,6 +66,7 @@ def stored_line(movement: Movement) -> Line:
         created_at=movement.created_at,
         created_by=movement.created_by,
         description=movement.description,
+        app=movement.app,
         sale_id=movement.sale_id,
         sale_number=movement.sale_number,
         document_type=movement.document_type,
