@@ -225,10 +225,9 @@ def _assign_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) 
     output=RoleAssignOut,
     ai={
         "description": (
-            "Gives a person of this business one of the roles the business made (origin own in base.role.list), which "
-            "rules over the role of their invitation, or returns them to the role of their invitation. Never the owner "
-            "nor oneself, and never a role that allows more than who gives it may do. What they may do changes at once. "
-            "Another basic role is given on erplora.com."
+            "Gives a person one of the business's own roles (origin own in base.role.list), or returns them to the one "
+            "of their invitation. Never the owner nor oneself, and never more than who gives it may do. It takes effect "
+            "at once. Another basic one is given on erplora.com."
         ),
         "risk": "high",
         "preview": {"operation": "base.role.detail", "fields": ["members"]},
@@ -237,12 +236,12 @@ def _assign_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) 
             "en": (
                 "give Luis the Cashier role",
                 "put Ana on the Shift lead role",
-                "take the Cashier role away from Luis, back to employee",
+                "take the Cashier role away from Luis",
             ),
             "es": (
                 "dale a Luis el rol Cajero",
                 "pon a Ana con el rol Jefe de turno",
-                "quítale a Luis el rol Cajero y que vuelva a ser empleado",
+                "quítale a Luis el rol Cajero",
             ),
         },
     },

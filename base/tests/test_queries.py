@@ -41,6 +41,8 @@ def test_anonymous():
         "menu": [],
         "apps": [],
         "locked": {},
+        "role": None,
+        "approvable": [],
         "language": "es",
         "demo": None,
     }

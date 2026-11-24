@@ -77,9 +77,10 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
     output=RoleDetailOut,
     ai=AI(
         description=(
-            "Reads what one role of this business allows, app by app: each permission in business words and whether "
-            "the role does it, does it only with a manager's approval or not at all. A basic role is given on "
-            "erplora.com and is not changed here; the business's own (origin own) are changed with base.role.update."
+            "Reads what one role of this business (owner, admin, manager, employee, accountant or one of its own) "
+            "allows, app by app: each permission in business words and whether the role does it, does it only with a "
+            "manager's approval or not at all. A basic role is given on erplora.com and is not changed here; the "
+            "business's own (origin own) are changed with base.role.update."
         ),
         asks={
             "en": ("what does the employee role allow?", "which permissions does the accountant role have?"),
