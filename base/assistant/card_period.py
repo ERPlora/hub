@@ -21,6 +21,15 @@ def period(start: Moment, end: Moment, language: str) -> str:
     return format_interval(start, end, "yMMMd", locale=locale)
 
 
+def each_day(days: str, hours: str, language: str) -> str:
+    """``days`` and the ``hours`` of each, both already in words, as the language joins a day and its time."""
+    return _joined(babel_locale(language), days, hours)
+
+
+def _joined(locale: Locale, day: str, hours: str) -> str:
+    return get_datetime_format("medium", locale=locale).replace("{1}", day).replace("{0}", hours)
+
+
 def _here(moment: dt.datetime) -> dt.datetime:
     return moment.astimezone(business_zone()).replace(tzinfo=None) if moment.tzinfo else moment
 
@@ -31,12 +40,9 @@ def _hours(locale: Locale) -> str:
 
 
 def _moments(start: dt.datetime, end: dt.datetime, locale: Locale) -> str:
-    joined = get_datetime_format("medium", locale=locale)
     day = format_date(start.date(), "medium", locale=locale)
     if start.date() == end.date():
-        hours = format_interval(start.time(), end.time(), _hours(locale), locale=locale)
-        return joined.replace("{1}", day).replace("{0}", hours)
-    ends = joined.replace("{1}", format_date(end.date(), "medium", locale=locale))
-    starts = joined.replace("{1}", day).replace("{0}", format_time(start.time(), "short", locale=locale))
-    ends = ends.replace("{0}", format_time(end.time(), "short", locale=locale))
+        return _joined(locale, day, format_interval(start.time(), end.time(), _hours(locale), locale=locale))
+    starts = _joined(locale, day, format_time(start.time(), "short", locale=locale))
+    ends = _joined(locale, format_date(end.date(), "medium", locale=locale), format_time(end.time(), "short", locale=locale))
     return locale.interval_formats[None].replace("{0}", starts).replace("{1}", ends)

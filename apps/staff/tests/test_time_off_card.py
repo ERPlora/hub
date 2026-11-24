@@ -14,9 +14,13 @@ TIME_OFF = "staff.time_off.create"
 THIN = " "
 
 
-def its_line(arguments: dict, language: str = "es") -> list[tuple[str, object]]:
+def its_data(arguments: dict, language: str = "es") -> list[tuple[str, object]]:
     fields = assistant.cards.card(get(TIME_OFF), arguments, language, ctx_for(language=language))["fields"]
-    return [(field["name"], field["value"]) for field in fields if field["kind"] != "empty"][:3]
+    return [(field["name"], field["value"]) for field in fields if field["kind"] != "empty"]
+
+
+def its_line(arguments: dict, language: str = "es") -> list[tuple[str, object]]:
+    return its_data(arguments, language)[:3]
 
 
 def test_whose_what_and_its_days_go_first():
@@ -36,6 +40,7 @@ def test_a_part_of_a_day_says_its_hours():
         "member": "Ana",
     }
     assert its_line(arguments)[2] == ("period", "3 dic 2026, 9:00–11:30")
+    assert not {"start_date", "end_date", "is_full_day", "start_time", "end_time"} & {name for name, _ in its_data(arguments)}
 
 
 def test_data_the_write_refuses_keep_the_card_as_they_came():

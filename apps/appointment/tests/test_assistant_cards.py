@@ -11,7 +11,7 @@ from live.operations import get
 
 from base import assistant
 
-from .conftest import HUB_DB, ctx_for
+from .conftest import HUB_DB, ctx_for, make_series
 
 pytestmark = HUB_DB
 
@@ -60,6 +60,18 @@ def test_a_blocked_time_of_the_whole_business_starts_with_its_period():
     assert names(fields_of("appointment.blocked_time.create", arguments)) == ["period", "title", "block_type"]
 
 
+def test_a_blocked_time_of_whole_days_says_its_days_without_hours():
+    arguments = {"title": "Fiesta", "block_type": "holiday", "start": "2026-12-24T00:00:00", "end": "2026-12-26T00:00:00", "all_day": True}
+    assert its_line(fields_of("appointment.blocked_time.create", arguments))[0]["value"] == "24–26 dic 2026"
+
+
+def test_what_a_period_says_is_not_said_again_after_it():
+    block = {"title": "Comida", "block_type": "break", "start": "2026-11-26T14:00:00+01:00", "end": "2026-11-26T15:00:00+01:00"}
+    assert not {"start", "end", "all_day"} & {field["name"] for field in fields_of("appointment.blocked_time.create", block)}
+    series = {"customer": "Lucía", "services": HAIRCUT, "start_date": "2026-12-01", "time": "10:00", "frequency": "monthly"}
+    assert not {"start_date", "time", "frequency"} & {field["name"] for field in fields_of("appointment.recurring.create", series)}
+
+
 def test_a_series_says_whom_when_it_repeats_and_the_service():
     arguments = {
         "customer": "Lucía",
@@ -84,3 +96,8 @@ def test_a_series_changed_says_from_when_its_new_time_and_its_new_professional()
         ("when", {"from_date": "1 feb 2027", "time": "11:00"}),
         ("staff", "Carlos"),
     ]
+
+
+def test_a_series_changed_says_first_which_series(salon):
+    arguments = {"id": str(make_series(salon).id), "from_date": "2027-02-01", "time": "11:00", "staff": "Carlos"}
+    assert names(fields_of("appointment.recurring.update", arguments)) == ["id", "when", "staff"]

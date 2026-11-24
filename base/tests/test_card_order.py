@@ -53,8 +53,8 @@ def test_a_summary_that_only_puts_some_data_first():
 
 
 def test_data_said_together_are_one_datum_in_the_order_named():
-    """A booking's service and who does it are one thing on its line («Corte · Ana»), which has room for three
-    (hub#2347): one datum whose value is theirs, by name, in the order named, as said; none not said."""
+    """When a series repeats (its first day, its time and how often) is one thing on its line, which has room for
+    three (hub#2347): one datum whose value is theirs, by name, in the order named, as said; none not said."""
     with_whom = card_order.together(CARD, "with", ("whom", "concept", "method"))
     assert with_whom == {
         "name": "with",
@@ -73,3 +73,8 @@ def test_an_amount_said_together_keeps_its_money():
 def test_nothing_said_together_is_no_datum_and_one_alone_is_itself():
     assert card_order.together(CARD, "with", ("concept", "note")) is None
     assert card_order.together(CARD, "with", ("concept", "day")) == datum("day")
+
+
+def test_a_datum_left_empty_is_not_said_together():
+    empty = {**datum("note"), "kind": "empty", "value": None}
+    assert card_order.together([*CARD, empty], "with", ("day", "note")) == datum("day")

@@ -6,7 +6,7 @@ import datetime as dt
 
 import pytest
 
-from base.assistant.card_period import period
+from base.assistant.card_period import each_day, period
 from base.tenancy.tests.business import HUB_DB, in_business_a
 
 __all__ = ["in_business_a"]
@@ -47,3 +47,7 @@ def test_two_moments_of_a_day_at_the_businesss_hour(language, said):
 def test_two_moments_of_different_days_say_each_day():
     start, end = dt.datetime(2026, 11, 26, 13, tzinfo=UTC), dt.datetime(2026, 11, 27, 8, tzinfo=UTC)
     assert period(start, end, "es") == f"26 nov 2026, 14:00{THIN}–{THIN}27 nov 2026, 9:00"
+
+
+def test_days_and_the_hours_of_each_as_the_language_joins_a_day_and_its_time():
+    assert each_day("3–4 dic 2026", "9:00–11:30", "es") == "3–4 dic 2026, 9:00–11:30"

@@ -30,8 +30,8 @@ def said_first(*names: str) -> Summary:
 
 def together(fields: list[dict], name: str, names: Sequence[str]) -> dict | None:
     """The data of ``fields`` named in ``names`` as one datum ``name``, their values in that order (those not said,
-    skipped; an amount with its money): what says one thing on a line that has room for three (a booking's service
-    and who does it). ``None`` when none was said; one alone, as it is."""
+    skipped; an amount with its money): what says one thing on a line that has room for three (when a series
+    repeats: its first day, its time and how often). ``None`` when none was said; one alone, as it is."""
     said = sorted(
         (field for field in fields if field["name"] in names and field["kind"] != "empty"),
         key=lambda field: names.index(field["name"]),
