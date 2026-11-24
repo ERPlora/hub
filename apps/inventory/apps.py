@@ -15,6 +15,13 @@ QUANTITIES_OF_GOODS = (
 #: Goods noted down as arrived («apunta que han llegado…» is read «apunta que llegan…»), never «llegan» alone: people
 #: arrive too («han llegado dos más para la mesa 7»).
 GOODS_NOTED_AS_ARRIVED = ("apunta que llegan", "apuntame que llegan", "anota que llegan", "registra que llegan")
+#: An order told as arrived or come in: the supplier's goods. «order» and «pedido» alone are a customer's check, which is
+#: taken, sent to the kitchen or served, and never arrives.
+ORDER_ARRIVED = (
+    "order came in", "order just came in", "order has come in", "order arrived", "order has arrived",
+    "order just arrived", "llegado el pedido", "llegar el pedido", "llego el pedido", "llega el pedido",
+    "pedido ha llegado", "pedido acaba de llegar",
+)
 #: Stock told as broken, the stock a write-off takes out.
 BROKEN_STOCK = ("roto", "rotura", "broke", "broken")
 
@@ -50,18 +57,18 @@ class InventoryConfig(LiveAppConfig):
     choices = {"allergens": ALLERGENS}
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «unidades» are the units of measure
     # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
-    # is the goods inventory.stock.receive records. So are «20 kilos de» or «5 cajas de» a product, and what is noted
-    # down as arrived, which are also its stock (inventory.stock); not the bottles, cans or units a sale line or a cart
-    # counts too. A restaurant's «carta» is its products, in the very group live says for them (with fewer words it would
-    # be a second concept, and «los productos de la carta» would count the products twice). What broke is the breakage
-    # a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem is a staff member's break), and
-    # told as broken («se han roto», «got broken») it is stock too, so beside a count it still brings the write-off;
+    # is the goods inventory.stock.receive records, and so is an order told as arrived. So are «20 kilos de» or «5 cajas
+    # de» a product, and what is noted down as arrived, which are also its stock (inventory.stock); not the bottles, cans
+    # or units a sale line or a cart counts too. A restaurant's «carta» is its products, in the very group live says for
+    # them (with fewer words it would be a second concept, and «los productos de la carta» would count the products
+    # twice). What broke is the breakage a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem
+    # is a staff member's break), and told as broken («se han roto», «got broken») it is stock too, so beside a count it still brings the write-off;
     # not «rota» nor «rotas», which say what the business's own things are («la cadena está rota»).
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
         (
             "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
-            "delivery note", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED,
+            "delivery note", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED, *ORDER_ARRIVED,
         ),
         ("stock", *BROKEN_STOCK, *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED),
         ("carta", "producto", "articulo", "product"),
