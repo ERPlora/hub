@@ -31,7 +31,7 @@ from live.operations import get
 from apps.inventory.models import Product
 from base import blueprint
 from base.models import Hub, Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.storage import hub_prefix
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.business import HUB_DB, A, B, in_business_a
@@ -48,7 +48,7 @@ LATTE = "catalog:hospitality/cafe_con_leche"
 def person(scope: Scope, username: str = "olga") -> OperationContext:
     user = get_user_model().objects.create_user(username=f"{username}-{scope.key}", password="pw")
     Membership.objects.create(user=user, host=scope.key, role=Membership.Role.OWNER)
-    return OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope), language="es")
+    return OperationContext(scope=scope, actor=user, permissions=access_for(user, scope), language="es")
 
 
 @pytest.fixture

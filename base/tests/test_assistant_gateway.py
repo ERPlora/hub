@@ -5,6 +5,7 @@ The gateway is ``fake_gateway.FakeGateway``: a real HTTP server on 127.0.0.1 tha
 """
 
 import asyncio
+import json
 
 import pytest
 
@@ -39,6 +40,15 @@ def test_a_report_goes_to_erplora_with_the_question_and_the_answer(gateway):
     assert answer == {"sent": True, "duplicate": False}
     seen = gateway.sent("/internal/assistant/report")[0]
     assert seen.body == {"hub": A.key, "message_id": "m1", "reason": "incorrect", "comment": "", "question": "¿Qué vendí?", "answer": "Nada"}
+    assert signed(seen)
+
+
+def test_what_the_hub_sends_travels_as_compact_json(gateway):
+    """No space after a comma or a colon, and «¿Qué» as written: the tools of a turn are most of each call's body."""
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    assistant.gateway.report(A, message_id="m1", reason="incorrect", comment="", question="¿Qué vendí?", answer="Nada")
+    seen = gateway.sent("/internal/assistant/report")[0]
+    assert seen.raw == json.dumps(seen.body, ensure_ascii=False, separators=(",", ":")).encode()
     assert signed(seen)
 
 

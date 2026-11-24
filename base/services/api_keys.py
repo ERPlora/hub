@@ -17,7 +17,7 @@ from live.outbox import record_event
 
 from base import api_actions, api_keys, events, queries
 from base.models.api_keys import ApiKey, ApiSettings
-from base.permissions import ADMINISTER_HUB, permissions_for
+from base.permissions import ADMINISTER_HUB, access_for
 from base.queries.ownership import see_all_permissions
 from base.sensitive import DATA_PERMISSIONS
 from base.schemas.api_keys import (
@@ -215,7 +215,7 @@ def _held_by_its_maker(key: ApiKey, hub) -> frozenset[str] | None:
     if key.owner is None:
         return None
     maker = get_user_model().objects.filter(username=key.owner.username).first()
-    held = permissions_for(maker, Scope("host", hub.slug))
+    held = access_for(maker, Scope("host", hub.slug))
     if not held:
         raise PermissionDenied(
             gettext("Whoever made this API key is no longer in the business. Make a new one."),

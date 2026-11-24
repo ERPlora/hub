@@ -69,7 +69,7 @@ class GatewayError(Exception):
 
 
 def _signed(path: str, payload: dict) -> tuple[str, bytes, dict[str, str]]:
-    body = json.dumps(payload, ensure_ascii=False).encode()
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
     headers = {
         "Content-Type": "application/json",
         **signing.signed_headers("POST", path, body, int(time.time()), settings.INTERNAL_SHARED_SECRET),

@@ -123,7 +123,7 @@ export function runSteps(steps: ToolStep[], execute: Executor): StepsRun {
 export const GOLDEN_PY = `
 import json, os
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.schemas.assistant import AssistantTurnIn
 from live import assistant as shared
 from live.context import OperationContext, Scope
@@ -134,7 +134,7 @@ member = Membership.objects.filter(host="a", role=Membership.Role.OWNER).select_
 if member is None:
     raise SystemExit("the steps run as the owner of a, who has not signed in to it yet")
 owner = member.user
-ctx = OperationContext(scope=scope, actor=owner, permissions=permissions_for(owner, scope), language=os.environ["QA_GOLDEN_LANGUAGE"])
+ctx = OperationContext(scope=scope, actor=owner, permissions=access_for(owner, scope), language=os.environ["QA_GOLDEN_LANGUAGE"])
 turn = get_operation("base.assistant.turn")
 asked = [{"role": "user", "content": "golden path"}]
 
