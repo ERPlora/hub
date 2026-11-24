@@ -583,7 +583,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   app («día», «hora», «semana» solo donde son la cosa pedida), para no quitar puesto a las herramientas de otras apps.
   Así cerrar por obras, cargar festivos de una vez o corregir un cambio temporal o un día especial desde el chat
   (SCHEDULE-F05, F07 y F13) llegan a su operación y no a los bloqueos de Citas: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno y por
+  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno y por
   delante de todo `appointment.blocked_time.*`, y una frase propia por herramienta solo llega entre las 10 primeras con
   sus `asks` (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
