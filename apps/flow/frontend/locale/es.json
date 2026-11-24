@@ -2737,6 +2737,8 @@
       "total_gifts": "Invitaciones",
       "total_refunds": "Devoluciones",
       "total_sales": "Ventas totales",
+      "app": "App",
+      "app_lines": "Lo que apuntan otras apps",
       "incomplete": "Revisión incompleta",
       "open_checks": "Cuentas abiertas",
       "open_check_labels": "Nombres de las cuentas abiertas",
