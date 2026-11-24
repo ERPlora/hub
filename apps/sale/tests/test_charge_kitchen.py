@@ -158,3 +158,13 @@ def test_a_cashier_who_cannot_send_to_the_kitchen_charges_as_her_till_does(flan)
     charge(order, ctx=cashier)
     assert Order.objects.get(pk=order.id).status == Order.Status.COMPLETED
     assert (sent(order), unsent(order)) == ([], 1)
+
+
+def test_a_charge_refused_after_the_send_leaves_nothing_sent(flan):
+    # An invoice without its recipient is refused once the round is out: the round goes back with the charge.
+    order = open_check("FLAN")
+    with pytest.raises(Conflict) as refused:
+        charge(order, document_type="invoice")
+    assert refused.value.code == "sale.invoice_recipient_incomplete"
+    assert not Sale.objects.filter(order_id=order.id).exists()
+    assert (sent(order), unsent(order)) == ([], 1)
