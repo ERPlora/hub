@@ -41,6 +41,7 @@ export const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan
  *  read from the other apps (Customers' cards for the recipient, Taxes' categories). */
 export const INVOICE_PERMISSIONS = [
   'invoice.view_invoice',
+  'invoice.view_all_invoices',
   'invoice.add_invoice',
   'invoice.rectify_invoice',
   'invoice.manage_series',
@@ -60,13 +61,19 @@ export const OWNER: SessionMe = withMenu('invoice', {
 /** The manager: everything but the issuer. */
 export const MANAGER: SessionMe = withMenu('invoice', {
   ...OWNER,
-  permissions: ['invoice.view_invoice', 'invoice.add_invoice', 'invoice.rectify_invoice', 'invoice.manage_series', ...READS],
+  permissions: ['invoice.view_invoice', 'invoice.view_all_invoices', 'invoice.add_invoice', 'invoice.rectify_invoice', 'invoice.manage_series', ...READS],
 });
 
 /** The employee: looks, prints, issues by hand and marks paid. */
 export const EMPLOYEE: SessionMe = withMenu('invoice', {
   ...OWNER,
   permissions: ['invoice.view_invoice', 'invoice.add_invoice', ...READS],
+});
+
+/** The accountancy firm: sees everyone's invoices and issues nothing. */
+export const ACCOUNTANT: SessionMe = withMenu('invoice', {
+  ...OWNER,
+  permissions: ['invoice.view_invoice', 'invoice.view_all_invoices'],
 });
 
 export interface MountOptions {

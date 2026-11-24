@@ -4,14 +4,16 @@
 // as paid» only where it applies and for whoever may issue; «Rectify» only where it applies and for
 // whoever may rectify; «+» opens «New manual invoice». Every state of the screen and the tabbar.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { AppPage } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppPage, toastError } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import {
   answerIssuer,
   business,
   BYE,
+  ACCOUNTANT,
   EMPLOYEE,
   errorFrame,
   flush,
@@ -23,6 +25,7 @@ import {
 } from '../__tests__/mount-invoice';
 import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
+import { browserDownloads, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
@@ -94,6 +97,62 @@ async function setup(options: MountOptions = {}) {
   const filter = (values: Record<string, string>) => emit('update:filters', values);
   return { ...m, call, table, prop, rows, params, show, emit, filter };
 }
+
+describe('InvoicesPage: «Download in Excel»', () => {
+  const FILE = { filename: 'invoices.xlsx', content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', invoices: 2, content_base64: btoa('PK-xlsx') };
+  const button = (s: Awaited<ReturnType<typeof setup>>) => s.wrapper.find('[data-testid="invoice-export"]');
+
+  it('is offered to whoever sees everyone’s invoices, and to nobody else', async () => {
+    const owner = await setup();
+    expect(button(owner).text()).toBe('Download in Excel');
+    const employee = await setup({ session: EMPLOYEE });
+    expect(button(employee).exists()).toBe(false);
+  });
+
+  it('downloads what the list shows: its filters and its search, with neither its sort nor its page', async () => {
+    const s = await setup({ session: ACCOUNTANT });
+    await s.show(PAGE);
+    await s.filter({ issue_date_from: '2026-10-01', issue_date_to: '2026-10-31' });
+    await s.emit('update:search', ' pérez ');
+    const asked: string[] = [];
+    s.net.onApi(({ url }) => (asked.push(url), Response.json(FILE)));
+    const saved = browserDownloads();
+    await button(s).trigger('click');
+    await flush();
+    await flush();
+    const [url] = asked.map((u) => new URL(u, 'http://localhost'));
+    expect(url.pathname).toBe('/api/invoice/invoices/export');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ issue_date_from: '2026-10-01', issue_date_to: '2026-10-31', search: 'pérez' });
+    expect(saved.map((file) => file.name)).toEqual(['invoices.xlsx']);
+    expect(saved[0].blob.type).toBe(FILE.content_type);
+    expect(await saved[0].blob.text()).toBe('PK-xlsx');
+  });
+
+  it('says why when the file is refused', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    s.net.onApi(() => Response.json({ error: { code: 'base.hub_busy', message: 'Your business is busy.' } }, { status: 503 }));
+    await button(s).trigger('click');
+    await flush();
+    expect(toastError).toHaveBeenCalledWith('The invoices could not be downloaded: Your business is busy.');
+  });
+
+  it('waits for the list: nothing to download while it is loading or empty', async () => {
+    const s = await setup();
+    const disabled = () => s.wrapper.findAllComponents(IonButton).find((b) => b.attributes('data-testid') === 'invoice-export')?.props('disabled');
+    expect(disabled()).toBe(true);
+    await s.show(PAGE);
+    expect(disabled()).toBe(false);
+    await s.filter({ status: 'paid' });
+    await s.show(EMPTY);
+    expect(disabled()).toBe(true);
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await setup({ locale: 'es' });
+    expect(button(s).text()).toBe('Descargar en Excel');
+  });
+});
 
 describe('InvoicesPage: the live list', () => {
   it('follows invoice.invoice.list, the last issued first, 50 from the first, until the first result loading', async () => {
