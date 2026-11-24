@@ -3,7 +3,7 @@
 import datetime as dt
 from uuid import UUID
 
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -98,11 +98,13 @@ def session_detail(ctx: OperationContext, session: Session) -> dict:
     settings, now = current_settings(), timezone.now()
     lines = lines_of(session, settings, now)
     hidden = hides_expected(ctx, session, settings)
+    with translation.override(ctx.language):  # The lines other apps recorded are named in the reader's language.
+        summary = figures(session, lines, hidden=hidden, costs=ctx.has(VIEW_COSTS))
     return {
         **session_row(ctx, session, settings, now, lines),
         "opening_notes": session.opening_notes,
         "closing_notes": session.closing_notes,
-        "summary": figures(session, lines, hidden=hidden, costs=ctx.has(VIEW_COSTS)),
+        "summary": summary,
     }
 
 
@@ -291,8 +293,9 @@ def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
             ),
         },
         "description": "One cash session by its id or number (S-261014-0001) with its report: who opened and closed it, its "
-        "drawer, opening float, sales by payment method, refunds and voids, cash in and out, comps at cost, expected, "
-        "counted, difference and notes, in cents. A blind count hides the expected of an open session from the reader."
+        "drawer, opening float, sales by payment method, refunds and voids, cash in and out, what other apps recorded apart "
+        "(tips in cash, by card and paid out), comps at cost, expected, counted, difference and notes, in cents. A blind "
+        "count hides the expected of an open session from the reader."
     },
 )
 def get_session(ctx: OperationContext, params: SessionGetIn) -> dict:

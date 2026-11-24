@@ -561,22 +561,20 @@ def auto_close(ctx: OperationContext, data: EmptyIn) -> dict:
 )
 def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
     session = session_to_close(ctx, data.session_id, data.session, lock=True)
-    settings = current_settings()
     if (
         data.type == Movement.Type.OUT
         and data.method_type == "cash"
-        and not settings.allow_negative_balance
+        and not current_settings().allow_negative_balance
         and expected_now(session) - data.amount < 0
     ):
-        raise Conflict(
-            str(NEGATIVE_BALANCE), code="cash_register.negative_balance_not_allowed"
-        )
+        raise Conflict(str(NEGATIVE_BALANCE), code="cash_register.negative_balance_not_allowed")
     movement = Movement.objects.create(
         session=session,
         type=data.type,
         amount=data.amount,
         method_type=data.method_type,
         description=data.description,
+        app=data.app or "",
         created_by=actor(ctx),
     )
     record_event(
@@ -588,6 +586,7 @@ def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
             "type": movement.type,
             "amount": movement.amount,
             "method_type": movement.method_type,
+            "app": movement.app,
         },
     )
     return line_row(stored_line(movement))
@@ -657,8 +656,8 @@ def _units(cents: int, scale: Decimal, sign: int = 1) -> float:
 
 
 def _report(ctx: OperationContext, session: Session, report: str) -> dict:
-    """The ``cash_session_report`` the receipt printer paints: the session, its close (or now), who, the float and
-    the expected cash then, and the detail's figures as its lines, in the language of who prints."""
+    """The ``cash_session_report`` the receipt printer paints: the session, its close (or now), who, the float and the
+    expected cash then, and the detail's figures as its lines (the tips just before the expected), in the language of who prints."""
     scale = Decimal(10) ** currency_decimals(business_currency(ctx))
     with translation.override(ctx.language):
         figures = session_detail(ctx, session)["summary"]
@@ -667,6 +666,7 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
             for key, label, sign in REPORT_LINES
             if figures[key] is not None and (key != "other_sales" or figures[key])
         ]
+        lines[-1:-1] = [{"label": row["label"], "amount": _units(row["amount"], scale)} for row in figures["app_lines"] or ()]
         if report == "z" and session.closing_balance is not None:
             lines.append({"label": str(COUNTED), "amount": _units(session.closing_balance, scale)})
         if report == "z" and session.difference is not None:
@@ -705,8 +705,8 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
             ),
         },
         "description": "Print the report of a cash session (by its id or number) on the receipt printer: the partial "
-        "report (X) while it is open, the closing (Z) once closed, with its float, sales by payment method, refunds, "
-        "cash in and out, comps, expected, counted and difference. Without an active receipt printer it fails and "
+        "report (X) while it is open, the closing (Z) once closed, with its float, sales by payment method, refunds, cash "
+        "in and out, tips, comps, expected, counted and difference. Without an active receipt printer it fails and "
         "says why: nothing printed. A blind count keeps an open session's report from whoever may not see the "
         "expected cash.",
         "risk": "normal",
