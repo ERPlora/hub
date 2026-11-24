@@ -31,7 +31,7 @@ import {
 } from './assistant-panel';
 import { CLAIM_ANSWER, DICTATION, DONE, GREETING } from './assistant-provider';
 import { saasSql } from './assistant-real';
-import { A, api, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
+import { A, api, capture, login, saveSessionForTheSweep, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
 import { chats, panelSpec, spend } from './provider-helpers';
 import { pressAssistant, topbarMore, topbarMoreMenu } from './topbar';
@@ -440,5 +440,6 @@ test.describe('files attached in the panel, kept in Files', () => {
     const sent = JSON.stringify(chats(provider()).map((seen) => seen.body));
     expect(sent).toContain('«albaran.pdf»');
     expect(sent).toContain('«factura.png»');
+    await saveSessionForTheSweep(page.context());
   });
 });
