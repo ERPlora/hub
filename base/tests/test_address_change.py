@@ -39,6 +39,8 @@ pytestmark = HUB_DB
 #: Addresses no business of the tests has.
 C = Scope("host", "tenant-c")
 D = Scope("host", "tenant-d")
+#: A business erplora.com registers for the first time.
+NEW = "0199c4b0-0000-7000-8000-0000000000c1"
 #: An app every template carries that nothing vetoes and no other app of the tests needs.
 APP = "task"
 
@@ -235,12 +237,25 @@ class TestItsApps:
         assert signed_in(client, A.key, session)
 
     def test_one_whose_database_is_still_to_be_made_is_not_entered(self, register):
-        new = "0199c4b0-0000-7000-8000-0000000000c1"
-        assert register(new, C.key).status_code == 202
+        assert register(NEW, C.key).status_code == 202
 
-        assert register(new, D.key).status_code == 202
+        assert register(NEW, D.key).status_code == 202
 
-        assert Hub.objects.get(pk=new).slug == D.key
+        assert Hub.objects.get(pk=NEW).slug == D.key
+
+    def test_a_new_business_at_the_address_it_left_is_born_with_its_own(self, hub_a, hub_b, change_address):
+        switch(hub_a, "disable")
+        assert off_in(hub_a) == {APP}  # kept in the cache under the address it leaves
+        change_address(change_address(hub_a, C), D)
+        with use_hub(hub_b):
+            AppActivation.objects.all().delete()
+        Hub.objects.filter(pk=hub_b.pk).update(slug=A.key, country="ES")
+        new = Hub.objects.get(pk=hub_b.pk)
+
+        with use_hub(new):
+            born = hub_registry.turn_on_born_apps(new)
+
+        assert off_in(new) == frozenset(activation.module_graph()) - set(born)
 
     def test_another_business_at_the_address_it_left_has_its_own(self, hub_a, hub_b, change_address):
         switch(hub_a, "disable")
@@ -347,6 +362,17 @@ class TestItsPeople:
         login(OLGA, hub_b, role="hub_owner")
 
         assert entered(change_address(hub_b, A)) == {f"saas:{OLGA}": "hub_owner"}
+
+    def test_who_was_left_at_an_address_is_in_no_new_business_either(self, client, hub_a, register):
+        session = login(ANA, hub_a, role="hub_owner")
+        Hub.objects.filter(pk=hub_a.pk).update(slug=D.key)
+        HubVisit.objects.create(host=A.key, saas_user_id=OLGA, day=dt.date(2026, 3, 10))
+
+        assert register(NEW, A.key).status_code == 202
+
+        assert not alive(session)
+        assert not Membership.objects.filter(host=A.key).exists()
+        assert not HubVisit.objects.filter(host=A.key).exists()
 
     def test_a_person_of_two_businesses_keeps_one_role_in_each(self, hub_a, hub_b, change_address):
         login(ANA, hub_a, role="hub_owner")

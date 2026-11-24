@@ -18,7 +18,7 @@ from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.models import OutboxEvent
-from live.operations import INTERNAL, on_commit, on_commit as after_commit, operation
+from live.operations import INTERNAL, atomic, on_commit, on_commit as after_commit, operation
 from live.outbox import notify, record_event
 from live.slugs import validate_hub_slug
 
@@ -150,7 +150,7 @@ def _requested(hub_id: UUID, fields: dict) -> tuple[Hub, bool]:
     """The new hub ``hub_id``, ``requested``, and that it is new; its row and that it is not, if a concurrent call
     registered it first."""
     try:
-        with transaction.atomic():
+        with atomic():
             hub = Hub.objects.create(
                 id=hub_id,
                 status=Hub.Status.REQUESTED,
@@ -168,7 +168,7 @@ def _requested(hub_id: UUID, fields: dict) -> tuple[Hub, bool]:
 
 def _save_at_its_address(hub: Hub, former: str) -> None:
     try:
-        with transaction.atomic():
+        with atomic():
             hub.save()
     except IntegrityError:
         raise _slug_taken() from None
