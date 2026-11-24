@@ -1889,9 +1889,10 @@ Pasos:
      negocio» deshace lo propio y devuelve el tamaño a 100%. El idioma pasa a toda la aplicación abierta, también a
      los textos que manda el servidor (el menú lateral, «Mis apps», el checklist, los paneles de Inicio y la campana),
      sin recargar ni volver a Inicio.
-  5. Si se lo pide al asistente («ponme el idioma en inglés») y confirma la tarjeta, el idioma nuevo se aplica igual
-     que desde el selector: la aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla
-     en este dispositivo.
+  5. Si se lo pide al asistente («ponme el idioma en inglés»), la tarjeta dice solo lo que ha pedido («English»; lo que
+     vuelve a ser del negocio, por su nombre: «El idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
+     paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
+     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
@@ -4175,8 +4176,9 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `queries.people.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
   `base.device.mode_set`, `base.device.list|rename|remove|prune` y `base.access.settings|settings_update`
-  (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (la foto, en
-  `avatars/` del almacén del hub, servida solo a una sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
+  (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (`preferences_set` cambia solo lo
+  que se le manda, y sin el idioma no deja su cookie; la foto, en `avatars/` del almacén del hub, servida solo a una
+  sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
   `base.pin.set`, `base.device.mode_changed|renamed|removed|pruned`, `base.access.settings_changed` y
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
 - El pase a erplora.com (BASE-F11; ACCOUNTS-F29 del SaaS): `base.saas_pass.create` (`base/services/`, `ai=INTERNAL`:
