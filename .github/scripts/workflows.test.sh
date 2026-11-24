@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests of the workflows' shape (deploy.yml, test.yml, ci.yml, rollback.yml): the tests and the
-# image build run side by side, and only the deploy itself waits for the one before.
+# Tests of the workflows' shape (deploy.yml, test.yml, ci.yml, rollback.yml): one push run of a branch
+# at a time, its tests and image build side by side, and a rollback waits only for a deploy.
 #   bash .github/scripts/workflows.test.sh
 # Needs python3 with PyYAML (preinstalled on GitHub's ubuntu runners and on macOS).
 set -euo pipefail
@@ -53,16 +53,19 @@ def before(job, first, second):
 
 
 GROUP = "deploy-${{ github.repository }}-${{ github.ref_name }}"
+# The push runs of a branch; a manual run (a release redeploy) is a group of its own.
+PUSHES = "${{ github.event_name == 'push' && format('deploy-push-{0}-{1}', github.repository, github.ref_name) || github.run_id }}"
 jobs = deploy.get("jobs", {})
 build, deploy_job = jobs.get("build", {}), jobs.get("deploy", {})
 deploy_if, build_if = str(deploy_job.get("if", "")), str(build.get("if", ""))
 
-# --- deploy.yml: only the deploy waits for the one before ---------------------------------------
-check("deploy.yml has no workflow-level concurrency", "concurrency" not in deploy)
+# --- deploy.yml: one push run of a branch at a time; a rollback waits only for a deploy ---------
+# Compared whole: `queue: max` would keep every push waiting, and cancelling would cut a deploy halfway.
+check("a push run waits for the one before it of its branch, and a newer push replaces the one waiting",
+      deploy.get("concurrency") == {"group": PUSHES, "cancel-in-progress": False})
 check("only the deploy job holds a lock", [name for name, job in jobs.items() if "concurrency" in job] == ["deploy"])
-lock = deploy_job.get("concurrency") or {}
-check("the deploy job holds the deploy lock of its branch", lock.get("group") == GROUP)
-check("a deploy in progress is never cancelled", lock.get("cancel-in-progress") is False)
+check("the deploy job holds the deploy lock of its branch and never cancels a deploy in progress",
+      deploy_job.get("concurrency") == {"group": GROUP, "cancel-in-progress": False})
 check("rollback.yml shares the deploy lock", (rollback.get("concurrency") or {}).get("group") == GROUP)
 
 # --- deploy.yml: tests and image build side by side ----------------------------------------------

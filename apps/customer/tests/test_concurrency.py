@@ -46,7 +46,7 @@ from apps.customer.schemas.memberships import SetGroupsIn, SetTagsIn
 from apps.customer.schemas.merging import MergeIn
 from apps.customer.schemas.orders import OrderLinkIn
 from apps.customer.schemas.purchases import PurchaseRecordIn, PurchaseRefundIn, PurchaseVoidIn
-from apps.customer.queries import CUSTOMER_UNAVAILABLE_CODE
+from apps.customer.queries.reads import CUSTOMER_UNAVAILABLE_CODE
 from apps.sale.tests.test_concurrency import delete_page_while_held, in_turn, locks
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile

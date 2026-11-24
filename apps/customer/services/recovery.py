@@ -9,11 +9,11 @@ from live.outbox import record_event
 
 from apps.customer import events
 from apps.customer.models import Customer, CustomerGroup, CustomerTag, CustomField
-from apps.customer.queries import (
+from apps.customer.queries.cards import load_detail
+from apps.customer.queries.reads import (
     CUSTOMER_UNAVAILABLE,
     CUSTOMER_UNAVAILABLE_CODE,
     find_customer,
-    load_detail,
     lost_since_copy,
     named,
 )
@@ -106,9 +106,10 @@ def _hang_from_copy(
 ) -> list[LeftOut]:
     """What hung from ``customer`` in a separate copy hung from it again, each by the operation its screen uses: the
     card put in its groups and tags besides those it is in (``set_groups``, ``set_tags``), each the business's own of
-    that name (``queries.named``, the active one first) or, if it has none, made again as the copy had it by the Groups
-    or Tags screen's create (and deactivated if it was); its values of the custom fields as the card's screen checks
-    them (CUSTOMER-F04), each field the business's own of that name or one made again by the Fields screen's create.
+    that name (``queries.reads.named``, the active one first) or, if it has none, made again as the copy had it by the
+    Groups or Tags screen's create (and deactivated if it was); its values of the custom fields as the card's screen
+    checks them (CUSTOMER-F04), each field the business's own of that name or one made again by the Fields screen's
+    create.
     Neither a value of a field the business deactivated (it shows on no card) nor one its field no longer takes comes
     back: the card comes back without it, and each is returned with why. One of a field the card holds a value of
     already does not either, and is nothing left out: the card keeps its own. A required field it has no value of

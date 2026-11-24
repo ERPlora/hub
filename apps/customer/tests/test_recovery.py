@@ -2,15 +2,15 @@
 
 The platform reads the copy (``base.tenancy.recovery``) through a direct, read-only connection: the copy is no
 business, so it has no alias and the ORM never reaches it. Customers answers it (``recoverable_from_copy`` on its
-config) with its own read, by SQL over its model's names (``queries.cards_in_copy``): each live card of the copy with
-what its create takes. Then, in the business, which of those it lacks (``queries.cards_not_in_business``): a card the
-business has live, merged into another or with its personal data erased is not lacking, and neither is one it made
-again (the same name, phone and email, the import's rule). One it deleted is still there (deleting keeps the card,
-CUSTOMER-F07): it comes back the same, with all that hangs from it and what the business deleted since (a group, a tag
-or a custom field, hub#1356), by ``customer.customer.restore`` (``queries.cards_deleted_in_business``, hub#1306); only
-one the business no longer has is created, by
+config) with its own read, by SQL over its model's names (``queries.recovery.cards_in_copy``): each live card of the
+copy with what its create takes. Then, in the business, which of those it lacks
+(``queries.recovery.cards_not_in_business``): a card the business has live, merged into another or with its personal
+data erased is not lacking, and neither is one it made again (the same name, phone and email, the import's rule). One
+it deleted is still there (deleting keeps the card, CUSTOMER-F07): it comes back the same, with all that hangs from it
+and what the business deleted since (a group, a tag or a custom field, hub#1356), by ``customer.customer.restore``
+(``queries.recovery.cards_deleted_in_business``, hub#1306); only one the business no longer has is created, by
 ``customer.customer.recover`` (hub#1285): as ``customer.customer.create`` makes it, with its groups, tags and custom
-field values (``queries.recoverable_cards_in_copy``), each by the screen's own operation.
+field values (``queries.recovery.recoverable_cards_in_copy``), each by the screen's own operation.
 
 Then, end to end on real databases (``hubs.CopiedHubs``): the business's own and its copy, a clone of it.
 """
@@ -64,7 +64,7 @@ def test_the_copy_gives_each_live_card_with_what_its_create_takes():
     Customer.objects.create(name="Merged", deleted_at=now, merged_into=ana)
     Customer.objects.create(name="Deleted customer", deleted_at=now, erased_at=now)
 
-    [read] = queries.cards_in_copy(direct())
+    [read] = queries.recovery.cards_in_copy(direct())
 
     assert read.pop("id") == ana.pk
     assert CustomerIn.model_validate(read).model_dump() == {
@@ -93,7 +93,7 @@ def test_a_copy_without_the_apps_table_gives_nothing():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE customer_customer CASCADE")
 
-    assert queries.cards_in_copy(direct()) == []
+    assert queries.recovery.cards_in_copy(direct()) == []
 
 
 def a_card_of_the_copy(card: Customer | None = None, **fields) -> dict:
@@ -117,7 +117,7 @@ def test_the_business_lacks_only_what_it_no_longer_has_nor_made_again():
     sharing = a_card_of_the_copy(name="Pablo Ruiz", phone="+34600555666", email="marta@example.com")
     cards = [a_card_of_the_copy(card) for card in (live, deleted, merged, erased)] + [absent, again, sharing]
 
-    lacking = queries.cards_not_in_business(cards)
+    lacking = queries.recovery.cards_not_in_business(cards)
 
     assert [card["id"] for card in lacking] == [absent["id"], sharing["id"]]
 
@@ -136,7 +136,7 @@ def test_the_business_holds_deleted_only_the_card_deleted_from_its_card_and_not_
     copy = [a_card_of_the_copy(card) for card in (live, deleted, merged, erased)]
     cards = [*copy, a_card_of_the_copy(twin), absent]
 
-    held = queries.cards_deleted_in_business(cards)
+    held = queries.recovery.cards_deleted_in_business(cards)
 
     assert [card["id"] for card in held] == [deleted.pk]
     assert held[0] is cards[1]
@@ -157,14 +157,14 @@ def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_int
     again = a_card_of_the_copy(name="MARTA RUIZ", phone="+34600555666", email="Marta@Example.com")
     absent = a_card_of_the_copy(name="Sara Gil", phone="+34600777888")
 
-    assert queries.card_in_business(a_card_of_the_copy(live)) == live.pk
-    assert queries.card_in_business(a_card_of_the_copy(merged)) == live.pk
-    assert queries.card_in_business(a_card_of_the_copy(twice)) == live.pk
-    assert queries.card_in_business(again) == live.pk
-    assert queries.card_in_business(a_card_of_the_copy(deleted)) is None
-    assert queries.card_in_business(absent) is None
+    assert queries.recovery.card_in_business(a_card_of_the_copy(live)) == live.pk
+    assert queries.recovery.card_in_business(a_card_of_the_copy(merged)) == live.pk
+    assert queries.recovery.card_in_business(a_card_of_the_copy(twice)) == live.pk
+    assert queries.recovery.card_in_business(again) == live.pk
+    assert queries.recovery.card_in_business(a_card_of_the_copy(deleted)) is None
+    assert queries.recovery.card_in_business(absent) is None
     # Erased (CUSTOMER-F16): never another card, not even one with the name, phone and email the copy still holds.
-    assert queries.card_in_business({"id": erased.pk, "name": live.name, "phone": live.phone, "email": live.email}) is None
+    assert queries.recovery.card_in_business({"id": erased.pk, "name": live.name, "phone": live.phone, "email": live.email}) is None
 
 
 @HUB_DB
@@ -179,7 +179,7 @@ def test_of_two_cards_made_again_alike_the_business_card_is_the_oldest():
 
     again = a_card_of_the_copy(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
 
-    assert queries.card_in_business(again) == first.pk
+    assert queries.recovery.card_in_business(again) == first.pk
 
 
 @HUB_DB
@@ -187,10 +187,10 @@ def test_the_app_declares_what_it_gives_back():
     [declared] = apps.get_app_config("customer").recoverable_from_copy()
 
     assert (declared.read, declared.missing, declared.create, declared.deleted, declared.restore) == (
-        queries.recoverable_cards_in_copy,
-        queries.cards_not_in_business,
+        queries.recovery.recoverable_cards_in_copy,
+        queries.recovery.cards_not_in_business,
         "customer.customer.recover",
-        queries.cards_deleted_in_business,
+        queries.recovery.cards_deleted_in_business,
         "customer.customer.restore",
     )
     assert str(declared.label) == "Customers"
@@ -223,11 +223,11 @@ def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_a
     deleted.tags.add(regular)
     CustomFieldValue.objects.create(customer=deleted, field=pet, value="Rex")
 
-    read = queries.recoverable_cards_in_copy(direct())
+    read = queries.recovery.recoverable_cards_in_copy(direct())
 
     # The cards as the copy gives them to the create, and what hangs from each.
-    cards = queries.cards_in_copy(direct())
-    assert [{key: card[key] for key in ("id", *queries.CARD_FIELDS)} for card in read] == cards
+    cards = queries.recovery.cards_in_copy(direct())
+    assert [{key: card[key] for key in ("id", *queries.recovery.CARD_FIELDS)} for card in read] == cards
     assert [card["id"] for card in read] == [ana.pk, luis.pk]
     takes = get_operation("customer.customer.recover").input
     ana_read, luis_read = (takes.model_validate(card).model_dump() for card in read)
@@ -277,7 +277,7 @@ def test_a_copy_without_the_apps_table_gives_no_card_to_recover():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE customer_customer CASCADE")
 
-    assert queries.recoverable_cards_in_copy(direct()) == []
+    assert queries.recovery.recoverable_cards_in_copy(direct()) == []
 
 
 # ── End to end: the business's own database and its copy (hub#1285) ─────────────────────────────────────────────────

@@ -85,7 +85,7 @@ def test_spanish_texts():
         assert str(models.Customer.Stage.LEAD.label) == "Contacto"
         assert str(models.Customer.Source.WALK_IN.label) == "En el local"
         assert (
-            str(queries.CUSTOMER_UNAVAILABLE) == "Este cliente ya no está disponible."
+            str(queries.reads.CUSTOMER_UNAVAILABLE) == "Este cliente ya no está disponible."
         )
         assert str(services.writes.PHONE_INVALID) == (
             "No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo "
