@@ -143,7 +143,8 @@ def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.To
         screen = assistant.cards.screen(op)
         named = {"name": op.name, "app": op.app_label, "app_name": app_name, "screen": screen, "kind": op.kind}
     reason = assistant.failure_reason.reason(op, outcome, ctx.language)
-    return {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code, "reason": reason}
+    ran = {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code, "reason": reason}
+    return {**ran, **assistant.handed_files.receipt(outcome)}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,7 +169,7 @@ def _assistant_answer(ctx, calls: _Calls, call, decision, *, stopped: bool):
     except ValueError:
         arguments = None
     if not isinstance(arguments, dict):
-        return assistant.tools.run(ctx, op, call.arguments), None, ""
+        return assistant.handed_files.run(ctx, op, call.arguments), None, ""
     return _assistant_write(ctx, op, call, decision, calls.files)
 
 
@@ -185,7 +186,8 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     """A write's ``(outcome, card, shown)``: the card when it still waits for its answer, with what it will do when its
     app declares a preview (BASE-F98), and the fingerprint of what it shows (``shown``, ``assistant.cards.fingerprint``);
     one that cannot be read is the write's outcome, and no card is shown. Neither is one for data the write would
-    refuse: the model hears which (``invalid_payload``) and asks again with them corrected. The yes is for the card it
+    refuse: the model hears which (``invalid_payload``) and asks again with them corrected; nor for an edit that names
+    nothing to change (``assistant.edits``), once its check has found the record. The yes is for the card it
     answers (hub#1208): drawn again, a card that no longer shows what ``call.shown`` says — a record found by its name is
     another, a name or what it will do changed — runs nothing and is shown anew; a «no» or a word typed wrong never
     needs it. The card shows the model's data, a file by the name it was attached with; the write runs with the file."""
@@ -202,6 +204,7 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     if declined is not None:
         return declined, None, ""
     failure, preview = assistant.cards.preview(ctx, op, given, found=found)
+    failure = failure or assistant.edits.unchanged(op, arguments)
     if failure is not None:
         return failure, None, ""
     drawn = {**card, "preview": preview}

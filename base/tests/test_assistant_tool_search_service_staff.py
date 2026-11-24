@@ -1,9 +1,9 @@
 """Phrases about the till, the kitchen, the reservations, the clock-ins, the services and the customer cards that the
 assistant once left without the tool they asked for, or offered it far down.
 
-Each one reaches its tool now: either among the twenty tools a turn offers for the phrase's own words, or once the model
-searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what it
-found.
+Each one reaches its tool now: either among the fifteen tools a turn offers for the phrase's own words, or once the
+model searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what
+it found.
 """
 
 import pytest
@@ -29,7 +29,7 @@ CLOCK_IN = "attendance.record.clock_in"
 CLOCK_OUT = "attendance.record.clock_out"
 UNASSIGN = "service.assignment.remove"
 
-#: The tools a phrase's own words already bring into the twenty a turn offers.
+#: The tools a phrase's own words already bring into the fifteen a turn offers.
 OFFERED = [
     pytest.param("es", "no me deja cerrar la caja sin contar, ni abrirla puedo", (CLOSE,), id="live-108-open"),
     pytest.param("es", "cierra la caja sin dar de baja a Ana", (CLOSE,), id="live-111"),

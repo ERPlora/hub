@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7df417d3ca4c5978f30cb90616f93f6f3461ed17b2dccbe32fcd6b2a25cf3e5c -->
+<!-- generated from WORKBOOK.md sha256:ac2c7abb1c774b98c806a970d2d18ead406686fc5aa3485bb1fb34079926a68d -->
 
 ## What it is for and who it is for
 
@@ -2680,7 +2680,8 @@ Steps:
      of a failure says the reason in one sentence: if its app refuses it, the same one its screen would give ("Not
      done, it failed: Remove in Employees. That person is not in this business."); if what did not fit was the data
      the assistant sent, which, with the name the card gives them ("The assistant sent data that does not fit:
-     Products."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
+     Products."), and if it asked for a change without saying what to change, that ("The assistant did not say what
+     to change."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
      too; the reason, said in the other language, no longer shows.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
 done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
@@ -2690,7 +2691,10 @@ Out: if accepted, the action done in its app, with the same event as if its butt
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". Data the action does not take (a country or a currency that does not exist, a value
 outside its list) never reach the card: they go back to the assistant, which corrects them, and the person confirms
-only once. "Run it" holds only for what the card shows: if it changes before it is tapped — the action finds another
+only once. Neither does a change that only names its record, with no data to change (never "Change in Customers:
+Lucía QA" alone): the assistant hears there is nothing to change and goes on with what it was asked, with the action
+that does it, or asks what to change; if the record is not there, it hears that. "Run it" holds only for what the card
+shows: if it changes before it is tapped — the action finds another
 record by its name, because someone created one that fits what was said better ("Mesa" when the card said "Mesa 4"),
 the record is renamed, or what "What will happen" says is no longer the same —, nothing is done and the new card
 shows, to be confirmed again; if what it found is no longer there, no card shows and the assistant tells it as its
@@ -3075,13 +3079,16 @@ Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
 Settings · Data and copies › Export, Files, Employees › Approvals, the API documentation, Attendance, Inventory
-(Products and Categories), Customers and the website's "Share and QR"
+(Products and Categories), Customers, the website's "Share and QR" and the assistant (the export it is asked for)
 Steps:
   1. The person presses download: the authorisation's form, an export, a file, a CSV, the OpenAPI file or the QR.
   2. In a browser, the file goes with its name to the browser's downloads, which already say so.
   3. Inside the ERPlora app (computer, or Android 10 or later), the Hub hands the file to the app, which saves it in the
      Downloads folder, and "Saved to {path}" appears (on Android, "Saved to Download/<name>"): inside the app there is
      no downloads bar nor any other notice.
+  4. In the assistant, when asked for an export ("Give me the whole menu as a CSV"), "Download <name>" comes under its
+     answer: the same file the export button of that screen gives, which comes down as in steps 2 and 3. The assistant
+     says it is there, without pasting its content into the chat.
 In: the file the screen already holds, with its name.
 Out: the file in Downloads and, inside the app, the notice with its path. Nothing is kept in the Hub.
 If it fails: inside the app the button is never left without an answer. With no downloads folder the person can open
@@ -3089,7 +3096,8 @@ If it fails: inside the app the button is never left without an answer. With no 
 download it."; with the app linked to another business: "The file could not be saved: this app is linked to another
 business."; a version of the app without this feature: "This version of the ERPlora app cannot save files. Update it
 to download."; any other failure (a name the app refuses, no space left): "The file could not be downloaded.". In
-those cases the screen does not say it was downloaded. The copies ERPlora keeps (Data and copies › Copies) come down
+those cases the screen does not say it was downloaded. The file the assistant gave lives in that tab: after the page
+reloads, in its place it says "The file «<name>» is no longer here: ask for it again to download it.". The copies ERPlora keeps (Data and copies › Copies) come down
 through a signed link and do not go through here.
 Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
