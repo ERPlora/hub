@@ -21,7 +21,7 @@ from live.operations import get
 from base import activation, assistant, entitlement, home
 from base.models import Membership
 from base.models.activation import AppActivation
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.assistant_context import owner_of_a
 from base.tests.test_app_activation import set_rows
@@ -122,7 +122,7 @@ def ranked_for(context, said: str) -> list[str]:
 
 def person(make_user, role: str, language: str = "es") -> OperationContext:
     member = make_user(f"p-{role}", host=A.key, role=role)
-    return OperationContext(scope=A, actor=member, permissions=permissions_for(member, A), language=language)
+    return OperationContext(scope=A, actor=member, permissions=access_for(member, A), language=language)
 
 
 def test_reading_an_app_says_what_it_is_for_in_the_persons_language(make_user):
