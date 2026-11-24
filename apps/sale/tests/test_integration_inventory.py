@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 from django.utils import translation
 from live.context import system_context
-from live.errors import Conflict
+from live.errors import Conflict, InvalidPayload
 from live.models import OutboxEvent
 
 from apps.inventory import events as inventory_events
@@ -138,9 +138,9 @@ def test_the_line_takes_the_catalogs_price_unit_and_category(shelf):
 
 def test_an_article_that_is_deleted_can_no_longer_be_sold(shelf):
     run("inventory.product.delete", {"product": "SHA"}, system_context(A))
-    with pytest.raises(Conflict) as refusal:
+    with pytest.raises(InvalidPayload) as refusal:
         run("sale.order.open", {"lines": [{"product": "SHA"}]})
-    assert refusal.value.code == "sale.product_not_available"
+    assert refusal.value.fields == {"product": "There is no product “SHA”. Say which one."}
 
 
 # ── Sold out («86», INVENTORY-F29; SALE-F07) ─────────────────────────────────────────────────────
