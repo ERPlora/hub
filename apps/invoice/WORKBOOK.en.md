@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:afc2947a25c54686d01eaa9c255463403bb3f6bec1c95d09b6f0f86c6b1c2c86 -->
+<!-- generated from WORKBOOK.md sha256:286826a8d1add94be856e8cee29ad14715ae08600379e2eb5424cd44a200b00f -->
 
 ## What it is for and who it is for
 
@@ -848,7 +848,7 @@ Steps:
 1. In **Invoicing → Invoices**, filter the list by what you want: usually the date, between the first and the last day
    of the month or the quarter; also by status, type, series, source, total or a search.
 2. Tap "Download in Excel".
-3. An Excel file is downloaded, for example `invoices-2026-10.xlsx`, with the invoices the list keeps (all of them, not
+3. An Excel file is downloaded, for example "invoices-2026-10.xlsx", with the invoices the list keeps (all of them, not
    only those of the page), from the oldest to the newest. One row per invoice and tax rate: "Number", "Date",
    "Customer", "Tax ID", "Taxable base", "Rate %", "Tax" and "Total". An invoice with three rates has three rows, each
    with its part; in the "Total" column, the rows of an invoice add up to its total, and the whole column adds up to the
@@ -857,12 +857,12 @@ Steps:
 4. A rectifying invoice comes with its amount in negative and the invoice it corrects with its own, as the list counts
    them.
 5. The same can be asked of the assistant ("download the invoices of October in Excel for my accountant"): the file
-   stays under its answer, with "Download {name}".
+   stays under its answer, with "Download" and its name.
 In: the invoices the person sees and the list filters.
 Out: the file; nothing changes. With no invoice, the button is off.
 If it fails: an employee does not have the button and the API answers that they have no permission; if the business is
-busy or another failure prevents it, a notice says "The invoices could not be downloaded: {reason}" and it can be tapped
-again.
+busy or another failure prevents it, a notice says that the invoices could not be downloaded and why, and it can be
+tapped again.
 Involved: INVOICE-F16, BASE-F112
 
 ## Services: what goes in and what comes out

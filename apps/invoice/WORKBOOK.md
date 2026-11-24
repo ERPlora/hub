@@ -851,7 +851,7 @@ Pasos:
 1. En **Facturación → Facturas**, filtra la lista por lo que quieras: normalmente la fecha, entre el primer y el último
    día del mes o del trimestre; también vale por estado, tipo, serie, origen, total o una búsqueda.
 2. Pulsa «Descargar en Excel».
-3. Se descarga un fichero de Excel, por ejemplo `facturas-2026-10.xlsx`, con las facturas que la lista deja (todas,
+3. Se descarga un fichero de Excel, por ejemplo «facturas-2026-10.xlsx», con las facturas que la lista deja (todas,
    no solo las de la página), de la más antigua a la más nueva. Una fila por factura y tipo de impuesto: «Número»,
    «Fecha», «Cliente», «NIF», «Base imponible», «Tipo %», «Cuota» y «Total». Una factura con tres tipos tiene tres
    filas, cada una con su parte; en la columna «Total», la suma de las filas de una factura es su total, y la suma de
@@ -859,11 +859,11 @@ Pasos:
    recargo %» y «Cuota de recargo». La moneda es la del negocio y las cifras son números.
 4. La rectificativa sale con su importe en negativo y la factura que corrige, con el suyo, tal como las cuenta la lista.
 5. Lo mismo se puede pedir al asistente («descárgame en Excel las facturas de octubre para la gestoría»): el fichero
-   queda bajo su respuesta, con «Descargar {nombre}».
+   queda bajo su respuesta, con «Descargar» y su nombre.
 Entra: las facturas que la persona ve y que la lista filtra.
 Sale: el fichero; nada cambia. Sin ninguna factura, el botón está apagado.
 Si falla: un empleado no tiene el botón y la API le responde que no tiene permiso; si el negocio está ocupado u otro
-fallo lo impide, un aviso dice «No se han podido descargar las facturas: {motivo}» y se puede volver a pulsar.
+fallo lo impide, un aviso dice que no se han podido descargar las facturas y por qué, y se puede volver a pulsar.
 Implicados: INVOICE-F16, BASE-F112
 
 ## Servicios: lo que entra y lo que sale
