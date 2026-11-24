@@ -8,7 +8,7 @@ from live.outbox import record_event
 
 from apps.appointment import events
 from apps.appointment.models import Settings
-from apps.appointment.queries import settings_out
+from apps.appointment.queries.settings import settings_out
 from apps.appointment.schemas import SettingsIn, SettingsOut
 from apps.appointment.services.writes import _actor
 

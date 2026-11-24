@@ -17,6 +17,7 @@ import {
   GREETING,
   LANGUAGES,
   languageOf,
+  LINK_ANSWER,
   NO_REASON,
   NOT_DONE,
   type Provider,
@@ -79,6 +80,7 @@ describe('answerTo', () => {
   it('the format, the claim and a slow answer by their markers', () => {
     expect(textOf(answerTo([user('E2E-FORMAT')]).frames)).toBe(FORMAT_ANSWER.en);
     expect(textOf(answerTo([user('E2E-CLAIM')]).frames)).toBe(CLAIM_ANSWER.en);
+    expect(textOf(answerTo([user('E2E-LINK')]).frames)).toBe(LINK_ANSWER.en);
     expect(answerTo([user('E2E-SLOW')]).delayMs).toBeGreaterThan(0);
     expect(answerTo([user('E2E-DOWN')]).status).toBe(500);
   });
@@ -284,7 +286,7 @@ describe('answerTo — in the language of the request (hub#1025)', () => {
   });
 
   it('each of its texts is its own in each language, never the other one’s', () => {
-    for (const said of [GREETING, DONE, NOT_DONE, CANNOT_RECTIFY, NO_REASON, SLOW_ANSWER, FORMAT_ANSWER, CLAIM_ANSWER]) expect(said.en).not.toBe(said.es);
+    for (const said of [GREETING, DONE, NOT_DONE, CANNOT_RECTIFY, NO_REASON, SLOW_ANSWER, FORMAT_ANSWER, CLAIM_ANSWER, LINK_ANSWER]) expect(said.en).not.toBe(said.es);
     expect(STEPS_SAID.en).not.toEqual(STEPS_SAID.es);
     // What the specs read after a write: the Spanish ones as they always did, the English ones in English.
     expect([DONE.es, NOT_DONE.es, DONE.en, NOT_DONE.en]).toEqual(['Hecho.', 'No lo he hecho.', 'Done.', 'I have not done it.']);

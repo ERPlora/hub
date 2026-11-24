@@ -26,7 +26,10 @@ HEADER_KEYS = ("title", "vertical", "roles")
 PURPOSE = "Para qué:"
 START = "## Punto de partida"
 STEPS = "## Recorrido"
-LEDGER_COLUMNS = ("flow", "date", "device", "app_version", "result", "issue")
+SCREEN = "screen"
+ASSISTANT_CHANNELS = ("assistant-es", "assistant-en")
+CHANNELS = (SCREEN, *ASSISTANT_CHANNELS)
+LEDGER_COLUMNS = ("flow", "date", "device", "app_version", "result", "issue", "channel", "phrase", "model_result")
 
 _FLOW_ID = r"[A-Z][A-Z0-9_]*-F\d+"
 _STEP = re.compile(rf"^(\d+)\. ({_FLOW_ID}(?:, {_FLOW_ID})*)(?: — \S.*)?$")
@@ -34,7 +37,7 @@ STEP_FORMAT = "«<n>. <FLOW-ID>[, <FLOW-ID>…][ — <note>]»"
 
 
 class LedgerError(Exception):
-    """A ledger of walks that cannot be read: a column is missing or a date is not ISO."""
+    """A ledger of walks that cannot be read: a column is missing, a date is not ISO or a channel is not one."""
 
 
 @dataclass(frozen=True)
@@ -71,6 +74,9 @@ class Walk:
     app_version: str
     result: str
     issue: str
+    channel: str
+    phrase: str
+    model_result: str
 
 
 def workbook_flows(root: Path) -> dict[str, WorkbookFlow]:
@@ -195,9 +201,9 @@ def coverage(flows: Mapping[str, WorkbookFlow], journeys: Iterable[Journey]) -> 
     return {app: Coverage(*(tuple(ids) for ids in lists)) for app, lists in sorted(split.items())}
 
 
-def last_walks(path: Path) -> dict[str, Walk]:
-    """The last walk of each flow the ledger at ``path`` records: the one with its latest date."""
-    walks: dict[str, Walk] = {}
+def last_walks(path: Path) -> dict[str, dict[str, Walk]]:
+    """The last walk of each flow on each channel in the ledger at ``path``: the one with its latest date there."""
+    walks: dict[str, dict[str, Walk]] = {}
     with path.open(encoding="utf-8", newline="") as file:
         rows = csv.DictReader(file)
         missing = [column for column in LEDGER_COLUMNS if column not in (rows.fieldnames or ())]
@@ -206,8 +212,10 @@ def last_walks(path: Path) -> dict[str, Walk]:
         for row in rows:
             walk = Walk(*(row[column] or "" for column in LEDGER_COLUMNS[1:]))
             _check_date(walk.date, path, rows.line_num)
-            if row["flow"] not in walks or walk.date >= walks[row["flow"]].date:
-                walks[row["flow"]] = walk
+            _check_channel(walk.channel, path, rows.line_num)
+            by_channel = walks.setdefault(row["flow"], {})
+            if walk.channel not in by_channel or walk.date >= by_channel[walk.channel].date:
+                by_channel[walk.channel] = walk
     return walks
 
 
@@ -219,3 +227,8 @@ def _check_date(text: str, path: Path, line: int) -> None:
         canonical = False
     if not canonical:
         raise LedgerError(f"{path} line {line}: {text!r} is not a date written YYYY-MM-DD")
+
+
+def _check_channel(text: str, path: Path, line: int) -> None:
+    if text not in CHANNELS:
+        raise LedgerError(f"{path} line {line}: {text!r} is not a channel, one of {', '.join(CHANNELS)}")

@@ -24,10 +24,9 @@ from live.operations import get, operation
 from live.outbox import record_event
 
 from apps.appointment.models import Appointment
-from apps.appointment.queries import bookable_members, business_zone, now
-from apps.appointment.schemas import AppointmentCreateIn
-from apps.appointment.schemas import CancelIn as AppointmentCancelIn
-from apps.appointment.schemas import SettingsIn as RulesIn
+from apps.appointment.queries.booking import bookable_members
+from apps.appointment.queries.business import now
+from apps.appointment.schemas import AppointmentCreateIn, CancelIn as AppointmentCancelIn, SettingsIn as RulesIn
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries import business_country
@@ -68,6 +67,7 @@ from apps.online_booking.schemas import (
 )
 from apps.service.models import Service
 from apps.staff.models import Member
+from base.business import business_zone
 
 from .logo import check_logo
 

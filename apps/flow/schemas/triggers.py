@@ -10,7 +10,6 @@ from pydantic import AwareDatetime, field_validator, model_validator
 from apps.flow.models import EVENT_MAX_LENGTH
 from apps.flow.schemas.fields import (
     BAD_EVENT,
-    D_CONDITION,
     FILTER_INPUT_ONLY,
     NO_EVENT,
     NO_MONTH_DAY,
@@ -28,7 +27,8 @@ class EventTrigger(In):
         description="The event's name (`sale.sale.completed`).",
     )
     filter: Condition = Field(
-        default_factory=dict, description="«Only when…»: " + D_CONDITION
+        default_factory=dict,
+        description="«Only when…»: comparisons on what the event brings (`input.…`), as in a condition's `when`.",
     )
 
     @field_validator("event")

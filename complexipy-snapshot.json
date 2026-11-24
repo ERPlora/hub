@@ -718,16 +718,6 @@
     ]
   },
   {
-    "path": "base/assistant/gateway.py",
-    "file_name": "gateway.py",
-    "functions": [
-      {
-        "name": "stream_turn",
-        "complexity": 33
-      }
-    ]
-  },
-  {
     "path": "base/tests/test_assistant_card_values_amounts.py",
     "file_name": "test_assistant_card_values_amounts.py",
     "functions": [

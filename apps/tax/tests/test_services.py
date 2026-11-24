@@ -100,11 +100,10 @@ def test_declarations(name, input, output, expose_api, risk):
         output,
         expose_api,
     )
-    assert (
-        op.ai["description"].strip()
-        and op.ai["risk"] == risk
-        and set(op.ai) == {"asks", "description", "risk"}  # asks: what a person says to ask for it (hub#1094)
-    )
+    # asks: what a person says to ask for it; does: what its name does not say (a rule created sets a rate).
+    does = {"does"} if name == "tax.rule.create" else set()
+    assert op.ai["description"].strip() and op.ai["risk"] == risk
+    assert set(op.ai) == {"asks", "description", "risk"} | does
 
 
 # tax.category.create (TAX-F02)
