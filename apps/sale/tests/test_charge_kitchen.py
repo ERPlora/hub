@@ -2,17 +2,13 @@
 does (SALE-F20), so nobody pays for a dish the kitchen never gets. The assistant and the API charge with that same
 operation; a send that fails charges nothing."""
 
-import json
-
 import pytest
 from live.context import OperationContext
 from live.errors import Conflict, PermissionDenied
-from live.operations import get
 
 from apps.kitchen.services import rounds
 from apps.sale.models import Order, OrderLine, Sale
-from apps.sale.tests.conftest import HUB_DB, ctx_for, run
-from base import assistant
+from apps.sale.tests.conftest import HUB_DB, charged_by_the_assistant, ctx_for, run
 
 pytestmark = HUB_DB
 
@@ -51,12 +47,7 @@ def charge(order, key="kitchen-charge-0001", ctx=None, **more):
 
 def test_the_assistant_charging_a_check_with_an_unsent_dish_sends_it_to_the_kitchen_first(flan):
     order = open_check("FLAN", "FLAN")
-    outcome = assistant.tools.run(
-        ctx_for(language="es"),
-        get("sale.sale.complete"),
-        json.dumps({"order_id": str(order.id), "idempotency_key": "assistant-0001", "payments": [{"method": "cash"}]}),
-    )
-    assert outcome.outcome == "ok", outcome.content
+    charged_by_the_assistant(order)
     assert Sale.objects.filter(order_id=order.id).count() == 1
     assert sent(order) == [(1, ["Home-made flan", "Home-made flan"])]
     assert unsent(order) == 0
