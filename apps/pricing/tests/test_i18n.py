@@ -62,8 +62,8 @@ def test_spanish_texts_are_the_old_modules():
             "Compra X, llévate Y",
             "Por tramos",
         ]
-        assert str(services.DUPLICATE_LIST_CODE) == "Ya existe una tarifa con ese código. Elige otro."
-        assert str(services.LIST_NOT_FOR_PRICES) == (
+        assert str(services.price_lists.DUPLICATE_LIST_CODE) == "Ya existe una tarifa con ese código. Elige otro."
+        assert str(services.prices.LIST_NOT_FOR_PRICES) == (
             "Esa tarifa no está disponible: no existe en este negocio o está desactivada."
         )
 

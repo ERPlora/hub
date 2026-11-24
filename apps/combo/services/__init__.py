@@ -23,16 +23,9 @@ from live.outbox import record_event
 from apps.combo import events
 from apps.combo.models import ACTOR_MAX_LENGTH, ChoiceGroup, ChoiceOption, Combo
 from apps.combo.queries.new_choices import field_refusal, product_said
-from apps.combo.queries import (
-    find_combo,
-    find_group,
-    find_option,
-    group_row,
-    load_detail,
-    option_row,
-    sold_by_unit,
-    takeaway_targets,
-)
+from apps.combo.queries.offers import sold_by_unit, takeaway_targets
+from apps.combo.queries.reads import find_combo, find_group, find_option
+from apps.combo.queries.rows import group_row, load_detail, option_row
 from apps.combo.schemas.choices import (
     DroppedOut, DropProductIn, OptionBulkIn, OptionIn, OptionOut, OptionPatchIn, OptionReorderIn,
 )

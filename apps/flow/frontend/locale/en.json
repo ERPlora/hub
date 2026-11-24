@@ -1170,6 +1170,7 @@
       "reservation__waitlist__get": "Read somebody on the waiting list",
       "sale__business_day__get": "Read the business day",
       "sale__checkout__preview": "Work out a check's total",
+      "sale__checkout__steps": "Read the steps other apps add to a charge",
       "sale__department__create": "Create a sales section",
       "sale__department__delete": "Delete a sales section",
       "sale__department__list": "Look for sales sections",
@@ -2737,6 +2738,8 @@
       "total_gifts": "Comps",
       "total_refunds": "Refunds",
       "total_sales": "Total sales",
+      "app": "App",
+      "app_lines": "What other apps recorded",
       "incomplete": "Review incomplete",
       "open_checks": "Open checks",
       "open_check_labels": "Names of the open checks",
@@ -2768,7 +2771,8 @@
       "running": "In progress",
       "issued": "Issued now",
       "aeat_proof": "AEAT test environment",
-      "aeat_proof_detail": "Why the AEAT test environment refused it"
+      "aeat_proof_detail": "Why the AEAT test environment refused it",
+      "steps": "Steps"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

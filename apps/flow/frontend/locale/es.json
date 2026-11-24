@@ -1170,6 +1170,7 @@
       "reservation__waitlist__get": "Leer a alguien de la lista de espera",
       "sale__business_day__get": "Leer el día de negocio",
       "sale__checkout__preview": "Calcular el total de una cuenta",
+      "sale__checkout__steps": "Leer los pasos que otras apps añaden al cobro",
       "sale__department__create": "Crear una sección de ventas",
       "sale__department__delete": "Borrar una sección de ventas",
       "sale__department__list": "Buscar secciones de ventas",
@@ -2737,6 +2738,8 @@
       "total_gifts": "Invitaciones",
       "total_refunds": "Devoluciones",
       "total_sales": "Ventas totales",
+      "app": "App",
+      "app_lines": "Lo que apuntan otras apps",
       "incomplete": "Revisión incompleta",
       "open_checks": "Cuentas abiertas",
       "open_check_labels": "Nombres de las cuentas abiertas",
@@ -2768,7 +2771,8 @@
       "running": "En curso",
       "issued": "Emitida ahora",
       "aeat_proof": "AEAT de pruebas",
-      "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas"
+      "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas",
+      "steps": "Pasos"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

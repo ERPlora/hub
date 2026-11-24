@@ -464,6 +464,7 @@ En la pantalla Archivos:
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
+| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -1017,6 +1018,14 @@ Pasos:
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
      desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
      España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
+  6. Si al asistente se le pide algo de una app desactivada diciendo su nombre, aunque no se diga «app» («quiero
+     gestionar reservas», «apunta una cita»), o si lo nombra lo que el asistente busca para hacerlo, dice qué app lo
+     hace, para qué sirve como lo dice Apps y que está desactivada, en vez de decir que no puede o de intentarlo con otra
+     cosa. A quien administra le pone la tarjeta de activarla del paso 4; con el sí, sigue con lo que se le pidió en la
+     misma conversación, ya con lo que hace esa app. A quien no puede activar apps le dice que la activa quien
+     administra el negocio; de una de pago sin contratar, que se contrata en erplora.com, sin ofrecer activarla; de una
+     que se está preparando o que no se pudo activar, su estado, como Apps. Lo que ya hacen las apps activadas («¿cuántos
+     servicios tengo?», «sube el precio del tinte a 40 €») no le hace nombrar ninguna.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
@@ -1024,7 +1033,7 @@ contratar no se puede activar (BASE-F20). Bajar de plan no apaga nada: con más 
 todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo. Desde el asistente, un nombre que vale
 para varias apps («reserva»: Reservas y Reservas online) no saca tarjeta ni activa ninguna: el asistente pregunta
 cuál, nombrándolas; uno que no es de ninguna: «Ninguna app tiene ese nombre o identificador.».
-Implicados: BASE-F97
+Implicados: BASE-F93, BASE-F97
 
 ### BASE-F25 Ver que una app se niega a desactivarse
 Estado: hecho
@@ -2535,7 +2544,8 @@ Pasos:
      2,50 €»), el asistente lo hace con las mismas acciones que esa persona tiene en las pantallas de sus apps, y lo
      que cambia algo, con la confirmación de BASE-F97. Si entre las que tiene a mano para ese mensaje no está la que
      hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
-     pantalla se hace.
+     pantalla se hace. Si lo pedido lo hace una app que el negocio no tiene activada, dice qué app es y ofrece
+     activarla (BASE-F24).
   10. El asistente sabe de entrada dónde está el negocio y qué hora es allí: su país, su zona horaria con la fecha y la
      hora de ese momento, el idioma del negocio y el que la persona eligió en «Mi perfil», su sector, las apps que
      tiene encendidas, a quien lo administra su plan y cuántas apps le cuenta (solo las que eligió el negocio, como
@@ -2550,7 +2560,7 @@ Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F
 se puede consultar en ese momento, el asistente lo dice y no contesta de memoria. «Detener» no deshace una acción que
 ya se había hecho. Si la voz de ERPlora no puede leer la respuesta en ese momento, la lee la del dispositivo; si
 tampoco hay, bajo la respuesta dice «No se ha podido leer la respuesta en voz alta. Inténtalo de nuevo.».
-Implicados: BASE-F102, BASE-F104, BASE-F106
+Implicados: BASE-F24, BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Adjuntar un archivo o dictar por voz
 Estado: hecho
@@ -3622,6 +3632,26 @@ Si falla: debajo, «No se pudo cambiar el ajuste de arranque al iniciar sesión.
 dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
+### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
+Estado: parcial — se cambia y se consulta por la API y con el asistente; falta su tarjeta en Ajustes › General y que
+el personal de soporte pueda entrar en el negocio con el acceso encendido
+Actor: propietario, administrador
+Pantalla: Ajustes · General
+Pasos:
+  1. Cuando el negocio quiere que el personal de soporte de ERPlora entre para ayudarle a configurarlo (cargar los
+     productos, ajustar sus apps), el propietario o un administrador enciende el acceso de soporte. Viene apagado.
+     Hoy se enciende y se apaga por la API o pidiéndoselo al asistente, que lo confirma antes de cambiarlo (BASE-F97).
+  2. El cambio se guarda al instante, con quién lo hizo y cuándo. No caduca: sigue encendido hasta que alguien del
+     negocio lo apaga, porque una puesta en marcha puede durar varios días.
+  3. Cualquiera del negocio puede consultar si está encendido, quién lo cambió por última vez y cuándo, si él mismo
+     puede cambiarlo y las 10 últimas entradas de soporte (quién y cuándo), la más reciente primero. Mientras nadie de
+     soporte haya entrado, la lista está vacía.
+Entra: encendido o apagado.
+Sale: el ajuste del negocio, con quién lo cambió y cuándo. Evento `base.support_access.changed`.
+Si falla: a quien no administra el negocio se le rechaza el cambio (403 `permission_denied`) y el ajuste se queda como
+estaba; al consultarlo, le sale que no puede cambiarlo.
+Implicados: BASE-F97, BASE-F100
+
 ## Para quien lo mantiene
 
 - **Permisos de dato** (BASE-F119; `base/sensitive.py`, `base/visibility.py`, `live.sensitive`): un campo de un
@@ -3975,8 +4005,8 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
   `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
-  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide), `state` como lo
-  dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
+  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` y `summary` (en el idioma de quien pide; para
+  qué sirve, el `summary` de su config, como en Apps), `state` como lo dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
   del hub recibe sus tablas), y `mandatory`, como `base.app.list`: el país del negocio la exige y, una vez activada,
   no se desactiva. La tarjeta de `base.app.enable` de una así añade el dato `mandatory` con el motivo de Apps
   (`activation.mandatory_off`, el mismo `MANDATORY_OFF`). Tests: `base/tests/test_assistant_mandatory_apps.py`. Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
@@ -3986,6 +4016,20 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   de ninguna no saca tarjeta, vuelve al modelo, que pregunta cuál. `AppChangeIn.app` la marca `REFERS`, así que la
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
+- Las apps no activadas en el asistente (BASE-F24 paso 6, hub#2178; `base/assistant/apps_not_on.py`): el catálogo de
+  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules` cuando las
+  palabras de la petición abierta o las búsquedas del modelo dicen su nombre en el idioma de la persona (`_names`: las
+  raíces de su `verbose_name`, comparadas con las palabras tal como se dicen, sin el vocabulario de `live`, que haría
+  de «precio» una palabra de Tarifas) y tiene una herramienta en los `PLACES` puestos de ese turno contra el catálogo
+  que la persona tendría con todas las apps encendidas (`relevance.relevant`); como mucho `NAMED` = 3, la mejor
+  primero, con lo que lee `base.app.get` (nombre, estado y `summary`), tras lo que se sabe del negocio. Si no se dice
+  ninguna, no se clasifica nada más. A quien tiene el permiso de `base.app.enable` se le ofrece esa herramienta antes de
+  la búsqueda (`with_switch`, solo si alguna está `off`), sin mover ninguna de las ofrecidas. Tras una escritura de
+  `SWITCHES` (encender, apagar o reintentar), el resto del turno lee las apps de sus filas, aún sin COMMIT
+  (`activation.changing`): la ronda siguiente ofrece las herramientas de la app encendida y ya no las de la apagada, y
+  no nombra ninguna app (lo que está activado se acaba de decidir). Medido con el tokenizador o200k_base: las frases de
+  uso diario de una peluquería y un restaurante no nombran ninguna (0 tokens más); las seis de la issue, de 145 a 513
+  más. Tests: `base/tests/test_apps_not_on.py`.
 - «Uso y plan» (BASE-F40, hub#603). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin
@@ -4021,7 +4065,8 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   erplora.com, solo el nombre.
   «Mejorar plan» y la Tienda, solo con `useMayBuy` (`base/frontend/lib/plan-link.ts`). e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
-- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio nace con todo
+- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`, la dirección web, que
+  al cambiar se lleva las apps como estaban: `base.services.address_change`; un negocio nace con todo
   apagado, también una demo, salvo las obligatorias de su país que la plataforma
   enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
   anteriores a la migración `base/0017` conservan todo encendido con sus raíces elegidas, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
@@ -4655,6 +4700,13 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `base.models.api_keys.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
+- Acceso de soporte (BASE-F126): el ajuste es `base.models.support_access.SupportAccess`, de una sola fila como
+  `ApiSettings` (sin fila, apagado), y cada entrada de soporte, una fila de `SupportVisit`; los dos, en la base de datos
+  del negocio. `base.support_access.get` (`base/queries/support_access.py`) da el estado, quién lo cambió y cuándo, si
+  quien pregunta puede cambiarlo y las 10 últimas entradas, y se sigue en vivo con `base.support_access.changed`;
+  `base.support_access.update` (`base/services/support_access.py`, con `base.administer_hub`) lo guarda y deja ese
+  evento en el outbox en la misma transacción. Rutas en `base/api/access.py`; tests en
+  `base/tests/test_support_access.py`.
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
   además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección
@@ -4917,6 +4969,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.api_doc.get` | F90 |
 | `base.api_doc.settings` | F90, F91 |
 | `base.api_doc.settings_update` | F91 |
+| `base.support_access.get`, `base.support_access.update` | F126 |
 | `base.assistant.turn` | F93, F97, F101 |
 | `base.assistant.find_tools`, `base.assistant.speak`, `base.docs.search` | F93 |
 | `base.assistant.transcribe` | F94 |

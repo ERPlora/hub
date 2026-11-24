@@ -729,7 +729,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
+  `tests/test_<fichero>.py` por fichero (los que comparten nombre con otra puerta, `test_queries_<módulo>.py`), más
+  `test_integration_inventory.py`,
   `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
   reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y
   producto eliminado) y `test_concurrency.py`.
@@ -741,18 +742,18 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   migración depende de `inventory 0001` y `tax 0005`.
 - **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara tres cosas, en este orden,
   cada una con su cuenta: «Menus», «Menu courses» y «Menu choices of products». Cada lectura de la copia va con su propio
-  SQL sobre los nombres del modelo (`queries.combos_in_copy` y `queries.groups_in_copy`, por `_rows_in_copy`;
-  `queries.options_in_copy`, con el SKU del producto allí). `reads_since` de los menús es `0002_combo_image` (leen la
+  SQL sobre los nombres del modelo (`queries.recovery.combos_in_copy` y `queries.recovery.groups_in_copy`, por `_rows_in_copy`;
+  `queries.recovery.options_in_copy`, con el SKU del producto allí). `reads_since` de los menús es `0002_combo_image` (leen la
   imagen); los otros dos, `0001_initial`. El menú y el plato que se rehacen guardan por cuál de la copia se hicieron
-  (`Combo.stands_for` y `ChoiceGroup.stands_for`, migración `0003_stands_for`), y `queries._standing_for` da el del
+  (`Combo.stands_for` y `ChoiceGroup.stands_for`, migración `0003_stands_for`), y `queries.recovery._standing_for` da el del
   negocio que hace de cada uno de la copia: el mismo mientras lo tiene; si no, el que una recuperación hizo por él (el
-  más antiguo); uno hecho a mano no hace de ninguno. `queries.combos_not_in_business` deja fuera el menú que el negocio
+  más antiguo); uno hecho a mano no hace de ninguno. `queries.recovery.combos_not_in_business` deja fuera el menú que el negocio
   tiene o que una recuperación rehízo, y uno con su nombre hecho a mano (sin mayúsculas ni espacios; cada uno vale por
   uno de la copia, el más antiguo primero); los crea `combo.combo.recover` (solo sistema, `INTERNAL`, sin ruta):
-  `combo.combo.create` y, con la imagen que deja `base.images.from_copy`, `_change_image`. `queries.groups_not_in_business`
+  `combo.combo.create` y, con la imagen que deja `base.images.from_copy`, `_change_image`. `queries.recovery.groups_not_in_business`
   pone cada plato en el menú que hace del suyo (el id de la copia si no hay ninguno, y `create` lo rechaza como
   `not_found`) y deja fuera el que el negocio tiene, el que una recuperación rehízo y uno con su nombre en ese menú; los
-  añade `combo.group.recover` (solo sistema): `combo.group.create`, que bloquea el menú. `queries.options_not_in_business`
+  añade `combo.group.recover` (solo sistema): `combo.group.create`, que bloquea el menú. `queries.recovery.options_not_in_business`
   pone cada elección en el plato que hace del suyo y en el producto que hace del suyo
   (`apps.inventory.queries.recovery.products_standing_for`, la misma pareja que Tarifas y Suplementos: el mismo mientras vive; si
   no, el vivo con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe
@@ -784,7 +785,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   ofrecida ∧ cada plato obligatorio con elecciones ofrecidas suficientes (`min`, o una si se puede
   repetir) ∧ (partido) algún precio de catálogo que pesar. Ofrecida = disponible ∧ producto activo,
   no eliminado y por unidades ∧ (menú «para llevar») con categoría para llevar.
-- **Reparto** (`queries.split_amount`): proporcional al `precio de catálogo × cantidad`, resto mayor,
+- **Reparto** (`queries.lines.split_amount`): proporcional al `precio de catálogo × cantidad`, resto mayor,
   empate al primero; partir solo si `goods` y hay más de una categoría fiscal. Sin redondeos de más:
   enteros en céntimos.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` en las acciones; `high` al retirar

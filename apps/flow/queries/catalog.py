@@ -260,8 +260,8 @@ def in_part(data: CatalogIn, app: str, name: str) -> bool:
         "description": "What an automation can start on and do in this business: the events of the active apps "
         "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for. "
         "One with `ask_first` only goes in an «Ask the assistant» step with «Ask me first». A business with many apps "
-        "has more than you can read at once: ask only for the apps you need, one at a time (`apps`), or for the "
-        "events and actions you know by name (`names`); what you ask for comes whole."
+        "has more than you can read at once: first read the names in the apps you need (`apps` and `only_names`), "
+        "then read whole only the events and actions you will use, by name (`names`)."
     },
 )
 def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
@@ -272,24 +272,26 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
             if in_part(data, config.label, name)
         ]
         apps = active_apps(ctx.scope)
-        actions = [
-            {
-                "name": name,
-                "kind": op.kind,
-                "app": op.app_label,
-                "app_name": str(apps[op.app_label].verbose_name),
-                "description": description(op),
-                "fields": action_fields(op),
-                "outputs": action_outputs(op),
-                "assistant": hub_assistant.tools.is_tool(op),
-                "ask_first": asks_first(op),
-            }
-            for name, op in ask_first_catalog(ctx.scope).items()
-            if in_part(data, op.app_label, name)
-        ]
+        chosen = {name: op for name, op in ask_first_catalog(ctx.scope).items() if in_part(data, op.app_label, name)}
+        actions = [] if data.only_names else [_whole_action(name, op, apps) for name, op in chosen.items()]
         off = [{"app": label, "app_name": str(config.verbose_name)} for label, config in off_apps(ctx.scope).items()]
     return {
         "events": sorted(events, key=lambda event: (event["app"], event["name"])),
         "actions": sorted(actions, key=lambda action: (action["app"], action["name"])),
+        "action_names": sorted(chosen, key=lambda name: (chosen[name].app_label, name)) if data.only_names else [],
         "off_apps": sorted(off, key=lambda app: app["app"]),
+    }
+
+
+def _whole_action(name: str, op: Operation, apps: dict[str, LiveAppConfig]) -> dict:
+    return {
+        "name": name,
+        "kind": op.kind,
+        "app": op.app_label,
+        "app_name": str(apps[op.app_label].verbose_name),
+        "description": description(op),
+        "fields": action_fields(op),
+        "outputs": action_outputs(op),
+        "assistant": hub_assistant.tools.is_tool(op),
+        "ask_first": asks_first(op),
     }

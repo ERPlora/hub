@@ -1,4 +1,4 @@
-"""Routes of the way in: the PIN pad, the PIN, the devices, the access settings and the profile."""
+"""Routes of the way in: the PIN pad, the PIN, the devices, the access settings, support access and the profile."""
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router
@@ -9,6 +9,7 @@ from base.request_body import accept_body_up_to
 from base.schemas.access import AccessSettingsUpdateIn
 from base.schemas.devices import DeviceByIdIn, DeviceModeIn, DeviceRenameIn, PinSetIn
 from base.schemas.profile import AvatarIn, PreferencesIn, ProfileUpdateIn
+from base.schemas.support_access import SupportAccessUpdateIn
 
 router = Router()
 
@@ -67,6 +68,16 @@ async def access_settings(request):
 @bind(router, "base.access.settings_update", "/access/settings/update")
 async def access_settings_update(request, data: AccessSettingsUpdateIn):
     return await run_operation(request, services.profile.access_settings_update, data)
+
+
+@bind(router, "base.support_access.get", "/support-access")
+async def support_access_get(request):
+    return await run_operation(request, queries.support_access.support_access_get)
+
+
+@bind(router, "base.support_access.update", "/support-access/update")
+async def support_access_update(request, data: SupportAccessUpdateIn):
+    return await run_operation(request, services.support_access.support_access_update, data)
 
 
 @bind(router, "base.profile.get", "/me/profile")

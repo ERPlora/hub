@@ -1,6 +1,6 @@
 """Events of the pricing app (``pricing.<entity>.<fact>``) and its reactions to other apps' events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that
+services/ records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. They carry ids, codes, quantities and prices, never a customer.
 
 Reactions: a product or a category Inventory deletes, a product it brings back from a separate copy, a customer
