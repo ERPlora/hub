@@ -42,4 +42,6 @@ def effective(
 def to_review(states: Mapping[str, str], apps: Mapping[str, Collection[str]]) -> frozenset[str]:
     """The permissions of ``apps`` a role saved with ``states`` has not seen: every one of an app turned on after it
     was saved, and each one an app added since."""
-    return frozenset(permission for permissions in apps.values() for permission in permissions if permission not in states)
+    return frozenset(
+        permission for permissions in apps.values() for permission in permissions if permission not in states
+    )

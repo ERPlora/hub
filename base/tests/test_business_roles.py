@@ -57,7 +57,9 @@ class TestWhatItAllows:
 
 class TestWhatIsLeftToReview:
     def test_nothing_when_it_was_saved_with_every_app(self):
-        assert to_review({**REVIEWED_SALE, "inventory.view": OFF, "inventory.manage": OFF}, {"sale": SALE, "inventory": STOCK}) == set()
+        saved = {**REVIEWED_SALE, "inventory.view": OFF, "inventory.manage": OFF}
+
+        assert to_review(saved, {"sale": SALE, "inventory": STOCK}) == set()
 
     def test_every_permission_of_an_app_turned_on_after_it_was_saved(self):
         assert to_review(REVIEWED_SALE, {"sale": SALE, "inventory": STOCK}) == set(STOCK)

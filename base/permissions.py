@@ -39,8 +39,9 @@ def access_for(user: Any, scope: Scope) -> frozenset[str]:
     A superuser is ERPlora's staff, whose place is the Hub admin on the platform host: on a
     business's host it holds only what a ``Membership`` there gives it, like anyone (the staff copy ``saas-staff:<id>``
     never has one). What each basic role gets, ``permissions_of_role``. The owner keeps the role of their invitation
-    whatever role of the business their row names: nobody takes owning the business from them. The business's role is
-    read from the database at work, so it is always that of the business of ``scope``.
+    whatever role of the business their row names: nobody takes owning the business from them. The role of the business
+    is read from the business's own database, the one at work (``use_hub``); outside one it fails, as any model of a
+    business does.
     """
     if user is None or not user.is_authenticated or not user.is_active:
         return frozenset()
@@ -49,7 +50,9 @@ def access_for(user: Any, scope: Scope) -> frozenset[str]:
     role = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
     if role is None:
         return frozenset()
-    own = None if role == Membership.Role.OWNER else BusinessRole.objects.filter(people__username=user.get_username()).first()
+    own = None
+    if role != Membership.Role.OWNER:
+        own = BusinessRole.objects.filter(people__username=user.get_username()).first()
     if own is None:
         return permissions_of_role(role)
     allowed = roles.effective(own.states, grantable(all_live_app_configs()), given=permissions_of_role(own.origin))
