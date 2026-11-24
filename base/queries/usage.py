@@ -49,7 +49,8 @@ BUSY_WINDOW_DAYS = 7
             "plan includes; its capacity (what it does at once against what it really has, and the times it fell short "
             "in the last 7 days); the requests served this month, the people active now and in 30 days, and the size of "
             "its database. A figure that is null has not been measured yet: say so, never read it as a zero. The "
-            "assistant's own messages are not here. Files and the database are measured every night."
+            "assistant's own messages of the month are read with base.assistant.usage. Files and the database are "
+            "measured every night."
         ),
         asks={
             "en": (
