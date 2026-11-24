@@ -108,8 +108,9 @@ def test_the_model_hears_the_name_of_each_file_it_reads_and_still_reads_it(owner
     said = [part["text"] for part in sent if part["type"] == "text"]
     assert any("«albaran.pdf»" in text for text in said)
     assert any("«factura.jpg»" in text for text in said)
-    # erplora.com still gets each file whole, to read it.
+    # erplora.com still gets each file whole, to read it; a photo as it takes one, without the name beside it.
     assert [part["type"] for part in sent if part["type"] != "text"] == ["input_file", "image_url"]
+    assert [sorted(part) for part in sent if part["type"] == "image_url"] == [["image_url", "type"]]
 
 
 def test_a_file_no_longer_attached_is_not_kept_and_the_model_hears_why(owner, store):

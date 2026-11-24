@@ -132,6 +132,7 @@ const planUrl = () => readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
 export const HUB_ASSISTANT: AssistantConfig = {
   turnUrl: '/api/assistant/turn',
   toolFiles: [{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }],
+  imageNames: true,
   elevationToken: () => approvalPass(),
   approval: hubApproval(),
   usage: (client) => client.api.call('base.assistant.usage', {}),

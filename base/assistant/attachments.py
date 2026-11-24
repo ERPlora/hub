@@ -63,6 +63,9 @@ def _said(part) -> list:
     name = part.get("filename") or ""
     if part.get("type") == "input_file" and part.get("mime_type") in TOOL_TYPES:
         return [{"type": "text", "text": FOR_A_TOOL.format(name=name)}]
+    if part.get("type") == "image_url":
+        # erplora.com takes a photo as its providers do, without the name the panel sends beside it.
+        part = {"type": "image_url", "image_url": part.get("image_url")}
     return [{"type": "text", "text": NAMED.format(name=name)}, part] if name else [part]
 
 
