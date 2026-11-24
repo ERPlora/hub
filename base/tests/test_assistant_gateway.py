@@ -211,3 +211,34 @@ def test_a_report_that_does_not_know_leaves_the_web_out(gateway):
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     assistant.gateway.report(A, message_id="m1", reason="other", comment="", question="", answer="x", web=None)
     assert "web" not in gateway.sent("/internal/assistant/report")[0].body
+
+
+# ── The web addresses erplora.com's own tools consulted, which the panel checks the answer's against (BASE-F99) ─────
+
+LAW, RATE = "https://www.boe.es/doc", "https://frankfurter.dev"
+
+
+def test_the_addresses_its_tools_consulted_close_the_round(gateway):
+    gateway.turn(
+        {"type": "sources", "sources": [LAW]},
+        {"type": "text_delta", "text": "Según el BOE, sube."},
+        {"type": "sources", "sources": [RATE]},
+        {"type": "response", "output": [], "usage": {}, "continuation": None},
+    )
+    frames = frames_of(**TURN)
+    assert [frame["type"] for frame in frames] == ["text", "done"]
+    assert frames[-1]["sources"] == [LAW, RATE]
+
+
+def test_a_round_whose_tools_consulted_nothing_says_none(gateway):
+    gateway.turn({"type": "text_delta", "text": "Hola"}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    assert frames_of(**TURN)[-1]["sources"] == []
+
+
+def test_what_was_consulted_before_a_failure_stays_with_what_was_said(gateway):
+    gateway.turn(
+        {"type": "sources", "sources": [LAW]},
+        {"type": "text_delta", "text": "Según el BOE"},
+        {"type": "error", "code": "assistant.provider_unavailable", "message": "x", "retriable": True},
+    )
+    assert frames_of(**TURN)[-1]["sources"] == [LAW]

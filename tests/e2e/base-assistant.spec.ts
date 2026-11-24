@@ -28,7 +28,7 @@ import {
   panelAtTheDesk,
   shots,
 } from './assistant-panel';
-import { CLAIM_ANSWER, DICTATION, GREETING } from './assistant-provider';
+import { CLAIM_ANSWER, DICTATION, GREETING, LINK_ANSWER } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { A, api, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
@@ -202,6 +202,16 @@ test('an answer that says it changed something nothing changed is flagged, outsi
     'The assistant said it made a change, but no action was run. Nothing was changed.',
   );
   await shots(page, 'BASE-G117');
+});
+
+test('an answer with a web address that nothing of the turn looked up is flagged, outside the answer', async ({ page }) => {
+  await panelAtTheDesk(page);
+  await ask(page, 'E2E-LINK ¿sube el IVA de la comida para llevar?');
+  await expect(lastAnswer(page)).toHaveText(LINK_ANSWER.en);
+  await expect(panel(page).locator('[data-testid="assistant-notice-unread_link"]')).toContainText(
+    'This answer shows a web address the assistant did not really look up. Do not trust it.',
+  );
+  await shots(page, 'BASE-G153');
 });
 
 test('the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
