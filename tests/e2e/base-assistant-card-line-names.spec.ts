@@ -6,7 +6,10 @@ import { expect, test } from '@playwright/test';
 
 import { askForACard, cancelAtComputerSize, captureStill, card, leave, openPanelInSpanish, signedInWith } from './assistant-panel';
 import { THREE_SIZES as VIEWPORTS } from './helpers';
+import { panelSpec } from './provider-helpers';
 import { post } from './service-helpers';
+
+panelSpec();
 
 test('BASE-F97 SERVICE-F03 — in Spanish the card says which price of a service changes and that its duration is minutes', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-LINE-NAMES-SERVICE';
