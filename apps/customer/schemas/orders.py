@@ -19,7 +19,7 @@ class OrderLinkIn(Schema):
     )
     customer: Reference | None = Field(
         None,
-        description="The customer's exact name, phone or email.",
+        description="The customer's name (or a part of it), phone or email.",
         json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
     )
 

@@ -1,7 +1,7 @@
 """Read operations of the customer app (``READ ONLY``), and the lookups its commands share.
 
 Every read sees the live cards only (not deleted, merged nor erased). A customer may be named by
-its id or by its exact name, phone or email (``find_customer``); groups, tags and fields, by name.
+its id or by its name, phone or email (``find_customer``); groups, tags and fields, by name.
 """
 
 import csv
@@ -346,7 +346,7 @@ def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
     input=CustomerRefIn,
     output=CustomerDetailOut,
     ai=AI(
-        "Retrieves a customer's whole card by its id or by its exact name, phone or email: contact and tax details, "
+        "Retrieves a customer's whole card by its id or by its name, phone or email: contact and tax details, "
         "groups, tags, custom fields and consent per channel.",
         asks={
             "en": ("what do we know about Marta?", "pull up Luis's details", "bring up Carmen's card"),

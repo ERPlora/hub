@@ -246,7 +246,7 @@ class LinkCustomerIn(ConversationRefIn):
     customer: Reference | None = Field(
         None,
         validate_default=True,
-        description="The card's exact name, phone or email, when its id is not known.",
+        description="The card's name (or a part of it), phone or email, when its id is not known.",
     )
 
     @field_validator("customer")
