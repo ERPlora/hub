@@ -466,6 +466,8 @@ Pasos:
 1. En **Ausencias**, pulsa **+**, elige el Miembro, el Tipo (viene Vacaciones), Desde y Hasta,
    «Día completo» (o sus horas) y, si quieres, el Motivo.
 2. Pulsa Guardar: la ausencia sale como **Pendiente**.
+3. Por el asistente, la tarjeta de confirmación pone delante de quién es, el tipo y sus días como un periodo
+   («21–31 dic 2026»; con sus horas si es una parte del día).
 Entra: la persona (cualquier ficha no dada de baja, también una Inactiva; por id o por nombre) y la
 ausencia, con motivo y notas opcionales. Con horas, valen las mismas cada día del rango.
 Sale: la ausencia Pendiente (`staff.time_off.created`; el aviso no lleva el motivo). Todavía no

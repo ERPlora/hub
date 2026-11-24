@@ -23,7 +23,7 @@ Para qué: que la agenda sepa quién trabaja, cuándo y qué cobra cada profesio
 8. STAFF-F15 — el horario de verano, desactivado.
 9. STAFF-F07 — tres profesionales más, pedidos al asistente.
 10. STAFF-F22 — los ajustes de Personal.
-11. STAFF-F17 — las vacaciones de Ana.
+11. STAFF-F17 — las vacaciones de Ana, también pedidas al asistente: su tarjeta dice de quién son, el tipo y sus días.
 12. STAFF-F24 — Ana pide un día libre desde su sesión.
 13. STAFF-F18 — se aprueba; otra petición se rechaza.
 14. STAFF-F19 — una ausencia, cancelada.

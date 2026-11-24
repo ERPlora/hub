@@ -1081,3 +1081,15 @@ msgstr "Ver las ventas de todos"
 
 msgid "Change the till settings, sections and quick notes"
 msgstr "Cambiar los ajustes del TPV, las secciones y las notas rápidas"
+
+msgid "No receipt printer takes this sale's paper: open the sale to print it on this device."
+msgstr "Ninguna impresora de tiques recibe el papel de esta venta: abre la venta para imprimirlo en este dispositivo."
+
+msgid "No receipt printer takes this bill: open it in Sales to print it on this device."
+msgstr "Ninguna impresora de tiques recibe esta cuenta: ábrela en Ventas para imprimirla en este dispositivo."
+
+msgid "Its fiscal document is still pending: open the sale to issue it."
+msgstr "Su documento fiscal sigue pendiente: abre la venta para emitirlo."
+
+msgid "Its VeriFactu record could not be read, and its paper never prints without its QR."
+msgstr "No se pudo leer su registro de VeriFactu, y su papel nunca se imprime sin su QR."

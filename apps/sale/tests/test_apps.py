@@ -136,7 +136,8 @@ def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
     # operation but the reactions only the system runs and the steps of Services' grant of a voucher
     # and of a session spent outside the till (asked directly, a line would pay for a voucher nobody
-    # granted, a professional would count a session nobody spent), and a write says how risky it is
+    # granted, a professional would count a session nobody spent) and the note of a bill the device printed
+    # (the assistant prints only through a printer), and a write says how risky it is
     # (high: money moves or a sale is corrected); a read never asks to confirm.
     from live.operations import AI, INTERNAL, registry
 
@@ -145,6 +146,7 @@ def test_every_operation_is_described_for_the_assistant():
     internal = {name for name, op in ops.items() if op.ai is INTERNAL}
     assert internal == {
         "sale.customer.reassign",
+        "sale.order.note_bill",
         "sale.order_line.check",
         "sale.record.get",
         "sale.sale.record_invoice",

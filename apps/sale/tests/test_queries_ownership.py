@@ -59,6 +59,11 @@ def missing(response) -> bool:
     return response.status_code == 404 and response.json()["error"]["code"] == NOT_FOUND
 
 
+def reached_unissued(response) -> bool:
+    """The reprint found the sale: with no issuer set, its fiscal document is still pending and nothing is printed."""
+    return response.status_code == 409 and response.json()["error"]["code"] == "sale.document_pending"
+
+
 @pytest.fixture
 def sales(coffee, people):
     """One sale charged by each employee."""
@@ -88,7 +93,7 @@ class TestAnEmployeeReachesOnlyTheirOwnSales:
         ana = people["ana"][1]
         assert missing(get(ana, "/sale/letterhead", sale_id=sales["bea"]["id"]))
         assert missing(post(ana, "/sale/sales/print", {"sale_id": sales["bea"]["id"]}))
-        assert post(ana, "/sale/sales/print", {"sale_id": sales["ana"]["id"]}).status_code == 200
+        assert reached_unissued(post(ana, "/sale/sales/print", {"sale_id": sales["ana"]["id"]}))
 
     def test_nor_what_it_could_refund_nor_its_refunds(self, people, sales):
         ana = people["ana"][1]
@@ -139,7 +144,7 @@ class TestWhoSeesEveryone:
         marta = people["marta"][1]
         assert listed(marta) == {sales["ana"]["number"], sales["bea"]["number"]}
         assert get(marta, "/sale/sales/detail", sale_id=sales["bea"]["id"]).status_code == 200
-        assert post(marta, "/sale/sales/print", {"sale_id": sales["bea"]["id"]}).status_code == 200
+        assert reached_unissued(post(marta, "/sale/sales/print", {"sale_id": sales["bea"]["id"]}))
 
     def test_the_owner_the_administrator_and_the_manager_hold_it_the_employee_does_not(self):
         configs = all_live_app_configs()

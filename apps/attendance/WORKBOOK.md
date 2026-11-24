@@ -497,7 +497,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 ## Para quien lo mantiene
 
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y
+  `queries/`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y
   un `tests/test_<fichero>.py` por fichero, más `test_integration_staff.py` (contra Personal real, sin
   dobles), `test_relay.py` (la baja en Personal entregada por el relay real del worker) y
   `test_concurrency.py` (hilos).

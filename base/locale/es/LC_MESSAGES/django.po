@@ -1698,6 +1698,10 @@ msgstr "Elige al menos una app y qué puede hacer la key en ella."
 msgid "That app does not publish what the key would do on it."
 msgstr "Esa app no publica lo que la key haría en ella."
 
+#: services/api_keys.py
+msgid "A key may not do more than you may do yourself."
+msgstr "Una key no puede hacer más de lo que puedes hacer tú."
+
 #: services.py:2052
 msgid "Give the key a name."
 msgstr "Ponle un nombre a la key."

@@ -49,6 +49,7 @@ ROUTES = {
     ("POST", "/sale/orders/void_line", "sale.order.void_line"),
     ("POST", "/sale/orders/fire", "sale.order.fire"),
     ("POST", "/sale/orders/print_bill", "sale.order.print_bill"),
+    ("POST", "/sale/orders/note_bill", "sale.order.note_bill"),
     ("POST", "/sale/orders/split", "sale.order.split"),
     ("POST", "/sale/orders/merge", "sale.order.merge"),
     ("POST", "/sale/orders/void", "sale.order.void"),

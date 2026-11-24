@@ -3,7 +3,7 @@
 // customer, lines with their notes and comps, the discount, the VAT breakdown and the total the server
 // works out —, «Bill — this is not an invoice…», and the print and close buttons. No number, no QR.
 // «Print» asks the printing queue first (PRINTING-F09): queued, a toast names the printer; else the
-// browser prints the screen's paper.
+// browser prints the screen's paper, and the check notes its bill as asked for (TABLE-F34).
 import { formatDateTime } from '@erplora/ui/components';
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,6 +44,12 @@ const VALUED = preview({
   total: 2700,
   breakdown: [{ tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '10.00', label: 'vat', base: 2455, tax: 245 }],
 });
+
+const NO_PRINTER = { error: { code: 'sale.no_printer', message: 'No receipt printer takes this bill.' } };
+const NOTED = { order_id: 'o1', bill_printed_at: '2026-10-14T19:30:00Z' };
+/** What the till asked to note: the bill the device printed. */
+const notes = (m: { sent: () => { path: string; body: unknown }[] }) =>
+  m.sent().filter((call) => call.path === '/api/sale/orders/note_bill').map((call) => call.body);
 
 const BUSINESS = { sale_id: null, name: 'Casa Pepe S.L.', tax_id: 'B12345674', lines: ['Calle Mayor 1', 'Tel. 600 000 000'] };
 
@@ -198,6 +204,33 @@ describe('PrebillModal', () => {
     ]);
     expect(toastSuccess).toHaveBeenCalledWith('Sent to Till.');
     expect(printPaper).not.toHaveBeenCalled();
+    expect(notes(m)).toEqual([]);
+  });
+
+  it('no receipt printer takes it: the device prints the paper and then the check notes its bill (TABLE-F34)', async () => {
+    const m = await setup();
+    await m.result('sale.checkout.preview', VALUED);
+    m.answerBy({ '/api/sale/orders/print_bill': [409, NO_PRINTER], '/api/sale/orders/note_bill': [200, NOTED] });
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(printPaper).toHaveBeenCalledExactlyOnceWith(m.find('pos-prebill-paper').element, { title: 'Bill' });
+    expect(notes(m)).toEqual([{ order_id: CHECK.id }]);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('a paper the device did not print notes nothing; a note that does not arrive says nothing', async () => {
+    const m = await setup();
+    await m.result('sale.checkout.preview', VALUED);
+    m.answerBy({ '/api/sale/orders/print_bill': [409, NO_PRINTER] });
+    vi.mocked(printPaper).mockRejectedValueOnce(new Error('blocked'));
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(notes(m)).toEqual([]);
+    expect(toastError).toHaveBeenCalledExactlyOnceWith('Bill could not be printed');
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(notes(m)).toEqual([{ order_id: CHECK.id }]);
+    expect(toastError).toHaveBeenCalledOnce();
   });
 
   it('prints the paper; a failure says the bill could not be printed', async () => {
