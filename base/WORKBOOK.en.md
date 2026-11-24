@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:071060c365b77163e378778e3812528097d614703eff05946236ae76ee495094 -->
+<!-- generated from WORKBOOK.md sha256:343b04cc3490bfde365309ad53e5f4c06f43cfcf4a9746b4a92c7d48e73c7da2 -->
 
 ## What it is for and who it is for
 
@@ -2494,6 +2494,8 @@ Steps:
   3. Their message shows on the right just as they wrote it. Below, the assistant's bubble, with three dots that move
      until the first text arrives. In Spanish, the assistant addresses them with «tú» or «usted» as they write to it
      (when it does not show, «tú», as the screens do) and keeps it to the end of the answer, never mixing the two.
+     Everything it writes is in the person's language, also what it says while it looks things up or before it shows
+     a card: not a sentence in English nor words of another alphabet; records' names, as they are written.
   4. While it answers, "Send" becomes "Stop", "Attach a file" and "Dictate by voice" turn off and the answer keeps
      appearing; the conversation scrolls down by itself. They can already write the next question, but it is not
      sent until this one ends.

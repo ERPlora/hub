@@ -615,7 +615,10 @@ Pasos:
    falta de lo que pueden usar las automatizaciones (las apps del caso, o los avisos y las acciones por su
    nombre), entero y con los datos de cada acción: también en un negocio con muchas apps usa los nombres y los
    datos reales, sin avisarte de que no los pudo comprobar. Antes de dejarlo te enseña su tarjeta y espera tu
-   sí, como cualquier cambio que te pide.
+   sí, como cualquier cambio que te pide. La tarjeta dice el nombre, cuándo arranca y cada paso con las mismas
+   frases que la lista y el editor («Cuando se cierra una caja», «Todos los días a las 10:00», «Crear una
+   tarea», «Esperar 1 hora»), nunca los códigos de su definición; igual si le pides que cree la automatización
+   directamente.
 3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas; lo revisas en **Propuestas por el
    asistente** (FLOW-F18).
 Entra: lo que se pide, en palabras, y lo que pueden usar las automatizaciones del negocio.

@@ -9,28 +9,21 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.invoice import queries, services
-from apps.invoice.schemas import (
-    AllocationsIn,
+from apps.invoice.schemas.invoices import (
     BySourceIn,
     DocumentIn,
-    FromRefundIn,
     FromSaleIn,
-    FromVoidIn,
-    GapsIn,
     InvoiceCreateIn,
     InvoiceGetIn,
     InvoiceListIn,
-    IssuerIn,
     MarkPaidIn,
-    RectificationPreviewIn,
-    RectifyIn,
-    RefundGetIn,
-    SeriesCreateIn,
-    SeriesListIn,
-    SeriesPeekIn,
-    SeriesUpdateIn,
     SubstituteIn,
 )
+from apps.invoice.schemas.issuer import IssuerIn
+from apps.invoice.schemas.numbering import AllocationsIn, GapsIn
+from apps.invoice.schemas.rectifying import FromRefundIn, FromVoidIn, RectificationPreviewIn, RectifyIn
+from apps.invoice.schemas.refunds import RefundGetIn
+from apps.invoice.schemas.series import SeriesCreateIn, SeriesListIn, SeriesPeekIn, SeriesUpdateIn
 
 router = Router(tags=["invoice"])
 

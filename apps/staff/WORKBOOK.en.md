@@ -94,7 +94,7 @@ Last name, Email and Phone (whoever sees the team's contact details), Role, Stat
 
 The **+** button opens **New**; a row opens **Edit · {name}**. Form: **First name, Last name, Email,
 Phone, Employee ID, Role** ("No role"), **Hub user** ("No Hub access"), **Status** (only when editing:
-Active, Inactive, On leave), **Bookable**, **Buffer between appointments (min)**, **Hire date**,
+Active, Inactive, On leave), **Bookable**, **Booking buffer (min)**, **Hire date**,
 **Color**, **Specialties**, **Bio** and, for whoever can see the pay, **Hourly rate** and **Commission
 (%)**. Row actions for the owner and the administrator: **Deactivate** and **Terminate**, both with a
 confirmation. The rate (in the column, in the form and in "My record") is in the business's currency, its
@@ -212,8 +212,8 @@ Screen: Staff
 Steps:
 1. In **Staff**, tap **+**: **New** opens (without Status: the person is born **Active**).
 2. Write First name and Last name (required, up to 100 characters). If you want, Email, Phone, Employee
-   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
-   appointments and, with the pay permission, Hourly rate and Commission (%). **Bookable** comes on.
+   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Booking buffer and, with the pay
+   permission, Hourly rate and Commission (%). **Bookable** comes on.
 3. Tap Save: the person shows in the table as **Active**, with their email and phone for whoever sees the team's
    contact details.
 In: the form; the active roles (STAFF-F04), by id or by their name. The rate is typed in the business's

@@ -35,7 +35,7 @@ from live.operations import MIN_ASKS, Operation, registry
 
 from base import approvals, assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 __all__ = ["in_business_a"]
@@ -76,7 +76,7 @@ def members(make_user, prefix: str) -> Callable[[str, str], OperationContext]:
         if role not in users:  # one person per role, whatever the language they ask in
             users[role] = make_user(f"{prefix}-{role}", host=A.key, role=role)
         user = users[role]
-        return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
+        return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
 
     return of
 

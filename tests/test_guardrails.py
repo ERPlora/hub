@@ -82,8 +82,8 @@ TENANCY_IDENTITY_REASON = (
 )
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
-        "The context builder reads Membership and a fresh copy of the user before any operation "
-        "runs, so it cannot go through one; read only."
+        "The context builder reads Membership, the role the business gave the person and a fresh copy of the user "
+        "before any operation runs, so it cannot go through one; read only."
     ),
     "base/health.py": READYZ_REASON,
     "base/registry.py": (

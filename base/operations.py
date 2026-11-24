@@ -39,7 +39,7 @@ from base import meter, platform_hub, registry
 from base.api_keys import KeyCaller
 from base.approvals import Approved, consequence_context
 from base.business import country_or_market
-from base.permissions import permissions_for, reload_user
+from base.permissions import access_for, reload_user
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import HUB_SCOPE_KIND, HubContextMissing, current_hub, use_hub
 from base.tenancy.identity import HubIdentityMismatch
@@ -251,7 +251,7 @@ class HubContextBuilder:
         actor = user if user is not None and user.is_authenticated else None
         if actor is not None:
             _note_the_person(request, actor)
-        permissions = permissions_for(actor, scope)
+        permissions = access_for(actor, scope)
         approved = getattr(request, "approved", None)
         if isinstance(approved, Approved):
             # A manager approved this very request (``base.approvals``): its one permission more. What that
@@ -295,4 +295,4 @@ class HubContextBuilder:
         refusal = registry.refusal(registry.hub_by_slug(ctx.scope.key))
         if refusal is not None:
             raise HostClosed(refusal.message, code=refusal.code, status=refusal.status)
-        return dataclasses.replace(ctx, permissions=permissions_for(reload_user(ctx.actor), ctx.scope))
+        return dataclasses.replace(ctx, permissions=access_for(reload_user(ctx.actor), ctx.scope))
