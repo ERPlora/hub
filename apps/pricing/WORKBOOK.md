@@ -635,9 +635,10 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
-  Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
+  `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `tests/test_<fichero>.py` por fichero (un `tests/test_services_<módulo>.py` por módulo de `services/`),
+  más `tests/test_integration_*.py` con Inventario, Clientes y Servicios de verdad, `tests/test_concurrency.py`
+  con hilos y `tests/test_relay.py` (PRICING-F14 de punta
   a punta: la operación real de la otra app, un tick real del worker y su relay, la reacción una sola vez y
   el hub B sin tocar al A). En Chrome, `tests/e2e/pricing-flows.spec.ts` (un test por flujo con pantalla,
   PRICING-F01 a F12, con sus capturas en tres tamaños) y `tests/e2e/pricing-lists.spec.ts` (de la tarifa al
