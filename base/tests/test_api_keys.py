@@ -353,6 +353,15 @@ class TestTheList:
         assert keys["Carts"]["scopes"] == {"cart_checkout": [READ, DELETE]}
         assert keys["Carts"]["revoked_at"] is None and "mode" not in keys["Carts"]
 
+    def test_a_key_left_in_the_old_shape_lists_only_its_actions(self, admin_on_a, hub_a):
+        """While a deploy migrates, the code of before still writes a key per app with «write»: the list shows what it
+        can do now (its reading) instead of failing."""
+        made = create(admin_on_a, hub_a, scopes={"tax": [READ]})["key"]
+        with use_hub(hub_a):
+            ApiKey.objects.filter(pk=made["id"]).update(scopes={"tax": ["read", "write"], "sale": ["write"]})
+        [listed] = get(admin_on_a, host(hub_a), "/keys").json()["keys"]
+        assert listed["scopes"] == {"tax": [READ]}
+
     def test_the_apps_that_publish_their_api_with_what_each_publishes(self, admin_on_a, hub_a):
         apps = {app["id"]: app for app in get(admin_on_a, host(hub_a), "/keys").json()["apps"]}
         assert apps["cart_checkout"]["actions"] == list(ACTIONS)

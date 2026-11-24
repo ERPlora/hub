@@ -56,7 +56,7 @@ def granted(scopes: object, app: str) -> frozenset[str]:
 
 def allows(scopes: object, app: str, action: str | None) -> bool:
     """Whether a key of ``scopes`` may do ``action`` on ``app``; an action nobody decided, never."""
-    return action is not None and action in granted(scopes, app)
+    return action in granted(scopes, app)
 
 
 def normalised(scopes: object) -> dict[str, list[str]]:
