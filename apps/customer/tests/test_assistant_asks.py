@@ -264,6 +264,12 @@ def test_the_qas_words_keep_offering_the_write_that_names_the_check(catalog_of):
     assert offered[len(assistant.relevance.ALWAYS)] == "sale.order.set_label", offered
 
 
+def test_the_link_tells_the_model_it_puts_the_check_in_the_customers_name():
+    """With the write that names the check offered beside it, what tells the model which one «ponla a su nombre» asks for
+    is the link's description."""
+    assert "in the customer's name" in shared.description(registry[LINK])
+
+
 @HUB_DB
 @pytest.mark.parametrize(("language", "search"), SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK)
 def test_searching_for_a_customer_on_a_check_finds_the_link(catalog_of, language, search):
