@@ -34,7 +34,7 @@ from base.models import Membership
 from base.permissions import access_for
 from base.registry import REGISTRY_SCOPE
 from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
-from base.tenancy.context import use_hub
+from base.tenancy.context import HubContextMissing, use_hub
 from base.tenancy.tests.business import A, HUB_DB, on_hub_a
 from control.models import Hub
 
@@ -321,6 +321,17 @@ def test_on_a_business_s_host_a_superuser_holds_only_what_its_membership_there_g
     with use_hub(hub_a):
         assert access_for(raised, A) == access_for(plain, A)
         assert "*" not in access_for(raised, A)
+
+
+@HUB_DB
+def test_outside_a_business_what_a_person_who_is_not_its_owner_may_do_is_refused_not_guessed(hub_a):
+    """The role a business gave a person is in that business's own database: with none entered there is no telling
+    whether they hold one, so the answer is a failure and never the wider role of their invitation."""
+    manager = get_user_model().objects.create_user("saas:9")
+    Membership.objects.create(user=manager, host=A.key, role=Membership.Role.MANAGER)
+
+    with pytest.raises(HubContextMissing):
+        access_for(manager, A)
 
 
 @pytest.mark.django_db
