@@ -373,6 +373,7 @@ class TestTheCommand:
             + "SAMPLE-F01,2026-11-23,tablet,1.6.0,ok,,assistant-es,partial,fail\n"
             + "SAMPLE-F01,2026-11-19,tablet,1.4.0,partial,ERPlora/hub#2,assistant-en,whole,ok\n"
             + "SAMPLE-F08,2026-11-22,tablet,1.6.0,ok,,assistant-en,,\n"
+            + "SAMPLE-F02,2026-11-20,tablet,1.5.0,ok,,assistant-es,whole,ok\n"
             + "SAMPLE-F05,2026-11-22,tablet,1.6.0,ok,,screen,,\n"
             + "HUB_APP-F02,2026-11-22,tablet,1.6.0,ok,,screen,,\n",
             encoding="utf-8",
@@ -385,10 +386,10 @@ class TestTheCommand:
             "  SAMPLE-F08 never",
             "  SAMPLE-F01 screen 2026-11-20 fail phone 1.5.0 ERPlora/hub#1",
             "  BASE-F01 screen 2026-11-21 ok tablet 1.5.0",
-            "last walks, assistant: 2 walked, 2 never",
-            "  SAMPLE-F02 never",
+            "last walks, assistant: 3 walked, 1 never",
             "  BASE-F01 never",
             "  SAMPLE-F01 assistant-en 2026-11-19 partial model:ok phrase:whole tablet 1.4.0 ERPlora/hub#2",
+            "  SAMPLE-F02 assistant-es 2026-11-20 ok model:ok phrase:whole tablet 1.5.0",
             "  SAMPLE-F08 assistant-en 2026-11-22 ok tablet 1.6.0",
             "  SAMPLE-F01 assistant-es 2026-11-23 ok model:fail phrase:partial tablet 1.6.0",
             "  the ledger names flows in no WORKBOOK of the Hub: HUB_APP-F02",
