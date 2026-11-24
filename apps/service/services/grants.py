@@ -21,7 +21,7 @@ from apps.service.schemas.grants import AdjustIn, GrantIn, GrantOut, RedeemIn, R
 from apps.service.services.grant_sales import charged_on, tell_sales
 from apps.service.services.writes import _actor
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 
 GRANT_ALREADY_VOIDED = _("That voucher was already voided.")
 GRANT_IN_USE = _("That voucher was already used: it cannot be voided.")

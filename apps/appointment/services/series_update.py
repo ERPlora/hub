@@ -38,7 +38,7 @@ from apps.appointment.services.writes import (
     _history,
     lock_appointments,
 )
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 from base.business import business_zone
 
 PATTERN_CHANGED = _("The repeating appointment changed its pattern")

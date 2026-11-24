@@ -96,7 +96,7 @@ def test_spanish_texts_are_the_old_modules():
             "Cancelada",
         ]
         assert (
-            str(queries.MEMBER_NOT_FOUND)
+            str(queries.reads.MEMBER_NOT_FOUND)
             == "Ese miembro del personal no existe en este negocio."
         )
         assert str(services.ACTIVE_TIME_OFF) == (

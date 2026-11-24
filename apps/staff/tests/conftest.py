@@ -9,7 +9,7 @@ import datetime as dt
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from django.utils import translation
+from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
@@ -153,3 +153,32 @@ def make_time_off(member: Member, start: str, end: str | None = None, hours: tup
     return TimeOff.objects.create(
         member=member, start_date=dt.date.fromisoformat(start), end_date=dt.date.fromisoformat(end or start), **times, **fields
     )
+
+
+# What the tests of the reads share.
+
+TERMINATED = Member.Status.TERMINATED
+# 2026-08-18 22:30 UTC is already 2026-08-19 00:30 in Madrid (the business's zone, settings.TIME_ZONE).
+LATE_EVENING_UTC = dt.datetime(2026, 8, 18, 22, 30, tzinfo=dt.UTC)
+
+
+def run(name, data, role="hub_admin", **ctx):
+    return get(name)(ctx_for(role, **ctx), data)
+
+
+def t(value):
+    return dt.time.fromisoformat(value)
+
+
+@pytest.fixture
+def frozen_now(monkeypatch):
+    """Freeze ``timezone.now`` (and so the business's «today») at an instant."""
+
+    def freeze(instant):
+        monkeypatch.setattr(timezone, "now", lambda: instant)
+
+    return freeze
+
+
+def today():
+    return timezone.localdate()
