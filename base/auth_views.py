@@ -144,7 +144,7 @@ def _open_session(request: HttpRequest, user: auth.RedeemedUser, slug: str, next
     """The session of the code's person on ``slug``: a member's, or ERPlora's support's; else the response that
     refuses it."""
     try:
-        if user.role == Membership.Role.SUPPORT:
+        if user.role == Membership.SUPPORT:
             support_entry.open_support_session(request, user, slug)
         else:
             sessions.open_session_from_saas(request, user, slug)

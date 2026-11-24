@@ -44,7 +44,7 @@ def open_support_session(request: HttpRequest, redeemed: RedeemedUser, slug: str
     entry = SupportEnterIn(username=user.get_username(), name=redeemed.name[:150], email=redeemed.email)
     if not support_access_enter(system_context(Scope("host", slug)), entry).entered:
         raise SupportAccessOff(slug)
-    Membership.objects.update_or_create(user=user, host=slug, defaults={"role": Membership.Role.SUPPORT})
+    Membership.objects.update_or_create(user=user, host=slug, defaults={"role": Membership.SUPPORT})
     ensure_hub_user(user)
     _log_in(request, user, redeemed.user_id, credential=SessionOwner.Credential.SUPPORT)
     return user

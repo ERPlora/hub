@@ -39,7 +39,7 @@ class MembershipQuerySet(models.QuerySet):
     def team(self, host: str) -> "MembershipQuerySet":
         """The active people of the business of ``host``: ERPlora's support, who only comes in to help, is none of
         them."""
-        return self.filter(host=host, user__is_active=True).exclude(role=Membership.Role.SUPPORT)
+        return self.filter(host=host, user__is_active=True).exclude(role=Membership.SUPPORT)
 
 
 class Membership(UUIDModel):
@@ -47,8 +47,8 @@ class Membership(UUIDModel):
 
     The prefix keeps the hub's roles apart from the platform's (superuser, ``support``), which reach the Hub admin only
     through the ``hub-admin`` audience, on a staff copy (``saas-staff:<id>``) with no membership. None makes a user
-    staff. ``hub_support`` is ERPlora's support inside a business that lets it in, on a copy of its own
-    (``saas-support:<id>``): no customer of the business, so never among its team (:meth:`MembershipQuerySet.team`).
+    staff. :attr:`SUPPORT` is ERPlora's support inside a business that lets it in, on a copy of its own
+    (``saas-support:<id>``): no role of the business, so never among its team (:meth:`MembershipQuerySet.team`).
     """
 
     class Role(models.TextChoices):
@@ -57,7 +57,8 @@ class Membership(UUIDModel):
         MANAGER = "hub_manager", _("Manager")
         EMPLOYEE = "hub_employee", _("Employee")
         ACCOUNTANT = "hub_accountant", _("Accountant")
-        SUPPORT = "hub_support", _("ERPlora support")
+
+    SUPPORT = "hub_support"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -71,7 +72,7 @@ class Membership(UUIDModel):
         validators=[RegexValidator(HOST_LABEL_RE, _("Enter the first label of the host, e.g. “a” for a.localhost."))],
         help_text=_("First label of the host, e.g. “a” for a.localhost."),
     )
-    role = models.CharField(_("role"), max_length=16, choices=Role.choices)
+    role = models.CharField(_("role"), max_length=16, choices=[*Role.choices, (SUPPORT, _("ERPlora support"))])
 
     objects = MembershipQuerySet.as_manager()
 

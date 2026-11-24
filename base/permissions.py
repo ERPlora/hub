@@ -75,7 +75,7 @@ def permissions_of_role(role: str) -> frozenset[str]:
     declared = frozenset(permission for config in configs for permission in config.permissions)
     if role == Membership.Role.OWNER:
         return declared
-    if role in (Membership.Role.ADMIN, Membership.Role.SUPPORT):
+    if role in (Membership.Role.ADMIN, Membership.SUPPORT):
         return declared - OWNER_ONLY
     return permissions_for_role(configs, role)
 

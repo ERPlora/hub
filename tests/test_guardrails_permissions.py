@@ -90,6 +90,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
+    "base.support_access.enter": (
+        PLATFORM,
+        "/auth/callback notes the entry of a person of ERPlora's support, before there is an actor, when the business "
+        "lets support in.",
+    ),
     "base.app.activation_settle": (
         PLATFORM,
         "The worker turns on, or marks failed, the apps whose tables it has just made in the business's own database "
