@@ -1,4 +1,5 @@
-"""A line of what another app records in a session (Tips), as the session's summary and its X/Z report show it."""
+"""What another app records in a session (Tips): its lines, as the session's summary and its X/Z report show them, and
+the mark of each movement it recorded."""
 
 from ninja import Field, Schema
 
@@ -12,3 +13,8 @@ class AppLine(Schema):
         description="In cents, with its sign: what was paid out of the drawer is negative.",
         json_schema_extra={"money": True, "signed": True},
     )
+
+
+class AppMark(Schema):
+    app: str = Field(description="The app that recorded it as its own (tip); empty = by hand, or a sale's.")
+    app_name: str = Field(description="That app's name in the reader's language (Tips); empty without one.")

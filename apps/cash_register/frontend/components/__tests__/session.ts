@@ -32,6 +32,7 @@ export const SESSION: SessionOut = {
     total_cash_in: 0,
     total_cash_out: 300,
     total_gifts: 40,
+    app_lines: [],
     expected_cash: 10000,
     counted: 9950,
     difference: -50,

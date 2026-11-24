@@ -4,11 +4,12 @@
 // drawer» and «Difference» while typing (only when the server shows the expected to this person), «Counted
 // cash» (from the session's last closing count, never an opening one), «Closing notes», «Close session».
 // Empty counted cash is asked for; with open checks the first press warns and the second closes («Close
-// anyway»). Success says «Session S-… closed · expected … · counted … · difference …».
+// anyway»). Success says «Session S-… closed · expected … · counted … · difference …». What another app records
+// (Tips, CASH_REGISTER-F18) shows in its own lines before the expected, as the detail names them.
 import { toastSuccess } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
-import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
+import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash, words } from '../__tests__/mount-cash-register';
 import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
@@ -24,6 +25,15 @@ const KITCHEN = 'kitchen.ticket.board';
 const PRINTS = 'printing.job.summary';
 
 const detail = (expected: number | null) => ({ id: 's1', number: 'S-261014-0001', status: 'open', summary: { expected_cash: expected } });
+const TIPS = [
+  { app: 'tip', label: 'Tips in cash', amount: 500 },
+  { app: 'tip', label: 'Tips by card', amount: 700 },
+  { app: 'tip', label: 'Tips paid out', amount: -200 },
+];
+const withTips = (expected: number | null, lines: typeof TIPS | null = TIPS) => {
+  const answer = detail(expected);
+  return { ...answer, summary: { ...answer.summary, app_lines: lines } };
+};
 const counts = (rows: unknown[]) => ({ rows, total: rows.length, limit: 20, offset: 0 });
 const checks = (rows: unknown[]) => ({ rows, total: rows.length, limit: 20, offset: 0 });
 const board = (cooking: unknown[] = [], ready: unknown[] = []) => ({
@@ -113,6 +123,28 @@ describe('CloseSessionForm', () => {
     const s = await setup();
     await s.ready(null);
     expect(s.find('cash-register-close-expected').exists()).toBe(false);
+  });
+
+  it("shows another app's lines before the expected cash they add up to, in the reader's language", async () => {
+    for (const [locale, said] of [
+      ['en', ['Tips in cash €5.00', 'Tips by card €7.00', 'Tips paid out -€2.00']],
+      ['es', ['Tips in cash 5,00 €', 'Tips by card 7,00 €', 'Tips paid out -2,00 €']],
+    ] as const) {
+      const s = await setup(locale);
+      await s.result(DETAIL, withTips(10300));
+      const lines = s.find('cash-register-close-app-lines');
+      expect(lines.findAll('[data-testid^="cash-register-close-app-lines-"]').map((line) => words(line.element))).toEqual(said);
+      const expected = s.find('cash-register-close-expected').element;
+      expect(lines.element.compareDocumentPosition(expected) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('shows no line of an app when there is none, nor when a blind count hides them', async () => {
+    for (const answer of [detail(10150), withTips(10150, []), withTips(null, null)]) {
+      const s = await setup();
+      await s.result(DETAIL, answer);
+      expect(s.find('cash-register-close-app-lines').exists()).toBe(false);
+    }
   });
 
   it('asks for the counted cash and sends nothing without it', async () => {
