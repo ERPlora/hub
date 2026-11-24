@@ -14,7 +14,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.service.models import Grant, GrantAdjustment, Redemption
 from apps.service.queries.packages import find_package
 from apps.service.queries.reads import CUSTOMER_VIEW, _page

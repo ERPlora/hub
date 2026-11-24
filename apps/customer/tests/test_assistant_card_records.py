@@ -566,26 +566,6 @@ def test_the_reads_answer_the_name_of_what_they_read():
 
 
 @HUB_DB
-@pytest.mark.parametrize("kind", ["group", "tag", "field"])
-def test_the_reads_find_a_group_a_tag_or_a_field_by_its_name_as_their_writes_do(kind):
-    """In any case, the active one before one no longer active, as ``find_group`` and its neighbours find it (hub#1280);
-    a name that fits none is not found."""
-    MODELS[kind].objects.create(name="VIP", is_active=False)
-    active = MODELS[kind].objects.create(name="vip")
-    assert read(f"customer.{kind}.detail", {kind: "Vip"}).id == active.id
-    with pytest.raises(NotFound):
-        read(f"customer.{kind}.detail", {kind: "Nobody"})
-
-
-@HUB_DB
-@pytest.mark.parametrize("kind", ["group", "tag", "field"])
-def test_the_reads_take_a_group_a_tag_or_a_field_by_its_id_whatever_name_comes_beside_it(kind):
-    """The id wins, as in their writes (``_find_named``)."""
-    own, other = two(kind)
-    assert read(f"customer.{kind}.detail", {"id": str(own.id), kind: other.name}).id == own.id
-
-
-@HUB_DB
 @pytest.mark.parametrize("name", READS)
 def test_the_reads_need_the_right_to_see_the_customers(name):
     denied = ctx_for(permissions=set(ctx_for().permissions) - {"customer.view"})

@@ -12,7 +12,7 @@ from live.operations import atomic
 
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
-from apps.customer.queries import business_country
+from apps.customer.queries.reads import business_country
 from base.queries.people import actor_name
 
 PHONE_INVALID = _(

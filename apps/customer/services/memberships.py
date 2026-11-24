@@ -9,7 +9,8 @@ from live.outbox import record_event
 
 from apps.customer import events
 from apps.customer.models import Customer, CustomerGroup, CustomerTag
-from apps.customer.queries import GROUP_UNAVAILABLE, TAG_UNAVAILABLE, find_customer, load_detail, named
+from apps.customer.queries.cards import load_detail
+from apps.customer.queries.reads import GROUP_UNAVAILABLE, TAG_UNAVAILABLE, find_customer, named
 from apps.customer.schemas.cards import CustomerDetailOut
 from apps.customer.schemas.memberships import SetGroupsIn, SetTagsIn
 from apps.customer.services.writes import lock_rows
