@@ -1,7 +1,7 @@
 """Read operations of the customer app (``READ ONLY``), and the lookups its commands share.
 
 Every read sees the live cards only (not deleted, merged nor erased). A customer may be named by
-its id or by its exact name, phone or email (``find_customer``); groups, tags and fields, by name.
+its id or by its name, phone or email (``find_customer``); groups, tags and fields, by name.
 """
 
 import csv
@@ -58,12 +58,12 @@ from base.business import currency_decimals
 from base.exports import visible_columns
 from base.ordering import list_order
 
-from . import contact, orders
+from . import contact, naming, orders
 
 CUSTOMER_UNAVAILABLE = _("This customer is no longer available.")
 NO_CUSTOMER_MATCHES = _("No customer matches “%(reference)s”.")
 SEVERAL_CUSTOMERS_MATCH = _(
-    "Several customers match “%(reference)s”: give their id, phone or email."
+    "Several customers match “%(reference)s”: %(matches)s. Say which one, or give their id, phone or email."
 )
 GROUP_UNAVAILABLE = _("That group no longer exists.")
 TAG_UNAVAILABLE = _("That tag no longer exists.")
@@ -88,24 +88,6 @@ def business_country(ctx: OperationContext) -> str:
 # ── Lookups shared with services.py ─────────────────────────────────────────────────────────────
 
 
-def _matching_ids(ctx: OperationContext, reference: str) -> list[UUID]:
-    """The live cards whose name, or email or phone for whoever sees them, is exactly ``reference`` (at most two)."""
-    text = reference.strip()
-    cards = Customer.objects.live()
-    if "@" in text and contact.sees_contact(ctx):
-        return list(cards.filter(email__iexact=text).values_list("id", flat=True)[:2])
-    numbers = candidates(text, business_country(ctx)) if contact.sees_contact(ctx) else []
-    if numbers:
-        return list(
-            cards.filter(phone__in=numbers)
-            .order_by("name", "id")
-            .values_list("id", flat=True)[:2]
-        )
-    wanted = normalize(text)
-    found = cards.filter(search_text__startswith=wanted).values_list("id", "name")
-    return [card_id for card_id, name in found if normalize(name) == wanted][:2]
-
-
 def find_customer(
     ctx: OperationContext,
     customer_id: UUID | None,
@@ -114,27 +96,28 @@ def find_customer(
     lock: bool = False,
     live: bool = True,
 ) -> Customer:
-    """The card ``customer_id`` names or, without it, the one live card ``reference`` names, a phone read in ``ctx``'s
-    business's country as the card's was saved (``business_country``).
+    """The card ``customer_id`` names or, without it, the one live card ``reference`` names (``naming.matching``: its
+    exact email, phone or name, else as the Customers list finds it), a phone read in ``ctx``'s business's country as
+    the card's was saved (``business_country``).
 
     ``lock`` locks its row until the end of the command's transaction; ``live=False`` also finds a
     deleted, merged or erased card, by its id only. ``NotFound`` (``customer.customer_unavailable``)
-    when there is none and ``Conflict`` (``customer.customer_ambiguous``) when the reference fits
-    several cards.
+    when there is none and ``Conflict`` (``customer.customer_ambiguous``), naming them, when the
+    reference fits several cards.
     """
     if customer_id is None:
-        ids = _matching_ids(ctx, reference or "")
-        if not ids:
+        found = naming.matching(ctx, reference or "", business_country(ctx))
+        if not found:
             raise NotFound(
                 NO_CUSTOMER_MATCHES % {"reference": reference},
                 code=CUSTOMER_UNAVAILABLE_CODE,
             )
-        if len(ids) > 1:
+        if len(found) > 1:
             raise Conflict(
-                SEVERAL_CUSTOMERS_MATCH % {"reference": reference},
+                SEVERAL_CUSTOMERS_MATCH % {"reference": reference, "matches": naming.names(found, ctx.language)},
                 code=CUSTOMER_AMBIGUOUS_CODE,
             )
-        customer_id = ids[0]
+        customer_id = found[0][0]
     cards = Customer.objects.live() if live else Customer.objects.all()
     if lock:
         cards = cards.select_for_update()
@@ -363,7 +346,7 @@ def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
     input=CustomerRefIn,
     output=CustomerDetailOut,
     ai=AI(
-        "Retrieves a customer's whole card by its id or by its exact name, phone or email: contact and tax details, "
+        "Retrieves a customer's whole card by its id or by its name, phone or email: contact and tax details, "
         "groups, tags, custom fields and consent per channel.",
         asks={
             "en": ("what do we know about Marta?", "pull up Luis's details", "bring up Carmen's card"),

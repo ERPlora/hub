@@ -2,7 +2,7 @@
 JSON Schema of the assistant's tools: every field says what it is).
 
 Made for voice: a document is named by its id or its number (``FACT-2026-000012``), a sale by its id or
-its number of the day (``20261014-0003``), a customer by its id or by its exact name, phone or email (the
+its number of the day (``20261014-0003``), a customer by its id or by its name, phone or email (the
 Customers app's reference), a series by its id or its code. A Spanish tax ID is checked with python-stdnum (NIF, NIE or CIF; the EU VAT number
 with document type 02); a foreign one is taken as written. Money is whole cents; rates are percentages
 with two decimals; quantities have three decimals, as the sale's.
@@ -162,7 +162,7 @@ SEARCH = "Free text to search."
 DIRECTION = "Sort direction: asc or desc."
 CUSTOMER_ID = "Id of a customer card of the Customers app: fills the recipient's data that is not sent."
 CUSTOMER_REF = (
-    "A customer card by its exact name, phone or email (for voice); same as customer_id."
+    "A customer card by its name (or a part of it), phone or email (for voice); same as customer_id."
 )
 CUSTOMER_NAME = "Recipient's name or company name."
 CUSTOMER_TAX_ID = "Recipient's tax ID: a Spanish NIF, NIE or CIF (checked), or the foreign document's number."

@@ -57,7 +57,7 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
     input=CustomerPatchIn,
     output=CustomerDetailOut,
     ai=AI(
-        "Updates a customer's card, by its id or its exact name, phone or email: only the fields sent change, and "
+        "Updates a customer's card, by its id or its name, phone or email: only the fields sent change, and "
         "with field_values its custom fields too, in one write: required fields must end up filled and values must "
         "match their type, or nothing is saved.",
         asks={

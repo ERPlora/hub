@@ -196,11 +196,11 @@ def _named_unless(id_field: str, message):
     return check
 
 
-CUSTOMER_REFERENCE = "The customer's exact name, phone or email, when the id is not known."
+CUSTOMER_REFERENCE = "The customer's name (or a part of it), phone or email, when the id is not known."
 
 
 class CustomerRefIn(Schema):
-    """A card by its ``id`` or by its exact name, phone or email (``customer``); the id wins."""
+    """A card by its ``id`` or by its name (or a part of it), phone or email (``customer``); the id wins."""
 
     id: UUID | None = Field(None, title=CUSTOMER, description="The customer's id.", json_schema_extra=A_CUSTOMER)
     customer: Reference | None = Field(
@@ -214,7 +214,7 @@ class CustomerRefIn(Schema):
 
 
 class CustomerOfIn(Schema):
-    """The card something belongs to: ``customer_id``, or its exact name, phone or email."""
+    """The card something belongs to: ``customer_id``, or its name (or a part of it), phone or email."""
 
     customer_id: UUID | None = Field(None, description="The customer's id.", json_schema_extra=A_CUSTOMER)
     customer: Reference | None = Field(

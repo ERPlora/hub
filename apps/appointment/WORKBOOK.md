@@ -631,7 +631,9 @@ Pasos:
 2. Al final, el bloque **Historial de visitas** enseña sus 10 últimas citas, la más reciente primero,
    con el día y la hora, los servicios, el profesional, el estado y las notas (la interna primero).
 Entra: las citas de la clienta que quien mira puede ver. Por la API o el asistente la clienta se nombra por su
-nombre, su teléfono o su email; por teléfono o email, solo quien ve el contacto de los clientes (BASE-F119).
+nombre (entero o una parte, con tildes o sin ellas, como la encuentra la lista de Clientes: «Lucía», «Lucia
+Fernandez»), su teléfono o su email; por teléfono o email, solo quien ve el contacto de los clientes (BASE-F119).
+Si encajan varias clientas, la respuesta dice cuáles para elegir.
 Sale: nada (solo lee). Una automatización lo lee sin notas ni motivos.
 Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este cliente aún no tiene citas.»
 Implicados: CUSTOMER-F24, BASE-F119

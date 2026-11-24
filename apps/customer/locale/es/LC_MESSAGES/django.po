@@ -404,8 +404,12 @@ msgid "No customer matches “%(reference)s”."
 msgstr "Ningún cliente coincide con «%(reference)s»."
 
 #, python-format
-msgid "Several customers match “%(reference)s”: give their id, phone or email."
-msgstr "Varios clientes coinciden con «%(reference)s»: indica su id, teléfono o email."
+msgid ""
+"Several customers match “%(reference)s”: %(matches)s. Say which one, or give "
+"their id, phone or email."
+msgstr ""
+"Varios clientes coinciden con «%(reference)s»: %(matches)s. Di cuál o indica "
+"su id, teléfono o email."
 
 msgid "That group no longer exists."
 msgstr "Ese grupo ya no existe."
