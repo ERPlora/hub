@@ -23,7 +23,7 @@ from base.assistant.tools import NOT_FROM_CHAT
 from base.blueprint.datasets import DATASETS, dataset
 from base.blueprint.photos import IMAGE_OPERATIONS
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 __all__ = ["in_business_a"]
@@ -60,7 +60,7 @@ def tells_where_to_export(said: str) -> bool:
 @pytest.fixture
 def owner(make_user):
     user = make_user("olga", host=A.key, role=Membership.Role.OWNER)
-    return OperationContext(scope=A, actor="olga", permissions=permissions_for(user, A), language="es")
+    return OperationContext(scope=A, actor="olga", permissions=access_for(user, A), language="es")
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
