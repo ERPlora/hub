@@ -17,9 +17,10 @@ from live import assistant as shared
 from live.context import OperationContext
 from live.operations import get
 
+from apps.inventory.queries.exports import PRODUCT_HEADERS
 from base import assistant
 from base.assistant.tools import NOT_FROM_CHAT
-from base.blueprint.datasets import dataset
+from base.blueprint.datasets import DATASETS, dataset
 from base.blueprint.photos import IMAGE_OPERATIONS
 from base.models import Membership
 from base.permissions import permissions_for
@@ -87,3 +88,10 @@ def test_what_the_tool_says_of_the_export_is_what_the_export_does(name):
     assert "products and services go with their own photos" in said
     assert dataset("customer.customer").personal
     assert "never the customers" in said
+    assert "sale" not in {part.app for part in DATASETS}
+    assert "never the sales" in said
+
+
+def test_the_products_csv_says_it_takes_no_photos_as_it_has_no_photo_column():
+    assert "image" not in PRODUCT_HEADERS
+    assert "A CSV takes no photos." in shared.description(get("inventory.product.export"))
