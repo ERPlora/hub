@@ -18,6 +18,7 @@ import {
   confirmationReady,
   confirmationSettled,
   confirmedWithTheWord,
+  decide,
   freshPage,
   home,
   lastAnswer,
@@ -28,7 +29,7 @@ import {
   panelAtTheDesk,
   shots,
 } from './assistant-panel';
-import { CLAIM_ANSWER, DICTATION, GREETING } from './assistant-provider';
+import { CLAIM_ANSWER, DICTATION, DONE, GREETING } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { A, api, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
@@ -400,5 +401,40 @@ test.describe('a copy of a business attached in the panel', () => {
     const sent = JSON.stringify(chats(provider()).map((seen) => seen.body));
     expect(sent).toContain(name);
     expect(sent).not.toContain(copy.data.content_base64);
+  });
+});
+
+test.describe('files attached in the panel, kept in Files', () => {
+  test('a PDF and a photo sent before the order are kept whole in the folder with their cards and the yes (BASE-F94, BASE-F73)', async ({ page }) => {
+    await login(page, A, '/');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const folder = `Facturas E2E ${Date.now()}`;
+    expect((await api(page.context(), A, 'POST', '/files/folder', { parent: '', name: folder })).status).toBe(200);
+    const kept = {
+      'albaran.pdf': Buffer.from('%PDF-1.4\n% albaran E2E\n'),
+      'factura.png': Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
+    };
+    await home(page);
+    await openPanel(page);
+    await panel(page).locator('[data-testid="assistant-attach-input"]').setInputFiles([
+      { name: 'albaran.pdf', mimeType: 'application/pdf', buffer: kept['albaran.pdf'] },
+      { name: 'factura.png', mimeType: 'image/png', buffer: kept['factura.png'] },
+    ]);
+    await expect(panel(page).locator('[data-testid="assistant-file"]')).toHaveText(['albaran.pdf', 'factura.png']);
+    // Sent alone, and asked for in later messages: the panel sends the whole conversation, the files with it.
+    await ask(page, '');
+    for (const name of Object.keys(kept)) {
+      await askForACard(page, `E2E-ASK base__file__upload ${JSON.stringify({ folder, name, content_base64: name })}`);
+      await expect(card(page)).toContainText(name);
+      await decide(page, 'submit');
+      await expect(lastAnswer(page)).toContainText(DONE.en);
+    }
+
+    const listed = await api<{ files: { name: string }[] }>(page.context(), A, 'GET', `/files?folder=${encodeURIComponent(folder)}`);
+    expect(listed.data.files.map((file) => file.name).sort()).toEqual(['albaran.pdf', 'factura.png']);
+    for (const [name, bytes] of Object.entries(kept)) {
+      const raw = await page.context().request.get(`${A}/api/files/raw?path=${encodeURIComponent(`${folder}/${name}`)}`);
+      expect(Buffer.from(await raw.body()).equals(bytes)).toBe(true);
+    }
   });
 });
