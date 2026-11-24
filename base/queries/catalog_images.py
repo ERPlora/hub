@@ -1,4 +1,4 @@
-"""The shared image library (``base.catalog_image.*``), named in the business's language."""
+"""The shared image library (``base.catalog_image.*``), named in the language of the person who asks."""
 
 from django.conf import settings
 from django.utils import translation
@@ -48,9 +48,15 @@ def image_library(ctx: OperationContext) -> image_catalog.Library:
             ) from None
 
 
+def titled_search(ctx: OperationContext, query: str, *, folder: str | None = None) -> list[dict]:
+    """The library's images that match ``query``, the best first, each titled in the language of the person who asks
+    (``ctx``'s, as their screens and the assistant's card read), whatever the business's."""
+    return [image.row(ctx.language) for image in image_library(ctx).search(query, ctx.language, folder=folder)]
+
+
 def business_language(ctx: OperationContext) -> str:
     """The language the business works in, as erplora.com registered it (Settings › Business), else the deployment's:
-    what its products and services are named in, so what the library's images are titled in on its screens."""
+    what its products and services are named in."""
     language = Hub.objects.filter(slug=ctx.scope.key).values_list("language", flat=True).first()
     return language or settings.LANGUAGE_CODE
 
@@ -84,12 +90,11 @@ def business_language(ctx: OperationContext) -> str:
 )
 def catalog_image_search(ctx: OperationContext, data: CatalogImageSearchIn) -> dict:
     """The library is everyone's: who may see the hub's Home may look an image up (the screens that set one need their
-    own app's permission). Any language matches; titled in the business's (INVENTORY-F30: in English when it is not
+    own app's permission). Any language matches; titled in the person's (INVENTORY-F30: in English when it is not
     Spanish)."""
-    language = business_language(ctx)
-    found = image_library(ctx).search(data.query, language, folder=data.folder)
+    found = titled_search(ctx, data.query, folder=data.folder)
     return {
-        "rows": [image.row(language) for image in found[data.offset : data.offset + data.limit]],
+        "rows": found[data.offset : data.offset + data.limit],
         "total": len(found),
         "limit": data.limit,
         "offset": data.offset,
