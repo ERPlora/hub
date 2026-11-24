@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:813cfaa6d504ae87e5e51cf319a867d776d3ed4b5fab30265c2c25a5b00b221d -->
+<!-- generated from WORKBOOK.md sha256:57917909e35ebf1e9af745f6290cfdd9dba5e91fddfb5a58cc028066ced8d88a -->
 
 ## What it is for and who it is for
 
@@ -1879,6 +1879,9 @@ Steps:
      and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
      (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
      Home.
+  5. If they ask the assistant for it ("switch me to English") and confirm the card, the new language applies just as
+     from the selector: the open application switches to it without reloading, and stays in it on reloading or opening
+     it again on this device.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
