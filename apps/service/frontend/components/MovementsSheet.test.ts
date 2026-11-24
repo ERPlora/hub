@@ -1,7 +1,7 @@
 // SERVICE-F19 «Ver los movimientos de un bono»: the sheet «Voucher movements» of a package follows
 // `service.movement.list` live, the most recent first: each session Delivered (with its service, or «No
 // service on the line»), each Courtesy and Correction (with what moved, who and why), the date, the
-// customer, the professional who did a session (hub#1236) and the sale.
+// customer, the professional who did a session and the sale by its number.
 import { StatusPill } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
@@ -23,6 +23,7 @@ const movement = (id: string, over: Partial<MovementOut> = {}): MovementOut => (
   member_id: null,
   member_name: null,
   sale_id: null,
+  sale_number: null,
   appointment_id: null,
   note: '',
   actor: 'ana',
@@ -34,7 +35,7 @@ const movement = (id: string, over: Partial<MovementOut> = {}): MovementOut => (
 const ROWS = [
   movement('m3', { kind: 'corrected', uses_delta: -1, service_id: null, service_name: null, actor: 'boss', reason: 'typo' }),
   movement('m2', { kind: 'adjusted', uses_delta: 2, days_delta: 30, service_id: null, service_name: null, actor: 'boss', reason: 'closed' }),
-  movement('m1', { sale_id: 'sale-9' }),
+  movement('m1', { sale_id: 'sale-9', sale_number: '20261123-0003' }),
   movement('m0', { service_id: null, service_name: null, customer_name: null, customer_id: 'cust-2' }),
 ];
 
@@ -67,7 +68,8 @@ describe('MovementsSheet', () => {
     expect(s.text('m2')).toContain('Given by boss');
     expect(s.text('m1')).toContain('Cut');
     expect(s.text('m1')).toContain('Customer: Lucía Pérez');
-    expect(s.text('m1')).toContain('Sale: sale-9');
+    expect(s.text('m1')).toContain('Sale: 20261123-0003');
+    expect(s.text('m1')).not.toContain('sale-9');
     expect(s.text('m1')).toContain('Oct 10, 2026');
     expect(s.text('m0')).toContain('No service on the line');
     expect(s.text('m0')).toContain('Customer: cust-2');
@@ -92,20 +94,28 @@ describe('MovementsSheet', () => {
     const s = await setup();
     await s.show(
       page([
-        movement('m2', { member_id: 'mem-1', member_name: 'Ana López', sale_id: 'sale-9' }),
+        movement('m2', { member_id: 'mem-1', member_name: 'Ana López', sale_id: 'sale-9', sale_number: '20261123-0003' }),
         movement('m1'),
         movement('m0', { kind: 'adjusted', uses_delta: 1, service_id: null, service_name: null, actor: 'boss', reason: 'gift' }),
       ]),
     );
-    expect(s.line('m2')).toContain('Customer: Lucía Pérez · Professional: Ana López · Sale: sale-9');
+    expect(s.line('m2')).toContain('Customer: Lucía Pérez · Professional: Ana López · Sale: 20261123-0003');
     expect([s.text('m1'), s.text('m0')].map((text) => text.includes('Professional'))).toEqual([false, false]);
+  });
+
+  // A sale the reader cannot read (Sales off, or not theirs to see) comes without its number: its id says nothing to
+  // a person, so the row says no sale.
+  it('names a sale only by its number', async () => {
+    const s = await setup();
+    await s.show(page([movement('m1', { sale_id: 'sale-9' })]));
+    expect([s.text('m1').includes('Sale'), s.text('m1').includes('sale-9')]).toEqual([false, false]);
   });
 
   it('paints every step of a session of the till: held, released, expired and given back with who and why', async () => {
     const s = await setup();
     await s.show(
       page([
-        movement('r4', { kind: 'returned', uses_delta: 0, sale_id: 'sale-7', actor: 'boss', reason: 'did not come' }),
+        movement('r4', { kind: 'returned', uses_delta: 0, sale_id: 'sale-7', sale_number: '20261123-0002', actor: 'boss', reason: 'did not come' }),
         movement('r3', { kind: 'expired', uses_delta: 0, actor: 'system' }),
         movement('r2', { kind: 'released', uses_delta: 0, actor: 'ana' }),
         movement('r1', { kind: 'held', uses_delta: -1 }),
@@ -114,7 +124,7 @@ describe('MovementsSheet', () => {
     const labels = s.wrapper.findAllComponents(StatusPill).map((p) => p.props('label'));
     expect(labels).toEqual(['Given back', 'Expired', 'Released', 'Held']);
     expect(s.text('r4')).toContain('Cut');
-    expect(s.text('r4')).toContain('Sale: sale-7');
+    expect(s.text('r4')).toContain('Sale: 20261123-0002');
     expect(s.text('r4')).toContain('Given back by boss — did not come');
     expect(s.text('r2')).toContain('Released by ana');
     expect(s.text('r3')).not.toContain('by');
@@ -143,7 +153,7 @@ describe('MovementsSheet', () => {
       'Entregada',
       'Entregada',
     ]);
-    await s.result(OP, page([movement('m9', { member_id: 'mem-1', member_name: 'Ana López' })]), {}, 2);
-    expect(s.line('m9')).toContain('Cliente: Lucía Pérez · Profesional: Ana López');
+    await s.result(OP, page([movement('m9', { member_id: 'mem-1', member_name: 'Ana López', sale_id: 'sale-9', sale_number: '20261123-0003' })]), {}, 2);
+    expect(s.line('m9')).toContain('Cliente: Lucía Pérez · Profesional: Ana López · Venta: 20261123-0003');
   });
 });
