@@ -498,8 +498,8 @@
     ]
   },
   {
-    "path": "base/home.py",
-    "file_name": "home.py",
+    "path": "base/home/__init__.py",
+    "file_name": "__init__.py",
     "functions": [
       {
         "name": "plan_meter_errors",
