@@ -97,13 +97,15 @@ live("base.profile.get", on=sorted({events.PROFILE_UPDATED, events.PIN_SET, even
 
 # ── People and permissions ─────────────────────────────────────────────────────────────────────────────────────────
 # Employees › Personal and a person's page follow the ways in (a PIN chosen or taken away, a badge), the names of «My
-# profile» and the photo (erplora.com's people and roles, and the plan's places); Roles, the photo.
+# profile» and the photo (erplora.com's people and roles, and the plan's places).
 _PEOPLE = sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS})
 live("base.person.list", on=_PEOPLE)
 live("base.person.detail", on=_PEOPLE)
-live("base.role.list", on=[HUB_STATE_APPLIED])
-# What a role allows: the photo brings the roles, and an app turned on or off adds or takes away its panel.
-live("base.role.detail", on=sorted({HUB_STATE_APPLIED, *APP_EVENTS}))
+# The roles and what each allows: the photo brings the basic ones and their people, the business makes its own, and an
+# app turned on or off adds or takes away its panel and what a role of the business has left to review.
+_ROLES = sorted({HUB_STATE_APPLIED, *APP_EVENTS, *events.ROLE_EVENTS})
+live("base.role.list", on=_ROLES)
+live("base.role.detail", on=_ROLES)
 # «No access» names who can give it: the photo brings the people and their roles, «My profile» their names.
 live("base.access.grantors", on=sorted({HUB_STATE_APPLIED, events.PROFILE_UPDATED}))
 # A device's own access: erplora.com's photo brings the roles, and the device reads its session again when it changes.

@@ -22,6 +22,9 @@ from base.tenancy.context import PLATFORM_SCOPE_KIND
 #: its devices and the way in. Here, not in ``base.queries``, so ``base.services`` can name them too.
 VIEW_HOME = "base.view_home"
 ADMINISTER_HUB = "base.administer_hub"
+#: Who makes, adjusts and deletes the roles of the business (``base.role.*``): the owner, an administrator and whoever a
+#: role of the business lets.
+MANAGE_ROLES = "base.manage_roles"
 #: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
 OPEN_MANAGEMENT = "base.open_management"
 
@@ -53,9 +56,13 @@ def access_for(user: Any, scope: Scope) -> frozenset[str]:
     own = None
     if role != Membership.Role.OWNER:
         own = BusinessRole.objects.filter(people__username=user.get_username()).first()
-    if own is None:
-        return permissions_of_role(role)
-    allowed = roles.effective(own.states, grantable(all_live_app_configs()), given=permissions_of_role(own.origin))
+    return permissions_of_role(role) if own is None else permissions_of_business_role(own)
+
+
+def permissions_of_business_role(role: BusinessRole) -> frozenset[str]:
+    """What a role of the business allows, of every app of this deployment: one turned on later gives what it gives the
+    basic role it came from (``base.roles``)."""
+    allowed = roles.effective(role.states, grantable(all_live_app_configs()), given=permissions_of_role(role.origin))
     return frozenset(permission for permission, state in allowed.items() if state == roles.ON)
 
 
