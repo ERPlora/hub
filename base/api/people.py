@@ -8,7 +8,7 @@ from base import queries, services
 from base.schemas.api_keys import ApiDocSettingsUpdateIn, ApiKeyCreateIn, ApiKeyIdIn
 from base.schemas.approvals import ApprovalExportIn, ApprovalIn, ApproversIn
 from base.schemas.people import BadgeSetIn, PersonIn
-from base.schemas.roles import RoleCreateIn, RoleIn, RoleUpdateIn
+from base.schemas.roles import RoleAssignIn, RoleCreateIn, RoleIn, RoleUpdateIn
 
 router = Router()
 
@@ -64,6 +64,11 @@ async def role_update(request, data: RoleUpdateIn):
 @bind(router, "base.role.delete", "/roles/delete")
 async def role_delete(request, data: RoleIn):
     return await run_operation(request, services.roles.role_delete, data)
+
+
+@bind(router, "base.role.assign", "/roles/assign")
+async def role_assign(request, data: RoleAssignIn):
+    return await run_operation(request, services.roles.role_assign, data)
 
 
 # ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────

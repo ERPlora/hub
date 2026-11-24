@@ -1,20 +1,25 @@
-"""The roles a business makes for itself (``base.role.create``, ``update`` and ``delete``, BASE-F127 to BASE-F129)."""
+"""The roles a business makes for itself (``base.role.create``, ``update`` and ``delete``, BASE-F127 to BASE-F129) and who
+has each (``base.role.assign``, BASE-F130)."""
 
 from functools import partial
 
 from django.db import IntegrityError
+from django.utils import translation
 from django.utils.translation import gettext, gettext_lazy as _, ngettext
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, PermissionDenied
+from live.errors import Conflict, InvalidPayload, OperationError, PermissionDenied
 from live.operations import AI, atomic, on_commit, operation
 from live.outbox import record_event
 
 from base import events, queries, roles
+from base import people as people_rules
 from base.models import HubUser
 from base.models.roles import NAME_UNIQUE, BusinessRole
-from base.permissions import MANAGE_ROLES, OWNER_ONLY, grantable, permissions_of_business_role, permissions_of_role
-from base.schemas.roles import RoleCreateIn, RoleDeleteOut, RoleIn, RoleRowOut, RoleUpdateIn
-from base.services.sessions import _wake_open_apps
+from base.permissions import (
+    MANAGE_ROLES, OWNER_ONLY, RoleHeld, grantable, permissions_of_business_role, permissions_of_role,
+)
+from base.schemas.roles import RoleAssignIn, RoleAssignOut, RoleCreateIn, RoleDeleteOut, RoleIn, RoleRowOut, RoleUpdateIn
+from base.services.sessions import _account_id, _wake_open_apps
 
 STATE_LABELS = {
     roles.ON: _("Allowed"),
@@ -198,6 +203,99 @@ def role_delete(ctx: OperationContext, data: RoleIn) -> dict:
     return {"key": key}
 
 
+def _assign_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The person by their name also for whoever manages roles and may not open their page, which names them on every
+    other card."""
+    if any(field["name"] == "person" for field in fields):
+        return fields
+    try:
+        person = queries.people.person_of(ctx, str(arguments.get("person")))
+    except OperationError:
+        return fields
+    label = gettext(str(RoleAssignIn.model_fields["person"].title))
+    return [{"name": "person", "label": label, "kind": "text", "value": person["name"]}, *fields]
+
+
+@operation(
+    "base.role.assign",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=MANAGE_ROLES,
+    input=RoleAssignIn,
+    output=RoleAssignOut,
+    ai={
+        "description": (
+            "Gives a person of this business one of the roles the business made (origin own in base.role.list), which "
+            "rules over the role of their invitation, or returns them to the role of their invitation. Never the owner "
+            "nor oneself, and never a role that allows more than who gives it may do. What they may do changes at once. "
+            "Another basic role is given on erplora.com."
+        ),
+        "risk": "high",
+        "preview": {"operation": "base.role.detail", "fields": ["members"]},
+        "summary": _assign_summary,
+        "asks": {
+            "en": (
+                "give Luis the Cashier role",
+                "put Ana on the Shift lead role",
+                "take the Cashier role away from Luis, back to employee",
+            ),
+            "es": (
+                "dale a Luis el rol Cajero",
+                "pon a Ana con el rol Jefe de turno",
+                "quítale a Luis el rol Cajero y que vuelva a ser empleado",
+            ),
+        },
+    },
+)
+def role_assign(ctx: OperationContext, data: RoleAssignIn) -> dict:
+    """«Role in this business»: the person's open devices follow what they may do now without signing in again."""
+    person = queries.people.person_of(ctx, data.person)
+    why = people_rules.role_refusal(
+        actor=queries.people.signed_in_username(ctx),
+        actor_role=queries.people.signed_in_role(ctx),
+        target=person["id"],
+        target_role=person["role"],
+    )
+    if why is not None:
+        message = str(people_rules.ROLE_REFUSALS[why])
+        raise PermissionDenied(message, code=why, fields={"person": message})
+    held = RoleHeld(person["role"], _role_to_give(data.role, person))
+    given = permissions_of_role(held.invitation) if held.own is None else permissions_of_business_role(held.own)
+    _held_by_who_asks(ctx, given, field="role")
+    HubUser.objects.update_or_create(
+        username=person["id"],
+        defaults={"business_role": held.own},
+        # Somebody erplora.com names who has no row here yet: their entry brings the rest up to date.
+        create_defaults={
+            "business_role": held.own,
+            "account_id": _account_id(person["id"]),
+            "email": person["email"],
+            "name": person["name"],
+        },
+    )
+    record_event(ctx, events.ROLE_ASSIGNED, {"person": person["id"], "id": str(held.own.pk) if held.own else None})
+    on_commit(partial(_wake_open_apps, ctx.scope.key))
+    with translation.override(ctx.language):
+        return {
+            "person": person["id"],
+            "name": person["name"],
+            "role": str(held.own.pk) if held.own else held.invitation,
+            "label": queries.roles.role_label(held),
+        }
+
+
+def _role_to_give(key: str, person: dict) -> BusinessRole | None:
+    """The role of the business ``key`` names, held until the COMMIT so nobody deletes it meanwhile; ``None`` for the
+    role of the person's invitation."""
+    basic = queries.roles.basic_role(key)
+    if basic is None:
+        return queries.roles.business_role(key, for_update=True)
+    if basic.value != person["role"]:
+        message = gettext("That role is given on erplora.com. Here you give one of the business's own.")
+        raise Conflict(message, code="base.role_basic", fields={"role": message})
+    return None
+
+
 def _own_role(key: str) -> BusinessRole:
     if queries.roles.basic_role(key) is not None:
         raise Conflict(
@@ -214,11 +312,11 @@ def _named(name: str) -> str:
     return name
 
 
-def _held_by_who_asks(ctx: OperationContext, given: frozenset[str]) -> None:
-    """Nobody gives a role what they may not do themselves."""
+def _held_by_who_asks(ctx: OperationContext, given: frozenset[str], *, field: str = "states") -> None:
+    """Nobody gives a role what they may not do themselves, nor a person a role that allows it."""
     if any(not ctx.has(permission) for permission in given):
         message = gettext("A role may not allow more than you may do yourself.")
-        raise PermissionDenied(message, code="base.role_beyond_editor", fields={"states": message})
+        raise PermissionDenied(message, code="base.role_beyond_editor", fields={field: message})
 
 
 def _save(role: BusinessRole) -> None:

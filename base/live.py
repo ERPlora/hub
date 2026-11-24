@@ -39,8 +39,8 @@ def events_of(hook: str) -> list[str]:
 
 live("base.setup.status", on=sorted({*events_of("setup"), *DATA_EVENTS}))
 live("base.widget.list", on=sorted({*events_of("widgets"), *DATA_EVENTS}))
-# The failed events of System change the bell's row of them too.
-live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_EVENTS}))
+# The failed events of System change the bell's row of them too, and the roles of the business the one to review them.
+live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_EVENTS, *events.ROLE_EVENTS}))
 live("base.notice.list", on=events_of("notices"))
 
 # ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -112,8 +112,10 @@ live("base.access.grantors", on=sorted({HUB_STATE_APPLIED, events.PROFILE_UPDATE
 live("base.session.access", on=[HUB_STATE_APPLIED])
 # The keys follow their own making, rotating and revoking; the apps a key may reach, the photo (a paid app comes or goes).
 live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *APP_EVENTS}))
-# Approvals follow each approval given and each pass spent; who may approve, the ways in and the photo (the roles).
+# Approvals follow each approval given and each pass spent; who may approve, the ways in, the photo and the business's
+# own roles (the roles).
 live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
 # The API's documentation: shown or hidden. The document itself is asked once (far bigger than a live result may be).
 live("base.api_doc.settings", on=[events.API_DOC_SETTINGS_CHANGED])
-live("base.approval.approvers", on=sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS}))
+_APPROVERS = {events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS, *events.ROLE_EVENTS}
+live("base.approval.approvers", on=sorted(_APPROVERS))

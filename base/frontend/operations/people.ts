@@ -89,6 +89,14 @@ export interface RoleChange {
   states?: Record<string, RoleState>;
 }
 
+/** `base.RoleAssignOut`: the role the person has now, the business's own or the one of their invitation. */
+export interface RoleGiven {
+  person: string;
+  name: string;
+  role: string;
+  label: string;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.person.list': { input: NoInput; output: { people: Person[]; seats: Seats } };
@@ -101,5 +109,6 @@ declare module '@erplora/ui/sdk' {
     'base.role.create': { input: { based_on: string; name: string; description?: string }; output: HubRoleRow };
     'base.role.update': { input: RoleChange; output: HubRoleRow };
     'base.role.delete': { input: { role: string }; output: { key: string } };
+    'base.role.assign': { input: { person: string; role: string }; output: RoleGiven };
   }
 }

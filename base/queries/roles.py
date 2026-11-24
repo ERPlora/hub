@@ -22,12 +22,12 @@ from base.apps_on import active_apps
 from base.approvals import approvable
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
-from base.permissions import VIEW_HOME, grantable, permissions_of_business_role, permissions_of_role
-from base.roles import basic_state, effective, to_review
+from base.permissions import RoleHeld, VIEW_HOME, grantable, permissions_of_business_role, permissions_of_role, role_held
+from base.roles import APPROVAL, basic_state, effective, to_review
 from base.schemas.roles import RoleDetailOut, RoleIn, RoleListIn, RoleListOut
 from base.sensitive import DATA_PERMISSIONS
 
-from .people import people_of
+from .people import is_a_person, people_of
 
 BUSINESS = _("The business")
 SENSITIVE_DATA = _("Sensitive data")
@@ -93,17 +93,46 @@ def role_detail(ctx: OperationContext, data: RoleIn) -> dict:
         basic = basic_role(data.role)
         on = configs_on(ctx.scope)
         members = members_by_role(ctx.scope)
-        approved = approvable_permissions(on)
         if basic is not None:
-            given = permissions_of_role(basic.value)
-            states = {
-                permission: basic_state(permission, given, approved) for config in on for permission in config.permissions
-            }
-            return {**_basic_out(basic, members), "apps": _panels(on, states)}
+            return {**_basic_out(basic, members), "apps": _panels(on, _states_of_basic(basic.value, on))}
         role = business_role(data.role)
-        given = permissions_of_role(role.origin)
-        states = effective(role.states, grantable(on), given=given, approvable=approved)
-        return {**_own_out(role, members, on), "apps": _panels(on, states)}
+        return {**_own_out(role, members, on), "apps": _panels(on, _states_of_own(role, on))}
+
+
+def _states_of_basic(role: str, on: list[LiveAppConfig]) -> dict[str, str]:
+    """What a basic role does today with each permission of the apps ``on``."""
+    given, approved = permissions_of_role(role), approvable_permissions(on)
+    return {permission: basic_state(permission, given, approved) for config in on for permission in config.permissions}
+
+
+def _states_of_own(role: BusinessRole, on: list[LiveAppConfig]) -> dict[str, str]:
+    """What a role of the business does today with each permission of the apps ``on`` it may hold."""
+    given = permissions_of_role(role.origin)
+    return effective(role.states, grantable(on), given=given, approvable=approvable_permissions(on))
+
+
+def signed_in_role_held(ctx: OperationContext) -> RoleHeld | None:
+    """What who asks is in this business; ``None`` for nobody, the platform, an API key or somebody of another one."""
+    return role_held(ctx.actor, ctx.scope) if is_a_person(ctx.actor) else None
+
+
+def role_label(held: RoleHeld) -> str:
+    """How the role that rules is named: as the business wrote it, or the basic one in the active language."""
+    return str(Membership.Role(held.invitation).label) if held.own is None else held.own.name
+
+
+def approvable_of(ctx: OperationContext, held: RoleHeld) -> list[str]:
+    """What who asks may do only if a manager approves it with their PIN, of the apps that are on."""
+    on = configs_on(ctx.scope)
+    states = _states_of_basic(held.invitation, on) if held.own is None else _states_of_own(held.own, on)
+    return sorted(permission for permission, state in states.items() if state == APPROVAL)
+
+
+def roles_to_review(scope: Scope) -> int:
+    """How many roles of the business have something to review: an app turned on, or a permission added, after they were
+    saved."""
+    apps = grantable(configs_on(scope))
+    return sum(1 for states in BusinessRole.objects.values_list("states", flat=True) if to_review(states, apps))
 
 
 def basic_role(key: str) -> Membership.Role | None:

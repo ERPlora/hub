@@ -10,7 +10,7 @@ from base import activation, bell, home, unpaid_plan
 from base.apps_on import active_apps
 from base.models.relay import EventDelivery
 from base.models import Hub, Membership
-from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, MANAGE_ROLES, VIEW_HOME
 from base.schemas.home import (
     NoticeListIn,
     NoticeListOut,
@@ -23,6 +23,7 @@ from base.schemas.home import (
 )
 from base.schemas.bell import BellCountersIn, BellCountersOut
 
+from .roles import roles_to_review
 from .usage import _plan_motives
 
 
@@ -157,13 +158,16 @@ def system_cards(ctx: OperationContext, data: SystemCardsIn) -> dict:
     ai=INTERNAL,
 )
 def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
-    """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on, the
-    reasons to upgrade its plan (BASE-F40) and its plan's unpaid invoice (BASE-F117)."""
+    """The bell: the counters above zero of the apps on, for who manages roles those to review (BASE-F131), and for who
+    runs the hub the events the relay gave up on, the reasons to upgrade its plan (BASE-F40) and its plan's unpaid
+    invoice (BASE-F117)."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         counters = home.bell_counters(ctx, modules)
         refresh = home.bell_refresh_every(ctx, modules)
+        if ctx.has(MANAGE_ROLES) and (count := roles_to_review(ctx.scope)):
+            counters.insert(0, bell.notice("base.roles_to_review", bell.ROLES_TO_REVIEW, {"count": count}))
         if ctx.has(ADMINISTER_HUB):
             now = timezone.now()
             unpaid = unpaid_plan.notice(hub, now)

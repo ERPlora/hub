@@ -17,6 +17,7 @@ from ninja import Schema
 
 from base import assistant
 from base.models import Hub, Membership
+from base.roles import ON
 from base.sensitive import VIEW_TEAM_CONTACT
 from base.services.assistant import LAST_ROUND
 from base.tenancy import context

@@ -18,7 +18,6 @@ from pydantic import ValidationError
 
 from base import approvals as approval_rules
 from base import assistant, queries
-from base.models import Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.assistant import (
     AssistantReportIn,
@@ -320,16 +319,20 @@ def _assistant_instructions(ctx: OperationContext, business: dict, offered: list
     the checklist, read again, in ``setup``, with ``LAST_ROUND`` on the last round of the request, and last of all the
     language of everything it writes (``prompt.language_rule``)."""
     apps = assistant.tools.active_apps(ctx.scope)
+    held = queries.roles.signed_in_role_held(ctx)
     text = assistant.prompt.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
         decimals=business.get("currency_decimals", 2),
         business=business.get("name") or "",
         screens=_assistant_screens(ctx, apps),
-        role=_assistant_role(ctx),
+        # The role of their invitation, unless one the business made rules over it (hub#585).
+        role=held.invitation if held and held.own is None else "",
         # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
         approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
+    if held and held.own:
+        text += "\n" + assistant.prompt.own_role(held.own.name, held.invitation)
     if any(op.name == assistant.relevance.FIND_TOOLS for op in offered):
         text += "\n" + assistant.prompt.SEARCH_FIRST
     text += "\n\n" + assistant.business_facts.block(ctx, business, apps, now=timezone.now())
@@ -338,14 +341,6 @@ def _assistant_instructions(ctx: OperationContext, business: dict, offered: list
     if last:
         text += "\n\n" + LAST_ROUND
     return text + "\n\n" + assistant.prompt.language_rule(ctx.language)
-
-
-def _assistant_role(ctx: OperationContext) -> str:
-    """The role in this business of whom the assistant serves (hub#585): their ``Membership``'s; "" for an actor with
-    none here (an API key, ERPlora's staff)."""
-    if not hasattr(ctx.actor, "get_username"):
-        return ""
-    return Membership.objects.filter(user=ctx.actor, host=ctx.scope.key).values_list("role", flat=True).first() or ""
 
 
 def _gateway_failure(code: str, message: str) -> OperationError:
