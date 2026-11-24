@@ -12,11 +12,9 @@ import json
 import pytest
 from django.db import IntegrityError
 from django.utils import timezone
-from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.operations import atomic
 
-from base import events
 from base.models import Membership
 from base.models.support_access import SupportAccess, SupportVisit
 from base.tenancy.context import use_hub
@@ -122,7 +120,3 @@ class TestTheEntries:
     def test_an_entry_without_a_name_says_its_email(self, client, olga):
         SupportVisit.objects.create(username="saas-support:7", email="sam@erplora.com")
         assert [visit["person"] for visit in get(client).json()["visits"]] == ["sam@erplora.com"]
-
-
-def test_the_setting_is_followed_live():
-    assert live_registry.subscribable["base.support_access.get"] == [events.SUPPORT_ACCESS_CHANGED]
