@@ -8,6 +8,7 @@ from live.live_registry import live
 from apps.sale import events as E
 from apps.tax.events import RULE_EVENTS
 from apps.tax.events import SETTINGS_UPDATED as TAX_SETTINGS_UPDATED
+from base.events import APP_EVENTS, HUB_STATE_APPLIED
 
 SALES = E.SALE_EVENTS
 FIGURES = E.FIGURE_EVENTS
@@ -26,6 +27,8 @@ live("sale.order.list", on=E.ORDER_EVENTS)
 live("sale.order.get", on=E.ORDER_EVENTS)
 # What a charge would be: the check, the settings (VAT included, discounts) and tax's rules.
 live("sale.checkout.preview", on=[*E.ORDER_EVENTS, E.SETTINGS_UPDATED, *RULE_EVENTS])
+# The steps of the charge: an app turned on or off, or the plan that gives it, brings its steps or takes them away.
+live("sale.checkout.steps", on=sorted([HUB_STATE_APPLIED, *APP_EVENTS]))
 # The settings decide which methods charge today.
 live("sale.payment_method.list", on=[E.PAYMENT_METHOD_CREATED, E.SETTINGS_UPDATED])
 live("sale.settings.get", on=[E.SETTINGS_UPDATED])

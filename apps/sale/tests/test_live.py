@@ -5,6 +5,7 @@ from pathlib import Path
 from live.live_registry import live_registry
 
 from apps.sale import events
+from base import events as base_events
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
 
@@ -32,6 +33,7 @@ def test_the_live_queries():
         "sale.order.list",
         "sale.order.get",
         "sale.checkout.preview",
+        "sale.checkout.steps",
         "sale.payment_method.list",
         "sale.settings.get",
         "sale.pos_settings.get",
@@ -45,9 +47,15 @@ def test_the_live_queries():
 
 def test_every_event_is_a_literal_of_an_events_module():
     tax_events = Path(__file__).parents[2].joinpath("tax", "events.py").read_text()
+    platform_events = Path(base_events.__file__).read_text()
     for on in sale_queries().values():
         for event in on:
-            assert f'"{event}"' in EVENTS_SOURCE or f'"{event}"' in tax_events, event
+            assert any(f'"{event}"' in source for source in (EVENTS_SOURCE, tax_events, platform_events)), event
+
+
+def test_an_app_turned_on_or_off_re_runs_the_steps_of_the_charge_and_nothing_else_of_sales():
+    for event in ("base.app.enabled", "base.app.disabled", "base.hub.state_applied"):
+        assert {name for name in live_registry.affected([event]) if name.startswith("sale.")} == {"sale.checkout.steps"}
 
 
 def test_a_charge_re_runs_the_sales_the_figures_and_the_checks():

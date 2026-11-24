@@ -73,9 +73,7 @@ def event_list(ctx: OperationContext, data: EventListIn) -> dict:
     """The old hub's System › Logs: the hub's last outbox events with how their deliveries went (``base.relay``)."""
     with translation.override(ctx.language):
         recent = list(
-            OutboxEvent.objects.filter(scope_kind=ctx.scope.kind, scope_key=ctx.scope.key).order_by(
-                "-created_at", "-id"
-            )[:EVENT_LOG_SIZE]
+            OutboxEvent.objects.filter(scope_kind=ctx.scope.kind).order_by("-created_at", "-id")[:EVENT_LOG_SIZE]
         )
         deliveries: dict[Any, list[EventDelivery]] = {}
         for delivery in EventDelivery.objects.filter(event_id__in=[event.pk for event in recent]).order_by(
@@ -157,9 +155,7 @@ def failed_event_list(ctx: OperationContext, data: FailedEventListIn) -> dict:
     """The deliveries the relay gave up on (``dead``) of the hub; a resent one is ``pending`` again and a discarded one
     is closed: neither is here."""
     with translation.override(ctx.language):
-        failed = EventDelivery.objects.filter(
-            status=EventDelivery.Status.DEAD, event__scope_kind=ctx.scope.kind, event__scope_key=ctx.scope.key
-        )
+        failed = EventDelivery.objects.filter(status=EventDelivery.Status.DEAD, event__scope_kind=ctx.scope.kind)
         page = failed.select_related("event").order_by("-event__created_at", "-id")[
             data.offset : data.offset + data.limit
         ]
@@ -188,12 +184,7 @@ def failed_event_detail(ctx: OperationContext, data: FailedEventIn) -> dict:
     """One failed event of System (a delivery the relay gave up on), of the hub of ``ctx`` only."""
     delivery = (
         EventDelivery.objects.select_related("event")
-        .filter(
-            pk=data.id,
-            status=EventDelivery.Status.DEAD,
-            event__scope_kind=ctx.scope.kind,
-            event__scope_key=ctx.scope.key,
-        )
+        .filter(pk=data.id, status=EventDelivery.Status.DEAD, event__scope_kind=ctx.scope.kind)
         .first()
     )
     if delivery is None:

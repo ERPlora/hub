@@ -2,7 +2,7 @@
 
 The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
 (no general list taken from another, no coherence of a rule): the actions that need one call the operations of
-services.py. Only a rule's tiers are read as the API reads them, because the price of a line reads them as such.
+services/. Only a rule's tiers are read as the API reads them, because the price of a line reads them as such.
 """
 
 import pydantic

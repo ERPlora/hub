@@ -206,7 +206,7 @@ def test_a_row_has_everything_the_screen_and_the_form_show(general):
         "track_stock": None,
         "tracks_stock": True,
         "is_active": True,
-        "is_sold_out": False,
+        "is_sold_out": False, "show_on_website": True,
         "category_ids": [drinks.id],
         # No image yet, so the till shows its initials.
         "image": "",
@@ -427,7 +427,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
         "unit": "kg",
         "price_quantity": Decimal("100.000"),
         "pricing_unit": "g",
-        "allergens": [],
+        "allergens": [], "show_on_website": True,
         "tracks_stock": True,
         # INVENTORY-F32: the till's tile shows it, or its initials without one.
         "image": "", "image_url": "",

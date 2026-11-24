@@ -169,9 +169,7 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
             unpaid = unpaid_plan.notice(hub, now)
             refresh = min(filter(None, [refresh, unpaid_plan.refresh_every(unpaid, now)]), default=None)
             failed = EventDelivery.objects.filter(
-                status=EventDelivery.Status.DEAD,
-                event__scope_kind=ctx.scope.kind,
-                event__scope_key=ctx.scope.key,
+                status=EventDelivery.Status.DEAD, event__scope_kind=ctx.scope.kind
             ).count()
             motives = _plan_motives(ctx, hub, modules)
             if motives:

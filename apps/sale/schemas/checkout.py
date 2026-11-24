@@ -297,3 +297,16 @@ class PreviewOut(Schema):
     limits_currency: str = Field(
         description="The currency (ISO 4217) the law writes both limits in, whatever the business charges in: EUR."
     )
+
+
+class CheckoutStepOut(Schema):
+    key: str = Field(description="«<app>.<step>».")
+    app: str = Field(description="The app that adds the step.")
+    component: str = Field(description="The component of that app that paints the step, without .vue.")
+
+
+class CheckoutStepsOut(Schema):
+    steps: list[CheckoutStepOut] = Field(
+        description="What the apps on add to the charge, between the amount and the tenders, in their order; empty "
+        "when none does, and then a charge takes nothing added to its tenders."
+    )

@@ -4,8 +4,6 @@
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
-git config merge.workbook-translation.driver \
-  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
@@ -143,6 +141,14 @@ Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v
 Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el de la ruta, 422
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
 no lo publica).
+
+**Cambio de dirección web** (`PUT /internal/hubs/{id}` con otro `slug`, HUBS-F16 de erplora.com): el negocio se abre en la
+nueva como estaba (`base/services/address_change.py`). En la misma transacción se mudan sus personas (`Membership`) y quién
+entró (`HubVisit`), acaban las sesiones abiertas en la dirección que deja, porque el navegador guarda cada una para su
+dirección, y en la que coge no queda nada de quien la tuvo antes. Sus apps (`AppActivation`) se copian a la dirección nueva en
+su propia base, que confirma antes que control: las de la anterior se quedan, así que un cambio que no llega a confirmarse
+deja el negocio abierto donde estaba y erplora.com lo reintenta. Los eventos y los caídos no se leen por la dirección: la base
+solo guarda los suyos. Tests: `base/tests/test_address_change.py`.
 
 Las puertas de WhatsApp (contrato en `apps/whatsapp_inbox/WORKBOOK.md`, «Contrato con el SaaS», puertas 1–4) llevan
 en el cuerpo el negocio, `hub` (su slug en la fase 1), y ejecutan la operación de la bandeja como el sistema en ese
