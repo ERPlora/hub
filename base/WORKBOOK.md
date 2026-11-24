@@ -2769,13 +2769,18 @@ Pasos:
      acción (o se canceló, falló o no tenía permiso), sale, fuera de la burbuja, «El asistente ha dicho que hizo un
      cambio, pero no se ejecutó ninguna acción. No se ha modificado nada.».
   3. Si escribe un identificador que ninguna consulta del turno devolvió y que la persona no escribió: «Esta
-     respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.».
+     respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.». Con una dirección
+     web, lo mismo: el asistente solo da las que ha consultado en el turno (una búsqueda en la web, un tipo de cambio o
+     lo que devolvió una herramienta), y si escribe otra que la persona no escribió: «Esta respuesta muestra una
+     dirección web que el asistente no ha consultado de verdad. No te fíes de ella.». La misma página escrita de otra
+     forma (con o sin «https://», «www.» o la barra del final) cuenta como consultada.
   4. Si señala una pantalla que este negocio no tiene: «Esta respuesta señala una pantalla que no existe aquí.», y
      sin «Ir a …» (BASE-F96).
   5. Los avisos llevan su icono de alerta, no los escribe el asistente y se quedan con el mensaje, también al
      recargar. Una respuesta limpia no lleva ninguno.
   6. Los recibos de BASE-F97 dicen qué se hizo de verdad, acción por acción.
-Entra: lo que se hizo en el turno, con su resultado, y lo que devolvieron sus consultas.
+Entra: lo que se hizo en el turno, con su resultado, lo que devolvieron sus consultas y las direcciones web que
+consultaron las herramientas de erplora.com.
 Sale: los avisos y los recibos, guardados con la conversación.
 Si falla: «Hecho» quiere decir que la acción de su app acabó sin error: si una app responde bien sin haber cambiado
 nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
