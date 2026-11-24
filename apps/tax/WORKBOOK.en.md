@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:b0430818ff96c837575d3e93b920229db3e726820186f8bff564ce9a2a8ab3e8 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:7d918a0a3790 -->
 
 Taxes says how much VAT each thing you sell carries: the tax categories of your products and services, the rate of
 each one in your country and from which day, and the texts the product importer recognises as a category. It comes
@@ -8,6 +7,7 @@ ready with Spain's rates: you check it when setting up the business and touch it
 the invoices charge with what it says here.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:18ba6d08edb6 -->
 
 Taxes keeps what says how much VAT each thing that is sold carries:
 
@@ -40,6 +40,7 @@ It does not decide the price, does not issue invoices or talk to the AEAT, and d
 country.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:9164c4db96ba -->
 
 - [Ley 37/1992 del IVA](https://www.boe.es/buscar/act.php?id=BOE-A-1992-28740): general, reduced and
   super-reduced rates (arts. 90 and 91), exemptions (art. 20) and the equivalence surcharge. The factory
@@ -53,6 +54,7 @@ country.
   the same thing.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:bd01385d4861 -->
 
 - **A business is born with Taxes on** (a demo too), without counting against the plan's app limit, and with its
   factory catalogue: **11 categories**, **18 aliases** and **the rates of Spain** (TAX-F16). With that a Spanish
@@ -88,6 +90,7 @@ Initial setup, step by step:
 4. Make a test sale and check the ticket's breakdown.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:a706ab738bfb -->
 
 Taxes opens from the **Taxes** menu and has four tabs in the bottom bar: **Categories**, **Rules**,
 **Aliases** and **Settings**. While no rate of the business's country is in force, the first three carry the "Your taxes" notice at the
@@ -98,12 +101,14 @@ in Rules, so do the row actions. The app requires the permission on every action
 the button.
 
 ### Categories
+<!-- from WORKBOOK.md sha256:952cd4e1f880 -->
 Here are the tax categories your products, your services and your menus point to: their key, which never changes,
 their name and the rate charged today in your country ("21.00%", "Exempt"…). The ones of origin "System" come from
 the factory; the "Custom" ones you create with **+**. Search by key or by name, or filter by column. While your
 country has no rate in force, the "Your taxes" notice shows at the top for whoever can manage them.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:9e84d17dd3a4 -->
 Table with Key, Name, Description, Origin ("System" or "Custom"), Active and the rate in force in the
 business's country ("21.00%", "Exempt"…). Search "Search key or name…" (key, name and description, stored
 or translated), column filters (Key, Name, Description and Origin) and sorting by any column; 50 per page,
@@ -112,6 +117,7 @@ with the text that was typed. A **+** button that opens the creation panel (Key,
 No row actions.
 
 ### Rules
+<!-- from WORKBOOK.md sha256:39abc67eec94 -->
 Here is the rate of each category in each country or region and from which day it applies, with its qualification:
 subject, exempt, not subject or reverse charge. An equivalence surcharge shows right under its rule. With **+** you
 create a rule. A rule is not edited: to change a rate, tap "Set end date" on its row and create the new one from the
@@ -119,6 +125,7 @@ next day; "Deactivate" stops applying it. At first the active ones show, and the
 ones.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:7ac142896abe -->
 Table with Category, Country, Region, %, Type, Qualification (with the exemption reason if there is one),
 Valid from, Valid to and Active. A component (the surcharge) shows right under its root rule, as
 "↳ label". Search "Search category or country…" and filters for Country, Region, Category, Type,
@@ -129,22 +136,26 @@ Exemption reason —only if it is exempt—, Regime, Valid from, Valid to, "Root
 "Restore".
 
 ### Aliases
+<!-- from WORKBOOK.md sha256:8aadbd534f7e -->
 Here are the outside texts, such as "food", "beer" or "IVA 10", that the product importer understands as a tax
 category. The "Shipped" ones come with the app; the "Learned" ones are saved when, while importing, you say which
 category a text is, or you add them with **+**.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:ecf51469a760 -->
 Table with Alias, Category, Source ("Shipped" or "Learned") and Active. Search "Search alias or category…",
 filters for Alias, Category and Source and sorting by any column. A **+** button with the creation panel
 (Alias, Category, Source —"Learned" at first—, "Add").
 
 ### Settings
+<!-- from WORKBOOK.md sha256:595beff4d7f0 -->
 Here you choose the business's tax region: the whole country, with VAT, or, in Spain, the Canary Islands (IGIC), Ceuta
 (IPSI) or Melilla (IPSI). The country is the one of your ERPlora account and is not changed here. In the Canary
 Islands, Ceuta and Melilla only the rules of their region are charged, never the national VAT. Whoever only views
 taxes sees the region without being able to change it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:4a5aed826ab7 -->
 "Your business's tax region": the business's "Country", read only ("It is the country of your ERPlora
 account."), and the "Tax region" dropdown with "Whole country (VAT)", "Canary Islands (IGIC)", "Ceuta
 (IPSI)" and "Melilla (IPSI)", with its explanation below, and "Save" ("Tax region saved."). The regions are
@@ -154,6 +165,7 @@ whole country, which you create in Rules.", with the name of its country. Whoeve
 it."). It is the screen of TAX-F11.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:7158504a719b -->
 
 | State | What the person sees |
 |---|---|
@@ -166,12 +178,14 @@ it."). It is the screen of TAX-F11.
 | No permission | What they cannot do does not appear; if they arrive by another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:3583ed9f46a1 -->
 
 In "New tax category", "New category alias", "New tax rule" and "End this tax rule", the phone's Back button asks
 "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes"
 closes the window without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:4e5d15746cf2 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -194,6 +208,7 @@ closes the window without saving. With the window as it opened, Back closes it w
 | TAX-F19 | Hand the rules and the categories to Sales, Invoicing, Inventory and Services | done |
 
 ### TAX-F01 View the tax categories
+<!-- from WORKBOOK.md sha256:8259854b242a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Categories
@@ -210,6 +225,7 @@ Involved: COMBO-F02, INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F06,
 SALE-F35, SERVICE-F01
 
 ### TAX-F02 Create a custom tax category
+<!-- from WORKBOOK.md sha256:b82e606d4976 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Categories
@@ -227,6 +243,7 @@ If it fails: a key with another shape or an empty name show below their field; a
 Involved: INVENTORY-F09
 
 ### TAX-F03 View and filter the rules
+<!-- from WORKBOOK.md sha256:fe6a8a94c391 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Rules
@@ -241,6 +258,7 @@ If it fails: the table's notice with "Retry".
 Involved: none
 
 ### TAX-F04 Set the rate of a category in a country or region
+<!-- from WORKBOOK.md sha256:d771c8c54e7e -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Rules
@@ -271,6 +289,7 @@ Nothing is saved.
 Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declare an exempt, not subject or reverse-charge operation
+<!-- from WORKBOOK.md sha256:b14f4fd29f77 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Rules
@@ -290,6 +309,7 @@ charges no tax: its rate must be 0 %.") and nothing is saved.
 Involved: INVOICE-F01
 
 ### TAX-F06 Add an equivalence surcharge to a rate
+<!-- from WORKBOOK.md sha256:0d00e2b0ca2f -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Rules
@@ -309,6 +329,7 @@ A component of a component does not exist: there is only one level.
 Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F07 Change a rate from a date
+<!-- from WORKBOOK.md sha256:800904413c0f -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Rules
@@ -327,6 +348,7 @@ of that category are refused until the next one is created.
 Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F08 Deactivate and restore a rule
+<!-- from WORKBOOK.md sha256:236120a980d0 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Rules
@@ -346,6 +368,7 @@ active."; restoring one that now overlaps another active one, the overlap notice
 Involved: SALE-F01
 
 ### TAX-F11 Set up a business in the Canary Islands, Ceuta or Melilla
+<!-- from WORKBOOK.md sha256:ca8a5c0fb9ef -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Settings, Rules
@@ -380,6 +403,7 @@ does not change it.
 Involved: INVOICE-F01, INVOICE-F03, SALE-F01
 
 ### TAX-F12 Create several rules at once
+<!-- from WORKBOOK.md sha256:3c2112afdc28 -->
 Status: done
 Actor: owner, administrator, manager (through the assistant or through the API with their session; an API key does not reach it)
 Screen: none (API)
@@ -396,6 +420,7 @@ they are created one by one (TAX-F06), because they need their root already save
 Involved: none
 
 ### TAX-F13 View the category aliases
+<!-- from WORKBOOK.md sha256:ec7b494a9a65 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Aliases
@@ -408,6 +433,7 @@ If it fails: the table's notice with "Retry".
 Involved: none
 
 ### TAX-F14 Teach a category alias by hand
+<!-- from WORKBOOK.md sha256:6bf0ea67cc7c -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Aliases
@@ -424,6 +450,7 @@ does not exist, below the Category. The reason of a field goes as soon as that f
 Involved: INVENTORY-F09
 
 ### TAX-F15 Tell the Inventory importer which category a text is
+<!-- from WORKBOOK.md sha256:af19bd83c189 -->
 Status: done
 Actor: system
 Screen: none
@@ -440,6 +467,7 @@ If it fails: a text that does not match gives back "nothing", never a similar ca
 Involved: INVENTORY-F09, INVENTORY-F10
 
 ### TAX-F16 Seed the factory catalogue when turned on
+<!-- from WORKBOOK.md sha256:83b6f17933c2 -->
 Status: done
 Actor: system
 Screen: none
@@ -462,6 +490,7 @@ If it fails: it never overwrites a row that already exists nor duplicates anythi
 Involved: none
 
 ### TAX-F17 Warn that rates are missing for the business's country
+<!-- from WORKBOOK.md sha256:8ffbe47297a7 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Home, Categories, Rules, Aliases
@@ -492,6 +521,7 @@ IGIC rule also counts: a business that only sells exempt services is properly se
 Involved: BASE-F01
 
 ### TAX-F18 Calculate the tax of an amount
+<!-- from WORKBOOK.md sha256:222e2ffcdf6a -->
 Status: done
 Actor: employee, manager, administrator, owner (through the assistant or through the API with their session; an API key does not reach it)
 Screen: none (API)
@@ -515,6 +545,7 @@ field. If the rules cannot be read, the calculation stops without guessing.
 Involved: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
 
 ### TAX-F19 Hand the rules and the categories to Sales, Invoicing, Inventory and Services
+<!-- from WORKBOOK.md sha256:d51001138966 -->
 Status: done
 Actor: system
 Screen: none
@@ -535,6 +566,7 @@ Involved: COMBO-F09, INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, MOD
 SALE-F07, SERVICE-F01
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:dc2186d804b5 -->
 
 Everything can be asked for through the screens, the assistant (by voice or text, with the person's own
 session) and the API, with the same rules and the same permissions. A business's API key reaches less:
@@ -546,6 +578,7 @@ food in Spain": when deactivating it or setting its end date, the one in force t
 the last deactivated one).
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:ca3c83710666 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -565,6 +598,7 @@ Categories, rules, aliases, the setup status, the roots of a component, the coun
 be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:976eb837225b -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -578,6 +612,7 @@ be followed live.
 | Saves the business's tax region (or the whole country) | manage | F11 | `tax.settings.update` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:0e812477c9ea -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -596,9 +631,11 @@ checkout and the rate of the sections are recalculated with the four of rules an
 Invoicing, the general rate a line of the manual invoice starts with, too.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:f97b272b4498 -->
 Nothing: Taxes depends on no app and reacts to no notice of others.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:75a83a0fa51a -->
 
 | App | What for | Service |
 |---|---|---|
@@ -609,6 +646,7 @@ Nothing: Taxes depends on no app and reacts to no notice of others.
 | Menus and combos, Modifiers | Choosing the own tax category of a menu or of an option, with its rate | `tax.category.list` |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:695a864a8c99 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

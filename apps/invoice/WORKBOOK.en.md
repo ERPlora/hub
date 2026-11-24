@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:042f0979cadba4fbe04d58e21b320b984ed7f254288c7e45c408429b5e998feb -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:f11adaa65fc6 -->
 
 Invoicing turns every charged sale into a numbered fiscal document and keeps it forever: the ticket of every charge,
 the full invoice when the customer gives their tax ID and the rectifying invoice when money is refunded or a document
@@ -8,6 +7,7 @@ was wrong. Here you search and view your invoices, issue one by hand, keep your 
 business's fiscal details.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:5a4b37d89479 -->
 
 Invoicing turns every charged sale into a **numbered fiscal document** and keeps it forever: the
 **ticket** (simplified invoice, F2) of every charge, the **full invoice** (F1) when the customer gives
@@ -18,6 +18,7 @@ the link between Sales and VeriFactu in the Spanish fiscal chain (sale → invoi
 restaurant and the hair salon alike: nothing in it belongs to one vertical.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:914fbdeb5a97 -->
 
 - The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them,
   issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
@@ -31,6 +32,7 @@ It does not charge or refund money (that is Sales), it sends nothing to the AEAT
 fingerprint (that is VeriFactu), and it does not keep the payment method.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:27ba2a3ddf4a -->
 
 Here the official specification prevails over the market:
 
@@ -57,6 +59,7 @@ Here the official specification prevails over the market:
   pre-bill carry no series number.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:68e51236911a -->
 
 - Turning Invoicing on also turns on **Sales**, **Taxes** and **Customers** (it requires them).
   **VeriFactu** does not turn on by itself, but in Spain it is needed for every invoice to reach the AEAT.
@@ -89,8 +92,10 @@ Initial setup, step by step:
    number (INVOICE-F01, INVOICE-F16).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Invoices
+<!-- from WORKBOOK.md sha256:3d2d214173cd -->
 All the business's invoices: the tickets of every charge, the full invoices and the rectifying ones, the latest
 issued on top. Search them by number, customer or tax ID, filter them by status, type, series, date or total, and
 open them to view, print or save them as a PDF. From each one you mark it paid, rectify it or turn a ticket into a
@@ -99,6 +104,7 @@ sales (the ones they charged and the ones attributed to them) and what rectifies
 the owner and the administrator see everyone's.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:61cdd123017d -->
 Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card view; on the phone, cards
 with the number as title) with "Number", "Customer", "Total", "Status", "Date" and "Type"; every column
 sorts. Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
@@ -115,6 +121,7 @@ Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry
 action shows as a notice above the table.
 
 #### Invoice detail
+<!-- from WORKBOOK.md sha256:db82ce9ceb96 -->
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
 tag and the buttons "Print / PDF" and "← Back". If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
@@ -136,6 +143,7 @@ Without VeriFactu, without a record yet or without permission, the card does not
 Error when opening: "Invoice not found" or the message of the failure, with "← Back".
 
 #### Rectify
+<!-- from WORKBOOK.md sha256:d49de4985cac -->
 Window opened by "Rectify", from the row or from the detail. Title "Rectify {number}", the note "A
 rectifying invoice (RECT series) will be issued with the amounts negated and the original invoice will be
 cancelled. This cannot be undone.", the "Type of rectifying invoice" (R1 to R4; on a ticket, always R5,
@@ -145,12 +153,14 @@ cannot be rectified ("A rectifying invoice cannot be rectified.", "The invoice i
 and the result "Rectifying invoice {number} issued. {original} is cancelled.", each with "Close".
 
 #### Full invoice (replace a ticket)
+<!-- from WORKBOOK.md sha256:1936f5dd4bc1 -->
 Window opened by "Full invoice" on the detail of a ticket. Title "Full invoice of ticket {number}", the
 customer search of Customers (it fills in the details) and "Name or company name", "Country", "Document
 type" (only outside Spain), "Tax ID" and "Address", all mandatory except the type. "Issue full invoice"
 and "Cancel". On issuing, the window closes and the detail opens the new F3.
 
 #### Ask for the ticket's invoice (public page)
+<!-- from WORKBOOK.md sha256:a19072e3e5a2 -->
 The customer opens it, without an account, with their ticket's code (`/p/<business>/invoice/<code>`, INVOICE-F04).
 Title "Request your invoice". At the top, "Ticket {number}" with "Business", "Date" and "Total". Below,
 "Enter your tax details to get the full invoice for this ticket.", the same fields as in "Full invoice" without the
@@ -165,6 +175,7 @@ registered or too many attempts), with "Retry" except when the code opens nothin
 from the server, "The ticket could not be loaded. Try again.".
 
 #### New manual invoice
+<!-- from WORKBOOK.md sha256:9002ed71623c -->
 Window with the "Series" (the active ones of the year that issue F1 or F2; at first, the default one or
 FACT), the customer search of Customers, "Customer", "Customer tax ID", "Address", "Country", "Notes" and
 the lines: "Description", "Qty" (1 at first; it takes decimals), "Price" (without tax, in the business's
@@ -177,11 +188,13 @@ currency and every line has a description, quantity, price and rate. A refusal s
 field.
 
 ### Series
+<!-- from WORKBOOK.md sha256:a6b504427144 -->
 The series your documents are numbered with, each with its code, type, year, prefix and the number it has reached.
 They are created by themselves with your first sale: create or change one only if you want another prefix or
 another format, or to continue the numbering you brought from another system. Only whoever keeps the series sees it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:52c5039d98c5 -->
 Menu **Invoicing → Series** (only with permission to keep the series). The intro "Each series sets the
 prefix, the format and the counter of the numbering of one invoice type and one year…" and a table with
 "Code", "Name", "Type", "Year", "Prefix", "Format" (empty reads `PREFIX-YYYY-NNNNNN`), "Current no.",
@@ -194,11 +207,13 @@ continue another system’s numbering.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
 ### Issuer
+<!-- from WORKBOOK.md sha256:a6d8c1a79747 -->
 Your business's fiscal details that appear on every invoice: legal name, tax ID and full address, and whether it is
 registered in the ROI. Without them no ticket or invoice is issued. Only the owner and the administrator see this tab and change
 them.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:5cd5d82f821f -->
 Menu **Invoicing → Issuer**. "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and
 "Country"; the switch "Registered in the ROI (intra-EU operations)", off at first, with "Your invoices and tickets
 will print your tax ID with your country’s prefix (ES…). VeriFactu keeps receiving it without the prefix." under
@@ -207,6 +222,7 @@ if the ERPlora account sent it, "Received from your ERPlora account on {date}.".
 administrator change it; the rest see it without being able to edit.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:4bf663a3acae -->
 
 | State | What the person sees |
 |---|---|
@@ -218,6 +234,7 @@ administrator change it; the rest see it without being able to edit.
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:76581dd3cc1a -->
 
 In "New manual invoice", "Rectify", "New numbering series", "Edit series" and "Full invoice of ticket", the phone's
 Back button asks "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and
@@ -226,6 +243,7 @@ the series the window picks by itself on opening and the rate that comes from th
 rectifying invoice already issued: Back closes its result (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:412941eb8908 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -253,6 +271,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
+<!-- from WORKBOOK.md sha256:420fc999d774 -->
 Status: done — Sales asks for it within the same charge
 Actor: system
 Screen: none
@@ -285,6 +304,7 @@ simplified invoice (€3,000) is watched by Sales when charging.
 Involved: SALE-F01, SALE-F04, TAX-F18, TAX-F19
 
 ### INVOICE-F02 The full invoice when charging a customer with a tax ID
+<!-- from WORKBOOK.md sha256:aaab0a0fefac -->
 Status: done — Sales asks for it within the same charge
 Actor: system
 Screen: none
@@ -310,6 +330,7 @@ without the tax ID (it stays in the application's log), so that it never stays "
 Involved: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Issue an invoice by hand
+<!-- from WORKBOOK.md sha256:381b4b4d3cd1 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoices, New manual invoice
@@ -354,6 +375,7 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, "Iss
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
+<!-- from WORKBOOK.md sha256:91d0d524459a -->
 Status: done
 Actor: customer, without an account
 Screen: Ask for the ticket's invoice (the business's public page, `/p/<business>/invoice/<code>`)
@@ -383,6 +405,7 @@ number, even if other details are typed.
 Involved: SALE-F29, INVOICE-F05, INVOICE-F18
 
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter
+<!-- from WORKBOOK.md sha256:92b6d72b3195 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoice detail, Full invoice
@@ -410,6 +433,7 @@ or the customer themselves with the code of their ticket.
 Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
+<!-- from WORKBOOK.md sha256:6954ac8ae03c -->
 Status: done
 Actor: system, employee, manager, administrator, assistant
 Screen: none
@@ -439,6 +463,7 @@ document that already came out issues no other and uses no number.
 Involved: SALE-F01, SALE-F29
 
 ### INVOICE-F07 Void a charged sale that already has its ticket
+<!-- from WORKBOOK.md sha256:f006da9259db -->
 Status: done — Sales asks for it within the same void
 Actor: system
 Screen: none
@@ -457,6 +482,7 @@ cannot, the void goes ahead and both stay "pending", in sight, until "Issue now"
 Involved: SALE-F30
 
 ### INVOICE-F08 Rectify an invoice by hand
+<!-- from WORKBOOK.md sha256:690f96f7dfc9 -->
 Status: done
 Actor: manager, administrator, assistant
 Screen: Rectify
@@ -505,6 +531,7 @@ you confirm, no other is issued: "The invoice is already cancelled." comes.
 Involved: SALE-F31
 
 ### INVOICE-F09 The rectifying invoice when refunding a whole sale
+<!-- from WORKBOOK.md sha256:8865f5c99f3e -->
 Status: done — Sales asks for it within the same refund
 Actor: system
 Screen: none
@@ -526,6 +553,7 @@ stay "pending", in sight, until "Issue now" (INVOICE-F06).
 Involved: SALE-F31
 
 ### INVOICE-F10 The rectifying invoice by differences when refunding part of a sale
+<!-- from WORKBOOK.md sha256:871172bf4299 -->
 Status: done — Sales asks for it within the same refund
 Actor: system
 Screen: none
@@ -547,6 +575,7 @@ original is rectified.
 Involved: SALE-F31
 
 ### INVOICE-F11 Number each document in its series and its year
+<!-- from WORKBOOK.md sha256:e1f2a935e35b -->
 Status: done
 Actor: system
 Screen: none
@@ -569,6 +598,7 @@ documents of the same series cannot carry the same number ("The number {number} 
 Involved: none
 
 ### INVOICE-F12 Create a numbering series
+<!-- from WORKBOOK.md sha256:b2b766a5beba -->
 Status: done
 Actor: manager, administrator
 Screen: Series
@@ -599,6 +629,7 @@ refused too.
 Involved: none
 
 ### INVOICE-F13 Change a series
+<!-- from WORKBOOK.md sha256:c0361f88f022 -->
 Status: done
 Actor: manager, administrator
 Screen: Series
@@ -618,6 +649,7 @@ is part of the VeriFactu chain. Create a new series if you need others." says so
 Involved: none
 
 ### INVOICE-F14 Know whether the year's numbering is ready
+<!-- from WORKBOOK.md sha256:d205ec105467 -->
 Status: done
 Actor: owner, manager, administrator, assistant
 Screen: Home, Series
@@ -645,6 +677,7 @@ the assistant says there are no series yet and that they will be created on thei
 Involved: none
 
 ### INVOICE-F15 Check that the numbering has no gaps
+<!-- from WORKBOOK.md sha256:6b9d08af9773 -->
 Status: done
 Actor: employee, manager, administrator, assistant
 Screen: none (assistant or API)
@@ -661,6 +694,7 @@ numbers, or one that was never used; before the first number of a series it does
 Involved: none
 
 ### INVOICE-F16 Find an invoice
+<!-- from WORKBOOK.md sha256:c0dc288b0662 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoices
@@ -685,6 +719,7 @@ before the start date."; neither of the two filters.
 Involved: none
 
 ### INVOICE-F17 View an invoice
+<!-- from WORKBOOK.md sha256:9070cddcc31a -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -708,6 +743,7 @@ or replaces one of theirs is theirs, so its links open.
 Involved: VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
+<!-- from WORKBOOK.md sha256:447204fc6dcf -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -738,6 +774,7 @@ and an invoice never prints without its QR.".
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F21
 
 ### INVOICE-F19 Mark an invoice as paid
+<!-- from WORKBOOK.md sha256:265b9583efa4 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's), assistant
 Screen: Invoices, Invoice detail
@@ -759,6 +796,7 @@ already born paid and a rectifying invoice is not paid: they do not offer the ac
 Involved: none
 
 ### INVOICE-F20 Give other apps the invoice of a sale
+<!-- from WORKBOOK.md sha256:b0a7e73cec22 -->
 Status: done
 Actor: system
 Screen: none
@@ -773,6 +811,7 @@ answers about a sale they see: someone else's, for an employee, "That sale does 
 Involved: SALE-F29
 
 ### INVOICE-F21 Set up the issuer
+<!-- from WORKBOOK.md sha256:745684432c4c -->
 Status: done
 Actor: owner, administrator
 Screen: Home, Invoices, Series, Issuer
@@ -805,6 +844,7 @@ next try is refused too; a refusal that names no field shows above the form and 
 Involved: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
+<!-- from WORKBOOK.md sha256:a925f3713a94 -->
 Status: done
 Actor: system (the ERPlora account)
 Screen: none (nobody enters the platform hub)
@@ -837,6 +877,7 @@ does not charge.
 Involved: VERIFACTU-F13
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:5a80ba0458db -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
 session) and the API, with the same rules and the same permissions. Designed for voice: an invoice is named
@@ -852,6 +893,7 @@ not a person, reach all the ones their permission opens. The numbering (its gaps
 whole series'.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:a84f6fb2cf7a -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -877,6 +919,7 @@ whole series'.
 All of them can be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:0a8075692b6c -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -896,6 +939,7 @@ All of them can be followed live.
 | Issues an ERPlora invoice with its VeriFactu record | only the system | F23 | `invoice.invoice.issue_platform` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:d253edda6d61 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -920,6 +964,7 @@ What each notice refreshes: the list, the detail, the invoice of a sale and the 
 with "issued" and those of the series; the issuer, with "issuer changed".
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:9f7f7584391b -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
@@ -933,6 +978,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 8… seconds up to 8 times; after that, it comes out with "Issue now" (INVOICE-F06).
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:927a09480231 -->
 
 - **Sales** (requirement): the sale, its lines, its refunds and its void, read from its rows; and
   `sale.sale.record_invoice`, by name and with the platform's permission, to give the sale, its void or
@@ -959,6 +1005,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 - **VeriFactu** (by name, without requirement): `verifactu.record.by_invoice`, the QR that A4 page carries.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:3d14a69ce8e5 -->
 
 | App | What for | Service |
 |---|---|---|
@@ -969,6 +1016,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 | Platform (Home) | The steps "Your business details" (F21) and "Your invoice numbering" (F14) of "Finish setting up your business" | `invoice.issuer.get`, `invoice.numbering.status` |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:6e99261bf878 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
