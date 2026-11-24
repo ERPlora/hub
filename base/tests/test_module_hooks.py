@@ -2,6 +2,8 @@
 (``crates/runtime/src/setup_status.rs`` at ``9dd38215``).
 """
 
+import logging
+
 import pytest
 
 from base import home
@@ -20,3 +22,12 @@ from base import home
 )
 def test_the_first_row_of_a_result(result, row):
     assert home.module_hooks.first_row(result) == row
+
+
+def test_a_hook_left_out_is_logged_under_the_name_the_home_always_had(caplog):
+    with caplog.at_level(logging.WARNING, logger="base.home"):
+        home.module_hooks.hook_failed("things.step", "things.thing.list", RuntimeError("its query failed"))
+
+    assert [(record.name, record.getMessage()) for record in caplog.records] == [
+        ("base.home", "Home: things.step left out, its query things.thing.list failed.")
+    ]
