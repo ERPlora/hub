@@ -348,6 +348,16 @@ TASK_VIDEOS = [
     (("SALE-F14",), "kG1MT9VEMjo", "B_-hW7QysXU"),
     (("SALE-F15",), "ADneSwlsnlg", "8vLwV_6ILUQ"),
     (("SALE-F17",), "NjZnHKLUZuo", "vSfuoQaudRw"),
+    (("SALE-F05",), "KvYeyeNY-CA", "94FyBhA7QIo"),
+    (("SALE-F16",), "pFFSYoohjuk", "_eMbZDJpfyw"),
+    (("SALE-F20",), "C0jWNygnU0U", "3IQxiU3BnHU"),
+    (("SALE-F20",), "GHkILBVV-Sk", "8IBXwlE-urA"),
+    (("SALE-F20",), "gtqSJWbcjQE", "hRnc17QyZPA"),
+    (("SALE-F30",), "f2hi4kRxNjY", "VGsi3kyPx_s"),
+    (("SALE-F31",), "lzKFSJAT-bc", "GzlfnHMKBx4"),
+    (("SALE-F34",), "hGVDzQ5E0E0", "ZsUbgRPTcXs"),
+    (("SALE-F35",), "xcjU2omEAI0", "EmgHg4RKKH0"),
+    (("SALE-F36",), "vWyct5l3cNE", "j5pACMwpr98"),
 ]
 
 
