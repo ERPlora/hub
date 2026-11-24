@@ -142,12 +142,11 @@ export interface CurrentOut {
   unassigned_cash: number;
 }
 
-/** «Print» of a session's report (CASH_REGISTER-F16): x while open, z once closed. */
+/** «Print» of a session's report (CASH_REGISTER-F16): x while open, z once closed. With no receipt printer for it,
+ *  the print fails (`cash_register.no_printer`) and the screen prints it. */
 export interface SessionPrintOut {
   report: 'x' | 'z';
-  /** It went to the receipt printer's queue; false = Printing is not on here: the browser prints it. */
-  queued: boolean;
-  job_id: string | null;
+  job_id: string;
   /** The printer that prints it; null = the first device with a receipt printer. */
   printer: string | null;
 }

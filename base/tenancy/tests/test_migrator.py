@@ -292,6 +292,58 @@ def test_add_creates_only_that_app_and_what_it_requires(new_database, make_hub):
     assert hub.schema_apps == {label: leaf[label] for label in (*PLATFORM, "inventory", "tax")}
 
 
+def test_a_database_whose_migrations_counter_went_back_records_what_it_applies(new_database, make_hub):
+    """The counter of ``django_migrations`` of a hub cloned before its clone wrote its counters down can go back to the
+    value it was cloned at (its page rebuilt from its own WAL): the next migration recorded would repeat an id and the
+    deploy would stop on it. The migrator puts it at the highest id before it applies anything."""
+    hub = make_hub(new_database)
+    migrator.ensure_schema(hub)
+    with hubs._maintenance(new_database) as conn:
+        conn.execute("SELECT setval(pg_get_serial_sequence('django_migrations', 'id'), 1)")
+
+    applied = migrator.ensure_schema(hub, add=["tax"])
+
+    assert f"tax.{leaves()['tax']}" in applied
+    with hubs._maintenance(new_database) as conn:
+        counter, highest = conn.execute(
+            "SELECT last_value, (SELECT max(id) FROM django_migrations) FROM django_migrations_id_seq"
+        ).fetchone()
+    assert counter == highest
+
+
+def test_the_migrations_counter_is_left_alone_while_another_run_holds_the_schema_lock(new_database, make_hub):
+    """The run that holds the lock is recording migrations: a counter moved under it could repeat one of its ids."""
+    hub = make_hub(new_database)
+    migrator.ensure_schema(hub)
+    counter = "SELECT last_value FROM django_migrations_id_seq"
+
+    with hubs._maintenance(new_database) as holder:
+        holder.execute("SELECT setval(pg_get_serial_sequence('django_migrations', 'id'), 1)")
+        holder.execute("SELECT pg_advisory_lock(hashtext('erplora.schema'))")
+        with pytest.raises(migrator.SchemaLocked):
+            migrator.ensure_schema(hub, add=["tax"], lock_wait=0.2)
+
+        assert holder.execute(counter).fetchone()[0] == 1
+
+
+def test_the_migrator_moves_no_counter_but_the_one_of_its_migrations(new_database, make_hub):
+    """Every other counter is written by the hub's own work while the migrator runs: setting one to a value read a
+    moment before could hand that value out twice."""
+    hub = make_hub(new_database)
+    migrator.ensure_schema(hub)
+    credit = "SELECT log_cnt FROM in_use_by_the_hub"
+    with hubs._maintenance(new_database) as conn:
+        conn.execute("CREATE SEQUENCE in_use_by_the_hub")
+        conn.execute("SELECT nextval('in_use_by_the_hub')")
+        left = conn.execute(credit).fetchone()[0]
+    assert left > 0
+
+    migrator.ensure_schema(hub, add=["tax"])
+
+    with hubs._maintenance(new_database) as conn:
+        assert conn.execute(credit).fetchone()[0] == left
+
+
 def test_ensure_schema_beats_once_per_app_it_migrates(new_database, make_hub):
     """A long migration renews its caller's lease between apps (the worker's ``hub_due``), so
     two workers of a deploy never take the same hub while it is being made."""

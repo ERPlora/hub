@@ -12,6 +12,7 @@
 // open per business), as cash-register-shift.spec.ts does.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { forgetSessions } from './cash-session-helpers';
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { boardShown, boardWidget, panelError, panelTitle, panelValue, setupRow, spanishOnTheHome, unfoldedTo } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
@@ -87,12 +88,7 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(() => {
-  const ids = [...mine].map((id) => `'${id}'`).join(',');
-  if (ids) {
-    psql(`delete from cash_register_count where session_id in (${ids})`);
-    psql(`delete from cash_register_movement where session_id in (${ids})`);
-    psql(`delete from cash_register_session where id in (${ids})`);
-  }
+  forgetSessions(mine);
   psql(
     [
       'delete from cash_register_settings',

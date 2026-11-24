@@ -2372,15 +2372,22 @@ Pasos:
      escriba datos de este negocio por su API.» y «Nueva API key».
   2. En «Nueva API key», el «Nombre» («Gestoría — facturas»), las «Peticiones por minuto» («De 1 a 10.000.») y
      «Qué puede hacer esta key»: «Acceso total», «Solo lectura», «Solo escritura» o «Por app», marcando en cada app
-     «Lectura» y «Escritura».
+     «Lectura» y «Escritura»; solo sale la casilla de lo que quien la crea puede hacer en esa app.
   3. Pulsa «Crear key»: sale «API key creada» con «Copia el token ahora», «Este es el único momento en que se
      muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
      dice «Copiado»). «Hecho» la cierra.
+  4. Lo que puede hacer una llave son cuatro acciones, en todas las apps (también las que se añadan después) o app
+     por app: leer, crear, modificar y borrar. «Lectura» es leer y «Escritura», crear, modificar y borrar de lo que
+     quien la crea puede dar; «Acceso total», las cuatro en todas las apps. Por la API se elige cada acción por
+     separado: una llave que solo lee y crea en Inventario.
+  5. Una llave nunca recibe más de lo que puede hacer quien la crea: en una app, una acción que no puede hacer en
+     ninguna de sus llamadas; en todas las apps, una acción que no puede hacer en alguna app que la publica.
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla, y quién la creó, que pone su techo
 (BASE-F125). Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
+publica lo que la key haría en ella.», «Una key no puede hacer más de lo que puedes hacer tú.» (403
+`base.api_key_beyond_maker`) o «No se pudo copiar al portapapeles.».
 Implicados: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotar una llave de API
@@ -2419,7 +2426,9 @@ Pantalla: Empleados · API keys
 Pasos:
   1. En **Empleados › API keys** (la pestaña solo existe para quien administra), una fila por llave: «Nombre»,
      «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada», «Último uso» («Nunca» si
-     no se ha usado) y «Límite».
+     no se ha usado) y «Límite». «Permisos» dice «Acceso total», «Solo lectura» o «Solo escritura» si la llave lo es
+     en todas las apps; si no, sus acciones en «Todas las apps» y app por app, con su inicial: L (leer), C (crear),
+     M (modificar) y B (borrar), como «Tienda online L/C · Impuestos L».
   2. Busca con «Buscar API key…». Al pie, «Documentación de la API» lleva a la documentación.
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.

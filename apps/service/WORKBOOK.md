@@ -523,8 +523,8 @@ Pantalla: asistente
 Pasos:
 1. Pide al asistente que conceda el bono a la clienta (por su nombre o su teléfono), con el importe
    cobrado y la venta que lo cobró. Si esa venta cobró varias líneas, también cuál de ellas.
-2. La tarjeta de confirmación del asistente nombra el bono, la clienta, la venta por su número
-   («20261014-0007») y la línea por lo que cobra; confírmala.
+2. La tarjeta de confirmación del asistente pone delante el bono, la clienta y la venta por su número
+   («20261014-0007»), y después la línea por lo que cobra y los importes; confírmala.
 3. El bono sale en **Bonos vendidos** de ese bono (SERVICE-F16).
 Entra: el bono del catálogo, vivo y activo, y la clienta (Clientes).
 Sale: un bono vendido con la titular, la fecha, el importe y los «Usos» y la «Vigencia» del catálogo

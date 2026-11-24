@@ -56,7 +56,7 @@ from psycopg import errors as pg_errors
 from psycopg import sql
 
 from base import activation, catalog, registry
-from base.tenancy import bootstrap, inventory, names
+from base.tenancy import bootstrap, inventory, names, sequences
 from base.tenancy import connections as tenancy_connections
 from control.models import Cluster, Hub
 
@@ -621,9 +621,8 @@ def _migrate_database(
     *,
     heartbeat: Callable[[], object] | None = None,
 ) -> tuple[list[str], dict[str, str]]:
-    """Under ``db_name``'s schema lock on ``target``, migrate ``targets(the hub apps it has)``; return what was applied
-    and, after, ``{hub app: its last migration}`` from its ``django_migrations``. The connection is closed in any
-    case."""
+    """Under ``db_name``'s schema lock on ``target``, its ``django_migrations`` counter put right first, migrate
+    ``targets(the hub apps it has)``; return what was applied and, after, its ``{hub app: last migration}``."""
     alias = _ddl_alias(db_name, target)
     connection = connections[alias]
     try:
@@ -632,6 +631,7 @@ def _migrate_database(
                 cursor.execute("SELECT set_config(%s, %s, false)", [setting, value])
         _take_schema_lock(connection, db_name, lock_wait)
         try:
+            sequences.reset_migrations(connection)
             applied = migrate_apps(alias, targets(set(_last_migrations(connection))), heartbeat=heartbeat)
             return applied, _last_migrations(connection)
         finally:
