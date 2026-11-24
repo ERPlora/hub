@@ -26,12 +26,8 @@ from PIL import Image as PILImage
 
 from apps.combo import events
 from apps.combo.models import Combo
-from apps.combo.schemas import (
-    ComboDetailOut,
-    ComboImageIn,
-    ComboImageSuggestOut,
-    ComboImageUploadIn,
-)
+from apps.combo.schemas.images import ComboImageIn, ComboImageSuggestOut, ComboImageUploadIn
+from apps.combo.schemas.menus import ComboDetailOut
 from base.models import Hub
 from base.storage import hub_prefix
 from base.tenancy.context import current_alias, use_hub
