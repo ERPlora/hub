@@ -84,7 +84,6 @@ def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -
         .filter(
             status=EventDelivery.Status.DEAD,
             event__scope_kind=ctx.scope.kind,
-            event__scope_key=ctx.scope.key,
             app_label__in=active_apps(ctx.scope),
         )
         .values_list("pk", flat=True)
@@ -133,12 +132,7 @@ def _failed_event(ctx: OperationContext, delivery_id: UUID) -> EventDelivery:
     failed (resent, discarded, or delivered in the meantime)."""
     delivery = (
         EventDelivery.objects.select_for_update(of=("self",))
-        .filter(
-            pk=delivery_id,
-            status=EventDelivery.Status.DEAD,
-            event__scope_kind=ctx.scope.kind,
-            event__scope_key=ctx.scope.key,
-        )
+        .filter(pk=delivery_id, status=EventDelivery.Status.DEAD, event__scope_kind=ctx.scope.kind)
         .first()
     )
     if delivery is None:
