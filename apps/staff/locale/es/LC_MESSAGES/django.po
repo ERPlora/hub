@@ -439,3 +439,6 @@ msgstr "Gestionar los roles, los horarios y los ajustes"
 
 msgid "Request their own time off"
 msgstr "Pedir sus propias ausencias"
+
+msgid "Dates"
+msgstr "Fechas"
