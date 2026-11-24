@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8b7e47f7f141aca9e24a3d7b5f88454b242a10776f79d54762614ca61cea5f3e -->
+<!-- generated from WORKBOOK.md sha256:7df417d3ca4c5978f30cb90616f93f6f3461ed17b2dccbe32fcd6b2a25cf3e5c -->
 
 ## What it is for and who it is for
 
@@ -2669,7 +2669,8 @@ Steps:
      invoice in VeriFactu", never "Run" or "Create". An action that carries no datum to show says only its action and
      its app, ending in a full stop and with no empty colon after it: "Test the connection in VeriFactu.".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
-     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so. After "Run it",
+     on its screen. "Cancel" or Esc do nothing: the assistant knows the person said no and says it was not done
+     because they cancelled it, without asking them to confirm it, since that card is already closed. After "Run it",
      the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
      offer to undo it unless asked to.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
