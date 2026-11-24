@@ -1104,6 +1104,7 @@
       "payment__method__get": "Leer un método de pago",
       "payment__method__list": "Buscar métodos de pago",
       "payment__method__update": "Cambiar un método de pago",
+      "payment__payment__check": "Comprobar el método del que sale un pago nuevo",
       "payment__payment__create": "Crear un pago",
       "payment__payment__get": "Leer un pago",
       "payment__payment__list": "Buscar pagos",

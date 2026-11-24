@@ -5,7 +5,16 @@ from uuid import UUID
 from ninja import Field, Schema
 from pydantic import model_validator
 
-from apps.inventory.schemas.fields import A_CATEGORY, SAY_WHICH_CATEGORY, Page, PageIn, Said, _ProductLineRef
+from apps.inventory.schemas.fields import (
+    A_CATEGORY,
+    A_CATEGORY_SAID,
+    SAY_WHICH_CATEGORY,
+    Page,
+    PageIn,
+    Said,
+    _ProductLineRef,
+)
+from base.schemas import assistant
 
 
 class ProductCategoryListIn(PageIn):
@@ -25,7 +34,9 @@ class ProductCategoryListIn(PageIn):
 class ProductCategoryIn(_ProductLineRef):
     category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
-        None, description="The category's name or slug, when its id is not known."
+        None,
+        description="The category's name or slug, when its id is not known.",
+        json_schema_extra=assistant.unless_given(A_CATEGORY_SAID, "category_id"),
     )
 
     @model_validator(mode="after")

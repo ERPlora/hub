@@ -35,6 +35,15 @@ HIGH_RISK = {
 }
 #: Recording a payment puts first on its card whom it pays, the invoice and how much (hub#2292).
 WITH_A_SUMMARY = {"payment.payment.create"}
+#: The read that only checks what a write names before its card: no tool, no route.
+CARD_ONLY = {"payment.payment.check"}
+#: The read each write checks the method it names with, before its card (hub#2290).
+CHECKS = {
+    **dict.fromkeys(
+        ("payment.method.update", "payment.method.deactivate", "payment.method.activate"), "payment.method.get"
+    ),
+    "payment.payment.create": "payment.payment.check",
+}
 
 
 def payment():
@@ -109,15 +118,20 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: every operation
     # says what it does, its risk and what a person types to ask for it (its asks, live.E020: payment
     # is listed in LIVE_ASSISTANT_ASKS_REQUIRED, hub#1090).
-    from live.operations import MIN_ASKS, registry
+    from live.operations import INTERNAL, MIN_ASKS, registry
 
     operations = {
         name: op for name, op in registry.items() if name.startswith("payment.")
     }
-    assert set(operations) == COMMANDS | QUERIES
+    assert set(operations) == COMMANDS | QUERIES | CARD_ONLY
     for name, op in operations.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
-        assert set(op.ai) == {"description", "risk", "asks", *(("summary",) if name in WITH_A_SUMMARY else ())}, name
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
+        declared = {*(("summary",) if name in WITH_A_SUMMARY else ()), *(("check",) if name in CHECKS else ())}
+        assert set(op.ai) == {"description", "risk", "asks", *declared}, name
+        assert op.ai.get("check") == CHECKS.get(name), name
         assert {
             language: len(op.ai["asks"].get(language, ())) >= MIN_ASKS
             for language in ("en", "es")
