@@ -101,7 +101,7 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
     down first (another doing it at the same time leaves its rows: ON CONFLICT DO NOTHING). The rows are read again
     once locked, a new statement, which sees what another committed meanwhile."""
     host = ctx.scope.key
-    rows = AppActivation.objects.all()
+    rows = AppActivation.objects.filter(host=host)
     if not rows.exists():
         AppActivation.objects.bulk_create(
             [
@@ -110,8 +110,8 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
             ],
             ignore_conflicts=True,
         )
-    list(rows.select_for_update().order_by("app", "id").values_list("id", flat=True))
-    return activation.effective(queries.apps.app_activations(), graph)
+    list(rows.select_for_update().order_by("app").values_list("id", flat=True))
+    return activation.effective(queries.apps.app_activations(host), graph)
 
 
 def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
@@ -120,11 +120,11 @@ def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
     off has none left."""
     after_commit(partial(activation.forget, host))
     now = timezone.now()
-    existing = set(AppActivation.objects.filter(app__in=list(changes)).values_list("app", flat=True))
+    existing = set(AppActivation.objects.filter(host=host, app__in=list(changes)).values_list("app", flat=True))
     for label, row in changes.items():
         if label in existing:
             settled = {"target": _code_leaf(label)} if row.state == CREATING else {"attempts": 0, "last_error": ""}
-            AppActivation.objects.filter(app=label).update(
+            AppActivation.objects.filter(host=host, app=label).update(
                 state=row.state, chosen=row.chosen, changed_at=now, next_attempt_at=None, **settled
             )
     AppActivation.objects.bulk_create(

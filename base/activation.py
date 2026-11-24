@@ -372,7 +372,7 @@ def states_of(scope: Scope) -> dict[str, Activation]:
         return every_on(graph)
     from base import queries  # base.queries imports this module
 
-    return effective(queries.apps.app_activations(), graph)
+    return effective(queries.apps.app_activations(scope.key), graph)
 
 
 def off_apps(scope: Scope) -> frozenset[str]:

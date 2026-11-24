@@ -217,7 +217,7 @@ class StuckActivations(HubReadings):
         return [hub for hub in super().hubs(now) if hub.status == Hub.Status.READY]
 
     def read(self, hub, now: dt.datetime) -> int:
-        return queries.apps.activations_stuck(now)
+        return queries.apps.activations_stuck(hub.slug, now)
 
     def metrics(self, readings: list, now: dt.datetime) -> list[Metric]:
         return [Metric(HUBS_NAMESPACE, "AppsActivationStuck", float(sum(readings)), "Count")]

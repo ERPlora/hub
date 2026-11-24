@@ -32,7 +32,7 @@ from apps.verifactu.tests.test_fiscal_backlog import record
 from base import activation, metrics, queries
 from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric, StuckActivations
 from base.models.activation import AppActivation
-from base.tenancy.context import current_hub, use_control, use_hub
+from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from control.models import Hub
 
@@ -406,10 +406,10 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
     assert stuck_count(counted(now, never())) == 1.0
     real = queries.apps.activations_stuck
 
-    def broken(at):
-        if current_hub() == hub_a:
+    def broken(host, at):
+        if host == hub_a.slug:
             raise RuntimeError("database gone")
-        return real(at)
+        return real(host, at)
 
     monkeypatch.setattr(queries.apps, "activations_stuck", broken)
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
@@ -424,7 +424,7 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
 def test_a_business_never_read_that_cannot_be_read_counts_nothing(hub_a, hub_b, monkeypatch):
     """Unlike the fiscal backlog, a business that cannot be read is no stuck app: that alarm already pages for it."""
 
-    def broken(at):
+    def broken(host, at):
         raise RuntimeError("database gone")
 
     monkeypatch.setattr(queries.apps, "activations_stuck", broken)

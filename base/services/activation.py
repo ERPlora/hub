@@ -123,15 +123,15 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
         now = timezone.now()
         asked = [label for label in dict.fromkeys(data.apps) if label in current and current[label].state in (CREATING, FAILED)]
         after_commit(partial(activation.forget, host))
-        after_commit(partial(_ring_next, hub))
+        after_commit(partial(_ring_next, hub, host))
         behind: list[str] = []
         if data.outcome == "newer_code":
             # Waited for a worker of its code since it was asked for (``changed_at``): after a rollback none is coming.
-            since = dict(queries.apps.app_rows().filter(app__in=asked).values_list("app", "changed_at"))
+            since = dict(AppActivation.objects.filter(host=host, app__in=asked).values_list("app", "changed_at"))
             behind = [label for label in asked if since[label] <= now - ACTIVATION_CODE_BEHIND_AFTER]
         if data.outcome == "locked" or (data.outcome == "newer_code" and not behind):
             wait = ACTIVATION_LOCKED_SECONDS if data.outcome == "locked" else ACTIVATION_NEWER_CODE_SECONDS
-            AppActivation.objects.filter(app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
+            AppActivation.objects.filter(host=host, app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
             return {"on": [], "failed": [], "waiting": asked}
         created = apps_created(hub)
         made = [label for label in asked if data.outcome == "created" and label in created]
@@ -143,34 +143,29 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
             _record_enabled(ctx, made, current, graph)
             _load_what_waited(ctx, made)
         if failed:
-            _settle_failed(ctx, failed, data, now)
+            kind = {"failed": "schema_failed", "newer_code": "code_behind"}.get(data.outcome, "not_created")
+            error = {
+                "schema_failed": data.error,
+                "code_behind": "code_behind: asked by a code no worker runs any more (a rollback): turn it on again.",
+                "not_created": "not_created: the migrator ended without its tables.",
+            }[kind]
+            for label in failed:
+                attempts = AppActivation.objects.get(host=host, app=label).attempts + 1
+                AppActivation.objects.filter(host=host, app=label).update(
+                    state=FAILED,
+                    attempts=attempts,
+                    last_error=error[:LAST_ERROR_MAX],
+                    next_attempt_at=now + _activation_retry_delay(attempts),
+                    changed_at=now,
+                )
+            record_event(ctx, events.APP_ACTIVATION_FAILED, {"apps": failed, "error": kind})
+            logger.warning("base.app.activation_failed hub=%s apps=%s: %s", host, ",".join(failed), error[:300])
         return {"on": made, "failed": failed, "waiting": []}
 
 
-def _settle_failed(ctx: OperationContext, failed: list[str], data: AppActivationSettleIn, now: dt.datetime) -> None:
-    """``failed``, with one more attempt, why and the next try; told once for all of them."""
-    kind = {"failed": "schema_failed", "newer_code": "code_behind"}.get(data.outcome, "not_created")
-    error = {
-        "schema_failed": data.error,
-        "code_behind": "code_behind: asked by a code no worker runs any more (a rollback): turn it on again.",
-        "not_created": "not_created: the migrator ended without its tables.",
-    }[kind]
-    for label, before in queries.apps.app_rows().filter(app__in=failed).values_list("app", "attempts"):
-        attempts = before + 1
-        AppActivation.objects.filter(app=label).update(
-            state=FAILED,
-            attempts=attempts,
-            last_error=error[:LAST_ERROR_MAX],
-            next_attempt_at=now + _activation_retry_delay(attempts),
-            changed_at=now,
-        )
-    record_event(ctx, events.APP_ACTIVATION_FAILED, {"apps": failed, "error": kind})
-    logger.warning("base.app.activation_failed hub=%s apps=%s: %s", ctx.scope.key, ",".join(failed), error[:300])
-
-
-def _ring_next(hub: Hub) -> None:
+def _ring_next(hub: Hub, host: str) -> None:
     """After the COMMIT of a settle (inside the hub's database): its ring moves to the next app to set up, or ends."""
-    activations_rung_at(hub.pk, queries.apps.activation_next_at())
+    activations_rung_at(hub.pk, queries.apps.activation_next_at(host))
 
 
 def _record_enabled(

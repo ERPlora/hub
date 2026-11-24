@@ -161,12 +161,15 @@ def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platf
     assert activation.off_apps(scope) == frozenset()
     assert activation.states_of(scope) == activation.every_on(graph)
     assert {"invoice", "verifactu", "whatsapp_inbox"} <= apps_on.active_apps(scope)
-    born_off()
     assert activation.off_apps(Scope("host", "worker-scope")) == frozenset(graph)
     assert activation.off_apps(Scope("host", "c")) == frozenset(graph)
 
 
 # ── How a hub is born ─────────────────────────────────────────────────────────────────────────────────────────
+
+
+def modules_on(scope):
+    return set(apps_on.active_apps(scope)) & set(activation.module_graph())
 
 
 @HUB_DB
@@ -185,6 +188,7 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
     # Requested, with its own database still to make: its template carries no app turned on
     # (base/tenancy/tests/test_provision.py), and nothing turns one on before it is ready.
     assert Hub.objects.get(slug="nuevo").status == "requested"
+    assert modules_on(Scope("host", "nuevo")) == set()
     assert rows("nuevo") == {}
 
 
@@ -202,7 +206,7 @@ def test_a_demo_is_born_with_every_app_off():
         DemoCreateIn(session_key=hashlib.sha256(b"a browser").hexdigest(), vertical="restaurant", language="es"),
     )
 
-    assert demo.status == "requested"
+    assert modules_on(Scope("host", demo.slug)) == set()
     assert rows(demo.slug) == {}
 
 

@@ -8,9 +8,9 @@ nothing of it. The businesses are ``hub_a`` and ``hub_b``, each on a database of
 import datetime as dt
 
 import pytest
-from django.db import IntegrityError
+from django.db import IntegrityError, OperationalError
 from django.utils import timezone
-from live.context import OperationContext, Scope
+from live.context import OperationContext, Scope, system_context
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -22,12 +22,17 @@ from base.models.activation import AppActivation
 from base.models.relay import EventDelivery
 from base.models.sessions import SessionOwner
 from base.permissions import access_for
-from base.services import usage
+from base.registry import REGISTRY_SCOPE
+from base.services import hub_registry, usage
 from base.tenancy.context import use_hub
-from base.tenancy.tests.business import HUB_DB, A, B
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B
+from base.tenancy.tests.concurrency import meanwhile, plan_with_room
 from base.tests.test_internal import code, signed
 from base.tests.test_session_revoke import ANA, OLGA, REVOKE, alive, login
 from control.models import HubVisit
+
+#: Room for two sessions of business A at once.
+__all__ = ["plan_with_room"]
 
 pytestmark = HUB_DB
 
@@ -36,6 +41,10 @@ C = Scope("host", "tenant-c")
 D = Scope("host", "tenant-d")
 #: An app every template carries that nothing vetoes and no other app of the tests needs.
 APP = "task"
+
+
+def control_gone(*args, **kwargs):
+    raise OperationalError("the connection is gone")
 
 
 @pytest.fixture
@@ -134,9 +143,6 @@ class TestItsApps:
         switch(here, "enable")
         assert off_in(here) == frozenset()
 
-        with use_hub(here):
-            assert AppActivation.objects.filter(app=APP).count() == 1
-
     def test_two_changes_in_a_row_keep_what_it_turned_off_in_between(self, hub_a, change_address):
         second = change_address(hub_a, C)
         switch(second, "disable")
@@ -161,49 +167,78 @@ class TestItsApps:
         here = change_address(hub_a, C)
 
         with use_hub(here):
-            assert queries.apps.activations_due(timezone.now()) == {APP: "0001_initial"}
-            assert queries.apps.activation_next_at() is not None
-            assert queries.apps.activations_stuck(timezone.now() + dt.timedelta(hours=1)) == 1
+            assert queries.apps.activations_due(here.slug, timezone.now()) == {APP: "0001_initial"}
+            assert queries.apps.activation_next_at(here.slug) is not None
             settle(here, outcome="created")
         assert off_in(here) == frozenset()
 
-    @pytest.mark.parametrize(("outcome", "state"), [("failed", activation.FAILED), ("locked", activation.CREATING)])
-    def test_the_worker_notes_how_an_app_went_at_the_new_address(self, hub_a, change_address, outcome, state):
+    def test_an_app_that_could_not_go_on_keeps_why_and_when_it_is_tried_again(self, hub_a, change_address):
+        at = timezone.now() + dt.timedelta(minutes=5)
         with use_hub(hub_a):
-            AppActivation.objects.filter(app=APP).update(state=activation.CREATING, attempts=2)
+            AppActivation.objects.filter(app=APP).update(
+                state=activation.FAILED, attempts=2, last_error="schema_failed: boom", next_attempt_at=at
+            )
 
         here = change_address(hub_a, C)
 
         with use_hub(here):
-            settle(here, outcome=outcome, error="boom")
-            row = AppActivation.objects.get(app=APP)
-        assert row.state == state
-        assert row.next_attempt_at is not None
-        assert row.attempts == (3 if outcome == "failed" else 2)
+            row = AppActivation.objects.get(host=here.slug, app=APP)
+        assert (row.state, row.attempts, row.last_error, row.next_attempt_at) == (
+            activation.FAILED,
+            2,
+            "schema_failed: boom",
+            at,
+        )
 
-    def test_an_app_with_a_row_under_each_address_is_as_it_was_left_last(self, hub_a):
-        """The code of before wrote a business's apps again, all off, the first time it turned one on at a new
-        address."""
+    def test_what_another_business_left_in_its_database_is_none_of_its_apps(self, hub_a, change_address):
+        """A business whose database was made from the one they shared has the rows of the others in it."""
         with use_hub(hub_a):
-            AppActivation.objects.update(changed_at=timezone.now() - dt.timedelta(days=1))
-            AppActivation.objects.create(host=C.key, app=APP, state=activation.OFF, chosen=False)
-        activation.forget(hub_a.slug)
-        assert off_in(hub_a) == {APP}
+            for scope, state in ((C, activation.OFF), (B, activation.OFF)):
+                AppActivation.objects.create(host=scope.key, app=APP, state=state, chosen=False)
 
-        switch(hub_a, "enable")
+        assert off_in(change_address(hub_a, C)) == frozenset()
 
-        assert off_in(hub_a) == frozenset()
-
-    def test_a_row_left_behind_waiting_is_nothing_to_set_up(self, hub_a):
         with use_hub(hub_a):
-            AppActivation.objects.create(host=C.key, app=APP, state=activation.FAILED, chosen=True)
-            AppActivation.objects.filter(host=C.key).update(
-                changed_at=timezone.now() - dt.timedelta(days=1), next_attempt_at=timezone.now() - dt.timedelta(days=1)
-            )
+            assert AppActivation.objects.get(host=B.key, app=APP).state == activation.OFF
 
-            assert queries.apps.activations_due(timezone.now()) == {}
-            assert queries.apps.activation_next_at() is None
-            assert queries.apps.activations_stuck(timezone.now()) == 0
+    def test_one_the_code_of_before_moved_without_its_apps_finds_them_where_they_were(self, hub_a, change_address):
+        Hub.objects.filter(pk=hub_a.pk).update(slug=C.key)
+        moved = Hub.objects.get(pk=hub_a.pk)
+        assert off_in(moved) == frozenset(activation.module_graph())
+
+        assert off_in(change_address(moved, A)) == frozenset()
+
+    def test_a_change_that_is_undone_leaves_it_open_where_it_was(self, hub_a, register, monkeypatch):
+        """Control and the business's database have no transaction in common: its apps are written down at the new
+        address before control says it has it, and stay at the one it has until then."""
+        switch(hub_a, "disable")
+        monkeypatch.setattr(hub_registry, "record_event", control_gone)
+        assert register(hub_a.pk, C.key).status_code == 503
+        monkeypatch.undo()
+
+        here = Hub.objects.get(pk=hub_a.pk)
+        assert (here.slug, off_in(here)) == (A.key, {APP})
+
+        switch(here, "enable")
+        assert register(hub_a.pk, C.key).status_code == 200
+        assert off_in(Hub.objects.get(pk=hub_a.pk)) == frozenset()
+
+    def test_a_business_whose_database_cannot_be_reached_keeps_its_address(self, client, hub_a, register, monkeypatch):
+        session = login(ANA, hub_a, role="hub_owner")
+        with monkeypatch.context() as away:
+            away.setattr(AppActivation.objects, "bulk_create", control_gone)
+            assert register(hub_a.pk, C.key).status_code == 503
+
+        assert Hub.objects.get(pk=hub_a.pk).slug == A.key
+        assert signed_in(client, A.key, session)
+
+    def test_one_whose_database_is_still_to_be_made_is_not_entered(self, register):
+        new = "0199c4b0-0000-7000-8000-0000000000c1"
+        assert register(new, C.key).status_code == 202
+
+        assert register(new, D.key).status_code == 202
+
+        assert Hub.objects.get(pk=new).slug == D.key
 
     def test_another_business_at_the_address_it_left_has_its_own(self, hub_a, hub_b, change_address):
         switch(hub_a, "disable")
@@ -225,6 +260,28 @@ class TestItsApps:
         assert off_in(change_address(hub_b, A)) == frozenset()
 
 
+
+
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
+def test_an_app_being_turned_off_as_the_address_changes_is_off_at_the_new_one(hub_a):
+    registered = get("base.hub.register")
+    asked = registered.input.model_validate(
+        {"id": hub_a.pk, "slug": C.key, "name": "A", "country": "ES", "timezone": "Europe/Madrid", "language": "es", "vertical": None}
+    )
+    written = 'UPDATE "base_appactivation"'
+
+    with (
+        use_hub(hub_a),
+        meanwhile(
+            lambda sql: sql.lstrip().startswith(written),
+            lambda: registered(system_context(REGISTRY_SCOPE), asked),
+        ) as outcome,
+    ):
+        run("base.app.disable", A, app=APP)
+
+    assert not isinstance(outcome[0], Exception), outcome[0]
+    assert off_in(Hub.objects.get(pk=hub_a.pk)) == {APP}
 
 
 # ── Its people ───────────────────────────────────────────────────────────────────────────────────────────────────

@@ -154,6 +154,6 @@ class HubVisits:
         if hub.status != Hub.Status.READY or (last is not None and now - last < (SWEEP_ACTIVE if active else SWEEP_ALL)):
             return
         self._swept[hub.pk] = now
-        pending = queries.apps.activation_next_at()
+        pending = queries.apps.activation_next_at(hub.slug)
         if pending is not None:
             services.activation.ring_activations(hub, pending)

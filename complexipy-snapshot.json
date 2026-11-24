@@ -708,6 +708,10 @@
     "file_name": "hub_registry.py",
     "functions": [
       {
+        "name": "hub_register",
+        "complexity": 22
+      },
+      {
         "name": "hub_seed_local",
         "complexity": 23
       }
@@ -789,6 +793,16 @@
     "functions": [
       {
         "name": "list_records",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/services/activation.py",
+    "file_name": "activation.py",
+    "functions": [
+      {
+        "name": "app_activation_settle",
         "complexity": 16
       }
     ]

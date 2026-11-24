@@ -206,11 +206,12 @@ def _what_is_due():
         ("schedule", ON, None, ""),
         ("gone_app", CREATING, None, ""),
     ]:
-        AppActivation.objects.update_or_create(
-            host="tenant-a", app=app, defaults={"state": state, "next_attempt_at": next_attempt_at, "target": target}
+        AppActivation.objects.create(
+            host="c", app=app, state=state, chosen=True, next_attempt_at=next_attempt_at, target=target
         )
 
-    assert activations_due(now) == {"printing": "0001_a", "flow": "0002_b"}
+    assert activations_due("c", now) == {"printing": "0001_a", "flow": "0002_b"}
+    assert activations_due("d", now) == {}
 
 
 # ── Turned on in A, its tables are made in A and nowhere else ───────────────────────────────────────────────────
