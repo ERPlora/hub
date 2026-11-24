@@ -1,4 +1,5 @@
-"""translate_workbooks: each app's WORKBOOK.en.md (the modules' and base's), generated from its Spanish user part.
+"""translate_workbooks: each app's WORKBOOK.<language>.md (the modules' and base's), generated from its Spanish user
+part, for every language of the Hub but Spanish: today English, and here a test language too.
 
 The hash is the user part's, not the file's: touching «Para quien lo mantiene» costs nothing. With
 the hash in the header unchanged, no call; otherwise one call and the header with the new hash.
@@ -21,7 +22,7 @@ from decouple import Config, RepositoryEmpty, RepositoryEnv
 from django.apps import apps as django_apps
 from django.core.management import CommandError, call_command
 
-from base import catalog
+from base import catalog, workbook_help
 from base.catalog import en_header, source_hash
 from base.management.commands import translate_workbooks
 from base.tests.test_catalog import USER_PART, WORKBOOK, module, translated
@@ -35,15 +36,16 @@ ENGLISH = "## What it is for\n\nKeeps **things**. See [how to use it](#how-to-us
 
 
 class FakeTranslator:
-    """Stands in for ``translate``: records each source and answers ``english``, or fails if called."""
+    """Stands in for ``translate``: records each source and its language and answers ``english``, or fails if called."""
 
     def __init__(self, english: str = ENGLISH, *, allowed: bool = True):
-        self.english, self.allowed, self.sources = english, allowed, []
+        self.english, self.allowed, self.sources, self.languages = english, allowed, [], []
 
-    def __call__(self, source: str) -> str:
+    def __call__(self, source: str, language: str) -> str:
         if not self.allowed:
             raise AssertionError("translate_workbooks reached the API")
         self.sources.append(source)
+        self.languages.append(language)
         return self.english
 
 
@@ -69,8 +71,19 @@ def translator(monkeypatch):
     return install
 
 
+def file_in(config, language: str) -> Path:
+    return Path(config.path) / f"WORKBOOK.{language}.md"
+
+
 def en_file(config) -> Path:
-    return Path(config.path) / "WORKBOOK.en.md"
+    return file_in(config, "en")
+
+
+@pytest.fixture
+def german(settings):
+    """A third language of the Hub, with no other change: what adding one to ``LANGUAGES`` does."""
+    settings.LANGUAGES = [*settings.LANGUAGES, ("de", "Deutsch")]
+    return "de"
 
 
 def test_an_up_to_date_translation_never_calls_the_api(tmp_path, installed, translator):
@@ -154,15 +167,20 @@ def test_a_translation_with_a_dangling_anchor_is_not_written(tmp_path, installed
 # ── date patterns: `OS-AAAAMMDD-NNNN` came back untouched from inline code (cart_checkout, kitchen, task) ──
 
 
+@pytest.mark.parametrize("language", ["en", "de"])
 @pytest.mark.parametrize("pattern", ["OS-AAAAMMDD-NNNN", "DD/MM/AAAA", "dd/mm/aaaa"])
-def test_a_translation_that_keeps_a_spanish_date_placeholder_is_not_written(tmp_path, installed, translator, pattern):
+def test_a_translation_that_keeps_a_spanish_date_placeholder_is_not_written(
+    tmp_path, installed, translator, settings, pattern, language
+):
+    settings.LANGUAGES = [("es", "Español"), (language, "Any")]
     [config] = installed(module(tmp_path))
     translator(english=ENGLISH.replace("Keeps **things**.", f"Keeps **things**, numbered `{pattern}`."))
 
-    with pytest.raises(CommandError, match=re.escape(pattern)):
+    with pytest.raises(CommandError, match=re.escape(pattern)) as raised:
         call_command("translate_workbooks")
 
-    assert not en_file(config).exists()
+    assert f"things: WORKBOOK.{language}.md: " in str(raised.value)
+    assert not file_in(config, language).exists()
 
 
 def test_a_translation_with_english_date_placeholders_is_written(tmp_path, installed, translator):
@@ -182,7 +200,7 @@ def test_the_instructions_translate_the_date_placeholders_even_in_inline_code():
         ("`OS-AAAAMMDD-NNNN`", "`OS-YYYYMMDD-NNNN`"),
         ("`DD/MM/AAAA`", "`DD/MM/YYYY`"),
     ):
-        assert f"{spanish} is {english}" in translate_workbooks.INSTRUCTIONS
+        assert f"{spanish} is {english}" in translate_workbooks.instructions("en")
 
 
 def test_check_lists_the_stale_translations_without_the_network(tmp_path, installed, translator):
@@ -247,6 +265,7 @@ def line_of(text: str, needle: str) -> int:
     return number
 
 
+@pytest.mark.parametrize("language", ["en", "de"])
 @pytest.mark.parametrize(
     "line",
     [
@@ -256,17 +275,25 @@ def line_of(text: str, needle: str) -> int:
     ],
     ids=["inline-code", "prose", "lowercase"],
 )
-def test_check_fails_naming_the_file_and_line_of_a_spanish_date_in_a_current_translation(tmp_path, installed, translator, line):
-    en = translated(USER_PART, body_with(line))
-    installed(module(tmp_path, "current", en=translated(USER_PART, ENGLISH)), module(tmp_path, en=en))
+def test_check_fails_naming_the_file_and_line_of_a_spanish_date_in_a_current_translation(
+    tmp_path, installed, translator, german, line, language
+):
+    text = translated(USER_PART, body_with(line))
+    current, things = installed(module(tmp_path, "current"), module(tmp_path))
+    for code in ("en", "de"):
+        file_in(current, code).write_text(translated(USER_PART, ENGLISH))
+        file_in(things, code).write_text(text if code == language else translated(USER_PART, ENGLISH))
     translator(allowed=False)
 
     with pytest.raises(CommandError) as raised:
         call_command("translate_workbooks", "--check")
 
     [pattern] = translate_workbooks._SPANISH_DATE_RE.findall(line)
+    [other] = {"en", "de"} - {language}
     message = str(raised.value)
-    assert f"things: WORKBOOK.en.md:{line_of(en, pattern)}: {pattern}" in message
+    assert f"Spanish date placeholders left in WORKBOOK.{language}.md" in message
+    assert f"things: WORKBOOK.{language}.md:{line_of(text, pattern)}: {pattern}" in message
+    assert f"WORKBOOK.{other}.md" not in message
     assert "current:" not in message and "Out of date" not in message
 
 
@@ -330,6 +357,140 @@ def test_check_reads_no_date_in_the_header_though_its_hash_spells_aaaa(tmp_path,
     translator(allowed=False)
 
     call_command("translate_workbooks", "--check")
+
+
+# ── every language of the Hub but the one the WORKBOOK is written in ─────────────────────────────
+
+
+def test_a_language_added_to_the_hub_gets_its_translation_next_to_the_others(tmp_path, installed, translator, german):
+    [config] = installed(module(tmp_path))
+    fake = translator()
+
+    call_command("translate_workbooks")
+
+    assert fake.sources == [USER_PART, USER_PART]
+    assert fake.languages == ["en", "de"]
+    for language in ("en", "de"):
+        assert file_in(config, language).read_text() == f"{en_header(source_hash(USER_PART))}\n\n{ENGLISH}"
+        # What the help then serves in that language.
+        assert workbook_help.workbook(Path(config.path), language) == (language, ENGLISH)
+    call_command("translate_workbooks", "--check")
+
+
+def test_only_the_language_that_is_not_current_is_translated(tmp_path, installed, translator, german, capsys):
+    [config] = installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    file_in(config, "de").write_text(translated("una versión anterior\n", ENGLISH))
+    before = en_file(config).read_text()
+    fake = translator(english=ENGLISH.replace("things", "Sachen"))
+
+    call_command("translate_workbooks")
+
+    assert fake.languages == ["de"]
+    assert en_file(config).read_text() == before
+    assert "Sachen" in file_in(config, "de").read_text()
+    assert capsys.readouterr().out == "things: wrote WORKBOOK.de.md; review the diff before committing it.\n"
+
+
+def test_an_app_is_told_up_to_date_once_when_it_is_in_every_language(tmp_path, installed, translator, german, capsys):
+    [config] = installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    file_in(config, "de").write_text(translated(USER_PART, ENGLISH))
+    translator(allowed=False)
+
+    call_command("translate_workbooks")
+
+    assert capsys.readouterr().out == "things: up to date.\n"
+
+
+def test_check_lists_the_stale_translations_of_each_language_with_its_file(tmp_path, installed, translator, german):
+    things, stock = installed(
+        module(tmp_path, "things", en=translated("una versión anterior\n", ENGLISH)),
+        module(tmp_path, "stock", en=translated(USER_PART, ENGLISH)),
+    )
+    file_in(things, "de").write_text(translated(USER_PART, ENGLISH))
+    file_in(stock, "de").write_text(translated("una versión anterior\n", ENGLISH))
+    translator(allowed=False)
+
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks", "--check")
+
+    def by_hand(label: str, language: str) -> str:
+        return (
+            f"{label}: translate by hand the part of WORKBOOK.md that changed into WORKBOOK.{language}.md "
+            f"and make its first line the header this prints: {HEADER_COMMAND.format(label)}"
+        )
+
+    assert str(raised.value).splitlines() == [
+        "Out of date WORKBOOK.en.md: things.",
+        by_hand("things", "en"),
+        "Out of date WORKBOOK.de.md: stock.",
+        by_hand("stock", "de"),
+    ]
+
+
+def test_check_names_the_files_of_every_language_when_they_are_current_or_missing(
+    tmp_path, installed, translator, german, capsys
+):
+    current, _untranslated = installed(
+        module(tmp_path, "current", en=translated(USER_PART, ENGLISH)), module(tmp_path, "untranslated")
+    )
+    file_in(current, "de").write_text(translated(USER_PART, ENGLISH))
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check")
+
+    assert capsys.readouterr().out == "Every WORKBOOK.en.md, WORKBOOK.de.md is up to date.\n"
+
+
+def test_with_english_as_the_only_translation_the_check_names_only_its_file(tmp_path, installed, translator, settings, capsys):
+    settings.LANGUAGES = [("en", "English"), ("es", "Español")]
+    installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check")
+
+    assert capsys.readouterr().out == "Every WORKBOOK.en.md is up to date.\n"
+
+
+def test_the_language_the_workbook_is_written_in_has_no_translation(tmp_path, installed, translator):
+    """Spanish is read from WORKBOOK.md: a WORKBOOK.es.md is neither checked nor written."""
+    [config] = installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    file_in(config, "es").write_text("## Para qué sirve\n")
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check")
+    call_command("translate_workbooks")
+
+    assert file_in(config, "es").read_text() == "## Para qué sirve\n"
+
+
+def test_a_file_in_a_language_the_hub_does_not_offer_is_not_checked(tmp_path, installed, translator, settings):
+    assert "de" not in dict(settings.LANGUAGES)
+    [config] = installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    file_in(config, "de").write_text(translated("una versión anterior\n", ENGLISH))
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check")
+
+
+@pytest.mark.parametrize(
+    ("answer", "said"),
+    [
+        (ENGLISH.replace("docs/img/list.png", "docs/img/lista.png"), "docs/img/list.png"),
+        (ENGLISH.replace("(#how-to-use-it)", "(#cómo-se-usa)"), "#cómo-se-usa"),
+    ],
+    ids=["image", "anchor"],
+)
+def test_a_wrong_translation_into_an_added_language_is_not_written_and_names_its_file(
+    tmp_path, installed, translator, german, answer, said
+):
+    [config] = installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    translator(english=answer)
+
+    with pytest.raises(CommandError, match=said) as raised:
+        call_command("translate_workbooks")
+
+    assert str(raised.value).startswith("things: WORKBOOK.de.md: ")
+    assert not file_in(config, "de").exists()
 
 
 # ── base: the platform's WORKBOOK is translated too, though it is no module of the store ─────────
@@ -514,14 +675,26 @@ def test_translate_sends_the_user_part_with_the_fixed_instructions_to_the_config
     key(environment="sk-ant-test-environment")
     fake = fake_client()
 
-    assert translate_workbooks.translate(USER_PART) == ENGLISH
+    assert translate_workbooks.translate(USER_PART, "en") == ENGLISH
 
     [call] = fake.streams
     assert call["model"] == "claude-test-model"
-    assert call["system"] == translate_workbooks.INSTRUCTIONS
+    assert call["system"] == translate_workbooks.instructions("en")
     assert call["messages"] == [{"role": "user", "content": USER_PART}]
-    for rule in ("image paths", "code", "identifiers", "#"):
-        assert rule in translate_workbooks.INSTRUCTIONS
+    for rule in ("image paths", "code", "identifiers", "#", "from Spanish into English", "its English translation"):
+        assert rule in call["system"]
+
+
+def test_translate_asks_for_the_language_by_its_name_in_the_hub(fake_client, key, german):
+    key(environment="sk-ant-test-environment")
+    fake = fake_client()
+
+    translate_workbooks.translate(USER_PART, german)
+
+    [call] = fake.streams
+    for asked in ("from Spanish into Deutsch", "its Deutsch translation", "as the Deutsch app shows them"):
+        assert asked in call["system"]
+    assert "English" not in call["system"] and "{" not in call["system"]
 
 
 @pytest.mark.parametrize("stop_reason", ["max_tokens", "refusal"])
@@ -529,14 +702,14 @@ def test_translate_never_returns_a_cut_or_refused_answer(fake_client, key, stop_
     key(environment="sk-ant-test-environment")
     fake_client(stop_reason=stop_reason)
     with pytest.raises(CommandError, match=stop_reason):
-        translate_workbooks.translate(USER_PART)
+        translate_workbooks.translate(USER_PART, "en")
 
 
 def test_translate_reports_an_api_failure(fake_client, key):
     key(environment="sk-ant-test-environment")
     fake_client(error=anthropic.APIConnectionError(request=None))
     with pytest.raises(CommandError, match="Claude API"):
-        translate_workbooks.translate(USER_PART)
+        translate_workbooks.translate(USER_PART, "en")
 
 
 @pytest.mark.parametrize(
@@ -556,6 +729,6 @@ def test_the_key_reaches_the_client_from_the_environment_or_the_checkouts_env_fi
     key(**sources)
     fake = fake_client()
 
-    translate_workbooks.translate(USER_PART)
+    translate_workbooks.translate(USER_PART, "en")
 
     assert fake.clients == [{"api_key": expected}]
