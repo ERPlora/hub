@@ -21,6 +21,7 @@ from base.tenancy.context import current, use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_session_revoke import ANA, OLGA, alive, login
 from control.models import HubVisit
+from control.tests.conftest import events
 
 pytestmark = HUB_DB
 
@@ -95,6 +96,7 @@ def test_renaming_it_changes_its_name_alone_in_its_row(own):
     after = Hub.objects.filter(pk=own.pk).values().get()
     assert (renamed.pk, renamed.slug) == (own.pk, "erp")
     assert {**after, "updated_at": None} == {**before, "slug": "erp", "updated_at": None}
+    assert events("base.hub.registered") == [{"id": str(own.pk), "slug": "erp", "created": False}]
 
 
 def test_its_database_opens_under_the_new_name_as_before(own):

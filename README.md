@@ -133,7 +133,8 @@ salto del personal. Los demás reservados responden 404, también `erplora`, el 
 (`base.hub.register`: 422 `base.slug_invalid` por su nombre, 409 `base.platform_hub_kept` por su id), lo da de baja ni lo
 vacía (409 `base.platform_hub_kept` en `base.hub.cancel` y `base.hub.reset`). Su fila nace con
 `create_platform_hub --execute` y solo cambia de nombre con `create_platform_hub --rename --execute` (sin `--execute`, un
-ensayo): ni su id, ni su BD, ni lo que guarda. Mientras la fila conserva el nombre anterior
+ensayo), como cualquier cambio de dirección («Cambio de dirección web», abajo): su id y su BD siguen, van con él sus
+personas, quién entró y sus apps, y acaban las sesiones abiertas con el nombre anterior. Mientras la fila conserva el nombre anterior
 (`PLATFORM_HUB_FORMER_SLUG`), el Hub la trata como el mismo negocio y sus facturas siguen entrando, pero ningún host lo
 abre. El renombrado, en este orden:
 

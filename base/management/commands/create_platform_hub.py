@@ -15,10 +15,12 @@ prod: production, pre: testing), always through their operations, as the system 
 VeriFactu are always active on it.
 
 A row already there is never made twice, whatever its name: one under the name it had before (``erplora``,
-``PLATFORM_HUB_FORMER_SLUG``) keeps it and works under it, and ``--rename`` gives it ``PLATFORM_HUB_SLUG``. Only its name
-in the registry changes; run with ``PLATFORM_HUB_SLUG`` set to the former name, ``--rename`` undoes it. It is a step of
-its own, for when every task runs a release that knows both names and erplora.com's gateway takes both (the hub is named
-to it by its slug, and a record it refuses is not sent again by itself).
+``PLATFORM_HUB_FORMER_SLUG``) keeps it and works under it, and ``--rename`` gives it ``PLATFORM_HUB_SLUG`` as any business
+changes its address (``base.hub.platform_rename``): its people, who came in and its apps go with it, the sessions opened
+under the former name end, and its id and its database stay. Run with ``PLATFORM_HUB_SLUG`` set to the former name,
+``--rename`` undoes it. It is a step of its own, for when every task runs a release that knows both names and
+erplora.com's gateway takes both (the hub is named to it by its slug, and a record it refuses is not sent again by
+itself).
 
 In AWS it runs once per environment as a one-off ECS task of the ``worker`` family, which has the migrator's credentials
 to make the database (WORKBOOK of invoice; runbook ``knowledge/wiki/runbooks/cut-shared-hubs-prod.md``). The command
@@ -33,6 +35,7 @@ from live.context import Scope, system_context
 from live.errors import OperationError
 from live.operations import get as get_operation
 
+from base.registry import REGISTRY_SCOPE
 from base.services import platform_hub, provisioning
 from base.tenancy import provision
 from base.tenancy.context import use_control, use_hub
@@ -111,9 +114,10 @@ class Command(BaseCommand):
         if not execute:
             self.stdout.write(f"- would rename its row from {hub.slug} to {slug}")
             return hub
-        renamed = platform_hub.platform_hub_renamed(hub.pk, slug)
-        self.stdout.write(f"- its row was renamed from {hub.slug} to {slug}")
-        return renamed
+        self._call(system_context(REGISTRY_SCOPE), "base.hub.platform_rename", {"id": str(hub.pk)})
+        self.stdout.write(f"- its row was renamed from {hub.slug} to {slug}, what is kept under it along with it")
+        with use_control():
+            return provisioning.registry_row(hub.pk)
 
     def _made(self, slug: str):
         """Its row (``is_platform``) and its own database, made now as a sign-up's (the SaaS is not told)."""

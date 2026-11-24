@@ -4970,6 +4970,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.location.list` | ninguno: solo el asistente y la API |
 | `base.hub.cut_finish` | ninguno: `manage.py cut_shared_hubs` y el migrador, al dar a un negocio su propia base de datos |
 | `base.hub.by_slugs`, `base.hub.seed_local` | ninguno: `manage.py seed_local_hubs`, solo en desarrollo |
+| `base.hub.platform_rename` | ninguno: `manage.py create_platform_hub --rename`, el nombre del negocio propio de ERPlora |
 
 ## Lo que queda fuera
 
