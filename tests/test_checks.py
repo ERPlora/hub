@@ -18,6 +18,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from allow_list_base import comparison_point, git
+from test_guardrails_lint import PYTHON
+from test_guardrails_ruff import NOQA_MARKERS, family_codes
 
 REPO = Path(__file__).resolve().parent.parent
 #: The checkout with the node_modules and packages/ui the frontend checks borrow: this one, or the one that lends them
@@ -127,12 +130,31 @@ def test_fast_passes_on_this_tree(head_tree):
     assert done.returncode == 0, done.stdout[-4000:] + done.stderr[-2000:]
 
 
+def f401_markers(tree: Path, commit: str) -> int:
+    found = git(tree, "grep", "-h", "-o", "-E", NOQA_MARKERS, commit, "--", *PYTHON)
+    assert found.returncode == 0, found.stderr
+    return family_codes(found.stdout.splitlines())["F401"]
+
+
+def silenced_imports(tree: Path) -> tuple[str, str]:
+    """Unused imports that silence F401 once more than where the branch left origin/main, and how they are reported.
+    The markers of a rule are counted over the whole repository, so a branch that removed some may add as many: the
+    probe adds those and one more."""
+    left, head = f401_markers(tree, comparison_point(tree)), f401_markers(tree, "HEAD")
+    planted = max(left - head, 0) + 1
+    # Spelled apart so that this file carries no noqa marker of its own.
+    text = "".join(f"import os as unused_{line}  " + "#" + " noqa: F401\n" for line in range(planted))
+    return text, f"F401: {head + planted} exceptions, {left} where the branch left origin/main"
+
+
 def test_fast_fails_naming_the_file_and_the_reason_of_every_check(head_tree):
-    for path, text in BREAKS.items():
+    imports, one_more = silenced_imports(head_tree)
+    for path, text in {**BREAKS, "apps/demo/silenced_imports.py": imports}.items():
         (head_tree / path).write_text(text, encoding="utf-8")
     done = checks(head_tree, "fast", "HEAD")
     assert done.returncode == 1, done.stdout[-4000:] + done.stderr[-2000:]
-    missing = [check for check, report in REPORTS.items() if report not in done.stdout]
+    reports = {**REPORTS, "one more noqa marker of a rule that has some": one_more}
+    missing = [check for check, report in reports.items() if report not in done.stdout]
     assert missing == [], done.stdout[-8000:]
 
 
