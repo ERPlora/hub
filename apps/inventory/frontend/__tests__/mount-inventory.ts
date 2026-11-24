@@ -176,6 +176,7 @@ export function product(overrides: Record<string, unknown> = {}) {
     tracks_stock: true,
     is_active: true,
     is_sold_out: false,
+    show_on_website: true,
     category_ids: [],
     allergens: [],
     created_at: '2026-10-13T10:00:00Z',

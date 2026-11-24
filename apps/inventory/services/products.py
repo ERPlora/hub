@@ -112,6 +112,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         tax_category=tax_category,
         track_stock=None if data.product_type == Product.Type.SERVICE else data.track_stock,
         is_active=data.is_active,
+        show_on_website=data.show_on_website,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
     )

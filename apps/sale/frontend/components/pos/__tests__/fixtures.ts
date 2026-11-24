@@ -27,6 +27,7 @@ export const product = (over: Partial<ProductOut> = {}): ProductOut => ({
   track_stock: null,
   tracks_stock: false,
   is_active: true,
+  show_on_website: true,
   category_ids: [],
   allergens: [],
   created_at: '2026-10-01T10:00:00Z',

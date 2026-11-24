@@ -4,7 +4,7 @@ before one of them still gives its products back, without it."""
 from base.recovery import held_in_copy
 
 #: Each a column of the product that ``inventory.product.recover`` takes, newer than the declaration's ``reads_since``.
-LATER_PRODUCT_FIELDS = ("allergens",)
+LATER_PRODUCT_FIELDS = ("allergens", "show_on_website")
 
 
 def later_product_fields(conn, table: str) -> tuple[str, ...]:

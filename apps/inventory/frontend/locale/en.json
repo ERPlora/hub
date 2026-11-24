@@ -77,6 +77,8 @@
         "edit": "Edit",
         "soldOut": "Mark sold out",
         "backOnSale": "Put back on sale",
+        "hideFromWebsite": "Hide from website",
+        "showOnWebsite": "Show on website",
         "delete": "Delete",
         "printLabel": "Print barcode"
       },
@@ -93,7 +95,10 @@
       },
       "photo": "Photo",
       "allergens": "Allergens",
-      "noAllergens": "No allergens declared"
+      "noAllergens": "No allergens declared",
+      "website": "Website",
+      "websiteShown": "Shown",
+      "websiteHidden": "Hidden"
     },
     "form": {
       "newTitle": "New product",
@@ -116,6 +121,8 @@
       "trackStock": "Track stock for this item",
       "trackInherit": "Following the hub setting",
       "trackOff": "Catalog only: sales do not move its stock",
+      "showOnWebsite": "Show on website",
+      "showOnWebsiteOff": "Your website’s catalog leaves it out; the till still sells it.",
       "unit": "Unit of measure",
       "categories": "Categories",
       "categoriesSearch": "Search a category to add",

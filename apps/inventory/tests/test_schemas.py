@@ -134,6 +134,7 @@ def test_product_in_defaults():
         "track_stock": None,
         "category_ids": [],
         "is_active": True,
+        "show_on_website": True,
     }
 
 
