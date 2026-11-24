@@ -1405,9 +1405,9 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, y una app ya puede declarar su
-paso en el cobro, pero Ventas todavía no pregunta esos pasos y rechaza siempre lo añadido, la hoja Cobro no los pinta y
-el Documento de venta no enseña lo añadido (hub#1497, hub#1500, hub#1502)
+Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, y Ventas ya dice qué pasos
+añaden al cobro las apps encendidas y acepta lo añadido solo cuando quien cobra tiene alguno, pero la hoja Cobro todavía
+no los pinta y el Documento de venta no enseña lo añadido (hub#1500, hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
@@ -1428,9 +1428,10 @@ lleva IVA (ver «Por qué la propina no entra en el tique» en el manual de Prop
 cobro, lo cobrado de más y su nombre, para cuadrar lo entregado y el cambio y para el papel, y el aviso de venta
 cobrada lo lleva aparte; las cifras de **Ventas** (SALE-F28) no lo suman. Lo suyo lo guarda la app del paso
 (TIP-F02).
-Si falla: sin ninguna app encendida que añada un paso al cobro, un cobro que trae un importe añadido (por la API o
-el asistente) no cobra: «Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la
-venta.». Si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
+Si falla: sin ninguna app encendida que añada un paso al cobro de quien cobra, un cobro que trae un importe añadido
+(por la API o el asistente) no cobra: «Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la
+venta.»; si la app está encendida pero quien cobra no tiene permiso para su paso, «No tienes permiso para añadir nada
+al cobro, como una propina: cobra solo la venta.». Si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
 cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
 «Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06), y esa misma
 clave con otro importe añadido es otro cobro: «Esa clave de intento ya se usó para otro cobro. Vuelve a abrir el
@@ -1577,6 +1578,7 @@ atribuyeron. Una que no ve no existe para ella (404 `sale.sale_not_found`).
 | Lo vendido cada uno de los últimos 7 días | ver ventas | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | ver ventas | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
+| Los pasos que añaden al cobro las apps encendidas, los que ve quien cobra y en su orden: de qué app es cada uno y qué parte suya lo pinta; sin ninguno, el cobro no acepta nada añadido | cobrar | F39 | `sale.checkout.steps` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
@@ -2000,7 +2002,7 @@ es una línea.
   son los del asistente (`assistant-icons.ts`). El TPV pasa a la disposición del
   móvil también cuando su propia caja mide menos de 700 px (`NARROW_TILL` de `PosPage.vue`): el panel
   acoplado desde 768 px dejaba la columna del catálogo en unos 90 px en una tableta de 834. Tests:
-  `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y
+  `SpeakKey.test.ts`, `PosPage.phone.test.ts` y las e2e `tests/e2e/sale-speak.spec.ts` y
   `tests/e2e/sale-speak-microphone.spec.ts` (el micrófono denegado: Chrome lo bloquea con una opción de
   lanzamiento, así que va en un fichero propio).
 - **El atrás del sistema** (BASE-F05, hub#302): las hojas de Ionic
@@ -2013,7 +2015,7 @@ es una línea.
   Solo cuentan las capas de la pantalla a la vista: otra app abierta desde ⠿ con el cajón o el ⋮ abiertos deja el TPV
   montado debajo (Ionic lo oculta con `ion-page-hidden`), y esa capa no se queda el atrás de la pantalla de encima.
   Una capa propia nueva del TPV se suma con `useSystemBack(abierta, cerrar)`. Tests: `useSystemBack.test.ts`,
-  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e
+  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.phone.test.ts` y la e2e
   `tests/e2e/sale-pos-system-back.spec.ts` (el puente de la app simulado como en `shell-nav.spec.ts`).
 
 ### Lo que la ventana de ayuda no enseña
@@ -2233,7 +2235,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
-  (SALE-F39, que leerá los pasos de las apps activas con una consulta `sale.checkout.steps` que aún no existe), las
+  (SALE-F39, que lee los pasos de las apps encendidas con la consulta `sale.checkout.steps`), las
   dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
 - **Los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos del plato y la alergia

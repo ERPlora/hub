@@ -12,6 +12,7 @@ valuation of a charge (``pricing.value`` over tax's closing), shared by the prev
 from . import (
     business as business,
     checkout as checkout,
+    checkout_steps as checkout_steps,
     departments as departments,
     figures as figures,
     letterhead as letterhead,

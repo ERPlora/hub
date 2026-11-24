@@ -89,6 +89,8 @@ class AppRefOut(Schema):
 
     id: str
     name: str
+    #: What it is for, as the Apps screen says it (``AppOut.summary``).
+    summary: str
     state: Literal["on", "off", "blocked", "creating", "failed"]
     mandatory: bool
 

@@ -14,17 +14,26 @@ from .test_recovery import direct
 
 
 @HUB_DB
-def test_a_copy_made_since_products_have_allergens_holds_them():
-    assert copy_columns.later_product_fields(direct(), Product._meta.db_table) == ("allergens",)
+def test_a_copy_made_today_holds_every_later_field():
+    assert copy_columns.later_product_fields(direct(), Product._meta.db_table) == ("allergens", "show_on_website")
 
 
 @HUB_DB
 def test_a_copy_made_before_products_had_allergens_holds_none_of_the_later_fields():
     with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
-        cursor.execute("ALTER TABLE inventory_product DROP COLUMN allergens")
+        cursor.execute("ALTER TABLE inventory_product DROP COLUMN allergens, DROP COLUMN show_on_website")
 
     assert copy_columns.later_product_fields(direct(), Product._meta.db_table) == ()
+
+
+@HUB_DB
+def test_a_copy_made_before_products_could_be_hidden_from_the_website_holds_their_allergens_alone():
+    with connections[current_alias()].cursor() as cursor:
+        # Undone with the test's transaction.
+        cursor.execute("ALTER TABLE inventory_product DROP COLUMN show_on_website")
+
+    assert copy_columns.later_product_fields(direct(), Product._meta.db_table) == ("allergens",)
 
 
 def test_each_later_field_came_after_the_migration_the_products_recovery_reads_since():
@@ -33,4 +42,4 @@ def test_each_later_field_came_after_the_migration_the_products_recovery_reads_s
 
     # One the declared migration already holds is no later field: it is read with the rest, or the copy is refused.
     assert not later & fields_held_since("inventory", "product", products.reads_since)
-    assert later <= fields_held_since("inventory", "product", "0006_product_allergens")
+    assert later <= fields_held_since("inventory", "product", "0007_product_show_on_website")

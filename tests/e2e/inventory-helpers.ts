@@ -26,6 +26,7 @@ export interface Product {
   needs_tax_setup: boolean;
   is_active: boolean;
   is_sold_out: boolean;
+  show_on_website: boolean;
   category_ids: string[];
   allergens: string[];
 }

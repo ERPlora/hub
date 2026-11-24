@@ -188,6 +188,14 @@ describe('ProductDetailModal', () => {
     expect(device.printLabel).not.toHaveBeenCalled();
   });
 
+  it('INVENTORY-F36: says whether the website shows it', async () => {
+    const s = await setup();
+    expect([s.el('inventory-product-detail-website')?.querySelector('ion-label')?.textContent?.trim(), s.value('website')]).toEqual(['Website', 'Shown']);
+    unmount(s);
+    const hidden = await setup({ product: product({ show_on_website: false }) }, { locale: 'es' });
+    expect([hidden.el('inventory-product-detail-website')?.querySelector('ion-label')?.textContent?.trim(), hidden.value('website')]).toEqual(['Página web', 'Oculto']);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ product: product({ is_active: false, allergens: ['milk', 'gluten'] }) }, { locale: 'es' });
     expect(s.value('allergens')).toBe('Gluten, Leche');

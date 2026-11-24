@@ -21,26 +21,11 @@ from apps.inventory.models import ProductCategory
 from apps.inventory.queries.reads import find_category, find_product
 from apps.inventory.queries.recovery import categories_standing_for, category_names_in_copy, products_standing_for
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
-from apps.modifier.schemas import (
-    CategoryRefIn,
-    CategoryRefOut,
-    GroupListIn,
-    GroupOut,
-    GroupRefIn,
-    LinkDetailOut,
-    LinkListIn,
-    LinkOut,
-    LinkRefIn,
-    OptionDetailOut,
-    OptionListIn,
-    OptionOut,
-    OptionRefIn,
-    Page,
-    ResolveIn,
-    ResolveOut,
-    TargetIn,
-    TargetOut,
-)
+from apps.modifier.schemas.fields import Page
+from apps.modifier.schemas.groups import GroupListIn, GroupOut, GroupRefIn
+from apps.modifier.schemas.links import CategoryRefIn, CategoryRefOut, LinkDetailOut, LinkListIn, LinkOut, LinkRefIn
+from apps.modifier.schemas.options import OptionDetailOut, OptionListIn, OptionOut, OptionRefIn
+from apps.modifier.schemas.till import ResolveIn, ResolveOut, TargetIn, TargetOut
 from apps.tax.models import TaxCategory
 from base.ordering import list_order, list_order_for
 from base.recovery import at_work, brought_back

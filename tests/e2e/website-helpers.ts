@@ -2,6 +2,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, hostPage, type Registration, registerBusinessIn, registrationOf, settled } from './helpers';
+import { cleanInventory } from './inventory-helpers';
 
 /** The site as `GET /website/site` answers it: what a spec puts back after. */
 export interface Site {
@@ -9,6 +10,32 @@ export interface Site {
   theme: Record<string, unknown>;
   content: Record<string, Record<string, unknown>>;
   is_live: boolean;
+}
+
+/** `found`'s site saved with its catalog showing Inventory's `categoryIds` with their prices, and published. */
+export async function publishWithMenuOf(context: BrowserContext, found: Site, categoryIds: string[]): Promise<void> {
+  const catalog = { hidden: false, title: '', source: 'inventory', category_ids: categoryIds, show_prices: true };
+  const content = { ...found.content, catalog };
+  const saved = await api(context, A, 'POST', '/website/site', { template: 'classic', theme: found.theme, content });
+  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
+  const published = await api(context, A, 'POST', '/website/site/publish');
+  expect(published.status, JSON.stringify(published.data)).toBe(200);
+}
+
+/** After a spec that published `a`'s site with its menu, also when a test failed: the site back as `found` and offline,
+ *  then `also`, the E2E products gone and the owner's browser closed. */
+export async function menuSpecDone(
+  owner: { context: BrowserContext } | undefined,
+  found: Site | undefined,
+  also: () => void = () => undefined,
+): Promise<void> {
+  try {
+    if (owner && found) await siteBackOffline(owner.context, found);
+  } finally {
+    also();
+    cleanInventory();
+    await owner?.context.close();
+  }
 }
 
 /** The owner of `a` on the website's editor at `viewport`, and the site as the run finds it. */
