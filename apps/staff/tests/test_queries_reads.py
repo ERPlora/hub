@@ -46,4 +46,6 @@ def test_an_ambiguous_name_names_the_candidates():
 
 def test_an_unknown_name_is_not_found():
     with pytest.raises(NotFound):
+        run("staff.member.detail", MemberRefIn(member="Nobody"))
+    with pytest.raises(NotFound):
         resolve_member(None, "Nobody")

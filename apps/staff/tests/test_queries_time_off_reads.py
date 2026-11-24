@@ -38,8 +38,9 @@ def test_time_off_detail_with_its_reason_and_approver(make_user):
 def test_time_off_detail_names_an_approver_without_a_name_by_username(make_user):
     leave = make_time_off(make_member(), "2026-10-12", approved_by=make_user("saas:42").person)
     assert (
-        load_time_off(leave.id).approved_by_name == "saas:42"
+        run("staff.time_off.detail", ByIdIn(id=leave.id)).approved_by_name == "saas:42"
     )
+    assert load_time_off(leave.id).approved_by_name == "saas:42"
 
 
 def test_time_off_detail_of_a_missing_or_terminated_record_is_not_found():
