@@ -1979,11 +1979,6 @@ msgstr "«%(said)s» coincide con varias apps: %(names)s. Di cuál."
 
 #: base/services.py
 #, python-format
-msgid "%(first)s and %(last)s"
-msgstr "%(first)s y %(last)s"
-
-#: base/services.py
-#, python-format
 msgid "Turn off %(apps)s first."
 msgstr "Desactiva antes %(apps)s."
 

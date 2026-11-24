@@ -11,13 +11,11 @@ import {
   canTurnOff,
   canTurnOn,
   comesWith,
-  goesOffWith,
   includedWith,
   offFirst,
   sellsApart,
   tabOf,
   TAB_HASH,
-  turnsOnWith,
 } from './apps';
 
 const TAX = app('tax', { name: 'Taxes', required_by: ['invoice'] });
@@ -110,29 +108,6 @@ describe('turning an app on or off', () => {
       ['verifactu', false, false],
       ['flow', false, false],
     ]);
-  });
-
-  it('names what turns on with an app: what it needs that is off, by name', () => {
-    const off = [{ ...SALE, state: 'off' as const, chosen: false }, { ...TAX_, state: 'off' as const }, CUSTOMER_];
-    expect(turnsOnWith(off[0], off)).toEqual(['Taxes']);
-    expect(turnsOnWith(TASK, ON)).toEqual([]);
-  });
-
-  it('names what goes off with an app: what came along with it and nothing else on needs', () => {
-    expect(goesOffWith(SALE, ON)).toEqual(['Customers', 'Taxes']);
-    const chosenTax = { ...TAX_, chosen: true };
-    expect(goesOffWith(SALE, [SALE, chosenTax, CUSTOMER_])).toEqual(['Customers']);
-    const invoice = app('invoice', { name: 'Invoicing', requires: ['customer', 'sale', 'tax'] });
-    const needed = [SALE, { ...TAX_, required_by: ['invoice', 'sale'] }, { ...CUSTOMER_, required_by: ['invoice', 'sale'] }, invoice];
-    expect(goesOffWith(invoice, needed)).toEqual([]);
-  });
-
-  it('never names one the business’s country requires on: it stays on, as the server keeps it (hub#997)', () => {
-    const mandatoryTax = { ...TAX_, mandatory: true };
-    expect(goesOffWith(SALE, [SALE, mandatoryTax, CUSTOMER_, TASK])).toEqual(['Customers']);
-    // One that could not be set up binds nothing yet: it goes with the app it came with.
-    const failedTax = { ...TAX_, mandatory: true, state: 'failed' as const };
-    expect(goesOffWith(SALE, [SALE, failedTax, CUSTOMER_, TASK])).toEqual(['Customers', 'Taxes']);
   });
 
   it('names the apps to turn off first: the chosen ones on that need it, else every one that does', () => {

@@ -30,13 +30,21 @@ vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/a
 
 freshEachTest();
 
-// sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off).
-const SALE = app('sale', { name: 'Sales', requires: ['customer'] });
+// sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off). What else
+// each switch changes is the list's to say (`along_said`), as the assistant's card says it.
+const SALE = app('sale', { name: 'Sales', requires: ['customer'], along_said: 'Customers turns off with it: only Sales needed it.' });
 const CUSTOMER = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
 const TASK = app('task', { name: 'Tasks' });
 const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
 const SCHEDULE = app('schedule', { name: 'Schedules', state: 'off', chosen: false, path: null });
-const BOOKING = app('booking', { name: 'Bookings', state: 'off', chosen: false, path: null, requires: ['schedule'] });
+const BOOKING = app('booking', {
+  name: 'Bookings',
+  state: 'off',
+  chosen: false,
+  path: null,
+  requires: ['schedule'],
+  along_said: 'Bookings needs Schedules: it turns on with it.',
+});
 const APPS: AppList = {
   apps: [SALE, CUSTOMER, TASK, FLOW, SCHEDULE, BOOKING, STOCK],
   country_name: 'Spain',
@@ -75,8 +83,10 @@ describe('the switch of an app', () => {
 
     const asked = confirmSpy.mock.calls[0][0];
     expect([asked.title, asked.tone]).toEqual(['Turn off Sales?', 'danger']);
-    expect(asked.message).toContain('Customers');
-    expect(asked.message).toContain('Nothing is deleted');
+    expect(asked.message).toBe(
+      'It leaves the menu for everyone in this business. Nothing is deleted: turned on again, it has its data. ' +
+        'Customers turns off with it: only Sales needed it.',
+    );
     expect(posted(m)).toEqual([['/api/apps/disable', { app: 'sale' }]]);
     expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Sales is off. Also turned off: Customers.');
     expect(sessionChanged).toHaveBeenCalledTimes(1);
@@ -173,6 +183,31 @@ describe('the switch of an app', () => {
     expect([asked.title, asked.message]).toEqual(['Turn on Bookings?', 'Bookings needs Schedules: it turns on with it.']);
     expect(posted(m)).toEqual([['/api/apps/enable', { app: 'booking' }]]);
     expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Bookings is on. Also turned on: Schedules.');
+  });
+
+  it('says what else its switch changes as the list says it, never working it out from what each app needs', async () => {
+    confirmSpy.mockResolvedValue(false);
+    // The server reads what the rows do not show: here Tasks comes along with Printing (one whose tables failed to be
+    // made comes along again), and Customers stays when Kitchen goes off (the business's country keeps it on).
+    const PRINTING = app('printing', {
+      name: 'Printing',
+      state: 'off',
+      chosen: false,
+      path: null,
+      requires: ['task'],
+      along_said: 'Printing needs Tasks: it turns on with it.',
+    });
+    const KITCHEN = app('kitchen', { name: 'Kitchen', requires: ['customer'], along_said: '' });
+    const KEPT = app('customer', { name: 'Customers', chosen: false, required_by: ['kitchen'] });
+    const m = await open('/apps#all');
+    await m.result(m.call, 'base.app.list', { ...APPS, apps: [TASK, KEPT, PRINTING, KITCHEN] });
+    await flip(m, 'printing', true);
+    expect(confirmSpy.mock.calls[0][0].message).toBe('Printing needs Tasks: it turns on with it.');
+    await flip(m, 'kitchen', false);
+    expect(confirmSpy.mock.calls[1][0].message).toBe(
+      'It leaves the menu for everyone in this business. Nothing is deleted: turned on again, it has its data.',
+    );
+    expect(posted(m)).toEqual([]);
   });
 
   it('while one change is sent its switch waits with a spinner and no other can start; a failure says so and puts it back', async () => {

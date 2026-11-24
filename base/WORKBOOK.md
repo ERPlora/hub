@@ -3746,10 +3746,12 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.apps.app_off_refusal` pone el motivo
   propio de la app por delante del de las que la necesitan, porque desactivarlas no la apagaría. `base.app.list` trae
   `mandatory` por app y `country_name` (CLDR, `business.country_name`), y Apps pinta «Obligatoria en {país}» con un
-  `StatusPill` de `@erplora/ui` junto al estado; `lib/apps.ts` `goesOffWith` deja fuera la obligatoria encendida,
-  como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
-  reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
-  `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
+  `StatusPill` de `@erplora/ui` junto al estado. Lo que se va o llega con una app lo dice cada fila de `base.app.list`
+  (`along_said`, de `base/app_switch.py`, la misma frase que la tarjeta del asistente), que deja fuera la obligatoria
+  encendida. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs reales),
+  `test_app_switch.py`, `test_assistant_app_cascade.py`, `test_queries_apps.py`,
+  `apps/verifactu/tests/test_app_disable.py`, `pages/AppsPage.test.ts` y las e2e
+  `tests/e2e/base-app-activation.spec.ts` y `tests/e2e/base-assistant-app-card.spec.ts`.
   Al alta nacen encendidas (hub#997, parte 3; BASE-F63, F14, F01): `activation.born_on(país)` da las obligatorias del
   país que dicen `platform_turns_on`, y `activation.born_apps(país)` les suma lo que necesitan. `provision._prepare` hace
   sus tablas en `migrating` (junto a las del vertical) y, en `seeding`, tras la semilla y antes de la foto del SaaS

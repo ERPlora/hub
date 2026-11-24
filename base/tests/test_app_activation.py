@@ -413,15 +413,32 @@ def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
     from base import assistant
 
     set_rows()
-    for name in ("base.app.enable", "base.app.disable"):
-        card = assistant.cards.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
-        assert [(field["name"], field["value"]) for field in card["fields"] if field["name"] == "app"] == [
-            ("app", "Reservas online")
-        ]
-        card = assistant.cards.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
-        assert [(field["name"], field["value"]) for field in card["fields"] if field["name"] == "app"] == [
-            ("app", "Reservations")
-        ]
+
+    def card(name, app, language):
+        shown = assistant.cards.card(get(name), {"app": app}, language, ctx(language=language))
+        return [(field["name"], field["value"]) for field in shown["fields"]]
+
+    assert card("base.app.enable", "online_booking", "es") == [
+        ("app", "Reservas online"),
+        ("along", "Reservas online necesita Citas, Clientes, Horarios, Impuestos, Personal y Servicios: se activan con ella."),
+    ]
+    assert card("base.app.disable", "online_booking", "es") == [("app", "Reservas online")]
+    assert card("base.app.enable", "reservas", "en") == [
+        ("app", "Reservations"),
+        ("along", "Reservations needs Customers, Sales & POS, Schedules, Tables, and Taxes: they turn on with it."),
+    ]
+    assert card("base.app.disable", "reservas", "en") == [("app", "Reservations")]
+
+
+@HUB_DB
+def test_the_apps_to_turn_off_first_are_named_as_the_screen_joins_them():
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    set_rows(customer="on", tax="on*", sale="on*", table="on*", invoice="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("customer")
+
+    assert refused.value.message == "Turn off Invoicing, Sales & POS, and Tables first."
 
 
 @HUB_DB

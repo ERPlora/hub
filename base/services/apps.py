@@ -19,7 +19,7 @@ from functools import partial
 from typing import Any
 
 from django.utils import timezone, translation
-from django.utils.translation import gettext, ngettext, ngettext_lazy, pgettext_lazy
+from django.utils.translation import gettext, ngettext, pgettext_lazy
 from live.context import OperationContext
 from live.errors import Conflict, NotFound, OperationError
 from live.meta import module_configs
@@ -27,7 +27,7 @@ from live.operations import on_commit as after_commit
 from live.operations import operation
 from live.outbox import record_event
 
-from base import activation, blueprint, entitlement, events, home, queries
+from base import activation, app_switch, blueprint, entitlement, events, home, listing, queries
 from base.activation import CREATING, FAILED
 from base.models.activation import AppActivation
 from base.models import Hub
@@ -40,17 +40,6 @@ from base.tenancy import migrator
 
 #: What the card of turning on an app the business's country requires calls its reason for never going off.
 ONCE_ON = pgettext_lazy("base", "Once on")
-#: What the card of turning an app on or off calls the apps that go on or off with it, and how it says them: as the
-#: Apps screen's dialog does (``base.appsPage.confirmOn.message`` and ``confirmOff.along`` of its catalogue).
-ALONG = pgettext_lazy("base", "Other apps")
-TURNS_ON_WITH = ngettext_lazy(
-    "%(app)s needs %(apps)s: it turns on with it.", "%(app)s needs %(apps)s: they turn on with it.", "count"
-)
-TURNS_OFF_WITH = ngettext_lazy(
-    "%(apps)s turns off with it: only %(app)s needed it.",
-    "%(apps)s turn off with it: only %(app)s needed them.",
-    "count",
-)
 
 
 class AppLimitReached(OperationError):
@@ -202,12 +191,8 @@ def _named(ctx: OperationContext, labels: Iterable[str]) -> list[dict[str, str]]
 
 
 def _names_said(ctx: OperationContext, labels: list[str]) -> str:
-    """«A», «A and B», «A, B and C», in the language of who asks."""
-    with translation.override(ctx.language):
-        names = sorted((item["name"] for item in _named(ctx, labels)), key=str.casefold)
-        if len(names) == 1:
-            return names[0]
-        return gettext("%(first)s and %(last)s") % {"first": ", ".join(names[:-1]), "last": names[-1]}
+    """«A», «A and B», «A, B, and C», in the language of who asks, as the screens order and join them."""
+    return listing.joined(listing.ordered(item["name"] for item in _named(ctx, labels)), ctx.language)
 
 
 def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]], *, already: bool) -> dict:
@@ -225,25 +210,15 @@ def _card_app(ctx: OperationContext, arguments: dict) -> tuple[Hub | None, Any]:
         return hub, None
 
 
-def _along(ctx: OperationContext, config: Any, changes: dict, *, on: bool) -> list[dict]:
-    """The card's datum of the apps ``changes`` turns on (or off) with ``config``'s; none without any."""
-    along = [label for label in changes if label != config.label]
-    if not along:
-        return []
-    names = {"count": len(along), "app": str(config.verbose_name), "apps": _names_said(ctx, along)}
-    said = (TURNS_ON_WITH if on else TURNS_OFF_WITH) % names
-    return [{"name": "along", "label": str(ALONG), "kind": "text", "value": said}]
-
-
 def _enable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
-    """The card of turning an app on: the apps it needs that are off, which come along (``activation.enabling``), and,
-    for one the business's country requires, the reason the Apps screen gives why it never goes off: the person reads
-    both before the yes, not after it."""
+    """The card of turning an app on: the apps it needs that are off, which come along (``app_switch``), and, for one
+    the business's country requires, the reason the Apps screen gives why it never goes off: the person reads both
+    before the yes, not after it."""
     hub, config = _card_app(ctx, arguments)
     if config is None:
         return fields
-    changes = activation.enabling(config.label, activation.states_of(ctx.scope), activation.module_graph())
-    shown = [*fields, *_along(ctx, config, changes, on=True)]
+    others = app_switch.along(config.label, activation.states_of(ctx.scope), activation.module_graph(), on=True)
+    shown = [*fields, *app_switch.card_datum(app_switch.said(config.label, others, on=True, language=ctx.language))]
     country = hub.country if hub else ""
     if not home.mandatory_in(config, country):
         return shown
@@ -252,17 +227,16 @@ def _enable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> 
 
 
 def _disable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
-    """The card of turning an app off: what came along only with it goes off too (``activation.disabling``, never one
-    the business's country requires on). One another app on needs is only named: its yes is refused, saying which apps
-    go off first."""
+    """The card of turning an app off: what came along only with it goes off too (``app_switch``, never one the
+    business's country requires on). One another app on needs is only named: its yes is refused, saying which apps go
+    off first."""
     hub, config = _card_app(ctx, arguments)
     if config is None:
         return fields
-    current, graph = activation.states_of(ctx.scope), activation.module_graph()
-    if activation.required_by(config.label, current, graph):
-        return fields
+    current = activation.states_of(ctx.scope)
     kept = activation.mandatory_on(current, hub.country if hub else "")
-    return [*fields, *_along(ctx, config, activation.disabling(config.label, current, graph, kept), on=False)]
+    others = app_switch.along(config.label, current, activation.module_graph(), kept, on=False)
+    return [*fields, *app_switch.card_datum(app_switch.said(config.label, others, on=False, language=ctx.language))]
 
 
 @operation(
