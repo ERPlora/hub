@@ -19,6 +19,7 @@ from apps.verifactu import certificates
 from apps.verifactu.models import Config, Environment, OwnCertificate
 from apps.verifactu.tests.conftest import (
     HUB_DB,
+    ISSUER,
     A,
     accepted_by_the_aeat_of_testing,
     b64,
@@ -26,7 +27,13 @@ from apps.verifactu.tests.conftest import (
     make_p12,
     run,
 )
-from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, the_model_hears, turn_as
+from apps.verifactu.tests.test_assistant_cards import screen_words
+from base.tests.test_assistant_yes_for_its_card import (
+    no_card_but_the_model_hears,
+    the_model_hears,
+    turn_as,
+    yes_to_its_card,
+)
 from base.tests.test_services_assistant import call
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("offline")]
@@ -155,4 +162,46 @@ def test_with_nothing_missing_the_card_is_still_drawn(issuer, opened):
 
     assert plan["confirm"]["operation"] == GO_LIVE
     assert plan["executed"] == []
+    still_in_testing()
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_the_card_names_the_issuer_and_warns_there_is_no_way_back(issuer, opened, language):
+    """hub#2340: once nothing was missing, the card read «Go live in VeriFactu. Check each detail before you continue.»
+    with nothing under it, and only after a cancel did the assistant say there was no way back. It says, before the
+    word is typed, who files (Invoicing's issuer, as a record's detail names it) and what Settings warns before going
+    live: as soon as the first record is sealed it can no longer go back to testing."""
+    own_certificate(accepted=True)
+    detail, screen = screen_words(language, "detail"), screen_words(language)
+
+    fields = ask_to_go_live(language)["confirm"]["fields"]
+
+    assert [(field["name"], field["label"], field["kind"], field["value"]) for field in fields] == [
+        ("issuer_name", detail["issuer"], "text", ISSUER["legal_name"]),
+        ("issuer_nif", detail["issuerNif"], "text", ISSUER["tax_id"]),
+        ("environment", screen["environment"], "text", screen["goLiveMessage"]),
+    ]
+    still_in_testing()
+
+
+def test_the_yes_to_that_card_goes_live(issuer, opened):
+    own_certificate(accepted=True)
+
+    done = yes_to_its_card(ctx_for("hub_admin"), GO_LIVE, {})
+
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert Config.objects.get().environment == Environment.PRODUCTION
+
+
+def test_the_yes_goes_nowhere_when_the_issuer_it_named_changed_meanwhile(issuer, opened):
+    """The yes is for the issuer the card named: renamed in Invoicing before it, nothing runs and the card is anew."""
+    own_certificate(accepted=True)
+
+    def renamed():
+        run("invoice.issuer.update", {**ISSUER, "legal_name": "Peluquería Ana y Bea SL"})
+
+    done = yes_to_its_card(ctx_for("hub_admin"), GO_LIVE, {}, renamed)
+
+    assert done["executed"] == []
+    assert done["confirm"]["fields"][0]["value"] == "Peluquería Ana y Bea SL"
     still_in_testing()

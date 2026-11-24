@@ -117,7 +117,8 @@ def workbook(root: Path, language: str) -> tuple[str, str]:
     for candidate in dict.fromkeys((language, language.split("-")[0])):
         if candidate == SOURCE_LANGUAGE:
             break
-        body = _current(root / f"WORKBOOK.{candidate}.md", header) if _LANGUAGE.fullmatch(candidate) else None
+        path = root / catalog.WORKBOOK_TRANSLATION.format(candidate)
+        body = _current(path, header) if _LANGUAGE.fullmatch(candidate) else None
         if body is not None:
             return candidate, body
     return SOURCE_LANGUAGE, source

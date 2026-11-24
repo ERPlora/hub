@@ -175,6 +175,15 @@ describe('WaitlistPage', () => {
     expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Luis Pérez', '+34 600 333 444', '2', 'No', 'En espera']);
     expect(s.prop<{ add: string }>('labels').add).toBe('Añadir cliente');
   });
+
+  it('in Spanish, the converted notice writes the weekday in lower case inside its sentence (hub#2275)', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.result(OP, page([WAITING]));
+    s.answer(200, { entry: { ...WAITING, is_converted: true, reservation_id: 'r1' }, reservation: reservationRow() });
+    await s.action('convert', WAITING);
+    await flush();
+    expect(s.find('reservation-waitlist-outcome').text()).toBe('Ana García ya tiene reserva el jueves, 15 de octubre · 21:00.');
+  });
 });
 
 describe('WaitlistPage: the list fills the page', () => {

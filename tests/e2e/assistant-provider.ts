@@ -25,6 +25,7 @@
 //   named in it as `E2E-ASK` is only asked by the next question that hears the list (WHATSAPP_INBOX-F19: the guest's
 //   «the 2nd» comes with what the business last wrote them);
 // - `E2E-CLAIM`: says it created something without running anything;
+// - `E2E-LINK`: gives as its source a web address that nothing of the turn looked up;
 // - `E2E-DOWN`: the provider fails (500);
 // - `E2E-SLOW`: a long answer, piece by piece, to stop it half-way;
 // - anything else: a short greeting. A dictation is always `DICTATION` (below).
@@ -71,6 +72,10 @@ export const FORMAT_ANSWER: Said = {
   ].join('\n'),
 };
 export const CLAIM_ANSWER: Said = { en: 'Done: I created table 9 and saved it.', es: 'Listo: he creado la mesa 9 y la he guardado.' };
+export const LINK_ANSWER: Said = {
+  en: 'Takeaway food goes up to 21 % on 1 January: https://example.com/vat-rates',
+  es: 'La comida para llevar sube al 21 % el 1 de enero: https://example.com/tipos-iva',
+};
 /** What it says once a write's result comes back: it ran, or it did not (cancelled, refused or failed). */
 export const DONE: Said = { en: 'Done.', es: 'Hecho.' };
 export const NOT_DONE: Said = { en: 'I have not done it.', es: 'No lo he hecho.' };
@@ -338,6 +343,7 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
   if (named) return call(named[1], JSON.parse(named[2]) as Record<string, unknown>);
   if (question.includes('E2E-FORMAT')) return text(FORMAT_ANSWER[language]);
   if (question.includes('E2E-CLAIM')) return text(CLAIM_ANSWER[language]);
+  if (question.includes('E2E-LINK')) return text(LINK_ANSWER[language]);
   if (question.includes('E2E-DOWN')) return { status: 500, frames: [], delayMs: 0 };
   if (question.includes('E2E-SLOW')) return text(SLOW_ANSWER[language], 250);
   return text(GREETING[language]);

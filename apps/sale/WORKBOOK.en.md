@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:12fcdd967f11f882bb984b831c84e41cf54abb6dbbb9468012e25cbcc161f4e9 -->
+<!-- generated from WORKBOOK.md sha256:42ef32bbd0ecd68a80faaa4ceb80b634c673de172be98eedc2f0afba9a22f7c6 -->
 
 ## What it is for and who it is for
 
@@ -1402,9 +1402,9 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-Status: not done — the sale knows how to keep apart, in each payment, what another app adds, but today it always
-refuses it: no app can declare its step at the charge yet, the Charge sheet does not paint those steps and the Sale
-document does not show what was added (hub#1497, hub#1500, hub#1502)
+Status: not done — the sale knows how to keep apart, in each payment, what another app adds, and an app can already
+declare its step at the charge, but Sales does not ask for those steps yet and always refuses what is added, the
+Charge sheet does not paint them and the Sale document does not show what was added (hub#1497, hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager
 Screen: Charge, Sale document

@@ -4,6 +4,7 @@ photo, and ERPlora's own hub following its deployment."""
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import Conflict
 from live.operations import operation
@@ -12,7 +13,7 @@ from base import operations as platform
 from apps.verifactu.models import Environment, Record
 from apps.verifactu.queries.config import config_out
 from apps.verifactu.queries.going_live import refuse_going_live, refuse_on_the_platform_hub
-from apps.verifactu.queries.route import effective_environment, sending_route
+from apps.verifactu.queries.route import effective_environment, issuer_identity, sending_route
 from apps.verifactu.schemas.config import ConfigOut, ConfigSyncIn, ConfigSyncOut
 from apps.verifactu.schemas.fields import NoInput
 
@@ -24,6 +25,25 @@ PRODUCTION_HAS_RECORDS = _(
     "It cannot go back to testing: this business already has records in production."
 )
 PLATFORM_ONLY = _("Only ERPlora's own business follows the environment of its server.")
+# The words of VeriFactu's screens: a record's detail names its issuer so, and Settings warns so before going live.
+ISSUER = pgettext_lazy("assistant card", "Issuer")
+ISSUER_NIF = pgettext_lazy("assistant card", "Issuer tax ID")
+AEAT_ENVIRONMENT = pgettext_lazy("assistant card", "AEAT environment")
+NO_WAY_BACK = pgettext_lazy(
+    "assistant card",
+    "From now on every record goes to the real AEAT. As soon as the first one is sealed you can no longer go back to "
+    "testing.",
+)
+
+
+def _go_live_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The card of going live says, before the yes, who files and that there is no way back once a record is sealed."""
+    nif, name = issuer_identity()
+    return [
+        {"name": "issuer_name", "label": str(ISSUER), "kind": "text", "value": name},
+        {"name": "issuer_nif", "label": str(ISSUER_NIF), "kind": "text", "value": nif},
+        {"name": "environment", "label": str(AEAT_ENVIRONMENT), "kind": "text", "value": str(NO_WAY_BACK)},
+    ]
 
 
 @operation(
@@ -49,6 +69,7 @@ PLATFORM_ONLY = _("Only ERPlora's own business follows the environment of its se
                 "quiero remitir de verdad a la AEAT a partir de ahora",
             ),
         },
+        "summary": _go_live_summary,
     },
 )
 def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:

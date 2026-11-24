@@ -26,7 +26,8 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   hub;
 - ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
   ``creating``, ``migrating``, ``seeding`` or ``failed`` before), plus ``maintenance`` with control's active freeze
-  (``null`` when lifted); never where its database is nor part of the photo's monotonic ``state_version``;
+  (``null`` when lifted) and ``move_scheduled_for``, when the business's move asked for its night starts, in UTC
+  (``null`` without one); never where its database is or goes, nor part of the photo's monotonic ``state_version``;
 - ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202; a business with its own database is copied by the
   worker, ``offboarding``); ``POST /internal/hubs/{id}/restore`` → ``base.hub.restore`` (200; 409 ``hub_purged`` when
   it can never come back);

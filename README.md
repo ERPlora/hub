@@ -151,7 +151,7 @@ Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v
 | Ruta | Operación | Respuesta |
 |---|---|---|
 | `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged`, `base.platform_hub_kept` |
-| `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; nunca dónde está su BD; 404 |
+| `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; `maintenance`, la congelación activa de la plataforma (`null` sin ella), y `move_scheduled_for`, cuándo empieza el traslado del negocio pedido para su madrugada (un instante en UTC; `null` sin traslado, una vez arrancado o cancelado); nunca dónde está su BD ni adónde se traslada; 404 |
 | `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged`, `base.platform_hub_kept` |
 | `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged` |
 | `GET /internal/hubs/{id}/dumps` | `base.hub.dump_list` | 200 `{available, dumps: [{id, kind, created_at, bytes, url}]}`: las copias de sus datos de la más nueva a la más vieja (`id` = su clave en el bucket, `url` prefirmada de 15 min, descarga como fichero); `available: false` si nunca tendrá copia (sin BD propia, o dado de baja antes de terminarla); 200 también dado de baja; 404 desconocido o purgado; 503 `base.dumps_unavailable` sin bucket |
@@ -556,6 +556,12 @@ sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/k
 4. Probado en pre, PR `pre` → `main` con «Create a merge commit»: despliega prod como siempre
    (release `hub-v…`).
 5. Después, `git push origin main:pre` (fast-forward) para que `pre` no se separe de `main`.
+
+Los push de una rama se despliegan de uno en uno: si entran varios seguidos, corre uno y espera solo el más nuevo,
+que ya lleva a los demás. Los intermedios salen cancelados en Actions y la release siguiente incluye sus commits. Una
+vuelta atrás o un relanzamiento a mano solo esperan a que acabe el paso de desplegar, nunca a las pruebas de un push.
+Para volver a desplegar una rama se lanza a mano (abajo): relanzar una ejecución vieja de un push entra en esa fila y
+descarta la que estuviera esperando.
 
 La rama decide el entorno (`.github/scripts/deploy-env.sh`): `main` → prod, `pre` → pre; cualquier
 otra no despliega. Relanzar o volver atrás, siempre desde la rama del entorno:
