@@ -53,8 +53,9 @@ from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
 from base import access, auth, queries, services
-from base.services import demos, sessions
+from base.services import demos, sessions, support_entry
 from base.chosen_language import supported_language, with_language_cookie
+from base.models import Membership
 from base.models.sessions import SessionOwner
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
@@ -72,6 +73,8 @@ SAAS_LOGOUT_PATH = "/logout"
 LOGIN_RETRY_TEMPLATE = "base/login_retry.html"
 #: The 429 of a refused callback from a caller past :data:`CALLBACK_ATTEMPTS`.
 TOO_MANY_ATTEMPTS_TEMPLATE = "base/too_many_attempts.html"
+#: The 403 of ERPlora's support coming into a business that does not let support in.
+SUPPORT_ACCESS_OFF_TEMPLATE = "base/support_access_off.html"
 #: The page of a page load without a session on its way to erplora.com, which keeps the link's fragment.
 JUMP_TEMPLATE = "base/jump.html"
 #: Refused callbacks per caller: 10 within 5 minutes of the first (README, «Límites de intentos»).
@@ -128,15 +131,38 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     result = auth.redeem_code(request.POST.get("code"), slug)
     if not result.ok:
         return (result.refused and _refused_attempt(request)) or auth.login_redirect(slug, next_path, error=result.error)
-    try:
-        sessions.open_session_from_saas(request, result.user, slug)
-    except sessions.InactiveUser:
-        logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
-        return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
+    refused = _open_session(request, result.user, slug, next_path)
+    if refused is not None:
+        return refused
     landing = _choose_a_pin_first(request, next_path, slug)
     # The language chosen in «My profile», else the account's on erplora.com.
     language = queries.profile.chosen_language(request.user) or result.user.locale
     return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(landing), language)))
+
+
+def _open_session(request: HttpRequest, user: auth.RedeemedUser, slug: str, next_path: str) -> HttpResponse | None:
+    """The session of the code's person on ``slug``: a member's, or ERPlora's support's; else the response that
+    refuses it."""
+    try:
+        if user.role == Membership.Role.SUPPORT:
+            support_entry.open_support_session(request, user, slug)
+        else:
+            sessions.open_session_from_saas(request, user, slug)
+    except sessions.InactiveUser:
+        logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, user.user_id)
+        return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
+    except support_entry.SupportAccessOff:
+        logger.info("Support entry on hub %r refused: the business does not let support in.", slug)
+        return auth.forget_state(_support_access_off(next_path, user.locale))
+    return None
+
+
+def _support_access_off(next_path: str, locale: str) -> HttpResponseForbidden:
+    """403 with a page of the Hub, in the account's language when the Hub has it, whose link tries the entry again."""
+    retry_url = f"{reverse('auth-login')}?{urlencode({'next': next_path})}"
+    with translation.override(supported_language(locale) or translation.get_language()):
+        page = render_to_string(SUPPORT_ACCESS_OFF_TEMPLATE, {"retry_url": retry_url})
+    return HttpResponseForbidden(page)
 
 
 def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:

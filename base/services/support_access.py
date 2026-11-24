@@ -10,6 +10,7 @@ from base.permissions import ADMINISTER_HUB
 from base.schemas.support_access import SupportAccessIn, SupportAccessOut, SupportAccessUpdateIn
 from base.services.devices import _actor_label
 from base.services.single_row import locked_single_row
+from base.services.support_entry import end_support_sessions
 
 
 @operation(
@@ -31,10 +32,12 @@ from base.services.single_row import locked_single_row
     ),
 )
 def support_access_update(ctx: OperationContext, data: SupportAccessUpdateIn) -> dict:
-    """«Support access»: saved at once, with who changed it."""
+    """«Support access»: saved at once, with who changed it; off, support leaves the business at once."""
     row = locked_single_row(SupportAccess)
     row.enabled = data.enabled
     row.updated_by = _actor_label(ctx)
     row.save()
+    if not data.enabled:
+        end_support_sessions(ctx.scope.key)
     record_event(ctx, events.SUPPORT_ACCESS_CHANGED, {"enabled": data.enabled})
     return queries.support_access.support_access_get(ctx, SupportAccessIn())

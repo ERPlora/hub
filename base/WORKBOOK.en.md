@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d02c987744fb700ce18dcfe49a8b446f91bfbee042e00be5a191c949473bf95f -->
+<!-- generated from WORKBOOK.md sha256:640df29f55ee432f69de58e24d24c6bcc9bc11ffe4e47c64511a0420105aadc8 -->
 
 ## What it is for and who it is for
 
@@ -3617,10 +3617,11 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-Status: partial — it is changed and read through the API and with the assistant; its card in Settings › General is
-still missing, and so is the support staff's way into the business with the access on
-Actor: owner, administrator
-Screen: Settings · General
+Status: partial — it is changed and read through the API and with the assistant, and the business already lets support
+in or refuses it as it says; its card in Settings › General is still missing, and so is erplora.com giving the support
+staff their code to come in
+Actor: owner, administrator, ERPlora's support staff
+Screen: Settings · General, the page "This business does not let support in"
 Steps:
   1. When the business wants ERPlora's support staff to come in and help set it up (loading the products, adjusting
      its apps), the owner or an administrator turns support access on. It comes off. Today it is turned on and off
@@ -3630,8 +3631,21 @@ Steps:
   3. Anyone of the business can read whether it is on, who changed it last and when, whether they may change it
      themselves and the last 10 entries of support (who and when), the most recent first. While nobody of support has
      come in, the list is empty.
-In: on or off.
-Out: the business's setting, with who changed it and when. Event `base.support_access.changed`.
+  4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
+     and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
+     resetting it, its copies). They are not in Employees nor among who can give access, take no place and do not
+     count in the plan's use, and their browser does not stay as a device of the business: it neither ends another
+     device's session nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest
+     entries at once, and what they do stays in the records under their name.
+  5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
+     administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
+     try again." with "Try again".
+  6. When someone of the business turns it off, the support sessions open in the business end at once and what they
+     have open learns it; the rest of the team's go on.
+In: on or off; the support account erplora.com vouches for.
+Out: the business's setting, with who changed it and when. Event `base.support_access.changed`. Each entry of
+support, with who and when. Event `base.support_access.entered`.
 If it fails: whoever does not run the business has the change refused (403 `permission_denied`) and the setting stays
-as it was; reading it, they see they cannot change it.
-Involved: BASE-F97, BASE-F100
+as it was; reading it, they see they cannot change it. With the access off, support opens no session and leaves no
+entry (the page of step 5).
+Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100

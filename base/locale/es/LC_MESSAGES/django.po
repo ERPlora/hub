@@ -2648,3 +2648,24 @@ msgstr "entrada de soporte"
 msgctxt "support visit"
 msgid "support entries"
 msgstr "entradas de soporte"
+
+msgid "ERPlora support"
+msgstr "Soporte de ERPlora"
+
+msgctxt "way in"
+msgid "ERPlora support"
+msgstr "Soporte de ERPlora"
+
+msgid "This business does not let support in"
+msgstr "Este negocio no deja entrar a soporte"
+
+msgid ""
+"The owner or an administrator of this business has to turn on ERPlora's "
+"support access before you can come in. Ask them to, then try again."
+msgstr ""
+"El propietario o un administrador de este negocio tiene que encender el "
+"acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a "
+"intentarlo."
+
+msgid "Try again"
+msgstr "Volver a intentarlo"

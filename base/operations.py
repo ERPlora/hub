@@ -38,9 +38,11 @@ from live.slugs import validate_hub_slug
 
 from base import meter
 from base import registry
+from base.access import CREDENTIAL_SESSION_KEY
 from base.api_keys import KeyCaller
 from base.approvals import Approved, consequence_context
 from base.business import country_or_market
+from base.models.sessions import SessionOwner
 from base.permissions import access_for, reload_user
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import HUB_SCOPE_KIND, HubContextMissing, current_hub, use_hub
@@ -223,12 +225,13 @@ def _session_ended(request: HttpRequest | None) -> bool:
 
 def _note_the_person(request: HttpRequest, user: Any) -> None:
     """The person of this request has activity in its business (``base.meter``, BASE-F40): here their session is already
-    read, so it adds no statement, and an API key or a visitor never get here. A demo is not measured; the platform's host
-    has no ``request.hub``."""
+    read, so it adds no statement, and an API key or a visitor never get here. A demo is not measured, nor ERPlora's
+    support, who is none of the business's people; the platform's host has no ``request.hub``."""
     from base.services.devices import saas_user_id_of
 
     hub = getattr(request, "hub", None)
-    if hub is not None and not hub.is_demo:
+    support = request.session.get(CREDENTIAL_SESSION_KEY) == SessionOwner.Credential.SUPPORT
+    if hub is not None and not hub.is_demo and not support:
         meter.note_seen(hub.slug, saas_user_id_of(user))
 
 

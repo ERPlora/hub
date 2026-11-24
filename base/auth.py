@@ -87,9 +87,9 @@ HUB_ADMIN_AUDIENCE = "hub-admin"
 PLATFORM_ADMIN = "platform_admin"
 PLATFORM_SUPPORT = "platform_support"
 
-# The SaaS's customer roles are the Hub's, as they are (``hub_owner``, ``hub_admin``…); any role
-# without the ``hub_`` prefix (a platform role, an old unprefixed one) is refused. The Hub admin
-# takes only the platform's roles.
+# The SaaS's roles on a business are the Hub's, as they are (``hub_owner``, ``hub_admin``…, and ``hub_support``,
+# ERPlora's support in a business that lets it in); any role without the ``hub_`` prefix (a platform role, an old
+# unprefixed one) is refused. The Hub admin takes only the platform's roles.
 _ROLES = frozenset(Membership.Role.values)
 _ROLES_BY_AUDIENCE = {
     HUB_SESSION_AUDIENCE: _ROLES,

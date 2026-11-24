@@ -14,8 +14,8 @@ from base.sensitive import TEAM_CONTACT
 
 # ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
 
-#: erplora.com's roles of a business, as its photo and its login send them.
-HubRole = Literal[*Membership.Role.values]
+#: erplora.com's roles of a business, as its photo and its login send them: ERPlora's support is no member of it.
+HubRole = Literal[*[role for role in Membership.Role.values if role != Membership.Role.SUPPORT]]
 
 
 class PersonListIn(Schema):

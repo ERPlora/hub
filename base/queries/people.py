@@ -29,7 +29,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
     with what the hub keeps of their way in (``Credential``) and their name in it (``Profile``). Two reads per side,
     never a join: who is a member is control's and the ways in are the hub's."""
     found: dict[str, dict[str, Any]] = {}
-    memberships = Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+    memberships = Membership.objects.team(slug).select_related("user")
     for membership in memberships:
         user = membership.user
         found[user.get_username()] = {
