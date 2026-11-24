@@ -260,7 +260,7 @@ test('from 80 % the foot says what is left and each answer moves it; a spent mon
   await openPanel(employee);
   await ask(employee, 'Hola');
   const theirs = panel(employee).locator('[data-testid="assistant-failure"]').last();
-  await expect(theirs).toContainText('Ask whoever runs the business to upgrade the plan.');
+  await expect(theirs).toContainText("Ask the business's owner to upgrade the plan.");
   await expect(theirs.locator('[data-testid="assistant-upgrade"]')).toHaveCount(0);
   await employee.context().close();
 });

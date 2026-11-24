@@ -37,10 +37,10 @@ TEST_INVOICE_FIELDS = {
 }
 
 
-def screen_words(language: str) -> dict:
-    """VeriFactu › Settings, as its screen says it in ``language``."""
+def screen_words(language: str, screen: str = "settings") -> dict:
+    """VeriFactu's ``screen`` (Settings by default), as it says it in ``language``."""
     locale = Path(settings.BASE_DIR) / "apps/verifactu/frontend/locale" / f"{language}.json"
-    return json.loads(locale.read_text())["verifactu"]["settings"]
+    return json.loads(locale.read_text())["verifactu"][screen]
 
 
 @pytest.mark.parametrize(
