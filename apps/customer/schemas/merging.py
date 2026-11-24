@@ -30,7 +30,7 @@ class MergeIn(CustomerRefIn):
     customer: Reference | None = Field(
         None,
         validate_default=True,
-        description="The card that stays: its exact name, phone or email, when its id is not known.",
+        description="The card that stays: its name (or a part of it), phone or email, when its id is not known.",
         json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "id"),
     )
     absorbed_id: UUID | None = Field(
@@ -43,7 +43,7 @@ class MergeIn(CustomerRefIn):
         None,
         validate_default=True,
         title=DUPLICATE_CUSTOMER,
-        description="The duplicate's exact name, phone or email, when its id is not known.",
+        description="The duplicate's name (or a part of it), phone or email, when its id is not known.",
         json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "absorbed_id"),
     )
 

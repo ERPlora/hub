@@ -45,6 +45,16 @@ def test_a_voucher_is_granted_to_a_card_named_by_its_phone_and_listed_by_its_nam
     assert (row.id, row.remaining) == (granted.id, 5)
 
 
+@pytest.mark.parametrize("reference", ["Lucia Fernandez", "Fernández", "Lucía"])
+def test_her_vouchers_are_listed_by_her_name_as_a_person_says_it(bono, reference):
+    """«Lucía Fernández QA» asked for as «Lucia Fernandez», on an English keyboard, or by one of her names (hub#2329)."""
+    lucia = run("customer.customer.create", {"name": "Lucía Fernández QA"})
+    run("customer.customer.create", {"name": "Carmen Ruiz"})
+    granted = run("service.grant.create", {"package_id": str(bono.id), "customer_id": str(lucia.id)})
+    [row] = run("service.grant.list", {"customer": reference}).rows
+    assert (row.id, row.customer_id) == (granted.id, lucia.id)
+
+
 def test_two_cards_merged_in_customers_take_the_vouchers_to_the_one_that_stays(bono):
     lucia = run("customer.customer.create", {"name": "Lucía Pérez"})
     duplicate = run("customer.customer.create", {"name": "Lucia P."})

@@ -269,7 +269,7 @@ def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
                 "quita la ficha de cliente de la conversación de Jorge",
             ),
         },
-        "description": "Joins a WhatsApp conversation to a customer card (by id or by the card's exact name, phone "
+        "description": "Joins a WhatsApp conversation to a customer card (by id or by the card's name, phone "
         "or email), creates the card from the WhatsApp name and number, or takes the card off.",
         "risk": "normal",
     },

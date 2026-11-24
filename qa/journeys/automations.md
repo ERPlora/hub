@@ -8,7 +8,8 @@ Para qué: montar automatizaciones desde la galería, desde cero o pidiéndosela
 
 ## Punto de partida
 
-- Un negocio con Automatizaciones, Clientes y la Bandeja de WhatsApp conectada (`whatsapp-inbox.md`).
+- Un negocio con Automatizaciones, Clientes y la Bandeja de WhatsApp conectada (`whatsapp-inbox.md`), y también
+  Caja, Tareas y el resto de apps de su plantilla encendidas.
 
 ## Recorrido
 
@@ -37,7 +38,7 @@ Para qué: montar automatizaciones desde la galería, desde cero o pidiéndosela
 23. FLOW-F03 — varias, pausadas desde la lista.
 24. FLOW-F06 — una copia.
 25. FLOW-F07 — la copia, borrada.
-26. FLOW-F17 — una automatización, pedida al asistente.
+26. FLOW-F17 — una automatización, pedida al asistente: que deje una tarea cuando la caja cierre con descuadre.
 27. FLOW-F18 — su borrador, revisado y creado.
 28. FLOW-F19 — otro borrador, descartado.
 29. FLOW-F33 — una automatización que trae otra app, encendida.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aa0e6587bbb73c948bc5a01707dd02950bcb23677265338a2f938666889e08b3 -->
+<!-- generated from WORKBOOK.md sha256:868d846ea1b797efa06bd7c06478552b1be038b2ca8da4a29d31ae54c127b8e8 -->
 
 ## What it is for and who it is for
 
@@ -979,9 +979,12 @@ What is **not** shared: the visit history on the card (Appointments only, F24) a
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever uses it) and the API, with the same rules and the same permissions. Lists come in pages of up to
-100 and all of them have a search. To speak naturally, a customer can be named by their id or by their
-exact name, their phone or their email ("add a note to Ana García"), and a group, a tag or a field, by
-its name; if two cards fit, the id, the phone or the email is asked for. Before changing anything, the
+100 and all of them have a search. To speak naturally, a customer can be named by their id, their phone, their
+email or their name, whole or a part of it, with or without accents ("add a note to Ana García", "Lucía's
+appointments"), and a group, a tag or a field, by its name. The card whose email, phone or name is exactly what was
+said counts first; if there is none, the ones the list's search finds with those words (F02). If several cards fit,
+the answer says which, up to five by their name, to choose one or give its id, its phone or its email. Before
+changing anything, the
 assistant asks for confirmation with its card (BASE-F97), which names each record as the screens name it, never by
 its id: the card ("Customer: Ana García"), the duplicate card of a merge, the groups and tags it is given, the group,
 tag or field being changed or deleted, by its name, and the open order as Sales names it (its title or, without one,

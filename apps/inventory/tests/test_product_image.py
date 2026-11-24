@@ -408,11 +408,11 @@ def test_it_suggests_the_librarys_images_for_the_products_name_the_best_first_an
     assert OutboxEvent.objects.count() == 0
 
 
-def test_the_suggestions_are_titled_in_the_businesss_language_for_an_employee_too(image_library):  # noqa: F811
+def test_the_suggestions_are_titled_in_the_persons_language_for_an_employee_too(image_library):  # noqa: F811
     created = product("White coffee")
-    Hub.objects.filter(slug=A.key).update(language="es")
+    Hub.objects.filter(slug=A.key).update(language="en")
 
-    found = run("inventory.product.suggest_image", ProductImageSuggestIn(id=created.id), "hub_employee", language="en")
+    found = run("inventory.product.suggest_image", ProductImageSuggestIn(id=created.id), "hub_employee", language="es")
 
     assert (found.rows[0].reference, found.rows[0].title) == (LATTE, "Café con leche")
 

@@ -611,8 +611,11 @@ Pasos:
 1. Abre el asistente del Hub y pídele algo que pase solo, hablando o escribiendo («crea un flujo que al completar
    una venta de más de 100 € me cree una tarea»).
 2. El asistente escribe un **borrador**: nombre, cuándo arranca, de uno a ocho pasos de «hacer algo»,
-   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Antes de dejarlo te enseña su tarjeta y
-   espera tu sí, como cualquier cambio que te pide.
+   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Para escribirlo lee solo lo que le hace
+   falta de lo que pueden usar las automatizaciones (las apps del caso, o los avisos y las acciones por su
+   nombre), entero y con los datos de cada acción: también en un negocio con muchas apps usa los nombres y los
+   datos reales, sin avisarte de que no los pudo comprobar. Antes de dejarlo te enseña su tarjeta y espera tu
+   sí, como cualquier cambio que te pide.
 3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas; lo revisas en **Propuestas por el
    asistente** (FLOW-F18).
 Entra: lo que se pide, en palabras, y lo que pueden usar las automatizaciones del negocio.
@@ -1252,7 +1255,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Una ejecución, con las palabras con que se nombra (su automatización y cuándo empezó) | ver | F24 | `flow.run.get` |
 | Los borradores pendientes del asistente (en vivo) | ver | F18, F19 | `flow.draft.list` |
 | Un borrador del asistente, esté pendiente, usado o descartado | ver | F18, F19 | `flow.draft.get` |
-| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto) | ver | F10, F11 | `flow.catalog.read` |
+| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto); todos, o solo los de unas apps o unos nombres | ver | F10, F11, F17 | `flow.catalog.read` |
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ae0ff600ab8bb7f82bd38b26d054e08e35f5db7b9b679e0b9a547822c219dac5 -->
+<!-- generated from WORKBOOK.md sha256:494fc31e2e432ee73b3dc475059c399dca9b6557c0906aea8120fbe41e41233d -->
 
 ## What it is for and who it is for
 
@@ -1074,7 +1074,7 @@ it sells, even if whoever charges does not see it.
 | Whether a session can be spent and why not | spend sessions | F21 | `service.grant.redeem_check` |
 | The customer's vouchers that can pay for a service, the one spent first and why | spend sessions | F22 | `service.grant.tender_options` |
 | A voucher's movements | view voucher balances | F19 | `service.movement.list` |
-| Up to five images of the library for a service's photo, by its name and titled in the business's language; it sets none | view services | F34 | `service.service.suggest_image` |
+| Up to five images of the library for a service's photo, by its name and titled in the language of whoever asks; it sets none | view services | F34 | `service.service.suggest_image` |
 
 All of them, except the checks, the images proposed and the reads of an assignment, a sold voucher or a session, can
 be followed live.

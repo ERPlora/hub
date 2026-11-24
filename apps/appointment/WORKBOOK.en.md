@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:640b9ee7377450c313bea49984b51a242bf325614c24dd1ec1ea2f264dae671a -->
+<!-- generated from WORKBOOK.md sha256:5f7398f817d2d7dc1d6d8ae68b1f331c100cfdb1702260443c762fae64f60d3f -->
 
 ## What it is for and who it is for
 
@@ -641,8 +641,9 @@ Steps:
 2. At the end, the **Visit history** block shows their last 10 appointments, the most recent first, with
    the day and the time, the services, the professional, the state and the notes (the internal one first).
 In: the customer's appointments that whoever is looking can see. Through the API or the assistant the customer is
-named by her name, her phone or her email; by phone or email, only by whoever sees the customers' contact details
-(BASE-F119).
+named by her name (whole or a part of it, with or without accents, as the Customers list finds her: "Lucía", "Lucia
+Fernandez"), her phone or her email; by phone or email, only by whoever sees the customers' contact details
+(BASE-F119). If several customers fit, the answer says which, to choose one.
 Out: nothing (it only reads). An automation reads it without notes or reasons.
 If it fails: "The visit history could not be loaded." · empty: "No appointments yet for this customer."
 Involved: CUSTOMER-F24, BASE-F119

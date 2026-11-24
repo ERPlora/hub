@@ -860,7 +860,9 @@ Pasos:
    desplaza para que se lea al menos una línea entera.
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
-   del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
+   del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué. Un cobro
+   por el asistente o por la API hace lo mismo: lo que la cuenta aún no ha enviado sale a cocina como una
+   ronda nueva antes de cobrar, y si Cocina lo rechaza, no se cobra nada y se dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento. Sí se puede invitar con su
    regalo: se queda en la cuenta a 0 y a cocina no le llega nada nuevo.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
