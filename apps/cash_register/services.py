@@ -87,6 +87,7 @@ REGISTER_EXISTS = _("There is already a drawer with that name.")
 REPORT_HIDDEN = _(
     "With the blind count on, the report of an open session is printed by whoever may see the expected cash."
 )
+NO_PRINTER = _("No receipt printer takes this report: open the session to print it on this device.")
 #: The words of the X and Z reports (their own context: «Cash in» is a total on the paper, «Entradas»).
 CLOSED_BY_ITSELF = pgettext_lazy("cash report", "Closed by itself")
 COUNTED = pgettext_lazy("cash report", "Counted")
@@ -705,9 +706,9 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
         },
         "description": "Print the report of a cash session (by its id or number) on the receipt printer: the partial "
         "report (X) while it is open, the closing (Z) once closed, with its float, sales by payment method, refunds, "
-        "cash in and out, comps, expected, counted and difference. Without Printing on or an active receipt printer, "
-        "nothing is queued. A blind "
-        "count keeps an open session's report from whoever may not see the expected cash.",
+        "cash in and out, comps, expected, counted and difference. Without an active receipt printer it fails and "
+        "says why: nothing printed. A blind count keeps an open session's report from whoever may not see the "
+        "expected cash.",
         "risk": "normal",
     },
 )
@@ -716,16 +717,8 @@ def print_session(ctx: OperationContext, data: SessionGetIn) -> dict:
     if hides_expected(ctx, session, current_settings()):
         raise Conflict(str(REPORT_HIDDEN), code="cash_register.report_hidden")
     report = "x" if session.is_open else "z"
-    nothing = {"report": report, "queued": False, "job_id": None, "printer": None}
-    try:
-        summary = operation_named("printing.job.summary")
-        create = operation_named("printing.job.create")
-        printing = summary(ctx, summary.input.model_validate({}))
-    except (UnknownOperation, AppInactive):
-        return nothing
-    # Without an active receipt printer the paper would wait in the queue for ever: the browser prints it.
-    if not any(row.usage == "receipt" and row.printers for row in printing.usages):
-        return nothing
+    with translation.override(ctx.language):
+        nothing = Conflict(str(NO_PRINTER), code="cash_register.no_printer")
     request = {
         "job_key": f"cash-session-{session.id}-{report}-{uuid.uuid7()}",
         "document_type": "cash_session_report",
@@ -736,9 +729,14 @@ def print_session(ctx: OperationContext, data: SessionGetIn) -> dict:
         "source_ref": session.number,
     }
     try:
-        queued = create(ctx, create.input.model_validate(request))
-    except AppInactive:
-        return nothing
-    if (job := queued.job) is None:
-        return nothing
-    return {"report": report, "queued": True, "job_id": job.id, "printer": job.printer_name}
+        summary = operation_named("printing.job.summary")
+        create = operation_named("printing.job.create")
+        printing = summary(ctx, summary.input.model_validate({}))
+        # Without an active receipt printer the paper would wait in the queue for ever: the screen prints it.
+        receipt = any(row.usage == "receipt" and row.printers for row in printing.usages)
+        job = create(ctx, create.input.model_validate(request)).job if receipt else None
+    except (UnknownOperation, AppInactive):
+        job = None
+    if job is None:
+        raise nothing
+    return {"report": report, "job_id": job.id, "printer": job.printer_name}
