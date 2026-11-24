@@ -43,8 +43,8 @@ const outcome = (over: Partial<MaterializeOut>): MaterializeOut => ({
   ...over,
 });
 
-async function setup() {
-  const m = await mountAppointment(SeriesList, { props: { canAdd: true, canChange: true, businessToday: '2026-10-14' } });
+async function setup(locale: 'en' | 'es' = 'en') {
+  const m = await mountAppointment(SeriesList, { props: { canAdd: true, canChange: true, businessToday: '2026-10-14' }, locale });
   await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const cells = (i: number) => m.wrapper.findAll('[data-testid="appointment-series-row"]')[i].findAll('[role="cell"]').map((c) => c.text().trim());
@@ -140,5 +140,16 @@ describe('SeriesList', () => {
     s.table().vm.$emit('add');
     await settle();
     expect(s.wrapper.findComponent(SeriesFormModal).props()).toMatchObject({ open: true, series: null });
+  });
+
+  it.each([
+    ['en', 'Keep it'],
+    ['es', 'No borrar'],
+  ] as const)('in %s, leaving «Delete» without deleting the series says so', async (locale, keep) => {
+    const s = await setup(locale);
+    await s.result(OP, page([series('r1')], 1, 100));
+    s.table().vm.$emit('action', { actionId: 'delete', row: series('r1') });
+    await settle();
+    expect(s.inDoc('appointment-series-delete-cancel')?.textContent?.trim()).toBe(keep);
   });
 });

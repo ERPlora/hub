@@ -71,8 +71,8 @@ const row = (id: string, over: Partial<AppointmentRow> = {}): AppointmentRow => 
   ...over,
 });
 
-async function setup(session = OWNER) {
-  const m = await mountAppointment(AgendaPage, { session, path: '/appointment/agenda' });
+async function setup(session = OWNER, locale: 'en' | 'es' = 'en') {
+  const m = await mountAppointment(AgendaPage, { session, path: '/appointment/agenda', locale });
   await m.live();
   await m.result('appointment.settings.get', SETTINGS);
   await m.reopen();
@@ -208,6 +208,21 @@ describe('AgendaPage', () => {
       path: '/api/appointment/appointments/reschedule',
       body: { id: 'a1', start: `${s.today()}T11:00`, staff_id: 's1', confirm_overlap: false },
     });
+  });
+
+  it.each([
+    ['en', 'Keep it', 'Keep it'],
+    ['es', 'No borrar', 'No cancelar'],
+  ] as const)('in %s, leaving «Delete» without deleting says so, and leaving «Cancel» keeps its own words', async (locale, keep, notCancel) => {
+    const s = await setup(OWNER, locale);
+    const ask = async (actionId: string) => {
+      s.wrapper.findComponent(AppointmentList).vm.$emit('action', { actionId, row: row('a1') });
+      await settle();
+    };
+    await ask('delete');
+    expect(s.inDoc('appointment-delete-cancel')?.textContent?.trim()).toBe(keep);
+    await ask('cancel');
+    expect(s.inDoc('appointment-cancel-cancel')?.textContent?.trim()).toBe(notCancel);
   });
 
   it('an employee whose account has no staff record is told so', async () => {
