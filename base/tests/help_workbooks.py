@@ -313,6 +313,86 @@ EO_WORDS = Words(
 )
 
 
+#: The made-up WORKBOOK of the Hub's own screens: three of its screens, a section that is no screen (the bell) and a flow
+#: that is done on one of them, with a note for whoever maintains it.
+PLATFORM_ES = """\
+# Base
+Prefijo: BASE
+
+## Para qué sirve y para quién
+
+Lo que el Hub trae **siempre**,
+sin activar nada.
+
+### De un vistazo
+
+El `Inicio` (hub#1).
+
+## Pantallas
+
+### Inicio · Resumen
+El negocio de un vistazo.
+
+#### De arriba abajo
+Los paneles (BASE-F02).
+
+### La campana
+Los avisos, en cualquier pantalla.
+
+### Archivos
+Los documentos del negocio.
+
+### Sistema · Registros
+Lo que ha pasado.
+
+## Flujos
+
+### BASE-F01 Ver el negocio de un vistazo
+Estado: hecho
+Pantalla: Inicio · Resumen
+Pasos:
+1. Entra en el Inicio (BASE-F02).
+
+## Para quien lo mantiene
+
+Nada.
+"""
+PLATFORM_EN = """\
+## What it is for and who it is for
+
+What the Hub **always** brings, with nothing to turn on.
+
+### At a glance
+
+The `Home` (hub#1).
+
+## Screens
+
+### Home · Summary
+The business at a glance.
+
+#### From top to bottom
+The panels (BASE-F02).
+
+### The bell
+The notices, on any screen.
+
+### Files
+The business's documents.
+
+### System · Logs
+What has happened.
+
+## Flows
+
+### BASE-F01 See the business at a glance
+Status: done
+Screen: Home · Summary
+Steps:
+1. Go to the Home (BASE-F02).
+"""
+
+
 def tabs(*labels: str) -> tuple[Tab, ...]:
     """The four tabs of Tables (floor plan, zones, tables, settings) labelled in one language."""
     ids = ("floor_plan", "zones", "tables", "settings")
@@ -328,6 +408,23 @@ EO_TABS = tabs("Salonplano", "Zonoj", "Tabloj", "Agordoj")
 def header_of(source: str = ES) -> str:
     """The first line that makes a translation current with the customer's part of ``source``."""
     return catalog.en_header(catalog.source_hash(catalog.user_part(source)))
+
+
+def ready_platform(monkeypatch, root: Path) -> SimpleNamespace:
+    """The only app with its help ready: the Hub's own screens, its WORKBOOKs the made-up ones written in ``root``."""
+    write_workbooks(root, {"en": PLATFORM_EN}, source=PLATFORM_ES)
+    base = apps.get_app_config("base")
+    platform = SimpleNamespace(
+        label=base.label, kind=base.kind, verbose_name=base.verbose_name, path=str(root), help=Help()
+    )
+    _only_ready(monkeypatch, platform)
+    return platform
+
+
+def _only_ready(monkeypatch, app: SimpleNamespace) -> None:
+    monkeypatch.setattr(app_help, "all_live_app_configs", lambda: [app])
+    # A cache of its own, so that no help read by another test (of another folder) answers for this one.
+    monkeypatch.setattr(app_help, "_READ", {})
 
 
 def write_workbooks(root: Path, translations: dict[str, str], source: str = ES) -> Path:
@@ -351,7 +448,5 @@ def ready_tables(monkeypatch, root: Path, ready: Help | None = None) -> SimpleNa
         path=str(write_workbooks(root, {"en": EN})),
         help=ready or Help(),
     )
-    monkeypatch.setattr(app_help, "module_configs", lambda: [module])
-    # A cache of its own, so that no help read by another test (of another folder) answers for this one.
-    monkeypatch.setattr(app_help, "_READ", {})
+    _only_ready(monkeypatch, module)
     return module
