@@ -6,12 +6,15 @@ A bill no receipt printer takes is not printed and notes nothing; the device the
 the screen notes it (``sale.order.note_bill``), the same note as the printer's.
 """
 
+import dataclasses
+
 import pytest
-from live.errors import Conflict
+from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.sale.models import Order
-from apps.sale.tests.conftest import HUB_DB, run
+from apps.sale.tests.conftest import HUB_DB, answered_yes_to_the_assistant, ctx_for, run
+from base import assistant
 
 pytestmark = HUB_DB
 
@@ -66,6 +69,27 @@ def test_a_check_already_charged_is_not_noted(coffee):
     run("sale.sale.complete", {"idempotency_key": "sale-bill-closed", "order_id": str(order.id), "payments": [{"method": "card"}]})
     with pytest.raises(Conflict):
         print_bill(order.id)
+    assert printed_at(order.id) is None
+
+
+def test_whoever_may_not_see_the_sales_notes_nothing(coffee):
+    order = open_check()
+    seller = ctx_for()
+    blind = dataclasses.replace(seller, permissions=seller.permissions - {"sale.view_sale"})
+    with pytest.raises(PermissionDenied):
+        run("sale.order.note_bill", {"order_id": str(order.id)}, blind)
+    assert printed_at(order.id) is None
+
+
+def test_the_assistant_cannot_note_a_bill_nothing_printed(coffee):
+    """The assistant prints only through a printer: the note of a bill the device printed is not one of its tools,
+    and a call that names it all the same runs nothing."""
+    owner = ctx_for("hub_owner", language="es")
+    tools = assistant.tools.catalog(owner)
+    assert "sale.order.print_bill" in tools
+    assert "sale.order.note_bill" not in tools
+    order = open_check()
+    assert answered_yes_to_the_assistant("sale.order.note_bill", {"order_id": str(order.id)}, owner)["executed"] == []
     assert printed_at(order.id) is None
 
 

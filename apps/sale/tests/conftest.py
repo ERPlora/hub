@@ -72,16 +72,20 @@ def charged_by_the_assistant(order):
     return outcome
 
 
-def confirmed_by_the_assistant(name: str, arguments: dict, ctx: OperationContext) -> dict:
-    """The receipt's row of the write ``name`` the assistant asked for with ``arguments``, once ``ctx``'s person said
-    yes to its card: its outcome, its code and why it was not done, in the person's language."""
+def answered_yes_to_the_assistant(name: str, arguments: dict, ctx: OperationContext) -> dict:
+    """The turn after ``ctx``'s person said yes to what the assistant asked for: the call ``name`` with ``arguments``."""
 
     def turn_of(*calls, decision=None):
         data = {"messages": [{"role": "user", "content": "imprímelo"}, asked(*calls)], "pending": list(calls)}
         return run("base.assistant.turn", {**data, "decision": decision}, ctx).model_dump(mode="json")
 
-    plan = answered(call(name, arguments), decision={"call_id": "c1", "accepted": True}, turn_of=turn_of)
-    [row] = plan["executed"]
+    return answered(call(name, arguments), decision={"call_id": "c1", "accepted": True}, turn_of=turn_of)
+
+
+def confirmed_by_the_assistant(name: str, arguments: dict, ctx: OperationContext) -> dict:
+    """The receipt's row of the write ``name`` the assistant asked for with ``arguments``, once ``ctx``'s person said
+    yes to its card: its outcome, its code and why it was not done, in the person's language."""
+    [row] = answered_yes_to_the_assistant(name, arguments, ctx)["executed"]
     return row
 
 
