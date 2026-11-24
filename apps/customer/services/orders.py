@@ -23,12 +23,7 @@ from apps.customer.schemas.orders import OrderCustomerOut, OrderLinkIn
         "is then in the customer's name (at most one per order; a new one replaces the old). With no customer given it "
         "takes the customer off.",
         asks={
-            "en": (
-                "put this order on Ana",
-                "this tab is Luis's",
-                "take the customer off this order",
-                "put this check in Marta's name",
-            ),
+            "en": ("put this order on Ana", "this tab is Luis's", "take the customer off this order"),
             "es": (
                 "Ana es la clienta de este pedido",
                 "quita el cliente de este pedido",
