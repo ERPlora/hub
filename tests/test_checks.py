@@ -234,7 +234,7 @@ def test_a_change_to_a_json_file_alone_fails_on_the_vitest_tests_that_import_it(
     assert "checks: pnpm exec eslint" not in output, output[-6000:]
 
 
-FIXES ={"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
+FIXES = {"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
 
 
 @pytest.mark.parametrize("lent, lacking", [((), {"node_modules", "packages/ui"}), (("node_modules",), {"packages/ui"})])
@@ -314,8 +314,9 @@ CODE, LOCALE, ROUTES = "shop/frontend/probe.ts", "shop/frontend/locale/en.json",
         ([CODE, LOCALE], {CODE}, {CODE, LOCALE}),
         ([ROUTES], None, {ROUTES}),
         (["package.json", "complexipy-snapshot.json"], None, None),
+        (["shop/orders.py", "shop/notes.md"], None, None),
     ],
-    ids=["with-code", "alone", "the-root-s-tool-configuration"],
+    ids=["with-code", "alone", "the-root-s-tool-configuration", "neither-json-nor-code"],
 )
 def test_a_json_file_goes_to_the_related_vitest_tests_and_never_to_eslint(tmp_path, monkeypatch, files, linted, related):
     """No linter reads a .json, but a frontend module that imports it has tests that pin what it says. Those of the root
