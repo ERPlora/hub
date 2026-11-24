@@ -18,10 +18,11 @@ from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
+from pydantic import ValidationError
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
@@ -58,6 +59,10 @@ def ctx_for(
     return OperationContext(
         scope=scope, actor=actor, permissions=permissions, language=language
     )
+
+
+def fields(error: ValidationError) -> set[str]:
+    return {".".join(str(part) for part in item["loc"]) for item in error.errors()}
 
 
 def run(name: str, data: dict | None = None, ctx: OperationContext | None = None):
@@ -118,7 +123,7 @@ def catalog_of(make_user):
         if role not in users:
             users[role] = make_user(f"asker-{role}", role=role)
         user = users[role]
-        ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
+        ctx = OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
         return assistant.tools.catalog(ctx)
 
     return of

@@ -1,7 +1,7 @@
 // STAFF-F01, F02, F03, F21 — the record of a staff member, the old side panel as a dialog: «New» from
 // «+», «Edit · {name}» from a row. Fields, in the old order: First name, Last name, Email, Phone,
 // Employee ID, Role («No role»), Hub user («No Hub access», with the hint of why to link one), Status
-// (only when editing), Bookable, Buffer between appointments, Hire date, Color, Specialties, Bio and,
+// (only when editing), Bookable, Booking buffer, Hire date, Color, Specialties, Bio and,
 // for whoever may see the pay, Hourly rate, Commission (%) and the HR notes. Role and Hub user are
 // Combo fields that search the server (a business may have more than the 100 it gives at once): the
 // active roles (`staff.role.list`) and the accounts with access to this business
@@ -112,7 +112,7 @@ describe('MemberFormModal: New (STAFF-F01)', () => {
       'Role',
       'Hub user',
       'Bookable',
-      'Buffer between appointments (min)',
+      'Booking buffer (min)',
       'Hire date',
       'Color',
       'Specialties',

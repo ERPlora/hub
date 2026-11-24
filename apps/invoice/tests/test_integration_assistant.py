@@ -705,7 +705,7 @@ def test_a_series_with_a_code_of_another_shape_gets_no_card_and_the_model_hears_
     wrong = {"code": "E2E-?", "name": "Online", "invoice_type": "F1", "year": 2026}
     with translation.override("es"):
         plan = turn(call("invoice.series.create", wrong))
-        why = str(schemas.SERIES_CODE_INVALID)
+        why = str(schemas.series.SERIES_CODE_INVALID)
     assert plan["confirm"] is None
     assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
         ("invoice.series.create", "error", "invalid_payload")

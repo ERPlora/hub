@@ -342,8 +342,9 @@ def _assistant_offer(ctx: OperationContext, tools: dict, still_open: list, *, la
 def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, off: list) -> str:
     """The model's instructions for this round, with what it knows of the business (``assistant.business_facts``):
     to search before it says something cannot be done when the round offers the search (``prompt.SEARCH_FIRST``), the
-    apps not on whose tools would do what was asked (``off``), the checklist, read again, in ``setup``, and
-    ``LAST_ROUND`` on the last round of the request, the one that offers no tool."""
+    apps not on that what was asked names (``off``), the checklist, read again, in ``setup``, ``LAST_ROUND`` on the last
+    round of the request, the one that offers no tool, and last of all the language of everything it writes
+    (``prompt.language_rule``)."""
     apps = assistant.tools.active_apps(ctx.scope)
     text = assistant.prompt.instructions(
         language=ctx.language,
@@ -364,7 +365,7 @@ def _assistant_instructions(ctx: OperationContext, business: dict, offered: list
         text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
     if not offered:
         text += "\n\n" + LAST_ROUND
-    return text
+    return text + "\n\n" + assistant.prompt.language_rule(ctx.language)
 
 
 def _assistant_role(ctx: OperationContext) -> str:

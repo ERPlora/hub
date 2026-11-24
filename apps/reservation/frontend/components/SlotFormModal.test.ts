@@ -36,6 +36,15 @@ describe('SlotFormModal', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  it.each([
+    ['en', 'Max guests', 'Optional'],
+    ['es', 'Máx comensales', 'Opcional'],
+  ] as const)('in %s, the maximum of guests says under its field that it is optional, not in its label', async (locale, label, help) => {
+    const s = await setup(locale);
+    const covers = s.field('max_covers') as Control & { helperText?: string };
+    expect([covers.label, covers.helperText]).toEqual([label, help]);
+  });
+
   // From and To are the app's own time wheel, never the device's; a slot needs both, so neither offers «Clear».
   it('From and To are the app’s time pickers, shown as read', async () => {
     const s = await setup();

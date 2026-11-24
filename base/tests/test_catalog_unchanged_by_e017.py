@@ -16,7 +16,7 @@ from live.operations import AI, Operation, registry
 
 from base import approvals, assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 #: Business A, entered for every test with its own database (``in_business_a``).
@@ -61,7 +61,7 @@ def legacy_catalog(ctx: OperationContext) -> list[str]:
 
 
 def person(user) -> OperationContext:
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language="es")
 
 
 @HUB_DB

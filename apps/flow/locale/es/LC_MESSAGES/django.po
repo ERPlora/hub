@@ -548,6 +548,9 @@ msgstr "Sus pasos usan permisos que no pide: %(names)s."
 msgid "Starts with"
 msgstr "Arranca con"
 
+msgid "Steps"
+msgstr "Pasos"
+
 msgid "Automation"
 msgstr "Automatización"
 
