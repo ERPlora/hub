@@ -40,12 +40,12 @@ STATE_LABELS = {
             "en": (
                 "create a Cashier role from the employee one",
                 "duplicate the manager role and call it Shift lead",
-                "I need a new role like employee for the kitchen",
+                "make a new role for the kitchen copied from the employee one",
             ),
             "es": (
                 "crea el rol Cajero a partir del de empleado",
                 "duplica el rol de encargado y llámalo Jefe de turno",
-                "quiero un rol nuevo como el de empleado para cocina",
+                "hazme un rol nuevo para cocina copiado del de empleado",
             ),
         },
     ),

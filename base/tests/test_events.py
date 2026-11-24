@@ -44,6 +44,9 @@ def test_every_event_is_named_as_the_convention_says():
         "base.person.pin_removed",
         "base.person.badge_set",
         "base.person.badge_removed",
+        "base.role.created",
+        "base.role.updated",
+        "base.role.deleted",
         # The business's API keys.
         "base.api_key.created",
         "base.api_key.rotated",
