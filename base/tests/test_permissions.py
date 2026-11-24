@@ -22,7 +22,7 @@ from base import permissions as permissions_module
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
 from base.permissions import OWN_BUSINESS, OWNER_ONLY, access_for, grantable, permissions_of_role, reload_user
-from base.roles import OFF, ON
+from base.roles import APPROVAL, OFF, ON
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import in_business_a
 from base.tests.test_auth_views import ON_HUB_A
@@ -210,8 +210,15 @@ class TestARoleOfTheBusiness:
     def test_a_person_of_the_business_without_one_holds_the_role_of_their_invitation(self, make_user):
         eva = make_user("eva", host=SLUG_A, role="hub_employee")
         HubUser.objects.create(username="eva")
+        given_a_role_of_the_business("marta", "hub_manager", {})
 
         assert access_for(eva, A) == permissions_of_role("hub_employee")
+
+    def test_what_it_does_with_approval_is_not_held(self, make_user, only_demo_and_shop):
+        eva = make_user("eva", host=SLUG_A, role="hub_employee")
+        given_a_role_of_the_business("eva", "hub_employee", {**CASHIER, "shop.refund": APPROVAL})
+
+        assert "shop.refund" not in access_for(eva, A)
 
     def test_a_role_of_business_a_stays_in_business_a(self, make_user, hub_b, only_demo_and_shop):
         eva = make_user("eva", host=SLUG_A, role="hub_employee")
