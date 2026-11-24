@@ -45,10 +45,7 @@ def instructions(  # noqa: PLR0913
     person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
     operation name; BASE-F100). What to do when its tools fall short each caller says after it: the chat,
     ``SEARCH_FIRST``."""
-    try:
-        language_name = get_language_info(language)["name"]
-    except KeyError:
-        language_name = language
+    language_name = _language_name(language)
     links = "\n".join(f"- [{name}]({path})" for path, name in screens.items())
     said = f"{17:.{decimals}f} {currency}"
     example = f"{said} → {17 * 10**decimals}"
@@ -81,6 +78,26 @@ quieres, puedes» or «dígame, quiere, puede», never a mix. Use Markdown: bold
   that currency; an amount of your own, in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}{_who_asks(role, language, approvable)}"""
+
+
+def language_rule(language: str) -> str:
+    """The chat's closing rule: everything the model writes in the person's language, also the sentence it writes
+    before or between its tools, which otherwise follows the English of what it has just read."""
+    name = _language_name(language)
+    read = "" if language.startswith("en") else (
+        f". These instructions, your tools and their results are in English: tell what they say in {name}"
+    )
+    return (
+        f"- Write everything you say in {name}, also what you say before or between your tools{read}, with no word of"
+        " another language or alphabet; a record's name, as its data writes it."
+    )
+
+
+def _language_name(language: str) -> str:
+    try:
+        return get_language_info(language)["name"]
+    except KeyError:
+        return language
 
 
 def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> str:
