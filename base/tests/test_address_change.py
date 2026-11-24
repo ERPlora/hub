@@ -596,6 +596,14 @@ class TestItsEvents:
             assert run("base.failed_event.list", A).total == 0
             assert run("base.event.list", A).entries == []
 
+    def test_an_event_of_no_business_is_none_of_its_own(self, hub_a):
+        with use_hub(hub_a):
+            failed_event(REGISTRY_SCOPE)
+
+            assert run("base.failed_event.list", A).total == 0
+            assert run("base.failed_event.retry_all", A).count == 0
+            assert run("base.event.list", A).entries == []
+
     def test_a_flow_is_tried_with_what_last_happened_wherever_it_was(self, hub_a, failed, change_address):
         here = change_address(hub_a, C)
         ctx = OperationContext(scope=C, actor="ana", permissions=frozenset({"*"}), language="en")
