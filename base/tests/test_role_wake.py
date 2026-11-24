@@ -53,6 +53,18 @@ def test_a_refused_change_wakes_nobody(ctx, cashier, listening):
     assert heard(here, timeout=0.5) == set()
 
 
+def test_a_change_that_is_rolled_back_wakes_nobody(ctx, cashier, listening, monkeypatch):
+    here = listening(A)
+    monkeypatch.setattr("base.queries.roles.role_row", lambda scope, role: 1 / 0)
+
+    with pytest.raises(ZeroDivisionError):
+        run(ctx, "base.role.update", role=str(cashier.pk), states={"sale.view_sale": "off"})
+
+    assert heard(here, timeout=0.5) == set()
+    cashier.refresh_from_db()
+    assert cashier.states == {"sale.view_sale": ON}
+
+
 def test_a_role_made_or_deleted_reaches_the_list_of_roles_of_its_business(ctx, cashier, listening):
     here, there = listening(A), listening(B)
 

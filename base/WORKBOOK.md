@@ -2318,7 +2318,7 @@ Pantalla: Asistente
 Pasos:
   1. Pide al asistente un rol a partir de otro, con su nombre: «crea el rol Cajero a partir de Empleado». Puede partir
      de uno básico o de uno propio, y llevar una descripción.
-  2. La tarjeta dice «A partir de: Empleado» y «Nombre: Cajero». Al pulsar «Ejecutar», el rol queda creado con lo
+  2. La tarjeta dice «A partir de: Empleado» y «Nombre: Cajero» (BASE-F97). Al aceptarla, el rol queda creado con lo
      mismo que permite el otro, app por app, menos ser el propietario del negocio, que ningún rol propio da.
   3. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él. Lo que permite se ve al tocarlo (BASE-F82) y
      se cambia con BASE-F128. Desde entonces no cambia con el rol del que salió.
@@ -2337,8 +2337,9 @@ Pantalla: Asistente
 Pasos:
   1. Pide el cambio al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
   2. La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
-     «Con aprobación» o «No»), y cuántas personas tienen ese rol. Pide escribir CONFIRMAR, como toda acción delicada.
-  3. Al pulsar «Ejecutar» solo cambia lo que se pidió. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian
+     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR
+     (BASE-F98).
+  3. Al aceptarla solo cambia lo que se pidió. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian
      al momento en sus dispositivos, sin cerrar su sesión (BASE-F13).
   4. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
      añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos.
@@ -2349,7 +2350,7 @@ tiene: «Un rol no puede permitir más de lo que puedes hacer tú.»; y ser el p
 del propietario del negocio: ningún rol lo da.». Un permiso que no es de una app encendida, «Ese permiso no es de
 ninguna app encendida de este negocio.»; «Con aprobación» en algo que un responsable no puede aprobar con su PIN, «Eso
 no se puede aprobar con un PIN: elige permitido o no.». El nombre, como al crearlo.
-Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F127
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127
 
 ### BASE-F129 Borrar un rol propio
 Estado: parcial — se borra pidiéndoselo al asistente o por la API del Hub; falta su pantalla
@@ -2357,14 +2358,14 @@ Actor: propietario, administrador
 Pantalla: Asistente
 Pasos:
   1. Pide al asistente «borra el rol Cajero».
-  2. La tarjeta dice el rol y cuántas personas lo tienen, y pide escribir CONFIRMAR. Al pulsar «Ejecutar», el rol
-     desaparece de **Empleados › Roles**.
+  2. La tarjeta dice el rol y, bajo «Lo que va a pasar», cuántas personas lo tienen, y pide escribir CONFIRMAR
+     (BASE-F98). Al aceptarla, el rol desaparece de **Empleados › Roles**.
   3. Quien salió del negocio con ese rol, si vuelve, entra con el de su invitación.
 Entra: el rol.
 Sale: el rol borrado. Evento `base.role.deleted`.
 Si falla: si alguien del negocio lo tiene, no se borra: «2 personas tienen este rol. Dales otro antes de borrarlo.». Un
 rol básico no se borra: «Este rol es de erplora.com. Duplícalo y cambia la copia.».
-Implicados: BASE-F82, BASE-F97, BASE-F127
+Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127
 
 ### BASE-F84 Aprobar con el PIN de un responsable
 Estado: hecho
