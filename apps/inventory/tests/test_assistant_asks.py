@@ -21,6 +21,8 @@ from base.tests.assistant_context import offered, owner_of_a
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import (
     TOP,
+    WITH_ROOM,
+    assert_offered_or_found,
     assert_offered_with_room,
     comparable,
     offered_to,
@@ -115,15 +117,15 @@ QUANTITY_IN = [
 ]
 
 
-def assert_its_words_bring_the_reception(tools, language: str, phrase: str, words: str) -> None:
-    """That ``phrase`` brings ``inventory.stock.receive`` among the first ten, and that without ``words`` among the
-    Hub's words it does not: they are what names the goods."""
+def assert_its_words_bring_the_reception(tools, language: str, phrase: str, words: str, room: int = TOP) -> None:
+    """That ``phrase`` brings ``inventory.stock.receive`` among the first ``room``, ten unless told, and that without
+    ``words`` among the Hub's words it does not: they are what names the goods."""
     assert comparable(phrase) not in probe_phrases()
-    assert_offered_with_room(tools, "inventory.stock.receive", phrase, language, room=TOP)
+    assert_offered_with_room(tools, "inventory.stock.receive", phrase, language, room=room)
     counted = assistant.relevance.ranking(tools)["synonyms"]
     without = tuple(tuple(word for word in group if word != words) for group in counted)
     assert without != counted  # positive control: the words are some of the Hub's
-    assert "inventory.stock.receive" not in offered_to(tools, phrase, language, synonyms=without)[:TOP]
+    assert "inventory.stock.receive" not in offered_to(tools, phrase, language, synonyms=without)[:room]
 
 
 @HUB_DB
@@ -186,6 +188,72 @@ def test_the_hub_reads_goods_noted_as_arrived_as_goods_and_nothing_else_that_arr
         phrase
         for phrase in NOT_GOODS_ARRIVING
         if any(stock in concept or receive in concept for concept in shared.asked([phrase], own).concepts)
+    ]
+    assert named == []
+
+
+#: The supplier's drinks order told as arrived, in the words of the real-model QA in English and in Spanish: «order» and
+#: «pedido» are a table's check to the Hub, so the turn offered only the checks' tools and the model asked which table
+#: the 48 bottles of water and 24 beers were for.
+QA_ORDER_ARRIVED = [
+    ("en", "The drinks order just came in: 48 bottles of water and 24 beers."),
+    ("es", "Acaba de llegar el pedido de bebidas: 48 botellas de agua y 24 cervezas."),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "phrase"), QA_ORDER_ARRIVED)
+def test_the_drinks_order_told_as_arrived_is_offered_the_reception(catalog_of, role, language, phrase):
+    assert_offered_or_found(catalog_of(role, language), "inventory.stock.receive", phrase, language=language)
+
+
+#: An order told as arrived or come in, each with the words that name it as goods: a customer's order is taken, sent to
+#: the kitchen or served, and never arrives.
+ORDER_ARRIVED = [
+    ("en", "our beer order came in this morning", "order came in"),
+    ("en", "the fruit order just came in", "order just came in"),
+    ("en", "the wine order has come in, 12 cases", "order has come in"),
+    ("en", "the brewery order arrived", "order arrived"),
+    ("en", "the cleaning products order has arrived", "order has arrived"),
+    ("en", "the bread order just arrived", "order just arrived"),
+    ("es", "ha llegado el pedido de la fruta", "llegado el pedido"),
+    ("es", "acaba de llegar el pedido del vino", "llegar el pedido"),
+    ("es", "ya llegó el pedido de la cervecera", "llego el pedido"),
+    ("es", "hoy llega el pedido del pan", "llega el pedido"),
+    ("es", "el pedido ha llegado esta mañana", "pedido ha llegado"),
+    ("es", "el pedido acaba de llegar", "pedido acaba de llegar"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "phrase", "words"), ORDER_ARRIVED)
+def test_an_order_told_as_arrived_is_offered_the_reception(catalog_of, role, language, phrase, words):
+    assert_its_words_bring_the_reception(catalog_of(role, language), language, phrase, words, room=WITH_ROOM)
+
+
+#: A customer's order, which is a check and never goods: put on a table, sent to the kitchen or ready to serve.
+CUSTOMER_ORDERS = [
+    "add the drinks order to table 4",
+    "the order for table 5 is ready",
+    "send table 4's order to the kitchen",
+    "pon el pedido de bebidas en la mesa 4",
+    "el pedido de la mesa 5 ya está listo",
+    "pasa a cocina el pedido de la mesa 4",
+]
+
+
+def test_the_hub_reads_an_order_told_as_arrived_as_goods_and_a_customers_order_as_none():
+    """Inventory's own words: an order told as arrived or come in is the goods received, and without the Hub's groups
+    it is not (positive control); a customer's order names no goods."""
+    receive = shared.stem("receive")
+    assert_its_words_name("inventory", [(phrase, receive) for _, phrase, _ in ORDER_ARRIVED])
+    own = apps.get_app_config("inventory").assistant_synonyms
+    named = [
+        phrase
+        for phrase in CUSTOMER_ORDERS
+        if any(receive in concept for concept in shared.asked([phrase], own).concepts)
     ]
     assert named == []
 
