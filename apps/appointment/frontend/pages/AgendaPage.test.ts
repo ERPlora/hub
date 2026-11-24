@@ -210,6 +210,22 @@ describe('AgendaPage', () => {
     });
   });
 
+  it.each([
+    ['en', 'Keep it', 'Keep it'],
+    ['es', 'No borrar', 'No cancelar'],
+  ] as const)('in %s, leaving «Delete» without deleting says so, and leaving «Cancel» keeps its own words', async (locale, keep, notCancel) => {
+    const s = await setup();
+    await s.setLocale(locale);
+    const ask = async (actionId: string) => {
+      s.wrapper.findComponent(AppointmentList).vm.$emit('action', { actionId, row: row('a1') });
+      await settle();
+    };
+    await ask('delete');
+    expect(s.inDoc('appointment-delete-cancel')?.textContent?.trim()).toBe(keep);
+    await ask('cancel');
+    expect(s.inDoc('appointment-cancel-cancel')?.textContent?.trim()).toBe(notCancel);
+  });
+
   it('an employee whose account has no staff record is told so', async () => {
     const s = await setup(EMPLOYEE);
     await s.result('appointment.agenda.lanes', { ...LANES, rows: [], own_staff_id: null, sees_everyone: false });
