@@ -669,7 +669,7 @@ declare module '@erplora/ui/sdk' {
     'service.package.create': { input: PackageIn; output: PackageOut };
     'service.package.update': { input: PackagePatchIn; output: PackageOut };
     'service.package.delete': { input: PackageRefIn; output: DeletedOut };
-    'service.grant.list': { input: GrantListIn; output: Page<GrantOut> };
+    'service.grant.list': { input: GrantListIn; output: Page<ListedGrantOut> };
     'service.grant.list_orphans': { input: PageIn; output: Page<OrphanOut> };
     'service.grant.get': { input: ByIdIn; output: GrantDetailOut };
     'service.session.get': { input: SessionRefIn; output: SessionDetailOut };

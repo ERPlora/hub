@@ -563,9 +563,12 @@ Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Bonos vendidos** (de uno eliminado, con Estado en **Eliminado**).
 2. Sale una fila por compra, la más reciente primero.
-3. **Cargar más** trae la siguiente página; **Cerrar** vuelve a la tabla.
+3. Una compra cobrada con su venta la dice por el número con que la nombra Ventas, «Venta:
+   20261124-0001». Quien no puede ver esa venta (Ventas apagada, o una venta que no es suya) ve la fila
+   sin venta.
+4. **Cargar más** trae la siguiente página; **Cerrar** vuelve a la tabla.
 Entra: las compras de ese bono y el nombre de cada clienta (Clientes); de una ficha eliminada, su
-identificador.
+identificador; el número de la venta de cada compra, de la lectura de la venta de Ventas.
 Sale: nada; solo lectura. **Gastar una sesión** (SERVICE-F21), **Ajustar** y **Anular** salen donde proceden
 y para quien puede.
 Si falla: vacía, «Nadie ha comprado este bono todavía.»; si no se puede leer, «No se han podido
@@ -1178,11 +1181,12 @@ con la sesión de quien vende, como hace con Inventario.
   sesión de quien pregunta, a `sale.sale.get` (el número de la venta), a `sale.record.get` (una línea de la venta con
   `sale_line_id`, una de la cuenta con `line_id` y una devolución con `refund_id`, «Devolución de la venta …») y a
   `appointment.appointment.get` (la `label` de la cita). Una `reference` que no es una devolución es la venta anulada.
-- **Lo que los movimientos de un bono dicen de Ventas** (F19): `service.movement.list` llama por su nombre, con la
-  sesión de quien mira, a `sale.sale.get`, una vez por cada venta de la página: su `number` y quién sirvió la línea de
-  la sesión, la de su `order_line_id` (su `staff_id` o, vacío, el de la venta, como cuenta Ventas la producción).
-  Nada se copia en Servicios. Sin Ventas, sin permiso de ver ventas o con una venta que no es suya, `sale_number`
-  va nulo y la lista sale igual.
+- **Lo que los bonos vendidos y sus movimientos dicen de Ventas** (F16, F19): `service.grant.list` y
+  `service.movement.list` llaman por su nombre, con la sesión de quien mira, a `sale.sale.get`, una vez por cada venta
+  de la página (`queries/sale_numbers.py`): su `number`; los movimientos, además, quién sirvió la línea de la sesión,
+  la de su `order_line_id` (su `staff_id` o, vacío, el de la venta, como cuenta Ventas la producción). Nada se copia
+  en Servicios. Sin Ventas, sin permiso de ver ventas o con una venta que no es suya, `sale_number` va nulo y la
+  lista sale igual. Las escrituras del bono responden `GrantOut`, sin `sale_number`: solo lo pide la lista.
 
 ### Quién puede qué
 
