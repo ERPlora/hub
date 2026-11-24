@@ -286,6 +286,27 @@ def test_the_rename_is_undone_by_naming_it_as_before(former, settings):
 
 
 @HUB_DB
+def test_the_rename_takes_its_people_with_it_and_undoing_it_brings_them_back(former, hub_a, make_user, settings):
+    from base.models import Membership
+    from control.models import HubVisit
+
+    ana = make_user("ana", host="erplora", role="hub_owner")
+    Membership.objects.create(user=ana, host=hub_a.slug, role="hub_employee")
+    HubVisit.objects.create(host="erplora", saas_user_id="ana", day="2026-11-24")
+
+    def where() -> tuple:
+        people = set(Membership.objects.values_list("host", "role"))
+        return people, set(HubVisit.objects.values_list("host", flat=True))
+
+    command("--rename", "--execute")
+    assert where() == ({("erp", "hub_owner"), (hub_a.slug, "hub_employee")}, {"erp"})
+
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    command("--rename", "--execute")
+    assert where() == ({("erplora", "hub_owner"), (hub_a.slug, "hub_employee")}, {"erplora"})
+
+
+@HUB_DB
 def test_it_is_never_renamed_over_another_row_with_that_name(former, hub_a):
     from control.models import Hub
 
