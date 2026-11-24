@@ -271,35 +271,6 @@ def test_which_app_a_name_names_tells_it_being_set_up_or_failed_as_the_apps_scre
     assert said == {"Printing": "creating", "Website": "failed", "sale": "on", "Invoicing": "off"}
 
 
-def kept_elsewhere(hub, state: str) -> AppActivation:
-    """A row of Tasks kept in ``hub``'s database under another host: every row carries its business."""
-    with use_hub(Hub.objects.get(pk=hub.pk)):
-        return AppActivation.objects.create(host="elsewhere", app="task", state=state, chosen=False)
-
-
-@own
-def test_a_change_never_touches_the_row_another_host_keeps_in_the_same_database(hub_a):
-    given(hub_a, created=("task", "staff"))
-    other = kept_elsewhere(hub_a, OFF)
-
-    assert run(hub_a, "base.app.enable", "task")["state"] == "on"
-
-    with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        other.refresh_from_db()
-    assert (other.state, other.chosen) == (OFF, False)
-
-
-@own
-def test_the_first_change_writes_the_business_down_whatever_another_host_keeps_in_the_same_database(hub_a):
-    with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        AppActivation.objects.filter(host=hub_a.slug).delete()
-    kept_elsewhere(hub_a, ON)
-
-    run(hub_a, "base.app.enable", "task")
-
-    assert set(rows_of(hub_a)) == set(activation.module_graph())
-
-
 def never_reached(name: str, ctx: OperationContext, data: dict) -> None:
     """The operation ``name`` never runs for a business without its own database: it is not entered
     (``HubWithoutDatabase``; its host answers 503 maintenance), and from control a hub's operation is refused."""

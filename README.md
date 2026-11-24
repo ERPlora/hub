@@ -144,6 +144,13 @@ Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
 no lo publica).
 
+**Cambio de dirección web** (`PUT /internal/hubs/{id}` con otro `slug`, HUBS-F16 de erplora.com): el negocio se abre en la
+nueva como estaba. Lo que guarda en su base (las apps encendidas, los eventos y los caídos) no se lee por la dirección. Lo que
+control guarda por ella se muda en la misma transacción (`base/services/address_change.py`): sus personas
+(`Membership`) y quién entró (`HubVisit`). Las sesiones abiertas en la dirección que deja acaban, porque el navegador guarda
+cada una para su dirección, y en la que coge no queda nada de quien la tuvo antes. Tests:
+`base/tests/test_address_change.py`.
+
 Las puertas de WhatsApp (contrato en `apps/whatsapp_inbox/WORKBOOK.md`, «Contrato con el SaaS», puertas 1–4) llevan
 en el cuerpo el negocio, `hub` (su slug en la fase 1), y ejecutan la operación de la bandeja como el sistema en ese
 negocio:

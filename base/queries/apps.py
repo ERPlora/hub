@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Q, Min
+from django.db.models import Q, Min, QuerySet
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
@@ -227,48 +227,55 @@ def app_limit(hub: Hub | None) -> int | None:
     return activation.plan_limit(hub.state)
 
 
-def app_activations(host: str) -> dict[str, activation.Activation]:
-    """The rows of ``host``'s business (``base.activation.states_of`` reads them): empty while it never changed
-    anything."""
+def app_rows() -> QuerySet[AppActivation]:
+    """The business's rows, one per app: its database holds no other business's, whatever address they were written
+    under. One left with two, by a change of address before they were read so, has the one changed last."""
+    newest = AppActivation.objects.order_by("app", "-changed_at").distinct("app")
+    return AppActivation.objects.filter(pk__in=newest.values("pk"))
+
+
+def app_activations() -> dict[str, activation.Activation]:
+    """The business's rows (``base.activation.states_of`` reads them): empty while it never changed anything."""
     return {
         app: activation.Activation(state, chosen)
-        for app, state, chosen in AppActivation.objects.filter(host=host).values_list("app", "state", "chosen")
+        for app, state, chosen in app_rows().values_list("app", "state", "chosen")
     }
 
 
-def activations_due(host: str, now: dt.datetime) -> dict[str, str]:
-    """The apps of ``host``'s business whose tables the worker makes now, with the last migration the code that
+def activations_due(now: dt.datetime) -> dict[str, str]:
+    """The apps of the business whose tables the worker makes now, with the last migration the code that
     asked named (``target``): ``creating`` unless put off (a schema held, a newer code's request), or ``failed`` once
     its next try came."""
     due = Q(state=activation.CREATING) & (Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)) | Q(
         state=activation.FAILED, next_attempt_at__lte=now
     )
     return dict(
-        AppActivation.objects.filter(host=host, app__in=list(activation.module_graph()))
-        .filter(due)
+        app_rows()
+        .filter(due, app__in=list(activation.module_graph()))
         .order_by("app")
         .values_list("app", "target")
     )
 
 
-def activation_next_at(host: str) -> dt.datetime | None:
-    """When the worker has to look into ``host``'s business next for apps to set up: now for one ``creating`` and not put
+def activation_next_at() -> dt.datetime | None:
+    """When the worker has to look into the business next for apps to set up: now for one ``creating`` and not put
     off, else the earliest next try of one ``creating`` or ``failed``; ``None`` when none waits."""
-    waiting = AppActivation.objects.filter(
-        host=host, app__in=list(activation.module_graph()), state__in=[activation.CREATING, activation.FAILED]
+    waiting = app_rows().filter(
+        app__in=list(activation.module_graph()), state__in=[activation.CREATING, activation.FAILED]
     )
     if waiting.filter(state=activation.CREATING, next_attempt_at__isnull=True).exists():
         return timezone.now()
     return waiting.aggregate(next=Min("next_attempt_at"))["next"]
 
 
-def activations_stuck(host: str, now: dt.datetime) -> int:
-    """How many apps of ``host``'s business are stuck turning on: ``creating`` since it was asked
+def activations_stuck(now: dt.datetime) -> int:
+    """How many apps of the business are stuck turning on: ``creating`` since it was asked
     for more than ``activation.STUCK_AFTER`` before ``now`` (``changed_at``: a schema held or a newer code's request
     puts it off without moving it), or ``failed``, at once: an error the business already sees, and each retry moves its
     ``changed_at``. Only the apps this code knows."""
     return (
-        AppActivation.objects.filter(host=host, app__in=list(activation.module_graph()))
+        app_rows()
+        .filter(app__in=list(activation.module_graph()))
         .filter(Q(state=activation.CREATING, changed_at__lt=now - activation.STUCK_AFTER) | Q(state=activation.FAILED))
         .count()
     )

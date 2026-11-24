@@ -58,10 +58,10 @@ def _activate_in(hub, now: dt.datetime) -> None:
     """Read what is due in ``hub``'s database; make its tables, unless the request or the database is of a newer code
     than this worker's; settle the rows with how it went."""
     with use_hub(hub):
-        due = queries.apps.activations_due(hub.slug, now)
+        due = queries.apps.activations_due(now)
         if not due:
             # Rung for nothing due now (a retry still to come, or nothing left): its ring moves to what is next, or ends.
-            services.activation.activations_rung_at(hub.pk, queries.apps.activation_next_at(hub.slug))
+            services.activation.activations_rung_at(hub.pk, queries.apps.activation_next_at())
             return
     apps, error = sorted(due), ""
     code = _code()
