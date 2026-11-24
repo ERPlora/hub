@@ -154,11 +154,6 @@
       "count": 3
     }
   },
-  "apps/inventory/frontend/components/ProductFormModal.vue": {
-    "complexity": {
-      "count": 2
-    }
-  },
   "apps/inventory/frontend/composables/useProductImport.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -174,11 +169,6 @@
   },
   "apps/inventory/frontend/lib/download.ts": {
     "max-params": {
-      "count": 1
-    }
-  },
-  "apps/inventory/frontend/pages/ProductsPage.vue": {
-    "vue/max-lines-per-block": {
       "count": 1
     }
   },

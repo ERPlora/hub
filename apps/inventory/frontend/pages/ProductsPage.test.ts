@@ -7,13 +7,13 @@
 // «Write off stock» (physical products, with the permission to move stock), «Edit», «Mark sold out» or
 // «Put back on sale» (INVENTORY-F29, the «Sold out» mark beside the switch) and «Delete». A row opens its
 // sheet. A refused row action is said above the table.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+import { EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { IonToggle } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Component } from 'vue';
 
-import { business, EMPLOYEE, errorFrame, flush, mountInventory, ok, page, POLISH, product, refusal, subId, UNITS, type ApiCall, type MountOptions } from '../__tests__/mount-inventory';
+import { business, EMPLOYEE, errorFrame, flush, ok, page, POLISH, product, refusal, subId } from '../__tests__/mount-inventory';
+import { api, setup } from '../__tests__/products-page';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
@@ -21,7 +21,6 @@ import ProductDetailModal from '../components/ProductDetailModal.vue';
 import ProductFormModal from '../components/ProductFormModal.vue';
 import StockModal from '../components/StockModal.vue';
 import { formatMoney } from '../lib/format';
-import ProductsPage from './ProductsPage.vue';
 import source from './ProductsPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
@@ -42,39 +41,6 @@ const COFFEE = product();
 const MASSAGE = product({ id: 'p2', name: 'Massage', sku: 'SRV-1', product_type: 'service', tracks_stock: false, stock: '0.000', price: 3000 });
 const OLD = product({ id: 'p3', name: 'Old wine', sku: 'OLD-1', needs_tax_setup: true, tax_category_key: null, is_active: true });
 const LIST = page([COFFEE, MASSAGE, OLD], 3);
-
-/** The API of the page: units, the hub's stock setting; anything else answers `answer`. */
-function api(answer: (call: ApiCall) => Response = () => ok({})) {
-  return (call: ApiCall): Response => {
-    const path = call.url.split('?')[0];
-    if (path === '/api/inventory/units') return ok(UNITS);
-    if (path === '/api/inventory/config') return ok({ allow_sell_without_stock: false, low_stock_threshold: 10, track_stock: true });
-    return answer(call);
-  };
-}
-
-async function setup(options: MountOptions = {}, answer?: (call: ApiCall) => Response) {
-  const m = await mountInventory(ProductsPage, { path: '/inventory/products', api: api(answer), ...options });
-  const call = await m.live();
-  const testid = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="inventory-products-row"]');
-  async function act(actionId: string, row: unknown = COFFEE) {
-    table().vm.$emit('action', { actionId, row });
-    await flush();
-  }
-  async function onNewStream(data: unknown) {
-    await m.clock.advance(150);
-    await m.result(m.net.lastStream(), 'inventory.product.list', data);
-  }
-  /** What the table's funnel applies (`v-model:filters`): the filters by name, as typed. */
-  async function filter(values: Record<string, string>) {
-    table().vm.$emit('update:filters', values);
-    await flush();
-  }
-  return { ...m, call, testid, table, prop, rows, act, onNewStream, filter, show: (data: unknown, rev?: number) => m.result(call, 'inventory.product.list', data, rev) };
-}
 
 describe('ProductsPage: the list', () => {
   it('is the inventory page on its Products tab, following the products by name, 50 a page', async () => {
@@ -338,8 +304,8 @@ describe('ProductsPage: actions', () => {
       ['count', 'Count stock', false],
       ['write_off', 'Write off stock', true],
       ['edit', 'Edit', false],
-      ['sold_out', 'Mark sold out', true],
-      ['back_on_sale', 'Put back on sale', true],
+      ['sold_out', 'Mark sold out', true], ['back_on_sale', 'Put back on sale', true],
+      ['hide_from_website', 'Hide from website', true], ['show_on_website', 'Show on website', true],
       ['delete', 'Delete', true],
     ]);
     const stock = actions.filter((a) => ['receive', 'count', 'write_off'].includes(a.id));

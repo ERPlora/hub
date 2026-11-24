@@ -8,10 +8,10 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, psql } from './helpers';
-import { cleanInventory, createProduct, stamp } from './inventory-helpers';
+import { createProduct, stamp } from './inventory-helpers';
 import { keepPhotoOfA, type PhotoOfA } from './saas-photo';
 import { STACK } from './stack';
-import { atRest, ownerOfTheSite, photo, PUBLIC_SIZES, type Site, siteBackOffline, WIDE } from './website-helpers';
+import { atRest, menuSpecDone, ownerOfTheSite, photo, PUBLIC_SIZES, publishWithMenuOf, type Site, WIDE } from './website-helpers';
 
 const KEY = 'WEBSITE-MENU';
 const DOMAIN = 'www.micarta.test';
@@ -79,24 +79,11 @@ test.beforeAll(async ({ browser }) => {
   const latte = await createProduct(context, { name: LATTE, sku: `E2E-MENU-L-${RUN}`, price: 180, category_ids: [tapas.data.id] });
   const library = await api(context, A, 'POST', '/inventory/products/image', { id: latte.id, image: 'catalog:hospitality/cafe_con_leche' });
   expect(library.status, JSON.stringify(library.data)).toBe(200);
-  const content = {
-    ...found.content,
-    catalog: { hidden: false, title: '', source: 'inventory', category_ids: [tapas.data.id], show_prices: true },
-  };
-  const saved = await api(context, A, 'POST', '/website/site', { template: 'classic', theme: found.theme, content });
-  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
-  const published = await api(context, A, 'POST', '/website/site/publish');
-  expect(published.status, JSON.stringify(published.data)).toBe(200);
+  await publishWithMenuOf(context, found, [tapas.data.id]);
 });
 
 test.afterAll(async () => {
-  try {
-    if (owner && found) await siteBackOffline(owner.context, found);
-  } finally {
-    saasPhoto?.putBack();
-    cleanInventory();
-    await owner?.context.close();
-  }
+  await menuSpecDone(owner, found, () => saasPhoto?.putBack());
 });
 
 test(`${KEY}: the catalog's address opens the page at the menu, each dish with its photo, description and allergens, at 375, 820 and 1440`, async ({
