@@ -16,7 +16,7 @@ Para qué: bonos de varias sesiones: crearlos, gastarlos al cobrar, corregirlos 
 1. SERVICE-F12 — el bono «10 lavados».
 2. SERVICE-F13 — su precio, cambiado; un bono de prueba, eliminado.
 3. SERVICE-F14 — el asistente concede a Lucía el bono «10 lavados», con la venta que lo cobró.
-4. SERVICE-F16 — quién tiene «5 cortes».
+4. SERVICE-F16 — quién tiene «5 cortes» y quién «10 lavados» (la compra de Lucía, con su venta).
 5. SERVICE-F15 — el asistente dice qué bonos tiene Lucía.
 6. SALE-F27, SERVICE-F22 — el corte de Lucía, pagado con su bono.
 7. SERVICE-F24 — al cobrar, la sesión se gasta.
