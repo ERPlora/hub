@@ -120,4 +120,11 @@ class TableConfig(LiveAppConfig):
         Nav("sessions", _("Sessions"), "ion:time-outline", "/table/sessions", permission="table.view_session"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/table/settings", permission="table.manage_settings"),
     ]
-    help = Help()
+    help = Help(
+        flow_videos={
+            "TABLE-F01": {"es": ["0S_fWROlNYc"], "en": ["Wsv-T4bTWww"]},
+            "TABLE-F02": {"es": ["3UpXXiCV5Lk"], "en": ["DiPULg6x8T4"]},
+            "TABLE-F04": {"es": ["3UpXXiCV5Lk"], "en": ["DiPULg6x8T4"]},
+            "TABLE-F06": {"es": ["0S_fWROlNYc"], "en": ["Wsv-T4bTWww"]},
+        },
+    )
