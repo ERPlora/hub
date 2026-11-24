@@ -32,10 +32,7 @@ from base.schemas.assistant import (
 )
 
 #: What the model hears of a tool that did not run (in English, as its instructions).
-NOT_CONFIRMED = "Not confirmed by the person: nothing was done."
-STOPPED = "The person stopped this request: nothing more was done."
 NOT_AVAILABLE = "This tool is not available to this person here: nothing was done."
-NOT_FROM_THE_CHAT = "This cannot be done from the chat (it names no record): nothing was done. Say where it is done."
 #: What the model hears on the last round of a request, the one that offers it no tool.
 LAST_ROUND = (
     "This request has used all its steps: no more tools. Answer the person now: say what was done and what is left, "
@@ -150,11 +147,6 @@ def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.To
     return {**ran, **assistant.handed_files.receipt(outcome)}
 
 
-def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOutcome":
-    """A tool that did not run, told to the model in the same envelope as an operation's error."""
-    return shared.ToolOutcome(outcome, code, shared.error_content(code, message))
-
-
 @dataclasses.dataclass(frozen=True)
 class _Calls:
     """What the calls of a turn run among: the person's tools and the files they attached, each by its name."""
@@ -169,9 +161,9 @@ def _assistant_answer(ctx, calls: _Calls, call, decision, *, stopped: bool):
     never in UTC, and its amounts in their currency (``assistant.tools.run``)."""
     op = shared.operation_of(call.name, calls.tools)
     if op is None:
-        return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None, ""
+        return shared.refusal("refused", "not_available", NOT_AVAILABLE), None, ""
     if stopped:
-        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
+        return shared.stopped(), None, ""
     try:
         arguments = None if op.kind == "query" else json.loads(call.arguments or "{}")
     except ValueError:
@@ -207,7 +199,7 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     answered = decision is not None and decision.call_id == call.call_id
     if card["blocked"] and not answered:
         return None, card, ""
-    declined = _assistant_declined(card, decision) if answered else None
+    declined = shared.declined(card, decision) if answered else None
     if declined is not None:
         return declined, None, ""
     failure, preview = assistant.cards.preview(ctx, op, given, found=found)
@@ -218,18 +210,6 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     if not answered or call.shown != shown:
         return None, drawn, shown
     return assistant.tools.run(_assistant_approved(ctx, op, call.arguments), op, json.dumps(given)), None, ""
-
-
-def _assistant_declined(card: dict, decision) -> "shared.ToolOutcome | None":
-    """What the person's answer to ``card`` leaves undone: a card that names no record, «Cancel all», a «no» or a
-    word typed wrong; ``None`` when it is a yes to run."""
-    if card["blocked"]:
-        return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT)
-    if decision.stop:
-        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED)
-    if not decision.accepted or not shared.confirmed(card, decision.typed):
-        return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED)
-    return None
 
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
@@ -328,7 +308,7 @@ def _assistant_late(messages: list[dict], pending: list) -> list[dict]:
     left. None within the request's rounds."""
     if shared.rounds(messages) <= shared.MAX_ROUNDS:
         return []
-    told = _assistant_refusal("refused", "base.assistant_out_of_steps", OUT_OF_STEPS).content
+    told = shared.refusal("refused", "base.assistant_out_of_steps", OUT_OF_STEPS).content
     return [{"role": "tool", "tool_call_id": call.call_id, "content": told} for call in pending]
 
 
