@@ -1,14 +1,16 @@
 """Read operations of the website app (``READ ONLY``) and the helpers its writes and its public home share.
 
 - **The editor**: ``website.site.get`` (the draft and what is published), ``website.site.preview`` (the draft
-  rendered as visitors would see it, with a fresh catalog) and ``website.qr.get`` (the QR of the hub's address).
+  rendered as visitors would see it, with a fresh catalog) and ``website.qr.get`` (the QR of the hub's address, or of
+  that address right at its catalog).
 - **The public reads** (no session, ``permission=None``): ``website.public.site``, ``website.public.catalog`` and
   ``website.public.reviews`` answer only while the module is on in the hub (404 ``app_inactive`` otherwise) and the hub's own site is published
   and live (404 ``website.not_published`` otherwise), the same guard ``/`` applies (``public_home.is_published``,
   through :func:`live_version`), and count each visitor (``base.throttle``: 60 a minute per hub and address, then
   429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version, language and currency; the
   reviews are those kept (``apps.website.reviews``: a read never asks Google).
-- **The catalog** (``read_catalog``): Inventory's products on sale or Services' offered services, read by their
+- **The catalog** (``read_catalog``, each item as ``catalog_items`` makes it): Inventory's products on sale (with their
+  photo, description and allergens; only those it shows on the website) or Services' offered services, read by their
   operations' names with a context that may read them (as ``apps.flow`` does), only while that app is on in the hub
   (``base.apps_on.active_apps``, the website's own guard); an app that is off or not there leaves the catalog empty,
   never an error.
@@ -21,7 +23,6 @@
 Every read is of the business's own database, which holds its one site and its images.
 """
 
-import base64
 from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
@@ -36,8 +37,9 @@ from live.errors import AppInactive, NotFound
 from live.operations import INTERNAL, get, operation, registry
 
 from apps.website import reviews
+from apps.website.catalog_items import product_item, service_item
 from apps.website.models import Image, Site
-from apps.website.qr import CONTENT_TYPES, public_url, qr_image
+from apps.website.qr import public_url, qr_file
 from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site, reviews_view
 from apps.website.schemas import (
     DAYS,
@@ -88,8 +90,6 @@ SOURCES = {
 }
 #: A site visitors see: published at least once and online.
 LIVE = Q(is_live=True, published_version__gt=0)
-#: How Services' pricing reads on the page.
-SERVICE_PRICE_KINDS = {"fixed": "fixed", "from": "from", "hourly": "hourly", "free": "free", "variable": "none"}
 
 
 # The site
@@ -229,14 +229,7 @@ def business_day(scope: Scope) -> str:
     ai=INTERNAL,
 )
 def get_qr(ctx: OperationContext, data: QrIn) -> dict:
-    url = public_url(ctx.scope.key, ctx.request)
-    return {
-        "format": data.format,
-        "url": url,
-        "content_type": CONTENT_TYPES[data.format],
-        "filename": f"website-qr-{ctx.scope.key}.{data.format}",
-        "content_base64": base64.b64encode(qr_image(url, data.format)).decode("ascii"),
-    }
+    return qr_file(ctx.scope.key, ctx.request, data.format, data.target)
 
 
 @operation(
@@ -548,14 +541,12 @@ def _service_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
     grouped: dict[str, tuple[str, list[dict]]] = {}
     for row in _rows(ctx, "service.service.list_for_sale"):
         category_id = str(row.category_id) if row.category_id else ""
-        kind = SERVICE_PRICE_KINDS.get(row.pricing_type, "none")
-        item = {"name": row.name, "price": row.price, "price_kind": kind, "minutes": row.duration_minutes}
-        grouped.setdefault(category_id, (row.category_name or "", []))[1].append(item)
+        grouped.setdefault(category_id, (row.category_name or "", []))[1].append(service_item(row))
     return _ordered(grouped, order)
 
 
 def _product_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
-    """Inventory's products on sale under each of their categories, in the categories' order; those without one last."""
+    """Inventory's products on sale that it shows on the website, by category in their order; without one, last."""
     categories = _product_categories(ctx)
     order = {str(row.id): position for position, row in enumerate(categories)}
     names = {str(row.id): row.name for row in categories}
@@ -563,8 +554,8 @@ def _product_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
     for link in _rows(ctx, "inventory.product_category.list", limit=MAX_ITEMS * 5):
         links.setdefault(str(link.product_id), []).append(str(link.category_id))
     grouped: dict[str, tuple[str, list[dict]]] = {}
-    for row in _rows(ctx, "inventory.product.list_for_sale"):
-        item = {"name": row.name, "price": row.price, "price_kind": "fixed" if row.price else "none", "minutes": None}
+    for row in _rows(ctx, "inventory.product.list_for_sale", show_on_website=True):
+        item = product_item(row)
         for category_id in [cid for cid in links.get(str(row.id), []) if cid in names] or [""]:
             grouped.setdefault(category_id, (names.get(category_id, ""), []))[1].append(item)
     return _ordered(grouped, order)

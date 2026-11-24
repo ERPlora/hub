@@ -625,7 +625,7 @@ export interface MovementOut {
   customer_name: string | null;
   service_id: string | null;
   service_name: string | null;
-  /** The professional who did a session (hub#1236); null = nobody said, and on an adjustment. */
+  /** Who did a session: said outside the till, or who served its sale line; null = nobody said, or an adjustment. */
   member_id: string | null;
   member_name: string | null;
   sale_id: string | null;
@@ -669,7 +669,7 @@ declare module '@erplora/ui/sdk' {
     'service.package.create': { input: PackageIn; output: PackageOut };
     'service.package.update': { input: PackagePatchIn; output: PackageOut };
     'service.package.delete': { input: PackageRefIn; output: DeletedOut };
-    'service.grant.list': { input: GrantListIn; output: Page<GrantOut> };
+    'service.grant.list': { input: GrantListIn; output: Page<ListedGrantOut> };
     'service.grant.list_orphans': { input: PageIn; output: Page<OrphanOut> };
     'service.grant.get': { input: ByIdIn; output: GrantDetailOut };
     'service.session.get': { input: SessionRefIn; output: SessionDetailOut };

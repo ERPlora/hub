@@ -195,17 +195,22 @@ def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting
 
 #: The cart's reads that give a line's id (``cart_checkout.item.update`` and ``.item.remove`` take it, never a product).
 LINE_READS = {"cart_checkout.cart.get", "cart_checkout.item.list"}
+#: The task the model searches for when the request brings the cart's reads past the places of a turn.
+LINE_SEARCHED = {"cart_checkout.item.update": "ver las líneas de un carrito"}
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("name", ["cart_checkout.item.update", "cart_checkout.item.remove"])
 def test_a_reported_change_of_a_line_is_offered_a_read_that_finds_the_line(catalog_of, name):
     """The person names the line by its product («el Café de QA-WEB-1»), the tool takes its id: the same turn offers a
-    read of the cart that gives it, so the model finds the line instead of asking for its id."""
+    read of the cart that gives it, or the search for its task (``LINE_SEARCHED``) finds one, so the model finds the
+    line instead of asking for its id."""
     tools = catalog_of(Membership.Role.OWNER, "es")
     offered = offered_to(tools, dict(REPORTED)[name])
     assert name in offered, offered
-    assert LINE_READS & set(offered), offered
+    task = LINE_SEARCHED.get(name)
+    found = {op.name for op in assistant.relevance.found(tools, task, "es")} if task else set()
+    assert LINE_READS & (set(offered) | found), offered
 
 
 def test_the_hub_reads_a_cesta_as_a_cart_and_units_as_a_quantity():

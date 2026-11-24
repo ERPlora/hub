@@ -13,7 +13,7 @@ from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
 from apps.sale.api import router
-from apps.sale.tests.conftest import HOST, HUB_DB, A, run
+from apps.sale.tests.conftest import DECLARED_STEP, HOST, HUB_DB, A, run
 from base.tests.routes import bound_routes, spa_route_map
 from config.api import api
 
@@ -32,6 +32,7 @@ ROUTES = {
     ("POST", "/sale/sales/refund", "sale.sale.refund"),
     ("POST", "/sale/sales/issue_documents", "sale.sale.issue_documents"),
     ("GET", "/sale/checkout/preview", "sale.checkout.preview"),
+    ("GET", "/sale/checkout/steps", "sale.checkout.steps"),
     ("GET", "/sale/orders", "sale.order.list"),
     ("GET", "/sale/orders/detail", "sale.order.get"),
     ("POST", "/sale/orders", "sale.order.open"),
@@ -49,6 +50,7 @@ ROUTES = {
     ("POST", "/sale/orders/void_line", "sale.order.void_line"),
     ("POST", "/sale/orders/fire", "sale.order.fire"),
     ("POST", "/sale/orders/print_bill", "sale.order.print_bill"),
+    ("POST", "/sale/orders/note_bill", "sale.order.note_bill"),
     ("POST", "/sale/orders/split", "sale.order.split"),
     ("POST", "/sale/orders/merge", "sale.order.merge"),
     ("POST", "/sale/orders/void", "sale.order.void"),
@@ -210,6 +212,13 @@ def test_an_added_amount_without_an_app_that_takes_it_is_a_409_over_http(employe
     assert refused.status_code == 409
     assert refused.json()["error"]["code"] == "sale.added_amount_not_accepted"
     assert get(employee_client, "/sale/sales").json()["total"] == 0
+
+
+@HUB_DB
+def test_whoever_charges_reads_the_steps_the_apps_on_add_to_the_charge_over_http(employee_client, a_step_at_the_charge):
+    steps = get(employee_client, "/sale/checkout/steps")
+    assert steps.status_code == 200, steps.json()
+    assert steps.json() == {"steps": [DECLARED_STEP]}
 
 
 @HUB_DB

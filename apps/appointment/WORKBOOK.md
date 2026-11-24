@@ -245,6 +245,8 @@ Pasos:
 4. Pulsa **Añadir cita**. Si el negocio permite solapes y esa hora choca con otra cita del
    profesional, responde a «Cita solapada».
 5. La cita aparece como **Confirmada** con su número (por ejemplo, APT-20261116-0001).
+6. Por el asistente, la tarjeta de confirmación pone delante la clienta, el día y la hora y el servicio; después,
+   la profesional.
 Entra: la ficha de la clienta (Clientes), los servicios con su precio y duración (Servicios), el
 profesional y quién hace qué (Personal y Servicios), el horario del negocio (Horarios) y el turno y las
 ausencias del profesional (Personal).
@@ -459,6 +461,8 @@ Pasos:
    los minutos y, si quieres, «Termina el (opcional)» o «Número de citas (opcional)».
 3. Pulsa **Crear cita periódica**: se crea la serie y se reservan sus citas hasta la antelación máxima de
    los ajustes.
+4. Por el asistente, la tarjeta de confirmación pone delante la clienta, cuándo se repite (el primer día, la hora y
+   cada cuánto) y el servicio; después, la profesional.
 Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Personal) y los ajustes de
 Citas.
 Sale: la serie activa, sus citas y el aviso `appointment.recurring.created`.
@@ -510,6 +514,8 @@ Pasos:
 5. El aviso dice solo lo que ha pasado: cuántas citas se mueven, con quién y con qué servicios van ahora,
    cuántas fechas nuevas se reservan, cuántas se cancelan y cuáles se quedan a su hora, con su fecha;
    si no ha hecho falta cambiar ninguna, «Guardado: no ha hecho falta cambiar ninguna cita.».
+6. Por el asistente, la tarjeta de confirmación pone delante la serie, desde cuándo y lo que cambia de cuándo se
+   repite, y después la profesional y los servicios nuevos.
 Entra: una serie y la fecha desde la que cambia.
 Sale: la serie partida en dos (la vieja termina el día antes) o, si el cambio empieza en su primera
 fecha, la misma serie editada; el aviso `appointment.recurring.updated`.
@@ -548,6 +554,8 @@ Pasos:
 2. Desde ese momento nadie puede reservar en esa franja; sin profesional, bloquea todo el negocio. Un
    bloqueo de día entero cubre esos días enteros, en la reserva y en las horas libres.
 3. La rejilla de «Por profesional» lo pinta rayado en su fila (o en todas, si es del negocio).
+4. Por el asistente, la tarjeta de confirmación pone delante de quién es el bloqueo (si es de una persona), su
+   inicio y su fin como un periodo («26 nov 2026, 14:00–15:00») y qué es.
 Entra: el profesional (Personal), si el bloqueo es suyo.
 Sale: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
 Si falla: «El final no puede ser anterior al inicio.»; quitar uno que ya no está, «Ese bloqueo no existe en
@@ -631,7 +639,9 @@ Pasos:
 2. Al final, el bloque **Historial de visitas** enseña sus 10 últimas citas, la más reciente primero,
    con el día y la hora, los servicios, el profesional, el estado y las notas (la interna primero).
 Entra: las citas de la clienta que quien mira puede ver. Por la API o el asistente la clienta se nombra por su
-nombre, su teléfono o su email; por teléfono o email, solo quien ve el contacto de los clientes (BASE-F119).
+nombre (entero o una parte, con tildes o sin ellas, como la encuentra la lista de Clientes: «Lucía», «Lucia
+Fernandez»), su teléfono o su email; por teléfono o email, solo quien ve el contacto de los clientes (BASE-F119).
+Si encajan varias clientas, la respuesta dice cuáles para elegir.
 Sale: nada (solo lee). Una automatización lo lee sin notas ni motivos.
 Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este cliente aún no tiene citas.»
 Implicados: CUSTOMER-F24, BASE-F119
@@ -886,14 +896,14 @@ agenda tuya que enseñar.».
 
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1284): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.tenancy.recovery`) con las citas de la copia que aún no han llegado y siguen
-  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.appointments_in_copy`, por SQL sobre los
+  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.recovery.appointments_in_copy`, por SQL sobre los
   nombres de los modelos: la copia no es un negocio y no tiene alias). La que el negocio aún guarda borrada vuelve la
-  misma por `appointment.appointment.restore` (`queries.appointments_deleted_in_business`, por su id, salvo que se
+  misma por `appointment.appointment.restore` (`queries.recovery.appointments_deleted_in_business`, por su id, salvo que se
   volviera a reservar: otra viva de su clienta a su hora, o de su serie en su fecha, según lo que el negocio guarda de
   ella y no lo que dice la copia; hub#1326). La restauración bloquea primero su serie (como toda escritura: una pasada
   de la serie no reserva esa fecha a la vez) y juzga, si sigue reservada, como una reserva: ficha viva, servicios y
   profesional reservables y la hora libre, con las reglas de una automatización. La que el negocio no tiene
-  (`queries.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
+  (`queries.recovery.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
   crea por `appointment.appointment.create`. La clienta se casa por la regla de
   Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
   la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
@@ -908,8 +918,8 @@ agenda tuya que enseñar.».
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
-  `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
-  `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
+  (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
 - **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo de la skill
@@ -918,7 +928,7 @@ agenda tuya que enseñar.».
   `staff.Member`; `AppointmentService.service` y `RecurringService.service` → `service.Service`. Los
   nombres se resuelven con `find_customer`, `find_service` y `resolve_member` de esas apps. La venta es
   un identificador opaco (`sale_id`): Venta no es requisito.
-- **Disponibilidad = Horarios ∩ Personal ∩ citas**: `queries.py` lee `schedule.hours.for_range` y
+- **Disponibilidad = Horarios ∩ Personal ∩ citas**: `queries/agenda.py` lee `schedule.hours.for_range` y
   `staff.availability.for_member` (sus operaciones, con un contexto de lectura que añade `schedule.view`
   y `staff.view` a quien reserva: reservar no exige permisos de esas apps), los bloqueos y las citas, y
   `engine.py` decide. Orden de los motivos (el primero gana): `invalid_start`, `in_past`, `too_soon`,
@@ -1003,7 +1013,7 @@ agenda tuya que enseñar.».
   Horarios. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
   reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
   pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
-  del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
+  del día de 25 h, las 09:00), y `queries.business.now()` da el instante en UTC para que la suma sea de tiempo real.
   La **duración** de una cita también cuenta tiempo real (`engine.ends_at`, en crear, lote, mover, series, horas
   libres y `availability.check`): 60 minutos son 60 minutos también la noche del cambio de hora, y lo que cambia
   es la hora de pared en que acaba (el 25/10/2026, las 01:37 + 90 min acaban a las 02:07 de la segunda vuelta; el

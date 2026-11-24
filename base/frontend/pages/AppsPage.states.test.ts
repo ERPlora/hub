@@ -85,16 +85,6 @@ describe('what the business’s country requires on (hub#997)', () => {
     expect(switchState(m, 'verifactu')).toMatchObject({ checked: false, disabled: false });
   });
 
-  it('turning off the app it came with never names it among what goes off with it', async () => {
-    confirmSpy.mockResolvedValue(false);
-    const m = await open('/apps');
-    await m.result(m.call, 'base.app.list', MINE);
-    await flip(m, 'sale', false);
-    const asked = confirmSpy.mock.calls[0][0];
-    expect(asked.message).toContain('Customers');
-    expect(asked.message).not.toContain('Taxes');
-  });
-
   it('in Spanish, with the country by its Spanish name', async () => {
     const m = await open('/apps', { locale: 'es' });
     await m.result(m.call, 'base.app.list', { ...MINE, country_name: 'España' });

@@ -3,7 +3,7 @@
 // of the business's zone.
 import { describe, expect, it } from 'vitest';
 
-import { addDays, formatDay, formatShortDate, formatTime, hhmm, todayIn, wallNowIn, weekdayOf } from './clock';
+import { addDays, formatDay, formatDayInSentence, formatShortDate, formatTime, hhmm, todayIn, wallNowIn, weekdayOf } from './clock';
 
 // Wednesday 14 October 2026, 23:30 UTC = Thursday 15, 01:30 in Madrid.
 const LATE = new Date('2026-10-14T23:30:00Z');
@@ -40,5 +40,10 @@ describe('the book’s clock', () => {
     expect(formatShortDate('2026-10-15', 'en')).toBe('10/15/2026');
     expect(formatTime('21:00:00', 'es')).toBe('21:00');
     expect(formatTime('21:00:00', 'en')).toBe('9:00 PM');
+  });
+
+  it('writes a day inside a sentence as the language does: the weekday in lower case in Spanish', () => {
+    expect(formatDayInSentence('2026-10-15', 'es')).toBe('jueves, 15 de octubre');
+    expect(formatDayInSentence('2026-10-15', 'en')).toBe('Thursday, October 15');
   });
 });

@@ -95,7 +95,9 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     output=ImportOut,
     ai={
         "description": (
-            "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on its apps "
+            "Loads a template of the catalogue (a restaurant, a hair salon…), or a copy of a business the person "
+            "attached in the chat (a .blueprint.zip, from another business or a backup: its name in file_base64), "
+            "into this business: turns on its apps "
             "that are off (with the apps they need, within the plan's limit of apps), then loads its menu or services, "
             "its tables and the rest of its apps' data, app by app; what is already there is left as it was. An app "
             "still being set up («waiting») brings its data by itself when it is ready: nothing to do but say so. "
@@ -109,11 +111,13 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
                 "set me up like a hair salon",
                 "fill the business with the café starter menu",
                 "import the restaurant template",
+                "load this copy of another business I attached",
             ),
             "es": (
                 "carga la plantilla de restaurante",
                 "quiero empezar con la plantilla de bar",
                 "importa la plantilla de restaurante",
+                "cárgame la copia de otro bar que te he adjuntado",
             ),
         },
         "summary": _import_summary,

@@ -195,7 +195,11 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Regis
 Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
 quiere, una clave del intento: repetir la misma llamada con la misma clave responde el pago ya registrado
-en vez de registrar otro.
+en vez de registrar otro. La tarjeta del asistente dice en su línea a quién se paga, la factura del
+proveedor y el importe («Crear en Pagos: Pescados QA · F-2611 · 180,00 €»); sin factura, el método del que
+sale va detrás del importe («Pescados QA · 180,00 € · Cuenta BBVA»), y los demás datos siguen, cada uno una vez.
+El método sale tal como lo encuentra el pago, aunque se dijera con otras palabras («Cuenta BBVA» cuando se
+dijo «el del BBVA»).
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` — la fecha es la del día del negocio en
 que se registra, no la del pago; el número cuenta por día y nunca se repite — y el aviso
 `payment.payment.created` (lleva la referencia, el beneficiario, el importe y la moneda).
@@ -207,7 +211,8 @@ puede ser 1.250 € o 1,25 €: hay que escribir los decimales); un beneficiario
 válido («Ese IBAN no es válido: revisa el país, los dígitos de control y la longitud.»); un método
 que no existe («Ese método de pago no existe en este negocio.») o desactivado («Ese método de pago
 está desactivado: elige uno activo.»). Por el asistente, un nombre de método que encaja con varios
-dice cuáles («“Caja” encaja con varios métodos de pago: …»). Una clave de intento que ya registró
+dice cuáles («“Caja” encaja con varios métodos de pago: …»); ese, uno que no existe o uno desactivado no
+sacan tarjeta: el asistente lo oye y pregunta. Una clave de intento que ya registró
 otro pago se rechaza («Esa clave de intento ya registró otro pago. Crea una clave nueva para cada
 pago.») y no se guarda nada.
 Implicados: FLOW-F11, FLOW-F21
@@ -313,11 +318,15 @@ Pasos:
    ha tocado.
 3. Para dejar de usarlo, pulsa **Desactivar** en su fila: pasa a **Desactivado** y deja de salir en
    «Nuevo pago». **Activar** lo devuelve.
-Entra: el método (por el asistente, por su nombre) y lo que cambia.
+Entra: el método (por el asistente, por su nombre) y lo que cambia. La tarjeta del asistente dice el
+método que va a cambiar tal como lo encuentra, aunque se dijera con otras palabras («Cambiar en Pagos:
+Cuenta BBVA 4821 · BBVA QA proveedores» cuando se dijo «el del BBVA»).
 Sale: el método cambiado (`payment.method.updated`, `.deactivated`, `.activated`). Los pagos que ya
 lo usaron lo conservan y enseñan su nombre nuevo.
 Si falla: un nombre que ya tiene otro método se rechaza debajo de Nombre. Desactivar uno desactivado
-o activar uno activo no cambia nada y dice por qué. Un método no se borra nunca.
+o activar uno activo no cambia nada y dice por qué. Un método no se borra nunca. Por el asistente,
+un nombre que encaja con varios métodos o con ninguno no saca tarjeta: el asistente dice cuáles encajan y
+pregunta cuál.
 Implicados: FLOW-F11, FLOW-F21
 
 ## Pagos: lo que entra y lo que sale
@@ -330,6 +339,7 @@ Implicados: FLOW-F11, FLOW-F21
 | `payment.payment.get` | Un pago entero, por su id o su referencia, con su IBAN completo | `payment.view_payment` | F06 |
 | `payment.method.list` | Los métodos, paginados, con búsqueda (nombre o cuenta), tipo, estado y orden | `payment.view_payment` | F01, F02, F08 |
 | `payment.method.get` | Un método, por su id o su nombre, con su cuenta completa | `payment.view_payment` | F08 |
+| `payment.payment.check` | El método activo del que sale un pago nuevo, tal como lo encuentra al registrarlo: lo que el asistente comprueba antes de su tarjeta; no es herramienta del asistente ni tiene ruta en la API | `payment.add_payment` | F02 |
 
 ### Lo que ofrece: acciones (cambian datos)
 

@@ -16,7 +16,7 @@ from live.errors import Conflict, NotFound
 from live.meta import Category, module_configs
 from live.operations import AI, INTERNAL, operation
 
-from base import activation, business, entitlement, home
+from base import activation, app_switch, business, entitlement, home
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models.activation import AppActivation
 from base.models import Hub
@@ -123,6 +123,9 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                         label for label in activation.required_by(config.label, current, graph) if label in shown
                     ],
                     "refusal": refusal(config.label),
+                    "along_said": app_switch.switch_said(
+                        config.label, current, graph, kept, language=ctx.language
+                    ),
                     "mandatory": home.mandatory_in(config, country),
                 }
                 for config in configs
@@ -211,6 +214,7 @@ def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
         return {
             "id": config.label,
             "name": str(config.verbose_name),
+            "summary": str(config.summary),
             "state": state,
             "mandatory": home.mandatory_in(config, hub.country if hub else ""),
         }

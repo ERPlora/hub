@@ -1064,6 +1064,10 @@ msgstr "El almacén de archivos no ha respondido. Inténtalo de nuevo en un mome
 msgid "There is already a file or folder with that name here."
 msgstr "Ya hay un archivo o una carpeta con ese nombre aquí."
 
+#: base/assistant/attachments.py
+msgid "There is no file «{name}» attached to this conversation: attach it again."
+msgstr "No hay ningún archivo «{name}» adjunto en esta conversación: vuelve a adjuntarlo."
+
 #: base/files.py
 #, python-format
 msgid "There is no space left for that file: your plan includes %(space)s."
@@ -1694,6 +1698,10 @@ msgstr "Elige al menos una app y qué puede hacer la key en ella."
 msgid "That app does not publish what the key would do on it."
 msgstr "Esa app no publica lo que la key haría en ella."
 
+#: services/api_keys.py
+msgid "A key may not do more than you may do yourself."
+msgstr "Una key no puede hacer más de lo que puedes hacer tú."
+
 #: services.py:2052
 msgid "Give the key a name."
 msgstr "Ponle un nombre a la key."
@@ -1976,11 +1984,6 @@ msgstr "Ninguna app tiene ese nombre o identificador."
 #, python-format
 msgid "“%(said)s” matches several apps: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias apps: %(names)s. Di cuál."
-
-#: base/services.py
-#, python-format
-msgid "%(first)s and %(last)s"
-msgstr "%(first)s y %(last)s"
 
 #: base/services.py
 #, python-format
@@ -2555,8 +2558,93 @@ msgctxt "base"
 msgid "Once on"
 msgstr "Una vez activada"
 
+msgctxt "base"
+msgid "Other apps"
+msgstr "Otras apps"
+
+#, python-format
+msgid "%(app)s needs %(apps)s: it turns on with it."
+msgid_plural "%(app)s needs %(apps)s: they turn on with it."
+msgstr[0] "%(app)s necesita %(apps)s: se activa con ella."
+msgstr[1] "%(app)s necesita %(apps)s: se activan con ella."
+msgstr[2] "%(app)s necesita %(apps)s: se activan con ella."
+
+#, python-format
+msgid "%(apps)s turns off with it: only %(app)s needed it."
+msgid_plural "%(apps)s turn off with it: only %(app)s needed them."
+msgstr[0] "%(apps)s se desactiva con ella: solo la necesitaba %(app)s."
+msgstr[1] "%(apps)s se desactivan con ella: solo las necesitaba %(app)s."
+msgstr[2] "%(apps)s se desactivan con ella: solo las necesitaba %(app)s."
+
 msgid "The assistant sent data that does not fit."
 msgstr "El asistente envió datos que no valen."
 
 msgid "The assistant sent data that does not fit: {names}."
 msgstr "El asistente envió datos que no valen: {names}."
+
+msgid "The assistant did not say what to change."
+msgstr "El asistente no dijo qué cambiar."
+
+#: models/roles.py
+msgid "description"
+msgstr "descripción"
+
+#: models/roles.py
+msgid "based on"
+msgstr "a partir de"
+
+#: models/roles.py
+msgid "what it allows"
+msgstr "qué permite"
+
+#: models/roles.py
+msgid "role of the business"
+msgstr "rol propio"
+
+#: models/roles.py
+msgid "roles of the business"
+msgstr "roles propios"
+
+#: models/__init__.py
+msgid "role in this business"
+msgstr "rol en este negocio"
+
+msgctxt "support access"
+msgid "support may come in"
+msgstr "soporte puede entrar"
+
+msgctxt "support access"
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "support access"
+msgid "updated by"
+msgstr "actualizado por"
+
+msgctxt "support access"
+msgid "support access"
+msgstr "acceso de soporte"
+
+msgctxt "support visit"
+msgid "person"
+msgstr "persona"
+
+msgctxt "support visit"
+msgid "name"
+msgstr "nombre"
+
+msgctxt "support visit"
+msgid "email"
+msgstr "email"
+
+msgctxt "support visit"
+msgid "entered at"
+msgstr "entró el"
+
+msgctxt "support visit"
+msgid "support entry"
+msgstr "entrada de soporte"
+
+msgctxt "support visit"
+msgid "support entries"
+msgstr "entradas de soporte"

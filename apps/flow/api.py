@@ -10,6 +10,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.flow import queries, services
+from apps.flow.schemas.catalog import CatalogIn
 from apps.flow.schemas.drafts import DraftListIn, DraftProposeIn, DraftRefIn
 from apps.flow.schemas.dry_run import SampleIn, TestIn
 from apps.flow.schemas.flows import CreateIn, EnabledIn, FlowListIn, FlowRefIn, GrantIn, StatusIn, UpdateIn
@@ -121,8 +122,8 @@ async def draft_dismiss(request, data: DraftRefIn):
 
 
 @bind(router, "flow.catalog.read", "/flow/catalog")
-async def catalog_read(request):
-    return await run_operation(request, queries.catalog.read_catalog)
+async def catalog_read(request, params: Query[CatalogIn]):
+    return await run_operation(request, queries.catalog.read_catalog, params)
 
 
 @bind(router, "flow.event.sample", "/flow/events/sample")

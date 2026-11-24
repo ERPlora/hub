@@ -7,7 +7,7 @@ the public context and the visitor's fingerprint.
   employee sees her own agenda).
 - **The public reads** (``online_booking.public``) answer only while the page is on, and ask the other apps
   with ``delegated(ctx)``: the same context with exactly what they need of Citas, Clientes, Servicios,
-  Horarios and Personal (as ``appointment.queries.reader`` does), never a role's.
+  Horarios and Personal (as ``appointment.queries.agenda.reader`` does), never a role's.
 - Every list pages (``limit`` ≤ 100) with ``id`` as the last tie-break.
 """
 
@@ -24,20 +24,13 @@ from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import get, operation
 
 from apps.appointment.models import Appointment, AppointmentService
-from apps.appointment.queries import (
-    bookable_members,
-    check_member,
-    day_bounds,
-    now,
-    zone_name,
-)
-from apps.appointment.queries import business_zone
-from apps.appointment.queries import current_settings as current_rules
+from apps.appointment.queries.booking import bookable_members, check_member
+from apps.appointment.queries.business import current_settings as current_rules, day_bounds, now
 from apps.appointment.queries.ownership import APPOINTMENTS
 from apps.appointment.schemas import SlotsIn
 from apps.customer.models import Customer
 from apps.customer.phones import candidates
-from apps.customer.queries import business_country
+from apps.customer.queries.reads import business_country
 from apps.customer.queries.contact import searched, sees_contact
 from apps.customer.search import normalize
 from apps.online_booking.models import Booking, Settings
@@ -60,6 +53,7 @@ from apps.service.models import Service
 from apps.service.queries.settings import current_settings as service_settings
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from base.business import business_zone, zone_name
 from base.ordering import list_order
 
 VIEW = "online_booking.view_booking"

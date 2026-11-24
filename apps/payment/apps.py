@@ -58,7 +58,17 @@ class PaymentConfig(LiveAppConfig):
         Nav("payments", _("Payments"), "lucide:send", "/payment/payments", permission="payment.add_payment"),
         Nav("methods", _("Methods"), "ion:wallet-outline", "/payment/methods", permission="payment.add_payment"),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "GLFTc6kYTk8", "en": "ajeaqIejNK0"},
+        flow_videos={
+            "PAYMENT-F01": {"es": ["OK2ZK8gru1U"], "en": ["SfCZrov4jeA"]},
+            "PAYMENT-F02": {"es": ["yorr2RF1IT0"], "en": ["hZyk-TWJJ9g"]},
+            "PAYMENT-F03": {"es": ["yorr2RF1IT0"], "en": ["hZyk-TWJJ9g"]},
+            "PAYMENT-F04": {"es": ["yorr2RF1IT0"], "en": ["hZyk-TWJJ9g"]},
+            "PAYMENT-F05": {"es": ["zIv0o81BH58"], "en": ["MMZbN9sJ6Eo"]},
+            "PAYMENT-F08": {"es": ["OK2ZK8gru1U"], "en": ["SfCZrov4jeA"]},
+        },
+    )
 
     fiscal_archive_models = ("PaymentMethod", "Payment")
 

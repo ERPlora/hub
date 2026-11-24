@@ -4,7 +4,7 @@
 // (a switch, «Yes»/«No», or «Not configured · Missing tax category», which opens the form; «Sold out» beside it) —,
 // search, sort, the filters behind the table's funnel (name, SKU, price and stock ranges, status), 50 a page. «+»,
 // import and export CSV; per row the sheet, the stock dialogs (physical products), edit, «Mark sold out» / «Put back on
-// sale» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused
+// sale», «Hide from website» / «Show on website» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused
 // row action (the switch, delete, export) is said above the table: no dialog is open then.
 import {
   type DataTableAction,
@@ -31,6 +31,7 @@ import ImportTaxModal from '../components/ImportTaxModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
 import ProductFormModal from '../components/ProductFormModal.vue';
 import StockModal, { type StockAction } from '../components/StockModal.vue';
+import { useFlagActions } from '../composables/useFlagActions';
 import { useLiveList } from '../composables/useLiveList';
 import { useProductImport } from '../composables/useProductImport';
 import { useServerTable } from '../composables/useServerTable';
@@ -162,9 +163,7 @@ const actions = computed<DataTableAction<Product>[]>(() => [
   ...(canChange.value
     ? [
         { id: 'edit', label: t('inventory.products.actions.edit'), icon: 'ion:create-outline' },
-        // INVENTORY-F29: one or the other, by what the article is now.
-        { id: 'sold_out', label: t('inventory.products.actions.soldOut'), icon: 'ion:ban-outline', hidden: (row: Product) => !!row.is_sold_out, menuOnly: true },
-        { id: 'back_on_sale', label: t('inventory.products.actions.backOnSale'), icon: 'ion:refresh-outline', hidden: (row: Product) => !row.is_sold_out, menuOnly: true },
+        ...flags.actions.value,
       ]
     : []),
   ...(canDelete.value
@@ -174,6 +173,7 @@ const actions = computed<DataTableAction<Product>[]>(() => [
 
 // ── Dialogs ───────────────────────────────────────────────────────────────────────────────────────
 const pageError = ref('');
+const flags = useFlagActions(pageError);
 const formOpen = ref(false);
 const editing = ref<Product | null>(null);
 const detailOpen = ref(false);
@@ -209,7 +209,6 @@ function openStock(kind: StockAction, row: Product | null = focused.value): void
 
 const update = useCommand('inventory.product.update');
 const remove = useCommand('inventory.product.delete');
-const soldOut = useCommand('inventory.product.set_sold_out');
 
 /** Bumped per product when the server refuses its switch: a fresh switch shows the saved state again. */
 const switchRevision = ref<Record<string, number>>({});
@@ -222,16 +221,6 @@ async function setActive(row: Product, active: boolean): Promise<void> {
     pageError.value = failure instanceof Error ? failure.message : t('inventory.products.updateError');
     // The switch flipped under the finger; the product did not change: put it back where it was.
     switchRevision.value = { ...switchRevision.value, [row.id]: (switchRevision.value[row.id] ?? 0) + 1 };
-  }
-}
-
-/** INVENTORY-F29: the till stops offering it (or offers it again); the row comes back by the stream. */
-async function setSoldOut(row: Product, value: boolean): Promise<void> {
-  pageError.value = '';
-  try {
-    await soldOut.run({ id: row.id, sold_out: value });
-  } catch (failure) {
-    pageError.value = failure instanceof Error ? failure.message : t('inventory.products.soldOutError');
   }
 }
 
@@ -253,10 +242,10 @@ async function askDelete(row: Product): Promise<void> {
 
 function onAction(event: DataTableActionEvent<Product>): void {
   const { actionId, row } = event;
+  if (flags.run(actionId, row)) return;
   if (actionId === 'detail') openDetail(row);
   else if (actionId === 'receive' || actionId === 'count' || actionId === 'write_off') openStock(actionId, row);
   else if (actionId === 'edit') openForm(row);
-  else if (actionId === 'sold_out' || actionId === 'back_on_sale') void setSoldOut(row, actionId === 'sold_out');
   else if (actionId === 'delete') void askDelete(row);
 }
 

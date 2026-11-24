@@ -44,12 +44,13 @@ from live.meta import all_live_app_configs, module_configs
 from live.shared_catalog import DOC_LANGUAGES
 
 from base.routers import SHARED_ALIAS
+from base.workbook_sections import FENCE, behind, closes, current_body
 from shared.models import App, AppDoc
 
 logger = logging.getLogger(__name__)
 
-WORKBOOK = "WORKBOOK.md"
-WORKBOOK_EN = "WORKBOOK.en.md"
+WORKBOOK, WORKBOOK_TRANSLATION = "WORKBOOK.md", "WORKBOOK.{}.md"  # {}: the language of the translation
+WORKBOOK_EN = WORKBOOK_TRANSLATION.format("en")
 #: The line that ends the customer's part of a WORKBOOK; compared exactly, outside code blocks.
 MAINTAINERS_HEADING = "## Para quien lo mantiene"
 #: The images of a module's documentation, linked relatively from its WORKBOOK.
@@ -64,16 +65,6 @@ SPANISH_CATALOG = PurePosixPath("locale/es/LC_MESSAGES/django.mo")
 #: Column lengths of ``shared.app`` the texts must fit in (``live.shared_catalog``).
 TEXT_LIMITS = {"verbose_name": 80, "summary": 120}
 
-_HEADER_FORMAT = "<!-- generated from WORKBOOK.md sha256:{} -->"
-#: What prints that first line for an app, in its Hub's checkout.
-_HEADER_COMMAND = (
-    'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
-    "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
-)
-_HEADER_RE = re.compile(
-    r"\A<!-- generated from WORKBOOK\.md sha256:([0-9a-f]{64}) -->[ \t]*\n+"
-)
-_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _COMMENT_START, _COMMENT_END = "<!--", "-->"
 _HEADING_ID_RE = re.compile(r'<h[1-6][^>]*\sid="([^"]*)"')
 _ANCHOR_RE = re.compile(r'<a\s[^>]*href="#([^"]*)"')
@@ -120,7 +111,7 @@ class RegistryError(CatalogError):
         return f"{len(self.problems)} problem(s) in the apps' registry:{lines}"
 
 
-# ── The WORKBOOK: its customer's part and its English translation ──────────────────────────────
+# ── The WORKBOOK: its customer's part and its translations ─────────────────────────────────────
 
 
 def user_part(text: str) -> str:
@@ -171,11 +162,11 @@ def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:  # noqa: C901
     last_blank, collapse = True, False
     for number, line in enumerate(text.splitlines(), start=1):
         if opened is None:
-            match = _FENCE_RE.match(line)
+            match = FENCE.match(line)
             if fence is not None or match:
                 if fence is None:
                     fence = match.group(1)
-                elif _closes(fence, line):
+                elif closes(fence, line):
                     fence = None
                 last_blank, collapse = not line.strip(), False
                 yield line, True
@@ -195,31 +186,6 @@ def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:  # noqa: C901
         raise WorkbookError(
             f"the HTML comment opened on line {opened} never closes: end it with «{_COMMENT_END}»."
         )
-
-
-def _closes(fence: str, line: str) -> bool:
-    """Whether ``line`` closes the fenced code block ``fence`` (its opening run of backticks or tildes) opened."""
-    match = _FENCE_RE.match(line)
-    return (
-        match is not None
-        and match.group(1)[0] == fence[0]
-        and len(match.group(1)) >= len(fence)
-        and not line.strip().lstrip(fence[0])
-    )
-
-
-def prose_lines(text: str) -> Iterator[tuple[int, str]]:
-    """Each line of ``text`` outside its fenced code blocks, with its number (the first is 1)."""
-    fence = None
-    for number, line in enumerate(text.splitlines(), start=1):
-        if fence is None:
-            match = _FENCE_RE.match(line)
-            if match:
-                fence = match.group(1)
-            else:
-                yield number, line
-        elif _closes(fence, line):
-            fence = None
 
 
 def _uncomment(line: str, opened: int | None, number: int) -> tuple[str, int | None]:
@@ -272,54 +238,50 @@ def source_hash(markdown: str) -> str:
     return hashlib.sha256(markdown.encode()).hexdigest()
 
 
-def en_header(digest: str) -> str:
-    """The first line of a ``WORKBOOK.en.md``: the hash of the Spanish part it was generated from."""
-    return _HEADER_FORMAT.format(digest)
-
-
-def translate_by_hand(label: str) -> str:
-    """How to bring app ``label``'s stale ``WORKBOOK.en.md`` up to date, for the errors that find it.
-
-    By hand: ERPlora uses no ``ANTHROPIC_API_KEY``, so no error sends to
-    ``translate_workbooks`` without ``--check``, which calls the Claude API. The header the command
-    prints (``en_header`` of the current Spanish part) is what makes the translation current.
-    """
-    return (
-        f"translate by hand the part of {WORKBOOK} that changed into {WORKBOOK_EN} and make its first "
-        f"line the header this prints: {_HEADER_COMMAND.format(label)}"
-    )
-
-
 @dataclass(frozen=True)
 class Translation:
-    """A module's WORKBOOK and the state of its English translation."""
+    """A module's WORKBOOK and the state of its translation into one language."""
 
     label: str
     source: str  # the Spanish customer's part
-    en_path: Path
+    path: Path
     state: str  # "missing", "current" or "stale"
-    en_body: str = ""  # WORKBOOK.en.md without its header, when current
+    body: str = ""  # the translation without its marks, when current
+    behind: tuple[str, ...] = ()  # the sections to translate again, when stale
 
 
-def workbook_translation(config) -> Translation:
-    """The Spanish part of ``config``'s WORKBOOK and whether ``WORKBOOK.en.md`` is generated from it.
+def translate_by_hand(state: Translation) -> str:
+    """How to bring a stale translation up to date, for the errors that find it.
+
+    By hand: ERPlora uses no ``ANTHROPIC_API_KEY``, so no error sends to
+    ``translate_workbooks`` without ``--check``, which calls the Claude API.
+    """
+    sections = "; ".join(state.behind) or "no section is missing: a heading or its mark is out of place"
+    return (
+        f"translate by hand into {state.path.name} each section of {WORKBOOK} that changed, with its mark on the "
+        f"line under its heading (the same headings, in the same order): {sections}"
+    )
+
+
+def workbook_translation(config, language: str = "en") -> Translation:
+    """The Spanish part of ``config``'s WORKBOOK and whether its translation into ``language`` is generated from it.
 
     Raises ``WorkbookError`` (via ``user_part``) and ``FileNotFoundError`` without ``WORKBOOK.md``.
     """
     root = Path(config.path)
     source = user_part((root / WORKBOOK).read_text(encoding="utf-8"))
-    en_path = root / WORKBOOK_EN
-    if not en_path.is_file():
-        return Translation(config.label, source, en_path, "missing")
-    en_text = en_path.read_text(encoding="utf-8")
-    match = _HEADER_RE.match(en_text)
-    if match is None or match.group(1) != source_hash(source):
-        return Translation(config.label, source, en_path, "stale")
-    return Translation(config.label, source, en_path, "current", en_text[match.end() :])
+    path = root / WORKBOOK_TRANSLATION.format(language)
+    if not path.is_file():
+        return Translation(config.label, source, path, "missing")
+    text = path.read_text(encoding="utf-8")
+    body = current_body(source, text)
+    if body is None:
+        return Translation(config.label, source, path, "stale", behind=tuple(behind(source, text)))
+    return Translation(config.label, source, path, "current", body)
 
 
 def workbook_configs(configs: Iterable | None = None) -> list:
-    """The apps whose ``WORKBOOK.en.md`` is generated: every module, and every platform app with a WORKBOOK
+    """The apps whose WORKBOOK is translated: every module, and every platform app with a WORKBOOK
     (``base``, which documents the Hub without being a module of the store: never in ``catalog_modules``)."""
     return [
         config
@@ -328,20 +290,20 @@ def workbook_configs(configs: Iterable | None = None) -> list:
     ]
 
 
-def stale_translations(configs: Iterable | None = None) -> list[str]:
-    """Labels of the apps (``workbook_configs``) whose ``WORKBOOK.en.md`` exists and no longer matches their WORKBOOK."""
-    stale = []
+def stale_translations(configs: Iterable | None = None, language: str = "en") -> dict[str, str]:
+    """By label, what to do with each existing translation into ``language`` that its WORKBOOK left behind (``workbook_configs``)."""
+    stale = {}
     for config in workbook_configs(configs):
         if (Path(config.path) / WORKBOOK).is_file():
             try:
-                if workbook_translation(config).state == "stale":
-                    stale.append(config.label)
-            except WorkbookError:
-                # A module's: build_registry reports the WORKBOOK itself. A platform app's (base) no
-                # registry reads, so it counts here, and the header command of ``translate_by_hand``
-                # (or ``translate_workbooks --app``, before any call) names the error.
+                state = workbook_translation(config, language)
+            except WorkbookError as error:
+                # A module's: build_registry reports the WORKBOOK itself. A platform app's (base) no registry reads.
                 if config.kind != "app":
-                    stale.append(config.label)
+                    stale[config.label] = f"{WORKBOOK}: {error}"
+                continue
+            if state.state == "stale":
+                stale[config.label] = translate_by_hand(state)
     return stale
 
 
@@ -467,15 +429,15 @@ def _documents(config, problems: list[str]) -> dict[str, str]:
     if state.state == "stale":
         problems.append(
             f"{config.label}: {WORKBOOK_EN}: out of date with {WORKBOOK}: "
-            f"{translate_by_hand(config.label)}"
+            f"{translate_by_hand(state)}"
         )
     elif state.state == "current":
         try:
-            check_anchors(state.en_body)
+            check_anchors(state.body)
         except WorkbookError as error:
             problems.append(f"{config.label}: {WORKBOOK_EN}: {error}")
         else:
-            docs["en"] = state.en_body
+            docs["en"] = state.body
     return docs
 
 

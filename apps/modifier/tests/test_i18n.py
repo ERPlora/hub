@@ -99,7 +99,7 @@ def test_spanish_texts_of_the_workbook():
             "mayor que cero."
         )
         assert (
-            str(schemas.MAX_BELOW_MIN)
+            str(schemas.groups.MAX_BELOW_MIN)
             == "El máximo no puede ser menor que el mínimo (0 = sin techo)."
         )
 

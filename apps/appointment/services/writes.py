@@ -20,24 +20,16 @@ from apps.appointment.models import (
     Recurring,
     Settings,
 )
-from apps.appointment.queries import (
-    CUSTOMER_SOURCES,
-    business_zone,
-    by_person,
-    check_member,
-    conflicts_of,
-    lines_for,
-    load_agenda,
-    may_book_for,
-    now,
-    resolve_services,
-    today,
-    verdict_message,
-)
-from apps.customer.queries import find_customer
+from apps.appointment.queries.access import by_person, may_book_for
+from apps.appointment.queries.agenda import conflicts_of, load_agenda, verdict_message
+from apps.appointment.queries.booking import check_member, lines_for, resolve_services
+from apps.appointment.queries.business import now, today
+from apps.appointment.queries.reads import CUSTOMER_SOURCES
+from apps.customer.queries.reads import find_customer
 from apps.service.models import Service
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from base.business import business_zone
 from base.queries.people import actor_name
 
 #: Run only by the platform (events.py): outside ``appointment.*``, so no role and no API key holds it.

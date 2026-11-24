@@ -189,7 +189,7 @@ seguir la numeración que traías de otro sistema. Solo la ve quien lleva las se
 #### Detalle
 Menú **Facturación → Series** (solo con permiso de llevar las series). La entrada «Cada serie define
 el prefijo, el formato y el contador de la numeración de un tipo de factura y un año…» y una tabla con
-«Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
+«Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIJO-AAAA-NNNNNN`), «Nº
 actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por debajo de 1280 px abre en
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
 {código}» (INVOICE-F12, INVOICE-F13). Sin emisor, lo dice el mismo aviso «Todavía no puedes facturar» de la
@@ -1271,7 +1271,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   (`base/assistant/relevance.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
   a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
   llegan a su operación desde el chat: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
+  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno,
   «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
   herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
   importes» sale 5.ª: live no lee como pedido el «cambiar» detrás de «ni» cuando
@@ -1290,7 +1290,7 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
   «Enviado a <impresora>.», el trabajo «Factura <número>»); la ayuda los enseña con un ejemplo (FACT-2026-000003,
   RECT-2026-000001, FACT, Oficina) o sin el hueco.
 - Los marcadores del formato de una serie (`{prefix}`, `{code}`, `{year}`, `{seq}` y `{seq:01d}`…`{seq:09d}`; vacío,
-  `PREFIX-YYYY-NNNNNN`) los enseña la ventana bajo el campo; el número es el `NumSerieFactura` de VeriFactu, solo
+  `PREFIJO-AAAA-NNNNNN`) los enseña la ventana bajo el campo; el número es el `NumSerieFactura` de VeriFactu, solo
   ASCII imprimible, y el código rechazado sin tarjeta del asistente es hub#872 (INVOICE-F12).
 - En INVOICE-F03, la categoría fiscal se nombra por su nombre y nunca por su clave (`product.generic`, hub#1149) y el
   botón se enciende al llegar la moneda (hub#938); el filtro de total lee el importe como el resto del Hub

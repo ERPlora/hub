@@ -6,6 +6,7 @@ import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 
+import { app } from '../__tests__/app-row';
 import { openFollower } from '../__tests__/followers';
 import { flush, OWNER } from '../__tests__/mount-base';
 import { sessionChanged } from '../lib/access';
@@ -17,23 +18,7 @@ vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/a
 const me = ref<SessionMe>(OWNER);
 
 function row(id: string, state: AppRow['state'] = 'on'): AppRow {
-  return {
-    id,
-    name: id,
-    icon: 'ion:cube-outline',
-    category: 'sales',
-    category_label: 'Sales',
-    summary: '',
-    premium: false,
-    right: 'free',
-    state,
-    chosen: true,
-    path: state === 'on' ? `/${id}/home` : null,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
-  };
+  return app(id, { name: id, state, path: state === 'on' ? `/${id}/home` : null });
 }
 
 function list(...apps: AppRow[]): AppList {

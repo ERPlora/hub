@@ -23,43 +23,17 @@ from live.outbox import record_event
 from apps.combo import events
 from apps.combo.models import ACTOR_MAX_LENGTH, ChoiceGroup, ChoiceOption, Combo
 from apps.combo.queries.new_choices import field_refusal, product_said
-from apps.combo.queries import (
-    find_combo,
-    find_group,
-    find_option,
-    group_row,
-    load_detail,
-    option_row,
-    sold_by_unit,
-    takeaway_targets,
+from apps.combo.queries.offers import sold_by_unit, takeaway_targets
+from apps.combo.queries.reads import find_combo, find_group, find_option
+from apps.combo.queries.rows import group_row, load_detail, option_row
+from apps.combo.schemas.choices import (
+    DroppedOut, DropProductIn, OptionBulkIn, OptionIn, OptionOut, OptionPatchIn, OptionReorderIn,
 )
-from apps.combo.schemas import (
-    CEILING_BELOW_FLOOR,
-    MAX_GROUPS,
-    MAX_OPTIONS,
-    ComboDetailOut,
-    ComboImageIn,
-    ComboImageUploadIn,
-    ComboIn,
-    ComboPatchIn,
-    ComboRecoverIn,
-    ComboRefIn,
-    DeletedOut,
-    DroppedOut,
-    DropProductIn,
-    GroupIn,
-    GroupOut,
-    GroupPatchIn,
-    GroupRecoverIn,
-    GroupRefIn,
-    GroupReorderIn,
-    OptionBulkIn,
-    OptionIn,
-    OptionOut,
-    OptionPatchIn,
-    OptionRefIn,
-    OptionReorderIn,
-)
+from apps.combo.schemas.courses import GroupIn, GroupOut, GroupPatchIn, GroupRecoverIn, GroupReorderIn
+from apps.combo.schemas.fields import CEILING_BELOW_FLOOR, MAX_GROUPS, MAX_OPTIONS, DeletedOut
+from apps.combo.schemas.images import ComboImageIn, ComboImageUploadIn
+from apps.combo.schemas.menus import ComboDetailOut, ComboIn, ComboPatchIn, ComboRecoverIn
+from apps.combo.schemas.references import ComboRefIn, GroupRefIn, OptionRefIn
 from apps.inventory import queries as inventory
 from apps.inventory.models import Product, Unit
 from apps.inventory.queries.reads import held

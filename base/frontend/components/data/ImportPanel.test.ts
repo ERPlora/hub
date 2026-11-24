@@ -4,6 +4,7 @@ import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtu
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { ImportRow } from '../../operations/blueprints';
 import { SESSION_CHANGED } from '../../lib/access';
+import { BLUEPRINT_FILE } from '../../lib/data';
 import ImportPanel from './ImportPanel.vue';
 
 afterEach(() => {
@@ -151,6 +152,8 @@ describe('ImportPanel', () => {
   it('a file: reads it in base64 and reviews it; one over 20 MB is refused before it is sent', async () => {
     const m = await panel({ '/api/settings/data/blueprints/inspect': () => Response.json(summary({ source: 'file' })) });
     const input = m.wrapper.get('[data-testid="import-file"]').element as HTMLInputElement;
+    // The file the assistant's panel also takes (HUB_ASSISTANT.toolFiles): one list for both.
+    expect(input.accept.split(',')).toEqual([BLUEPRINT_FILE.extension, BLUEPRINT_FILE.mime]);
     // What the page writes in the input's value: a file input only takes '' (emptied for the same file again).
     const written: string[] = [];
     Object.defineProperty(input, 'value', { get: () => 'C:\\fakepath\\chosen.zip', set: (value: string) => void written.push(value), configurable: true });
@@ -160,7 +163,8 @@ describe('ImportPanel', () => {
     Object.defineProperty(input, 'files', { value: [big], configurable: true });
     input.dispatchEvent(new Event('change'));
     await settle();
-    expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain('the file is larger than 20 MB.');
+    // The same words as the assistant's panel when a copy attached there is larger (base.data.import.fileTooBig).
+    expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain('The file could not be read: the file is larger than 20 MB.');
     expect(m.calls).toEqual([]);
     const small = new File([new Uint8Array([80, 75, 3, 4])], 'mine.blueprint.zip');
     Object.defineProperty(input, 'files', { value: [small], configurable: true });

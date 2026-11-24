@@ -58,6 +58,19 @@ Para qué: abrir el local, servir las mesas del mediodía y cobrar.
 
 Un defecto se abre como issue en el repo del Hub, con el ID del flujo y el paso del recorrido en el que salió.
 
+## Por pantalla o hablando con el asistente
+
+El mismo recorrido, en el mismo orden, se hace por pantalla o pidiéndole cada paso al asistente. No hay recorridos
+aparte para el asistente: `journeys/assistant.md` prueba su propio panel. Cuando se hace hablando:
+
+- **Cada paso se pide como lo pediría quien actúa en él**, en español o en inglés, con la frase entera o a medias a
+  propósito. Las frases no se guardan en el recorrido: las escribe quien prueba, como lo diría el dueño o el empleado,
+  sin nombrar herramientas, pantallas ni campos.
+- **Con la frase a medias, lo correcto es que el asistente pregunte** lo que falta antes de hacer nada.
+- **En un flujo que el asistente no hace, lo correcto es que lo diga** y mande a la pantalla donde se hace; quien prueba
+  lo hace entonces en pantalla, para que el recorrido siga.
+- **El resultado se comprueba en pantalla o en los datos**, nunca en lo que contesta el asistente.
+
 ## La cobertura
 
 ```bash
@@ -68,9 +81,23 @@ uv run python manage.py qa_coverage --ledger ~/qa/walks.csv
 - Sin opciones dice, por app, qué flujos hechos con pantalla están en algún recorrido, cuáles en ninguno y cuáles
   quedan **fuera del alcance visual**: los que no están `hecho` y los de `Pantalla: ninguna…`, que hace el sistema
   solo (su efecto se comprueba en el paso del recorrido que lo provoca).
-- Con `--ledger` cruza con el **registro de pasadas**, un CSV que vive fuera del repo con las columnas
-  `flow,date,device,app_version,result,issue` (una fila por flujo recorrido, la fecha como `AAAA-MM-DD`) y dice qué
-  flujos no se han recorrido nunca y cuándo fue la última vez de los demás, empezando por los más antiguos.
+- Con `--ledger` cruza con el **registro de pasadas**, un CSV que vive fuera del repo con una fila por flujo recorrido,
+  y dice, para la pantalla y para el asistente, qué flujos no se han recorrido nunca así y cuándo fue la última pasada
+  de los demás en cada canal, empezando por los más antiguos.
+
+| Columna | Qué lleva |
+|---|---|
+| `flow` | el ID del flujo; también los de erplora.com y la aplicación, que el comando solo nombra al final |
+| `date` | el día de la pasada, `AAAA-MM-DD` |
+| `device`, `app_version` | dónde se hizo y con qué versión |
+| `result` | `ok`, `partial` o `fail`: si el flujo hizo lo que dice su WORKBOOK; vacía si no llegó a hacerse |
+| `issue` | la issue del defecto, `repo#N`, o vacía |
+| `channel` | por dónde se hizo: `screen`, `assistant-es` o `assistant-en` |
+| `phrase` | la frase, `whole` (entera) o `partial` (a medias); vacía en pantalla |
+| `model_result` | `ok`, `partial` o `fail`: si el modelo entendió, preguntó cuando debía o mandó a la pantalla correcta; vacía en pantalla |
+
+El comando se para si al registro le falta una columna y, diciendo la línea, si una fecha no es `AAAA-MM-DD` o un canal
+no es uno de los tres.
 
 ## Cómo se mantiene
 

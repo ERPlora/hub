@@ -611,8 +611,14 @@ Pasos:
 1. Abre el asistente del Hub y pídele algo que pase solo, hablando o escribiendo («crea un flujo que al completar
    una venta de más de 100 € me cree una tarea»).
 2. El asistente escribe un **borrador**: nombre, cuándo arranca, de uno a ocho pasos de «hacer algo»,
-   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Antes de dejarlo te enseña su tarjeta y
-   espera tu sí, como cualquier cambio que te pide.
+   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Para escribirlo mira primero los nombres
+   de los avisos y las acciones de las apps del caso, y después lee enteros, con los datos que pide cada acción,
+   solo los que va a usar: también en un negocio con muchas apps llega a cualquier acción y usa los nombres y los
+   datos reales, sin avisarte de que no los pudo comprobar. Antes de dejarlo te enseña su tarjeta y espera tu
+   sí, como cualquier cambio que te pide. La tarjeta dice el nombre, cuándo arranca y cada paso con las mismas
+   frases que la lista y el editor («Cuando se cierra una caja», «Todos los días a las 10:00», «Crear una
+   tarea», «Esperar 1 hora»), nunca los códigos de su definición; igual si le pides que cree la automatización
+   directamente.
 3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas; lo revisas en **Propuestas por el
    asistente** (FLOW-F18).
 Entra: lo que se pide, en palabras, y lo que pueden usar las automatizaciones del negocio.
@@ -1252,7 +1258,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Una ejecución, con las palabras con que se nombra (su automatización y cuándo empezó) | ver | F24 | `flow.run.get` |
 | Los borradores pendientes del asistente (en vivo) | ver | F18, F19 | `flow.draft.list` |
 | Un borrador del asistente, esté pendiente, usado o descartado | ver | F18, F19 | `flow.draft.get` |
-| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto) | ver | F10, F11 | `flow.catalog.read` |
+| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto); todos, o solo los de unas apps o unos nombres, enteros o solo sus nombres | ver | F10, F11, F17 | `flow.catalog.read` |
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
@@ -1718,7 +1724,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   Bandeja de WhatsApp), «pasos» es «pasó» sin tilde («¿qué pasó con…?») y «pregunta» también es verbo («se les
   pregunta»); «borra» y «bórralo» tienen otra raíz que «borrador». `tests/test_assistant_asks.py` mide con las 30 frases
   reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-flow-2026-11-08.json`), nunca con los propios `asks`: cada
-  una se ofrece, y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
+  una se ofrece (o, las del último evento real, el recuento por evento y los permisos, las encuentra la búsqueda de
+  su tarea), y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
   ejecución, la receta; sin ella el modelo pedía el id). También cuando la automatización se nombra solo por su
   nombre propio: `live` da el peso del verbo pedido a la acción que lo hace dicho de otra forma, «activa X» a
   `flow.flow.set_enabled`, «renombra X» a `flow.flow.update` (recibe `name`) y «permite a X…» a `flow.flow.grant`.

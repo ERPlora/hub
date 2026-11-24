@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:5aa05709589510c0e397182bfa6b48d8a3f6ecf460e27fcce98e106c3b4e6399 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:e6ed4a05350a -->
 
 Tables is the floor plan of your place and its zones, such as the dining room, the terrace or the bar.
 At a glance you see which table is free, occupied or reserved and how long each group has been seated.
@@ -8,6 +7,7 @@ You tap a free table to seat a group and an occupied one to open its check, orde
 pressing and holding it, you move its check to another table, merge it with another one or split it.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:3aac7d55b653 -->
 
 Tables is the **floor plan of the restaurant or bar**: the zones of the room (dining room, terrace,
 bar), the tables of each zone with their capacity, their shape and their spot on the plan, and the
@@ -16,6 +16,7 @@ service, how many guests there are, since when and who serves them, and it knows
 which table.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:d127f563699a -->
 
 - The floor **manager** draws the plan: creates zones and tables, places them by dragging them and
   changes their capacity, their shape or their status.
@@ -25,12 +26,14 @@ which table.
   checks, corrects the guests, takes the table away from a check and closes a table by hand.
 
 ### What it does not do
+<!-- from WORKBOOK.md sha256:bb862340af76 -->
 
 Tables does not charge (that is Sales: the table takes you to the till with its check), does not take
 bookings (that is Reservations: Tables only sets the table aside on the plan) and is not the kitchen
 screen.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:92fa24b7c93a -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
@@ -80,6 +83,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   None of the ones consulted says the mark goes away when lines are added or the bill is printed again.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:be04001c0d6c -->
 
 - Tables needs **Sales** (the check of each table is an open check of Sales) and **Customers** (the
   customer of a table and forgetting their name). They are switched on with it and are not switched off
@@ -98,12 +102,14 @@ Initial setup, step by step:
 5. In **Floor plan**, "Service", tap a free table and seat it: its check opens in Sales.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:0389ca436095 -->
 
 The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sessions** and
 **Settings**. **Zones** and **Tables** show only to whoever can change them, and **Settings**, to whoever
 can change it; the buttons the profile cannot use do not show.
 
 ### Floor plan
+<!-- from WORKBOOK.md sha256:d7ebffba514e -->
 Here you see at a glance how the room is doing: each table in its place, with its colour and, when it is
 occupied, how long the party has been seated. In **Service** you tap a free table to seat a party and an
 occupied one to open its check, order more or charge it; pressing and holding a table, you move the check
@@ -118,6 +124,7 @@ The colour of each table says how it is:
 - **Grey stripes**, Blocked: it is out of service and cannot be seated.
 
 #### Details
+<!-- from WORKBOOK.md sha256:ad31524129ac -->
 Menu **Tables → Floor plan**. At the top are the strip of zones (it slides sideways on the phone and
 fades at an edge with more zones behind it), the **Service / Edit plan** switch (only for whoever can draw
 the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit zone"). Each tab has a dot
@@ -183,12 +190,14 @@ charges, moves or edits a table. It has two modes:
 The windows cover the whole screen on the phone and are centred on tablet and computer.
 
 ### Zones
+<!-- from WORKBOOK.md sha256:5d9ec3af9e94 -->
 Here you create and order the zones of your place, such as the dining room, the terrace or the bar,
 each with its colour. The zones are the tabs at the top of the **Floor plan**, and here you see how many
 tables each one has and how many are free right now. With the "+" you add a zone and, from its row, you
 change its name, its colour or its order.
 
 #### Details
+<!-- from WORKBOOK.md sha256:2e7133d35544 -->
 Menu **Tables → Zones**. Table: Name (with its colour), Tables, Free ("free / total"), Order, Status
 (Active, Inactive); search box "Search zone…", column filters behind the funnel, table or cards view.
 The "+" (only for whoever can create zones) opens the panel with Name, Description, Colour (Blue, Cyan,
@@ -197,12 +206,14 @@ Purple, Green, Amber, Red, Grey), Order and "Add zone"; per row "Edit" (the same
 in "Delete zone?" and leaves "Delete zone" off if the zone has tables.
 
 ### Tables
+<!-- from WORKBOOK.md sha256:b5ef031709da -->
 Here you have all the tables of your place in a list, with their number, zone, capacity and status. It
 is for finding a table, adding new tables with the "+" or changing their details with **Edit** without
 going through the plan. A new table appears in the first free spot of its zone; to move it into place,
 use **Edit plan** on the **Floor plan**.
 
 #### Details
+<!-- from WORKBOOK.md sha256:4e15f81e8669 -->
 Menu **Tables → Tables**. Table in natural order (2 before 10): Number, Name, Zone, Capacity, Status;
 search box "Search table…" (number and name), column filters behind the funnel (zone, status, shape,
 capacity), table or cards view. The "+" opens the panel with Number, Capacity, Width, Height, Zone and
@@ -210,12 +221,14 @@ capacity), table or cards view. The "+" opens the panel with Number, Capacity, W
 "Delete" (the administrator only, with confirmation).
 
 ### Sessions
+<!-- from WORKBOOK.md sha256:e4c2086d4faa -->
 Here you see the checks of the room, the open ones and those already closed, with their table, who
 serves, the guests and how long they have been running. From each row you look at the **Details** of a
 check, close one that was left open or, with **Seat again**, take a check that was left without a table
 to a free one.
 
 #### Details
+<!-- from WORKBOOK.md sha256:5020f8ed3fd9 -->
 Menu **Tables → Sessions**: the checks of the room. Tabs "Open", "Closed" and "All". Table: Table ("No
 table (parked)" if it has none), Charged and Closed (they do not show in Open), Zone, Server, Guests,
 Opened, Time, Status (Open, Closed, Transferred, Merged, Parked); the time of an open check turns amber
@@ -229,17 +242,20 @@ business's time. What was charged goes in the currency it was charged in: the bu
 with its decimals), never in euros if the business charges in another.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:73aa03dc474f -->
 Here you decide how the room works: whether the guests are asked for when a table is seated, and after
 how many minutes the time of an occupied table turns amber and then red. If they are not asked for, the
 table is seated with its capacity. Change what you need and tap **Save**: it applies to the whole
 business, on every device.
 
 #### Details
+<!-- from WORKBOOK.md sha256:c3a114219ff0 -->
 Menu **Tables → Settings**: "Ask for the guests when seating a table", "Amber warning (minutes)" and
 "Red warning (minutes)", and "Save". Only whoever can change them sees it (by default, the owner and the
 administrator).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:0356f21a2484 -->
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
@@ -253,12 +269,14 @@ In all of them: "Reconnecting…" while the live connection is recovered (what i
 is not active in this business" and "You do not have permission".
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:23e6ee2f8093 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -298,6 +316,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F34 | See which tables have asked for the bill | done |
 
 ### TABLE-F01 Create and order the zones of the room
+<!-- from WORKBOOK.md sha256:d8bca1dff5ed -->
 Status: done
 Actor: manager, administrator, assistant
 Screen: Zones; assistant
@@ -321,6 +340,7 @@ of permission.
 Involved: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Add tables
+<!-- from WORKBOOK.md sha256:a24292b9d079 -->
 Status: done
 Actor: manager, administrator
 Screen: Home, Floor plan (Edit plan), Tables
@@ -350,6 +370,7 @@ goes away as soon as that field is corrected.
 Involved: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Place the tables on the plan
+<!-- from WORKBOOK.md sha256:6586c9fa1d07 -->
 Status: done
 Actor: manager, administrator
 Screen: Floor plan (Edit plan)
@@ -366,6 +387,7 @@ If it fails: "Could not save the position" above the plan; the table goes back t
 Involved: TABLE-F02, TABLE-F09
 
 ### TABLE-F04 Edit or delete a table
+<!-- from WORKBOOK.md sha256:652560c1992e -->
 Status: done
 Actor: manager, administrator
 Screen: Floor plan (Edit plan), Tables
@@ -390,6 +412,7 @@ check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Take a table out of service (block it) and bring it back
+<!-- from WORKBOOK.md sha256:f85c9af93206 -->
 Status: done
 Actor: manager, administrator
 Screen: Floor plan (Edit plan), Tables
@@ -407,6 +430,7 @@ assistant or the API, is refused with the same out-of-service notice.
 Involved: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Rename or delete a zone
+<!-- from WORKBOOK.md sha256:d0e81853c9ba -->
 Status: done
 Actor: manager, administrator
 Screen: Zones, Floor plan (Edit plan)
@@ -425,6 +449,7 @@ does not exist in this business.". The reason of a field shows under it until th
 Involved: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Create many tables at once
+<!-- from WORKBOOK.md sha256:8b479557afbd -->
 Status: done
 Actor: manager, assistant
 Screen: assistant and API
@@ -440,6 +465,7 @@ none is created and it says which ones.
 Involved: TABLE-F02
 
 ### TABLE-F08 Set up the room: guests when seating and time warnings
+<!-- from WORKBOOK.md sha256:1c494047e8c7 -->
 Status: done
 Actor: administrator
 Screen: Settings
@@ -461,6 +487,7 @@ notice that belongs to no field stays until it is saved again.
 Involved: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 See how the room is
+<!-- from WORKBOOK.md sha256:48cde36cc0d2 -->
 Status: done
 Actor: manager, employee
 Screen: Floor plan
@@ -486,6 +513,7 @@ If it fails: a failure on loading shows with "Retry".
 Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19, BASE-F119
 
 ### TABLE-F10 Seat a party at a free or reserved table
+<!-- from WORKBOOK.md sha256:81f5b014aff5 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
@@ -514,6 +542,7 @@ cannot do it.
 Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12, BASE-F119
 
 ### TABLE-F11 Go back to an occupied table to order more or charge it
+<!-- from WORKBOOK.md sha256:192792bf6bce -->
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
@@ -533,6 +562,7 @@ Involved: TABLE-F13, TABLE-F14, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F18, TABL
 SALE-F19
 
 ### TABLE-F12 Take a check that is already open to a table
+<!-- from WORKBOOK.md sha256:e6f250a28dbb -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Sales → Sell ("Choose table", SALE-F19); assistant
@@ -558,6 +588,7 @@ is done with the party in front: an automation cannot do it.
 Involved: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
 ### TABLE-F13 Take the table away from a check (park it)
+<!-- from WORKBOOK.md sha256:659be89591c4 -->
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service); also in Sales → Sell, "Choose table" → "Remove from table" (SALE-F19)
@@ -574,6 +605,7 @@ closed, transferred, merged or parked.".
 Involved: TABLE-F24, SALE-F19
 
 ### TABLE-F14 Correct the guests of an occupied table
+<!-- from WORKBOOK.md sha256:0d46276b4f87 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
@@ -589,6 +621,7 @@ shows as when removing the table ("That check is not open…"). There is always 
 Involved: TABLE-F10, TABLE-F13, TABLE-F17
 
 ### TABLE-F15 Move the check to another table (transfer)
+<!-- from WORKBOOK.md sha256:5bd0c0ca19b8 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
@@ -609,6 +642,7 @@ destination is no longer free; "That check is not open…" if someone else alrea
 Involved: TABLE-F28, SALE-F25, KITCHEN-F05
 
 ### TABLE-F16 Join the checks of two occupied tables (merge)
+<!-- from WORKBOOK.md sha256:3076e7e511ea -->
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
@@ -631,6 +665,7 @@ same table without another check.
 Involved: TABLE-F17, SALE-F24, KITCHEN-F05
 
 ### TABLE-F17 Split the check of a table
+<!-- from WORKBOOK.md sha256:c841f38aa4eb -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
@@ -652,6 +687,7 @@ it.
 Involved: TABLE-F16, TABLE-F18, SALE-F23, FLOW-F12
 
 ### TABLE-F18 Free the table when the whole check is charged
+<!-- from WORKBOOK.md sha256:1a08c100642c -->
 Status: done
 Actor: system
 Screen: Sales: Charge
@@ -668,6 +704,7 @@ If it fails: nothing to see: the plan and Sessions read it from Sales on every r
 Involved: TABLE-F17, TABLE-F22, SALE-F22
 
 ### TABLE-F19 Void a charge of a table
+<!-- from WORKBOOK.md sha256:ec826b0faf49 -->
 Status: done
 Actor: system
 Screen: Sales: Sales
@@ -682,6 +719,7 @@ If it fails: as TABLE-F18.
 Involved: TABLE-F22, SALE-F30
 
 ### TABLE-F20 Delete the open check of a table in Sales
+<!-- from WORKBOOK.md sha256:88acc6cab292 -->
 Status: done
 Actor: manager
 Screen: Sales: Open checks
@@ -694,6 +732,7 @@ If it fails: as TABLE-F18.
 Involved: TABLE-F21, SALE-F18
 
 ### TABLE-F21 Close a table by hand
+<!-- from WORKBOOK.md sha256:4cba7ab1dc24 -->
 Status: done
 Actor: employee, manager
 Screen: Sessions, Floor plan (Service)
@@ -715,6 +754,7 @@ changed its check); "That check is not open…" (someone else already closed it)
 Involved: TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Look up the checks of the room (open and closed)
+<!-- from WORKBOOK.md sha256:16f65a1f7e79 -->
 Status: done
 Actor: manager, employee
 Screen: Sessions
@@ -733,6 +773,7 @@ If it fails: if the list does not load, a notice shows with "Retry". Refunds do 
 Involved: TABLE-F18, TABLE-F19, TABLE-F23, BASE-F119
 
 ### TABLE-F23 Delete a closed check from the history
+<!-- from WORKBOOK.md sha256:d62beadec9cc -->
 Status: done
 Actor: administrator, assistant
 Screen: Sessions; assistant
@@ -748,6 +789,7 @@ deleting it.".
 Involved: TABLE-F22
 
 ### TABLE-F24 Seat a parked check again
+<!-- from WORKBOOK.md sha256:52d5718d7720 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Sessions; also in Sales → Sell, by tapping a table in "Choose table" with the check on screen (SALE-F19)
@@ -764,6 +806,7 @@ again is done with the party in front: an automation cannot do it.
 Involved: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12, KITCHEN-F05
 
 ### TABLE-F25 Hold the table of a confirmed booking
+<!-- from WORKBOOK.md sha256:962683b52911 -->
 Status: done
 Actor: system
 Screen: none (it is seen on the Floor plan)
@@ -784,6 +827,7 @@ If it fails: a deleted, deactivated or out-of-service table is not held, and Res
 Involved: RESERVATION-F07, TABLE-F09, TABLE-F28
 
 ### TABLE-F26 Move or release the hold when the booking changes
+<!-- from WORKBOOK.md sha256:501f7b5d0e4d -->
 Status: done
 Actor: system
 Screen: none (it is seen on the Floor plan)
@@ -799,6 +843,7 @@ Reservations does not save the change and the booking stays held at the old one.
 Involved: RESERVATION-F08, TABLE-F25
 
 ### TABLE-F27 Release the table when the booking is cancelled or a no-show
+<!-- from WORKBOOK.md sha256:34f6e60d1788 -->
 Status: done
 Actor: system
 Screen: none (it is seen on the Floor plan)
@@ -813,6 +858,7 @@ If it fails: if it is asked twice, nothing changes.
 Involved: RESERVATION-F09, RESERVATION-F10, RESERVATION-F20, TABLE-F25
 
 ### TABLE-F28 Seat the party of a booking
+<!-- from WORKBOOK.md sha256:abb575fbf71c -->
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
@@ -838,6 +884,7 @@ If it fails: the same notices as when seating a party at a free or reserved tabl
 Involved: RESERVATION-F11, TABLE-F10, TABLE-F25
 
 ### TABLE-F29 Expire the holds that are due
+<!-- from WORKBOOK.md sha256:8219c2551176 -->
 Status: done
 Actor: system
 Screen: none
@@ -853,6 +900,7 @@ back.
 Involved: TABLE-F09, TABLE-F25
 
 ### TABLE-F30 Hold or release a table by hand
+<!-- from WORKBOOK.md sha256:06f3e16f9856 -->
 Status: done
 Actor: manager, employee, assistant
 Screen: assistant and API
@@ -869,6 +917,7 @@ If it fails: "That table does not exist in this business."; releasing a hold tha
 Involved: TABLE-F09, TABLE-F28
 
 ### TABLE-F31 Forget the name of a customer whose data are erased (GDPR)
+<!-- from WORKBOOK.md sha256:47ba9641e333 -->
 Status: done
 Actor: system
 Screen: none (it is seen on the Floor plan)
@@ -884,6 +933,7 @@ If it fails: repeating it changes nothing; a notice without an id does not touch
 Involved: CUSTOMER-F16, CUSTOMER-F13, RESERVATION-F22
 
 ### TABLE-F32 Put or remove the customer of a table
+<!-- from WORKBOOK.md sha256:b526d5d71845 -->
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
@@ -902,6 +952,7 @@ If it fails: the reason of Customers; the table is seated anyway.
 Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ### TABLE-F33 See how much each table has run up
+<!-- from WORKBOOK.md sha256:29d1b5dd3652 -->
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
@@ -922,13 +973,15 @@ If it fails: as the rest of the plan, a failure on loading shows with "Retry".
 Involved: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F34, SALE-F17, SALE-F19, SALE-F22
 
 ### TABLE-F34 See which tables have asked for the bill
+<!-- from WORKBOOK.md sha256:254bb826e22e -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
 Steps:
 1. In Sales, with a table's check on screen, the waiter prints the bill to take it to the table ("Print
    bill"), on the receipt printer or through the device's print dialog, or asks the assistant for it ("print
-   the bill for table 4").
+   the bill for table 4"), which only prints it on the receipt printer: if none takes it, it is neither printed
+   nor marked, and its receipt says so.
 2. In **Tables → Floor plan**, that table turns **Bill requested**: its written status, with its icon, says
    "Bill requested" instead of "Occupied", and the table is painted in a colour of its own that cannot be
    mistaken for those of the other statuses nor for the amber and red of the time warning. It still shows the
@@ -948,6 +1001,7 @@ table is not marked until it is printed again; a failure on loading the plan sho
 Involved: TABLE-F09, TABLE-F15, TABLE-F17, TABLE-F18, TABLE-F20, TABLE-F33, SALE-F21
 
 ## Tables: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:8771976cb810 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a table is
@@ -963,6 +1017,7 @@ when splitting by its name. What the person cannot see (the Sales check, without
 not show.
 
 ### What it offers: queries (they read and change nothing)
+<!-- from WORKBOOK.md sha256:c76c32487833 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -983,6 +1038,7 @@ The zones, the tables, the checks, the servers, the status of the plan and the s
 live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:c83317f25cba -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -1006,6 +1062,7 @@ For the platform only (without a route in the API, as the system): `table.sessio
 `table.hold.forget_customer` (reaction to Customers).
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:ec6336a36e56 -->
 
 | Notice | When | What it carries |
 |---|---|---|
@@ -1025,6 +1082,7 @@ For the platform only (without a route in the API, as the system): `table.sessio
 No notice carries names or free notes: only ids and numbers.
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:8ccba51a5db3 -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
@@ -1052,6 +1110,7 @@ What Reservations sends when it calls (the same names as its notices `status_cha
   booking was left without a table.
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:d0d40f82bbdf -->
 
 - **Sales** (requirement): opens the check of each table (`sale.order.open`), sets its title
   (`sale.order.set_label`), splits it (`sale.order.split`), joins it (`sale.order.merge`) and voids the
@@ -1062,6 +1121,7 @@ What Reservations sends when it calls (the same names as its notices `status_cha
   to paint it) and the search by name or phone (`find_customer`).
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:7d47c0101e6f -->
 
 | App | What for | Service |
 |---|---|---|
@@ -1075,6 +1135,7 @@ Kitchen does not call Tables: the ticket carries the title of its check, the one
 hears every notice of Tables, like those of any app.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:8e5066d4e11f -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

@@ -8,13 +8,8 @@ from live.operations import operation
 
 from apps.appointment import events
 from apps.appointment.models import Appointment
-from apps.appointment.queries import (
-    APPOINTMENT_NOT_FOUND,
-    MOVABLE,
-    find_appointment,
-    load_detail,
-    resolve_services,
-)
+from apps.appointment.queries.booking import resolve_services
+from apps.appointment.queries.reads import APPOINTMENT_NOT_FOUND, MOVABLE, find_appointment, load_detail
 from apps.appointment.schemas import (
     AppointmentIdIn,
     AppointmentOut,
@@ -38,7 +33,7 @@ from apps.appointment.services.writes import (
     lock_appointments,
     lock_series,
 )
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 
 DELETE = "appointment.delete_appointment"
 OCCURRENCE_BOOKED = _("Its repeating appointment has booked that date again since.")

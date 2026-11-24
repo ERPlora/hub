@@ -73,53 +73,53 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         PART_OF_THE_WORK,
         "What the check of each table of the room charged, to say whether it is paid.",
     ),
-    ("apps/appointment/queries/__init__.py", "load_detail"): (
+    ("apps/appointment/queries/reads.py", "load_detail"): (
         PART_OF_THE_WORK,
         "The appointment a booking or a change of the caller has just written, answered back to them.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_with_lines"): (
+    ("apps/appointment/queries/series.py", "series_with_lines"): (
         PART_OF_THE_WORK,
         "The repeating appointment a write of the caller has just made or changed, answered back to them.",
     ),
-    ("apps/appointment/queries/__init__.py", "load_agenda"): (
+    ("apps/appointment/queries/agenda.py", "load_agenda"): (
         PART_OF_THE_WORK,
         "The professional's busy times the booking rules weigh, so that nobody books over a colleague's appointment.",
     ),
-    ("apps/appointment/queries/__init__.py", "conflicts_of"): (
+    ("apps/appointment/queries/agenda.py", "conflicts_of"): (
         PART_OF_THE_WORK,
         "The appointments a time would overlap, which a booking asks to confirm; checking a free time names them only "
         "to who may see that professional's agenda.",
     ),
-    ("apps/appointment/queries/__init__.py", "count_active_for_service"): (
+    ("apps/appointment/queries/appointments.py", "count_active_for_service"): (
         NO_ROW_READ,
         "How many upcoming appointments carry a service and when the first is: the warning before it is archived.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_reach"): (
+    ("apps/appointment/queries/series.py", "series_reach"): (
         NO_ROW_READ,
         "How many booked appointments an edit of a repeating appointment the caller sees would reach, and how many of "
         "them are charged.",
     ),
-    ("apps/appointment/queries/__init__.py", "appointments_deleted_in_business"): (
+    ("apps/appointment/queries/recovery.py", "appointments_deleted_in_business"): (
         ONLY_THE_SYSTEM,
         "Which appointments of a separate copy the business still holds deleted, asked only by the platform when it "
         "recovers the business.",
     ),
-    ("apps/appointment/queries/__init__.py", "appointments_not_in_business"): (
+    ("apps/appointment/queries/recovery.py", "appointments_not_in_business"): (
         ONLY_THE_SYSTEM,
         "Which appointments of a separate copy the business lacks, asked only by the platform when it recovers the "
         "business.",
     ),
-    ("apps/appointment/queries/__init__.py", "_made_again"): (
+    ("apps/appointment/queries/recovery.py", "_made_again"): (
         ONLY_THE_SYSTEM,
         "Whether a repeating appointment of a separate copy was made again since, asked only by the platform when it "
         "recovers the business.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_deleted_in_business"): (
+    ("apps/appointment/queries/recovery.py", "series_deleted_in_business"): (
         ONLY_THE_SYSTEM,
         "Which repeating appointments of a separate copy the business still holds deleted, asked only by the platform "
         "when it recovers the business.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_not_in_business"): (
+    ("apps/appointment/queries/recovery.py", "series_not_in_business"): (
         ONLY_THE_SYSTEM,
         "Which repeating appointments of a separate copy the business lacks, asked only by the platform when it "
         "recovers the business.",

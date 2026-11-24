@@ -177,7 +177,7 @@ class CustomerOf(In):
     customer: Said | None = Field(
         None,
         validate_default=True,
-        description="The customer as a person says it: her full name, her phone or her email.",
+        description="The customer as a person says it: her name or a part of it, her phone or her email.",
     )
 
     @field_validator("customer")

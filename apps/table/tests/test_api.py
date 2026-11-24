@@ -266,6 +266,11 @@ def test_a_table_has_asked_for_the_bill_once_printed_until_it_is_paid_over_http(
     table = make_table("4")
     post(admin_client, "/table/sessions/open", {"table_id": str(table.id), "order_id": check.json()["id"]})
     assert get(admin_client, "/table/tables/detail", id=str(table.id)).json()["bill_requested"] is False
+    # No receipt printer takes the bill: nothing is printed and the table has not asked for it.
+    assert post(admin_client, "/sale/orders/print_bill", {"order_id": check.json()["id"]}).status_code == 409
+    assert get(admin_client, "/table/tables/detail", id=str(table.id)).json()["bill_requested"] is False
+    till = {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}
+    assert post(admin_client, "/printing/printers", till).status_code == 201
     assert post(admin_client, "/sale/orders/print_bill", {"order_id": check.json()["id"]}).status_code == 200
     [row] = get(admin_client, "/table/tables").json()["rows"]
     assert (row["status"], row["bill_requested"]) == ("occupied", True)

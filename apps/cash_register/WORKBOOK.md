@@ -206,7 +206,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
 | CASH_REGISTER-F16 | Imprimir el informe de la sesión (X o Z) | común | hecho |
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
-| CASH_REGISTER-F18 | Ver las propinas en la caja | común | no hecho |
+| CASH_REGISTER-F18 | Ver las propinas en la caja | común | parcial — falta enseñarlas en el Detalle de la sesión y en la ventana «Cerrar sesión» |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
 Estado: hecho
@@ -320,7 +320,8 @@ Pasos:
    aparece el movimiento (la salida en negativo) y el esperado sube o baja.
 Entra: tipo, importe y concepto. Desde la pantalla el medio es siempre efectivo; el asistente o la API
 pueden apuntar también tarjeta, transferencia u otro, que salen en la lista y en «Entradas» o
-«Salidas» pero no cuentan para el esperado.
+«Salidas» pero no cuentan para el esperado. Lo que otra app apunta como suyo (Propinas) sale en la lista, pero no
+en «Entradas» ni en «Salidas»: tiene sus propias líneas (F18).
 Sale: el movimiento, a nombre de quien lo apunta (avisa: `cash_register.movement.added`). El signo lo
 pone el sistema según el tipo.
 Si falla: «Esta salida dejaría la caja en negativo y el saldo negativo no está permitido.» si los
@@ -601,8 +602,8 @@ Pasos:
    caja (Z)».
 3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
    se cerró sola), nombrado como en el detalle, el fondo, el esperado y, línea a línea, las ventas por forma de
-   pago, devoluciones, entradas, salidas, invitaciones (solo si quien imprime ve los costes), el esperado y, en
-   el Z, el contado y el descuadre.
+   pago, devoluciones, entradas, salidas, invitaciones (solo si quien imprime ve los costes), las propinas, el esperado
+   y, en el Z, el contado y el descuadre.
 4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
    dispositivo con el mismo informe (en la cola esperaría para siempre): el del navegador o, en la app
    instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»),
@@ -615,7 +616,10 @@ instalada no abre su pantalla de impresión, con el suyo («…: esta versión d
 imprimir; actualízala», «…: el servicio de impresión del dispositivo no se abrió»…). Con el arqueo ciego,
 quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el esperado); en una
 cerrada sí. El informe de una sesión que no ve (la de otro empleado) no se imprime: «Esa sesión de caja no existe.»
-Implicados: CASH_REGISTER-F11, PRINTING-F17
+Si se le pide al asistente («saca el informe X de cómo va la caja»), solo se hace si una impresora de recibos activa
+lo recibe; si no, no se imprime nada y su recibo dice que no se hizo, con el motivo: «Ninguna impresora de recibos
+recibe este informe: abre la sesión para imprimirlo en este dispositivo.».
+Implicados: CASH_REGISTER-F11, PRINTING-F17, BASE-F97
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
 Estado: hecho
@@ -639,7 +643,8 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-Estado: no hecho — Caja todavía no distingue lo que apunta otra app (hub#1499)
+Estado: parcial — Caja ya distingue lo que apunta otra app y el informe X o Z las saca aparte; falta enseñarlas en el
+Detalle de la sesión y en la ventana «Cerrar sesión» (hub#1499)
 Vertical: común
 Actor: sistema, empleado, responsable
 Pantalla: Caja, Detalle de la sesión
@@ -650,10 +655,12 @@ Pasos:
    «Propinas pagadas» en efectivo, con la venta o la persona en el concepto.
 3. En el **Detalle de la sesión**, el resumen las enseña aparte de las ventas, de las entradas y de las salidas:
    «Propinas en efectivo», «Propinas con tarjeta» (y con otras formas de pago, si las hubo) y «Propinas pagadas».
+   La propina con tarjeta o con otra forma de pago que se rebaja se resta de su línea; «Propinas pagadas» es lo que
+   salió del cajón en efectivo. Con el arqueo ciego, quien no ve el esperado no las ve, como las demás cifras (F07).
 4. Solo el efectivo toca el esperado: la propina en efectivo lo sube (está en el cajón) y la pagada en efectivo
    lo baja (salió del cajón); la de tarjeta no. Así el arqueo cuadra al cerrar (F09).
-5. El informe X o Z (F16) lleva las mismas tres líneas, y la ventana «Cerrar sesión» cuenta la propina en
-   efectivo en el «Esperado en el cajón».
+5. El informe X o Z (F16) lleva las mismas líneas, justo antes del esperado, y la ventana «Cerrar sesión» cuenta la
+   propina en efectivo en el «Esperado en el cajón».
 Entra: las entradas y salidas que Propinas apunta en la sesión abierta, marcadas como suyas
 (`cash_register.movement.add`).
 Sale: las líneas en la sesión (avisa: `cash_register.movement.added`), con el nombre de la app que las apunta.
@@ -683,7 +690,7 @@ puede ver las sesiones no le nombra ninguna.
 | Un cajón por su id, activo o no: su nombre (el que dice la confirmación del asistente) | ver sesiones | F02, F03 | `cash_register.register.get` |
 | Las sesiones, de la más reciente a la más antigua (o por cuándo se cerraron), con búsqueda por número, filtros (estado, número, cajón, fechas e importes) y páginas | ver sesiones | F03, F09, F12 | `cash_register.session.list` |
 | La sesión abierta con su esperado (si quien pregunta puede verlo), si la caja está activada y los cobros fuera de turno (cuántos y su efectivo) | ver sesiones | F04, F10, F12, F17 | `cash_register.session.current` |
-| Una sesión (por id o número) con su resumen: ventas por forma de pago, devoluciones, entradas, salidas, invitaciones, esperado, contado y diferencia | ver sesiones | F11, F16 | `cash_register.session.get` |
+| Una sesión (por id o número) con su resumen: ventas por forma de pago, devoluciones, entradas, salidas, lo que apuntan otras apps (propinas), invitaciones, esperado, contado y diferencia | ver sesiones | F11, F16, F18 | `cash_register.session.get` |
 | Los movimientos de una sesión (o los cobros fuera de turno), con búsqueda, filtros y páginas; con el arqueo ciego, a quien no puede ver el esperado, solo los apuntados a mano de la sesión abierta | ver movimientos | F07, F11, F17 | `cash_register.movement.list` |
 | Los arqueos de una sesión, con páginas | ver arqueos | F06, F09, F11 | `cash_register.count.list` |
 | El resumen del cierre de una sesión (la abierta si no se dice) con el efectivo contado: su número, el contado y, si quien pregunta puede verlo, el esperado y la diferencia, y lo que la revisión del turno encuentra abierto; no cierra nada | cerrar | F08, F09 | `cash_register.session.closing_summary` |
@@ -703,7 +710,7 @@ Todas se pueden seguir en vivo.
 | Cierra las sesiones olvidadas al corte del día | cerrar | F10 | `cash_register.session.auto_close` |
 | Apunta una entrada o una salida (también la que apunta otra app, como Propinas, marcada como suya) | apuntar | F05, F18 | `cash_register.movement.add` |
 | Registra un arqueo | contar | F06 | `cash_register.count.add` |
-| Imprime el informe X o Z de una sesión en la impresora de recibos | ver sesiones | F16 | `cash_register.session.print` |
+| Imprime el informe X o Z de una sesión en la impresora de recibos; sin una impresora de recibos activa, falla y dice por qué, y la pantalla lo imprime en el dispositivo | ver sesiones | F16 | `cash_register.session.print` |
 
 ### Lo que avisa
 
@@ -714,7 +721,7 @@ Todas se pueden seguir en vivo.
 | Cajón cambiado | Renombrarlo, desactivarlo o activarlo | Cuál | `cash_register.register.updated` |
 | Sesión abierta | Abrir | La sesión, su número, el fondo y quién | `cash_register.session.opened` |
 | Sesión cerrada | Cerrar (a mano o sola) | La sesión, su número, esperado, contado, diferencia y si se cerró sola | `cash_register.session.closed` |
-| Movimiento apuntado | Apuntar una entrada o una salida | La sesión, el tipo, el importe y el medio | `cash_register.movement.added` |
+| Movimiento apuntado | Apuntar una entrada o una salida | La sesión, el tipo, el importe, el medio y la app que lo apunta (vacía si es a mano) | `cash_register.movement.added` |
 | Arqueo registrado | Registrar un arqueo | La sesión, el tipo y el total | `cash_register.count.added` |
 
 ### A qué reacciona
@@ -783,7 +790,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_sale.py` (ventas reales de Ventas) y
   `tests/test_concurrency.py` (sesiones reales en hilos).
@@ -894,7 +901,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien
   la usa: Caja está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`, hub#1087) y cada campo de
-  `schemas.py` su `description`. `tests/test_assistant_asks.py` comprueba con las frases reales de la QA
+  `schemas/` su `description`. `tests/test_assistant_asks.py` comprueba con las frases reales de la QA
   del asistente (hub#1087) que cada una llega a su herramienta y, si nombra «el turno abierto», también
   a `session.current`, que da su número; para el Hub, «arqueo», «recuento» y «conteo» son el arqueo
   (`count`), «moneda» o «divisa», la del negocio (`currency`), y «una entrada», «una salida» o «un
@@ -913,6 +920,12 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
   `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`, también el de los
   datos que enseña una vista previa).
+- **Lo que apunta otra app** (F18): `cash_register.movement.add` admite `app`, el nombre de registro de la app que
+  apunta la línea como suya (Propinas, `tip`), que se guarda en `Movement.app`; Caja no la conoce ni la tiene en
+  `requires`. `queries/app_lines.py` agrupa esas líneas por app y las nombra con el nombre de la app en el idioma de
+  quien lee (`base.system.app_name`): lo que entra, por forma de pago; lo que sale con tarjeta u otra forma de pago,
+  restado de su línea (ningún cajón paga con tarjeta); lo que sale en efectivo, «pagadas». No cuentan en
+  «Entradas» ni en «Salidas», y el esperado es el de siempre (solo el efectivo).
 - **El cierre por el asistente** (F09; PLAN §30): la
   descripción de `session.close` le pide leer antes `session.closing_summary` con el mismo contado,
   decir su resumen y cerrar nombrando la sesión por el número que dio (así nunca cierra otra que se

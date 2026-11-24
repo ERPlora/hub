@@ -268,6 +268,9 @@ class Movement(UUIDModel):
         pgettext_lazy("cash register", "payment method"), max_length=60, blank=True
     )
     description = models.CharField(_("concept"), max_length=255, blank=True)
+    #: The app that recorded the line as its own (Tips), by its registry name: the drawer shows it apart from the cash
+    #: brought in and taken out by hand. Empty: written by hand, or a sale's.
+    app = models.CharField(_("recorded by app"), max_length=32, blank=True, default="", db_default="")
     sale = models.ForeignKey(
         "sale.Sale",
         on_delete=models.PROTECT,

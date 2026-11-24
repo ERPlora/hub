@@ -10,14 +10,9 @@ from live.outbox import record_event
 
 from apps.appointment import events
 from apps.appointment.models import Recurring
-from apps.appointment.queries import (
-    CHANGE_OWN,
-    RECURRING_NOT_FOUND,
-    find_series,
-    load_series,
-    may_change,
-    resolve_services,
-)
+from apps.appointment.queries.access import CHANGE_OWN, may_change
+from apps.appointment.queries.booking import resolve_services
+from apps.appointment.queries.series import RECURRING_NOT_FOUND, find_series, load_series
 from apps.appointment.schemas import (
     RecurringDeletedOut,
     RecurringOut,
@@ -30,7 +25,7 @@ from apps.appointment.services.writes import (
     SYSTEM,
     _member_for_booking,
 )
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 
 
 def _set_active(ctx: OperationContext, series_id: UUID, active: bool) -> dict:

@@ -100,7 +100,7 @@
         "hubUserHint": "Without a Hub user, counter sales go to whoever is signed in and will not count towards this person's commission.",
         "status": "Status",
         "bookable": "Bookable",
-        "bookingBuffer": "Buffer between appointments (min)",
+        "bookingBuffer": "Booking buffer (min)",
         "hireDate": "Hire date",
         "color": "Color",
         "specialties": "Specialties",

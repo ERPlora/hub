@@ -63,12 +63,13 @@ LINE_NOT_SPLITTABLE = _(
     permission="sale.add_sale",
     input=OrderAddLineIn,
     output=OrderOut,
-    ai=AI(
-        description="Add a product of the catalog (by id, SKU or name) to an open check, with its quantity in the product's "
-        "unit. Find a check the person names with sale.order.list(search=...); never ask them for order_id. The price is "
-        "the catalog's and stays frozen on the line.",
-        risk="normal",
-        asks={
+    ai={
+        "description": "Add a product of the catalog (by id, SKU or name) to an open check, with its quantity in the "
+        "product's unit. Find a check the person names with sale.order.list(search=...); never ask them for order_id. "
+        "The price is the catalog's and stays frozen on the line.",
+        "risk": "normal",
+        "check": "sale.order_line.check",
+        "asks": {
             "en": (
                 "add two coffees to table 4",
                 "put another beer on that tab",
@@ -80,7 +81,7 @@ LINE_NOT_SPLITTABLE = _(
                 "mete un cruasán en la cuenta",
             ),
         },
-    ),
+    },
 )
 def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
     find_order(data.order_id)

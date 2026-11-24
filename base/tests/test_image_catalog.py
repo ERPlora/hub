@@ -356,10 +356,10 @@ def speaks(language: str, slug: str = A.key) -> None:
 
 
 @HUB_DB
-def test_search_answers_the_best_images_first_titled_in_the_businesss_language(image_library):
-    speaks("es")
+def test_search_answers_the_best_images_first_titled_in_the_persons_language(image_library):
+    speaks("en")
 
-    page = get("base.catalog_image.search")(ctx_with(HOME, language="en"), CatalogImageSearchIn(query="leche"))
+    page = get("base.catalog_image.search")(ctx_with(HOME, language="es"), CatalogImageSearchIn(query="leche"))
 
     first = page.rows[0].model_dump()
     assert first == {
@@ -373,12 +373,23 @@ def test_search_answers_the_best_images_first_titled_in_the_businesss_language(i
 
 
 @HUB_DB
-def test_a_business_in_a_language_the_library_does_not_speak_reads_english_titles(image_library):
-    speaks("fr")
+def test_a_person_in_a_language_the_library_does_not_speak_reads_english_titles(image_library):
+    speaks("es")
 
-    page = get("base.catalog_image.search")(ctx_with(HOME, language="es"), CatalogImageSearchIn(query="leche"))
+    page = get("base.catalog_image.search")(ctx_with(HOME, language="fr"), CatalogImageSearchIn(query="leche"))
 
     assert page.rows[0].title == "White coffee"
+
+
+@HUB_DB
+def test_no_words_list_the_library_by_its_title_in_the_persons_language(image_library):
+    speaks("en")
+
+    page = get("base.catalog_image.search")(
+        ctx_with(HOME, language="es"), CatalogImageSearchIn(query="", folder="hospitality")
+    )
+
+    assert [row.title for row in page.rows] == ["Café con leche", "Café latte", "Café solo", "Patatas bravas"]
 
 
 @HUB_DB
@@ -454,6 +465,31 @@ def test_an_employee_searches_over_http_and_a_stranger_does_not(client, make_use
 
     assert response.status_code == 200, response.content
     assert [row["reference"] for row in response.json()["rows"]] == ["catalog:hospitality/patatas_bravas"]
+
+
+HIGHLIGHTS = {
+    "name": "mechas",
+    "folder": "beauty_hair",
+    "title": {"en": "Highlights", "es": "Mechas"},
+    "tags": {"en": ["hair highlights", "colour", "streaks"], "es": ["reflejos", "mechas de color", "color"]},
+}
+
+
+@HUB_DB
+@pytest.mark.parametrize(("person", "business", "title"), [("es", "en", "Mechas"), ("en", "es", "Highlights")])
+def test_the_library_titles_its_images_in_the_language_the_person_chose(
+    client, make_user, settings, tmp_path, person, business, title
+):
+    # The language the person chose in «My profile» travels in Django's language cookie, as for every other screen.
+    settings.CATALOG_DIR = str(write_library(tmp_path / "img", [*IMAGES, HIGHLIGHTS]))
+    speaks(business)
+    client.force_login(make_user("ana", host=A.key, role="hub_admin"))
+    client.cookies[settings.LANGUAGE_COOKIE_NAME] = person
+
+    response = client.get("/api/catalog/images?query=Mechas", HTTP_HOST=ON_A)
+
+    assert response.status_code == 200, response.content
+    assert [(row["reference"], row["title"]) for row in response.json()["rows"]] == [("catalog:beauty_hair/mechas", title)]
 
 
 # ── /p/catalog/<folder>/<name>.webp ─────────────────────────────────────────────────────────────────────────────

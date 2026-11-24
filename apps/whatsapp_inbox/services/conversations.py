@@ -9,7 +9,7 @@ from live.operations import get, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.queries.agents import team
@@ -269,7 +269,7 @@ def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
                 "quita la ficha de cliente de la conversación de Jorge",
             ),
         },
-        "description": "Joins a WhatsApp conversation to a customer card (by id or by the card's exact name, phone "
+        "description": "Joins a WhatsApp conversation to a customer card (by id or by the card's name, phone "
         "or email), creates the card from the WhatsApp name and number, or takes the card off.",
         "risk": "normal",
     },

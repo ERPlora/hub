@@ -85,6 +85,19 @@ def run(name: str, data: dict | None = None, role: str = "hub_admin", **ctx):
     return op(ctx_for(role, **ctx), op.input.model_validate(data or {}))
 
 
+def as_ctx(ctx, name, data=None):
+    op = get(name)
+    return op(ctx, op.input.model_validate(data or {}))
+
+
+def employee_linked_to(member, make_user):
+    """An employee's context whose account is linked to ``member`` (their own agenda)."""
+    user = make_user("bea", role="hub_employee")
+    member.user = user.person
+    member.save(update_fields=["user"])
+    return ctx_for("hub_employee", actor=user)
+
+
 @pytest.fixture(autouse=True)
 def english():
     """Every test starts in English: a request in Spanish leaves its language active on the thread."""
@@ -135,6 +148,7 @@ def next_weekday(weekday: int, weeks_ahead: int = 1) -> dt.date:
 
 #: A Monday one to two weeks ahead: inside the default 90 days of advance, never in the past.
 MONDAY = next_weekday(0)
+TUESDAY = MONDAY + dt.timedelta(days=1)
 
 
 def at(day: dt.date, hhmm: str) -> dt.datetime:

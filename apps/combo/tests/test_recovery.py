@@ -20,8 +20,15 @@ from live.errors import InvalidPayload
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.combo import queries
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
+from apps.combo.queries.recovery import (
+    combos_in_copy,
+    combos_not_in_business,
+    groups_in_copy,
+    groups_not_in_business,
+    options_in_copy,
+    options_not_in_business,
+)
 from apps.inventory.models import Product
 from apps.inventory.tests.test_recovery import (
     CATEGORIES,
@@ -64,7 +71,7 @@ def test_the_copy_gives_each_choice_of_a_live_product_with_what_its_create_takes
     make_option(mains, old)
     Product.objects.filter(pk=old.pk).update(is_deleted=True)
 
-    read = queries.options_in_copy(direct())
+    read = options_in_copy(direct())
 
     # With each product's SKU there, the article's identity, to find the one made again if the business lost it.
     assert read == [
@@ -83,7 +90,7 @@ def test_a_copy_without_the_apps_table_gives_nothing():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE combo_choiceoption CASCADE")
 
-    assert queries.options_in_copy(direct()) == []
+    assert options_in_copy(direct()) == []
 
 
 def a_choice_of_the_copy(group, product, **fields) -> dict:
@@ -113,7 +120,7 @@ def test_lacking_is_a_choice_the_business_no_longer_offers_in_that_course():
     other_product = a_choice_of_the_copy(starters, soup, price_delta=-50, is_available=False)
     other_course = a_choice_of_the_copy(mains, lentils, price_delta=200)
 
-    lacking = queries.options_not_in_business([still, offered_again, other_product, other_course])
+    lacking = options_not_in_business([still, offered_again, other_product, other_course])
 
     # As the menu builder's create takes each, with its id in the copy: the course, the product and what it adds.
     assert lacking == [
@@ -142,7 +149,7 @@ def test_a_product_gone_gets_its_choices_on_the_one_a_recovery_made_again_with_i
     make_product("Salad", sku="SAL")
     by_hand = a_choice_of_a_product_gone(starters, "SAL")
 
-    lacking = queries.options_not_in_business([offered_again, other_product, other_course, by_hand])
+    lacking = options_not_in_business([offered_again, other_product, other_course, by_hand])
 
     assert lacking == [
         {"id": other_product["id"], "group_id": mains.id, "product_id": fries.id, "price_delta": 50,
@@ -156,9 +163,9 @@ def test_a_product_gone_gets_its_choices_on_the_one_a_recovery_made_again_with_i
 
 @HUB_DB
 def test_with_nothing_read_nothing_is_lacking():
-    assert queries.options_not_in_business([]) == []
-    assert queries.combos_not_in_business([]) == []
-    assert queries.groups_not_in_business([]) == []
+    assert options_not_in_business([]) == []
+    assert combos_not_in_business([]) == []
+    assert groups_not_in_business([]) == []
 
 
 @HUB_DB
@@ -178,7 +185,7 @@ def test_a_choice_of_a_course_gone_goes_to_the_one_a_recovery_made_again_for_it(
     make_group(menu, "Desserts")
     by_hand = a_choice_of_the_copy(sides, lentils) | {"group_id": made_by_hand}
 
-    lacking = queries.options_not_in_business([offered_again, lacking_there, by_hand])
+    lacking = options_not_in_business([offered_again, lacking_there, by_hand])
 
     assert lacking == [
         {"id": lacking_there["id"], "group_id": sides.id, "product_id": lentils.id, "price_delta": 100,
@@ -199,7 +206,7 @@ def test_the_copy_gives_each_menu_with_what_its_recover_takes():
         image=LIBRARY_IMAGE,
     )
 
-    read = queries.combos_in_copy(direct())
+    read = combos_in_copy(direct())
 
     # In the menus' order, with the id of its tax category there (Taxes never deletes one).
     assert read == [
@@ -217,7 +224,7 @@ def test_the_copy_gives_each_course_menu_by_menu_in_its_order():
     starters = make_group(day, "Starters", sort_order=0, min_choices=0, max_choices=0)
     drink = make_group(kids, "Drink", sort_order=0)
 
-    read = queries.groups_in_copy(direct())
+    read = groups_in_copy(direct())
 
     assert read == [
         {"id": starters.id, "combo_id": day.id, "name": "Starters", "min_choices": 0, "max_choices": 0,
@@ -231,14 +238,14 @@ def test_the_copy_gives_each_course_menu_by_menu_in_its_order():
 
 @HUB_DB
 @pytest.mark.parametrize(
-    ("table", "read"), [("combo_combo", "combos_in_copy"), ("combo_choicegroup", "groups_in_copy")]
+    ("table", "read"), [("combo_combo", combos_in_copy), ("combo_choicegroup", groups_in_copy)]
 )
 def test_a_copy_without_the_menus_or_the_courses_table_gives_none(table, read):
     with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute(f"DROP TABLE {table} CASCADE")
 
-    assert getattr(queries, read)(direct()) == []
+    assert read(direct()) == []
 
 
 def a_menu_of_the_copy(name: str = "Menu of the day", **fields) -> dict:
@@ -275,7 +282,7 @@ def test_lacking_is_a_menu_the_business_no_longer_has():
         "Sandwich and beer", supply_kind="goods", tax_category_id=None, is_active=False, image=LIBRARY_IMAGE
     )
 
-    lacking = queries.combos_not_in_business(
+    lacking = combos_not_in_business(
         [still, brought, by_hand, other_brunch, brunch, dinner, other_dinner, vegan, takeaway]
     )
 
@@ -313,7 +320,7 @@ def test_lacking_is_a_course_its_menu_no_longer_has():
     make_combo("Brunch")
     eggs = a_course_of_the_copy(lost, "Eggs")
 
-    lacking = queries.groups_not_in_business([still, brought, taken, sides, drink, eggs])
+    lacking = groups_not_in_business([still, brought, taken, sides, drink, eggs])
 
     assert lacking == [
         sides | {"stands_for": sides["id"]},
@@ -335,7 +342,7 @@ def combo_events() -> list[str]:
 
 @HUB_DB
 def test_a_menu_made_again_is_its_screens_create_with_its_image_and_which_it_stands_for(image_library):  # noqa: F811
-    [record] = queries.combos_not_in_business(
+    [record] = combos_not_in_business(
         [a_menu_of_the_copy("Vegan menu", kitchen_name="VEGAN", price=1250, sort_order=3, is_active=False,
                             image=LIBRARY_IMAGE)]
     )
@@ -363,7 +370,7 @@ def test_a_menu_made_again_is_its_screens_create_with_its_image_and_which_it_sta
     ],
 )
 def test_a_menu_made_again_without_an_image_of_the_library_is_the_screens_create(image_library, image):  # noqa: F811
-    [record] = queries.combos_not_in_business([a_menu_of_the_copy(image=image)])
+    [record] = combos_not_in_business([a_menu_of_the_copy(image=image)])
 
     made = made_again(record, "combo.combo.recover")
 
@@ -376,7 +383,7 @@ def test_a_menu_whose_tax_category_was_turned_off_since_is_refused_as_its_screen
     off = tax_category("restaurant.closed")
     off.is_active = False
     off.save(update_fields=["is_active"])
-    [record] = queries.combos_not_in_business([a_menu_of_the_copy(tax_category_id=off.id)])
+    [record] = combos_not_in_business([a_menu_of_the_copy(tax_category_id=off.id)])
 
     with pytest.raises(InvalidPayload) as refused:
         made_again(record, "combo.combo.recover")
@@ -389,7 +396,7 @@ def test_a_menu_whose_tax_category_was_turned_off_since_is_refused_as_its_screen
 def test_a_course_made_again_goes_last_in_its_menu_and_keeps_which_it_stands_for():
     menu = make_combo()
     make_group(menu, "Mains")
-    [record] = queries.groups_not_in_business(
+    [record] = groups_not_in_business(
         [a_course_of_the_copy(menu.id, "Sides", min_choices=0, max_choices=2, allow_repeat=True)]
     )
 
@@ -410,12 +417,12 @@ def test_the_app_declares_its_menus_then_their_courses_then_their_choices():
         (str(one.label), one.read, one.missing, one.create, one.deleted, one.restore)
         for one in (menus, courses, choices)
     ] == [
-        ("Menus", queries.combos_in_copy, queries.combos_not_in_business, "combo.combo.recover", None, ""),
-        ("Menu courses", queries.groups_in_copy, queries.groups_not_in_business, "combo.group.recover", None, ""),
+        ("Menus", combos_in_copy, combos_not_in_business, "combo.combo.recover", None, ""),
+        ("Menu courses", groups_in_copy, groups_not_in_business, "combo.group.recover", None, ""),
         (
             "Menu choices of products",
-            queries.options_in_copy,
-            queries.options_not_in_business,
+            options_in_copy,
+            options_not_in_business,
             "combo.option.create",
             None,
             "",

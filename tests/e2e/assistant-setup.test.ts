@@ -157,7 +157,7 @@ describe('the setup command', () => {
 
   it('runs every step through the tool runner of the assistant, as the owner, and is Python', () => {
     expect(SETUP_PY).toContain('shared.run_tool(ctx, get(step["tool"]), json.dumps(step["arguments"]))');
-    expect(SETUP_PY).toContain('permissions_for(owner, scope)');
+    expect(SETUP_PY).toContain('access_for(owner, scope)');
     const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: SETUP_PY, encoding: 'utf8' });
     expect(parsed.status, parsed.stderr).toBe(0);
   });

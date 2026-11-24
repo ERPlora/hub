@@ -33,7 +33,7 @@ Para qué: lo que se tuerce en un servicio con la sala llena: mesas que cambian,
 18. KITCHEN-F09, PRINTING-F11 — se reimprime una comanda que se ha manchado.
 19. KITCHEN-F22 — se cancela la comanda de una mesa que se marcha sin comer.
 20. KITCHEN-F24 — el pedido de barra hecho a mano ya no hace falta: se borra, pidiéndoselo al asistente.
-21. INVENTORY-F29 — se acaba la tarta de queso.
+21. INVENTORY-F29 — se acaba la tarta de queso: se le pide al asistente con otras palabras que las de la carta.
 22. SALE-F07 — el TPV lo avisa al pedirla.
 23. COMBO-F12 — se agota una elección del menú del día.
 24. SALE-F09, BASE-F84 — una venta a precio libre en la sección «Varios».

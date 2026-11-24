@@ -1,12 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:8f5216ea2deb93b2823f619d2ae43697f621318f8abcccf510817570cf99afd7 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:9d490871898b -->
 
 Printing is where you add the business's printers, say what comes out of each one (receipts, kitchen and bar
 orders, labels) and see whether the paper is coming out. The paper is taken out by the ERPlora app on the device next
 to the printer; if something does not come out, the queue says so and lets you retry or cancel it.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:34c98cfd0c75 -->
 
 Printing is where the business **adds its printers, says what comes out of each one and sees whether the
 paper is coming out**. Each printer has a name ("Till", "Kitchen"), its connection (network, USB,
@@ -18,6 +18,7 @@ confirms. Only **devices set up** with their printers print: a session on any ot
 device does not take anybody's paper. If something does not come out, the queue says so and lets you retry or cancel it.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:c3eb399528b2 -->
 
 - The **owner** and the **administrator**: everything; they also retry and cancel stuck jobs.
 - The **manager**: adds and changes printers, the devices that print and the settings, and asks for
@@ -32,6 +33,7 @@ shift report to Cash register, the label to Inventory) and **does not talk to th
 does. A browser does not reach the printers.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:76798bd543fd -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
@@ -52,6 +54,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   no number, QR or payment, and warns that it is not an invoice. Whoever composes the document puts that in.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:2bc96de0a93b -->
 
 - **Switch Printing on** in the business. It needs no other app.
 - **The ERPlora app installed** on the device next to the printer (on its network, with its
@@ -77,16 +80,19 @@ Initial setup, step by step:
    (PRINTING-F07, PRINTING-F01).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:987ea6940844 -->
 
 Four tabs at the bottom, the same as the menu: **Printers**, **Devices**, **Queue** and **Settings**.
 
 ### Printers
+<!-- from WORKBOOK.md sha256:78a7116925ef -->
 Here you see at a glance whether the paper comes out. At the top, one card per role (Receipt, Kitchen, Bar, Label)
 says whether it has a printer and a device, how much is waiting in the queue and which printer it comes out of. Below
 are your printers, with their connection, their paper and their state. With "Add printer" you add one by its address,
 or with "Search printers" you find it on the network; on each row, "Test" prints a test page.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:2a3e2e51bb6f -->
 Menu **Printing → Printers**. Title "Printing" and the sentence "Add the business's printers, say what each one
 prints and check that paper comes out.". Two areas, in this order:
 
@@ -127,11 +133,13 @@ Whoever cannot change printers does not see "Search printers", "Add printer", "E
 "Deactivate"; whoever cannot print does not see "Test".
 
 ### Devices
+<!-- from WORKBOOK.md sha256:3130ef6aa03b -->
 Here you set up the devices that take the paper out: the one next to the printers, with the ERPlora app open. Only
 the devices on this list print, with anybody's session. From that device, "Print from this device" sets it up with
 the printers it reaches; the list says when each one was last seen, and on each row you can change it or retire it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:f7e1351a88f5 -->
 Menu **Printing → Devices**. Title "Devices that print" and the sentence "Only the devices set up here
 print the queue, with anybody’s session: set up the one next to the printers from that
 device.". Underneath, a note about the device it is being looked at on: "This device prints for: Till,
@@ -155,11 +163,13 @@ with "It will print nothing more, and the jobs it has go back to the queue. To p
 up again from it.", "Yes, retire" and "Back".
 
 ### Queue
+<!-- from WORKBOOK.md sha256:c19d3e08bd95 -->
 The queue is every print job that has been asked for, from the most recent to the oldest, with its document, its
 printer and its status: Pending, Sent, Printed, Failed or Cancelled. Filter it by status, role or printer, or search
 by document number. A stuck job is sent again with "Retry" or withdrawn with "Cancel".
 
 #### Detail
+<!-- from WORKBOOK.md sha256:289c68d0f194 -->
 Menu **Printing → Queue**. Title "Print queue". The table of jobs, from the most recent to the
 oldest, 50 per page: Document ("Receipt T-000123", or "Receipt · 14/10/26 23:05" if it carries no number),
 Role, Printer, Status ("Pending", "Sent", "Printed", "Failed", "Cancelled"), Attempts, Asked on
@@ -171,11 +181,13 @@ without an answer once its time is up; "Cancel" opens a window with "Reason (opt
 "Back". Empty: "No print jobs.". Error when loading: the message with "Retry".
 
 ### Settings
+<!-- from WORKBOOK.md sha256:6cf77cae5f7f -->
 Here you decide how the business prints: whether the receipt comes out on its own on checkout, whether the drawer
 opens with it, how many copies come out and, if you have several printers with the same role, which one prints each
 thing. The receipt's header and footer are written in the Sales settings: this screen's note takes you there.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:24bb637290c6 -->
 Menu **Printing → Settings**. A card "Ticket settings" with "Print receipt on checkout", "Open drawer on
 checkout" and "Receipt copies" (1, 2 or 3); another "Printer of each role" with a dropdown per
 role ("Receipt", "Kitchen", "Bar", "Label"): "The first active one of this role" or one of its
@@ -187,6 +199,7 @@ settings." with "Retry"; when saving, "Could not save the settings." with the re
 role whose printer it refuses (PRINTING-F06).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:426bcc39c9e1 -->
 
 | State | What the person sees |
 |---|---|
@@ -198,12 +211,14 @@ role whose printer it refuses (PRINTING-F06).
 | No permission | What they cannot do does not appear (in Devices, neither "Print from this device", nor "Edit", nor "Retire"); the settings, by its address, "No access" (BASE-F118). |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:7d83e59ccb2b -->
 
 In "Print from this device", "Edit device", "New printer" and "Edit printer", the phone's Back button asks "Discard
 changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes
 the window without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:94b98614d91b -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -231,6 +246,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F22 | Print the receipt and open the drawer at the till that charges | common | done |
 
 ### PRINTING-F01 See how printing is going
+<!-- from WORKBOOK.md sha256:f5e6f2dc8c77 -->
 Status: done
 Actor: administrator, manager; the employee, only on the Home
 Screen: Home, Printers, Queue
@@ -274,6 +290,7 @@ minute does not make it ring (a device that restarts is not an alarm).
 Involved: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
 
 ### PRINTING-F02 Find a network printer without typing its address
+<!-- from WORKBOOK.md sha256:5c8ee76752e6 -->
 Status: partial — the search is in Printers and the ERPlora app on the device does it for the
 business opened from it at erplora.com; since version 1.1.34 of the app, also on a network without internet
 access (it goes through the network of its Wi-Fi or its cable). It has yet to be tried on a device, with a real
@@ -299,6 +316,7 @@ that it is on and on the same network, or add it by its address.".
 Involved: PRINTING-F03
 
 ### PRINTING-F03 Add a printer by its address
+<!-- from WORKBOOK.md sha256:03c8838f7b00 -->
 Status: done
 Actor: administrator, manager
 Screen: Printers
@@ -322,6 +340,7 @@ without tapping "Save" again; another field's stays until its own changes.
 Involved: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Assign what comes out of each printer
+<!-- from WORKBOOK.md sha256:975d3699487e -->
 Status: done
 Actor: administrator, manager
 Screen: Printers, Settings
@@ -342,6 +361,7 @@ role or an inactive one is refused: "That printer does not have this role.", "Th
 Involved: PRINTING-F01, PRINTING-F06, INVENTORY-F25, PRINTING-F22
 
 ### PRINTING-F05 Do a test print
+<!-- from WORKBOOK.md sha256:0cc410e6570e -->
 Status: done
 Actor: administrator, manager
 Screen: Printers
@@ -360,6 +380,7 @@ off: "The printer does not answer. Check that it is on and connected.") and, aft
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
+<!-- from WORKBOOK.md sha256:fe9be6185920 -->
 Status: done
 Actor: administrator, manager
 Screen: Settings
@@ -382,6 +403,7 @@ show values and offers "Retry". Without permission, "No access".
 Involved: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Print the receipt when charging
+<!-- from WORKBOOK.md sha256:87f49f80ecc4 -->
 Status: done
 Actor: employee
 Screen: Sell (from Sales)
@@ -406,6 +428,7 @@ the queue (PRINTING-F14).
 Involved: SALE-F08, PRINTING-F13, PRINTING-F18, PRINTING-F22
 
 ### PRINTING-F08 Reprint a receipt or an invoice
+<!-- from WORKBOOK.md sha256:28ae74ba59cc -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Sales, Invoices (from those apps)
@@ -425,6 +448,7 @@ If it fails: as in F07.
 Involved: SALE-F31, PRINTING-F22
 
 ### PRINTING-F09 Print the table's bill
+<!-- from WORKBOOK.md sha256:a5af092e5fe2 -->
 Status: done
 Actor: employee
 Screen: Sell (from Sales)
@@ -439,6 +463,7 @@ If it fails: "A bill has lines to charge for: this one has none.".
 Involved: SALE-F15, PRINTING-F22
 
 ### PRINTING-F10 Print the order in the kitchen and at the bar
+<!-- from WORKBOOK.md sha256:29d603b15434 -->
 Status: done
 Actor: employee
 Screen: Sell (from Sales)
@@ -459,6 +484,7 @@ printer exists but no device that is on takes it out, it waits in the queue and 
 Involved: KITCHEN-F08, KITCHEN-F18, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F11 Reprint an order
+<!-- from WORKBOOK.md sha256:c23f8b49dbb9 -->
 Status: done
 Actor: employee, manager
 Screen: Tickets (from Kitchen)
@@ -472,6 +498,7 @@ sends nothing to the queue; if Printing refuses it, Kitchen says its reason.
 Involved: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Print a barcode label
+<!-- from WORKBOOK.md sha256:0371b27fdd2c -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Product card (from Inventory), Printers
@@ -492,6 +519,7 @@ oldest to the newest.
 Involved: INVENTORY-F25, PRINTING-F01, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F13 Open the drawer when charging
+<!-- from WORKBOOK.md sha256:aefce3c516ce -->
 Status: done
 Actor: employee
 Screen: Sell (from Sales)
@@ -513,6 +541,7 @@ the device's error.
 Involved: PRINTING-F06, PRINTING-F07, PRINTING-F22
 
 ### PRINTING-F14 Get a print job unstuck
+<!-- from WORKBOOK.md sha256:e5ac51e3dc4e -->
 Status: done
 Actor: owner, administrator
 Screen: Queue
@@ -533,6 +562,7 @@ buttons are not seen.
 Involved: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Go to the receipt text, which is written in Sales
+<!-- from WORKBOOK.md sha256:e1d175ae8b9c -->
 Status: done — the receipt header and footer live in the Sales settings, and the Settings note leads
 there
 Actor: administrator
@@ -547,6 +577,7 @@ If it fails: with Sales switched off, the note shows without the link.
 Involved: SALE-F02
 
 ### PRINTING-F16 Send to print from the assistant
+<!-- from WORKBOOK.md sha256:0a85995d9466 -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Assistant
@@ -565,6 +596,7 @@ If it fails: the same as the screen, with the server's words.
 Involved: PRINTING-F05, PRINTING-F14, PRINTING-F19
 
 ### PRINTING-F17 Print the cash register closing
+<!-- from WORKBOOK.md sha256:4a8df525c78e -->
 Status: done
 Actor: employee
 Screen: Session detail (from Cash register)
@@ -580,6 +612,7 @@ If it fails: as in F07.
 Involved: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Take the paper out: the device picks up and confirms the jobs
+<!-- from WORKBOOK.md sha256:1fb7664a2a38 -->
 Status: done
 Actor: the owner, the administrator or the manager (they set up the device) and the device's app
 (it picks up)
@@ -640,6 +673,7 @@ anybody could pretend to be the till.
 Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
 
 ### PRINTING-F19 See the state of a printer
+<!-- from WORKBOOK.md sha256:4c410470a0af -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Printers
@@ -659,6 +693,7 @@ If it fails: "There is no printer with that name.".
 Involved: PRINTING-F01
 
 ### PRINTING-F20 How long the hub keeps the print jobs
+<!-- from WORKBOOK.md sha256:b8da91d53af6 -->
 Status: done
 Actor: system
 Screen: none
@@ -677,6 +712,7 @@ time.
 Involved: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 See in System who prints and where to get the ERPlora app
+<!-- from WORKBOOK.md sha256:0c8eeab8b017 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -707,6 +743,7 @@ buttons do not show (never a button that leads nowhere).
 Involved: BASE-F02, BASE-F39, PRINTING-F18
 
 ### PRINTING-F22 Print the receipt and open the drawer at the till that charges
+<!-- from WORKBOOK.md sha256:a895bc35fe36 -->
 Status: done
 Actor: employee (charges and prints); the manager sets up each till with its printers (PRINTING-F18)
 Screen: Sell and Sales (from Sales), Session detail (from Cash register), Printers, Settings
@@ -740,10 +777,12 @@ Involved: PRINTING-F04, PRINTING-F06, PRINTING-F07, PRINTING-F08, PRINTING-F09, 
 PRINTING-F18
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:79fbdbb33ea2 -->
 
 The other apps and the assistant use Printing through these operations, by their name; never its tables.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:39fbee70568b -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -761,6 +800,7 @@ The other apps and the assistant use Printing through these operations, by their
 | Whether a role's station answers right now: ready (a set-up device that prints it gave signs in the last 90 s), not connected (set up, but silent) or not set up (none); for the Home's health row and the "Your printer" card | view | F21 | `printing.device.health` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:235368aed276 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
@@ -780,6 +820,7 @@ The other apps and the assistant use Printing through these operations, by their
 | Cancels a job | queue | F14 | `printing.job.cancel` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:7855b609be60 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -800,15 +841,18 @@ The other apps and the assistant use Printing through these operations, by their
 The notices do not carry the document (it may have a customer's name or tax ID): only ids.
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:550413d3b388 -->
 
 Nothing. The apps that print call `printing.job.create` by its name, inside their own
 transaction (the sale's, the closing's), and do not wait for a notice.
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:ac587771636d -->
 
 Nothing (`requires = []`). It reads nobody's models: whoever prints sends the document already composed.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:2b1e48397819 -->
 
 | App | What for | Service |
 |---|---|---|
@@ -822,6 +866,7 @@ Nothing (`requires = []`). It reads nobody's models: whoever prints sends the do
 | `base` (the Home's health row) | "Printer ready", "Printer not connected" or "Printer not set up" | `printing.device.health` |
 
 ### Who may do what
+<!-- from WORKBOOK.md sha256:7c70724508da -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

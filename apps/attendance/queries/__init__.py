@@ -1,0 +1,821 @@
+"""Read operations of the attendance app, and the lookups services.py shares (WORKBOOK «Servicios»).
+
+Every query runs READ ONLY. Who sees what: whoever clocks sees their own working days and their history
+(the law makes them accessible to the worker); ``attendance.view_all`` sees the team. «Own» is every day
+of a staff record linked to the caller's user (a rehired person keeps their old days). Durations are
+computed here, in seconds, as of the moment the query runs (``as_of``); the screens make them run on
+from there. A day waiting for review has no worked time: «until now» would count days nobody worked.
+"""
+
+import calendar
+import csv
+import datetime as dt
+import io
+from typing import Any
+from uuid import UUID
+
+from babel.dates import format_date
+from django.db.models import (
+    CharField,
+    Count,
+    DateTimeField,
+    DurationField,
+    F,
+    IntegerField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Sum,
+    Value,
+)
+from django.db.models.functions import Coalesce, Concat
+from django.utils import timezone, translation
+from django.utils.translation import gettext
+from django.utils.translation import gettext_lazy as _
+from live.context import OperationContext
+from live.errors import NotFound, PermissionDenied
+from live.operations import operation
+
+from apps.attendance.models import AttendanceSettings, Break, Correction, Record
+from apps.attendance.schemas import (
+    CorrectionListIn,
+    CorrectionPage,
+    CurrentOut,
+    EmptyIn,
+    ExportOut,
+    PersonListIn,
+    PersonOut,
+    PersonPage,
+    PersonRefIn,
+    PresenceCountOut,
+    PresenceListIn,
+    PresencePage,
+    RecordDetailOut,
+    RecordExportIn,
+    RecordListIn,
+    RecordPage,
+    RecordRefIn,
+    SettingsOut,
+)
+from apps.staff.models import Member
+from base.models import HubUser
+from base.ordering import list_order_for
+from base.business import babel_locale, business_zone
+
+from .people import MEMBER_NOT_FOUND, actor_user, find_member, member_name_expression, own_member, person_out
+
+RECORD_NOT_FOUND = _("That working day does not exist in this business.")
+OWN_DAYS_ONLY = _("You can only see your own working days.")
+#: The reason of the system's correction when a termination closes a day (ATTENDANCE-F13). Stored in
+#: English, the source, and shown in the reader's language.
+TERMINATED_REASON = _("Day closed when the person was terminated in Staff.")
+TERMINATED_REASON_SOURCE = "Day closed when the person was terminated in Staff."
+SYSTEM_REASONS = frozenset({TERMINATED_REASON_SOURCE})
+
+VIEW_ALL = "attendance.view_all"
+#: Who reads someone else's working day: whoever sees the team, and whoever may correct it.
+READS_ANY_DAY = (VIEW_ALL, "attendance.correct")
+#: Who reads someone else by id: whoever reads any day, and whoever clocks others in and out.
+READS_ANY_PERSON = (*READS_ANY_DAY, "attendance.clock_others")
+#: How many past days «Recent days» of the clock screen shows (the old module's ten).
+RECENT_DAYS = 10
+#: The CSV of the old module, column for column (WORKBOOK ATTENDANCE-F10).
+CSV_HEADER = (
+    "date",
+    "user",
+    "clock_in",
+    "clock_out",
+    "break_minutes",
+    "worked_minutes",
+    "status",
+    "within_radius_in",
+    "within_radius_out",
+)
+#: What a spreadsheet runs as a formula when a cell starts with it (OWASP «CSV injection»).
+FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+#: The settings until the business saves its own (the old module's table defaults).
+DEFAULTS = {
+    "require_location": False,
+    "geofence_radius_m": 100,
+    "workplace_lat": None,
+    "workplace_lng": None,
+    "auto_close_after_hours": 12,
+}
+
+
+# ── Lookups shared with services.py ─────────────────────────────────────────────────────────────
+
+
+def user_name(person: HubUser | None) -> str:
+    if person is None:
+        return ""
+    return (person.name or person.username).strip()
+
+
+def saved_settings() -> AttendanceSettings | None:
+    return AttendanceSettings.objects.filter(slot=1).first()
+
+
+def settings_values(row: AttendanceSettings | None) -> dict:
+    values = dict(DEFAULTS)
+    if row is not None:
+        values.update({key: getattr(row, key) for key in DEFAULTS})
+    return {
+        **values,
+        "workplace_set": values["workplace_lat"] is not None
+        and values["workplace_lng"] is not None,
+        "saved": row is not None,
+        "updated_at": row.updated_at if row is not None else None,
+    }
+
+
+def annotated(records: QuerySet) -> QuerySet:
+    """Working days with what their row shows: the person's name, the breaks and the corrections."""
+    closed = (
+        Break.objects.filter(record=OuterRef("pk"), ended_at__isnull=False)
+        .values("record")
+        .annotate(
+            total=Sum(F("ended_at") - F("started_at"), output_field=DurationField())
+        )
+        .values("total")
+    )
+    running = Break.objects.filter(record=OuterRef("pk"), ended_at__isnull=True).values(
+        "started_at"
+    )[:1]
+    breaks = (
+        Break.objects.filter(record=OuterRef("pk"))
+        .values("record")
+        .annotate(n=Count("id"))
+        .values("n")
+    )
+    corrections = (
+        Correction.objects.filter(record=OuterRef("pk"))
+        .values("record")
+        .annotate(n=Count("id"))
+        .values("n")
+    )
+    return records.select_related("member").annotate(
+        member_name=Concat(
+            "member__first_name",
+            Value(" "),
+            "member__last_name",
+            output_field=CharField(),
+        ),
+        closed_break=Subquery(closed, output_field=DurationField()),
+        break_started_at=Subquery(running, output_field=DateTimeField()),
+        break_count=Coalesce(Subquery(breaks, output_field=IntegerField()), 0),
+        correction_count=Coalesce(
+            Subquery(corrections, output_field=IntegerField()), 0
+        ),
+    )
+
+
+def _seconds(delta: dt.timedelta) -> int:
+    return max(0, int(delta.total_seconds()))
+
+
+def review_hours() -> int:
+    """After how many hours an open day waits for review (the settings, 12 until saved)."""
+    return settings_values(saved_settings())["auto_close_after_hours"]
+
+
+def is_stale(record: Record, hours: int, now: dt.datetime) -> bool:
+    """An open day older than ``hours``: a forgotten clock-out (ATTENDANCE-F05).
+
+    It reads as waiting for review whether or not the worker's review (every quarter of an hour) has
+    flagged it yet: it never counts «until now», and only a manager's correction closes it.
+    """
+    return record.status == Record.Status.OPEN and record.clock_in_at + dt.timedelta(hours=hours) < now
+
+
+def effective_status(record: Record, hours: int, as_of: dt.datetime) -> str:
+    return Record.Status.NEEDS_REVIEW if is_stale(record, hours, as_of) else record.status
+
+
+def durations(record: Record, as_of: dt.datetime, hours: int) -> tuple[int, int | None]:
+    """``(break_seconds, worked_seconds)`` of an annotated day as of ``as_of``.
+
+    Only an open day (or a closed one) has an end to measure against: a day waiting for review has no
+    worked time, and its running break does not grow either (its end is unknown).
+    """
+    status = effective_status(record, hours, as_of)
+    closed = _seconds(record.closed_break) if record.closed_break else 0
+    running = 0
+    if record.break_started_at is not None and (record.clock_out_at or status == Record.Status.OPEN):
+        running = _seconds((record.clock_out_at or as_of) - record.break_started_at)
+    breaks = closed + running
+    end = record.clock_out_at or (as_of if status == Record.Status.OPEN else None)
+    worked = None if end is None else max(0, _seconds(end - record.clock_in_at) - breaks)
+    return breaks, worked
+
+
+def record_out(record: Record, as_of: dt.datetime, hours: int) -> dict:
+    breaks, worked = durations(record, as_of, hours)
+    return {
+        "id": record.id,
+        "member_id": record.member_id,
+        "member_name": record.member_name,
+        "work_date": record.work_date,
+        "clock_in_at": record.clock_in_at,
+        "clock_out_at": record.clock_out_at,
+        "status": effective_status(record, hours, as_of),
+        "source": record.source,
+        "in_distance_m": record.in_distance_m,
+        "in_within_radius": record.in_within_radius,
+        "out_distance_m": record.out_distance_m,
+        "out_within_radius": record.out_within_radius,
+        "note": record.note,
+        "break_count": record.break_count,
+        "break_seconds": breaks,
+        "worked_seconds": worked,
+        "break_started_at": record.break_started_at,
+        "correction_count": record.correction_count,
+        "as_of": as_of,
+    }
+
+
+def load_record(record_id: UUID, as_of: dt.datetime | None = None) -> dict:
+    """One day as services.py returns it after a write."""
+    record = annotated(Record.objects.filter(pk=record_id)).get()
+    return record_out(record, as_of or timezone.now(), review_hours())
+
+
+def _owns(ctx: OperationContext, record: Record) -> bool:
+    user = actor_user(ctx)
+    return user is not None and record.member.user_id == user.pk
+
+
+def _reads_any(ctx: OperationContext, permissions: tuple[str, ...]) -> bool:
+    return any(ctx.has(permission) for permission in permissions)
+
+
+def visible_record(ctx: OperationContext, record_id: UUID) -> Record:
+    """A day the caller may see (their own, or any for whoever sees the team or corrects); ``NotFound`` otherwise."""
+    record = annotated(Record.objects.filter(pk=record_id)).first()
+    if record is None or not (_reads_any(ctx, READS_ANY_DAY) or _owns(ctx, record)):
+        raise NotFound(str(RECORD_NOT_FOUND))
+    return record
+
+
+def _own_days(ctx: OperationContext) -> Q | None:
+    user = actor_user(ctx)
+    return None if user is None else Q(member__user_id=user.pk)
+
+
+def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.datetime, hours: int) -> QuerySet:
+    """The days of the list and the CSV: the caller's own unless they see the team, then the filters.
+
+    The status filter reads the status a day shows: a forgotten open day is «needs review».
+    """
+    records = Record.objects.all()
+    own = _own_days(ctx)
+    named = params.member_id is not None or bool(params.member)
+    if named:
+        member = find_member(params.member_id, params.member, include_terminated=True)
+        if not ctx.has(VIEW_ALL) and (
+            own is None or member.user_id != actor_user(ctx).pk
+        ):
+            raise PermissionDenied(str(OWN_DAYS_ONLY))
+        records = records.filter(member=member)
+    if params.mine or not ctx.has(VIEW_ALL):
+        records = records.filter(own) if own is not None else records.none()
+    if params.status:
+        limit = as_of - dt.timedelta(hours=hours)
+        if params.status == Record.Status.OPEN:
+            records = records.filter(status=Record.Status.OPEN, clock_in_at__gte=limit)
+        elif params.status == Record.Status.NEEDS_REVIEW:
+            records = records.filter(
+                Q(status=Record.Status.NEEDS_REVIEW) | Q(status=Record.Status.OPEN, clock_in_at__lt=limit)
+            )
+        else:
+            records = records.filter(status=params.status)
+    if params.date_from:
+        records = records.filter(work_date__gte=params.date_from)
+    if params.date_to:
+        records = records.filter(work_date__lte=params.date_to)
+    records = annotated(records)
+    if params.search:
+        records = records.filter(member_name__icontains=params.search)
+    return records.order_by(*list_order_for(params.sort))
+
+
+def _page(rows: list, total: int, params) -> dict:
+    return {
+        "rows": rows,
+        "total": total,
+        "limit": params.limit,
+        "offset": params.offset,
+    }
+
+
+def correction_out(trail: Correction) -> dict:
+    system = trail.is_system
+    return {
+        "id": trail.id,
+        "record_id": trail.record_id,
+        "old_clock_in_at": trail.old_clock_in_at,
+        "old_clock_out_at": trail.old_clock_out_at,
+        "old_status": trail.old_status,
+        "new_clock_in_at": trail.new_clock_in_at,
+        "new_clock_out_at": trail.new_clock_out_at,
+        "new_status": trail.new_status,
+        # A system reason is stored in English and read in the reader's language.
+        "reason": gettext(trail.reason)
+        if system and trail.reason in SYSTEM_REASONS
+        else trail.reason,
+        "is_system": system,
+        # The name copied when the correction was made: it outlives the user.
+        "created_by_name": trail.created_by_name,
+        "created_at": trail.created_at,
+    }
+
+
+def day_name(record: Record) -> str:
+    """A working day as «Correct working day» names it: the person and its business day, in the active language."""
+    day = format_date(record.work_date, "medium", locale=babel_locale(translation.get_language()))
+    return f"{record.member_name} · {day}"
+
+
+def business_date(instant: dt.datetime) -> dt.date:
+    """The business's calendar day of an instant, on its clock (hub#779)."""
+    return timezone.localdate(instant, business_zone())
+
+
+# ── Operations ──────────────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "attendance.record.current",
+    kind="query",
+    permission="attendance.clock",
+    input=EmptyIn,
+    output=CurrentOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "how long have I worked today?",
+                "am I clocked in right now?",
+                "show me my working day so far",
+            ),
+            "es": (
+                "¿cuántas horas llevo hoy?",
+                "¿estoy fichado ahora?",
+                "enséñame mi jornada de hoy",
+            ),
+        },
+        "description": "Your working day today («my day», «am I clocked in?»): your staff record, whether "
+        "you are clocked in or on a break and since when, today's worked and break time and your last "
+        "ten days."
+    },
+)
+def current(ctx: OperationContext, params: EmptyIn) -> dict:
+    as_of = timezone.now()
+    today = business_date(as_of)
+    member = own_member(ctx)
+    if member is None:
+        return {
+            "member": None,
+            "open": None,
+            "today": {
+                "date": today,
+                "worked_seconds": 0,
+                "break_seconds": 0,
+                "running": None,
+            },
+            "recent": [],
+            "as_of": as_of,
+        }
+    hours = review_hours()
+    days = annotated(Record.objects.filter(member=member))
+    open_day = next(iter(days.filter(status=Record.Status.OPEN)), None)
+    if open_day is not None and is_stale(open_day, hours, as_of):
+        # A forgotten day: the clock offers «Clock in», which flags it and opens a new one.
+        open_day = None
+    worked = breaks = 0
+    for record in days.filter(work_date=today):
+        day_breaks, day_worked = durations(record, as_of, hours)
+        breaks += day_breaks
+        worked += day_worked or 0
+    running = None
+    if open_day is not None and open_day.work_date == today:
+        running = "break" if open_day.break_started_at else "work"
+    return {
+        "member": {"id": member.id, "name": member.full_name},
+        "open": record_out(open_day, as_of, hours) if open_day else None,
+        "today": {
+            "date": today,
+            "worked_seconds": worked,
+            "break_seconds": breaks,
+            "running": running,
+        },
+        "recent": [
+            record_out(r, as_of, hours)
+            for r in days.order_by("-clock_in_at", "id")[:RECENT_DAYS]
+        ],
+        "as_of": as_of,
+    }
+
+
+@operation(
+    "attendance.record.list",
+    kind="query",
+    permission="attendance.clock",
+    input=RecordListIn,
+    output=RecordPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "list this week's clock-ins",
+                "show Luis's working days in October",
+                "which days did Carmen clock in this month?",
+            ),
+            "es": (
+                "¿qué fichajes hay de esta semana?",
+                "muéstrame las jornadas de Luis en octubre",
+                "¿qué días ha fichado Carmen este mes?",
+            ),
+        },
+        "description": "Lists working days (clock-in, clock-out, breaks, worked time, status) with filters "
+        "by person (id or name), dates and status, «mine» for your own; an employee only sees their own."
+    },
+)
+def list_records(ctx: OperationContext, params: RecordListIn) -> dict:
+    as_of = timezone.now()
+    hours = review_hours()
+    records = scoped_records(ctx, params, as_of, hours)
+    rows = [
+        record_out(r, as_of, hours)
+        for r in records[params.offset : params.offset + params.limit]
+    ]
+    return _page(rows, records.count(), params)
+
+
+@operation(
+    "attendance.record.detail",
+    kind="query",
+    permission="attendance.clock",
+    input=RecordRefIn,
+    output=RecordDetailOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "show me Nuria's working day on Monday with its breaks",
+                "where did Pedro clock in from yesterday?",
+                "who clocked Marta's day today?",
+            ),
+            "es": (
+                "enséñame la jornada de Nuria del lunes con sus pausas",
+                "¿desde dónde fichó Pedro ayer?",
+                "¿quién fichó hoy por Marta?",
+            ),
+        },
+        "description": "One working day with its breaks, where it was clocked from and who clocked it; "
+        "someone else's only for whoever sees the team or corrects days."
+    },
+)
+def record_detail(ctx: OperationContext, params: RecordRefIn) -> dict:
+    as_of = timezone.now()
+    hours = review_hours()
+    record = visible_record(ctx, params.id)
+    # A running break only runs while the day is open; on a day waiting for review it has no end.
+    open_now = effective_status(record, hours, as_of) == Record.Status.OPEN
+    breaks = [
+        {
+            "id": b.id,
+            "started_at": b.started_at,
+            "ended_at": b.ended_at,
+            "seconds": _seconds((b.ended_at or record.clock_out_at or as_of) - b.started_at)
+            if b.ended_at or record.clock_out_at or open_now
+            else 0,
+        }
+        for b in Break.objects.filter(record=record).order_by("started_at", "id")
+    ]
+    return {
+        **record_out(record, as_of, hours),
+        "name": day_name(record),
+        "in_lat": record.in_lat,
+        "in_lng": record.in_lng,
+        "in_accuracy_m": record.in_accuracy_m,
+        "out_lat": record.out_lat,
+        "out_lng": record.out_lng,
+        "out_accuracy_m": record.out_accuracy_m,
+        "created_by_name": user_name(record.created_by),
+        "created_at": record.created_at,
+        "updated_at": record.updated_at,
+        "breaks": breaks,
+    }
+
+
+def export_filename(date_from: dt.date | None, date_to: dt.date | None) -> str:
+    """``attendance-2026-10.csv`` for a whole month, the dates for another range, else ``attendance.csv``."""
+    if date_from is None or date_to is None:
+        return "attendance.csv"
+    last_day = calendar.monthrange(date_from.year, date_from.month)[1]
+    if date_from.day == 1 and date_to == date_from.replace(day=last_day):
+        return f"attendance-{date_from:%Y-%m}.csv"
+    return f"attendance-{date_from.isoformat()}_{date_to.isoformat()}.csv"
+
+
+def _cell(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(FORMULA_STARTS) else text
+
+
+def _local(instant: dt.datetime | None) -> str:
+    return (
+        ""
+        if instant is None
+        else timezone.localtime(instant, business_zone()).strftime("%Y-%m-%d %H:%M")
+    )
+
+
+def _flag(value: bool | None) -> str:
+    return "" if value is None else str(int(value))
+
+
+@operation(
+    "attendance.record.export",
+    kind="query",
+    permission="attendance.clock",
+    input=RecordExportIn,
+    output=ExportOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "export this month's clock-ins to CSV",
+                "download October's working days for the labour inspection",
+                "give me last week's working days as a CSV",
+            ),
+            "es": (
+                "exporta los fichajes del mes en CSV",
+                "descarga las jornadas de octubre para la inspección de trabajo",
+                "saca en CSV las jornadas de la semana pasada",
+            ),
+        },
+        "description": "Exports the working days of the filter (every page) as a CSV for the accountant or a "
+        "labour inspection: date, person, clock-in, clock-out, break and worked minutes, status and "
+        "whether it was clocked within the workplace radius. An employee exports only their own."
+    },
+)
+def export_records(ctx: OperationContext, params: RecordExportIn) -> dict:
+    as_of = timezone.now()
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(CSV_HEADER)
+    count = 0
+    hours = review_hours()
+    for record in scoped_records(ctx, params, as_of, hours):
+        breaks, worked = durations(record, as_of, hours)
+        writer.writerow(
+            [
+                record.work_date.isoformat(),
+                _cell(record.member_name),
+                _local(record.clock_in_at),
+                _local(record.clock_out_at),
+                breaks // 60,
+                "" if worked is None else worked // 60,
+                effective_status(record, hours, as_of),
+                _flag(record.in_within_radius),
+                _flag(record.out_within_radius),
+            ]
+        )
+        count += 1
+    return {
+        "filename": export_filename(params.date_from, params.date_to),
+        "content_type": "text/csv",
+        "rows": count,
+        "csv": buffer.getvalue(),
+    }
+
+
+@operation(
+    "attendance.correction.list",
+    kind="query",
+    permission="attendance.clock",
+    input=CorrectionListIn,
+    output=CorrectionPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "who corrected Elena's working day?",
+                "show me this week's corrections of clock-ins",
+                "what was changed in yesterday's clock-in and why?",
+            ),
+            "es": (
+                "¿quién corrigió la jornada de Elena?",
+                "muéstrame las correcciones de fichajes de esta semana",
+                "¿qué se cambió en el fichaje de ayer y por qué?",
+            ),
+        },
+        "description": "The history of corrections of a working day (or of all of them): the times before "
+        "and after, the reason, who and when, newest first. An employee sees the history of their own days."
+    },
+)
+def list_corrections(ctx: OperationContext, params: CorrectionListIn) -> dict:
+    trails = Correction.objects.all()
+    if params.record_id is not None:
+        trails = trails.filter(record=visible_record(ctx, params.record_id))
+    elif not ctx.has(VIEW_ALL):
+        own = _own_days(ctx)
+        trails = (
+            trails.filter(record__in=Record.objects.filter(own))
+            if own is not None
+            else trails.none()
+        )
+    trails = trails.order_by("-created_at", "-id")
+    rows = [
+        correction_out(t) for t in trails[params.offset : params.offset + params.limit]
+    ]
+    return _page(rows, trails.count(), params)
+
+
+def present_records() -> QuerySet:
+    """Who is in: an open day within the review hours (a forgotten one is not), of a record that is not
+    terminated (its person no longer works here)."""
+    limit = timezone.now() - dt.timedelta(hours=review_hours())
+    return Record.objects.filter(status=Record.Status.OPEN, clock_in_at__gte=limit).exclude(
+        member__status=Member.Status.TERMINATED
+    )
+
+
+@operation(
+    "attendance.presence.list",
+    kind="query",
+    permission=VIEW_ALL,
+    input=PresenceListIn,
+    output=PresencePage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "who is clocked in right now?",
+                "who is on a break at the moment?",
+                "tell me who is still working and since when",
+            ),
+            "es": (
+                "¿quién está fichado ahora mismo?",
+                "¿quién está en pausa en este momento?",
+                "¿quién sigue dentro y desde qué hora entró?",
+            ),
+        },
+        "description": "Who is clocked in right now («who is in?»): how many and who, since when and whether "
+        "they are on a break. A day waiting for review does not count."
+    },
+)
+def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
+    records = annotated(present_records())
+    if params.search:
+        records = records.filter(member_name__icontains=params.search)
+    records = records.order_by("member_name", "id")
+    rows = [
+        {
+            "record_id": r.id,
+            "member_id": r.member_id,
+            "member_name": r.member_name,
+            "clock_in_at": r.clock_in_at,
+            "break_started_at": r.break_started_at,
+            "source": r.source,
+        }
+        for r in records[params.offset : params.offset + params.limit]
+    ]
+    return _page(rows, records.count(), params)
+
+
+@operation(
+    "attendance.presence.count",
+    kind="query",
+    permission=VIEW_ALL,
+    input=EmptyIn,
+    output=PresenceCountOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "how many are in right now?",
+                "how many people have clocked in and are still here?",
+                "count who is clocked in now",
+            ),
+            "es": (
+                "¿cuántos no han fichado aún la salida?",
+                "¿cuánta gente está dentro en este momento?",
+                "número de fichados ahora mismo",
+            ),
+        },
+        "description": "How many people are clocked in right now («how many are in?»), the Home's «Clocked in "
+        "now». A day waiting for review does not count; for who they are, attendance.presence.list."
+    },
+)
+def count_presence(ctx: OperationContext, params: EmptyIn) -> dict:
+    return {"count": present_records().count()}
+
+
+def listed_people() -> QuerySet:
+    """The people whose days can be listed, named: every staff record that is not terminated, and the terminated
+    ones that have days."""
+    with_days = Record.objects.filter(member=OuterRef("pk"))
+    return Member.objects.annotate(name=member_name_expression()).filter(
+        ~Q(status=Member.Status.TERMINATED) | Q(pk__in=with_days.values("member"))
+    )
+
+
+@operation(
+    "attendance.person.list",
+    kind="query",
+    permission=VIEW_ALL,
+    input=PersonListIn,
+    output=PersonPage,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "whose clock-ins can I see?",
+                "list the people of the time clock",
+                "find Marta in the time clock",
+            ),
+            "es": (
+                "¿de quién puedo ver los fichajes?",
+                "lista la gente del control horario",
+                "¿a quién puedo elegir en el filtro «Persona»?",
+            ),
+        },
+        "description": "The people whose working days can be listed: every staff record that is not "
+        "terminated, and the terminated ones that have days (kept four years). Search by name."
+    },
+)
+def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
+    people = listed_people().order_by("first_name", "last_name", "id")
+    if params.search:
+        people = people.filter(name__icontains=params.search)
+    rows = [person_out(m) for m in people[params.offset : params.offset + params.limit]]
+    return _page(rows, people.count(), params)
+
+
+@operation(
+    "attendance.person.detail",
+    kind="query",
+    permission="attendance.clock",
+    input=PersonRefIn,
+    output=PersonOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "is Marta still active in the time clock?",
+                "give me Luis's details in the time clock",
+                "has Pedro left the business? check the time clock",
+            ),
+            "es": (
+                "¿sigue activa Marta en el control horario?",
+                "dame la ficha de Luis en el control horario",
+                "¿Pedro sigue de alta para fichar?",
+            ),
+        },
+        "description": "One person of the time clock by id, as the «Person» filter names them: their name and "
+        "the staff record's status. Your own for whoever clocks; anyone for whoever sees the team, clocks others "
+        "or corrects days."
+    },
+)
+def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
+    people = listed_people().filter(pk=params.id)
+    if not _reads_any(ctx, READS_ANY_PERSON):
+        user = actor_user(ctx)
+        people = people.filter(user_id=user.pk) if user is not None else people.none()
+    member = people.first()
+    if member is None:
+        raise NotFound(str(MEMBER_NOT_FOUND))
+    return person_out(member)
+
+
+@operation(
+    "attendance.settings.get",
+    kind="query",
+    permission="attendance.clock",
+    input=EmptyIn,
+    output=SettingsOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "what radius does the time clock allow?",
+                "does clocking in from a phone ask for the location?",
+                "after how many hours is a forgotten day flagged?",
+            ),
+            "es": (
+                "dame el radio en metros para fichar con el móvil",
+                "¿se pide la ubicación al fichar con el móvil?",
+                "¿a partir de cuántas horas se avisa de un día olvidado?",
+            ),
+        },
+        "description": "The time clock settings: whether a personal device must share its location and be "
+        "within the workplace radius to clock in, the radius, the workplace and after how many hours a "
+        "forgotten day is flagged for review."
+    },
+)
+def get_settings(ctx: OperationContext, params: EmptyIn) -> dict:
+    return settings_values(saved_settings())

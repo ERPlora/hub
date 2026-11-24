@@ -751,6 +751,10 @@
     "method": "get",
     "path": "/api/sale/checkout/preview"
   },
+  "sale.checkout.steps": {
+    "method": "get",
+    "path": "/api/sale/checkout/steps"
+  },
   "sale.order.list": {
     "method": "get",
     "path": "/api/sale/orders"
@@ -818,6 +822,10 @@
   "sale.order.print_bill": {
     "method": "post",
     "path": "/api/sale/orders/print_bill"
+  },
+  "sale.order.note_bill": {
+    "method": "post",
+    "path": "/api/sale/orders/note_bill"
   },
   "sale.order.split": {
     "method": "post",

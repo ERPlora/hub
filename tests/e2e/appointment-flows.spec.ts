@@ -9,10 +9,11 @@
 // (F12), booked again (F13), edited from an occurrence on (F14), paused, reactivated and deleted (F15); the
 // customer's card shows her visits (F20). Each size works on a day of its own; what it creates is «E2E Apf …»,
 // removed before and after, and the settings of Citas are put back at the end.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
 import { pickDay, pickTime } from './date-time-fields';
+import { cutLabels } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, ownerPage, pick, post, rowAction, settled } from './service-helpers';
 
@@ -147,16 +148,6 @@ async function chooseCustomer(page: Page, modal: string, who: Cast): Promise<voi
 /** Waits until the agenda's row of appointment `id` shows `status`: the live list has caught up with the change. */
 async function showsStatus(page: Page, id: string, status: string): Promise<void> {
   await expect(shown(page).locator(`[data-testid=appointment-list-row][data-id="${id}"]`).first()).toContainText(status);
-}
-
-/** The fields of `form` whose label does not fit and is cut with «…» (none should be). */
-async function cutLabels(form: Locator): Promise<string[]> {
-  return form.locator('ion-input, ion-select, ion-textarea').evaluateAll((fields) =>
-    fields.flatMap((field) => {
-      const label = field.shadowRoot?.querySelector('.label-text') ?? field.querySelector('.label-text');
-      return label && label.scrollWidth > label.clientWidth + 1 ? [field.getAttribute('data-testid') ?? field.tagName] : [];
-    }),
-  );
 }
 
 /** The searched word of a name built by `named` («E2E Apf <word> …»). */

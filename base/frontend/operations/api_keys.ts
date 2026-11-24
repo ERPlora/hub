@@ -3,17 +3,18 @@
 
 type NoInput = Record<string, never>;
 
-/** `base.ApiKeyOut`: a key of the business (never its whole token). */
-export type ApiKeyMode = 'full' | 'read' | 'write' | 'per_app';
-export type ApiKind = 'read' | 'write';
+/** What a key may do on an app (`base.api_actions`). */
+export type ApiAction = 'read' | 'create' | 'update' | 'delete';
+/** Per app (its id), or `'*'` for every app of the business: the actions given there. */
+export type ApiKeyScopes = Record<string, readonly ApiAction[]>;
 
+/** `base.ApiKeyOut`: a key of the business (never its whole token). */
 export interface ApiKeyRow {
   id: string;
   name: string;
   /** The token's first characters, to tell it apart. */
   prefix: string;
-  mode: ApiKeyMode;
-  scopes: Record<string, ApiKind[]>;
+  scopes: ApiKeyScopes;
   rate_per_minute: number;
   created_by: string;
   created_at: string;
@@ -22,25 +23,24 @@ export interface ApiKeyRow {
   revoked_at: string | null;
 }
 
-/** `base.ApiAppOut`: an app this business has that publishes its API. */
+/** `base.ApiAppOut`: an app this business has that publishes its API, and what it publishes. */
 export interface ApiApp {
   id: string;
   name: string;
-  read: boolean;
-  write: boolean;
+  actions: ApiAction[];
 }
 
-/** `base.ApiKeyListOut`. */
+/** `base.ApiKeyListOut`: also the most who asks may give a key. */
 export interface ApiKeyList {
   keys: ApiKeyRow[];
   apps: ApiApp[];
+  grantable: ApiKeyScopes;
 }
 
 export interface ApiKeyInput {
   name: string;
   rate_per_minute: number;
-  mode: ApiKeyMode;
-  scopes: Record<string, ApiKind[]>;
+  scopes: ApiKeyScopes;
 }
 
 declare module '@erplora/ui/sdk' {

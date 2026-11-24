@@ -11,26 +11,12 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.combo import queries, services
-from apps.combo.schemas import (
-    ComboImageIn,
-    ComboImageSuggestIn,
-    ComboImageUploadIn,
-    ComboIn,
-    ComboListIn,
-    ComboPatchIn,
-    ComboRefIn,
-    ForSaleIn,
-    GroupIn,
-    GroupPatchIn,
-    GroupRefIn,
-    GroupReorderIn,
-    OptionBulkIn,
-    OptionIn,
-    OptionPatchIn,
-    OptionRefIn,
-    OptionReorderIn,
-    ResolveIn,
-)
+from apps.combo.schemas.choices import OptionBulkIn, OptionIn, OptionPatchIn, OptionReorderIn
+from apps.combo.schemas.courses import GroupIn, GroupPatchIn, GroupReorderIn
+from apps.combo.schemas.images import ComboImageIn, ComboImageSuggestIn, ComboImageUploadIn
+from apps.combo.schemas.menus import ComboIn, ComboListIn, ComboPatchIn
+from apps.combo.schemas.references import ComboRefIn, GroupRefIn, OptionRefIn
+from apps.combo.schemas.till import ForSaleIn, ResolveIn
 from apps.combo.schemas.on_sale import ComboOnSaleIn
 from base.request_body import accept_body_up_to
 
@@ -45,22 +31,22 @@ MAX_PHOTO_BODY = 2_900_000
 
 @bind(router, "combo.combo.list", "/combo/combos")
 async def combo_list(request, params: Query[ComboListIn]):
-    return await run_operation(request, queries.list_combos, params)
+    return await run_operation(request, queries.menus.list_combos, params)
 
 
 @bind(router, "combo.combo.get", "/combo/combos/detail")
 async def combo_get(request, params: Query[ComboRefIn]):
-    return await run_operation(request, queries.get_combo, params)
+    return await run_operation(request, queries.menus.get_combo, params)
 
 
 @bind(router, "combo.combo.for_sale", "/combo/combos/for_sale")
 async def combo_for_sale(request, params: Query[ForSaleIn]):
-    return await run_operation(request, queries.list_for_sale, params)
+    return await run_operation(request, queries.till.list_for_sale, params)
 
 
 @bind(router, "combo.combo.resolve", "/combo/combos/resolve")
 async def combo_resolve(request, params: Query[ResolveIn]):
-    return await run_operation(request, queries.resolve, params)
+    return await run_operation(request, queries.lines.resolve, params)
 
 
 @bind(router, "combo.combo.create", "/combo/combos", status=201)
@@ -150,4 +136,4 @@ async def combo_image_upload(request, data: ComboImageUploadIn):
 
 @bind(router, "combo.combo.suggest_image", "/combo/combos/image/suggest")
 async def combo_image_suggest(request, params: Query[ComboImageSuggestIn]):
-    return await run_operation(request, queries.suggest_image, params)
+    return await run_operation(request, queries.images.suggest_image, params)

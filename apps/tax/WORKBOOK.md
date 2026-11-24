@@ -732,7 +732,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las herramientas que ofrece un turno y el
   asistente manda a la pantalla o busca una automatización. `tests/test_assistant_asks.py` mide con las
   frases reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-tax-2026-11-08.json` y la del
-  empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 20 primeras, y lo que el
+  empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 15 que ofrece el turno, y lo que el
   empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
   herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
   las de cualquier herramienta lo ve un test. live lee «activar» y «desactivar» como las acciones `activate` y
@@ -743,6 +743,11 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Sin sinónimos propios
   (`assistant_synonyms`): «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.
+  Como una regla no se edita (TAX-F04 y TAX-F07), `tax.rule.create` dice además que pone y cambia
+  (`does`: `set` y `update`): «ponle el IVA a la comida para llevar» o «sube el IVA de los libros al 10 %»
+  la ofrecen, y la búsqueda de herramientas la encuentra por «poner el IVA de una categoría»
+  (`tests/test_assistant_rate_rule.py`). Con una palabra propia para «regla» en «el IVA de…» subiría la regla de
+  descuento de Tarifas, que también es una regla.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
   con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
   (`ai=INTERNAL`, sin API ni consulta viva): solo nombra la regla en la tarjeta; el modelo encuentra las reglas en

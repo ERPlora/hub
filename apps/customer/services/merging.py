@@ -19,13 +19,9 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.queries import (
-    CUSTOMER_UNAVAILABLE,
-    CUSTOMER_UNAVAILABLE_CODE,
-    find_customer,
-    health_consent,
-    load_detail,
-)
+from apps.customer.queries.cards import load_detail
+from apps.customer.queries.health import health_consent
+from apps.customer.queries.reads import CUSTOMER_UNAVAILABLE, CUSTOMER_UNAVAILABLE_CODE, find_customer
 from apps.customer.schemas.cards import CustomerDetailOut
 from apps.customer.schemas.merging import MergeIn
 from apps.customer.services.writes import _actor, lock_rows
@@ -55,7 +51,7 @@ MERGE_FILLED = (
     ai=AI(
         "Use this tool once both cards are known; do not stop at reading or explaining the merge. `customer` is the "
         "card that stays and `absorbed` is the duplicate merged into it: for «merge A into B», B is `customer` and A "
-        "is `absorbed`. Pass an exact name, phone or email in either field or, once customer.customer.by_phone or "
+        "is `absorbed`. Pass a name, phone or email in either field or, once customer.customer.by_phone or "
         "customer.customer.list found the cards, their ids in `id` and `absorbed_id`; never ask the person for an "
         "internal id. The survivor keeps its data and fills only its empty fields, notes are appended and figures "
         "summed; activity, custom values, groups, tags, purchases, orders and consent move to it, and the duplicate is "

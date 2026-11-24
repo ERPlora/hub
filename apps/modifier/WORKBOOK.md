@@ -688,11 +688,12 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   que también es el de un turno o un umbral). Así consultar los grupos, las opciones y los enganches, engancharlos y
   soltarlos, y cambiar o borrar grupos y opciones desde el chat (MODIFIER-F03 a F07) llegan a su operación: las frases
   reales de la QA del asistente (`tests/e2e/qa/probes/*-es-modifier-2026-11-08.json`, del dueño y del empleado) quedan
-  entre las 20 primeras herramientas del turno, y una frase propia por herramienta solo llega con sus `asks`
+  entre las 15 herramientas que ofrece el turno o, las de ver una asignación y ver un grupo, las encuentra la
+  búsqueda de su tarea; una frase propia por herramienta solo llega con sus `asks`
   (`tests/test_assistant_asks.py`), también la de borrar un grupo «sin cambiar los pedidos antiguos», desde que live
   deja de leer «sin cambiar» como una orden de cambiar (ERPlora/live#60).
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
-  las marcas `refers` de `schemas/__init__.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
+  las marcas `refers` de `schemas/fields.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
   pueden tener una opción con el mismo nombre, y el enganche por su grupo y lo que engancha. El id lleva su título
   («Grupo», «Opción», «Se aplica a»), nunca «Registro». Sin persona detrás, sin permiso, con un id de otro negocio o

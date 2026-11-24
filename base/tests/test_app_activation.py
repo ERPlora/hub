@@ -389,9 +389,13 @@ def test_one_already_on_says_so_also_when_it_had_come_along_with_another():
 @HUB_DB
 def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
     set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
-    assert app_get("reservas", language="es") == {"id": "reservation", "name": "Reservas", "state": "off", "mandatory": False}
+    said = {app: row["summary"] for app, row in by_id(app_list(language="es")).items()}
+    assert app_get("reservas", language="es") == {
+        "id": "reservation", "name": "Reservas", "summary": said["reservation"], "state": "off", "mandatory": False
+    }
     assert app_get("Reservas online", language="es") == {
-        "id": "online_booking", "name": "Reservas online", "state": "on", "mandatory": False
+        "id": "online_booking", "name": "Reservas online", "summary": said["online_booking"], "state": "on",
+        "mandatory": False,
     }
     assert app_get("online_booking")["name"] == "Online booking"
     with pytest.raises(NotFound):
@@ -413,11 +417,32 @@ def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
     from base import assistant
 
     set_rows()
-    for name in ("base.app.enable", "base.app.disable"):
-        card = assistant.cards.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
-        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservas online")]
-        card = assistant.cards.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
-        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservations")]
+
+    def card(name, app, language):
+        shown = assistant.cards.card(get(name), {"app": app}, language, ctx(language=language))
+        return [(field["name"], field["value"]) for field in shown["fields"]]
+
+    assert card("base.app.enable", "online_booking", "es") == [
+        ("app", "Reservas online"),
+        ("along", "Reservas online necesita Citas, Clientes, Horarios, Impuestos, Personal y Servicios: se activan con ella."),
+    ]
+    assert card("base.app.disable", "online_booking", "es") == [("app", "Reservas online")]
+    assert card("base.app.enable", "reservas", "en") == [
+        ("app", "Reservations"),
+        ("along", "Reservations needs Customers, Sales & POS, Schedules, Tables, and Taxes: they turn on with it."),
+    ]
+    assert card("base.app.disable", "reservas", "en") == [("app", "Reservations")]
+
+
+@HUB_DB
+def test_the_apps_to_turn_off_first_are_named_as_the_screen_joins_them():
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    set_rows(customer="on", tax="on*", sale="on*", table="on*", invoice="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("customer")
+
+    assert refused.value.message == "Turn off Invoicing, Sales & POS, and Tables first."
 
 
 @HUB_DB

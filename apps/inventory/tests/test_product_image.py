@@ -5,7 +5,8 @@ own (``file:inventory/products/<uuid7 hex>.webp`` under its hub's prefix, ``base
 initials. ``inventory.product.set_image`` sets one of the library (or none), ``inventory.product.upload_image`` keeps a
 photo (a JPG, PNG or WebP of 2 MB at most, kept as a 512 × 512 WebP) and ``inventory.product.suggest_image`` proposes
 the library's best images for the product's name, never setting one. Every read of a product says its ``image`` and
-the ``image_url`` the screens show; the photos are served to the hub's sessions only (``members_media``).
+the ``image_url`` the screens show; the photos are served to anyone (``public_media``), as the website's catalog shows
+them to its visitors.
 """
 
 import base64
@@ -123,8 +124,9 @@ def test_the_column_is_added_with_a_database_default_so_the_previous_code_still_
     assert (operation.field.default, operation.field.db_default, operation.field.max_length) == ("", "", 200)
 
 
-def test_its_photos_are_served_to_the_hubs_sessions_only():
-    assert django_apps.get_app_config("inventory").members_media == [FOLDER]
+def test_its_photos_are_served_to_anyone_as_the_websites_images():
+    config = django_apps.get_app_config("inventory")
+    assert (config.public_media, getattr(config, "members_media", [])) == ([FOLDER], [])
 
 
 # ── Declarations ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -408,11 +410,11 @@ def test_it_suggests_the_librarys_images_for_the_products_name_the_best_first_an
     assert OutboxEvent.objects.count() == 0
 
 
-def test_the_suggestions_are_titled_in_the_businesss_language_for_an_employee_too(image_library):  # noqa: F811
+def test_the_suggestions_are_titled_in_the_persons_language_for_an_employee_too(image_library):  # noqa: F811
     created = product("White coffee")
-    Hub.objects.filter(slug=A.key).update(language="es")
+    Hub.objects.filter(slug=A.key).update(language="en")
 
-    found = run("inventory.product.suggest_image", ProductImageSuggestIn(id=created.id), "hub_employee", language="en")
+    found = run("inventory.product.suggest_image", ProductImageSuggestIn(id=created.id), "hub_employee", language="es")
 
     assert (found.rows[0].reference, found.rows[0].title) == (LATTE, "Café con leche")
 
@@ -501,7 +503,7 @@ def test_set_and_suggest_over_http(admin_client, image_library):  # noqa: F811
     assert found.json()["rows"][0]["reference"] == LATTE
 
 
-def test_a_session_of_the_hub_sees_a_products_photo_and_a_visitor_does_not(admin_client, client, hub_files):  # noqa: F811
+def test_a_products_photo_is_seen_by_the_hubs_sessions_and_by_a_visitor_of_its_website(admin_client, hub_files):  # noqa: F811
     created = product()
     url = upload(photo(), created.id).image_url
 
@@ -509,7 +511,9 @@ def test_a_session_of_the_hub_sees_a_products_photo_and_a_visitor_does_not(admin
     assert seen.status_code == 200
     assert seen["Content-Type"] == "image/webp"
     admin_client.logout()
-    assert admin_client.get(url, HTTP_HOST=f"{HOST}:8000").status_code == 404
+    visited = admin_client.get(url, HTTP_HOST=f"{HOST}:8000")
+    assert (visited.status_code, visited["Content-Type"]) == (200, "image/webp")
+    assert visited["Cache-Control"] == "public, max-age=31536000, immutable"
 
 
 def test_the_image_is_said_in_english_and_spanish():

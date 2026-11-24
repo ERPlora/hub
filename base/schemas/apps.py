@@ -45,6 +45,10 @@ class AppOut(Schema):
     #: ``can_disable``, base's for one the business's country requires on, and the apps it depends on (hub#618,
     #: hub#694, hub#997); ``None``: nothing refuses it.
     refusal: str | None
+    #: What else flipping its switch turns on or off, as its question says it before the yes, in the reader's language
+    #: (``base.app_switch``, the assistant's card says the same): «Mesas se desactiva con ella: solo la necesitaba
+    #: Reservas.»; empty when it changes only this app.
+    along_said: str
     #: The business's country requires it on, as the app declares it (``mandatory``, hub#997): «Mandatory in …», on or
     #: off; once on there, it never goes off.
     mandatory: bool
@@ -85,6 +89,8 @@ class AppRefOut(Schema):
 
     id: str
     name: str
+    #: What it is for, as the Apps screen says it (``AppOut.summary``).
+    summary: str
     state: Literal["on", "off", "blocked", "creating", "failed"]
     mandatory: bool
 

@@ -136,7 +136,9 @@ def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
     # operation but the reactions only the system runs and the steps of Services' grant of a voucher
     # and of a session spent outside the till (asked directly, a line would pay for a voucher nobody
-    # granted, a professional would count a session nobody spent), and a write says how risky it is
+    # granted, a professional would count a session nobody spent), the note of a bill the device printed
+    # (the assistant prints only through a printer) and the steps of the charge sheet (its own layout: each step
+    # writes through its own app), and a write says how risky it is
     # (high: money moves or a sale is corrected); a read never asks to confirm.
     from live.operations import AI, INTERNAL, registry
 
@@ -144,7 +146,10 @@ def test_every_operation_is_described_for_the_assistant():
     assert ops
     internal = {name for name, op in ops.items() if op.ai is INTERNAL}
     assert internal == {
+        "sale.checkout.steps",
         "sale.customer.reassign",
+        "sale.order.note_bill",
+        "sale.order_line.check",
         "sale.record.get",
         "sale.sale.record_invoice",
         "sale.sale.voucher_sold",
@@ -345,6 +350,16 @@ TASK_VIDEOS = [
     (("SALE-F14",), "kG1MT9VEMjo", "B_-hW7QysXU"),
     (("SALE-F15",), "ADneSwlsnlg", "8vLwV_6ILUQ"),
     (("SALE-F17",), "NjZnHKLUZuo", "vSfuoQaudRw"),
+    (("SALE-F05",), "KvYeyeNY-CA", "94FyBhA7QIo"),
+    (("SALE-F16",), "pFFSYoohjuk", "_eMbZDJpfyw"),
+    (("SALE-F20",), "C0jWNygnU0U", "3IQxiU3BnHU"),
+    (("SALE-F20",), "GHkILBVV-Sk", "8IBXwlE-urA"),
+    (("SALE-F20",), "gtqSJWbcjQE", "hRnc17QyZPA"),
+    (("SALE-F30",), "f2hi4kRxNjY", "VGsi3kyPx_s"),
+    (("SALE-F31",), "lzKFSJAT-bc", "GzlfnHMKBx4"),
+    (("SALE-F34",), "hGVDzQ5E0E0", "ZsUbgRPTcXs"),
+    (("SALE-F35",), "xcjU2omEAI0", "EmgHg4RKKH0"),
+    (("SALE-F36",), "vWyct5l3cNE", "j5pACMwpr98"),
 ]
 
 

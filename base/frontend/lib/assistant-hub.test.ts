@@ -23,6 +23,7 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations/home';
 import { approvalPass, withApproval } from './approval';
+import { BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
 import {
   actionKey,
   HUB_ASSISTANT,
@@ -169,6 +170,21 @@ describe("«Read aloud» in the server's voice", () => {
     expect((await config.speak!(READING)).type).toBe('audio/mpeg');
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect([url, (init.headers as Record<string, string>)['X-CSRFToken']]).toEqual(['/api/assistant/speak', 'tok123']);
+  });
+});
+
+describe('HUB_ASSISTANT: the files its tools take whole', () => {
+  it("a copy of a business (.blueprint.zip), with Settings › Data › Import's limit and its words when one is larger", () => {
+    // The same file Import's own picker offers.
+    expect(BLUEPRINT_FILE).toEqual({ extension: '.zip', mime: 'application/zip' });
+    expect(HUB_ASSISTANT.toolFiles).toEqual([{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }]);
+    expect(MAX_FILE_BYTES).toBe(20 * 1024 * 1024);
+    expect(said(en)('base.data.import.fileTooBig')).toBe('The file could not be read: the file is larger than 20 MB.');
+    expect(said(es)('base.data.import.fileTooBig')).toBe('No se pudo leer el fichero: el fichero pasa de 20 MB.');
+  });
+
+  it('each attached photo comes to the turn with its name, so the assistant can keep it in Files', () => {
+    expect(HUB_ASSISTANT.imageNames).toBe(true);
   });
 });
 

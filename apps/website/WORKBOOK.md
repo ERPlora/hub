@@ -118,7 +118,10 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
 La dirección de la página web con **Copiar enlace**, su código QR y **Descargar PNG** (para imprimir) y
 **Descargar SVG** (para ampliar sin perder calidad). Avisa de que, en el dispositivo donde se ha entrado, la
 dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en línea, de que
-la dirección aún lleva al acceso del equipo.
+la dirección aún lleva al acceso del equipo. Si el borrador muestra el catálogo, debajo, separada por una línea, «La
+dirección de tu catálogo»: la misma dirección, que abre la página directamente en el catálogo, con su **Copiar
+enlace**, su QR y sus **Descargar PNG** y **Descargar SVG**, y la nota «Abre tu página web directamente en el
+catálogo: imprime su QR para tus mesas o tu mostrador.».
 
 #### La página pública
 La plantilla elegida con lo publicado, en la dirección del negocio: barra superior
@@ -128,8 +131,10 @@ título en letra grande, el lema y dos botones redondeados: **Escríbenos por Wh
 sección de contacto, si no hay WhatsApp) y **Cómo llegar** (a la dirección); sin contacto ni dirección, uno a la
 primera sección. Cada sección lleva una línea pequeña encima del título («Quiénes somos», «Lo que ofrecemos», «Echa un
 vistazo», «Reseñas de Google», «Hablemos», «Visítanos») y su contenido en tarjetas redondeadas: Sobre nosotros con su
-foto enmarcada al lado del texto; el catálogo en una rejilla de tarjetas (un degradado con la inicial, porque los
-productos no traen foto; el precio en una píldora; píldoras para saltar de categoría si hay dos o más); la galería en
+foto enmarcada al lado del texto; el catálogo en una rejilla de tarjetas (la foto del producto o, sin foto, y en los
+servicios, un degradado con la inicial; bajo el nombre, la duración de un servicio, la descripción del producto y sus
+alérgenos, «Alérgenos: Gluten, Leche»; el precio en una píldora; píldoras para saltar de categoría si hay dos o más; las
+fotos se cargan según aparecen en pantalla, así que una carta larga no se descarga entera al abrirla); la galería en
 una rejilla de fotos cuadradas y redondeadas (dos por fila en el móvil, tres en una tableta, cuatro en un ordenador)
 que crecen un poco al pasar el ratón y se abren enteras aparte; las reseñas de Google con la valoración en grande, sus
 estrellas (redondeadas a la media estrella) y «128 reseñas en Google», los botones **Ver en Google** y **Escribir una
@@ -262,13 +267,16 @@ Actor: propietario, administrador, asistente, API
 Pantalla: Página web
 Pasos:
 1. Despliega **Catálogo** y enciende **Mostrar**.
-2. En **Qué mostrar**, elige **Productos** (los de Inventario a la venta: activos y no agotados) o **Servicios** (los
+2. En **Qué mostrar**, elige **Productos** (los de Inventario a la venta: activos, no agotados y sin ocultar de la página
+   web) o **Servicios** (los
    ofrecidos); solo salen los de las apps activas en el negocio.
 3. Si quieres, elige las **Categorías** (ninguna = **Todas las categorías**) y si se ven los precios con **Mostrar
    precios**. Se guarda solo, como el resto del borrador.
 Entra: la fuente, las categorías elegidas y si se ven los precios.
 Sale: en la vista previa y, al publicar, en la página: el catálogo agrupado por categoría en su orden (lo que no tiene
-categoría, al final), hasta 200 elementos, con píldoras para saltar de categoría si hay dos o más. Precios, en la
+categoría, al final), hasta 200 elementos, con píldoras para saltar de categoría si hay dos o más. Cada producto lleva
+su foto (la propia o la de la librería de imágenes; sin foto, un degradado con su inicial), su descripción y sus
+alérgenos por su nombre, en el idioma del visitante («Alérgenos: Gluten, Leche»); cada servicio, su duración. Precios, en la
 moneda del negocio (la de su país) con sus decimales; en un negocio de España: «15,00 €», «Desde 40,00 €», «20,00 € /
 hora» o «Gratis»; un precio variable no se muestra. Al publicar se guarda una copia, y la página la refresca al abrirse
 con los productos o servicios de ese momento; si el país del negocio cambia, la página y la vista previa salen ya en la
@@ -277,7 +285,7 @@ Si falla: sin Inventario ni Servicios activos, la nota «Activa Inventario o Ser
 o servicios.»; si la fuente guardada es de una app que se ha apagado, «Inventario no está activa en este negocio: tu
 página no muestra el catálogo hasta que la actives o elijas otra fuente.» (o Servicios) y la página no lleva catálogo,
 nunca un error; si las categorías no se pueden leer, «No se pudieron cargar las categorías» bajo el selector.
-Implicados: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
+Implicados: INVENTORY-F27, INVENTORY-F36, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 Ver la vista previa
 Estado: hecho (servidor, pantalla y e2e)
@@ -334,22 +342,27 @@ Pasos:
 1. En **Página web**, pulsa **Compartir y QR**.
 2. **Copiar enlace** copia la dirección («Enlace copiado»); **Descargar PNG** baja el QR para imprimirlo y
    **Descargar SVG** para ampliarlo sin perder calidad.
-3. **Cerrar** vuelve al editor.
+3. Si el borrador muestra el catálogo, debajo está «La dirección de tu catálogo», con su propio
+   **Copiar enlace**, **Descargar PNG** y **Descargar SVG**: es el QR para imprimir y dejar en las mesas.
+4. **Cerrar** vuelve al editor.
 Entra: nada: la dirección es la del negocio.
-Sale: la dirección pública del negocio, la suya en erplora.com tal y como la ve el navegador, y su QR. Avisa de que en ese
-dispositivo la dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en
-línea, de que aún lleva al acceso del equipo.
+Sale: la dirección pública del negocio, la suya en erplora.com tal y como la ve el navegador, y su QR; con el catálogo
+a la vista, también la del catálogo, la misma dirección terminada en `#catalog`, que abre la página directamente en él
+(también en el dominio propio del negocio, con su dirección), y su QR. Con el catálogo oculto, sin fuente o con su
+app apagada, ese bloque no sale. Avisa de que en ese dispositivo la dirección abre la app (para ver la página: el móvil
+o una ventana privada) y, si la página no está en línea, de que aún lleva al acceso del equipo.
 Si falla: si no se puede copiar, «No se pudo copiar el enlace: selecciónalo y cópialo a mano.».
-Implicados: WEBSITE-F07, WEBSITE-F10, BASE-F112 (dentro de la app)
+Implicados: WEBSITE-F05, WEBSITE-F07, WEBSITE-F10, BASE-F112 (dentro de la app)
 
 ### WEBSITE-F10 Visitar la página pública
 Estado: hecho (servidor, página pública y e2e)
 Actor: cualquiera, sin cuenta
 Pantalla: La página pública
 Pasos:
-1. Abre la dirección del negocio (tu-negocio.erplora.com) en un móvil, una tableta o un ordenador.
+1. Abre la dirección del negocio (tu-negocio.erplora.com) en un móvil, una tableta o un ordenador, o escanea el QR
+   del catálogo de la mesa, que abre la página directamente en el catálogo.
 2. Se ve la página publicada en el idioma del navegador (inglés o español), con lo que escribió el propietario tal
-   cual.
+   cual; en el catálogo, cada producto con su foto, su descripción y sus alérgenos en ese idioma.
 3. **Entrar** lleva al acceso de ERPlora y, al entrar, a la app; con la sesión abierta, la dirección abre la app como
    siempre.
 Entra: la dirección del negocio.
@@ -420,9 +433,9 @@ las mismas reglas y los mismos permisos.
 | Las categorías de Inventario o de Servicios para elegir | gestionar | F05 | `website.catalog.categories` |
 | Una imagen subida por el nombre de su archivo: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | ver | F04, F11 | `website.image.get` |
 | Una categoría de Inventario o de Servicios por su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | gestionar | F05 | `website.category.get` |
-| El QR de la dirección pública, en PNG o SVG | ver | F09 | `website.qr.get` |
+| El QR de la dirección pública o del catálogo (`target`: `page` o `catalog`, la misma dirección con `#catalog`), en PNG o SVG | ver | F09 | `website.qr.get` |
 | Lo publicado, sin las secciones ocultas (sin sesión) | cualquiera | F10 | `website.public.site` |
-| El catálogo publicado, leído en ese momento y con los precios en el idioma de quien pregunta y en la moneda del negocio (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
+| El catálogo publicado, leído en ese momento: cada producto con su foto, su descripción y sus alérgenos, y los precios y los nombres de los alérgenos en el idioma de quien pregunta y en la moneda del negocio (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
 | Las reseñas de Google guardadas del sitio publicado, con sus textos en el idioma de quien pregunta (sin sesión; nunca pregunta a Google) | cualquiera | F10, F12 | `website.public.reviews` |
 
 Las tres públicas responden solo con la página en línea (si no, 404 `website.not_published`) y cuentan a cada
@@ -469,9 +482,15 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 ### A qué reacciona y lo que necesita de otras apps
 - No reacciona a avisos de otras apps y no requiere ninguna (`requires = []`).
 - **Inventario** y **Servicios**, solo si están activas en el negocio: el catálogo los lee por el nombre de sus
-  consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`,
+  consultas (`inventory.product.list_for_sale` con `show_on_website=true`, `inventory.category.list`,
+  `inventory.product_category.list`,
   `service.service.list_for_sale`, `service.category.list`; INVENTORY-F27 y SERVICE-F10), con un contexto que solo
-  puede leerlos; con la app apagada o sin ella, el catálogo sale vacío, nunca un error, y el editor lo dice.
+  puede leerlos; con la app apagada o sin ella, el catálogo sale vacío, nunca un error, y el editor lo dice. Cada
+  elemento lo arma `catalog_items` (`product_item`, `service_item`): del producto, su `description`, su `image_url` y
+  los códigos de sus `allergens`, que la copia publicada guarda tal cual; `render.catalog_view` escribe al pintar
+  `allergens_label` («Alérgenos: Gluten, Leche», con los nombres de `base.allergens` en el idioma del visitante). Una
+  copia publicada antes de las fotos se pinta sin ellas hasta la siguiente lectura en vivo. La foto propia de un
+  producto la sirve `/p/media/` a cualquiera (`public_media` de Inventario).
 - De la plataforma: el registro del hub (su id, para el almacén de ficheros; `base.operations.hub_id`), el almacén
   `storages["hub_files"]` y la vista `/p/media/…` (`base.storage`, `base.media`), el límite por visitante
   (`base.throttle`) y la entrada `/` (`base.public_home`, que llama al proveedor de la app).
@@ -490,7 +509,8 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 ## Para quien lo mantiene
 
 - **La página en el dominio propio** (BASE-F110, `request.custom_domain`, `public_home.respond`): allí solo están `/` y las
-  imágenes, ni `/auth` ni `/api`, así que es otra página, guardada aparte (`page_cache_key(…, own_domain=True)`): **Entrar**
+  imágenes (las del negocio, `/p/media/<hex>/`, y las de la librería compartida que puede llevar un producto,
+  `/p/catalog/`), ni `/auth` ni `/api`, así que es otra página, guardada aparte (`page_cache_key(…, own_domain=True)`): **Entrar**
   es la dirección absoluta del negocio (`render_site(hub_address=…)`), `<html data-ep-static>` deja a `catalog.ts` y
   `reviews.ts` sin pedir nada, su catálogo se lee al pintarla (`queries.live_catalog`, nunca la instantánea de la
   publicación) y se guarda un minuto, lo que la API guarda ese catálogo, en vez de una hora; su CSP no lleva `report-uri`,

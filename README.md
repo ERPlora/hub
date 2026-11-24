@@ -4,8 +4,6 @@
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
-git config merge.workbook-translation.driver \
-  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
@@ -33,12 +31,16 @@ scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, so
 
 `scripts/checks.sh fast` pasa primero, en unos segundos y sin red ni base de datos, los tests de guardarraíles del
 tamaño de cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de
-excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Después
+excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`), y el que
+exige que cada módulo de Python que añade la rama traiga su test con su nombre, el mismo que se corre cuando el módulo
+cambia (abajo); no cuentan los ficheros solo movidos ni un `__init__.py` que solo importa. Después
 comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `origin/main` (en `origin/main`, del commit
 anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
 
 - ESLint sobre sus ficheros TypeScript, JavaScript y Vue y, si toca alguno, la comprobación de tipos (`pnpm typecheck`)
-  y las pruebas de Vitest relacionadas (`vitest related`).
+  y las pruebas de Vitest relacionadas (`vitest related`). Un `.json` que no esté en la raíz (los textos, el mapa de
+  rutas de `frontend/generated/`) pasa solo a `vitest related`: ESLint no lo lee, y los de la raíz configuran las
+  herramientas (con `package.json`, Vitest correría su suite entera).
 - pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
   `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
   contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia). Un
@@ -131,7 +133,7 @@ Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v
 | Ruta | Operación | Respuesta |
 |---|---|---|
 | `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged` |
-| `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; nunca dónde está su BD; 404 |
+| `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; `maintenance`, la congelación activa de la plataforma (`null` sin ella), y `move_scheduled_for`, cuándo empieza el traslado del negocio pedido para su madrugada (un instante en UTC; `null` sin traslado, una vez arrancado o cancelado); nunca dónde está su BD ni adónde se traslada; 404 |
 | `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged` |
 | `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged` |
 | `GET /internal/hubs/{id}/dumps` | `base.hub.dump_list` | 200 `{available, dumps: [{id, kind, created_at, bytes, url}]}`: las copias de sus datos de la más nueva a la más vieja (`id` = su clave en el bucket, `url` prefirmada de 15 min, descarga como fichero); `available: false` si nunca tendrá copia (sin BD propia, o dado de baja antes de terminarla); 200 también dado de baja; 404 desconocido o purgado; 503 `base.dumps_unavailable` sin bucket |
@@ -141,6 +143,14 @@ Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v
 Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el de la ruta, 422
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
 no lo publica).
+
+**Cambio de dirección web** (`PUT /internal/hubs/{id}` con otro `slug`, HUBS-F16 de erplora.com): el negocio se abre en la
+nueva como estaba (`base/services/address_change.py`). En la misma transacción se mudan sus personas (`Membership`) y quién
+entró (`HubVisit`), acaban las sesiones abiertas en la dirección que deja, porque el navegador guarda cada una para su
+dirección, y en la que coge no queda nada de quien la tuvo antes. Sus apps (`AppActivation`) se copian a la dirección nueva en
+su propia base, que confirma antes que control: las de la anterior se quedan, así que un cambio que no llega a confirmarse
+deja el negocio abierto donde estaba y erplora.com lo reintenta. Los eventos y los caídos no se leen por la dirección: la base
+solo guarda los suyos. Tests: `base/tests/test_address_change.py`.
 
 Las puertas de WhatsApp (contrato en `apps/whatsapp_inbox/WORKBOOK.md`, «Contrato con el SaaS», puertas 1–4) llevan
 en el cuerpo el negocio, `hub` (su slug en la fase 1), y ejecutan la operación de la bandeja como el sistema en ese
@@ -536,6 +546,12 @@ sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/k
 4. Probado en pre, PR `pre` → `main` con «Create a merge commit»: despliega prod como siempre
    (release `hub-v…`).
 5. Después, `git push origin main:pre` (fast-forward) para que `pre` no se separe de `main`.
+
+Los push de una rama se despliegan de uno en uno: si entran varios seguidos, corre uno y espera solo el más nuevo,
+que ya lleva a los demás. Los intermedios salen cancelados en Actions y la release siguiente incluye sus commits. Una
+vuelta atrás o un relanzamiento a mano solo esperan a que acabe el paso de desplegar, nunca a las pruebas de un push.
+Para volver a desplegar una rama se lanza a mano (abajo): relanzar una ejecución vieja de un push entra en esa fila y
+descarta la que estuviera esperando.
 
 La rama decide el entorno (`.github/scripts/deploy-env.sh`): `main` → prod, `pre` → pre; cualquier
 otra no despliega. Relanzar o volver atrás, siempre desde la rama del entorno:

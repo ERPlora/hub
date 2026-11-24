@@ -116,8 +116,7 @@ class PaymentIn(Closed):
     )
     extra: Cents = Field(
         0,
-        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks. "
-        "A charge that brings it is refused while no active app adds such a step.",
+        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks.",
     )
     extra_label: _text(60) = Field(
         "", validate_default=True, description="Leave it out: the name of that app's added amount, filled by its step."
@@ -297,4 +296,17 @@ class PreviewOut(Schema):
     )
     limits_currency: str = Field(
         description="The currency (ISO 4217) the law writes both limits in, whatever the business charges in: EUR."
+    )
+
+
+class CheckoutStepOut(Schema):
+    key: str = Field(description="«<app>.<step>».")
+    app: str = Field(description="The app that adds the step.")
+    component: str = Field(description="The component of that app that paints the step, without .vue.")
+
+
+class CheckoutStepsOut(Schema):
+    steps: list[CheckoutStepOut] = Field(
+        description="What the apps on add to the charge, between the amount and the tenders, in their order; empty "
+        "when none does, and then a charge takes nothing added to its tenders."
     )

@@ -14,7 +14,7 @@ from apps.inventory.schemas.products import ProductOut
 from apps.inventory.services.writes import _actor, _product_payload
 from base import images
 
-#: Where a product's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
+#: Where a product's own photos are kept under its hub's prefix: the folder ``public_media`` serves (apps.py).
 PHOTOS = "inventory/products/"
 
 

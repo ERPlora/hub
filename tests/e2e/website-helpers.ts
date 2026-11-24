@@ -2,6 +2,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, hostPage, type Registration, registerBusinessIn, registrationOf, settled } from './helpers';
+import { cleanInventory } from './inventory-helpers';
 
 /** The site as `GET /website/site` answers it: what a spec puts back after. */
 export interface Site {
@@ -9,6 +10,32 @@ export interface Site {
   theme: Record<string, unknown>;
   content: Record<string, Record<string, unknown>>;
   is_live: boolean;
+}
+
+/** `found`'s site saved with its catalog showing Inventory's `categoryIds` with their prices, and published. */
+export async function publishWithMenuOf(context: BrowserContext, found: Site, categoryIds: string[]): Promise<void> {
+  const catalog = { hidden: false, title: '', source: 'inventory', category_ids: categoryIds, show_prices: true };
+  const content = { ...found.content, catalog };
+  const saved = await api(context, A, 'POST', '/website/site', { template: 'classic', theme: found.theme, content });
+  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
+  const published = await api(context, A, 'POST', '/website/site/publish');
+  expect(published.status, JSON.stringify(published.data)).toBe(200);
+}
+
+/** After a spec that published `a`'s site with its menu, also when a test failed: the site back as `found` and offline,
+ *  then `also`, the E2E products gone and the owner's browser closed. */
+export async function menuSpecDone(
+  owner: { context: BrowserContext } | undefined,
+  found: Site | undefined,
+  also: () => void = () => undefined,
+): Promise<void> {
+  try {
+    if (owner && found) await siteBackOffline(owner.context, found);
+  } finally {
+    also();
+    cleanInventory();
+    await owner?.context.close();
+  }
 }
 
 /** The owner of `a` on the website's editor at `viewport`, and the site as the run finds it. */
@@ -21,6 +48,14 @@ export async function ownerOfTheSite(
   expect(site.status).toBe(200);
   return { owner, found: site.data };
 }
+
+/** The three sizes the public page is seen at: a small phone, a tall tablet and a computer. */
+export const PUBLIC_SIZES = [
+  { name: '375', width: 375, height: 667 },
+  { name: '820', width: 820, height: 1180 },
+  { name: '1440', width: 1440, height: 900 },
+] as const;
+export const WIDE = { width: 1440, height: 900 };
 
 /**
  * The page at rest for its capture: no focus ring (the website's own step), then the harness's one wait, `settled`

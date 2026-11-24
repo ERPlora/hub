@@ -17,7 +17,7 @@ import GrantsSheet from './GrantsSheet.vue';
 
 const OP = 'service.grant.list';
 const ROWS = [
-  grant({ uses_added: 2, days_added: 30, sale_id: 'sale-9' }),
+  grant({ uses_added: 2, days_added: 30, sale_id: 'sale-9', sale_number: '20261124-0001' }),
   grant({ id: 'g2', customer_name: null, customer_id: 'cust-2', max_uses: null, remaining: null, expires_at: null, used: 0, can_void: true, can_adjust: false }),
   grant({ id: 'g3', status: 'voided', voided_at: '2026-10-05T10:00:00Z', voided_by: 'boss', void_reason: 'wrong customer', can_adjust: false, uses_removed: 1 }),
 ];
@@ -50,7 +50,7 @@ describe('GrantsSheet', () => {
     const s = await setup();
     await s.show(page(ROWS));
     const first = s.text('g1');
-    for (const part of ['Active', 'Customer: Lucía Pérez', 'Oct 1, 2026', '€90.00', '2 used · 3 left', 'Sale: sale-9', 'Expires Mar 30, 2027', 'Given afterwards: +2 sessions, +30 days']) {
+    for (const part of ['Active', 'Customer: Lucía Pérez', 'Oct 1, 2026', '€90.00', '2 used · 3 left', 'Sale: 20261124-0001', 'Expires Mar 30, 2027', 'Given afterwards: +2 sessions, +30 days']) {
       expect(first, part).toContain(part);
     }
     expect(s.text('g2')).toContain('Customer reference: cust-2');
@@ -61,6 +61,14 @@ describe('GrantsSheet', () => {
     expect(s.text('g3')).toContain('Corrected afterwards: −1 session');
     const pills = s.wrapper.findAllComponents(StatusPill).map((p) => p.props('label'));
     expect(pills).toEqual(['Active', 'Active', 'Voided']);
+  });
+
+  // A sale the reader cannot read (Sales off, or not theirs to see) comes without its number: its id says nothing to
+  // a person, so the row says no sale.
+  it('names the sale that charged a voucher only by its number', async () => {
+    const s = await setup();
+    await s.show(page([grant({ sale_id: 'sale-9', sale_number: null })]));
+    expect([s.text('g1').includes('Sale'), s.text('g1').includes('sale-9')]).toEqual([false, false]);
   });
 
   it('offers Adjust and Void where they apply, and opens their dialogs', async () => {
@@ -148,6 +156,7 @@ describe('GrantsSheet', () => {
     await s.show(page(ROWS));
     expect(s.text('g1')).toContain('2 usadas · quedan 3');
     expect(s.text('g1')).toContain('Cliente: Lucía Pérez');
+    expect(s.text('g1')).toContain('Venta: 20261124-0001');
     expect(s.inDoc('service-grants-title')?.textContent).toContain('Bonos vendidos — Bono 5 cortes');
     expect(s.inDoc('service-grants-redeem-g1')?.textContent?.trim()).toBe('Gastar una sesión');
   });

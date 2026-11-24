@@ -582,7 +582,7 @@ def test_a_customer_named_aloud_must_be_one(catalog, customer):
 # ── An open check ───────────────────────────────────────────────────────────────────────────────
 
 
-def test_charging_a_whole_check_closes_it(catalog):
+def test_charging_a_whole_check_closes_it(catalog, without_kitchen):
     order = open_order({"product": "COF", "quantity": "2"}, {"product": "WAT"})
     OutboxEvent.objects.all().delete()
     sale = complete(
@@ -620,7 +620,7 @@ def test_a_check_is_charged_at_its_own_discounts(catalog):
     )
 
 
-def test_paying_part_of_a_check_leaves_the_rest_open(catalog):
+def test_paying_part_of_a_check_leaves_the_rest_open(catalog, without_kitchen):
     order = open_order({"product": "STK"}, {"product": "WAT"})
     steak, water = order.lines
     OutboxEvent.objects.all().delete()

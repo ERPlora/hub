@@ -1,22 +1,21 @@
-"""``manage.py translate_workbooks [--app <id>] [--check]``: each app's ``WORKBOOK.en.md``.
+"""``manage.py translate_workbooks [--app <id>] [--check]``: each app's ``WORKBOOK.<language>.md``.
 
-The WORKBOOK is written in Spanish (it is the specification); its English version is the translation
-of its user part (``base.catalog.user_part``), versioned next to it and headed by
-``<!-- generated from WORKBOOK.md sha256:<hash> -->``. The hash is the user part's, so editing
-«Para quien lo mantiene» never asks for a new translation.
+The WORKBOOK is written in Spanish (it is the specification); its translation into each other language of
+``settings.LANGUAGES`` is made from its user part (``base.catalog.user_part``), versioned next to it and marked section
+by section (``base.workbook_sections``). The marks are the user part's, so editing «Para quien lo mantiene» never asks
+for a new translation.
 
 ERPlora uses no ``ANTHROPIC_API_KEY``: whoever edits a WORKBOOK translates the
-change by hand, with the header ``base.catalog.translate_by_hand`` names. ``--check`` is what runs (in
-CI, through the tests): it never reaches the network nor needs the key, and fails listing the apps
-whose ``WORKBOOK.en.md`` exists and is out of date (a missing one is no error), telling to translate
-each by hand, and every Spanish date placeholder (``AAAA``, ``aaaa``) a current one keeps outside its
-fenced code blocks, by file and line: in English the year is ``YYYY``.
+change by hand, with the marks ``base.catalog.translate_by_hand`` names. ``--check`` is what runs (in
+CI, through the tests): it never reaches the network nor needs the key, and fails listing, by language, the apps
+whose translation exists and is out of date (a missing one is no error), telling the sections to translate
+by hand, and every Spanish date placeholder (``AAAA``, ``aaaa``) a current one keeps outside its
+fenced code blocks, by file and line: a translation writes the year ``YYYY``.
 
 Without ``--check`` it translates through the Claude API, for whoever has a key; no error sends there.
 The ``anthropic`` client is a development dependency, the key lives in the local ``.env`` (or the
 environment) and the model is ``settings.WORKBOOK_TRANSLATION_MODEL``. Without the key, a module to
-translate stops the command before any call, naming the key; an up-to-date one needs none, and an
-unchanged hash costs no call.
+translate stops the command before any call, naming the key; an up-to-date one needs none and costs no call.
 """
 
 import re
@@ -27,13 +26,15 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from base import catalog
+from base.workbook_help import SOURCE_LANGUAGE
+from base.workbook_sections import MARK, marked, prose_lines
 
-#: The fixed instructions of every translation.
+#: The fixed instructions of every translation, but for its language (``instructions``).
 INSTRUCTIONS = """\
 You translate the customer documentation of an app of ERPlora, a point-of-sale and back-office \
-platform for small businesses in Spain, from Spanish into English.
+platform for small businesses in Spain, from Spanish into {language}.
 
-The user message is a Markdown document. Reply with its English translation and nothing else: no \
+The user message is a Markdown document. Reply with its {language} translation and nothing else: no \
 preface, no notes, no code fence around it.
 
 - Translate the prose, the headings, the text of tables and lists, and the alt text of images.
@@ -46,7 +47,7 @@ and blank lines.
 rest of the pattern (`MM`, `DD`, `NNNN`, `hh:mm`) stays as it is.
 - Rewrite every in-page link `(#...)` to point at its translated heading: the heading in lowercase, \
 punctuation removed and spaces as hyphens (`## How to use it` is `#how-to-use-it`).
-- Translate the labels of the app quoted with «...» as the English app shows them, in double quotes.
+- Translate the labels of the app quoted with «...» as the {language} app shows them, in double quotes.
 """
 #: Long WORKBOOKs come back whole: streamed, so the request never times out.
 MAX_TOKENS = 64000
@@ -57,36 +58,46 @@ _IMAGE_PATH_RE = re.compile(r"docs/img/[^\s)\"'>]+")
 _SPANISH_DATE_RE = re.compile(r"[\w/:-]*(?:AAAA|aaaa)[\w/:-]*")
 
 
-def spanish_dates(configs) -> list[str]:
-    """``<app>: WORKBOOK.en.md:<line>: <pattern>`` of each Spanish date placeholder in a current translation.
+def languages() -> list[str]:
+    """The languages each WORKBOOK is translated into: the Hub's, but the one it is written in."""
+    return [language for language, _name in settings.LANGUAGES if language != SOURCE_LANGUAGE]
+
+
+def instructions(language: str) -> str:
+    """The instructions of a translation into ``language``, by the name ``settings.LANGUAGES`` gives it."""
+    return INSTRUCTIONS.format(language=dict(settings.LANGUAGES)[language])
+
+
+def spanish_dates(configs, language: str) -> list[str]:
+    """``<app>: <file>:<line>: <pattern>`` of each Spanish date placeholder in a current translation into ``language``.
 
     Its fenced code blocks are left as they are (the translation's own rule), so a pattern there is
-    quoted on purpose and does not count; inline code does, as in ``OS-AAAAMMDD-NNNN``. Nor does the
-    header (line 1 of a current one): its hash is hex, and may spell ``aaaa``. A stale or unreadable
-    translation is ``stale_translations``'s.
+    quoted on purpose and does not count; inline code does, as in ``OS-AAAAMMDD-NNNN``. Nor does a
+    mark: its hash is hex, and may spell ``aaaa``. A stale or unreadable translation is
+    ``stale_translations``'s.
     """
     found = []
     for config in configs:
         if not (Path(config.path) / catalog.WORKBOOK).is_file():
             continue
         try:
-            state = catalog.workbook_translation(config)
+            state = catalog.workbook_translation(config, language)
         except catalog.WorkbookError:
             continue
         if state.state != "current":
             continue
-        for number, line in catalog.prose_lines(state.en_path.read_text(encoding="utf-8")):
-            if number == 1:
+        for number, line in prose_lines(state.path.read_text(encoding="utf-8")):
+            if MARK.fullmatch(line):
                 continue
             found += [
-                f"{config.label}: {catalog.WORKBOOK_EN}:{number}: {pattern}"
+                f"{config.label}: {state.path.name}:{number}: {pattern}"
                 for pattern in _SPANISH_DATE_RE.findall(line)
             ]
     return found
 
 
-def translate(source: str) -> str:
-    """The English translation of ``source`` (a Spanish user part), in one call to the Claude API."""
+def translate(source: str, language: str) -> str:
+    """The translation into ``language`` of ``source`` (a Spanish user part), in one call to the Claude API."""
     try:
         import anthropic
     except ModuleNotFoundError as error:
@@ -105,7 +116,7 @@ def translate(source: str) -> str:
         with anthropic.Anthropic(api_key=api_key).messages.stream(
             model=settings.WORKBOOK_TRANSLATION_MODEL,
             max_tokens=MAX_TOKENS,
-            system=INSTRUCTIONS,
+            system=instructions(language),
             messages=[{"role": "user", "content": source}],
         ) as stream:
             message = stream.get_final_message()
@@ -122,7 +133,7 @@ def translate(source: str) -> str:
 
 class Command(BaseCommand):
     help = (
-        "Check each app's WORKBOOK.en.md (the modules' and base's), translated by hand from the user part "
+        "Check each app's WORKBOOK.<language>.md (the modules' and base's), translated by hand from the user part "
         "of its WORKBOOK.md (--check); without --check, generate it through the Claude API."
     )
 
@@ -133,12 +144,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--check",
             action="store_true",
-            help="Fail when a WORKBOOK.en.md is out of date or keeps a Spanish date; never reaches the network.",
+            help="Fail when a translation is out of date or keeps a Spanish date; never reaches the network.",
         )
 
     def handle(self, *args, app: str | None = None, check: bool = False, **options):
         # The modules and base (the platform's WORKBOOK): base is no module of the store, but its
-        # WORKBOOK.en.md is generated and checked like theirs.
+        # translations are generated and checked like theirs.
         configs = catalog.workbook_configs()
         if app is not None:
             known = ", ".join(sorted(config.label for config in configs))
@@ -146,55 +157,69 @@ class Command(BaseCommand):
             if not configs:
                 raise CommandError(f"No app {app!r} with a WORKBOOK to translate; the apps are: {known}.")
         if check:
-            problems = []
-            stale = catalog.stale_translations(configs)
-            if stale:
-                problems += [f"Out of date WORKBOOK.en.md: {', '.join(stale)}."]
-                problems += [f"{label}: {catalog.translate_by_hand(label)}" for label in stale]
-            dates = spanish_dates(configs)
-            if dates:
-                problems += ["Spanish date placeholders left in WORKBOOK.en.md (in English the year is YYYY, or yyyy):"]
-                problems += dates
-            if problems:
-                raise CommandError("\n".join(problems))
-            self.stdout.write("Every WORKBOOK.en.md is up to date.")
+            self._check(configs)
             return
         for config in configs:
             if (Path(config.path) / catalog.WORKBOOK).is_file():
                 self._translate(config)
 
+    def _check(self, configs) -> None:
+        files = {language: catalog.WORKBOOK_TRANSLATION.format(language) for language in languages()}
+        problems = []
+        for language, file in files.items():
+            stale = catalog.stale_translations(configs, language)
+            if stale:
+                problems += [f"Out of date {file}: {', '.join(stale)}."]
+                problems += [f"{label}: {what_to_do}" for label, what_to_do in stale.items()]
+            dates = spanish_dates(configs, language)
+            if dates:
+                problems += [f"Spanish date placeholders left in {file} (a translation writes the year YYYY, or yyyy):"]
+                problems += dates
+        if problems:
+            raise CommandError("\n".join(problems))
+        self.stdout.write(f"Every {', '.join(files.values())} is up to date.")
+
     def _translate(self, config) -> None:
+        written = [language for language in languages() if self._translate_into(config, language)]
+        if not written:
+            self.stdout.write(f"{config.label}: up to date.")
+
+    def _translate_into(self, config, language: str) -> bool:
+        """Write ``config``'s translation into ``language``; ``False`` when it was already current."""
         try:
-            state = catalog.workbook_translation(config)
+            state = catalog.workbook_translation(config, language)
         except catalog.WorkbookError as error:
             raise CommandError(
                 f"{config.label}: {catalog.WORKBOOK}: {error}"
             ) from error
         if state.state == "current":
-            self.stdout.write(f"{config.label}: up to date.")
-            return
-        english = translate(state.source).strip() + "\n"
+            return False
+        translated = translate(state.source, language).strip() + "\n"
+        file = f"{config.label}: {state.path.name}"
         lost = sorted(
             set(_IMAGE_PATH_RE.findall(state.source))
-            - set(_IMAGE_PATH_RE.findall(english))
+            - set(_IMAGE_PATH_RE.findall(translated))
         )
         if lost:
             raise CommandError(
-                f"{config.label}: the translation changed the image paths {', '.join(lost)}: nothing written."
+                f"{file}: the translation changed the image paths {', '.join(lost)}: nothing written."
             )
-        spanish_dates = sorted(set(_SPANISH_DATE_RE.findall(english)))
+        spanish_dates = sorted(set(_SPANISH_DATE_RE.findall(translated)))
         if spanish_dates:
             raise CommandError(
-                f"{config.label}: the translation kept the Spanish date placeholders {', '.join(spanish_dates)}: nothing written."
+                f"{file}: the translation kept the Spanish date placeholders {', '.join(spanish_dates)}: nothing written."
             )
         try:
-            catalog.check_anchors(english)
+            catalog.check_anchors(translated)
         except catalog.WorkbookError as error:
             raise CommandError(
-                f"{config.label}: the translation {error} Nothing written."
+                f"{file}: the translation {error} Nothing written."
             ) from error
-        header = catalog.en_header(catalog.source_hash(state.source))
-        state.en_path.write_text(f"{header}\n\n{english}", encoding="utf-8")
+        text = marked(state.source, translated)
+        if text is None:
+            raise CommandError(f"{file}: the translation has other headings than {catalog.WORKBOOK}: nothing written.")
+        state.path.write_text(text, encoding="utf-8")
         self.stdout.write(
-            f"{config.label}: wrote {catalog.WORKBOOK_EN}; review the diff before committing it."
+            f"{config.label}: wrote {state.path.name}; review the diff before committing it."
         )
+        return True

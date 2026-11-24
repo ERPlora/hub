@@ -10,7 +10,6 @@ from pydantic import AfterValidator
 from apps.flow.schemas.fields import (
     A_DRAFT,
     D_STEPS,
-    D_TRIGGER,
     DraftStatus,
     In,
     Note,
@@ -27,7 +26,7 @@ class DraftListIn(PageIn):
 
 class DraftDefinitionIn(In):
     trigger: Trigger | None = Field(
-        None, description="When it starts; none: only by hand. " + D_TRIGGER
+        None, description="When it starts, by its `kind`; none: only by hand."
     )
     steps: Annotated[list[DraftStep], AfterValidator(_steps)] = Field(
         min_length=1,

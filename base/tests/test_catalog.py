@@ -24,14 +24,13 @@ from base.catalog import (
     RegistryError,
     WorkbookError,
     build_registry,
-    en_header,
     known_verticals,
-    prose_lines,
     source_hash,
     stale_translations,
     template_apps,
     user_part,
 )
+from base.workbook_sections import mark, marked, sections
 
 CUT = "## Para quien lo mantiene"
 WORKBOOK = f"""\
@@ -72,6 +71,21 @@ Guarda **cosas**. Ver [cómo se usa](#cómo-se-usa).
 
 ### Paso a paso
 Estado: hecho
+"""
+#: The same part before a change of its first section.
+OLD_PART = USER_PART.replace("cosas", "objetos")
+#: The translation of ``USER_PART``, without its marks.
+ENGLISH = """\
+## What it is for
+
+Keeps **things**. See [how to use it](#how-to-use-it).
+
+![List of things](docs/img/list.png)
+
+## How to use it
+
+### Step by step
+Status: done
 """
 ICONS = {
     "ion:cube-outline": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path d='M1 1'/></svg>",
@@ -153,11 +167,11 @@ def module(
     return SimpleNamespace(**(config | fields))
 
 
-def translated(
-    source: str, body: str = "## What it is for\n\nKeeps **things**.\n"
-) -> str:
-    """A ``WORKBOOK.en.md`` generated from ``source`` (the Spanish user part)."""
-    return f"{en_header(source_hash(source))}\n\n{body}"
+def translated(source: str, body: str = ENGLISH) -> str:
+    """A ``WORKBOOK.en.md`` generated from ``source`` (the Spanish user part), which has the headings of ``body``."""
+    text = marked(source, body)
+    assert text is not None
+    return text
 
 
 def problems(configs, icons=ICONS) -> list[str]:
@@ -230,13 +244,6 @@ def test_only_a_fence_like_the_opening_one_closes_its_code_block(fence, inner):
     part = user_part(fenced)
     assert CUT in part
     assert "Estado: hecho" in part
-
-
-@pytest.mark.parametrize(("fence", "inner"), NOT_CLOSING.values(), ids=NOT_CLOSING)
-def test_the_prose_lines_are_the_numbered_ones_outside_the_fenced_code_blocks(fence, inner):
-    """What ``translate_workbooks --check`` reads for a Spanish date: an unclosed block runs to the end."""
-    text = f"Before.\n{fence}\n{inner}\nDD/MM/AAAA\n{fence}\nAfter.\n~~~\nDD/MM/AAAA"
-    assert list(prose_lines(text)) == [(1, "Before."), (6, "After.")]
 
 
 def test_a_dangling_anchor_fails_and_names_it():
@@ -335,7 +342,7 @@ def test_a_module_becomes_one_entry_with_both_languages_its_icon_and_its_documen
         requires=["catalog", "stock"],
         verticals=["hair_salon", "restaurant"],
         listed=True,
-        docs={"es": USER_PART, "en": "## What it is for\n\nKeeps **things**.\n"},
+        docs={"es": USER_PART, "en": ENGLISH},
     )
 
 
@@ -434,38 +441,37 @@ def test_a_module_without_workbook_fails(tmp_path):
     assert problem.startswith("things: WORKBOOK.md:")
 
 
-#: The command that prints the first line of a hand-made WORKBOOK.en.md.
-HEADER_COMMAND = (
-    'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
-    "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
-)
-
-
-def test_a_stale_translation_fails_telling_to_translate_it_by_hand_with_its_header(tmp_path):
-    """ERPlora uses no ANTHROPIC_API_KEY: never a command that calls the API.
-
-    The command ends the line: copied to its end, it runs (a full stop after its quote would be Python).
-    """
-    stale = translated(USER_PART.replace("cosas", "objetos"))
-    [problem] = problems([module(tmp_path, en=stale)])
-    assert problem == (
-        "things: WORKBOOK.en.md: out of date with WORKBOOK.md: translate by hand the part of WORKBOOK.md "
-        "that changed into WORKBOOK.en.md and make its first line the header this prints: "
-        f"{HEADER_COMMAND.format('things')}"
+def by_hand(*headings: str, file: str = "WORKBOOK.en.md") -> str:
+    """What to do with the stale translation ``file``, behind in the sections of ``USER_PART`` with these ``headings``."""
+    marks = {section.partition("\n")[0]: mark(section) for section in sections(USER_PART)}
+    return (
+        f"translate by hand into {file} each section of WORKBOOK.md that changed, with its mark on the line under its "
+        f"heading (the same headings, in the same order): {'; '.join(f'{title} → {marks[title]}' for title in headings)}"
     )
+
+
+def test_a_stale_translation_fails_telling_to_translate_by_hand_only_the_sections_left_behind(tmp_path):
+    """ERPlora uses no ANTHROPIC_API_KEY: never a command that calls the API."""
+    [problem] = problems([module(tmp_path, en=translated(OLD_PART))])
+    assert problem == f"things: WORKBOOK.en.md: out of date with WORKBOOK.md: {by_hand('## Para qué sirve')}"
     assert "translate_workbooks" not in problem
 
 
-def test_a_translation_without_its_header_is_stale(tmp_path):
-    [problem] = problems([module(tmp_path, en="## What it is for\n")])
-    assert problem.startswith("things: WORKBOOK.en.md: out of date with WORKBOOK.md:")
-    assert HEADER_COMMAND.format("things") in problem
+def test_a_translation_without_its_marks_is_stale_in_every_section(tmp_path):
+    [problem] = problems([module(tmp_path, en=ENGLISH)])
+    every = by_hand("## Para qué sirve", "## Cómo se usa", "### Paso a paso")
+    assert problem == f"things: WORKBOOK.en.md: out of date with WORKBOOK.md: {every}"
+
+
+def test_a_translation_with_one_heading_more_is_stale_though_no_section_is_behind(tmp_path):
+    [problem] = problems([module(tmp_path, en=f"{translated(USER_PART)}\n## More\n")])
+    assert problem.endswith(": no section is missing: a heading or its mark is out of place")
 
 
 def test_a_translation_with_a_dangling_anchor_fails(tmp_path):
-    en = translated(USER_PART, "## What it is for\n\nSee [how](#how-to-use-it).\n")
+    en = translated(USER_PART, ENGLISH.replace("(#how-to-use-it)", "(#nowhere)"))
     [problem] = problems([module(tmp_path, en=en)])
-    assert problem.startswith("things: WORKBOOK.en.md:") and "#how-to-use-it" in problem
+    assert problem.startswith("things: WORKBOOK.en.md:") and "#nowhere" in problem
 
 
 @pytest.mark.parametrize(
@@ -539,10 +545,17 @@ def test_without_the_generated_json_every_icon_fails(tmp_path, settings):
 def test_stale_translations_lists_the_modules_to_translate_again(tmp_path):
     configs = [
         module(tmp_path, "current", en=translated(USER_PART)),
-        module(tmp_path, "stale", en=translated("otra cosa\n")),
+        module(tmp_path, "stale", en=translated(OLD_PART)),
         module(tmp_path, "untranslated"),
     ]
-    assert stale_translations(configs) == ["stale"]
+    assert stale_translations(configs) == {"stale": by_hand("## Para qué sirve")}
+
+
+def test_a_workbook_that_cannot_be_read_is_told_once_by_the_registry_for_a_module(tmp_path):
+    broken = WORKBOOK.replace("(#cómo-se-usa)", "(#no-existe)")
+    things, base = module(tmp_path, workbook=broken), module(tmp_path, "base", kind="platform", workbook=broken)
+    assert stale_translations([things]) == {}
+    assert stale_translations([base]) == {"base": "WORKBOOK.md: links to no heading of the published part: #no-existe."}
 
 
 # ── AppImagesFinder ────────────────────────────────────────────────────────────────────────────
@@ -748,7 +761,8 @@ def test_the_real_modules_build_their_registry():
 
 
 def test_no_real_translation_is_stale():
-    assert stale_translations() == []
+    stale = stale_translations()
+    assert stale == {}, "\n".join(f"{label}: {what_to_do}" for label, what_to_do in stale.items())
 
 
 def test_the_real_verticals_derive_from_the_modules():
