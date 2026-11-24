@@ -30,8 +30,8 @@
     ]
   },
   {
-    "path": "apps/attendance/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/attendance/queries/__init__.py",
+    "file_name": "__init__.py",
     "functions": [
       {
         "name": "scoped_records",

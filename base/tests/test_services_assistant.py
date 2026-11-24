@@ -149,6 +149,8 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
             "outcome": "ok",
             "code": "",
             "reason": {},
+            # A read that hands no file (a CSV export does: base/tests/test_handed_files.py).
+            "file": None,
         }
     ]
     assert (plan["confirm"], plan["pending"]) == (None, [])
