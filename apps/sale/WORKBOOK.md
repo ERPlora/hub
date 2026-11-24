@@ -2002,7 +2002,7 @@ es una línea.
   son los del asistente (`assistant-icons.ts`). El TPV pasa a la disposición del
   móvil también cuando su propia caja mide menos de 700 px (`NARROW_TILL` de `PosPage.vue`): el panel
   acoplado desde 768 px dejaba la columna del catálogo en unos 90 px en una tableta de 834. Tests:
-  `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y
+  `SpeakKey.test.ts`, `PosPage.phone.test.ts` y las e2e `tests/e2e/sale-speak.spec.ts` y
   `tests/e2e/sale-speak-microphone.spec.ts` (el micrófono denegado: Chrome lo bloquea con una opción de
   lanzamiento, así que va en un fichero propio).
 - **El atrás del sistema** (BASE-F05, hub#302): las hojas de Ionic
@@ -2015,7 +2015,7 @@ es una línea.
   Solo cuentan las capas de la pantalla a la vista: otra app abierta desde ⠿ con el cajón o el ⋮ abiertos deja el TPV
   montado debajo (Ionic lo oculta con `ion-page-hidden`), y esa capa no se queda el atrás de la pantalla de encima.
   Una capa propia nueva del TPV se suma con `useSystemBack(abierta, cerrar)`. Tests: `useSystemBack.test.ts`,
-  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e
+  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.phone.test.ts` y la e2e
   `tests/e2e/sale-pos-system-back.spec.ts` (el puente de la app simulado como en `shell-nav.spec.ts`).
 
 ### Lo que la ventana de ayuda no enseña
