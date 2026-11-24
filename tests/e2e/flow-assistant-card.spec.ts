@@ -9,8 +9,8 @@
 import { expect, test } from '@playwright/test';
 
 import { cardSpec } from './assistant-card-helpers';
-import { askForACard, cancelAtComputerSize, card, openPanelAtTheDesk } from './assistant-panel';
-import { A, capture, login, psql, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
+import { askForACard, cancelAtComputerSize, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
+import { capture, psql, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-FLOW-ASSISTANT-CARD-SAYS-ITS-CODES';
 const TAG = 'E2EFac';
@@ -24,10 +24,7 @@ function cleanup(): void {
 cardSpec(NEEDED, cleanup);
 
 test('flow-assistant-card — a draft says when it starts and its steps in words, never its codes', async ({ browser }) => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const [context, page] = await ownerIn(browser, 'es');
   const draft = {
     name: `${TAG} Repasar el cierre de caja`,
     definition: {
