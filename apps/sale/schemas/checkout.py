@@ -116,8 +116,7 @@ class PaymentIn(Closed):
     )
     extra: Cents = Field(
         0,
-        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks. "
-        "A charge that brings it is refused while no active app adds such a step.",
+        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks.",
     )
     extra_label: _text(60) = Field(
         "", validate_default=True, description="Leave it out: the name of that app's added amount, filled by its step."
