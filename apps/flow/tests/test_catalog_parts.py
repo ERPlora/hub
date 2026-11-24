@@ -50,6 +50,19 @@ def test_apps_bring_every_event_and_action_of_those_apps_and_nothing_else():
     assert part.events and part.actions
 
 
+def test_every_app_read_on_its_own_comes_whole_to_the_assistant():
+    # Sales is the largest app and sits just under the limit: one more action can leave it cut again.
+    whole = run("flow.catalog.read", ctx=ctx_for(language="es"))
+    for app in {action.app for action in whole.actions} | {event.app for event in whole.events}:
+        part = whole.model_copy(
+            update={
+                "events": [event for event in whole.events if event.app == app],
+                "actions": [action for action in whole.actions if action.app == app],
+            }
+        )
+        assert len(part.model_dump_json()) <= MAX_RESULT_CHARS, app
+
+
 def test_saying_no_part_reads_the_whole_catalog_as_the_editor_does():
     assert run("flow.catalog.read", {"apps": None, "names": None}) == run("flow.catalog.read")
 
