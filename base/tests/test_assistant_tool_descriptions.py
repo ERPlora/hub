@@ -22,8 +22,14 @@ def descriptions(node: object) -> list[str]:
 
 
 def said_more_than_once(name: str) -> dict[str, int]:
+    """Each paragraph of ``name``'s parameters said in more than one description, whole or inside a longer one."""
     said = Counter(descriptions(shared.tool_spec(registry[name])["parameters"]))
-    return {text[:60]: times for text, times in said.items() if len(text) >= PARAGRAPH and times > 1}
+    times = {
+        paragraph: sum(count for text, count in said.items() if paragraph in text)
+        for paragraph in said
+        if len(paragraph) >= PARAGRAPH
+    }
+    return {paragraph[:60]: count for paragraph, count in times.items() if count > 1}
 
 
 TOOLS = sorted(name for name, op in registry.items() if shared.is_tool(op))
