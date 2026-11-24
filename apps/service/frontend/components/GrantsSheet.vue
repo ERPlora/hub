@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // SERVICE-F16 «Ver quién ha comprado un bono»: «Sold vouchers — {package}» follows `service.grant.list`
 // live, the most recent first, 20 at a time: Active or Voided, the customer (their reference when the
-// card is gone), the date, the amount (in the business's currency), sessions used and left (or «no limit»), the sale, the expiry,
+// card is gone), the date, the amount (in the business's currency), sessions used and left (or «no limit»), the sale by its number, the expiry,
 // what was given or corrected afterwards and, on a voided one, who, when and why. Spend a session (SERVICE-F21, on a
 // voucher not voided, not expired and with a session left), Adjust (SERVICE-F18) and Void (SERVICE-F17) show where they apply and for whoever may, and open their
 // dialogs.
@@ -118,10 +118,10 @@ const day = (value: string | null) => formatDate(value, locale.value);
           />
         </div>
         <div
-          v-if="grant.sale_id"
+          v-if="grant.sale_number"
           class="service-sheet-list__line"
         >
-          {{ t('service.grants.sale', { id: grant.sale_id }) }}
+          {{ t('service.grants.sale', { number: grant.sale_number }) }}
         </div>
         <div
           v-if="grant.uses_added || grant.days_added"

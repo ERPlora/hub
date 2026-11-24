@@ -1,6 +1,6 @@
 // SERVICE-F21 «Gastar una sesión fuera del cobro» in Chrome (hub#1058), with the real Staff, Customers and Sales
-// apps: a voucher of 5 haircuts charged at the till for 90.00 and granted saying its sale; in «Sold vouchers» the
-// receptionist taps «Spend a session», the only service it covers comes chosen, she picks Ana from the team, sees
+// apps: a voucher of 5 haircuts charged at the till for 90.00 and granted saying its sale; in «Sold vouchers» its row
+// says that sale by its number (SERVICE-F16) and the receptionist taps «Spend a session», the only service it covers comes chosen, she picks Ana from the team, sees
 // «5 sessions left · 4 after this one» and spends it: the row drops to «1 used · 4 left» by itself and Ana's
 // production in Sales rises by the session's worth (90.00 ÷ 5). A voucher with nothing left offers no session to
 // spend: its row says «5 used · 0 left». «Movements» then names Ana on that session, beside its customer (SERVICE-F19,
@@ -70,6 +70,7 @@ test('Sold vouchers: a session spent outside the till, choosing the service and 
   const sheet = page.locator('ion-modal[data-testid=service-grants]');
   const row = sheet.locator(`[data-testid=service-grants-row-${lucias.id}]`);
   await expect(row).toContainText('0 used · 5 left');
+  await expect(row).toContainText(`Sale: ${sold.number}`);
   await atEachSize('service-grants-redeem', sheet.locator(`[data-testid=service-grants-redeem-${lucias.id}]`));
 
   // A voucher with nothing left: its row says so and offers no session to spend (Adjust gives it sessions back).
