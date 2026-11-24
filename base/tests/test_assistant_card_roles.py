@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.operations import get
 
 from base import assistant
-from base.models import Membership
+from base.models import HubUser, Membership
 from base.permissions import access_for
 from base.roles import OFF, ON
 from base.tenancy.tests.business import A, HUB_DB, in_business_a
@@ -126,9 +126,63 @@ def test_the_yes_changes_the_role(olga, cashier):
     assert cashier.states == {"sale.view_sale": ON, "sale.void_sale": OFF}
 
 
-@pytest.mark.parametrize("name", ["base.role.create", "base.role.update", "base.role.delete"])
+@pytest.mark.parametrize("name", ["base.role.create", "base.role.update", "base.role.delete", "base.role.assign"])
 @pytest.mark.parametrize("role", list(Membership.Role))
 def test_the_assistant_offers_them_to_who_manages_roles(make_user, name, role):
     tools = assistant.tools.catalog(asking(make_user("saas:9", host=A.key, role=role), "es"))
 
     assert (name in tools) == (role in {Membership.Role.OWNER, Membership.Role.ADMIN})
+
+
+@pytest.fixture
+def luis(make_user):
+    return make_user("saas:6", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Luis")
+
+
+@LANGUAGES
+def test_giving_one_says_the_person_and_the_role_by_their_names(olga, cashier, luis, language):
+    card = turn(olga, language, "base.role.assign", {"person": "saas:6", "role": str(cashier.pk)})["confirm"]
+
+    assert lines(card["fields"]) == {
+        "en": [("Person", "Luis"), ("Role", "Cashier")], "es": [("Persona", "Luis"), ("Rol", "Cashier")],
+    }[language]
+    assert lines(card["preview"]) == {
+        "en": [("People with this role", 2)], "es": [("Personas con este rol", 2)],
+    }[language]
+    assert card["risk"] == "high"
+
+
+@LANGUAGES
+def test_returning_somebody_to_their_invitation_says_its_role_in_words(olga, cashier, luis, language):
+    card = turn(olga, language, "base.role.assign", {"person": "saas:6", "role": "hub_employee"})["confirm"]
+
+    assert [value for _, value in lines(card["fields"])] == ["Luis", {"en": "Employee", "es": "Empleado"}[language]]
+
+
+def test_whoever_manages_roles_and_does_not_run_the_business_sees_the_person_by_name_too(make_user, cashier, luis):
+    mara = make_user("saas:5", host=A.key, role=Membership.Role.MANAGER)
+    held_by(mara, a_role("People", base__view_home=ON, base__manage_roles=ON))
+
+    card = turn(mara, "en", "base.role.assign", {"person": "saas:6", "role": str(cashier.pk)})["confirm"]
+
+    assert lines(card["fields"]) == [("Person", "Luis"), ("Role", "Cashier")]
+
+
+def test_somebody_who_is_not_of_the_business_is_not_said_by_their_id(olga, cashier):
+    fields = assistant.cards.card(
+        get("base.role.assign"), {"person": "saas:99", "role": str(cashier.pk)}, "en", asking(olga, "en")
+    )["fields"]
+
+    assert lines(fields) == [("Role", "Cashier")]
+
+
+def test_the_yes_gives_the_role(olga, cashier, luis):
+    drawn = turn(olga, "es", "base.role.assign", {"person": "saas:6", "role": str(cashier.pk)})
+
+    plan = card_turn.turn(
+        asking(olga, "es"), drawn["pending"][0], said="the roles",
+        decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"},
+    )
+
+    assert [row["outcome"] for row in plan["executed"]] == ["ok"]
+    assert HubUser.objects.get(username="saas:6").business_role == cashier

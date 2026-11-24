@@ -22,6 +22,7 @@ from base.services.assistant import LAST_ROUND
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway
+from base.tests.roles import a_role, held_by
 from base.tests.test_assistant import SECRET_SET
 from base.tests.test_assistant_previews import PricedPreviewOut, count_preview, declaring
 from base.tests.test_assistant_previews import settle  # a dangerous write with its preview
@@ -726,3 +727,23 @@ def test_a_turn_reads_the_hubs_own_words():
     asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
     plan = run("base.assistant.turn", {"*"}, messages=[asked])
     assert shared.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
+
+
+def test_a_turn_names_the_role_of_the_business_that_rules_over_the_membership(make_user):
+    luis = make_user("saas:6", host=A.key, role=Membership.Role.EMPLOYEE)
+    held_by(luis, a_role("Cajero sin anulaciones", base__view_home=ON))
+
+    said = run("base.assistant.turn", actor=luis, messages=[ASK])["instructions"]
+
+    assert "You talk to the «Cajero sin anulaciones» of this business" in said
+    assert "«Empleado»" not in said
+
+
+def test_a_turn_names_the_owner_whatever_role_their_row_names(make_user):
+    olga = make_user("saas:1", host=A.key, role=Membership.Role.OWNER)
+    held_by(olga, a_role("Cajero sin anulaciones", base__view_home=ON))
+
+    said = run("base.assistant.turn", actor=olga, messages=[ASK])["instructions"]
+
+    assert "You talk to the «Propietario» of this business" in said
+    assert "Cajero sin anulaciones" not in said
