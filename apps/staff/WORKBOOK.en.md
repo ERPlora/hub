@@ -212,8 +212,8 @@ Screen: Staff
 Steps:
 1. In **Staff**, tap **+**: **New** opens (without Status: the person is born **Active**).
 2. Write First name and Last name (required, up to 100 characters). If you want, Email, Phone, Employee
-   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
-   appointments and, with the pay permission, Hourly rate and Commission (%). **Bookable** comes on.
+   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Booking buffer and, with the pay
+   permission, Hourly rate and Commission (%). **Bookable** comes on.
 3. Tap Save: the person shows in the table as **Active**, with their email and phone for whoever sees the team's
    contact details.
 In: the form; the active roles (STAFF-F04), by id or by their name. The rate is typed in the business's
