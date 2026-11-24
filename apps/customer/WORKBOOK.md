@@ -1200,6 +1200,14 @@ asistente.
   entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas/` lleva su
   descripción: son la herramienta del asistente. Las referencias humanas
   (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
+- **Palabras del asistente** (`assistant_synonyms`, en `apps.py`): para el Hub, un cliente asignado a una cuenta, como
+  lo dice el botón del TPV («Asignar cliente», «Assign customer»), o una cuenta puesta «a su nombre» es lo que hace
+  `customer.order.link` (F19). Solo dicho en frase: «asigna», «pon» o «set» solos asignan o ponen cualquier cosa, y
+  por eso ofrecen antes los cambios de la cuenta de Venta. «a nombre de» no entra: «¿a nombre de quién va este
+  pedido?» pregunta por el cliente de la cuenta (`customer.order.customer`). Con «La cuenta de la mesa 4 es de Lucía,
+  ponla a su nombre» el turno ofrece el enlace o, si no cabe en sus puestos, lo encuentra la búsqueda que hace el
+  modelo («assign customer to an open check of a table»); abrir una cuenta nueva a nombre de alguien sigue ofreciendo
+  antes `sale.order.open`. Lo fija `tests/test_assistant_asks.py`.
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
   marcas `refers` de `schemas/fields.py` (`A_CUSTOMER`, `A_GROUP`, `A_TAG`, `A_FIELD`, `A_ORDER`), leídas como quien
   pregunta: la ficha con `customer.customer.detail` (solo las vivas, como sus pantallas) y el grupo, la etiqueta y el
