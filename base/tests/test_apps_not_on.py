@@ -203,3 +203,15 @@ def test_no_tool_the_turn_offers_loses_its_place(make_user):
         names = offered(turn(context, user(said)))
         assert names[: len(ranked) - 1] == ranked[:-1], said
         assert names[len(ranked) - 1 :] in ([ranked[-1]], [shared.tool_name(ENABLE), ranked[-1]]), said
+
+
+def test_an_app_off_the_models_search_finds_is_named_in_the_round_that_follows(make_user):
+    """Words that do not name Reservations («lo del sábado») leave it unsaid; the task the model searched for names it,
+    as the search brings the tools it finds to the next round."""
+    set_rows(**SALON)
+    context = owner_of_a(make_user, "es")
+    said = user("ayúdame con lo del sábado")
+    assert "«Reservas» (" not in turn(context, said)["instructions"]  # positive control: the words alone name it not
+    search = call("base.assistant.find_tools", {"query": "crear una reserva de mesa"}, "s1")
+    plan = turn(context, said, asked(search), {"role": "tool", "tool_call_id": "s1", "content": "{}"})
+    assert said_off(context, "reservation") in plan["instructions"]
