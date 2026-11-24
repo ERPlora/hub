@@ -2383,6 +2383,101 @@ msgctxt "workbook"
 msgid "Involved"
 msgstr "Implicados"
 
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Home · Summary"
+msgstr "Inicio · Resumen"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Home · Activity"
+msgstr "Inicio · Actividad"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Staff"
+msgstr "Empleados · Personal"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Roles"
+msgstr "Empleados · Roles"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Roles · What it allows"
+msgstr "Empleados · Roles · Qué permite"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · API keys"
+msgstr "Empleados · API keys"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Approvals"
+msgstr "Empleados · Aprobaciones"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "A person's page"
+msgstr "Ficha de una persona"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Files"
+msgstr "Archivos"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Apps"
+msgstr "Apps"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Usage and plan"
+msgstr "Sistema · Uso y plan"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Updates"
+msgstr "Sistema · Actualizaciones"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Failed events"
+msgstr "Sistema · Eventos caídos"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Logs"
+msgstr "Sistema · Registros"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · General"
+msgstr "Ajustes · General"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Business"
+msgstr "Ajustes · Negocio"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Printing"
+msgstr "Ajustes · Impresión"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Data and backups"
+msgstr "Ajustes · Datos y copias"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "My profile"
+msgstr "Mi perfil"
+
 #: queries/app_help.py
 msgctxt "workbook"
 msgid "Settings"
