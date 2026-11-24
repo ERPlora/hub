@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:73dc6213d32ed1d942b459e7349f5ad8788bd6a13b847603e5e388954cf8c6ba -->
+<!-- generated from WORKBOOK.md sha256:89f53a4f9ab4bb3fb2d133179acd3cce6dfd89e7052b33b3154c69b53431bd75 -->
 
 ## What it is for and who it is for
 
@@ -1044,8 +1044,8 @@ Steps:
 1. In the product's form (the **+** or "Edit"), in "Photo", tap "Choose from the library": the "Image
    library" window opens with the "Search image…" box already filled with the product's name.
 2. Search in Spanish or in English ("café con leche", "latte", "champú"): the search looks at each
-   image's title and synonyms, never at its file name. Each image shows with its title in the business's
-   language (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
+   image's title and synonyms, never at its file name. Each image shows with its title in the language of
+   whoever looks at it, the one in "My profile" (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
    "Fitness" and "Spa and wellness" narrow by sector; they come 60 at a time with "Load more".
 3. Tap an image: the window closes and the form shows it in "Photo", with "Change" and "Remove photo".
 4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
@@ -1273,7 +1273,7 @@ assistant says which one is not there (in a goods receipt, on which line) or ask
 | The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost (empty for whoever does not see the costs) and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
 | The units of measure with their step | view products | F26 | `inventory.unit.list` |
 | The inventory settings | manage settings | F19 | `inventory.config.get` |
-| Up to five library images for a product's photo, by its name and titled in the business's language; it sets none | view products | F30 | `inventory.product.suggest_image` |
+| Up to five library images for a product's photo, by its name and titled in the language of whoever asks; it sets none | view products | F30 | `inventory.product.suggest_image` |
 
 ### What it offers: actions (they change data)
 

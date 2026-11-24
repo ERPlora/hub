@@ -1062,7 +1062,7 @@ Pasos:
    producto.
 2. Busca en español o en inglés («café con leche», «latte», «champú»): el buscador mira el título y los
    sinónimos de cada imagen, nunca el nombre de su archivo. Cada imagen sale con su título en el idioma
-   del negocio (en inglés si no es el español). Las pestañas «Todas», «Hostelería», «Peluquería»,
+   de quien la mira, el de «Mi perfil» (en inglés si no es el español). Las pestañas «Todas», «Hostelería», «Peluquería»,
    «Estética», «Comercio», «Deporte» y «Spa y bienestar» acotan por sector; salen de 60 en 60 con
    «Cargar más».
 3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
@@ -1290,7 +1290,7 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste (vacío para quien no ve los costes) y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
 | Los ajustes del inventario | gestionar ajustes | F19 | `inventory.config.get` |
-| Hasta cinco imágenes de la librería para la foto de un producto, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver productos | F30 | `inventory.product.suggest_image` |
+| Hasta cinco imágenes de la librería para la foto de un producto, por su nombre y tituladas en el idioma de quien pregunta; no pone ninguna | ver productos | F30 | `inventory.product.suggest_image` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1579,7 +1579,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     productos: ≤ 2 MB, Pillow a WebP 512×512 recortada al centro, el espacio del plan con
     `base.files.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
     en `base`, `base.catalog_image.search` (consulta: título y `tags` del manifiesto en `es` y `en`; título en
-    el idioma del negocio). Reutilizan `inventory.product.updated`.
+    el idioma de quien pregunta, el de la petición). Reutilizan `inventory.product.updated`.
   - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs
     (`shared/catalog/…`, de solo lectura para los hubs) con caché inmutable, la misma vista genérica que
     `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por

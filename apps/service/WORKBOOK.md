@@ -1065,7 +1065,7 @@ la línea que vende, aunque quien cobra no lo vea.
 | Si se puede gastar una sesión y por qué no | gastar sesiones | F21 | `service.grant.redeem_check` |
 | Los bonos de una clienta que pueden pagar un servicio, el que se gasta primero y por qué | gastar sesiones | F22 | `service.grant.tender_options` |
 | Los movimientos de un bono | ver saldos de bonos | F19 | `service.movement.list` |
-| Hasta cinco imágenes de la librería para la foto de un servicio, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver servicios | F34 | `service.service.suggest_image` |
+| Hasta cinco imágenes de la librería para la foto de un servicio, por su nombre y tituladas en el idioma de quien pregunta; no pone ninguna | ver servicios | F34 | `service.service.suggest_image` |
 
 Todas, menos las comprobaciones, las imágenes propuestas y las lecturas de una asignación, un bono vendido o una
 sesión, se pueden seguir en vivo.
