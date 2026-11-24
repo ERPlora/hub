@@ -104,7 +104,28 @@ class CustomerConfig(LiveAppConfig):
             permission="customer.configure",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "ggbb7gK64QA", "en": "Kqkvd9csYU0"},
+        flow_videos={
+            "CUSTOMER-F01": {"es": ["MyjzkT6rXfM"], "en": ["Oa8rsR8S4e0"]},
+            "CUSTOMER-F02": {"es": ["8MNU36kOqm8"], "en": ["mpE7xid1hUM"]},
+            "CUSTOMER-F03": {"es": ["qYp2QA6fiCQ"], "en": ["PyQCw1irq2A"]},
+            "CUSTOMER-F04": {"es": ["MyjzkT6rXfM"], "en": ["Oa8rsR8S4e0"]},
+            "CUSTOMER-F05": {"es": ["8TW6rkC6FPQ"], "en": ["LIX3G55DuEQ"]},
+            "CUSTOMER-F06": {"es": ["E98cCrGq7Cs"], "en": ["TZzcrWmx-Sg"]},
+            "CUSTOMER-F07": {"es": ["MyjzkT6rXfM"], "en": ["Oa8rsR8S4e0"]},
+            "CUSTOMER-F08": {"es": ["3WazHMlQIkY"], "en": ["DqXR6vfJffs"]},
+            "CUSTOMER-F09": {"es": ["rxfPiVW4Dhw"], "en": ["dI9ZQCy1tlg"]},
+            "CUSTOMER-F12": {"es": ["FYTeu4vFu_A"], "en": ["9I9ZK8qv3LA"]},
+            "CUSTOMER-F13": {"es": ["FYTeu4vFu_A"], "en": ["9I9ZK8qv3LA"]},
+            "CUSTOMER-F14": {"es": ["HOxJQoIca8Q"], "en": ["A2ny2_gcsO8"]},
+            "CUSTOMER-F15": {"es": ["HOxJQoIca8Q"], "en": ["A2ny2_gcsO8"]},
+            "CUSTOMER-F23": {"es": ["05K2nQZ_7cQ"], "en": ["pAh0BU7ll1s"]},
+            "CUSTOMER-F27": {"es": ["qcRUx6geFOM"], "en": ["PqBsh6c9Tws"]},
+            "CUSTOMER-F28": {"es": ["j99LxL3KfoA"], "en": ["NaUVuAl9Obw"]},
+            "CUSTOMER-F29": {"es": ["yptV7z91fyM"], "en": ["UoSCsyIBwto"]},
+        },
+    )
 
     fiscal_archive_models = ("Purchase",)
 

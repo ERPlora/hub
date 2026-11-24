@@ -115,4 +115,20 @@ class ReservationConfig(LiveAppConfig):
             permission="reservation.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "6-9Ca12M6o0", "en": "WlNYEi3jCjU"},
+        flow_videos={
+            "RESERVATION-F02": {"es": ["AL8cmSYK11k"], "en": ["ZOUn-FIILR4"]},
+            "RESERVATION-F03": {"es": ["bdFYu4Joc3w"], "en": ["Frt5bMCp6lo"]},
+            "RESERVATION-F04": {"es": ["bdFYu4Joc3w"], "en": ["Frt5bMCp6lo"]},
+            "RESERVATION-F06": {"es": ["dtI39MRe1gk"], "en": ["rFYllyUQe2Q"]},
+            "RESERVATION-F07": {"es": ["WW1mMVh51hM"], "en": ["o37Ho17tWnI"]},
+            "RESERVATION-F08": {"es": ["S8LU9RkaLDc"], "en": ["Hf2TuSIgJ1Y"]},
+            "RESERVATION-F09": {"es": ["S8LU9RkaLDc"], "en": ["Hf2TuSIgJ1Y"]},
+            "RESERVATION-F10": {"es": ["6azOhfKZCwk"], "en": ["ISpAS2jfrOc"]},
+            "RESERVATION-F14": {"es": ["j_NWW1dEiYs"], "en": ["zvNv_-7YbHc"]},
+            "RESERVATION-F15": {"es": ["j_NWW1dEiYs"], "en": ["zvNv_-7YbHc"]},
+            "RESERVATION-F20": {"es": ["S8LU9RkaLDc"], "en": ["Hf2TuSIgJ1Y"]},
+            "RESERVATION-F23": {"es": ["dtI39MRe1gk"], "en": ["rFYllyUQe2Q"]},
+        },
+    )
