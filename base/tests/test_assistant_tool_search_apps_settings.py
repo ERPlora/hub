@@ -1,6 +1,6 @@
 """What the assistant is asked about apps, settings, the theme, names and payments, in phrases that once reached no tool.
 
-A turn offers the twenty tools the person's words name best. Some phrases bring theirs in, though not always first; for
+A turn offers the fifteen tools the person's words name best. Some phrases bring theirs in, though not always first; for
 the rest the model searches the whole catalogue for the task (``base.assistant.find_tools``) and the next step of the
 same request offers what the search found.
 """
@@ -25,15 +25,9 @@ THEME = "base.profile.preferences_set"
 APP_ON = "base.app.enable"
 RENAME_FLOW = "flow.flow.update"
 
-#: Phrases whose own words bring the tool they ask for into the twenty a turn offers.
+#: Phrases whose own words bring the tool they ask for into the fifteen a turn offers.
 OFFERED = [
-    pytest.param(
-        "es",
-        ("apaga el sonido de la cocina", "desactiva el temporizador de la cocina"),
-        "kitchen.settings.update",
-        id="live-98-kitchen",
-    ),
-    pytest.param("es", ("desactiva la zona Terraza",), "table.zone.update", id="live-98-zone"),
+    pytest.param("es", ("apaga el sonido de la cocina",), "kitchen.settings.update", id="live-98-kitchen"),
     pytest.param("es", ("desactiva el campo Talla",), "customer.field.update", id="live-98-field"),
     pytest.param(
         "es",
@@ -53,7 +47,7 @@ OFFERED = [
     ),
     pytest.param(
         "es",
-        ("quita el modo oscuro", "activa el modo noche", "desactiva el modo nocturno", "pon la app en oscuro"),
+        ("quita el modo oscuro", "activa el modo noche", "pon la app en oscuro"),
         THEME,
         id="live-107",
     ),
@@ -84,6 +78,27 @@ REMINDERS_OFF = ("turn off the appointment reminders", "desactivar los recordato
 REMINDERS_ON = ("turn on the appointment reminders", "activar los recordatorios de citas")
 QUICK_NOTE = ("create a quick note", "crear una nota rápida")
 SEARCHED = [
+    pytest.param(
+        "es",
+        "desactiva el temporizador de la cocina",
+        ("change the kitchen settings", "cambiar los ajustes de la cocina"),
+        "kitchen.settings.update",
+        id="live-98-kitchen-timer",
+    ),
+    pytest.param(
+        "es",
+        "desactiva la zona Terraza",
+        ("change a table zone", "cambiar una zona de mesas"),
+        "table.zone.update",
+        id="live-98-zone",
+    ),
+    pytest.param(
+        "es",
+        "desactiva el modo nocturno",
+        ("turn off the dark mode", "desactivar el modo oscuro"),
+        THEME,
+        id="live-107-nocturno",
+    ),
     pytest.param("es", "pausa los recordatorios de citas", REMINDERS_OFF, RECIPE_OFF, id="live-97-es"),
     pytest.param("es", "suspende los recordatorios de citas", REMINDERS_OFF, RECIPE_OFF, id="live-97-es-suspende"),
     pytest.param("en", "pause the appointment reminders", REMINDERS_OFF, RECIPE_OFF, id="live-97-en"),

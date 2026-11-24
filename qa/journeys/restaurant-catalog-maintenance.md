@@ -12,7 +12,7 @@ Para qué: sacar la carta a una hoja de cálculo, traer la nueva y retirar lo qu
 
 ## Recorrido
 
-1. INVENTORY-F11 — la carta, exportada a CSV.
+1. INVENTORY-F11 — la carta, exportada a CSV desde Productos y otra vez pidiéndosela al asistente.
 2. INVENTORY-F10 — las categorías de la carta de invierno, desde un CSV.
 3. INVENTORY-F09 — sus productos, desde otro CSV.
 4. INVENTORY-F04 — se elimina un plato que estaba en el menú del día.

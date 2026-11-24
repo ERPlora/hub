@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:868d846ea1b797efa06bd7c06478552b1be038b2ca8da4a29d31ae54c127b8e8 -->
+<!-- generated from WORKBOOK.md sha256:1120cb08ee63ee6bc7dbc16c7f2a297c58a76517896b4b43246e17e8f7d7b854 -->
 
 ## What it is for and who it is for
 
@@ -403,6 +403,8 @@ Steps:
 1. With the search and the filters wanted, tap **Export CSV**.
 2. The browser downloads the file "customers.csv" with ALL the cards that match the search, not only the page
    that is seen.
+3. Asked of the assistant ("Give me all the customers in a CSV"), "Download customers.csv" comes under its answer,
+   the same file the button gives; the assistant does not paste the cards into the chat.
 In: the table's search and filters.
 Out: a file with the columns `name`, `email`, `phone`, `tax_id`, `company_name`, `address`, `city`,
 `postal_code`, `country`, `lifecycle_stage`, `notes`, `source`, `is_active`, `total_purchases`,
@@ -413,7 +415,7 @@ formula; the import removes it. For whoever does not see the customers' contact 
 without the `email` and `phone` columns.
 If it fails: without permission to export, the server refuses it even if called through the API. With no
 cards, a file with only the headers comes out.
-Involved: BASE-F112 (inside the app)
+Involved: BASE-F112 (inside the app and from the assistant)
 
 ### CUSTOMER-F10 Recognise a person by their phone number
 Status: done
