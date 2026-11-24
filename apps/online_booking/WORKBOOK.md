@@ -455,7 +455,7 @@ del equipo con su sesión abierta.
   numeración, horas libres, antelaciones, confirmación automática y política de cancelación son de Citas;
   qué servicio se reserva online, de Servicios (`Service.allow_online_booking`); la ficha, de Clientes.
 - **`requires = ["appointment", "customer", "service", "staff"]`**: lee las citas, busca y crea fichas, lee
-  el catálogo y los profesionales de un servicio (`appointment.queries.bookable_members`, que devuelve
+  el catálogo y los profesionales de un servicio (`appointment.queries.booking.bookable_members`, que devuelve
   fichas de Personal). Escribe en ellas solo por sus operaciones: `appointment.appointment.create`,
   `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (solo el email que tecleó la
   clienta como contacto de la cita, si su ficha no tiene), `appointment.settings.update`,
@@ -475,7 +475,7 @@ del equipo con su sesión abierta.
   de la base en un despliegue posterior.
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
   apps usan `delegated(ctx)`: el mismo contexto con los permisos justos de Citas, Clientes, Servicios,
-  Horarios y Personal (como `appointment.queries.reader`), y como actor «online booking» cuando no hay
+  Horarios y Personal (como `appointment.queries.agenda.reader`), y como actor «online booking» cuando no hay
   persona. La reserva va con `source = "online"`: Citas aplica la antelación, la ventana y que la clienta
   nunca solapa, y decide Pendiente o Confirmada.
 - **Ficha por teléfono**: el móvil se normaliza a E.164 (`apps.customer.phones`); entre las fichas vivas con
@@ -498,7 +498,7 @@ del equipo con su sesión abierta.
 - **Límites**: 5 por visitante y hora y 100 por negocio y hora (429; constantes de `services.py`), y las
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
-- **Reloj**: el de Citas (`apps.appointment.queries.now`, `business_zone`); los tests lo fijan.
+- **Reloj**: el de Citas (`apps.appointment.queries.business.now`, `base.business.business_zone`); los tests lo fijan.
 - Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`);
   `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
   Sus dos avisos no los escucha ninguna app salvo Automatizaciones, que se apunta a todos (`"*"` en

@@ -159,38 +159,38 @@ class AppointmentConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
-        recovers from it: of the copy's appointments still to come and booked (``queries.appointments_in_copy``), each
+        recovers from it: of the copy's appointments still to come and booked (``recovery.appointments_in_copy``), each
         the business still holds deleted comes back the same, with its number, its history and its series
-        (``queries.appointments_deleted_in_business``, ``appointment.appointment.restore``), and each it no longer has
+        (``recovery.appointments_deleted_in_business``, ``appointment.appointment.restore``), and each it no longer has
         is created by ``appointment.appointment.create``, the agenda's own, for the business's card of its customer
-        (``queries.appointments_not_in_business``); what does not fit the agenda now (its time taken, outside the hours,
-        a customer, a service or a professional it no longer has) is refused with why, never booked over another.
+        (``recovery.appointments_not_in_business``); what does not fit the agenda now (its time taken, outside the
+        hours, a customer, a service or a professional it no longer has) is refused with why, never booked over another.
 
-        Then its series still booking (``queries.series_in_copy``), after the appointments so that none of their dates
+        Then its series still booking (``recovery.series_in_copy``), after the appointments so that none of their dates
         is booked twice: each the business holds deleted comes back the same, active, with the appointments it had
-        booked and booking nothing by itself (``queries.series_deleted_in_business``,
+        booked and booking nothing by itself (``recovery.series_deleted_in_business``,
         ``appointment.recurring.restore``), and each it no longer has is created by ``appointment.recurring.create``,
-        Repeating's own (``queries.series_not_in_business``); one made again since stays as it is."""
-        from apps.appointment import queries  # the models are not loaded yet when this module is
+        Repeating's own (``recovery.series_not_in_business``); one made again since stays as it is."""
+        from apps.appointment.queries import recovery  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
         return [
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0001_initial",
-                read=queries.appointments_in_copy,
-                missing=queries.appointments_not_in_business,
+                read=recovery.appointments_in_copy,
+                missing=recovery.appointments_not_in_business,
                 create="appointment.appointment.create",
-                deleted=queries.appointments_deleted_in_business,
+                deleted=recovery.appointments_deleted_in_business,
                 restore="appointment.appointment.restore",
             ),
             Recoverable(
                 label=_("Repeating appointments"),
                 reads_since="0001_initial",
-                read=queries.series_in_copy,
-                missing=queries.series_not_in_business,
+                read=recovery.series_in_copy,
+                missing=recovery.series_not_in_business,
                 create="appointment.recurring.create",
-                deleted=queries.series_deleted_in_business,
+                deleted=recovery.series_deleted_in_business,
                 restore="appointment.recurring.restore",
             ),
         ]
