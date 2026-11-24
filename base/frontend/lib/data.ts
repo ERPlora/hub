@@ -142,6 +142,9 @@ export function downloadFrom(url: string): void {
 /** The server takes 20 MB of zip at most (`base.blueprint`): 300 photos of its own fit (INVENTORY-F33). */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
+/** The file a copy of a business comes in, as a file picker offers it: Import's and the assistant's panel's. */
+export const BLUEPRINT_FILE = { extension: '.zip', mime: 'application/zip' } as const;
+
 function folded(text: string): string {
   return text
     .normalize('NFD')

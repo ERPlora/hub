@@ -15,6 +15,7 @@ from . import (
     departments as departments,
     figures as figures,
     letterhead as letterhead,
+    line_checks as line_checks,
     line_parts as line_parts,
     order_lines as order_lines,
     orders as orders,

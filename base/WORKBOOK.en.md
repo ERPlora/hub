@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:856474882bf42ea629181c0c4bae3c58f3b81efd43dd0658981f9e638be899b3 -->
+<!-- generated from WORKBOOK.md sha256:8b7e47f7f141aca9e24a3d7b5f88454b242a10776f79d54762614ca61cea5f3e -->
 
 ## What it is for and who it is for
 
@@ -1411,7 +1411,8 @@ Steps:
      reaching what its plan includes: some things may stop or slow down until you upgrade.", and "See the plan’s
      usage" opens "System" on "Usage and plan". Without them, the notice goes away.
   10. Whoever runs the business can ask the assistant the same ("how much space do I have left?", "how many requests
-      have we had this month?") and it answers with these figures.
+      have we had this month?") and it answers with these figures. Anyone can ask it for the assistant's messages of
+      the month (BASE-F104).
 In: what is measured of this business: every night, what its files and its database take up and the people who had
 activity; during the day, its requests, its connections and who has activity. The plan's limits erplora.com passes to the
 hub, the apps it chose, the assistant's messages erplora.com counts and WhatsApp's.
@@ -2526,23 +2527,32 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
-  1. To attach, they tap "Attach a file" and choose one or several: images, PDF, Word, Excel, text or CSV. Each one
-     shows over the box with its name and its "Remove attachment" ×.
+  1. To attach, they tap "Attach a file" and choose one or several: images, PDF, Word, Excel, text or CSV, or the
+     copy of a business (a .blueprint.zip, the same one Settings · Data and backups › Import takes, BASE-F30). Each
+     one shows over the box with its name and its "Remove attachment" ×.
   2. They go with the next message, with or without text, and stay in the person's bubble by their name. They travel
-     only once, with that question: afterwards the conversation only remembers what they were called.
-  3. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
+     with the conversation while the page stays open; once it is reloaded, the conversation only remembers what they
+     were called.
+  3. The assistant does not read the copy of a business: if the person asks it to load it, the assistant loads it
+     with its card, as Import does (BASE-F31, BASE-F97). If the page was reloaded before saying "yes", it loads
+     nothing and asks for it to be attached again.
+  4. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
      app, the device) asks for permission to use the microphone; while it asks, another tap does not open a second
      recording. While it records, the button turns red and is called "Stop recording"; after two minutes it stops by
      itself.
-  4. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
+  5. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
      itself**: the person reviews it and taps "Send", and what they ask goes through its card like any other request
      (BASE-F97).
-In: the files (8 MB each and 20 MB among all those of a question) or the recording.
-Out: the file travels with the question to erplora.com, which reads it; the recording goes through the business to
-erplora.com's transcription. The browser never talks to erplora.com directly.
+In: the files (8 MB each; the copy of a business, 20 MB as in Import; and 20 MB among all those of a question) or the
+recording.
+Out: the file travels with the question to erplora.com, which reads it; the copy of a business stays in the
+business: erplora.com only gets its name. The recording goes through the business to erplora.com's transcription.
+The browser never talks to erplora.com directly.
 If it fails: in one line over the box, and the file is not attached: "menu.pdf is too large: 8 MB at most per file.",
-"The files of one question add up to 20 MB at most.", "menu.zip cannot be attached: images, PDF, Word, Excel, text
-or CSV." or "menu.pdf could not be read.". With the microphone blocked, "Microphone access is blocked. Allow it in
+"The file could not be read: the file is larger than 20 MB." (the copy of a business, as in Import), "The files of
+one question add up to 20 MB at most.", "menu.rar cannot be attached: images, PDF, Word, Excel, text or CSV." or
+"menu.pdf could not be read.". A copy no longer in the conversation is not loaded: "There is no file
+«copia.blueprint.zip» attached to this conversation: attach it again.". With the microphone blocked, "Microphone access is blocked. Allow it in
 your browser to dictate." and, in the installed app (Android or Windows), where there is no browser, "Microphone
 access is blocked. Allow it in your device settings to dictate."; a recording too long, "The recording is too long:
 dictate a shorter message."; no voice, "Nothing was heard. Try again closer to the microphone."; and if it cannot be
@@ -2860,11 +2870,14 @@ Steps:
      upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
      plan" for the owner; the panel opens anyway.
+  7. Asked how many messages are left or how many have been used this month ("how many messages do I have left this
+     month?"), the assistant answers with the same figures as "Usage and plan" (BASE-F40) and the day they renew. It
+     reads them only when asked; if they cannot be read, it says so, without making up a number.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
 answering is what counts. If the pass of "Upgrade plan" does not arrive, the usual address opens, which asks to sign in (BASE-F11).
-Involved: BASE-F11, BASE-F106
+Involved: BASE-F11, BASE-F40, BASE-F106
 
 ### BASE-F105 Report a bad answer
 Status: done

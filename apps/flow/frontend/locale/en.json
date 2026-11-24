@@ -1191,6 +1191,7 @@
       "sale__order__split": "Split a check",
       "sale__order__split_line": "Split a line of a check",
       "sale__order__update_line": "Change a line of a check",
+      "sale__order_line__check": "Check the product of a new line of a check",
       "sale__order__add_combo_line": "Add a set menu to a check",
       "sale__order__print_bill": "Print the bill of a check",
       "sale__payment_method__create": "Add a payment method to sales",

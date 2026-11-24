@@ -60,8 +60,11 @@ def test_an_app_the_business_has_no_right_to_offers_no_tool(monkeypatch):
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
-def test_the_assistants_own_operations_are_not_its_tools():
-    assert not [name for name in assistant.tools.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
+def test_the_assistants_own_operations_are_not_its_tools_but_the_months_messages():
+    """Its turn, a report, a dictation, reading aloud and the search of the rest run apart from its tools; this month's
+    messages are a read the person may ask for, as «Usage and plan» shows them."""
+    own = [name for name in assistant.tools.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
+    assert own == ["base.assistant.usage"]
 
 
 #: Writes only the platform runs, of both shapes their permission takes (``<app>.system``, ``system.<app>``), each with

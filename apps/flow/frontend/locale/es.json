@@ -1191,6 +1191,7 @@
       "sale__order__split": "Dividir una cuenta",
       "sale__order__split_line": "Dividir una línea de una cuenta",
       "sale__order__update_line": "Cambiar una línea de una cuenta",
+      "sale__order_line__check": "Comprobar el producto de una línea nueva de una cuenta",
       "sale__order__add_combo_line": "Añadir un menú a una cuenta",
       "sale__order__print_bill": "Imprimir una cuenta",
       "sale__payment_method__create": "Añadir una forma de pago a las ventas",

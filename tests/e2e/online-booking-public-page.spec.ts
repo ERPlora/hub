@@ -110,6 +110,18 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       expect(appointment).toBe(`pending online ${who.member.id} online booking`);
       await shoot('booked');
 
+      // Right after booking, Cancel only asks, naming the booking; keeping it leaves the booking as it was.
+      await page.locator('[data-testid=ob-preview-cancel]').click();
+      const asking = page.locator('[data-testid=ob-cancel]');
+      await expect(asking).toBeVisible();
+      await expect(asking).toContainText(`¿Cancelar la reserva ${number}`);
+      await expect(page.locator('[data-testid=ob-cancel-submit]')).toContainText('Cancelar la reserva');
+      await shoot('cancel-asks');
+      await page.locator('[data-testid=ob-cancel-cancel]').click();
+      await expect(asking).toBeHidden();
+      await expect(page.locator('[data-testid=ob-personal-cancelled]')).toHaveCount(0);
+      expect(psql(`select status from appointment_appointment where number = '${number}'`)).toBe('pending');
+
       // Her confirmation carries the address; opening it shows the business and only her booking, and cancelling asks first.
       await page.locator('[data-testid=ob-preview-view]').click();
       const status = page.locator('[data-testid=ob-preview-status]');
