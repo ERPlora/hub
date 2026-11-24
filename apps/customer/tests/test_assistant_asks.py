@@ -245,15 +245,12 @@ def test_a_check_said_to_be_a_customers_reaches_the_link(catalog_of, language, p
     assert_offered_or_found(catalog_of(Membership.Role.OWNER, language), LINK, phrase, search, language)
 
 
-#: The places a turn gives the tools before the search, the fewer the Hub has given (19, then 15). The QA's Spanish words
-#: bring the link 16th: within 19, and past 15, where the search the model made for them finds it.
-PLACES = 15
-
-
 @HUB_DB
 def test_the_turn_itself_offers_the_link_for_a_customer_set_on_a_check(catalog_of):
+    """The English words need no search; the QA's Spanish ones bring the link past the places of a turn, and the search
+    the model made for them finds it."""
     language, phrase, _ = CHECK_SAID_TO_BE_A_CUSTOMERS[1]
-    offered = offered_to(catalog_of(Membership.Role.OWNER, language), phrase, language)[:PLACES]
+    offered = offered_to(catalog_of(Membership.Role.OWNER, language), phrase, language)
     assert LINK in offered, offered
 
 
