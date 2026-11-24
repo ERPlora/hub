@@ -2,7 +2,7 @@
 
 from ninja import Field
 
-from apps.combo.schemas import ComboRefIn
+from apps.combo.schemas.references import ComboRefIn
 
 
 class ComboOnSaleIn(ComboRefIn):

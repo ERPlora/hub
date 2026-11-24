@@ -11,26 +11,12 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.combo import queries, services
-from apps.combo.schemas import (
-    ComboImageIn,
-    ComboImageSuggestIn,
-    ComboImageUploadIn,
-    ComboIn,
-    ComboListIn,
-    ComboPatchIn,
-    ComboRefIn,
-    ForSaleIn,
-    GroupIn,
-    GroupPatchIn,
-    GroupRefIn,
-    GroupReorderIn,
-    OptionBulkIn,
-    OptionIn,
-    OptionPatchIn,
-    OptionRefIn,
-    OptionReorderIn,
-    ResolveIn,
-)
+from apps.combo.schemas.choices import OptionBulkIn, OptionIn, OptionPatchIn, OptionReorderIn
+from apps.combo.schemas.courses import GroupIn, GroupPatchIn, GroupReorderIn
+from apps.combo.schemas.images import ComboImageIn, ComboImageSuggestIn, ComboImageUploadIn
+from apps.combo.schemas.menus import ComboIn, ComboListIn, ComboPatchIn
+from apps.combo.schemas.references import ComboRefIn, GroupRefIn, OptionRefIn
+from apps.combo.schemas.till import ForSaleIn, ResolveIn
 from apps.combo.schemas.on_sale import ComboOnSaleIn
 from base.request_body import accept_body_up_to
 

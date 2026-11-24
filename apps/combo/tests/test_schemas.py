@@ -9,25 +9,11 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from apps.combo.schemas import (
-    ChoiceIn,
-    ComboIn,
-    ComboListIn,
-    ComboPatchIn,
-    ComboRefIn,
-    DropProductIn,
-    ForSaleIn,
-    GroupIn,
-    GroupPatchIn,
-    GroupRefIn,
-    GroupReorderIn,
-    OptionBulkIn,
-    OptionIn,
-    OptionPatchIn,
-    OptionRefIn,
-    OptionReorderIn,
-    ResolveIn,
-)
+from apps.combo.schemas.choices import DropProductIn, OptionBulkIn, OptionIn, OptionPatchIn, OptionReorderIn
+from apps.combo.schemas.courses import GroupIn, GroupPatchIn, GroupReorderIn
+from apps.combo.schemas.menus import ComboIn, ComboListIn, ComboPatchIn
+from apps.combo.schemas.references import ComboRefIn, GroupRefIn, OptionRefIn
+from apps.combo.schemas.till import ChoiceIn, ForSaleIn, ResolveIn
 
 ID = str(uuid.uuid7())
 

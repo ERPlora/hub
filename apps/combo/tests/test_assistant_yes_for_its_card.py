@@ -18,7 +18,7 @@ import pytest
 from live.operations import AI, registry
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU
+from apps.combo.schemas.fields import A_CHOICE, A_COURSE, A_MENU
 from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, make_option, make_product
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
