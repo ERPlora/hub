@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:49055b4ac1e7812e2b33b42be657dd4aa482222ee20153e29e26baab882aee91 -->
+<!-- generated from WORKBOOK.md sha256:8273b8244f6871e3ec3494558f8fd2660c3c4e3e85c3bd576061748655c49394 -->
 
 ## What it is for and who it is for
 
@@ -1016,13 +1016,15 @@ Steps:
   5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
      longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
      businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
-  6. If the assistant is asked for something an app that is off does, without naming it ("I want to manage
-     reservations", "book an appointment"), it says which app does it, what it is for as Apps says it and that it is
-     off, instead of saying it cannot or trying it with something else. To whoever runs the business it shows the card
-     of turning it on from step 4; with the yes, it goes on with what was asked in the same conversation, now with what
-     that app does. To whoever cannot turn apps on it says that whoever runs the business turns it on; of a paid one not
-     subscribed to, that it is subscribed to on erplora.com, without offering to turn it on; of one being set up or that
-     could not be turned on, its state, as Apps does.
+  6. If the assistant is asked for something of an app that is off by saying its name, even without saying "app" ("I
+     want to manage reservations", "book an appointment"), or if what the assistant searches for to do it names it, it
+     says which app does it, what it is for as Apps says it and that it is off, instead of saying it cannot or trying it
+     with something else. To whoever runs the business it shows the card of turning it on from step 4; with the yes, it
+     goes on with what was asked in the same conversation, now with what that app does. To whoever cannot turn apps on
+     it says that whoever runs the business turns it on; of a paid one not subscribed to, that it is subscribed to on
+     erplora.com, without offering to turn it on; of one being set up or that could not be turned on, its state, as Apps
+     does. What the apps that are on already do ("how many services do I have?", "raise the dye's price to 40 €")
+     makes it name none.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not

@@ -1017,12 +1017,14 @@ Pasos:
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
      desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
      España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
-  6. Si al asistente se le pide algo que hace una app desactivada, sin nombrarla («quiero gestionar reservas», «apunta
-     una cita»), dice qué app lo hace, para qué sirve como lo dice Apps y que está desactivada, en vez de decir que no
-     puede o de intentarlo con otra cosa. A quien administra le pone la tarjeta de activarla del paso 4; con el sí, sigue
-     con lo que se le pidió en la misma conversación, ya con lo que hace esa app. A quien no puede activar apps le dice
-     que la activa quien administra el negocio; de una de pago sin contratar, que se contrata en erplora.com, sin
-     ofrecer activarla; de una que se está preparando o que no se pudo activar, su estado, como Apps.
+  6. Si al asistente se le pide algo de una app desactivada diciendo su nombre, aunque no se diga «app» («quiero
+     gestionar reservas», «apunta una cita»), o si lo nombra lo que el asistente busca para hacerlo, dice qué app lo
+     hace, para qué sirve como lo dice Apps y que está desactivada, en vez de decir que no puede o de intentarlo con otra
+     cosa. A quien administra le pone la tarjeta de activarla del paso 4; con el sí, sigue con lo que se le pidió en la
+     misma conversación, ya con lo que hace esa app. A quien no puede activar apps le dice que la activa quien
+     administra el negocio; de una de pago sin contratar, que se contrata en erplora.com, sin ofrecer activarla; de una
+     que se está preparando o que no se pudo activar, su estado, como Apps. Lo que ya hacen las apps activadas («¿cuántos
+     servicios tengo?», «sube el precio del tinte a 40 €») no le hace nombrar ninguna.
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
@@ -3981,17 +3983,19 @@ Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
 - Las apps no activadas en el asistente (BASE-F24 paso 6, hub#2178; `base/assistant/apps_not_on.py`): el catálogo de
-  un turno sigue siendo solo de las apps activas, así que `named` clasifica las palabras de la petición abierta y las
-  búsquedas del modelo con el mismo `relevance.relevant`, contra el catálogo que la persona tendría con todas las apps
-  de `home.shown_modules` encendidas; las no activadas con una herramienta en los `PLACES` puestos de ese turno, como
-  mucho `NAMED` = 3 y la mejor primero, van a las instrucciones con lo que lee `base.app.get` (nombre, estado y
-  `summary`), tras lo que se sabe del negocio. Nada se añade si todas están activas. A quien tiene el permiso de
-  `base.app.enable` se le ofrece esa herramienta antes de la búsqueda (`with_switch`, solo si alguna está `off`), sin
-  mover ninguna de las ofrecidas. Tras una escritura de `SWITCHES` que sale bien, el resto del turno lee las apps de sus
-  filas, aún sin COMMIT (`activation.changing`), y la ronda siguiente ya ofrece las herramientas de la app encendida.
-  Medido con el tokenizador o200k_base sobre las 760 sondas del propietario: con muchas apps apagadas, unos 400-480
-  tokens más por llamada de media (la mitad, la herramienta de activar); con todas activas, ninguno. Tests:
-  `base/tests/test_apps_not_on.py`.
+  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules` cuando las
+  palabras de la petición abierta o las búsquedas del modelo dicen su nombre en el idioma de la persona (`_names`: las
+  raíces de su `verbose_name`, comparadas con las palabras tal como se dicen, sin el vocabulario de `live`, que haría
+  de «precio» una palabra de Tarifas) y tiene una herramienta en los `PLACES` puestos de ese turno contra el catálogo
+  que la persona tendría con todas las apps encendidas (`relevance.relevant`); como mucho `NAMED` = 3, la mejor
+  primero, con lo que lee `base.app.get` (nombre, estado y `summary`), tras lo que se sabe del negocio. Si no se dice
+  ninguna, no se clasifica nada más. A quien tiene el permiso de `base.app.enable` se le ofrece esa herramienta antes de
+  la búsqueda (`with_switch`, solo si alguna está `off`), sin mover ninguna de las ofrecidas. Tras una escritura de
+  `SWITCHES` (encender, apagar o reintentar), el resto del turno lee las apps de sus filas, aún sin COMMIT
+  (`activation.changing`): la ronda siguiente ofrece las herramientas de la app encendida y ya no las de la apagada, y
+  no nombra ninguna app (lo que está activado se acaba de decidir). Medido con el tokenizador o200k_base: las frases de
+  uso diario de una peluquería y un restaurante no nombran ninguna (0 tokens más); las seis de la issue, de 145 a 513
+  más. Tests: `base/tests/test_apps_not_on.py`.
 - «Uso y plan» (BASE-F40, hub#603). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin
