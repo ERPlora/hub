@@ -29,7 +29,7 @@ from apps.appointment.services.writes import (
 )
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries.reads import business_country, find_customer
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 
 PHONE_INVALID = _(
     "That phone is not a valid number for the business's country. Check it, or type it with its international "

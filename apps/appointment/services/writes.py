@@ -28,7 +28,7 @@ from apps.appointment.queries.reads import CUSTOMER_SOURCES
 from apps.customer.queries.reads import find_customer
 from apps.service.models import Service
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 from base.business import business_zone
 from base.queries.people import actor_name
 
