@@ -30,12 +30,15 @@ def test_the_model_hears_the_name_of_a_file_for_a_tool_never_its_bytes():
 
     sent = attachments.for_gateway(messages)
 
-    text, copy, menu = sent[0]["content"]
+    text, copy, named, menu = sent[0]["content"]
     assert text == {"type": "text", "text": "cárgame esta copia"}
     assert copy["type"] == "text"
     assert "«bar-pepe.blueprint.zip»" in copy["text"]
     assert ZIP not in json.dumps(sent)
-    # What erplora.com reads still goes to it whole, and the conversation the person keeps is not touched.
+    # What erplora.com reads still goes to it whole, after its name (erplora.com does not give the model the name),
+    # and the conversation the person keeps is not touched.
+    assert named["type"] == "text"
+    assert "«carta.pdf»" in named["text"]
     assert menu == MENU
     assert messages == [said(COPY, MENU)]
 
