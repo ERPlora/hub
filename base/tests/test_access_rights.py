@@ -11,7 +11,7 @@ from live.operations import get as get_operation
 
 from base import events
 from base.models import Membership
-from base.permissions import VIEW_HOME, permissions_for
+from base.permissions import VIEW_HOME, access_for
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 from base.tests.test_people import photo
 
@@ -32,7 +32,7 @@ def people(make_user):
 
 
 def grantors(user) -> list[dict]:
-    ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="en")
+    ctx = OperationContext(scope=A, actor=user, permissions=access_for(user, A), language="en")
     answer = get_operation("base.access.grantors")(ctx, get_operation("base.access.grantors").input())
     return answer.model_dump(mode="json")["grantors"]
 
@@ -56,7 +56,7 @@ def test_an_administrator_invited_on_erplora_com_who_has_not_entered_yet_is_name
 def test_it_follows_the_people_and_their_names_live_and_every_person_of_the_business_may_ask(people):
     assert live_registry.subscribable["base.access.grantors"] == sorted({events.HUB_STATE_APPLIED, events.PROFILE_UPDATED})
     assert get_operation("base.access.grantors").permission == VIEW_HOME
-    assert VIEW_HOME in permissions_for(people["eva"], A)
+    assert VIEW_HOME in access_for(people["eva"], A)
 
 
 def test_by_its_route_an_employee_reads_the_names_and_nobody_without_a_session_does(client, people):

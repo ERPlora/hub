@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:17766d06b143c25bb82d1e81ac9517cca2e47a956e364331a7077d97347f1e3a -->
+<!-- generated from WORKBOOK.md sha256:2f2e3caeb9bd1ecfd8255cc08b597edb65ac187c67ed579d56262c1770c0c6f4 -->
 
 ## What it is for and who it is for
 
@@ -600,7 +600,9 @@ Steps:
    what the automations can use (the apps involved, or the notices and actions by their name), whole and with
    the data of each action: in a business with many apps too, it uses the real names and data, without warning
    you that it could not check them. Before leaving it, it shows you its card and waits for your yes, like any
-   change it asks you for.
+   change it asks you for. The card says the name, when it starts and each step with the same phrases as the
+   list and the editor ("When a till is closed", "Every day at 10:00", "Create a task", "Wait 1 hour"), never
+   the codes of its definition; the same if you ask it to create the automation directly.
 3. It tells you it has left it waiting in Automations and repeats its doubts; you review it in **Proposed by
    the assistant** (FLOW-F18).
 In: what is asked for, in words, and what the business's automations can use.
