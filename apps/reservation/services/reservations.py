@@ -17,6 +17,7 @@ from apps.reservation.services.gate import choose_table, judge, lock_book
 from apps.reservation.services.guests import CARD_SOURCES, _guest_contact, card_for_phone, typed_phone
 from apps.reservation.services.other_apps import drop_hold, status_changed, sync_hold
 from apps.reservation.services.writes import S, _stamp
+from base.assistant import card_order
 
 #: What a reservation may still change once seated, completed, cancelled or not shown.
 NOTES_ONLY = {"notes", "internal_notes"}
@@ -48,8 +49,7 @@ def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict])
     whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
     if whom is None:
         return fields
-    rest = [field for field in fields if field is not whom]
-    return [whom, *sorted(rest, key=lambda field: field["name"] not in ("date", "time"))]
+    return card_order.first(fields, (whom["name"], "date", "time"))
 
 
 @operation(
