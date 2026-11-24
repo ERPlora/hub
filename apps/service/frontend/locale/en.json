@@ -213,7 +213,7 @@
       },
       "customer": "Customer: {name}",
       "customerRef": "Customer reference: {id}",
-      "sale": "Sale: {id}",
+      "sale": "Sale: {number}",
       "uses": "{used} used · {remaining} left",
       "usesUnlimited": "{used} used · no limit",
       "expires": "Expires {when}",
