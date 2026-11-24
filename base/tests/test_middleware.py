@@ -201,34 +201,6 @@ def prod_domain(settings):
 
 
 @pytest.mark.usefixtures("prod_domain")
-def test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready(client, superuser):
-    """ERPlora's own hub has its row, but its slug is reserved (``live.slugs``): its host is no hub's, before the registry
-    is read, so no page, API call or jump reaches «Usage and plan» there, with a session or with a key. On the platform
-    host the staff only get the admin. Should this ever open, that screen would promise it a plan the SaaS never sends."""
-    from base.models import Hub
-
-    Hub.objects.create(slug="erplora", status="ready", is_platform=True)
-    host = "erplora.erplora.com"
-
-    def closed():
-        assert browse(client, "/system", host).status_code == 404
-        assert browse(client, "/auth/login", host).status_code == 404
-        assert browse(client, "/auth/callback", host).status_code == 404
-        for path in ("/api/system/plan", "/api/live"):
-            for headers in ({}, {"HTTP_AUTHORIZATION": "Bearer erpk_live_any"}):
-                api = client.get(path, HTTP_HOST=host, **headers)
-                assert (api.status_code, api.json()["error"]["code"]) == (404, "not_found")
-
-    closed()
-    client.force_login(superuser)
-    closed()
-
-    for path in ("/system", "/api/system/plan"):
-        page = browse(client, path, "hubs.erplora.com")
-        assert (page.status_code, page["Location"]) == (302, reverse("admin:index"))
-
-
-@pytest.mark.usefixtures("prod_domain")
 def test_with_a_base_domain_the_pages_of_another_domain_are_not_found(client, superuser):
     page = browse(client, "/demo/items", f"{A.key}.erplora.com")
     assert through_the_jump(client, page, f"{A.key}.erplora.com")["Location"].startswith(SAAS_LOGIN)

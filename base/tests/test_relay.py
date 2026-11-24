@@ -37,6 +37,7 @@ from apps.printing.models import PrintJob
 from apps.sale.tests.conftest import db_dsn
 from apps.verifactu.models import Record
 from base import relay
+from base.models.activation import AppActivation
 from base.models.relay import EventDelivery
 from base.services import relay_runs
 from base.tenancy.context import use_control, use_hub
@@ -671,6 +672,29 @@ def test_an_event_of_hub_b_runs_in_b_and_is_heard_in_b_only(till, factory_data_b
     heard(on_a)
     worker_loop()
     assert "inventory.stock.changed" in heard(on_a)
+
+
+@HUB_DB_COMMITTED
+def test_what_a_hub_recorded_before_its_address_changed_is_delivered_under_the_new_one(hub_b, factory_data_b, listen, worker_loop):
+    """A hub's outbox is in its own database: what waits there is that hub's, under the address it has now."""
+    with use_hub(hub_b):
+        stocked(B)
+        charge("relay-renamed-1", scope=B)
+    renamed = Scope("host", "renamed-b")
+    type(hub_b).objects.filter(pk=hub_b.pk).update(slug=renamed.key)
+    here = type(hub_b).objects.get(pk=hub_b.pk)
+    with use_hub(here):
+        # Its apps on are kept under the address they were turned on at.
+        AppActivation.objects.filter(host=B.key).update(host=renamed.key)
+    on_the_new_one = listen(renamed)
+
+    worker_loop()
+
+    with use_hub(here):
+        assert stock() == Decimal("8")
+        assert not EventDelivery.objects.exclude(status=EventDelivery.Status.DELIVERED).exists()
+        assert newest("inventory.stock.changed").scope_key == renamed.key
+    assert "inventory.stock.changed" in heard(on_the_new_one)
 
 
 @HUB_DB_COMMITTED

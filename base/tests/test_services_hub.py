@@ -58,6 +58,40 @@ def a_user_context():
     return OperationContext(scope=registry.REGISTRY_SCOPE, actor=user, permissions=frozenset({"*"}))
 
 
+class TestErplorasOwnHub:
+    """ERPlora's own hub (``is_platform``) is no business of erplora.com's: nobody makes it, takes it or closes it."""
+
+    @pytest.mark.parametrize("slug", ["erp", "erplora"])
+    def test_nobody_can_make_a_business_with_its_name(self, slug):
+        with pytest.raises(InvalidPayload) as refused:
+            register(slug=slug)
+        assert refused.value.code == "base.slug_invalid"
+        assert not Hub.objects.filter(pk=HUB_ID).exists()
+
+    @pytest.fixture
+    def own(self):
+        return Hub.objects.create(id=HUB_ID, slug="erp", name="ERPlora", status="ready", is_platform=True)
+
+    def test_registering_its_id_never_takes_it(self, own):
+        with pytest.raises(Conflict) as refused:
+            register(slug="acme", name="Acme Bar")
+        assert refused.value.code == "base.platform_hub_kept"
+        own.refresh_from_db()
+        assert (own.slug, own.name, own.status, own.is_platform) == ("erp", "ERPlora", "ready", True)
+
+    def test_it_is_never_closed(self, own):
+        with pytest.raises(Conflict) as refused:
+            hub_cancel(SYSTEM, HubCancelIn(id=HUB_ID))
+        assert refused.value.code == "base.platform_hub_kept"
+        own.refresh_from_db()
+        assert (own.status, own.cancelled_at) == ("ready", None)
+        assert events("base.hub.cancelled") == []
+
+    def test_a_business_is_still_registered_and_closed(self, own):
+        assert register(id=str(OTHER_ID)).created
+        assert hub_cancel(SYSTEM, HubCancelIn(id=OTHER_ID)).status == "cancelled"
+
+
 class TestRegister:
     def test_a_new_business_is_requested_with_its_own_database_to_make(
         self, django_capture_on_commit_callbacks, fake_saas
