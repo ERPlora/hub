@@ -17,6 +17,7 @@ from live.meta import Help
 from base import catalog
 from base.queries import app_help
 from base.workbook_help import Tab, Words
+from base.workbook_sections import marked
 
 ES = """\
 # Mesas
@@ -325,16 +326,13 @@ EN_TABS = tabs("Floor plan", "Zones", "Tables", "Settings")
 EO_TABS = tabs("Salonplano", "Zonoj", "Tabloj", "Agordoj")
 
 
-def header_of(source: str = ES) -> str:
-    """The first line that makes a translation current with the customer's part of ``source``."""
-    return catalog.en_header(catalog.source_hash(catalog.user_part(source)))
-
-
 def write_workbooks(root: Path, translations: dict[str, str], source: str = ES) -> Path:
     """``WORKBOOK.md`` in ``root`` and, for each language, its ``WORKBOOK.<language>.md`` current with it."""
     (root / "WORKBOOK.md").write_text(source, encoding="utf-8")
     for language, body in translations.items():
-        (root / f"WORKBOOK.{language}.md").write_text(f"{header_of(source)}\n\n{body}", encoding="utf-8")
+        text = marked(catalog.user_part(source), body)
+        assert text is not None, f"the made-up {language} has other headings than its source"
+        (root / f"WORKBOOK.{language}.md").write_text(text, encoding="utf-8")
     return root
 
 

@@ -207,7 +207,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
 | CASH_REGISTER-F16 | Imprimir el informe de la sesión (X o Z) | común | hecho |
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
-| CASH_REGISTER-F18 | Ver las propinas en la caja | común | hecho |
+| CASH_REGISTER-F18 | Ver las propinas en la caja | común | parcial — falta la app Propinas, que es la que las apunta |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
 Estado: hecho
@@ -644,7 +644,8 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-Estado: hecho
+Estado: parcial — Caja ya enseña aparte lo que apunta otra app, en el Detalle de la sesión, en Movimientos, en la
+ventana «Cerrar sesión» y en el informe X o Z; falta la app Propinas, que es la que lo apunta (hub#1498)
 Vertical: común
 Actor: sistema, empleado, responsable
 Pantalla: Caja, Detalle de la sesión

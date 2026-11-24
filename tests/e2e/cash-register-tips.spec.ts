@@ -5,7 +5,7 @@
 // file opens is deleted after it.
 import { expect, test } from '@playwright/test';
 
-import { A, api, login, painted, saveSessionForTheSweep, shot, shown } from './helpers';
+import { A, api, capture, login, saveSessionForTheSweep, shown } from './helpers';
 import { forgetSessions, freshSession } from './cash-session-helpers';
 import { dialog, fill } from './inventory-helpers';
 import { rowAction } from './service-helpers';
@@ -67,8 +67,7 @@ test('CASH_REGISTER-F18: a tip in cash shows in its own line in the detail and t
   await expect(close.locator('[data-testid=cash-register-close-expected]')).toContainText(/15[.,]00/);
   for (const width of WIDTHS) {
     await page.setViewportSize({ width: width.width, height: width.height });
-    await painted(page);
-    await page.screenshot({ path: shot(`cash-register-tips-close-${width.label}`) });
+    await capture(page, `cash-register-tips-close-${width.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await fill(close, 'cash-register-close-counted', '15,00');

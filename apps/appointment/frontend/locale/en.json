@@ -152,7 +152,8 @@
     "deleteDialog": {
       "title": "Delete the appointment",
       "message": "Delete {number}? Day to day it is better to Cancel, which keeps the record.",
-      "confirm": "Delete"
+      "confirm": "Delete",
+      "keep": "Keep it"
     },
     "history": {
       "title": "Appointment history",
@@ -211,7 +212,8 @@
       "deleteDialog": {
         "title": "Delete {name}'s repeating appointments?",
         "message": "Appointments already booked are kept. This series will stop booking new ones.",
-        "confirm": "Delete"
+        "confirm": "Delete",
+        "keep": "Keep it"
       },
       "form": {
         "titleNew": "New repeating appointment",
