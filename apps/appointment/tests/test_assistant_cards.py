@@ -68,6 +68,8 @@ def test_a_series_says_whom_when_it_repeats_and_the_service():
         "start_date": "2026-12-01",
         "time": "10:00",
         "frequency": "monthly",
+        "duration_minutes": 90,
+        "max_occurrences": 6,
     }
     line = its_line(fields_of("appointment.recurring.create", arguments))
     assert names(line) == ["customer", "when", "services"]
