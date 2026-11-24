@@ -1,8 +1,5 @@
-import { DataTable } from '@erplora/ui/components';
-import type { Component } from 'vue';
-
 import ProductsPage from '../pages/ProductsPage.vue';
-import { flush, mountInventory, ok, product, UNITS, type ApiCall, type MountOptions } from './mount-inventory';
+import { flush, mountInventory, ok, product, tableOf, UNITS, type ApiCall, type MountOptions } from './mount-inventory';
 
 /** The API of the page: units, the hub's stock setting; anything else answers `answer`. */
 export function api(answer: (call: ApiCall) => Response = () => ok({})) {
@@ -17,9 +14,7 @@ export function api(answer: (call: ApiCall) => Response = () => ok({})) {
 export async function setup(options: MountOptions = {}, answer?: (call: ApiCall) => Response) {
   const m = await mountInventory(ProductsPage, { path: '/inventory/products', api: api(answer), ...options });
   const call = await m.live();
-  const testid = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
+  const { testid, table, prop } = tableOf(m);
   const rows = () => m.wrapper.findAll('[data-testid="inventory-products-row"]');
   async function act(actionId: string, row: unknown = product()) {
     table().vm.$emit('action', { actionId, row });

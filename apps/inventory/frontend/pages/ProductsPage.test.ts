@@ -13,6 +13,7 @@ import { IonToggle } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { business, EMPLOYEE, errorFrame, flush, ok, page, POLISH, product, refusal, subId } from '../__tests__/mount-inventory';
+import { api, setup } from '../__tests__/products-page';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
@@ -22,7 +23,6 @@ import StockModal from '../components/StockModal.vue';
 import { formatMoney } from '../lib/format';
 import source from './ProductsPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { api, setup } from '../__tests__/products-page';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), save: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({

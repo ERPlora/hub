@@ -7,7 +7,6 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, shown } from './helpers';
 import {
-  cleanInventory,
   createProduct,
   dialog,
   type Product,
@@ -18,7 +17,7 @@ import {
   stamp,
 } from './inventory-helpers';
 import { rowAction } from './service-helpers';
-import { atRest, ownerOfTheSite, PUBLIC_SIZES, type Site, siteBackOffline, WIDE } from './website-helpers';
+import { atRest, menuSpecDone, ownerOfTheSite, PUBLIC_SIZES, publishWithMenuOf, type Site, WIDE } from './website-helpers';
 
 const KEY = 'WEBSITE-MENU-HIDDEN';
 const RUN = stamp();
@@ -38,23 +37,11 @@ test.beforeAll(async ({ browser }) => {
   expect(tapas.status, JSON.stringify(tapas.data)).toBe(201);
   await createProduct(context, { name: SHOWN, sku: `E2E-HID-T-${RUN}`, price: 350, category_ids: [tapas.data.id] });
   staffMeal = await createProduct(context, { name: HIDDEN, sku: `E2E-HID-S-${RUN}`, price: 500, category_ids: [tapas.data.id] });
-  const content = {
-    ...found.content,
-    catalog: { hidden: false, title: '', source: 'inventory', category_ids: [tapas.data.id], show_prices: true },
-  };
-  const saved = await api(context, A, 'POST', '/website/site', { template: 'classic', theme: found.theme, content });
-  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
-  const published = await api(context, A, 'POST', '/website/site/publish');
-  expect(published.status, JSON.stringify(published.data)).toBe(200);
+  await publishWithMenuOf(context, found, [tapas.data.id]);
 });
 
 test.afterAll(async () => {
-  try {
-    if (owner && found) await siteBackOffline(owner.context, found);
-  } finally {
-    cleanInventory();
-    await owner?.context.close();
-  }
+  await menuSpecDone(owner, found);
 });
 
 test(`${KEY}: a dish hidden from the website in Products is not on the public menu and the till still sells it`, async ({

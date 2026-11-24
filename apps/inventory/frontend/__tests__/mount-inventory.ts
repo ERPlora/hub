@@ -1,6 +1,8 @@
 // Test helper of the inventory's pages and components: `mountInShell` with its catalogues over base's, the dashboard,
 // its people and the hub's business; the API's answers and the catalogue's rows its tests share.
+import { DataTable } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
+import type { VueWrapper } from '@vue/test-utils';
 import { ApiError, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import type { Component, Ref } from 'vue';
 
@@ -240,3 +242,11 @@ export async function mountInventory(component: Component, options: MountOptions
 }
 
 export * from '../../../../base/frontend/__tests__/mount-in-shell';
+
+/** A mounted page's DataTable: an element by its test id, the table and one of its props. */
+export function tableOf(m: { wrapper: VueWrapper }) {
+  const testid = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
+  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
+  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
+  return { testid, table, prop };
+}
