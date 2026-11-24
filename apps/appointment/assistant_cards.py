@@ -44,10 +44,10 @@ def series(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[d
 
 
 def series_change(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
-    """Which series, from when and what changes of when it repeats (as one datum), and then who does it and the
-    service: «desde febrero, a las 11:00 y con Carlos»."""
+    """Which series, from when and what changes of when it repeats (as one datum), and then, as the form asks them,
+    who does it and the services: «desde febrero, a las 11:00 y con Carlos»."""
     when = card_order.together(fields, "when", REPEATS_FROM)
-    return card_order.put_first(fields, ("id",), *_some(when), *_said(fields, WITH_WHOM), dropped=REPEATS_FROM)
+    return card_order.put_first(fields, ("id",), *_some(when), dropped=REPEATS_FROM)
 
 
 def _some(*data: dict | None) -> list[dict]:
