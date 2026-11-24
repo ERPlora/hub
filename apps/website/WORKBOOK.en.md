@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e7ef759bd4df1718e8cb03954f013a4ba22b1b0963a39af9d9aa9ce278067ea7 -->
+<!-- generated from WORKBOOK.md sha256:b7df9b2ceca79ce2c4cfb6d4c67c85eb2077e3b90d492afbd8337ecb8c3d79c4 -->
 
 ## What it is for and who it is for
 
@@ -327,7 +327,7 @@ Steps:
 1. In **Website**, tap **Share and QR**.
 2. **Copy link** copies the address («Link copied»); **Download PNG** gets the QR to print it and **Download SVG** to
    enlarge it without losing quality.
-3. If the draft shows the catalog (WEBSITE-F05), below is «Your catalog's address», with its own **Copy link**,
+3. If the draft shows the catalog, below is «Your catalog's address», with its own **Copy link**,
    **Download PNG** and **Download SVG**: it is the QR to print and leave on the tables.
 4. **Close** goes back to the editor.
 In: nothing: the address is the business's.

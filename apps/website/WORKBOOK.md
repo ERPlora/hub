@@ -341,7 +341,7 @@ Pasos:
 1. En **Página web**, pulsa **Compartir y QR**.
 2. **Copiar enlace** copia la dirección («Enlace copiado»); **Descargar PNG** baja el QR para imprimirlo y
    **Descargar SVG** para ampliarlo sin perder calidad.
-3. Si el borrador muestra el catálogo (WEBSITE-F05), debajo está «La dirección de tu catálogo», con su propio
+3. Si el borrador muestra el catálogo, debajo está «La dirección de tu catálogo», con su propio
    **Copiar enlace**, **Descargar PNG** y **Descargar SVG**: es el QR para imprimir y dejar en las mesas.
 4. **Cerrar** vuelve al editor.
 Entra: nada: la dirección es la del negocio.
