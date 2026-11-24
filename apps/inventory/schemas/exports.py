@@ -2,13 +2,14 @@
 
 from ninja import Field, Schema
 
+from base.schemas.assistant import A_HANDED_FILE
 from base.sensitive import COSTS
 
 
 class ExportOut(Schema):
     filename: str = Field(description="Name of the file.")
     content_type: str = Field(description="Media type.")
-    content: str = Field(description="The CSV.")
+    content: str = Field(description="The CSV.", json_schema_extra=A_HANDED_FILE)
 
 
 class ProductRow(Schema):
