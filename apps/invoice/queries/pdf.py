@@ -56,16 +56,16 @@ def file_name(invoice: Invoice) -> str:
         "risk": "high",
         "asks": {
             "en": (
-                "download FACT-2025-000317 as a PDF",
+                "give me FACT-2025-000317 as a PDF",
                 "save Carpintería Lema's invoice, I have to keep it",
             ),
             "es": (
-                "descárgame el PDF de la FACT-2025-000317",
+                "dame el PDF de la FACT-2025-000317",
                 "bájame la factura de Carpintería Lema, que la tengo que guardar",
             ),
         },
-        "description": "Writes the PDF file of one invoice for the person to download: its A4 page with its VeriFactu "
-        "QR. duplicate marks it as a copy.",
+        "description": "Writes the PDF file of one invoice, for the person to keep: its A4 page with its VeriFactu QR. "
+        "duplicate marks it as a copy.",
     },
 )
 def invoice_pdf(ctx: OperationContext, params: DocumentIn) -> dict:
