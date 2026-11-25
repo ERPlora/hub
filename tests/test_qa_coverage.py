@@ -33,6 +33,7 @@ Un ejemplo.
 ### SAMPLE-F01 Hecho en una pantalla
 Estado: hecho
 Pantalla: Lista
+Operaciones: las de la lista
 
 ### SAMPLE-F02 Hecho con una nota
 Estado: hecho — también por la API
@@ -59,6 +60,7 @@ Pantalla: Ninguna; la dirección sigue igual
 ### SAMPLE-F08 Hecho y sin recorrido
 Estado: hecho
 Pantalla: Ficha
+Operaciones: ninguna (solo lleva a otra pantalla)
 
 ## Para quien lo mantiene
 
@@ -185,6 +187,10 @@ class TestTheWorkbooks:
         for flow_id in ("SAMPLE-F05", "SAMPLE-F06"):
             assert flows[flow_id].done
             assert not flows[flow_id].on_screen
+
+    def test_a_flow_says_that_it_uses_no_operation(self, tree):
+        flows = qa_coverage.workbook_flows(tree)
+        assert [flow_id for flow_id, flow in flows.items() if flow.no_operations] == ["SAMPLE-F08"]
 
     def test_a_partial_flow_and_one_not_done_are_not_done(self, tree):
         flows = qa_coverage.workbook_flows(tree)

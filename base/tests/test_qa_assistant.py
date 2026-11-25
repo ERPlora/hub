@@ -67,6 +67,12 @@ Estado: hecho
 Actor: responsable
 Pantalla: Ficha
 
+### SAMPLE-F09 Ir a otra pantalla
+Estado: hecho
+Actor: empleado
+Pantalla: Ajustes
+Operaciones: ninguna
+
 ## Servicios: lo que entra y lo que sale
 
 ### Lo que ofrece: consultas
@@ -120,8 +126,10 @@ OPERATIONS = {
 }
 
 
-def flow(*, actor="empleado", screen="Lista"):
-    return WorkbookFlow("SAMPLE-F01", "sample", done=True, on_screen=True, actor=actor, screen=screen)
+def flow(*, actor="empleado", screen="Lista", no_operations=False):
+    return WorkbookFlow(
+        "SAMPLE-F01", "sample", done=True, on_screen=True, actor=actor, screen=screen, no_operations=no_operations
+    )
 
 
 def manual(root, text, app="sample"):
@@ -248,6 +256,12 @@ class TestTheGroupOfAFlow:
     def test_it_comes_from_its_operations_when_it_has_another_screen(self, operations, group):
         assert qa_assistant.asked(flow(), operations).group == group
 
+    @pytest.mark.parametrize(
+        ("screen", "group"), [("Ajustes", Group.CANNOT), ("asistente", Group.ASSISTANT_ONLY)], ids=["screen", "assistant"]
+    )
+    def test_a_flow_that_uses_no_operation_has_one_too(self, screen, group):
+        assert qa_assistant.asked(flow(screen=screen, no_operations=True), []).group == group
+
     def test_a_tool_never_used_from_the_chat_is_none(self):
         assert qa_assistant.asked(flow(), [operation("base.hub.reset")]).group == Group.CANNOT
 
@@ -329,6 +343,14 @@ class TestWhetherAFlowContradictsItself:
     def test_it_does_when_it_names_the_assistant_and_no_tool_backs_it(self, actor, screen, operations, contradicts):
         assert qa_assistant.asked(flow(actor=actor, screen=screen), operations).contradicts is contradicts
 
+    @pytest.mark.parametrize(
+        ("actor", "operations", "contradicts"),
+        [("responsable", [], False), ("responsable", [WRITE], True), ("responsable, asistente", [], True)],
+        ids=["none-cited", "one-cited", "the-assistant-named"],
+    )
+    def test_it_does_when_it_says_it_uses_no_operation_and_one_is_cited(self, actor, operations, contradicts):
+        assert qa_assistant.asked(flow(actor=actor, no_operations=True), operations).contradicts is contradicts
+
 
 class TestTheReport:
     @pytest.fixture
@@ -344,6 +366,7 @@ class TestTheReport:
             "SAMPLE-F04": Group.CANNOT,
             "SAMPLE-F05": None,
             "SAMPLE-F08": Group.CAN,
+            "SAMPLE-F09": Group.CANNOT,
         }
 
     def test_an_operation_the_registry_does_not_have_backs_nothing(self, tmp_path):
@@ -357,6 +380,7 @@ class TestTheReport:
             "SAMPLE-F04": [],
             "SAMPLE-F05": [],
             "SAMPLE-F08": [],
+            "SAMPLE-F09": [],
         }
 
     def test_the_tools_no_flow_cites_leave_out_what_is_no_tool_and_what_a_flow_out_of_reach_cites(self, report):
@@ -382,8 +406,8 @@ class TestTheCommand:
 
     def test_it_gives_each_flow_its_group_what_to_expect_and_its_operations_and_then_the_three_lists(self, lines):
         written = lines(assistant=True)
-        assert written[written.index("assistant: 3 can, 1 assistant only, 1 cannot, 1 undecided") : -1] == [
-            "assistant: 3 can, 1 assistant only, 1 cannot, 1 undecided",
+        assert written[written.index("assistant: 3 can, 1 assistant only, 2 cannot, 1 undecided") : -1] == [
+            "assistant: 3 can, 1 assistant only, 2 cannot, 1 undecided",
             "  SAMPLE-F01 can: does it; check it on the screen or in the data"
             " — sample.item.list (tool), sample.item.create (tool)",
             "  SAMPLE-F02 can: does it; check it on the screen or in the data — sample.item.list (tool)",
@@ -391,9 +415,10 @@ class TestTheCommand:
             " — sample.item.create (tool)",
             "  SAMPLE-F04 cannot: says it does not do it and which screen does: Ficha — sample.item.upload",
             "  SAMPLE-F08 can: does it; check it on the screen or in the data — sample.item.delete (tool)",
+            "  SAMPLE-F09 cannot: says it does not do it and which screen does: Ajustes",
             "undecided, none of their operations is known: 1",
             "  SAMPLE-F05",
-            "contradictions, the assistant is named and no tool backs it: 1",
+            "contradictions, the assistant is named and no tool backs it, or no operation is said and one is cited: 1",
             "  SAMPLE-F04",
             "tools no flow cites: 1",
             "  sample.item.rebuild",
