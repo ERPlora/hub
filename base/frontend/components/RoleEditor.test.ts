@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { between } from '../__tests__/settings-form';
 import { click, flush, ionChecked, ionValue, mountBase } from '../__tests__/mount-base';
-import type { RoleDetail, RolePermission, RoleState } from '../operations/people';
+import type { HubRoleRow, RoleDetail, RolePermission, RoleState } from '../operations/people';
 import RoleEditor from './RoleEditor.vue';
 
 const KEY = '0199aaaa-0000-7000-8000-000000000001';
@@ -45,10 +45,17 @@ const withNews = (): RoleDetail =>
     apps: [...cashier().apps, { app: 'table', name: 'Mesas', permissions: [line('table.view', 'on', { to_review: true })] }],
   });
 
-const answerOf = (fields: Partial<RoleDetail> = {}) => {
-  const { apps: _apps, ...info } = cashier(fields);
-  return { ...info, permissions: 12 };
-};
+/** What the Hub answers to the save: the role as the list shows it. */
+const answerOf = (fields: Partial<HubRoleRow> = {}): HubRoleRow => ({
+  key: KEY,
+  label: 'Cajero',
+  description: 'La caja',
+  origin: 'own',
+  members: 2,
+  to_review: false,
+  permissions: 12,
+  ...fields,
+});
 
 async function open(role = cashier()) {
   return mountBase(RoleEditor, { locale: 'es', props: { role } });
