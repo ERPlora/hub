@@ -1,12 +1,14 @@
 // Picking a day or a time in the date and time fields of @erplora/ui (DateField, TimeField, and the two of a
-// DateTimeField) as a person does: a tap on the field opens Ionic's calendar or time wheel in a popover; the person
-// moves to the month, taps the day (or the hour, the minute and AM/PM) and presses Done, or Clear to empty a field
-// that is not required. The field then shows the value in the app's language.
+// DateTimeField) as a person does: a tap on the field opens Ionic's calendar or time wheel in the middle of the screen;
+// the person moves to the month and taps the day, or takes the hour, the minute and AM/PM and presses Done; Clear empties
+// a field that is not required. The field then shows the value in the app's language.
 import { expect, type Locator, type Page } from '@playwright/test';
+
+import { settled } from './helpers';
 
 /** Opens the picker of `field`: the ion-datetime of the popover it presents (Ionic hides the inline popovers that are
  *  not presented), once ready (before, the calendar does not move to another month). */
-async function openPicker(page: Page, field: Locator, presentation: 'date' | 'time'): Promise<Locator> {
+export async function openPicker(page: Page, field: Locator, presentation: 'date' | 'time'): Promise<Locator> {
   await field.click();
   const picker = page.locator(`ion-popover.ep-picker-field__popover--${presentation}:not(.overlay-hidden) ion-datetime`);
   await expect(picker).toHaveClass(/datetime-ready/);
@@ -37,9 +39,29 @@ export function timeAsShown(time: string): string {
   return new Intl.DateTimeFormat('en-US', options).format(Date.parse(`1970-01-01T${time}:00Z`));
 }
 
-/** Picks `day` (`YYYY-MM-DD`) in the DateField `field`. */
-export async function pickDay(page: Page, field: Locator, day: string): Promise<void> {
-  const picker = await openPicker(page, field, 'date');
+/** What the open `picker` does not show: the days of its month, its wheels and its buttons that are out of the screen, or
+ *  cut by the popover that holds them, once it stays where it opened. */
+export async function cutInPicker(picker: Locator): Promise<string[]> {
+  await settled(picker.page());
+  return picker.evaluate((host) => {
+    const frame = host.closest('ion-popover')!.shadowRoot!.querySelector('.popover-content')!.getBoundingClientRect();
+    const root = host.shadowRoot!;
+    const parts = [...root.querySelectorAll('.calendar-month:nth-child(2) .calendar-day[data-day], ion-picker, .datetime-buttons ion-button')];
+    const painted = parts.filter((part) => part.getClientRects().length > 0);
+    return [host, ...painted].flatMap((part) => {
+      const box = part.getBoundingClientRect();
+      const top = Math.max(frame.top, 0);
+      const bottom = Math.min(frame.bottom, window.innerHeight);
+      const left = Math.max(frame.left, 0);
+      const right = Math.min(frame.right, window.innerWidth);
+      const whole = box.top >= top - 1 && box.bottom <= bottom + 1 && box.left >= left - 1 && box.right <= right + 1;
+      return whole ? [] : [part.id || part.getAttribute('data-day') || part.localName];
+    });
+  });
+}
+
+/** `day` (`YYYY-MM-DD`) in the calendar `picker`, moved to its month. */
+export async function dayIn(picker: Locator, day: string): Promise<Locator> {
   const [year, month, date] = day.split('-').map(Number);
   const target = year * 12 + month;
   for (let moves = 0; moves < 24; moves++) {
@@ -52,8 +74,14 @@ export async function pickDay(page: Page, field: Locator, day: string): Promise<
       await expect.poll(() => shownMonth(picker), { timeout: 2_000 }).not.toBe(shown);
     }).toPass();
   }
-  await picker.locator('.calendar-month').nth(1).locator(`.calendar-day[data-day="${date}"][data-month="${month}"]`).click();
-  await confirm(picker);
+  return picker.locator('.calendar-month').nth(1).locator(`.calendar-day[data-day="${date}"][data-month="${month}"]`);
+}
+
+/** Picks `day` (`YYYY-MM-DD`) in the DateField `field`. */
+export async function pickDay(page: Page, field: Locator, day: string): Promise<void> {
+  const picker = await openPicker(page, field, 'date');
+  await (await dayIn(picker, day)).click();
+  await expect(picker).toBeHidden();
 }
 
 /** Taps the option of the wheel `column` that reads `text` until the wheel holds it: in its middle (`option-active`) and
