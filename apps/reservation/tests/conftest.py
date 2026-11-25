@@ -45,6 +45,9 @@ TODAY = dt.date(2026, 10, 14)
 TOMORROW = dt.date(2026, 10, 15)
 #: Thursday = 3 (Monday = 0).
 THURSDAY = 3
+#: Madrid's clocks go back an hour (03:00 summer time is 02:00 again) and forward (02:00 is 03:00).
+CLOCKS_BACK = dt.date(2026, 10, 25)
+CLOCKS_FORWARD = dt.date(2026, 3, 29)
 
 
 def ctx_for(

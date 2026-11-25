@@ -10,7 +10,8 @@ from live.outbox import record_event
 
 from apps.reservation import events
 from apps.reservation.models import BlockedDate
-from apps.reservation.queries import find_block, blocked_out
+from apps.reservation.queries.lookups import find_block
+from apps.reservation.queries.rows import blocked_out
 from apps.reservation.schemas.blocked_dates import BlockedDateIn, BlockedDateOut, BlockedDateRefIn
 from apps.reservation.schemas.fields import DeletedOut
 from apps.reservation.services.writes import _stamp

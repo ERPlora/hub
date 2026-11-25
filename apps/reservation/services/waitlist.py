@@ -11,7 +11,8 @@ from live.outbox import record_event
 
 from apps.reservation import engine, events
 from apps.reservation.models import Reservation, WaitlistEntry
-from apps.reservation.queries import entry_out, find_entry
+from apps.reservation.queries.lookups import find_entry
+from apps.reservation.queries.rows import entry_out
 from apps.reservation.schemas.fields import DeletedOut
 from apps.reservation.schemas.waitlist import (
     ConvertedOut,

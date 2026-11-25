@@ -809,7 +809,7 @@ la que solo se le autorizó reservar.
   descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
   por lista.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `engine.py` (la puerta del
-  alta sin base de datos), `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  alta sin base de datos), `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_table.py`, `tests/test_integration_customer.py`,
   `tests/test_integration_schedule.py` (las apps reales, sin dobles) y `tests/test_concurrency.py`
@@ -891,7 +891,7 @@ la que solo se le autorizó reservar.
   país `ES`; lo que no es número válido se queda como estaba).
 - **Hora del negocio**: la zona del hub (`base.business.business_zone`). El día y la hora se guardan de
   pared; «ahora» es la hora del negocio. Lo que dura cuenta tiempo real (`engine.Window.of` con la zona,
-  instantes en UTC; en `queries.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
+  instantes en UTC; en `queries/clock.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
   las mesas libres de F23, el motivo «La mesa 5 ya tiene una reserva de 21:00 a 23:00.» y el fin de cada
   reserva), la antelación mínima y la ventana de liberación de F13; y una hora pasada se juzga por el
   instante. La noche del cambio de hora el fin de pared se corre: 90 minutos desde las 01:37 del 25/10
@@ -907,7 +907,7 @@ la que solo se le autorizó reservar.
   `tests/test_assistant_asks.py`). Cada id que nombra un registro en una
   escritura lleva su marca `refers` (`names` de `base/schemas/assistant.py`; `base.E009` la comprueba al arrancar):
   los de Reservas, la lectura por id de su registro (`reservation.reservation.get`, `.waitlist.get`,
-  `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
+  `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries/rows.py`,
   `*_label`: día mediano y hora corta de CLDR, como dice la tarjeta una fecha); el cliente
   (`customer_id`, `on_behalf_of`), `customer.customer.detail` por su `name`; la mesa, `table.table.get`
   por su `label`, su número con su zona (`table_label` de Mesas, hub#550).

@@ -15,7 +15,7 @@ def test_the_settings_now_and_a_stay_are_on_the_businesss_clock(monkeypatch, in_
     pin_clock(monkeypatch, dt.datetime(2026, 11, 2, 9, 0, tzinfo=dt.UTC))
     monkeypatch.setattr(in_business_a, "timezone", CANARY)
     assert run("reservation.settings.get").timezone == CANARY
-    assert queries.business_now() == dt.datetime(2026, 11, 2, 9, 0)
-    assert queries.starts_at(dt.date(2026, 11, 2), dt.time(21, 30)) == dt.datetime(
+    assert queries.clock.business_now() == dt.datetime(2026, 11, 2, 9, 0)
+    assert queries.clock.starts_at(dt.date(2026, 11, 2), dt.time(21, 30)) == dt.datetime(
         2026, 11, 2, 21, 30, tzinfo=dt.UTC
     )

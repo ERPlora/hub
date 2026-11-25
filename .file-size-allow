@@ -35,7 +35,6 @@
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
-1023 apps/reservation/queries.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
 604 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
