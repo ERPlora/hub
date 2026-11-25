@@ -5,15 +5,29 @@
 // apps it changed go back as they were.
 import { expect, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, saveSessionForTheSweep, shown, turnOffTurnedOn, turnOnMissing } from './helpers';
+import {
+  A,
+  api,
+  capture,
+  horizontalOverflow,
+  login,
+  psql,
+  saveSessionForTheSweep,
+  scrolledTo,
+  shown,
+  turnOffTurnedOn,
+  turnOnMissing,
+} from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { addToTill, cleanSales, stamp } from './sale-helpers';
 
 const RUN = stamp();
+/** A low phone, a tablet upright and on its side, and a desk. */
 const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '1280', width: 1280, height: 800 },
-  { label: '1440', width: 1440, height: 900 },
+  { width: 375, height: 667 },
+  { width: 820, height: 1180 },
+  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
 ];
 
 interface Method {
@@ -88,9 +102,11 @@ test('TIP-F02: the Charge sheet proposes the tips of the payment method, and the
   await expect(sheet.locator('[data-testid=sale-checkout-added]')).toContainText(/\+ .*0[.,]50.* (tip|de propina)/);
   await expect(sheet.locator('[data-testid=sale-checkout-confirm]')).toContainText(/10[.,]50/);
   for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await expect(step).toBeInViewport({ ratio: 0.5 });
-    await capture(page, `tip-checkout-step-${size.label}`);
+    await page.setViewportSize(size);
+    await scrolledTo(step);
+    await expect(step).toBeInViewport();
+    expect(await horizontalOverflow(page), `${size.width}x${size.height}`).toBe(0);
+    await capture(page, `tip-checkout-step-${size.width}x${size.height}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -98,7 +114,7 @@ test('TIP-F02: the Charge sheet proposes the tips of the payment method, and the
   await step.locator('[data-testid=tip-step-custom]').click();
   await step.locator('[data-testid=tip-step-amount] input').fill('1,20');
   await expect(sheet.locator('[data-testid=sale-checkout-confirm]')).toContainText(/11[.,]20/);
-  await capture(page, 'tip-checkout-step-other-amount-1440');
+  await capture(page, 'tip-checkout-step-other-amount-1440x900');
 
   await sheet.locator('[data-testid=sale-checkout-confirm]').click();
   await expect(sheet).toBeHidden();
