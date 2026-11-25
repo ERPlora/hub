@@ -215,13 +215,8 @@ export interface DeletedOut {
   id: string;
 }
 
-export interface SaleOptionOut {
-  id: string;
-  product_id: string;
-  product_name: string;
-  sku: string;
-  price_delta: number;
-  /** Its dish's allergens, by their codes, in the regulation's order. */
+/** A choice the till can sell now, with its dish's allergens (codes, in the regulation's order). */
+export interface SaleOptionOut extends Pick<OptionOut, 'id' | 'product_id' | 'product_name' | 'sku' | 'price_delta'> {
   allergens: string[];
 }
 

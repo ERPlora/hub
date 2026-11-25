@@ -12,7 +12,7 @@
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
 618 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
 742 apps/cash_register/services.py ERPlora/erplora-next#74
-301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
+298 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
 542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
