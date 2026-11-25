@@ -11,7 +11,9 @@ from live.context import OperationContext
 from live.operations import get
 from pydantic import BaseModel, ValidationError
 
-from apps.schedule.schemas import BulkSpecialDayIn, IntervalIn, OverrideIn, SpecialDayIn
+from apps.schedule.schemas.intervals import IntervalIn
+from apps.schedule.schemas.overrides import OverrideIn
+from apps.schedule.schemas.special_days import BulkSpecialDayIn, SpecialDayIn
 from base.assistant import card_order
 from base.assistant.card_period import period
 
