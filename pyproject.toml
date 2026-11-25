@@ -165,7 +165,7 @@ ancestors = [
     "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy",
     "base.tenancy.migrator", "base.tenancy.move", "base.services", "base.queries", "base.schemas", "base.ws_print",
     "control", "control.models", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries",
-    "apps.*.schemas",
+    "apps.*.schemas", "apps.*.models",
 ]
 depth = 0
 ignore_imports = [

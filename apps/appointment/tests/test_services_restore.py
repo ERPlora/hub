@@ -17,7 +17,7 @@ from live.operations import get
 
 from apps.appointment.models import Appointment, Counter, History, Recurring
 from apps.customer.models import Customer
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.staff.models import Member
 
 from .conftest import A, HUB_DB, MONDAY, at, make_appointment, make_series, make_settings, run

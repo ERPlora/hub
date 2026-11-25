@@ -237,7 +237,7 @@ def make_service(
     tax=None,
     **fields,
 ):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     return Service.objects.create(
         name=name, price=price, duration_minutes=duration, tax_category=tax, **fields
@@ -254,7 +254,7 @@ def assign(
     service, member, *, duration: int | None = None, price: int | None = None, **fields
 ):
     """``member`` performs ``service`` (with their own minutes and price, if given)."""
-    from apps.service.models import Assignment
+    from apps.service.models.catalog import Assignment
 
     return Assignment.objects.create(
         service=service,
