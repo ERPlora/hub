@@ -582,9 +582,11 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py` (`ModifierGroup`, `ModifierOption`, `ModifierLink`),
-  `migrations/`, `schemas/`, `queries/` (con `selection.py`, la valoración, y `copy_columns.py`), `services/`,
-  `events.py`, `live.py`, `api.py`,
-  `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
+  `migrations/`, `schemas/`, `queries/` (con `selection.py`, la valoración, y `copy_columns.py`), `services/`
+  (un módulo por entidad, `recovery.py`, lo que vuelve de una copia aparte, `defaults.py`, las opciones por defecto, y
+  `writes.py`, lo que comparten), `events.py`, `live.py`, `api.py`,
+  `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero (`tests/test_services_<módulo>.py` en
+  `services/`; lo de `recovery.py`, en `tests/test_recovery*.py`), más
   `tests/test_integration_inventory.py`, `tests/test_integration_tax.py`, `tests/test_integration_sale.py`
   (F06 y F07 contra Ventas: descuento, repetido, a peso e IVA al céntimo) y
   `tests/test_integration_kitchen.py` (F08, Ventas → relay → Cocina) con las apps reales,
@@ -718,7 +720,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
   `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El `product` y la `category` de
-  `_Target` se leen por sus palabras como los busca `services._target`, con `as_said`: `A_PRODUCT_BY_NAME` con
+  `_Target` se leen por sus palabras como los busca `services.links._target`, con `as_said`: `A_PRODUCT_BY_NAME` con
   `inventory.product.get`, que busca entre los mismos productos vivos que `find_product` (sus `rows` solo dan la fila
   final por su id), y `A_CATEGORY_BY_NAME` con `modifier.category.get`, el mismo `find_category`. Se dejan sin leer
   junto a `product_id` o `category_id` y, al soltar, también junto al `id` del enganche (hub#1291;
