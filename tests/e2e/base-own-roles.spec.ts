@@ -30,7 +30,7 @@ const cutChoices = (form: Locator) =>
   form.locator('ion-segment').evaluateAll((strips) =>
     strips.flatMap((strip) => {
       const cut = [...strip.querySelectorAll('ion-label')].some((label) => label.scrollWidth > label.clientWidth);
-      return cut || strip.scrollWidth > strip.clientWidth ? [`${strip.getAttribute('data-testid')}: ${strip.scrollWidth} in ${strip.clientWidth}, ${[...strip.querySelectorAll('ion-segment-button')].map((b) => b.getBoundingClientRect().width.toFixed(1))}, ${[...strip.querySelectorAll('ion-label')].map((b) => b.scrollWidth)}`] : [];
+      return cut || strip.scrollWidth > strip.clientWidth ? [`${strip.getAttribute('data-testid')}: ${strip.scrollWidth} in ${strip.clientWidth}`] : [];
     }),
   );
 const isOn = (toggle: Locator) => toggle.evaluate((el) => (el as HTMLIonToggleElement).checked);
