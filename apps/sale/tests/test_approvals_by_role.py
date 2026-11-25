@@ -68,7 +68,7 @@ def test_a_refund_is_on_the_record_once_though_its_request_is_sent_again(till, c
     first, again = (post(till, "/sale/sales/refund", body) for _ in range(2))
 
     assert (first.status_code, again.status_code) == (200, 200), again.content
-    assert first.json()["id"] == again.json()["id"]
+    assert again.json()["already"] is True
     assert record() == [by_mario("sale.sale.refund")]
 
 

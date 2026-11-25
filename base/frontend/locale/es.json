@@ -1095,12 +1095,12 @@
       }
     },
     "approvals": {
-      "intro": "Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.",
+      "intro": "Cada acción que puede necesitar la autorización de un encargado: quién la hizo, quién la autorizó y con qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.",
       "search": "Buscar por persona o acción…",
-      "empty": "Todavía nadie ha tenido que autorizar nada en este negocio.",
+      "empty": "Todavía no hay ninguna acción de este tipo en este negocio.",
       "error": "No se pudo cargar el registro de aprobaciones.",
-      "used": "Usada",
-      "unused": "Sin usar",
+      "used": "Hecha",
+      "unused": "Sin hacer",
       "export": {
         "button": "Exportar CSV",
         "pending": "Exportando…",
@@ -1108,13 +1108,14 @@
       },
       "way": {
         "pin": "PIN",
-        "badge": "Placa"
+        "badge": "Placa",
+        "role": "Su rol"
       },
       "columns": {
         "at": "Cuándo",
         "action": "Acción",
         "approvedBy": "Autorizado por",
-        "requestedBy": "Lo pidió",
+        "requestedBy": "Quién",
         "way": "Con",
         "used": "Estado"
       }

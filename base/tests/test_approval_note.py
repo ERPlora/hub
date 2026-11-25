@@ -18,7 +18,7 @@ from base.api_keys import KeyCaller
 from base.models import Membership
 from base.models.access import AccessSettings
 from base.models.approvals import Approval
-from base.permissions import ADMINISTER_HUB, access_for
+from base.permissions import ADMINISTER_HUB, VIEW_HOME, access_for
 from base.roles import APPROVAL, OFF, ON
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HUB_DB, in_business_a
@@ -49,6 +49,7 @@ __all__ = ["adam", "approvable", "eva", "in_business_a", "mario"]
 pytestmark = HUB_DB
 
 ADD_LINE = "demo.item.add_line"
+MAY = frozenset({ADMINISTER_HUB, VIEW_HOME})
 
 
 def changed() -> bool:
@@ -163,7 +164,7 @@ class TestWhatIsNotDone:
 
     def test_an_action_that_changed_nothing_leaves_nothing(self, client, adam, monkeypatch):
         """The answer given again to a request repeated with its key, or an edit that edits nothing: no event."""
-        monkeypatch.setattr(get_operation(APPROVABLE), "fn", lambda ctx, data: CHANGE)
+        monkeypatch.setattr(get_operation(APPROVABLE), "fn", lambda ctx, data: {**CHANGE, "can_change": True})
         client.force_login(adam)
 
         assert post(client, SETTINGS, CHANGE).status_code == 200
@@ -226,13 +227,13 @@ class TestWhoActs:
 
     def test_an_automation_leaves_nothing(self):
         """It keeps its own runs; the permission is the one it was granted, not somebody's."""
-        run(OperationContext(scope=A, actor="flow_run:0190a1b2", permissions=frozenset({ADMINISTER_HUB})))
+        run(OperationContext(scope=A, actor="flow_run:0190a1b2", permissions=MAY))
 
         assert changed()
         assert not Approval.objects.exists()
 
     def test_an_api_key_leaves_its_name(self):
-        key = KeyCaller(key_id="k1", name="Shop", prefix="erpk_live_x", permissions=frozenset({ADMINISTER_HUB}), owner="saas:1")
+        key = KeyCaller(key_id="k1", name="Shop", prefix="erpk_live_x", permissions=MAY, owner="saas:1")
 
         run(OperationContext(scope=A, actor=key, permissions=key.permissions))
 
@@ -243,7 +244,7 @@ class TestWhoActs:
         mario = make_user("saas:4", host=A.key, role=Membership.Role.MANAGER, first_name="Mario")
         item = get_operation("demo.item.create")
         created = item(asking(mario), item.input.model_validate({"name": "Mesa 4"}))
-        call = card_turn.call(ADD_LINE, {"item_id": str(created.id), "text": "Coffee", "qty": 2})
+        call = card_turn.call(ADD_LINE, {"id": str(created.id), "text": "Coffee", "qty": 2})
 
         drawn = card_turn.turn(asking(mario), call, said="add 2 coffees")
         assert not Approval.objects.exists()
@@ -252,7 +253,7 @@ class TestWhoActs:
 
         row = Approval.objects.get()
         assert (row.operation, row.requested_by_name, row.way) == (ADD_LINE, "Mario", "role")
-        assert row.figures == {"qty": 2, "text": "Coffee"}
+        assert row.figures == {"qty": "2", "text": "Coffee"}
 
     def test_a_business_never_reads_what_was_done_in_another(self, client, hub_b):
         bea = get_user_model().objects.create(username="saas:21", first_name="Bea")

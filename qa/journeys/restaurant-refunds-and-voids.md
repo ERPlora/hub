@@ -1,7 +1,7 @@
 ---
 title: Anular y devolver una venta cobrada
 vertical: restaurant
-roles: responsable, empleado
+roles: propietario, responsable, empleado
 ---
 
 Para qué: deshacer un cobro equivocado y devolver parte de una cuenta, con su reflejo en la caja, las facturas y VeriFactu.
@@ -26,3 +26,5 @@ Para qué: deshacer un cobro equivocado y devolver parte de una cuenta, con su r
 10. CASH_REGISTER-F15 — la devolución, en la caja.
 11. INVOICE-F16, INVOICE-F17 — el tique y su rectificativa, en Facturas.
 12. VERIFACTU-F16 — los registros de la venta, la anulación y la devolución.
+13. BASE-F85 — el propietario lee lo que aprobó el PIN del responsable y, por su rol, la tarta que devolvió él mismo; lo
+    filtra y lo exporta.

@@ -1599,6 +1599,10 @@ msgctxt "approval"
 msgid "figures"
 msgstr "cifras"
 
+msgctxt "approval"
+msgid "Their role"
+msgstr "Su rol"
+
 #: models.py:499
 msgctxt "approval"
 msgid "approval"
@@ -1647,8 +1651,8 @@ msgstr "Autorizado por"
 
 #: queries.py
 msgctxt "approvals export"
-msgid "Asked by"
-msgstr "Lo pidió"
+msgid "Who"
+msgstr "Quién"
 
 #: queries.py
 msgctxt "approvals export"
@@ -1662,13 +1666,13 @@ msgstr "Estado"
 
 #: queries.py
 msgctxt "approvals export"
-msgid "Used"
-msgstr "Usada"
+msgid "Done"
+msgstr "Hecha"
 
 #: queries.py
 msgctxt "approvals export"
-msgid "Not used"
-msgstr "Sin usar"
+msgid "Not done"
+msgstr "Sin hacer"
 
 #: queries.py:1408
 msgid "The API documentation is hidden in this business."
