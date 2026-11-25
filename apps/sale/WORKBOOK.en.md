@@ -1380,7 +1380,7 @@ turned off, the POS goes back to accepting every active method.
 Involved: none
 
 ### SALE-F35 Add and order the open-price sections
-<!-- from WORKBOOK.md sha256:b52128dd72f8 -->
+<!-- from WORKBOOK.md sha256:6d1c451fbcf9 -->
 Status: done
 Vertical: common
 Actor: manager
@@ -1397,7 +1397,8 @@ charged with.
 If it fails: a VAT category that does not exist is refused next to its field. A field's reason goes away
 as soon as that field is corrected ("VAT charged", by choosing another category). A section someone else
 already deleted: "That section is no longer in this business. Reload the list and try again.".
-Through the assistant: its confirmation card says the section by its name, never by an id; one that is no longer there stays off the card (BASE-F97).
+Through the assistant: its confirmation card says the section by its name, never by an id (one that is no longer there
+stays off the card), and the VAT it charges with today's rate, as the list does ("Product — generic · 21%") (BASE-F97).
 Involved: TAX-F01, BASE-F97
 
 ### SALE-F36 Prepare the quick notes

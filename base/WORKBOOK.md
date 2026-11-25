@@ -2803,7 +2803,7 @@ Pasos:
      fecha o unos registros por su nombre); cada dato detrás, y una cifra, un importe o un sí o un no en primer lugar,
      lleva delante el nombre de su dato, el mismo que en su pantalla, porque suelto no dice qué es: «Cambiar en
      Servicios: Mechas · Precio mínimo: 65,00 €», nunca «Mechas · 65,00 €», que se lee igual que su precio; «Crear en
-     Ventas / TPV: Varios · Categoría fiscal: Producto — general · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
+     Ventas / TPV: Varios · Categoría fiscal: Producto — general · 21 % · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
      3». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
@@ -2828,8 +2828,8 @@ Pasos:
      Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
      y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
      como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
-     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una y por su nombre
-     («Categoría fiscal: Restauración — comida»);
+     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una, por su nombre y su tipo
+     de hoy («Categoría fiscal: Restauración — comida · 10 %»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
@@ -2853,7 +2853,10 @@ Pasos:
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno),
      también el de un dato que su app no llama como el campo que lo nombra («Rectificativa: resto de causas (R4)», no «R4»); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     no lo pone, nunca por su código. Una categoría fiscal lleva además el tipo que cobra hoy en el país y la región
+     del negocio, como la pantalla **Secciones** («Categoría fiscal: Producto — general · 21 %»); sin una regla en
+     vigor, solo su nombre, y también solo su nombre en una regla de Impuestos, que lleva su propio país y su propio
+     tipo. Un registro que se dijo con palabras se busca como lo buscará la acción, también
      dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
      «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron; y si la acción no las usa
      porque llega el identificador de su registro, ni se leen ni salen. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
@@ -2896,7 +2899,7 @@ asistente oye que no hay nada que cambiar y sigue con lo que se le pidió, con l
 quiere cambiar; si el registro no está, oye eso. «Ejecutar» vale solo
 para lo que enseña la tarjeta: si antes de pulsarlo cambia —la acción encuentra por su nombre otro registro, porque
 alguien ha creado uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4»), el registro cambia de
-nombre o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
+nombre, el tipo de su categoría fiscal cambia o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
 confirmarla otra vez; si lo que encontró ya no está, no sale tarjeta y el asistente lo cuenta como su error.
 «Cancelar» y lo escrito que no coincide valen igual aunque haya cambiado. Si se recarga la página con la tarjeta
 abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
