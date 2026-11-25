@@ -108,6 +108,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
         "operation_date": date_format(invoice.operation_date, "SHORT_DATE_FORMAT")
         if invoice.operation_date != invoice.issue_date
         else "",
+        "due_date": date_format(invoice.due_date, "SHORT_DATE_FORMAT") if invoice.due_date else "",
         # RD 1619/2012 art. 6.1.f: the unit price without VAT and the discount apart, the amount its base.
         "discounted": discounted,
         "lines": [

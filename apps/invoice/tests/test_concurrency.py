@@ -6,6 +6,8 @@ the same invoice at once are one rectification, and the other is refused without
 (the current product's open question 12, closed here with its test).
 """
 
+import datetime as dt
+
 import pytest
 from django.db import connections
 from django.utils import timezone
@@ -15,6 +17,7 @@ from apps.customer.models import Customer
 from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
 from apps.invoice.tests.conftest import HUB_DB_COMMITTED, ISSUER, deliver, run
+from apps.invoice.tests.manual import manual
 from apps.sale.models import Sale
 from base.tenancy.tests import hubs
 from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile
@@ -22,33 +25,9 @@ from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile
 #: Several sessions of business A at once, each committing: its plan has room for them all.
 pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
-RECIPIENT = {
-    "customer_name": "Talleres Pérez SL",
-    "customer_tax_id": "B12345674",
-    "customer_address": "Calle Luna 3",
-}
-
-
 @pytest.fixture(autouse=True)
 def issuer_set_up(factory_data):
     run("invoice.issuer.update", ISSUER)
-
-
-def manual():
-    return run(
-        "invoice.invoice.create",
-        {
-            "lines": [
-                {
-                    "description": "Course",
-                    "quantity": "1",
-                    "unit_price": 1000,
-                    "tax_rate": "21",
-                }
-            ],
-            **RECIPIENT,
-        },
-    )
 
 
 def outcome(result) -> str:
@@ -67,6 +46,18 @@ def test_six_documents_at_once_take_six_numbers_in_a_row_without_a_hole(today):
         f"FACT-{today.year}-{n:06d}" for n in range(1, 7)
     ]
     assert InvoiceSeries.objects.get(code="FACT", year=today.year).current_number == 6
+
+
+def test_a_day_before_an_invoice_being_issued_meanwhile_is_refused_and_spends_no_number(at):
+    # The last invoice of a series is read with the series locked: one that is being issued counts. The series is there
+    # from before, so what the second one waits for is that lock, not the series' birth.
+    at(("Europe/Madrid", dt.datetime(2026, 11, 24, 11, 0, tzinfo=dt.UTC)))
+    manual(issue_date="2026-11-22")
+    with meanwhile(writes("invoice_invoice"), lambda: manual(issue_date="2026-11-23")) as outcomes:
+        manual()
+    assert [outcome(result) for result in outcomes] == ["invoice.issue_date_before_last"]
+    assert sorted(str(day) for day in Invoice.objects.values_list("issue_date", flat=True)) == ["2026-11-22", "2026-11-24"]
+    assert fact_numbers() == 2
 
 
 def charged_without_document(charge, key: str):

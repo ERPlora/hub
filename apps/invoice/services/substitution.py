@@ -98,6 +98,7 @@ def substitute(ctx: OperationContext, data: SubstituteIn) -> dict:
         recipient=recipient,
         issuer=_issuer_of(ticket),
         operation_date=ticket.operation_date,
+        due_date=ticket.due_date,
         source_type=Invoice.Source.SUBSTITUTION,
         source_sale=ticket.source_sale,
         substitutes=ticket,

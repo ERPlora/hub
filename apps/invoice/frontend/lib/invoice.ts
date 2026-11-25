@@ -4,20 +4,27 @@
 // reader's language from what it rectifies and why (the server keeps no sentence).
 import type { StatusPillTone } from '@erplora/ui/components';
 
-import type { BreakdownOut, InvoiceOut, InvoiceSource, InvoiceStatus, InvoiceType } from '../operations';
+import type { InvoiceStatusFilter } from '../invoice-dates';
+import type { BreakdownOut, InvoiceOut, InvoiceSource, InvoiceType } from '../operations';
 import { formatPercent } from './format';
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 
 export const TYPE_CODES: readonly InvoiceType[] = ['F1', 'F2', 'F3', 'R1', 'R2', 'R3', 'R4', 'R5'];
-export const STATUS_CODES: readonly InvoiceStatus[] = ['issued', 'paid', 'cancelled'];
+/** What the list filters by: the statuses an invoice keeps, and the overdue ones. */
+export const STATUS_FILTERS: readonly InvoiceStatusFilter[] = ['issued', 'overdue', 'paid', 'cancelled'];
 export const SOURCE_CODES: readonly InvoiceSource[] = ['sale', 'manual', 'substitution', 'rectification', 'refund', 'void'];
 
-const TONES: Record<InvoiceStatus, StatusPillTone> = { issued: 'info', paid: 'success', cancelled: 'danger' };
+const TONES: Record<InvoiceStatusFilter, StatusPillTone> = { issued: 'info', overdue: 'warning', paid: 'success', cancelled: 'danger' };
 
-/** The colour of a status: issued in progress, paid done, cancelled blocked. */
-export function statusTone(status: InvoiceStatus): StatusPillTone {
+/** The colour of a status: issued in progress, overdue needs attention, paid done, cancelled blocked. */
+export function statusTone(status: InvoiceStatusFilter): StatusPillTone {
   return TONES[status] ?? 'neutral';
+}
+
+/** The status a person reads: an overdue invoice says so instead of issued. */
+export function shownStatus(invoice: Pick<InvoiceOut, 'status' | 'overdue'>): InvoiceStatusFilter {
+  return invoice.overdue ? 'overdue' : invoice.status;
 }
 
 /** A ticket (F2) or its rectification (R5): it identifies no customer. */
