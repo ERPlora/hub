@@ -622,7 +622,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   nombre y por `id` en la dirección de la lista: en descendente es la ascendente leída al revés, empates
   incluidos (`base.ordering`). El catálogo entero de opciones por
   `sort_order` va antes por el orden y el nombre de sus grupos, en los dos sentidos. Lo fijan los
-  `test_tied_*` de `tests/test_queries.py`, con las filas creadas fuera de orden.
+  `test_tied_*` de `tests/test_queries_groups.py` y `tests/test_queries_options.py`, con las filas creadas fuera de orden.
 - **Dinero**: céntimos enteros con signo, entre −99.999.999 y 99.999.999. Una opción con categoría
   fiscal propia tiene que valer más de cero (422 en `price_delta`): su línea propia no puede valer cero
   ni menos. Lo comprueba la operación antes y la base de datos después
@@ -646,26 +646,26 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
 - **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara tres cosas, «Modifier
   groups», «Modifier groups of categories» y después «Modifier groups of products», cada una contada aparte.
-  `queries.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y los alérgenos de cada
+  `queries.recovery.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y los alérgenos de cada
   opción solo si la copia tiene la columna (`queries/copy_columns.py`, `LATER_OPTION_FIELDS`, igual que
-  `queries.options_in_copy`): una copia anterior devuelve sus opciones sin ellos y `reads_since` no sube; y
-  `queries.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
+  `queries.recovery.options_in_copy`): una copia anterior devuelve sus opciones sin ellos y `reads_since` no sube; y
+  `queries.recovery.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
   nombre es único, `modifier_group_name_unique`), cada opción con la clave de su categoría fiscal propia (Impuestos nunca
   borra una). Los crea `modifier.group.recover` (permiso `modifier.system`, sin ruta ni herramienta del asistente):
   `create_group` y después `create_option` por cada opción, en una sola transacción; la opción que su alta rechaza
   (`InvalidPayload` o `Conflict`) se devuelve en `left_out` con su código y `OPTION_LEFT`, y el grupo vuelve sin ella.
-  Las dos lecturas de enganches llevan además los grupos de la copia por su nombre (`queries.group_names_in_copy`,
+  Las dos lecturas de enganches llevan además los grupos de la copia por su nombre (`queries.recovery.group_names_in_copy`,
   `copy_groups`), y `_not_hung` pone cada enganche en el grupo que hace del de la copia
-  (`queries.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
+  (`queries.recovery.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
   recuperación, `base.recovery.brought_back`, y que no es ninguno de la copia; uno hecho a mano no hace de ninguno).
-  `queries.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
+  `queries.recovery.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
   las categorías vivas de la copia por su nombre (`apps.inventory.queries.recovery.category_names_in_copy`), y
-  `queries.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
+  `queries.recovery.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
   (`apps.inventory.queries.recovery.categories_standing_for`, la misma pareja que los enlaces de productos a categorías de
   Inventario: la misma mientras vive; si no, la viva con su nombre que trajo una recuperación; una hecha a mano no
-  recibe nada). `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
+  recibe nada). `queries.recovery.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
   producto no borrado allí, con el SKU del producto allí, y
-  `queries.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
+  `queries.recovery.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
   (`apps.inventory.queries.recovery.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
   con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe nada) y deja
   los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; grupo y
