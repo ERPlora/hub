@@ -89,6 +89,13 @@ describe('AppBlockedPage', () => {
     expect(m.wrapper.find('[data-testid="app-blocked-subscription"]').text()).toContain('erplora.com');
   });
 
+  it('where the Store’s address does not come (ERPlora’s own business buys nothing) the owner gets no link', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.app.list', { ...LIST, store_url: '', plan_url: '' });
+    expect(m.wrapper.find('[data-testid="app-blocked-subscription"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="app-blocked-buy"]').exists()).toBe(false);
+  });
+
   it('bought meanwhile: it offers to open the app with a full load (the session comes up to date)', async () => {
     const m = await open();
     await m.result(m.call, 'base.app.list', LIST);

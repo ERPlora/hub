@@ -87,6 +87,7 @@ class PlanUsageOut(Schema):
     known: bool
     #: A demo: nothing of it is measured, and its data is deleted when it ends.
     demo: bool
+    platform: bool = Field(description="ERPlora's own business: it has no plan and never will, so nothing to upgrade.")
     plan_slug: str | None = Field(description="The plan the business is on (free, starter…); None: not known.")
     people: LimitOut
     devices: LimitOut

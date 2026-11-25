@@ -9,7 +9,7 @@ const GB = 1024 ** 3;
 
 const USAGE: PlanUsage = {
   known: true,
-  demo: false,
+  demo: false, platform: false,
   plan_slug: 'starter',
   people: { used: 1, limit: 5 },
   devices: { used: 1, limit: 3 },
