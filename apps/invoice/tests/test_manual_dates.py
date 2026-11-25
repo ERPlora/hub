@@ -6,36 +6,20 @@ import datetime as dt
 import re
 
 import pytest
-from live.errors import Conflict
 from pydantic import ValidationError
 
-from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import HUB_DB, ctx_for, fields, run
-from apps.invoice.tests.manual import LINE, RECIPIENT, manual
+from apps.invoice.models import Invoice
+from apps.invoice.tests.conftest import HUB_DB, fields, run
+from apps.invoice.tests.manual import LINE, NOON, RECIPIENT, manual, page, refused, stored
 from apps.verifactu.models import Record
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("issuer", "nothing_leaves")]
 
 YESTERDAY, TODAY, TOMORROW = dt.date(2026, 11, 23), dt.date(2026, 11, 24), dt.date(2026, 11, 25)
-NOON = ("Europe/Madrid", dt.datetime(2026, 11, 24, 11, 0, tzinfo=dt.UTC))
 #: 2 January 2027, the first days a business still invoices the year that ended.
 NEW_YEAR = ("Europe/Madrid", dt.datetime(2027, 1, 2, 11, 0, tzinfo=dt.UTC))
 #: 23:30 of 2 November in Bogotá; 05:30 of the 3rd in Madrid.
 BOGOTA_NIGHT = ("America/Bogota", dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC))
-
-
-def stored(answer) -> Invoice:
-    return Invoice.objects.get(pk=answer.id)
-
-
-def refused(**data) -> Conflict:
-    """The refusal of a manual invoice with ``data``: nothing is issued and no number is spent."""
-    before = (Invoice.objects.count(), sum(InvoiceSeries.objects.values_list("current_number", flat=True)))
-    with pytest.raises(Conflict) as error:
-        manual(**data)
-    after = (Invoice.objects.count(), sum(InvoiceSeries.objects.values_list("current_number", flat=True)))
-    assert after == before
-    return error.value
 
 
 # The day it is dated
@@ -216,9 +200,6 @@ def test_the_full_invoice_that_replaces_a_ticket_keeps_its_due_date(at):
 def test_the_printed_document_says_when_it_falls_due_only_if_it_does(at, language, label, day):
     at(NOON)
 
-    def page(answer) -> str:
-        return run("invoice.invoice.document", {"invoice_id": str(answer.id)}, ctx_for(language=language)).html
-
-    html = page(manual(due_date="2026-12-24"))
+    html = page(manual(due_date="2026-12-24"), language)
     assert f'<span class="k">{label}</span><span class="v">{day}</span>' in html
-    assert label not in page(manual())
+    assert label not in page(manual(), language)

@@ -12,6 +12,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict
 
 from apps.invoice.schemas.fields import A_REFUND, A_SALE, NEXT_NUMBER, SALE, InvoiceRefIn, InvoiceTypeCode, _text
+from apps.invoice.schemas.invoices import WithholdingOut
 
 RectificationType = Literal["R1", "R2", "R3", "R4"]
 
@@ -83,7 +84,7 @@ class PreviewLineOut(Schema):
     total_amount: int = Field(description="Its total with tax, in cents (negative).", json_schema_extra={"money": True})
 
 
-class RectificationPreviewOut(Schema):
+class RectificationPreviewOut(WithholdingOut):
     """The rectifying invoice that rectifying would issue now, before it is issued: nothing is written.
     ``invoice.invoice.rectify`` shows its type, next number and amounts on the card the assistant asks to confirm it
     with: their titles are the names the Invoicing screens give them, its type a closed list said by its name, and an
