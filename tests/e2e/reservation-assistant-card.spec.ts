@@ -138,7 +138,7 @@ for (const language of ['es', 'en'] as const) {
     await openPanelAtTheDesk(page);
 
     // A normal write paints its first three data in one line (BASE-F97): booking carries its table as its fifth datum,
-    // a change says its reservation and, right after it, the new table.
+    // a change says its reservation and, right after it, the new table by its name.
     const booking = await datumOf(
       page,
       'reservation__reservation__create',
@@ -157,7 +157,7 @@ for (const language of ['es', 'en'] as const) {
     expect([change.label, change.value]).toEqual([TABLE[language], terrace.label]);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await expect(card(page)).toContainText(`${books.reservation.label} · ${terrace.label}`);
+      await expect(card(page)).toContainText(`${books.reservation.label} · ${TABLE[language]}: ${terrace.label}`);
       await expect(card(page)).not.toContainText(room.label);
       await capture(page, `hub-550-update-table-${language}-${vp.label}`);
     }

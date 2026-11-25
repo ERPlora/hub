@@ -9,7 +9,7 @@ from apps.appointment import engine
 from apps.appointment.schemas import CheckIn, CheckOut, SlotsIn, SlotsOut
 from apps.service.models import Service
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 from base.business import business_zone, zone_name
 
 from .agenda import conflicts_of, load_agenda, verdict_message

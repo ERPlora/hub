@@ -5,7 +5,7 @@ from uuid import UUID
 
 from live.context import OperationContext
 
-from apps.staff.queries import own_member
+from apps.staff.queries.reads import own_member
 
 from .ownership import is_own
 

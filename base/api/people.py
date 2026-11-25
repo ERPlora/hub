@@ -8,7 +8,7 @@ from base import queries, services
 from base.schemas.api_keys import ApiDocSettingsUpdateIn, ApiKeyCreateIn, ApiKeyIdIn
 from base.schemas.approvals import ApprovalExportIn, ApprovalIn, ApproversIn
 from base.schemas.people import BadgeSetIn, PersonIn
-from base.schemas.roles import RoleDetailIn
+from base.schemas.roles import RoleAssignIn, RoleCreateIn, RoleIn, RoleUpdateIn
 
 router = Router()
 
@@ -43,12 +43,32 @@ async def person_badge_remove(request, data: PersonIn):
 
 @bind(router, "base.role.list", "/roles")
 async def role_list(request):
-    return await run_operation(request, queries.people.role_list)
+    return await run_operation(request, queries.roles.role_list)
 
 
 @bind(router, "base.role.detail", "/roles/detail")
-async def role_detail(request, data: Query[RoleDetailIn]):
+async def role_detail(request, data: Query[RoleIn]):
     return await run_operation(request, queries.roles.role_detail, data)
+
+
+@bind(router, "base.role.create", "/roles")
+async def role_create(request, data: RoleCreateIn):
+    return await run_operation(request, services.roles.role_create, data)
+
+
+@bind(router, "base.role.update", "/roles/update")
+async def role_update(request, data: RoleUpdateIn):
+    return await run_operation(request, services.roles.role_update, data)
+
+
+@bind(router, "base.role.delete", "/roles/delete")
+async def role_delete(request, data: RoleIn):
+    return await run_operation(request, services.roles.role_delete, data)
+
+
+@bind(router, "base.role.assign", "/roles/assign")
+async def role_assign(request, data: RoleAssignIn):
+    return await run_operation(request, services.roles.role_assign, data)
 
 
 # ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────

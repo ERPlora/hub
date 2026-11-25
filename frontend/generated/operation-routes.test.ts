@@ -317,9 +317,10 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(19);
   });
 
-  it('binds the twenty-five routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
+  it('binds the twenty-six routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'invoice.invoice.list': { method: 'get', path: '/api/invoice/invoices' },
+      'invoice.invoice.export': { method: 'get', path: '/api/invoice/invoices/export' },
       'invoice.invoice.get': { method: 'get', path: '/api/invoice/invoices/detail' },
       'invoice.invoice.by_source': { method: 'get', path: '/api/invoice/invoices/by_source' },
       'invoice.invoice.document': { method: 'get', path: '/api/invoice/invoices/document' },
@@ -345,7 +346,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
       'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(25);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(26);
   });
 
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {

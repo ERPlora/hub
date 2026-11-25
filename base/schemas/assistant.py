@@ -45,9 +45,9 @@ def unless_given(mark: dict, *data: str) -> dict:
 #: the name of a file the person attached, and the turn gives the operation that file.
 AN_ATTACHED_FILE: dict = {"attached_file": True}
 
-#: The mark of the datum of a read's output that holds a whole file for the person (a CSV export), beside its
-#: ``filename`` and ``content_type`` (base/assistant/handed_files.py): in the chat, the panel offers it to download and
-#: the model hears its name.
+#: The mark of the datum of a read's output that holds a whole file for the person (a CSV export as it is, or a file of
+#: another type in base64), beside its ``filename`` and ``content_type`` (base/assistant/handed_files.py): in the chat,
+#: the panel offers it to download and the model hears its name.
 A_HANDED_FILE: dict = {"handed_file": True}
 
 
@@ -118,7 +118,9 @@ class AssistantTurnIn(Schema):
 class AssistantHandedFileOut(Schema):
     filename: str
     content_type: str
-    content: str = Field(description="The whole file, as its screen's button saves it.")
+    content: str = Field(
+        description="The whole file, as its screen's button saves it: a text as it is, any other type in base64."
+    )
 
 
 class AssistantExecutedOut(Schema):

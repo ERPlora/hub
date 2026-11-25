@@ -16,7 +16,7 @@ from apps.service.services.assignments import assign, update_assignment
 from apps.service.services.catalog import create_service
 from apps.service.services.service_images import _change_image
 from apps.staff.models import Member
-from apps.staff.queries import live_members
+from apps.staff.queries.reads import live_members
 from base import images
 from base.recovery import LeftOut
 

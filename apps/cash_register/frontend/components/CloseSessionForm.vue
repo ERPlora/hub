@@ -10,7 +10,8 @@
 // (`MoneyInput`), read with its `parseMoney` as every amount of the Hub (hub#1160). With something pending the
 // first press warns, the second closes («Close anyway»): it warns, it never prevents. «Close session» waits in grey
 // until the business has answered its money, in which the count is written and read (hub#921), and says so with
-// «Retry» if that read fails (hub#938). Success says the three figures and tells the window.
+// «Retry» if that read fails (hub#938). Success says the three figures and tells the window. What another app records
+// (tips, CASH_REGISTER-F18) is said before the expected, in the lines the detail names it with.
 import { InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -22,6 +23,8 @@ import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
+import { appLineItems } from '../lib/summary';
+import FigureList from './FigureList.vue';
 import ShiftReview from './ShiftReview.vue';
 
 const props = defineProps<{ session: { id: string; number: string } }>();
@@ -72,6 +75,11 @@ const expected = computed(() => detail.data.value?.summary.expected_cash ?? null
 /** What is typed, read in the business's money; nothing until it has answered. */
 const read = computed(() => (business.value ? parseMoney(counted.value, { money: business.value }) : null));
 const difference = computed(() => (expected.value !== null && read.value?.ok && read.value.cents !== null ? read.value.cents - expected.value : null));
+const appLines = computed(() => appLineItems(detail.data.value?.summary.app_lines, locale.value, business.value));
+const figures = computed(() => [
+  { key: 'expected', label: t('cash_register.close.expected'), value: formatMoney(expected.value, locale.value, business.value) },
+  { key: 'difference', label: t('cash_register.close.difference'), value: formatSignedMoney(difference.value, locale.value, business.value) },
+]);
 
 /** A reading of the review: answered, refused (the review is incomplete), off in this hub (nothing pending)
  *  or still on its way. */
@@ -152,20 +160,16 @@ defineExpose({ confirm, canDismiss });
       v-bind="review"
       :acknowledged="acknowledged"
     />
-    <dl
+    <FigureList
+      v-if="appLines.length"
+      :items="appLines"
+      testid="cash-register-close-app-lines"
+    />
+    <FigureList
       v-if="expected !== null"
-      class="cash-close__figures"
-      data-testid="cash-register-close-expected"
-    >
-      <div>
-        <dt>{{ $t('cash_register.close.expected') }}</dt>
-        <dd>{{ formatMoney(expected, locale, business) }}</dd>
-      </div>
-      <div>
-        <dt>{{ $t('cash_register.close.difference') }}</dt>
-        <dd>{{ formatSignedMoney(difference, locale, business) }}</dd>
-      </div>
-    </dl>
+      :items="figures"
+      testid="cash-register-close-expected"
+    />
     <MoneyInput
       :model-value="counted"
       testid="cash-register-close-counted"
@@ -224,20 +228,6 @@ defineExpose({ confirm, canDismiss });
 .cash-close {
   display: grid;
   gap: 0.85rem;
-}
-.cash-close__figures {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem 1rem;
-  margin: 0;
-}
-.cash-close__figures dt {
-  font-size: 0.8rem;
-  color: var(--ion-color-medium-shade, #5f5f5f);
-}
-.cash-close__figures dd {
-  margin: 0;
-  font-weight: 600;
 }
 .cash-close__actions {
   display: flex;

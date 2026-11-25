@@ -19,7 +19,7 @@ from apps.appointment.schemas import (
     DeletedOut,
 )
 from apps.appointment.services.writes import _actor
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 from base.business import business_zone
 
 MANAGE_SCHEDULE = "appointment.manage_schedule"

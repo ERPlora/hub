@@ -29,9 +29,11 @@ peluquería: no hay nada propio de un vertical.
 
 - El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, emite una
   factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
-- El **responsable**, además, ve las facturas de todos, rectifica y lleva las series de numeración.
+- El **responsable**, además, ve las facturas de todos, las descarga en Excel, rectifica y lleva las series de
+  numeración.
 - El **propietario** y el **administrador**, además, configuran el **emisor** (la identidad fiscal del
   negocio que sale en cada factura).
+- La **gestoría** ve y descarga en Excel las facturas de todos, sin emitir ni cambiar nada.
 - El **sistema**, sin nadie delante, factura cada cobro y rectifica cada devolución y cada anulación.
 
 No cobra ni devuelve dinero (eso es Ventas), no envía nada a la AEAT ni calcula la huella (eso es
@@ -106,7 +108,8 @@ propietario y el administrador ven las de todos.
 #### Detalle
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
-columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
+columna se ordena. «Descargar en Excel», para quien ve las facturas de todos, guarda la lista tal como está filtrada (INVOICE-F24).
+Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
 último emitido sale arriba. Mientras el emisor no está configurado, lo dice una sola vez el aviso «Todavía no puedes
 facturar» de la campana («No se podrá emitir ningún tique ni factura hasta que configures esto: Los datos de tu
@@ -256,6 +259,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
 | INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
+| INVOICE-F24 | Descargar en Excel las facturas emitidas | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 Estado: hecho — Ventas lo pide dentro del mismo cobro
@@ -684,7 +688,7 @@ en cualquier campo de importe del Hub y como en las demás listas («1.000,50»,
 («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con
 «1.000» en euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial,
 «La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
-Implicados: ninguno
+Implicados: INVOICE-F24
 
 ### INVOICE-F17 Ver una factura
 Estado: hecho
@@ -839,6 +843,29 @@ entera; en producción con el envío real a la AEAT cerrado, «no listo»: «El 
 este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra.
 Implicados: VERIFACTU-F13
 
+### INVOICE-F24 Descargar en Excel las facturas emitidas
+Estado: hecho
+Actor: propietario, administrador, responsable, gestoría, asistente
+Pantalla: Facturas
+Pasos:
+1. En **Facturación → Facturas**, filtra la lista por lo que quieras: normalmente la fecha, entre el primer y el último
+   día del mes o del trimestre; también vale por estado, tipo, serie, origen, total o una búsqueda.
+2. Pulsa «Descargar en Excel».
+3. Se descarga un fichero de Excel, por ejemplo «facturas-2026-10.xlsx», con las facturas que la lista deja (todas,
+   no solo las de la página), de la más antigua a la más nueva. Una fila por factura y tipo de impuesto: «Número»,
+   «Fecha», «Cliente», «NIF», «Base imponible», «Tipo %», «Cuota» y «Total». Una factura con tres tipos tiene tres
+   filas, cada una con su parte; en la columna «Total», la suma de las filas de una factura es su total, y la suma de
+   toda la columna es el total de lo descargado. Si alguna lleva recargo de equivalencia, salen también «Tipo de
+   recargo %» y «Cuota de recargo». La moneda es la del negocio y las cifras son números.
+4. La rectificativa sale con su importe en negativo y la factura que corrige, con el suyo, tal como las cuenta la lista.
+5. Lo mismo se puede pedir al asistente («descárgame en Excel las facturas de octubre para la gestoría»): el fichero
+   queda bajo su respuesta, con «Descargar» y su nombre.
+Entra: las facturas que la persona ve y que la lista filtra.
+Sale: el fichero; nada cambia. Sin ninguna factura, el botón está apagado.
+Si falla: un empleado no tiene el botón y la API le responde que no tiene permiso; si el negocio está ocupado u otro
+fallo lo impide, un aviso dice que no se han podido descargar las facturas y por qué, y se puede volver a pulsar.
+Implicados: INVOICE-F16, BASE-F112
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
@@ -860,6 +887,7 @@ entera.
 |---|---|---|---|
 | Las facturas, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `invoice.invoice.list` |
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
+| Las facturas que deja la búsqueda y los filtros de la lista, en un Excel (una fila por factura y tipo de impuesto) | ver las de todos | F24 | `invoice.invoice.export` |
 | El tique que abre su código (número, fecha y total) y, si ya la tiene, su factura completa con su QR de VeriFactu | la página pública | F04 | `invoice.public.ticket` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
@@ -877,7 +905,7 @@ entera.
 | El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
 | Si el hub de plataforma puede emitir ahora (en producción, solo con el envío real a la AEAT abierto) | solo el sistema | F23 | `invoice.invoice.platform_health` |
 
-Todas se pueden seguir en vivo.
+Todas menos el Excel se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -975,6 +1003,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 |---|---|---|---|---|---|
 | Ver facturas, series, numeración y emisor; imprimir | sí | sí | sí | sí | `invoice.view_invoice` |
 | Ver las facturas de todos (sin él, solo las suyas: las que emitió, las de sus ventas y lo que las rectifica o sustituye) | sí | sí | sí | no | `invoice.view_all_invoices` |
+| Descargar en Excel las facturas emitidas | sí | sí | sí | no | `invoice.view_all_invoices` |
 | Emitir a mano, facturar una venta, sustituir un tique, marcar pagada | sí | sí | sí | sí | `invoice.add_invoice` |
 | Rectificar (a mano, por devolución y por anulación) | sí | sí | sí | no | `invoice.rectify_invoice` |
 | Crear y cambiar series | sí | sí | sí | no | `invoice.manage_series` |
@@ -987,7 +1016,8 @@ quien abre la página pública del tique, sin sesión y sin ningún otro permiso
 sola (riesgo alto, como sustituir un tique en el mostrador).
 
 La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir» y «Ver las facturas de
-todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, rectificar ni configurar nada.
+todos»: abre, imprime y descarga en Excel (INVOICE-F24) las facturas emitidas de todos, sin emitir, rectificar ni
+configurar nada.
 
 ## Para quien lo mantiene
 
@@ -1054,8 +1084,9 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   al forinto. El documento A4 escribe los importes con esos decimales. Los importes y precios unitarios agrupan
   los millares desde cuatro cifras («1.234,56 €», hub#1090) en la lista, la ficha y el aviso del tope del tique.
 - **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4): el hub propio de
-  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
-  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal_platform.py`
+  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erp`, reservado en `live.slugs`: ningún negocio lo puede
+  coger y el alta normal del SaaS no lo crea). Mientras su fila conserva el nombre que tuvo antes (`erplora`), es el
+  mismo hub y sus facturas entran igual (`base/platform_hub.py`). Las cuatro puertas viven en `base/internal_platform.py`
   (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el
@@ -1113,7 +1144,9 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual de la familia `worker`, que tiene las credenciales del
   migrador para hacer la BD, con el comando `python manage.py create_platform_hub --execute` (primero sin
-  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
+  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve. Una fila que ya existe
+  nunca se hace otra vez, se llame como se llame, y solo `--rename` le pone el nombre `PLATFORM_HUB_SLUG` (los pasos, en
+  el `README.md` del Hub, «Registro de hubs y `/internal`»).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;
@@ -1141,7 +1174,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   solo `status` y `paid_at` (pagar, cancelar al rectificar entera). Se corrige con una rectificativa
   por diferencias (importes negativos, `rectification_kind = "I"`); nunca se borra.
 - **Dinero**: céntimos enteros con signo (las R en negativo); `Decimal` y mitad hacia arriba
-  (`apps.tax.queries.round_half_up`); cantidades con tres decimales, como Ventas.
+  (`apps.tax.queries.calculation.round_half_up`); cantidades con tres decimales, como Ventas.
 - **El desglose** (`tax_breakdown`) es una lista, una entrada por clave fiscal, en orden estable:
   `{"tax", "regime", "qualification", "exempt_reason", "rate", "surcharge_rate", "base", "quota",
   "surcharge_quota"}` (sin recargo, `"surcharge_rate": "0.00"` y `"surcharge_quota": 0`); los tipos como
@@ -1397,6 +1430,33 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     o rectificarla. La numeración no se filtra: un hueco o el libro de números son de la serie entera y solo dan
     números, no clientes ni importes.
 
+24. **El Excel de las facturas emitidas** (INVOICE-F24):
+    - **El formato es `.xlsx`, con números**: la gestoría trabaja en hojas de cálculo y las cifras deben sumarse sin
+      convertirlas. Se escribe con XlsxWriter (la única pieza que se añade; el fichero lo abre cualquier programa).
+    - **Una fila por factura y tipo de impuesto, con su propio total** (la AEAT lo pide así: «una línea por cada tipo», y
+      el «Total Factura» de cada línea es su base más su cuota más su recargo, en una operación exenta coincide con su
+      base). Así la columna «Total» suma el total de lo descargado, sin contar dos veces una factura con varios tipos.
+    - **Los mismos filtros que la lista**: se descarga lo que la lista deja (fecha, estado, tipo, serie, búsqueda…), como
+      exportan Clientes, Inventario y Control horario. Los filtros de la lista no se vuelven a escribir en la descarga.
+    - **Recargo**: sus dos columnas salen solo si alguna factura de lo descargado lo lleva.
+    - **Fuera de Automatizaciones**: lleva el nombre y el NIF de todos los clientes y es para que lo baje una persona, como
+      el CSV de Clientes; ninguna automatización lo ejecuta sola.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | AEAT (libros registro) | una línea por cada tipo de IVA o recargo; «Total Factura» de cada línea es su subtotal (base + cuota + recargo); en una exenta, tipo y cuota son cero y el total es la base | https://sede.agenciatributaria.gob.es/Sede/iva/facturacion-registro/preguntas-frecuentes.html · https://sede.agenciatributaria.gob.es/Sede/iva/facturacion-registro/preguntas-frecuentes/libro-registro-facturas-expedidas-iva-irpf.html |
+    | Copilot Gestoría | una factura con varios tipos ocupa una fila por tipo; CSV con base, tipo, cuota y total | https://copilotgestoria.com/tutoriales/informes-libro-iva-emitidas |
+    | Holded | exporta el listado de facturas desde «Acciones» a Excel, PDF, Google Sheets o por líneas | https://intercom.help/holded/es/articles/6877413-gestionar-tus-facturas |
+    | Business Central | «Open in Excel» respeta los filtros de la lista: las mismas filas y columnas que se ven | https://learn.microsoft.com/en-us/dynamics365/business-central/across-work-with-excel |
+    | Shopify | los pedidos se filtran y después se exportan; cada impuesto va en sus columnas «Tax # Name» y «Tax # Value» | https://help.shopify.com/en/manual/orders/manage-orders/exporting-orders |
+    | Loyverse | los recibos se exportan a CSV con los filtros de fecha y tipo de recibo | https://help.loyverse.com/help/receipts-section-reports-back |
+    | Odoo | los informes contables se exportan a PDF o XLSX | https://www.odoo.com/documentation/16.0/applications/finance/accounting/reporting.html |
+    | Sage 50 | cualquier documento e informe se exporta a Excel, y también a CSV, PDF, HTML, texto y XML | https://www.sage.com/es-es/blog/exportacion-excel-programa-contabilidad/ |
+
+    Gana: un `.xlsx` sencillo, una fila por factura y tipo con su subtotal, con los filtros de la lista, para quien ve
+    todas las facturas. Un CSV con decimales de texto (como exportan Clientes e Inventario) obligaría a la gestoría a
+    convertir las cifras; un formato AEAT o varias hojas piden más de lo que ha pedido nadie.
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
@@ -1406,7 +1466,8 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
   impresión del navegador).
 - No hace presupuestos, proformas, borradores ni albaranes.
 - No lleva vencimientos, cobros parciales ni recordatorios de impago.
-- No exporta el libro registro de facturas expedidas para la gestoría.
+- No exporta el libro registro de facturas expedidas en el formato oficial de la AEAT; el Excel de las facturas emitidas
+  es una hoja sencilla para la gestoría (INVOICE-F24).
 - No vigila el techo de la factura simplificada: lo pide Ventas al cobrar.
 - No borra ni anonimiza los datos de un cliente en sus facturas (la ley obliga a conservarlas).
 

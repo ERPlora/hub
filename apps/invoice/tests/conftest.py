@@ -187,6 +187,25 @@ def charge(db):
 
 
 @pytest.fixture
+def equivalence_surcharge(db):
+    """The equivalence surcharge of Spain's generic products, 5.2 % beside their 21 % VAT, as Taxes keeps it."""
+    from apps.tax.models import TaxRule
+
+    root = TaxRule.objects.get(category__key="product.generic", country_code="ES", parent__isnull=True)
+    return run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "tax_category_key": "product.generic",
+            "rate_pct": "5.2",
+            "tax_type": "surcharge",
+            "parent_id": str(root.id),
+            "component_label": "Recargo de equivalencia",
+        },
+    )
+
+
+@pytest.fixture
 def db_dsn(django_db_setup):
     """DSN of control's test database, where a live stream listens for a business's notices."""
     params = connections["default"].settings_dict
