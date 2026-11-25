@@ -38,7 +38,7 @@ async function newInvoice(page: Page, customer: string) {
   return dialog;
 }
 
-test('INVOICE-F03, F16, F17 and F19: an invoice of yesterday that fell due is overdue until it is paid', async ({ page, context }) => {
+test('INVOICE-F03, F16, F17 and F19: an invoice of yesterday that fell due is overdue until it is paid', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/invoice/invoices');
   const customer = `e2e Vencida ${RUN}`;
