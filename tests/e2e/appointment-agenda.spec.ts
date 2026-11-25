@@ -13,6 +13,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { aMonday, salonCleanUp } from './appointment-helpers';
 import { cardDeletes } from './customer-helpers';
 import { dayAsShown, pickDay, pickTime } from './date-time-fields';
+import { expectTextClearOfLabel } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -217,6 +218,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     const cancel = page.locator('ion-modal[data-testid=appointment-cancel]');
     await expect(cancel).toContainText(`Cancel ${who.customer.name}'s appointment`);
     await cancel.locator('[data-testid=appointment-cancel-reason] textarea').fill('Ill');
+    await expectTextClearOfLabel(cancel.locator('p'), cancel.locator('[data-testid=appointment-cancel-reason]'), 'cancelling an appointment');
     await cancel.locator('[data-testid=appointment-cancel-submit]').click();
     await expect(shown(page).locator(`[data-testid=appointment-list-row][data-id="${appointment.id}"]`)).toContainText('Cancelled');
     expect(psql(`select cancellation_reason from appointment_appointment where id = '${appointment.id}'`)).toBe('Ill');
