@@ -1192,7 +1192,7 @@ puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
 por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
 preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
-Implicados: BASE-F22, INVENTORY-F12, VERIFACTU-F01, BASE-F32
+Implicados: BASE-F22, INVENTORY-F12, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Leer el informe de la importación
 Estado: hecho
@@ -1291,7 +1291,7 @@ Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un no
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
 exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
 restablecer.
-Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33, BASE-F36
+Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33, INVENTORY-F36, BASE-F36
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho
@@ -4148,7 +4148,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
   `data/<app>.<parte>.json`, más las fotos propias en `media/<nombre>`, WebP de 2 MB como mucho; 20 MB, 100 MB al
   descomprimir y 1 000 entradas como mucho, para que quepan 300 fotos de 60 KB; `BlueprintInvalid.reason`),
-  el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
+  el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.verticals.template_apps(vertical)`) y las siete
   partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
   `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
   de su app (nunca su ORM; las filas se enlazan por nombre, gh:hub#2626). Lo que ya existe se salta.
@@ -4367,7 +4367,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   propio de ERPlora (`PLATFORM_HUB_SLUG`; una fila del registro con BD propia, de `create_platform_hub`)
   contesta el negocio de ERPlora, su emisor:
   `PLATFORM_ISSUER_LEGAL_NAME` y `PLATFORM_ISSUER_COUNTRY` con la moneda de ese país, la zona y el idioma del despliegue,
-  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host es el de
+  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com, y `BusinessPanel` dice en todos los roles que
+  esos datos los pone ERPlora en su servidor, sin enlace), con fila o sin ella; su host es el de
   `PLATFORM_HUB_SLUG` (`erp`), el único nombre reservado que se sirve (`base/tests/test_platform_hub_host.py`). La moneda
   que cobra cada app (BASE-F50, hub#577) es
   `base.operations.business_currency(scope)`: la de `base.business.get` leída como la plataforma (`system_context`;

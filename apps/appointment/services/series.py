@@ -17,7 +17,7 @@ from apps.appointment.queries.agenda import load_agenda, verdict_message
 from apps.appointment.queries.booking import lines_for, resolve_services
 from apps.appointment.queries.business import current_settings, now, today
 from apps.appointment.queries.series import SERIES_DEFAULT_WINDOW, find_series, load_series, pattern_of
-from apps.appointment.schemas import MaterializeIn, MaterializeOut, RecurringCreateIn
+from apps.appointment.schemas.series import MaterializeIn, MaterializeOut, RecurringCreateIn
 from apps.appointment.services.writes import (
     BOOK_OWN_ONLY,
     _actor,

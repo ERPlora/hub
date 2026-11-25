@@ -18,7 +18,7 @@ from apps.invoice.tests.conftest import HUB_DB_COMMITTED, ISSUER, run
 from apps.sale.models import Sale
 from apps.verifactu.models import Record
 from base import catalog, relay, worker
-from base.catalog import RegisterResult
+from base.catalog.register_apps import RegisterResult
 from base.models.relay import EventDelivery
 
 #: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
@@ -31,7 +31,7 @@ REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 def tick(monkeypatch, factory_data):
     """One tick of the worker's real loop at ``at``, without the SaaS (``register_apps``), serving business A in its
     own database as a fresh process would (no hub served yet), without releasing control's connection."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
 
     def once(at: dt.datetime) -> None:

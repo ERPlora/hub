@@ -23,7 +23,8 @@ import pytest
 from django.db import DatabaseError
 
 from base import catalog, outbound, relay, scheduler, worker, worker_data
-from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
+from base.catalog.errors import CatalogError, SharedSchemaNotReady
+from base.catalog.register_apps import RegisterResult
 from base.tenancy import context, provision
 
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
@@ -248,7 +249,7 @@ def calls(monkeypatch):
         done.append("register_apps")
         return WRITTEN
 
-    monkeypatch.setattr(catalog, "register_apps", register_apps)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", register_apps)
     monkeypatch.setattr(
         worker, "close_old_connections", lambda: done.append("close_old_connections")
     )
@@ -279,7 +280,7 @@ def test_releases_the_connections_register_apps_opened_before_idling(calls):
     ids=["written", "skipped"],
 )
 def test_says_what_it_registered_once_it_waits_for_work(monkeypatch, caplog, result, said):
-    monkeypatch.setattr(catalog, "register_apps", lambda: result)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: result)
 
     with caplog.at_level(logging.INFO, logger="base.worker"):
         worker.run(stopped())
@@ -307,7 +308,7 @@ def registrations(monkeypatch, *outcomes):
             raise outcome
         return outcome
 
-    monkeypatch.setattr(catalog, "register_apps", register_apps)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", register_apps)
     return attempts
 
 

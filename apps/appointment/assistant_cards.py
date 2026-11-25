@@ -6,7 +6,7 @@ from django.utils.translation import gettext, gettext_noop
 from live.context import OperationContext
 from pydantic import ValidationError
 
-from apps.appointment.schemas import BlockedTimeCreateIn
+from apps.appointment.schemas.blocked_times import BlockedTimeCreateIn
 from base.assistant import card_order
 from base.assistant.card_period import period
 

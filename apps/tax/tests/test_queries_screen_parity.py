@@ -6,7 +6,9 @@ from datetime import date
 import pytest
 
 from apps.tax.models import TaxAlias, TaxCategory
-from apps.tax.schemas import AliasListIn, CategoryGetIn, CategoryListIn, RuleListIn
+from apps.tax.schemas.aliases import AliasListIn
+from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn
+from apps.tax.schemas.rules import RuleListIn
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 

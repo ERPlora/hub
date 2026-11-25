@@ -20,7 +20,7 @@ describe('invoice catalogues (en source + es)', () => {
       expect(EN.has(`invoice.typeNames.${type}`), type).toBe(true);
     }
     for (const status of ['issued', 'paid', 'cancelled']) expect(EN.has(`invoice.status.${status}`), status).toBe(true);
-    for (const source of ['sale', 'manual', 'substitution', 'rectification', 'refund', 'void']) {
+    for (const source of ['sale', 'manual', 'substitution', 'rectification', 'refund', 'void', 'platform']) {
       expect(EN.has(`invoice.sources.${source}`), source).toBe(true);
     }
     for (const idType of ['02', '03', '04', '05', '06', '07']) expect(EN.has(`invoice.recipient.idTypes.${idType}`), idType).toBe(true);

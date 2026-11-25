@@ -9,7 +9,7 @@ from live.operations import operation
 
 from apps.tax.models import TaxAlias
 from apps.tax.queries.naming import resolve_category_text
-from apps.tax.schemas import AliasListIn, AliasPage, AliasResolveIn, AliasResolveOut
+from apps.tax.schemas.aliases import AliasListIn, AliasPage, AliasResolveIn, AliasResolveOut
 from base.ordering import list_order
 
 

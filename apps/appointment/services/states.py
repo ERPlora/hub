@@ -14,7 +14,8 @@ from apps.appointment import events
 from apps.appointment.queries.access import CHANGE_ALL, CHANGE_OWN, by_person, may_change
 from apps.appointment.queries.business import current_settings, now
 from apps.appointment.queries.reads import MOVABLE, find_appointment, load_detail
-from apps.appointment.schemas import AppointmentOut, AppointmentRefIn, CancelIn
+from apps.appointment.schemas.appointments import AppointmentOut, AppointmentRefIn
+from apps.appointment.schemas.changes import CancelIn
 from apps.appointment.services.moving import _acting_for_customer
 from apps.appointment.services.writes import (
     CANNOT,

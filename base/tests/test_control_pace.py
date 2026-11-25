@@ -26,7 +26,7 @@ from live.operations import get as get_operation
 
 from base import catalog, control_pace, events, hub_listener, queries, registry, scheduler, services, worker
 from base import worker_activations, worker_data
-from base.catalog import RegisterResult
+from base.catalog.register_apps import RegisterResult
 from base.hub_listener import Listener
 from base.models.activation import AppActivation
 from base.models.scheduler import TaskSchedule
@@ -53,7 +53,7 @@ def at_rest(hub_a, hub_b, monkeypatch):
         with use_hub(Hub.objects.select_related("cluster").get(pk=hub.pk)):
             scheduler.sync(START)
             TaskSchedule.objects.update(next_run=START + dt.timedelta(days=1))
-    monkeypatch.setattr(catalog, "register_apps", lambda: SKIPPED)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: SKIPPED)
     monkeypatch.setattr(worker, "Background", Inline)
     monkeypatch.setattr(worker_data, "_measured", dt.date.max)
 

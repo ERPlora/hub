@@ -6,7 +6,7 @@ from django.utils import timezone
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.appointment.schemas import NoticesIn, NoticesOut
+from apps.appointment.schemas.appointments import NoticesIn, NoticesOut
 from base.business import business_zone
 
 from .access import VIEW_OWN

@@ -62,9 +62,9 @@ def test_languages_and_time():
 
 
 def test_the_static_files_finders_add_the_documentation_images_of_the_modules():
-    # base.catalog.AppImagesFinder publishes apps/<id>/docs/img/ as /static/catalog/<id>/img/.
+    # base.catalog.static_files.AppImagesFinder publishes apps/<id>/docs/img/ as /static/catalog/<id>/img/.
     assert settings.STATICFILES_FINDERS == [
         "django.contrib.staticfiles.finders.FileSystemFinder",
         "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-        "base.catalog.AppImagesFinder",
+        "base.catalog.static_files.AppImagesFinder",
     ]

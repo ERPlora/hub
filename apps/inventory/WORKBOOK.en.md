@@ -1282,7 +1282,7 @@ Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-
 KITCHEN-F32
 
 ### INVENTORY-F36 Show or hide a product on the website
-<!-- from WORKBOOK.md sha256:b47ee2758a6e -->
+<!-- from WORKBOOK.md sha256:c0d789f73141 -->
 Status: done
 Actor: administrator, manager, assistant, API
 Screen: Products, Product card
@@ -1302,10 +1302,12 @@ The website's menu (WEBSITE-F05) leaves the hidden products out, also in the pre
 200 items; the published page shows it on the next visit, within a minute at most. The till, Kitchen and Menus do not
 change: a hidden product is still sold, and selling it out or turning it off does not remove the mark. The products
 that already existed show on the website, as before. Recovering the business from a separate copy (BASE-F114) gives
-each product back with its mark.
+each product back with its mark. A backup or a template of "Data and backups" (BASE-F35) says which products are hidden
+and, when it is loaded (BASE-F31), the ones that come in are still hidden; a product the business already had stays as
+it was, and a file that does not say it brings its products visible.
 If it fails: the reason shows above the table or inside the form ("The product could not be updated" or the one the
 app gives). Whoever cannot change products sees the card's line, but not the actions nor the form.
-Involved: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F114
+Involved: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F31, BASE-F35, BASE-F114
 
 ## What the verticals share
 <!-- from WORKBOOK.md sha256:ddaf4af257f8 -->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Settings › Business: the business as erplora.com registered it, read only because erplora.com owns it and pushes
-// every change. «Change on erplora.com» leaves the Hub by `openExternalLink` (the installed app opens nothing on a
-// `_blank` link) and is never offered in the Google Play copy (`managementOffered`).
+// Settings › Business: the business as erplora.com registered it (ERPlora's own, as its server says), read only because
+// erplora.com owns it and pushes every change. «Change on erplora.com» leaves the Hub by `openExternalLink` (the
+// installed app opens nothing on a `_blank` link) and is never offered in the Google Play copy (`managementOffered`).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, openExternalLink, useSession } from '@erplora/ui/shell';
@@ -47,6 +47,8 @@ const zone = computed(() => {
 
 const where = computed(() => {
   if (data.value?.demo) return t('base.settingsBusiness.whereDemo');
+  // Of the rest, only ERPlora's own business has no page on erplora.com.
+  if (data.value?.settings_url === '') return t('base.settingsBusiness.wherePlatform');
   return admin.value ? t('base.settingsBusiness.whereAdmin') : t('base.settingsBusiness.whereOthers');
 });
 const offered = managementOffered();

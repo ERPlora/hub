@@ -1,4 +1,4 @@
-"""The website's QR: the hub's public address, in PNG to print and SVG to scale."""
+"""The QR of an address of the hub, in PNG to print and SVG to scale, and the hub's public address it starts from."""
 
 import io
 import re
@@ -8,7 +8,7 @@ import qrcode.constants
 from django.test import RequestFactory
 from PIL import Image
 
-from apps.website.qr import BORDER, BOX_SIZE, public_url, qr_image
+from base.qr import BORDER, BOX_SIZE, public_url, qr_image
 
 URL = "https://pepe.erplora.com/"
 OTHER = "https://other.erplora.com/"

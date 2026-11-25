@@ -6,7 +6,7 @@ from django.conf import settings
 from django.utils import translation
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory
-from apps.tax.schemas import normalize_text
+from apps.tax.schemas.aliases import normalize_text
 
 
 def category_by_reference(text: str) -> TaxCategory | None:

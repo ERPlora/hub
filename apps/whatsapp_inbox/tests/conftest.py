@@ -20,7 +20,7 @@ from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of
 from base import catalog, hub_visits, worker
-from base.catalog import RegisterResult
+from base.catalog.register_apps import RegisterResult
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.context import use_hub
@@ -166,7 +166,7 @@ def tick(monkeypatch):
     than now (a second by default), without erplora.com's catalogue, as a fresh process (no business served yet, A
     first) whose pass serves every business however slow the machine. The worker closes each business's connection
     after serving it, so a test that ticks is committed (``HUB_DB_COMMITTED``)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(hub_visits, "HUB_PASS_SECONDS", 3600)
 
     def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:
