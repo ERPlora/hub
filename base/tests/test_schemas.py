@@ -14,6 +14,8 @@ FULL = {
     "menu": [{"id": "demo", "label": "Demo", "items": [{"path": "/demo/items", "label": "Demo", "icon": "ion:flask-outline"}]}],
     "apps": [{"label": "demo", "state": "on"}],
     "locked": {"tax": ["/tax/rules"]},
+    "role": "Cajero",
+    "approvable": ["sale.void_sale"],
     "language": "es",
     "demo": None,
 }

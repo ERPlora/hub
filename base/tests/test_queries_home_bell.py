@@ -8,14 +8,20 @@ The stand-in modules name real operations registered for the test (``declare``),
 import logging
 
 from django.utils import timezone
-from live.meta import BellCounter
+from live.meta import BellCounter, all_live_app_configs
 from live.models import OutboxEvent
 from live.operations import get
 
+from base.apps_on import active_apps
 from base.models.relay import EventDelivery
 from base.models import Hub
+from base.models.roles import BusinessRole
+from base.permissions import grantable
+from base.roles import OFF, ON
 from base.schemas.bell import BellCountersIn
+from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A, B, in_business_a
+from base.tests.roles import a_role
 from base.tests.test_queries_home import ADMIN, ctx, declare, in_b, module, modules
 
 __all__ = ["declare", "in_business_a", "modules"]
@@ -200,3 +206,85 @@ def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
     assert spanish["body"].startswith("Una app no recibió lo que otra le mandó")
     assert bell(ctx()) == []  # not an administrator
     assert [c["count"] for c in in_b(bell, ctx(ADMIN, scope=B))] == [1]
+
+
+MANAGE_ROLES = "base.manage_roles"
+
+
+def to_review(context) -> list[dict]:
+    return [row for row in bell(context) if row["key"] == "base.roles_to_review"]
+
+
+def reviewed(name: str):
+    """A role of the business saved with every permission it can hold of every app."""
+    states = {permission: OFF for app in grantable(all_live_app_configs()).values() for permission in app}
+    return BusinessRole.objects.create(name=name, origin="hub_employee", states=states)
+
+
+def test_the_roles_to_review_for_whoever_manages_roles(modules):
+    """An app turned on or a permission added after a role was saved leaves it to review (BASE-F128): the bell says how
+    many, to whoever can save them."""
+    modules(module("sale"))
+    reviewed("Cashier")
+    a_role("Shift lead", base__view_home=ON)
+    a_role("Kitchen", base__view_home=ON)
+
+    assert to_review(ctx(MANAGE_ROLES)) == [
+        {
+            "key": "base.roles_to_review",
+            "app": "base",
+            "count": 2,
+            "route": "/employees#roles",
+            "label": "Roles to review",
+            "icon": "ion:shield-checkmark-outline",
+            "severity": "info",
+            "title": "2 roles to review",
+            "body": "An app turned on or a new permission is not in them yet: look at what each role allows.",
+            "action_label": "Review the roles",
+            "due": None,
+        }
+    ]
+    [spanish] = to_review(ctx(MANAGE_ROLES, language="es"))
+    assert (spanish["label"], spanish["title"], spanish["action_label"]) == (
+        "Roles por revisar",
+        "2 roles por revisar",
+        "Revisar los roles",
+    )
+
+
+def test_nobody_else_is_told_of_the_roles_to_review(modules):
+    modules(module("sale"))
+    a_role("Shift lead", base__view_home=ON)
+
+    assert to_review(ctx()) == []
+    assert to_review(ctx(ADMIN)) == []
+
+
+def test_roles_saved_with_all_there_is_are_not_to_review(modules):
+    modules(module("sale"))
+    reviewed("Cashier")
+
+    assert to_review(ctx(MANAGE_ROLES)) == []
+
+
+def test_what_a_role_lacks_of_an_app_that_is_off_is_not_to_review(modules, monkeypatch):
+    """It is reviewed when the business turns that app on, not before."""
+    modules(module("sale"))
+    role = reviewed("Cashier")
+    role.states = {permission: state for permission, state in role.states.items() if not permission.startswith("sale.")}
+    role.save()
+    assert [row["count"] for row in to_review(ctx(MANAGE_ROLES))] == [1]
+
+    on = active_apps(A) - {"sale"}
+    monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: on)
+
+    assert to_review(ctx(MANAGE_ROLES)) == []
+
+
+def test_the_roles_to_review_of_another_business_are_not_told(modules, hub_b):
+    modules(module("sale"))
+    with use_hub(hub_b):
+        a_role("Theirs", base__view_home=ON)
+
+    assert to_review(ctx(MANAGE_ROLES)) == []
+    assert [row["count"] for row in in_b(to_review, ctx(MANAGE_ROLES, scope=B))] == [1]

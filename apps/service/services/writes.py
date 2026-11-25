@@ -10,7 +10,7 @@ from live.operations import atomic
 
 from apps.service.models import ACTOR_MAX_LENGTH
 from apps.tax.models import TaxCategory
-from apps.tax.queries import held_categories
+from apps.tax.queries.categories import held_categories
 from base.queries.people import actor_name
 
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")

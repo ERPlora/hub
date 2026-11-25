@@ -127,6 +127,7 @@ def test_every_operation_is_described_for_the_assistant():
     ops = {name: op for name, op in registry.items() if name.startswith("invoice.")}
     assert set(ops) == {
         "invoice.invoice.list",
+        "invoice.invoice.export",
         "invoice.invoice.get",
         "invoice.invoice.by_source",
         "invoice.invoice.document",
@@ -179,6 +180,9 @@ def test_every_operation_is_described_for_the_assistant():
         )
         if op.kind == "command":
             assert op.ai.get("risk") == ("high" if name in high else "normal"), name
+        elif name == "invoice.invoice.export":
+            # A file with every customer's name and tax ID, for a person to download: no automation runs it alone.
+            assert op.ai.get("risk") == "high"
         else:
             assert "risk" not in op.ai, name
 

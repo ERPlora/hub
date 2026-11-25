@@ -334,7 +334,7 @@ the section with "Retry".
 Involved: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 
 ### RESERVATION-F06 Take a reservation by hand (phone or counter)
-<!-- from WORKBOOK.md sha256:88c54d76f19d -->
+<!-- from WORKBOOK.md sha256:b1d2347d3c72 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations ("New reservation")
@@ -347,7 +347,7 @@ Steps:
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
    assistant's card first says who it is for, by the name of their card (also when it was named by its phone)
    or, without a card, by the name that was said, and only once; then the day and the time, before the phone
-   ("Create in Reservations: Ana García · Oct 15, 2026 · 9:00 PM"). It carries the table with its zone, as
+   ("Create in Reservations: Ana García · Date: Oct 15, 2026 · Time: 9:00 PM"). It carries the table with its zone, as
    Tables names it ("5 (Terrace)": the number repeats across zones), never by a code.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
@@ -394,7 +394,7 @@ table out of service (blocked, deactivated, deleted or in a deactivated zone), w
 Involved: TABLE-F25, RESERVATION-F19
 
 ### RESERVATION-F08 Change a reservation (day, time, guests, table)
-<!-- from WORKBOOK.md sha256:447f2daf2735 -->
+<!-- from WORKBOOK.md sha256:7a3e4eead4a3 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations (row → "Edit", or tap the row)
@@ -408,7 +408,7 @@ Steps:
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
 4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
    says the reservation by its customer, its day and its time and the new table with its zone, as Tables
-   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
+   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · Table: 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
 same number written another way (with spaces or without the prefix) is not a change. Whoever does not see the
 customers' contact details (BASE-F119) does not see the phone nor the email and does not change them: saving keeps

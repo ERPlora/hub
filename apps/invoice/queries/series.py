@@ -13,7 +13,7 @@ from apps.invoice import fiscal
 from apps.invoice.models import FACTORY_SERIES_NAMES, Invoice, InvoiceSeries
 from apps.invoice.queries.rows import _page
 from apps.invoice.schemas.series import SeriesDetailOut, SeriesListIn, SeriesPage, SeriesPeekIn, SeriesPeekOut
-from apps.tax.queries import business_today
+from apps.tax.queries.jurisdiction import business_today
 
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
 

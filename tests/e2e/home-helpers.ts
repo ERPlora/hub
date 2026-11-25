@@ -1,6 +1,6 @@
 // What the e2e of the Home share: a person of `a` signed in in Spanish on it, its setup card («Configura tu negocio»)
 // and a step's row in it, and the panels of its widget board.
-import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, type ViewportSize } from '@playwright/test';
 
 import { A, type Credentials, login, OWNER, shown } from './helpers';
 import { capturedFitting } from './screen';
@@ -56,6 +56,14 @@ export async function spanishHome(page: Page, who: Credentials = OWNER): Promise
   await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   await page.goto(`${A}/`);
   await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+}
+
+/** A person of `a` (the owner unless `who` says another) on the Home in Spanish, in a context of their own of `size`. */
+export async function spanishPerson(browser: Browser, size: ViewportSize, who?: Credentials) {
+  const context = await spanishContext(browser, size);
+  const page = await context.newPage();
+  await spanishHome(page, who);
+  return { context, page };
 }
 
 /** The panel `key` added to the Home's board from «Personalizar panel» (`open`, when given, checks the picker open), the

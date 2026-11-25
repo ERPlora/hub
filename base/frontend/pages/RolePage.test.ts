@@ -8,8 +8,10 @@ function employee(fields: Partial<RoleDetail> = {}): RoleDetail {
   return {
     key: 'hub_employee',
     label: 'Empleado',
+    description: '',
     origin: 'basic',
     members: 2,
+    to_review: false,
     apps: [
       {
         app: 'base',
@@ -76,6 +78,14 @@ describe('RolePage', () => {
     expect(line(m, 'sale.view_all_sales').text()).toContain('No');
     expect(m.wrapper.text()).toContain('Lo que este rol deja hacer en este negocio, app por app.');
     expect(m.wrapper.get('[data-testid="role-members"]').text()).toBe('Personas con este rol: 2');
+  });
+
+  it('a role the business made goes by its own name, and says nothing of erplora.com', async () => {
+    const m = await open({ locale: 'es' });
+    await m.result(m.call, 'base.role.detail', employee({ key: '0199aaaa-0000-7000-8000-000000000001', label: 'Cajero', origin: 'own' }));
+    expect(m.wrapper.text()).toContain('Cajero');
+    expect(m.wrapper.text()).toContain('Lo que este rol deja hacer en este negocio, app por app.');
+    expect(m.wrapper.text()).not.toContain('erplora.com');
   });
 
   it('in English too', async () => {

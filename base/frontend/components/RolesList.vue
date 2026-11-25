@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Employees › Roles: erplora.com's roles. A role is given when a person is invited on erplora.com and changed
-// there, so this list is read only; a row opens what the role allows. The link leaves the Hub by `openExternalLink`
+// Employees › Roles: erplora.com's roles and, after them, the business's own. A role is given when a person is invited
+// on erplora.com and changed there; a row opens what the role allows. The link leaves the Hub by `openExternalLink`
 // (the installed app opens nothing on a `_blank` link) and is never offered in the Google Play copy
 // (`managementOffered`).
 import { DataTable, type DataTableColumn, StatusPill } from '@erplora/ui/components';
@@ -12,7 +12,7 @@ import { useRouter } from 'vue-router';
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
-import { roleKey } from '../lib/people';
+import { roleName } from '../lib/people';
 import type { HubRoleRow } from '../operations/people';
 
 const { t, locale } = useBaseI18n();
@@ -30,7 +30,7 @@ const number = (n: number) => new Intl.NumberFormat(locale.value).format(n);
 const open = (row: HubRoleRow) => void router.push(`/employees/roles/${row.key}`);
 
 const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
-  { key: 'key', label: t('base.roles.columns.role'), format: (_, row) => t(roleKey(row.key)), width: 'minmax(10rem,2fr)' },
+  { key: 'key', label: t('base.roles.columns.role'), format: (_, row) => roleName(row, t), width: 'minmax(10rem,2fr)' },
   { key: 'origin', label: t('base.roles.columns.origin'), cell: 'origin', width: '8rem', sortable: false },
   { key: 'available', label: t('base.roles.columns.available'), cell: 'available', width: '12rem', sortable: false },
   { key: 'members', label: t('base.roles.columns.members'), cell: 'members', align: 'right', width: '8rem' },
@@ -62,7 +62,7 @@ const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
       :page-size="10"
       :page-size-options="[]"
       :views="['table', 'cards']"
-      :card-title="(row: HubRoleRow) => t(roleKey(row.key))"
+      :card-title="(row: HubRoleRow) => roleName(row, t)"
       card-title-column="key"
       :search-keys="['label']"
       :search-placeholder="t('base.roles.search')"
@@ -73,11 +73,11 @@ const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
       @row-click="open"
       @retry="refresh()"
     >
-      <template #origin>
+      <template #origin="{ row }">
         <StatusPill
           size="sm"
           tone="neutral"
-          :label="t('base.roles.basic')"
+          :label="t(`base.roles.${(row as HubRoleRow).origin}`)"
         />
       </template>
       <template #available>

@@ -87,13 +87,14 @@ export function useServerTable<Op extends OpName>(op: Op, options: ServerTableOp
   const pageFilters = computed(() => JSON.stringify(options.filters?.() ?? {}));
   watch(pageFilters, () => goToPage(0));
 
-  /** The page's filters, search and sort: what every window shares. */
-  const query = computed(() => ({
+  /** What narrows the rows: the page's filters and its search, whatever the sort or the page. */
+  const filterParams = computed(() => ({
     ...(JSON.parse(pageFilters.value) as object),
     ...(text.value.trim() ? { search: text.value.trim().slice(0, options.maxSearch) } : {}),
-    sort: sort.value,
-    dir: dir.value,
   }));
+
+  /** The page's filters, search and sort: what every window shares. */
+  const query = computed(() => ({ ...filterParams.value, sort: sort.value, dir: dir.value }));
 
   /** The rows on screen, from the page's first row, as windows of at most `MAX_LIMIT` (the engine's). */
   const list = useLiveWindows(op, () => query.value, MAX_LIMIT, {
@@ -130,6 +131,7 @@ export function useServerTable<Op extends OpName>(op: Op, options: ServerTableOp
     sort,
     dir,
     filtered,
+    filterParams,
     windows,
     goToPage,
     setPageSize,

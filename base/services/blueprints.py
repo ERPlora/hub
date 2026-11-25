@@ -102,7 +102,8 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
             "its tables and the rest of its apps' data, app by app; what is already there is left as it was. An app "
             "still being set up («waiting») brings its data by itself when it is ready: nothing to do but say so. "
             "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
-            "fiscal data. Use this, not blueprint.list or blueprint.inspect, when asked to load, import or apply one."
+            "fiscal data. Use this, not blueprint.list or blueprint.inspect, when asked to load, import or apply one. "
+            f"A copy is made in the business it comes from. {blueprint.export.TO_ANOTHER_BUSINESS}"
         ),
         "risk": "high",
         "asks": {

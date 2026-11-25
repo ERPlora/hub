@@ -2,6 +2,7 @@
 request to the business's API, a live query re-run, who may approve a refused action with their PIN and the ceiling of
 an API key its holder made."""
 
+from base import events
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
 from base.operations import HubContextBuilder
@@ -81,6 +82,25 @@ class TestWhoApproves:
 
         assert response.status_code == 200, response.content
         assert response.json()["approver"] == "Mario"
+
+    def test_is_not_offered_when_a_role_of_the_business_takes_the_permission_away(self, client, adam, eva, mario):
+        given("saas:2", Membership.Role.EMPLOYEE)
+
+        response = get(client, "/approvals/approvers", operation=APPROVABLE)
+
+        assert response.json()["people"] == []
+
+    def test_nor_approves_with_their_pin(self, client, adam, eva, mario):
+        asked = refused(client)
+        given("saas:2", Membership.Role.EMPLOYEE)
+
+        assert approve(client, asked, "saas:2").status_code == 403
+
+    def test_the_list_follows_a_role_given_and_what_a_role_allows(self):
+        from live.live_registry import live_registry
+
+        for event in (events.ROLE_ASSIGNED, events.ROLE_UPDATED):
+            assert "base.approval.approvers" in live_registry.affected([event])
 
 
 def test_an_api_key_holds_no_more_than_the_role_of_the_business_of_its_maker(made, client, hub_a):

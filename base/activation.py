@@ -21,7 +21,7 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - **Every module on** (:func:`every_on`), its roots chosen: what a hub without rows had before hubs started with every
   module off. The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
-  that is no business's and ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active;
+  that is no business's and ERPlora's own hub (``base.platform_hub``, Invoicing and VeriFactu always active;
   :func:`is_platform`). The worker runs each hub's scheduled tasks on that hub's own scope (``base.scheduler``), so a
   business's apps are its own there too (hub#1053).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
@@ -51,13 +51,13 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
-from django.conf import settings
 from django.core.cache import cache
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 from live.context import Scope
 from live.meta import module_configs
 
+from base import platform_hub
 from base.business import country_name, country_or_market
 from base.tenancy.context import HUB_SCOPE_KIND
 
@@ -361,7 +361,7 @@ def veto(
 def is_platform(scope: Scope) -> bool:
     """A scope that is no business choosing its apps: no business's at all, or ERPlora's own hub. Every module is on
     in it."""
-    return scope.kind != HUB_SCOPE_KIND or scope.key == settings.PLATFORM_HUB_SLUG
+    return scope.kind != HUB_SCOPE_KIND or platform_hub.is_platform_slug(scope.key)
 
 
 def states_of(scope: Scope) -> dict[str, Activation]:

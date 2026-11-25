@@ -383,10 +383,10 @@ def renew_hub_lease(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owne
 def platform_hub_register(slug: str) -> Hub:
     """ERPlora's platform hub in the registry (``manage.py create_platform_hub``): its row, ``is_platform``, born
     ``requested`` with its own database's name, as a sign-up, but not due: the command makes it itself, under its
-    lease, and the worker's pass over ``hub_due`` never takes it first. The one already there otherwise. Never a
-    business's row: the slug is reserved (``live.slugs``)."""
+    lease, and the worker's pass over ``hub_due`` never takes it first. The one already there otherwise, whatever its
+    name: it is never made twice. Never a business's row: the slug is reserved (``live.slugs``)."""
     with _control_transaction():
-        hub = Hub.objects.select_for_update().filter(slug=slug).first()
+        hub = Hub.objects.select_for_update().filter(is_platform=True).first()
         if hub is not None:
             return hub
         new_id = uuid7()

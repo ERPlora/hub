@@ -27,7 +27,7 @@ pytestmark = HUB_DB
     [("52.5", 53), ("52.4999", 52), ("-52.5", -53), ("0.5", 1), ("2100.21", 2100)],
 )
 def test_round_half_up(value, cents):
-    assert queries.round_half_up(Decimal(value)) == cents
+    assert queries.calculation.round_half_up(Decimal(value)) == cents
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def test_round_half_up(value, cents):
     ],
 )
 def test_split_amount(amount, rates, included, expected):
-    base, tax, quotas = queries.split_amount(
+    base, tax, quotas = queries.calculation.split_amount(
         amount, [Decimal(r) for r in rates], tax_included=included
     )
     assert (base, tax, quotas) == expected

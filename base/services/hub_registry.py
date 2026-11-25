@@ -41,6 +41,7 @@ from base.schemas.hub_registry import (
 )
 from base.services.address_change import address_changed, forget_address
 from base.services.photo import _sync_verifactu, _sync_whatsapp
+from base.services.platform_hub import refuse_platform_hub
 from base.services.provisioning import holds_hub_lease, offboarding_due
 from base.services.sessions import _apply_members, _sync_hub_users, _wake_open_apps
 from base.tenancy import names as database_names
@@ -89,7 +90,8 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
 
     A customer's slug never takes a demo's ``demo-…`` nor a reserved name (``base.slug_invalid``); one that is
     another hub's is ``base.slug_taken``. A cancelled hub is restored first (``base.hub_cancelled``); a purged one
-    never comes back (``hub_purged``). The worker clones its database (``base.tenancy.provision``) and the SaaS hears
+    never comes back (``hub_purged``), and ERPlora's own hub is no business of the SaaS's
+    (``base.platform_hub_kept``). The worker clones its database (``base.tenancy.provision``) and the SaaS hears
     ``ready`` from it; an update of a hub still being prepared keeps it due (a failed one is tried again now), and
     one of a ready hub, idempotent, says nothing.
 
@@ -111,6 +113,7 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
         hub, created = _requested(data.id, fields)
     if not created:
         _refuse_purged(hub)
+        refuse_platform_hub(hub)
         if hub.status in LEFT_STATUSES:
             raise Conflict(gettext("This hub was cancelled: restore it first."), code="base.hub_cancelled")
         former = hub.slug
@@ -228,10 +231,11 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
 def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
     """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore. A
     business with a finished database of its own is due for its copy (``offboarding``, the worker's). One that already
-    left stays as it is: its 90 days count from when it left."""
+    left stays as it is: its 90 days count from when it left. ERPlora's own hub is never closed."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
+    refuse_platform_hub(hub)
     if hub.status not in LEFT_STATUSES:
         hub.status, hub.cancelled_at = Hub.Status.CANCELLED, timezone.now()
         hub.save(update_fields=["status", "cancelled_at", "updated_at"])

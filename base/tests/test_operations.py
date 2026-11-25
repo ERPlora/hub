@@ -47,6 +47,9 @@ def in_a(hub_a):
         ("acme-2.localhost", "acme-2"),
         # A demo's host is a hub's too; whether it answers is the registry's (base.middleware).
         ("demo-0000beef.localhost:8000", "demo-0000beef"),
+        # ERPlora's own hub: the one reserved name that is a hub's.
+        ("erp.localhost:8000", "erp"),
+        ("ERP.localhost", "erp"),
     ],
 )
 def test_scope_is_the_first_label_of_the_host(host, key):
@@ -62,6 +65,9 @@ def test_scope_is_the_first_label_of_the_host(host, key):
         "www.localhost",
         "WWW.localhost:8000",
         "api.localhost",
+        "test.localhost",
+        # The name ERPlora's own hub had before is served no more.
+        "erplora.localhost",
         # The bare host and an IP are no hub.
         "localhost:8000",
         "127.0.0.1:8000",
@@ -310,13 +316,11 @@ def test_a_scope_without_a_hub_has_no_id(scope):
     assert (caught.value.status, caught.value.message) == (404, "Ningún hub responde en este host.")
 
 
-def test_erploras_own_hub_is_the_one_of_its_slug(settings):
-    # ERPlora's own hub issues ERPlora's invoices; it is named by its reserved slug (PLATFORM_HUB_SLUG). Apps ask
-    # here, never there.
-    settings.PLATFORM_HUB_SLUG = "erplora"
-
-    assert is_platform_hub(Scope("host", "erplora")) is True
-    assert is_platform_hub(Scope("host", "a")) is False
+@pytest.mark.parametrize(("slug", "expected"), [("erp", True), ("erplora", True), ("a", False), ("test", False)])
+def test_erploras_own_hub_is_the_one_of_its_name_and_of_the_one_it_had_before(slug, expected):
+    # ERPlora's own hub issues ERPlora's invoices. Its row keeps its former name until it is renamed, and it is the
+    # same hub under both. Apps ask here, never the setting.
+    assert is_platform_hub(Scope("host", slug)) is expected
 
 
 def a_stream_of_an_admin_of_a(make_user, language: str = "en"):

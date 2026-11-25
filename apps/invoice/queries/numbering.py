@@ -17,7 +17,7 @@ from apps.invoice.schemas.numbering import (
     NumberingStatusIn,
     NumberingStatusOut,
 )
-from apps.tax.queries import business_today
+from apps.tax.queries.jurisdiction import business_today
 
 
 @operation(

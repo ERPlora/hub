@@ -15,7 +15,7 @@ from live.errors import OperationError
 from live.operations import get
 
 from apps.tax.models import WHOLE_COUNTRY, TaxAlias, TaxCategory, TaxRule, TaxSettings
-from apps.tax.queries import business_jurisdiction
+from apps.tax.queries.jurisdiction import business_jurisdiction
 from apps.tax.schemas import REGION_TAX_KINDS, TAX_REGIONS
 from base.admin import ADMIN_HUB_SESSION_KEY
 

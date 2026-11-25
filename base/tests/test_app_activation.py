@@ -153,11 +153,13 @@ def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
 
 
 @HUB_DB
-def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platform(settings):
-    """ERPlora's own hub issues its invoices with Invoicing and VeriFactu; the worker's legacy scope is not it."""
-    settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG = "erplora", "worker-scope"
+@pytest.mark.parametrize("name", ["erp", "erplora"], ids=["renamed", "not-renamed-yet"])
+def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platform(settings, name):
+    """ERPlora's own hub issues its invoices with Invoicing and VeriFactu, under its name and under the one its row had
+    before; the worker's legacy scope is not it."""
+    settings.WORKER_SCOPE_SLUG = "worker-scope"
     graph = activation.module_graph()
-    scope = Scope("host", "erplora")
+    scope = Scope("host", name)
     assert activation.off_apps(scope) == frozenset()
     assert activation.states_of(scope) == activation.every_on(graph)
     assert {"invoice", "verifactu", "whatsapp_inbox"} <= apps_on.active_apps(scope)

@@ -42,6 +42,17 @@ PLAN_LIMITS = BellCounter(
     body=_("Your business is reaching what its plan includes: some things may stop or slow down until you upgrade."),
     action_label=_("See the plan’s usage"),
 )
+ROLES_TO_REVIEW = BellCounter(
+    key="roles_to_review",
+    operation="",
+    route="/employees#roles",
+    label=_("Roles to review"),
+    icon="ion:shield-checkmark-outline",
+    severity="info",
+    title=ngettext_lazy("%(count)d role to review", "%(count)d roles to review", "count"),
+    body=_("An app turned on or a new permission is not in them yet: look at what each role allows."),
+    action_label=_("Review the roles"),
+)
 
 
 def notice(key: str, counter: BellCounter, row: Mapping[str, Any] | None) -> dict:

@@ -44,7 +44,7 @@ class Setting(NamedTuple):
 BOOLEAN = re.compile("true|false")
 SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 SETTINGS = {
-    "PLATFORM_HUB_SLUG": Setting(SLUG, SERVING, "erplora"),
+    "PLATFORM_HUB_SLUG": Setting(SLUG, SERVING, "erp"),
     LOCK: Setting(BOOLEAN, SERVING, "false"),
     "VERIFACTU_ERPLORA_ROUTE_ENABLED": Setting(BOOLEAN, SERVING, "true"),
 }
