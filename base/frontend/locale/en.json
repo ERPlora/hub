@@ -935,8 +935,7 @@
         "basedOn": "Based on",
         "help": "It will allow the same as that role. Then adjust what it allows.",
         "create": "Create role",
-        "created": "Role {name} created",
-        "error": "The role could not be created"
+        "created": "Role {name} created"
       },
       "remove": {
         "title": "Delete role",

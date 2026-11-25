@@ -935,8 +935,7 @@
         "basedOn": "A partir de",
         "help": "Permitirá lo mismo que ese rol. Después ajustas lo que permite.",
         "create": "Crear rol",
-        "created": "Rol {name} creado",
-        "error": "No se pudo crear el rol"
+        "created": "Rol {name} creado"
       },
       "remove": {
         "title": "Borrar rol",
