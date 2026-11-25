@@ -612,7 +612,7 @@ def test_a_cut_renews_its_lease_around_every_long_step(phase_one, monkeypatch):
     monkeypatch.setattr(ops, "clone_database", spy("clone", ops.clone_database))
     monkeypatch.setattr(photo_services, "apply_kept_photo", spy("seed", photo_services.apply_kept_photo))
     monkeypatch.setattr(cut, "_copy_group", spy("group", cut._copy_group))
-    monkeypatch.setattr(cut.migrator, "ensure_schema", spy("schema", cut.migrator.ensure_schema))
+    monkeypatch.setattr(cut.migrator.schema, "ensure_schema", spy("schema", cut.migrator.schema.ensure_schema))
 
     run("--copy-all", aurora.slug, "--no-dump")
 

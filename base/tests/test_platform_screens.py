@@ -12,6 +12,7 @@ from base.platform_screens import SCREENS
 
 FRONTEND = settings.BASE_DIR / "base" / "frontend"
 ROUTE = re.compile(r"path: '([^']+)'")
+ROUTE_META = re.compile(r"path: '([^']+)',\n(?:(?!path: ).)*?meta: \{([^}]*)\}", re.DOTALL)
 HASH = re.compile(r"'(#[a-z]+)'")
 SETTINGS_TAB = re.compile(r"\{ id: '(\w+)'.*permission: '([\w.]+)' \}")
 
@@ -48,6 +49,13 @@ def test_each_screen_has_an_id_and_an_address_of_its_own():
 def test_each_address_is_a_route_of_the_platform_with_its_parameters_unread():
     routes = set(ROUTE.findall(source("routes.ts")))
     assert [screen.path for screen in SCREENS if screen.path.partition("#")[0] not in routes] == []
+
+
+def test_the_routes_that_offer_the_help_are_those_with_a_screen_in_it():
+    routes = dict(ROUTE_META.findall(source("routes.ts")))
+    assert {screen.path.partition("#")[0] for screen in SCREENS} == {
+        path for path, meta in routes.items() if "help: true" in meta
+    }
 
 
 @pytest.mark.parametrize(

@@ -55,7 +55,7 @@ def test_every_hub_app_fits_a_hub_s_own_database():
     }
 
     assert PEOPLE_APPS | WAITED_FOR_THEM <= every_hub_app
-    assert set(migrator.portable_apps()) == every_hub_app
+    assert set(migrator.app_sets.portable_apps()) == every_hub_app
 
 
 @pytest.mark.parametrize(
@@ -66,11 +66,11 @@ def test_every_hub_app_fits_a_hub_s_own_database():
     ],
 )
 def test_each_vertical_s_template_holds_its_whole_list(vertical, its_people_apps):
-    """The templates ``migrate_hubs`` builds (``migrator.templates``): ``hub_template_<vertical>`` with every app of
+    """The templates ``migrate_hubs`` builds (``migrator.hub_templates.templates``): ``hub_template_<vertical>`` with every app of
     the vertical, none left out."""
     wanted = set(catalog.template_apps(vertical))
     [template] = [
-        template for template in migrator.templates("hub") if template.db_name == names.template_db_name("hub", vertical)
+        template for template in migrator.hub_templates.templates("hub") if template.db_name == names.template_db_name("hub", vertical)
     ]
 
     assert its_people_apps <= wanted
@@ -79,7 +79,7 @@ def test_each_vertical_s_template_holds_its_whole_list(vertical, its_people_apps
 
 
 def test_every_vertical_s_list_fits():
-    portable = set(migrator.portable_apps())
+    portable = set(migrator.app_sets.portable_apps())
 
     assert {vertical: set(catalog.template_apps(vertical)) - portable for vertical in catalog.known_verticals()} == {
         vertical: set() for vertical in catalog.known_verticals()

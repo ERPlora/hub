@@ -1,23 +1,20 @@
-"""Writes of the combo app: menus, courses and choices (WORKBOOK COMBO-F02 to F06, F12, F13).
-
-Each write is one transaction with its events in the outbox; only the fields sent change; a new
-course or choice goes last; reordering takes the whole list at once. Refusals about a field carry it,
-so the screen puts them next to it.
-"""
+"""Writes of a course's choices (WORKBOOK COMBO-F06, F12) and the reaction to a product deleted in Inventory
+(COMBO-F13). A choice is a product that can be sold by the unit; a new one goes last, a change keeps its place."""
 
 import pytest
 from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.models import OutboxEvent
 
-from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
+from apps.combo.models import ChoiceOption
+from apps.combo.schemas.choices import OptionBulkIn
+from apps.combo.services.choices import bulk_create_options
 
 from .conftest import (
     A,
     DRINK,
-    FOOD,
     HUB_DB,
     ctx_for,
+    events,
     make_combo,
     make_group,
     make_option,
@@ -26,285 +23,6 @@ from .conftest import (
 )
 
 pytestmark = HUB_DB
-
-
-def events(name: str) -> list[dict]:
-    return [
-        event.payload
-        for event in OutboxEvent.objects.filter(name=name).order_by("created_at", "id")
-    ]
-
-
-# Menus (COMBO-F02, F03, F04)
-
-
-def test_a_menu_eaten_in_is_created_with_its_tax_category():
-    menu = run(
-        "combo.combo.create",
-        {
-            "name": "Menu of the day",
-            "kitchen_name": "MENU",
-            "price": 1350,
-            "tax_category_key": FOOD,
-        },
-        ctx_for(actor="marta"),
-    )
-    combo = Combo.objects.get(pk=menu.id)
-    assert (
-        combo.name,
-        combo.kitchen_name,
-        combo.price,
-        combo.supply_kind,
-        combo.tax_category.key,
-    ) == (
-        "Menu of the day",
-        "MENU",
-        1350,
-        "service",
-        FOOD,
-    )
-    assert (combo.created_by, combo.updated_by) == ("marta", "marta")
-    assert (menu.sellable, menu.groups) == (False, [])
-    assert events("combo.combo.created") == [
-        {"id": str(combo.id), "name": "Menu of the day"}
-    ]
-
-
-def test_a_menu_eaten_in_without_a_tax_category_is_refused_on_the_field():
-    with pytest.raises(InvalidPayload) as caught:
-        run("combo.combo.create", {"name": "Menu of the day", "price": 1350})
-    assert caught.value.fields == {
-        "tax_category_key": "A menu eaten in needs its own VAT category: without it, it cannot be billed."
-    }
-    assert Combo.objects.count() == 0
-    assert events("combo.combo.created") == []
-
-
-def test_an_unknown_tax_category_is_refused_on_the_field():
-    with pytest.raises(InvalidPayload) as caught:
-        run("combo.combo.create", {"name": "x", "tax_category_key": "nope.nope"})
-    assert caught.value.fields == {
-        "tax_category_key": "That tax category does not exist in Taxes."
-    }
-
-
-def test_a_menu_to_take_away_needs_no_tax_category():
-    menu = run(
-        "combo.combo.create",
-        {"name": "Sandwich pack", "price": 600, "supply_kind": "goods"},
-    )
-    assert (menu.supply_kind, menu.tax_category_key) == ("goods", None)
-
-
-def test_only_a_manager_builds_menus():
-    with pytest.raises(PermissionDenied):
-        run(
-            "combo.combo.create",
-            {"name": "x", "supply_kind": "goods"},
-            ctx_for("hub_employee"),
-        )
-
-
-def test_a_change_touches_only_what_is_sent():
-    combo = make_combo(
-        "Menu of the day",
-        price=1350,
-        kitchen_name="MENU",
-        sort_order=3,
-        is_active=False,
-    )
-    menu = run(
-        "combo.combo.update",
-        {"combo": "menu of the day", "price": 1400},
-        ctx_for(actor="ana"),
-    )
-    combo.refresh_from_db()
-    # The old module put it back on sale, at order 0 and without kitchen name: not any more.
-    assert (combo.price, combo.is_active, combo.sort_order, combo.kitchen_name) == (
-        1400,
-        False,
-        3,
-        "MENU",
-    )
-    assert combo.updated_by == "ana"
-    assert menu.price == 1400
-    assert events("combo.combo.updated") == [
-        {"id": str(combo.id), "name": "Menu of the day"}
-    ]
-
-
-def test_a_change_that_changes_nothing_says_nothing():
-    combo = make_combo(price=1350)
-    run("combo.combo.update", {"id": str(combo.id), "price": 1350})
-    assert events("combo.combo.updated") == []
-
-
-def test_eaten_in_needs_a_category_and_take_away_may_clear_it():
-    pack = make_combo("Pack", supply_kind="goods")
-    with pytest.raises(InvalidPayload) as caught:
-        run("combo.combo.update", {"id": str(pack.id), "supply_kind": "service"})
-    assert set(caught.value.fields) == {"tax_category_key"}
-    menu = make_combo("Menu")
-    run(
-        "combo.combo.update",
-        {"id": str(menu.id), "supply_kind": "goods", "tax_category_key": None},
-    )
-    menu.refresh_from_db()
-    assert (menu.supply_kind, menu.tax_category) == ("goods", None)
-    with pytest.raises(InvalidPayload):
-        run(
-            "combo.combo.update",
-            {"id": str(menu.id), "supply_kind": "service", "tax_category_key": None},
-        )
-
-
-def test_withdrawing_a_menu_takes_its_courses_and_choices():
-    combo = make_combo("Menu of the day")
-    make_option(make_group(combo), make_product())
-    assert run("combo.combo.delete", {"combo": "Menu of the day"}).id == combo.id
-    assert (
-        Combo.objects.count(),
-        ChoiceGroup.objects.count(),
-        ChoiceOption.objects.count(),
-    ) == (0, 0, 0)
-    assert events("combo.combo.deleted") == [
-        {"id": str(combo.id), "name": "Menu of the day"}
-    ]
-    with pytest.raises(NotFound):
-        run("combo.combo.delete", {"id": str(combo.id)})
-
-
-# Courses (COMBO-F05)
-
-
-def test_a_course_goes_last_in_its_menu():
-    combo = make_combo("Menu of the day")
-    make_group(combo, "Starters", sort_order=7)
-    course = run(
-        "combo.group.create",
-        {
-            "combo": "menu of the day",
-            "name": "Mains",
-            "min_choices": 1,
-            "max_choices": 2,
-        },
-    )
-    assert (
-        course.name,
-        course.sort_order,
-        course.min_choices,
-        course.max_choices,
-        course.options,
-    ) == (
-        "Mains",
-        8,
-        1,
-        2,
-        [],
-    )
-    assert events("combo.group.created") == [
-        {"id": str(course.id), "combo_id": str(combo.id)}
-    ]
-
-
-def test_two_courses_with_the_same_name_in_one_menu_are_refused():
-    combo = make_combo()
-    make_group(combo, "Starters")
-    with pytest.raises(Conflict) as caught:
-        run("combo.group.create", {"combo_id": str(combo.id), "name": "STARTERS"})
-    assert caught.value.code == "combo.group_exists"
-    assert caught.value.fields == {"name": "That menu already has a course “STARTERS”."}
-
-
-def test_a_menu_holds_twenty_courses_at_most():
-    combo = make_combo()
-    for n in range(20):
-        make_group(combo, f"Course {n}")
-    with pytest.raises(Conflict) as caught:
-        run("combo.group.create", {"combo_id": str(combo.id), "name": "One more"})
-    assert (caught.value.code, caught.value.message) == (
-        "combo.too_many_groups",
-        "A menu holds 20 courses at most.",
-    )
-
-
-def test_a_course_change_keeps_its_place_and_what_is_not_sent():
-    combo = make_combo("Menu of the day")
-    course = make_group(
-        combo, "Starters", sort_order=4, min_choices=1, max_choices=2, allow_repeat=True
-    )
-    out = run(
-        "combo.group.update",
-        {"combo": "Menu of the day", "group": "starters", "min_choices": 2},
-    )
-    course.refresh_from_db()
-    # The old module sent it to the top and back to 1 and 1.
-    assert (
-        course.sort_order,
-        course.min_choices,
-        course.max_choices,
-        course.allow_repeat,
-    ) == (4, 2, 2, True)
-    assert out.min_choices == 2
-    assert events("combo.group.updated") == [
-        {"id": str(course.id), "combo_id": str(combo.id)}
-    ]
-
-
-def test_a_course_change_checks_the_ceiling_against_what_it_keeps():
-    course = make_group(make_combo(), "Mains", min_choices=1, max_choices=1)
-    with pytest.raises(InvalidPayload) as caught:
-        run("combo.group.update", {"id": str(course.id), "min_choices": 3})
-    assert caught.value.fields == {
-        "min_choices": "The maximum (1) is below the minimum (3): nobody could ever satisfy this course."
-    }
-
-
-def test_renaming_a_course_to_a_name_in_use_is_refused():
-    combo = make_combo()
-    make_group(combo, "Starters")
-    mains = make_group(combo, "Mains")
-    with pytest.raises(Conflict) as caught:
-        run("combo.group.update", {"id": str(mains.id), "name": "starters"})
-    assert caught.value.code == "combo.group_exists"
-
-
-def test_withdrawing_a_course_takes_its_choices():
-    course = make_group(make_combo())
-    make_option(course, make_product())
-    assert run("combo.group.delete", {"id": str(course.id)}).id == course.id
-    assert (ChoiceGroup.objects.count(), ChoiceOption.objects.count()) == (0, 0)
-    assert events("combo.group.deleted") == [
-        {"id": str(course.id), "combo_id": str(course.combo_id)}
-    ]
-
-
-def test_reordering_courses_saves_the_whole_order_at_once():
-    combo = make_combo()
-    a, b, c = (make_group(combo, name) for name in ("A", "B", "C"))
-    menu = run(
-        "combo.group.reorder",
-        {"id": str(combo.id), "group_ids": [str(c.id), str(a.id), str(b.id)]},
-    )
-    assert [g.name for g in menu.groups] == ["C", "A", "B"]
-    assert [g.sort_order for g in menu.groups] == [0, 1, 2]
-    assert events("combo.group.reordered") == [{"combo_id": str(combo.id)}]
-
-
-def test_reordering_needs_every_course_of_the_menu_and_nothing_else():
-    combo = make_combo()
-    a, b = make_group(combo, "A"), make_group(combo, "B")
-    other = make_group(make_combo("Other"), "X")
-    for ids in ([a.id], [a.id, b.id, other.id], [a.id, other.id]):
-        with pytest.raises(Conflict) as caught:
-            run(
-                "combo.group.reorder",
-                {"id": str(combo.id), "group_ids": [str(i) for i in ids]},
-            )
-        assert caught.value.code == "combo.reorder_mismatch"
-
-
-# Choices (COMBO-F06, F12)
 
 
 def test_a_choice_is_a_product_named_as_said_and_goes_last():
@@ -567,3 +285,14 @@ def test_a_product_priced_per_several_units_is_not_a_portion():
     assert caught.value.code == "combo.product_not_by_unit"
     with pytest.raises(Conflict):
         run("combo.option.bulk_create", {"group_id": str(course.id), "product_ids": [str(napkins.id)]})
+
+
+def test_several_choices_that_would_pass_forty_are_refused_together():
+    course = make_group(make_combo())
+    for n in range(39):
+        make_option(course, make_product(f"Dish {n}"))
+    extra = [make_product("One more").id, make_product("And another").id]
+    with pytest.raises(Conflict) as caught:
+        bulk_create_options(ctx_for(), OptionBulkIn(group_id=course.id, product_ids=extra))
+    assert caught.value.code == "combo.too_many_options"
+    assert course.options.count() == 39

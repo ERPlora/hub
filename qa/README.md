@@ -106,7 +106,9 @@ no es uno de los tres.
   operaciones de un flujo son las de las filas que lo nombran en la columna `Flujos` de las tablas de servicios de los
   WORKBOOK, y qué es herramienta lo dice el registro de operaciones. La columna cita una operación en los flujos en los
   que la ejecuta quien los hace: una escritura del sistema va en el flujo del sistema, no en la consulta que enseña lo
-  que dejó. Un flujo que no usa ninguna operación lo dice con la clave `Operaciones: ninguna`, debajo de `Pantalla:`.
+  que dejó. La de otra app que pide la pantalla de un flujo se cita en la fila de esa app o en una tabla del WORKBOOK del
+  flujo. Lo que va entre comillas invertidas en `Servicio` es una operación o un modelo, y `Flujos` solo nombra flujos
+  del Hub. Un flujo que no usa ninguna operación lo dice con la clave `Operaciones: ninguna`, debajo de `Pantalla:`.
 
 | Grupo | Cuándo | Qué se espera al pedirlo hablando |
 |---|---|---|
@@ -114,12 +116,17 @@ no es uno de los tres.
 | `assistant only` | `Pantalla:` nombra solo al asistente | lo mismo, y no hay otro camino |
 | `cannot` | cualquier otro, también el que dice `Operaciones: ninguna` | dice que no lo hace él y en qué pantalla se hace |
 
-Después da lo que queda por escribir en los WORKBOOK, en tres listas: los flujos sin decidir, porque no se conoce
-ninguna de sus operaciones ni dicen que no usen ninguna; los que se contradicen, y las herramientas que no cita ningún
-flujo. Un flujo se contradice si `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, si lo nombra
-`Pantalla:` y las que se conocen no son herramientas ni las del propio panel del asistente, o si dice `Operaciones:
-ninguna` y una tabla lo cita. Que el asistente pueda hacerlo y `Actor:` no lo nombre
-no es una contradicción: lo dice su grupo.
+Después da lo que queda por escribir en los WORKBOOK, en cuatro listas que tienen que salir vacías:
+
+- los flujos sin decidir, porque no se conoce ninguna de sus operaciones ni dicen que no usen ninguna;
+- los que se contradicen: `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, lo nombra
+  `Pantalla:` y las que se conocen no son herramientas ni las del propio panel del asistente, o dice `Operaciones:
+  ninguna` y una tabla lo cita. Que el asistente pueda hacerlo y `Actor:` no lo nombre no es una contradicción: lo dice
+  su grupo;
+- las herramientas que no cita ningún flujo;
+- lo que se cita y no existe: un flujo que no está en ningún WORKBOOK o, en un flujo `hecho`, algo que no es una
+  operación del registro ni un modelo. El WORKBOOK de una app que aún no está hecha puede nombrar las operaciones que
+  tendrá.
 
 ## Cómo se mantiene
 
@@ -128,7 +135,8 @@ no es una contradicción: lo dice su grupo.
 
 - un recorrido cita un ID que no existe en ningún WORKBOOK o que no está `hecho`;
 - un flujo `hecho` con pantalla no está en ningún recorrido;
-- un recorrido no sigue el formato de arriba.
+- un recorrido no sigue el formato de arriba;
+- `qa_coverage --assistant` da algo en cualquiera de sus cuatro listas.
 
 Un flujo nuevo entra en el recorrido en el que lo haría una persona, en su sitio dentro de la sesión; si ninguno
 encaja, se escribe un recorrido nuevo.

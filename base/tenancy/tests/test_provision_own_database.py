@@ -24,7 +24,7 @@ HUB_DIR = Path(__file__).resolve().parents[3]
 @pytest.fixture
 def every_app_portable():
     """Every app a and b turn on can live in a hub's own database."""
-    assert migrator.hub_apps() == frozenset(migrator.portable_apps())
+    assert migrator.app_sets.hub_apps() == frozenset(migrator.app_sets.portable_apps())
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
                 assert hub.db_name in databases()
                 with use_hub(hub):
                     turned_on = set(AppActivation.objects.filter(host=hub.slug, state="on").values_list("app", flat=True))
-                assert {label for label in migrator.portable_apps() if label not in ("base", "live")} <= turned_on
+                assert {label for label in migrator.app_sets.portable_apps() if label not in ("base", "live")} <= turned_on
             assert "a: created (its own database)" in out.getvalue()
             # A second run leaves them as they are; one left cancelled is ready again, on the database it has.
             with use_hub(local["b"]):

@@ -156,7 +156,7 @@ def _read(copy, labels: list[str]) -> list[tuple[str, list[Recoverable], list[li
     """Each app of ``labels`` with what it gives back, the records its reads found in ``copy`` (one list a
     declaration) and why it gives nothing back (``""`` when it gives back what it read)."""
     declared_by_app = recoverable_apps()
-    code = migrator.code_migrations()
+    code = migrator.app_sets.code_migrations()
     read = []
     try:
         with ops.connect_ops(copy.db_name, cluster=copy.cluster) as conn:
@@ -182,7 +182,7 @@ def _applied(conn: psycopg.Connection) -> dict[str, set[str]]:
     return applied
 
 
-def _refusal(label: str, declared: list[Recoverable] | None, applied: set[str], code: migrator.CodeMigrations) -> str:
+def _refusal(label: str, declared: list[Recoverable] | None, applied: set[str], code: migrator.app_sets.CodeMigrations) -> str:
     """Why the copy cannot give back ``label``'s records, by its ``django_migrations`` there; ``""`` when it can."""
     if not declared:
         return f"recover_not_recoverable: {label} gives nothing back from a copy"

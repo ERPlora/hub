@@ -8,39 +8,15 @@ own database, cloned from the template for each test, through the migrator's ali
 """
 
 import hashlib
-import uuid
 
-import pytest
-from django.db import connections
-from django.db.migrations.executor import MigrationExecutor
+from base.tests.hub_migration import database, migrate
 
-from base.tenancy import connections as tenancy_connections
-from base.tenancy import names
-from base.tenancy.tests import hubs
+__all__ = ["database"]
 
 BEFORE = [("base", "0026_api_key_owner")]
 AFTER = [("base", "0027_api_key_actions")]
 EVERYTHING = ["read", "create", "update", "delete"]
 WRITING = ["create", "update", "delete"]
-
-
-@pytest.fixture
-def database(hub_databases, django_db_blocker):
-    """The migrator's connection to a business's database cloned from the template for the test, dropped after it."""
-    name = names.hub_db_name(hub_databases.control, uuid.uuid7())
-    with django_db_blocker.unblock(), hubs.clone_of_the_template(hub_databases, name):
-        database = connections[tenancy_connections.register_ddl_alias(name)]
-        try:
-            yield database
-        finally:
-            database.close()
-
-
-def migrate(database, targets):
-    executor = MigrationExecutor(database)
-    executor.loader.build_graph()
-    executor.migrate(targets)
-    return MigrationExecutor(database).loader.project_state(targets).apps
 
 
 def key(models, alias: str, name: str, **fields):

@@ -695,8 +695,8 @@ Pasos:
    con importe fijo, «Se aprueba: Descontar 5,00 € de la cuenta»), y un responsable lo aprueba con su
    PIN (o su placa) en ese mismo dispositivo. La cuenta guarda quién lo autorizó y al cobrar no se
    vuelve a pedir; si al cobrar el descuento pasa del máximo sin autorizar, se pregunta igual, con «Se
-   aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda lo aprobado
-   con su cifra.
+   aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda con su cifra lo
+   aprobado y también el que da por su cuenta quien puede darlo.
 Entra: «Permitir descuentos» y el descuento máximo de los ajustes. El asistente solo lo pone en una cuenta de la
 que se le habla (su mesa o su nombre): el descuento que un producto o una categoría lleva en todas las ventas es
 una regla de Tarifas (PRICING-F11).
@@ -1210,9 +1210,10 @@ anularla.»; anulada desde otro dispositivo a la vez, «Esta venta ya está anul
 dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se pulsa «Cancelar», no se
 anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
 lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
-bono que vuelven, el stock y la ficha del cliente; quién la aprobó queda en **Empleados › Aprobaciones**. Si el rol pasa
-a «No» con la ventana abierta, la anulación se rechaza y no se anula nada, aunque un responsable ya la hubiera aprobado.
-Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
+bono que vuelven, el stock y la ficha del cliente; quién la aprobó, o que la hizo por su cuenta quien puede, queda en
+**Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la anulación se rechaza y no se
+anula nada, aunque un responsable ya la hubiera aprobado.
+Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
 Estado: hecho
@@ -1253,9 +1254,10 @@ marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para
 el Hub no contesta, volver a pulsar no devuelve dos veces. Si en «Hace falta una aprobación»
 se pulsa «Cancelar», no se devuelve nada y la ventana dice «Esto necesita la aprobación de un
 encargado.». La devolución aprobada es la misma, una sola vez, con su rectificativa y las sesiones de
-bono que vuelven; quién la aprobó queda en **Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la
-devolución se rechaza y no se devuelve nada, aunque un responsable ya la hubiera aprobado.
-Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
+bono que vuelven; quién la aprobó, o que la hizo por su cuenta quien puede, queda en **Empleados › Aprobaciones**.
+Si el rol pasa a «No» con la ventana abierta, la devolución se rechaza y no se devuelve nada, aunque un
+responsable ya la hubiera aprobado.
+Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUSTOMER-F22) e Inventario
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
 
@@ -1589,7 +1591,7 @@ atribuyeron. Una que no ve no existe para ella (404 `sale.sale_not_found`).
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Los pasos que añaden al cobro las apps encendidas, los que ve quien cobra y en su orden: de qué app es cada uno y qué parte suya lo pinta; sin ninguno, el cobro no acepta nada añadido | cobrar | F39 | `sale.checkout.steps` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
-| Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
+| Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19, F40 | `sale.order.get` |
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
 | Los ajustes del TPV (para editarlos) | ajustes | F34 | `sale.settings.get` |
 | Los ajustes que el TPV necesita para vender | ver ventas | F01–F05 | `sale.pos_settings.get` |
@@ -1616,9 +1618,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Vuelve a imprimir el tique o la factura de una venta, con «DUPLICADO», por la impresora de tiques; si ninguna lo recibe (o su documento fiscal está pendiente, o no se puede leer su QR), falla y dice por qué, y la pantalla lo imprime en el dispositivo | ver ventas | F29 | `sale.sale.print` |
 | Devuelve dinero de una venta por cobro, y las líneas que vuelven (las pagadas con bono devuelven su sesión); con su rectificativa en la misma devolución | devolver | F31, F32 | `sale.sale.refund` |
 | Abre una cuenta, con o sin líneas (artículos, servicios —a su precio reservado o al de la profesional— o precio libre); la de una cita que ya tiene una abierta devuelve esa (`already`) | montar la cuenta | F01, F17, F26, F38 | `sale.order.open` |
-| Añade un artículo del catálogo a una cuenta | montar la cuenta | F01, F10 | `sale.order.add_line` |
+| Añade un artículo del catálogo a una cuenta | montar la cuenta | F01, F10, F11, F40 | `sale.order.add_line` |
 | Añade un servicio de Servicios a una cuenta | montar la cuenta | F38 | `sale.order.add_service_line` |
-| Añade un menú de Menús y combos a una cuenta, con lo elegido en cada plato; Menús comprueba la elección y pone el precio | montar la cuenta | F12 | `sale.order.add_combo_line` |
+| Añade un menú de Menús y combos a una cuenta, con lo elegido en cada plato; Menús comprueba la elección y pone el precio | montar la cuenta | F12, F40, F42 | `sale.order.add_combo_line` |
 | Paga una línea de servicio con un bono de la clienta (reserva la sesión) | montar la cuenta y gastar sesiones | F27 | `sale.order.apply_voucher` |
 | Deshace el bono de una línea (suelta la sesión) | montar la cuenta y gastar sesiones | F27 | `sale.order.remove_voucher` |
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
@@ -1628,12 +1630,12 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Marca o quita la alergia del cliente en una línea sin enviar | montar la cuenta | F41 | `sale.order.set_line_allergy` |
 | Separa una línea de N unidades en N líneas | montar la cuenta | F27 | `sale.order.split_line` |
 | Quita una línea sin enviar | montar la cuenta | F01 | `sale.order.remove_line` |
-| Anula una línea ya enviada a cocina, con motivo | anular | F20 | `sale.order.void_line` |
+| Anula una línea ya enviada a cocina, con motivo | anular | F20, KITCHEN-F29 | `sale.order.void_line` |
 | Envía a cocina las líneas pendientes | montar la cuenta | F20 | `sale.order.fire` |
 | Divide una cuenta | montar la cuenta | F23 | `sale.order.split` |
 | Junta dos cuentas | montar la cuenta | F24 | `sale.order.merge` |
-| Anula una cuenta abierta (una vacía, sin líneas vivas ni cobros, con solo montar la cuenta) | anular; vacía: montar la cuenta | F18 | `sale.order.void` |
-| La misma anulación de una cuenta con algo pedido o cobrado, la que un responsable aprueba con su PIN | anular | F18 | `sale.order.void_ordered` |
+| Anula una cuenta abierta (una vacía, sin líneas vivas ni cobros, con solo montar la cuenta) | anular; vacía: montar la cuenta | F18, TABLE-F20 | `sale.order.void` |
+| La misma anulación de una cuenta con algo pedido o cobrado, la que un responsable aprueba con su PIN | anular | F18, TABLE-F20 | `sale.order.void_ordered` |
 | Pone el descuento de la cuenta (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_discount`, `sale.order.set_discount_over_limit` |
 | Pone el descuento de una línea (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Pone el título de una cuenta (aparcar) | montar la cuenta | F17 | `sale.order.set_label` |
@@ -1708,6 +1710,14 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Citas** (opcional): la cita de una cuenta y lo que reservó, para cobrar su precio reservado
   (`appointment.appointment.get`).
 
+| De | Para qué | Flujos | Servicio |
+|---|---|---|---|
+| Inventario | Los artículos que se tocan o se buscan, con lo agotado, los que no tienen IVA y sus alérgenos | F07, F40 | `inventory.product.list` |
+| Inventario | Los alérgenos de los platos de un menú | F40 | `inventory.product.get` |
+| Suplementos | Los grupos y las opciones de un artículo, o de un plato de un menú | F11, F42 | `modifier.group.for_target` |
+| Menús y combos | Los menús que se pueden vender, con sus platos y elecciones | F12, F42 | `combo.combo.for_sale` |
+| VeriFactu | Si ahora se pueden emitir tiques y facturas, y si no, por qué | F07 | `verifactu.config.get` |
+
 ### Quién la usa
 
 | App | Para qué | Servicio |
@@ -1750,8 +1760,8 @@ con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para
 y devolver una venta, anular una línea enviada a cocina, eliminar una cuenta con algo pedido, vender a
 precio libre y los descuentos por encima del máximo. La acción aprobada hace todo lo que hace la del
 responsable (también lo que mueven Facturación y Servicios: la rectificativa y las sesiones de bono que
-vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras de todo
-el negocio, los ajustes y crear medios de pago no se aprueban.
+vuelven) y queda en **Empleados › Aprobaciones**, como la que el responsable hace por su cuenta (BASE-F85). Ver las
+ventas de todos, las cifras de todo el negocio, los ajustes y crear medios de pago no se aprueban.
 
 La gestoría (`hub_accountant`) solo lee: «Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas», «Ver
 los medios de pago» y «Ver las ventas de todos». No monta cuentas, no cobra, no anula ni devuelve, nadie le aprueba

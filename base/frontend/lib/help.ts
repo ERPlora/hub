@@ -2,6 +2,17 @@ import type { LiveClient } from '@erplora/ui/sdk';
 
 import type { AppHelp, HelpFlow, HelpScreen } from '../operations-help';
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** A screen of the Hub itself with help of its own (`base/platform_screens.py`). */
+    help?: boolean;
+  }
+}
+
+/** The app whose help is the one of the Hub's own screens, and the name it goes by until it is read. */
+export const PLATFORM = 'base';
+export const PLATFORM_NAME = 'ERPlora';
+
 export interface HelpFlowGroup {
   screen: HelpScreen;
   flows: HelpFlow[];
@@ -30,6 +41,13 @@ export function resolveScreen(screens: HelpScreen[], routePath: string): HelpScr
       return path === prefix || path.startsWith(`${prefix}/`);
     })
     .sort((one, other) => other.path.length - one.path.length)[0];
+}
+
+/** The Hub's own screen in view: `pattern` is its route with the parameters unread. A hash that names no tab of the page
+ *  opens the page's first tab, as the page itself does. */
+export function resolvePlatformScreen(screens: HelpScreen[], pattern: string, hash: string): HelpScreen | undefined {
+  const tabs = screens.filter((screen) => screen.path.split('#')[0] === pattern);
+  return tabs.find((screen) => screen.path === `${pattern}${hash}`) ?? tabs[0];
 }
 
 const folded = (text: string): string =>

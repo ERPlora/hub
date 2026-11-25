@@ -20,7 +20,7 @@ from base.tenancy.context import use_hub
 from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, run
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
-SERVICES_SOURCE = Path(services.__file__).read_text()
+SERVICES_SOURCE = "".join(path.read_text() for path in sorted(Path(services.__file__).parent.glob("*.py")))
 
 MENU = [events.COMBO_CREATED, events.COMBO_UPDATED, events.COMBO_DELETED]
 TREE = [

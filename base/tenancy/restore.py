@@ -27,7 +27,7 @@ time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewe
    template's tables (only while the kept copy is there with its note: what has the hub's name then is never its data)
    and closed to the app until the end; filled in one transaction by ``pg_restore`` reading the copy from the bucket on
    its input (``move._restore_from_bucket``); its identity (``base_hub_identity``) checked and its schema brought to
-   the code's leaf (``migrator.ensure_schema``: it learns the apps the copy has). Each half of the copy has
+   the code's leaf (``migrator.schema.ensure_schema``: it learns the apps the copy has). Each half of the copy has
    ``move.COPY_TIMEOUT_SECONDS``; the host answers «maintenance» for both.
 6. **Ended**: opened to the app, and control ends the restore and dates the kept copy in one transaction.
 

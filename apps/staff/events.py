@@ -1,4 +1,4 @@
-"""Events of the staff app (``<app>.<entity>.<fact>``): recorded by services.py, cited by live.py.
+"""Events of the staff app (``<app>.<entity>.<fact>``): recorded by services, cited by live.py.
 
 Their payloads carry ids only, never a reason for leaving or for an absence (personal data; sick
 leave is health data). The staff app reacts to no event of another app.

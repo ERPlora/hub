@@ -162,16 +162,6 @@
     ]
   },
   {
-    "path": "apps/invoice/services/series.py",
-    "file_name": "series.py",
-    "functions": [
-      {
-        "name": "update_series",
-        "complexity": 17
-      }
-    ]
-  },
-  {
     "path": "apps/kitchen/queries/state.py",
     "file_name": "state.py",
     "functions": [
@@ -630,8 +620,8 @@
     ]
   },
   {
-    "path": "base/ws_print.py",
-    "file_name": "ws_print.py",
+    "path": "base/ws_print/protocol.py",
+    "file_name": "protocol.py",
     "functions": [
       {
         "name": "PrintSocket::_on_stream",

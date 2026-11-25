@@ -83,9 +83,9 @@ def _activate_in(hub, now: dt.datetime) -> None:
         )
     else:
         try:
-            migrator.ensure_schema(hub, add=apps, lock_wait=ACTIVATION_LOCK_WAIT)
+            migrator.schema.ensure_schema(hub, add=apps, lock_wait=ACTIVATION_LOCK_WAIT)
             outcome = "created"
-        except migrator.SchemaLocked:
+        except migrator.schema.SchemaLocked:
             outcome = "locked"
         except Exception as failure:
             outcome, error = "failed", f"{type(failure).__name__}: {failure}"
@@ -98,6 +98,6 @@ def _activate_in(hub, now: dt.datetime) -> None:
 
 
 @cache
-def _code() -> migrator.CodeMigrations:
+def _code() -> migrator.app_sets.CodeMigrations:
     """This code's migration graph (its leaves and nodes): it never changes while the process runs."""
-    return migrator.code_migrations()
+    return migrator.app_sets.code_migrations()

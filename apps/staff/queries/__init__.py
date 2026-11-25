@@ -1,4 +1,4 @@
-"""Read operations of the staff app (``READ ONLY``), and the loaders services.py reuses.
+"""Read operations of the staff app (``READ ONLY``), and the loaders services reuses.
 
 A terminated record is the app's soft delete: no query returns it, nor its schedules or its time
 off. «Today» is the business's day, on its clock (``reads.business_today``). A staff member may

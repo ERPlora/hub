@@ -12,7 +12,8 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import PrintDevice, Printer
-from apps.printing.queries import active_devices, actor, device_row, find_device, this_device_key
+from apps.printing.queries.device_reads import active_devices, device_row, find_device, this_device_key
+from apps.printing.queries.jobs import actor
 from apps.printing.schemas import DeviceOut, DeviceRefIn, DeviceRegisterIn, DeviceSeenIn, DeviceSeenOut, DeviceUpdateIn
 from apps.printing.services.writes import MANAGE_SETTINGS
 

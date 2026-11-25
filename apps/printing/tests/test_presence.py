@@ -45,7 +45,7 @@ def went_quiet(minutes: int = 10):
 
 
 async def test_an_employees_till_is_seen_at_its_hello_and_at_every_beat(sockets, session, monkeypatch, caplog):
-    monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
+    monkeypatch.setattr(ws_print.presence, "PRESENCE_SECONDS", 0)
     cookie = await db(session, "eva", host=A.key, role=Membership.Role.EMPLOYEE)
     till = await db(printer, scope=A)
     await db(set_up, DEVICE, till, scope=A)

@@ -36,6 +36,7 @@ una línea de import; lo que no importa ninguno de ellos está en los demás mó
 | `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
 | `saas-photo.ts` | la foto de erplora.com de `a` para una spec que cambia lo que dice (sus personas, su plan…): guardada antes de la ejecución, enviada más nueva y firmada como la manda el SaaS, y devuelta después (`keepPhotoOfA`) |
 | `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
+| `table-columns.ts` | cómo reparte su ancho una lista `DataTable`, columna a columna, cuando deja de moverse (`steady`): lo que mide cada una, lo que corta y si la cabecera cae encima de sus celdas |
 | `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
 | `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
 | `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
