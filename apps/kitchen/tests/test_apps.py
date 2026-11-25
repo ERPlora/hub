@@ -119,6 +119,8 @@ def test_every_new_ticket_has_a_device_notice_that_opens_the_kitchen_display():
 #: The reads that are no assistant tool: what names a station and a dish on the assistant's card (hub#671); the
 #: model reads the stations from their list and the dishes with their ticket.
 INTERNAL_READS = {"kitchen.station.get", "kitchen.item.get"}
+#: The writes whose card orders its data (``ai={"summary": …}``): a ticket by hand says its dishes after where it goes.
+SUMMARIZED = {"kitchen.ticket.create"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -135,6 +137,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        expected |= {"summary"} if op.name in SUMMARIZED else set()
         if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
             expected |= {"asks"}
             said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
