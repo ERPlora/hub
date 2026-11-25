@@ -10,6 +10,124 @@
       "retry": "Reintentar",
       "invalid": "Escribe la propina como un importe.",
       "notSaved": "La venta está cobrada, pero la propina no se ha guardado."
+    },
+    "title": "Propinas",
+    "tabs": {
+      "label": "Secciones de Propinas"
+    },
+    "list": {
+      "period": {
+        "label": "Periodo",
+        "today": "Hoy",
+        "week": "7 días",
+        "month": "30 días"
+      },
+      "search": "Buscar venta o persona…",
+      "add": "Anotar propina",
+      "loading": "Cargando propinas…",
+      "loadError": "No se han podido cargar las propinas.",
+      "empty": "Todavía no hay propinas.",
+      "emptyMessage": "Las propinas que se cobran en el TPV, y las que se anotan aquí, salen en esta lista.",
+      "noResults": "Ninguna propina coincide",
+      "noResultsMessage": "Prueba con otra búsqueda, otro periodo u otros filtros.",
+      "entity": {
+        "one": "propina",
+        "many": "propinas"
+      },
+      "columns": {
+        "date": "Fecha",
+        "sale": "Venta",
+        "for": "Para",
+        "method": "Forma de pago",
+        "amount": "Importe",
+        "status": "Estado"
+      },
+      "pool": "Al bote",
+      "unassigned": "Sin asignar",
+      "status": {
+        "active": "Activa",
+        "voided": "Anulada"
+      },
+      "methodTypes": {
+        "cash": "Efectivo",
+        "card": "Tarjeta",
+        "transfer": "Transferencia",
+        "other": "Otra"
+      },
+      "actions": {
+        "adjust": "Ajustar",
+        "void": "Anular"
+      }
+    },
+    "form": {
+      "title": "Anotar propina",
+      "target": {
+        "label": "De dónde viene",
+        "sale": "De una venta",
+        "pool": "Al bote, sin tique"
+      },
+      "sale": "Número de venta",
+      "method": "Forma de pago",
+      "amount": "Importe",
+      "poolHint": "El efectivo contado del bote: entra en la caja abierta y se reparte con las reglas del día.",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "failed": "No se ha podido anotar la propina.",
+      "done": "Propina anotada.",
+      "amountInvalid": "Escribe la propina como un importe mayor que cero."
+    },
+    "adjust": {
+      "title": "Ajustar la propina de {sale}",
+      "poolTitle": "Ajustar una propina del bote",
+      "amount": "Importe",
+      "for": "Para",
+      "searchPerson": "Buscar una persona…",
+      "noPerson": "Nadie del equipo coincide.",
+      "reason": "Motivo",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "failed": "No se ha podido ajustar la propina.",
+      "done": "Propina ajustada."
+    },
+    "void": {
+      "title": "Anular la propina de {sale}",
+      "poolTitle": "Anular una propina del bote",
+      "explain": "La propina se queda en la lista como anulada, con tu motivo. Si era en efectivo, sale de la caja abierta.",
+      "reason": "Motivo",
+      "confirm": "Anular",
+      "cancel": "Cancelar",
+      "failed": "No se ha podido anular la propina.",
+      "done": "Propina anulada."
+    },
+    "settings": {
+      "heading": "Propinas al cobrar",
+      "intro": "Lo que ofrece la hoja Cobro: tres sugerencias por cada forma de pago, cada una un porcentaje del total de la cuenta antes de descuentos o un importe.",
+      "loading": "Cargando los ajustes…",
+      "loadError": "No se han podido cargar los ajustes.",
+      "enabled": "Pedir propina al cobrar",
+      "allowCustom": "Permitir otra cantidad",
+      "preselected": {
+        "label": "Sale marcada",
+        "none": "Sin propina",
+        "option": "Sugerencia {n}"
+      },
+      "methods": "Sugerencias por forma de pago",
+      "suggestion": "Sugerencia {n}",
+      "kind": {
+        "label": "Tipo de la sugerencia {n}",
+        "percent": "%",
+        "amount": "Importe"
+      },
+      "noMethods": "Ventas todavía no tiene ninguna forma de pago activa.",
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "saveError": "No se han podido guardar los ajustes.",
+      "noPermission": "No tienes permiso para cambiar estos ajustes.",
+      "errors": {
+        "percent": "Escribe un porcentaje del 1 al 100.",
+        "amount": "Escribe un importe mayor que cero.",
+        "same": "Esa sugerencia ya está."
+      }
     }
   }
 }
