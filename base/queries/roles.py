@@ -23,7 +23,8 @@ from base.approvals import approvable_permissions
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
 from base.permissions import (
-    RoleHeld, VIEW_HOME, grantable, permissions_of_business_role, permissions_of_role, role_held, states_of_business_role,
+    INVITATION_ALONE, RoleHeld, VIEW_HOME, grantable, permissions_of_business_role, permissions_of_role, role_held,
+    states_of_business_role,
 )
 from base.roles import APPROVAL, basic_state, to_review
 from base.schemas.roles import RoleDetailOut, RoleIn, RoleListIn, RoleListOut
@@ -57,18 +58,17 @@ ROLE_NOT_FOUND = _("This role does not exist in this business.")
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
     """Employees › Roles: erplora.com's, from the top, and the business's own by their name."""
-    members, on = members_by_role(ctx.scope), configs_on(ctx.scope)
+    members, on, ruling = members_by_role(ctx.scope), configs_on(ctx.scope), ruling_key(ctx)
     own = sorted(BusinessRole.objects.all(), key=lambda role: role.name.casefold())
     with translation.override(ctx.language):
-        return {
-            "roles": [
-                *(
-                    {**_basic_out(role, members), "permissions": len(permissions_of_role(role.value))}
-                    for role in people_rules.ROLE_ORDER
-                ),
-                *(_own_row(role, members, on) for role in own),
-            ]
-        }
+        rows = [
+            *(
+                {**_basic_out(role, members), "permissions": len(permissions_of_role(role.value))}
+                for role in people_rules.ROLE_ORDER
+            ),
+            *(_own_row(role, members, on) for role in own),
+        ]
+    return {"roles": [{**row, "mine": row["key"] == ruling} for row in rows]}
 
 
 @operation(
@@ -97,10 +97,13 @@ def role_detail(ctx: OperationContext, data: RoleIn) -> dict:
         on = configs_on(ctx.scope)
         members = members_by_role(ctx.scope)
         if basic is not None:
-            return {**_basic_out(basic, members), "apps": _panels(on, states_of(RoleHeld(basic.value, None), on))}
-        role = business_role(data.role)
-        review = to_review(role.states, grantable(on))
-        return {**_own_out(role, members, on), "apps": _panels(on, states_of(RoleHeld(role.origin, role), on), review)}
+            found = {**_basic_out(basic, members), "apps": _panels(on, states_of(RoleHeld(basic.value, None), on))}
+        else:
+            role = business_role(data.role)
+            review = to_review(role.states, grantable(on))
+            apps = _panels(on, states_of(RoleHeld(role.origin, role), on), review)
+            found = {**_own_out(role, members, on), "apps": apps}
+    return {**found, "mine": found["key"] == ruling_key(ctx)}
 
 
 def states_of(held: RoleHeld, configs: list[LiveAppConfig]) -> dict[str, str]:
@@ -116,6 +119,14 @@ def states_of(held: RoleHeld, configs: list[LiveAppConfig]) -> dict[str, str]:
 def signed_in_role_held(ctx: OperationContext) -> RoleHeld | None:
     """What who asks is in this business; ``None`` for nobody, the platform, an API key or somebody of another one."""
     return role_held(ctx.actor, ctx.scope)
+
+
+def ruling_key(ctx: OperationContext) -> str | None:
+    """The key of the role that rules what who asks may do, as ``base.role.list`` names it; ``None`` without one."""
+    held = signed_in_role_held(ctx)
+    if held is None:
+        return None
+    return str(held.own.pk) if held.own is not None else held.invitation
 
 
 def role_label(held: RoleHeld) -> str:
@@ -161,17 +172,19 @@ def configs_on(scope: Scope) -> list[LiveAppConfig]:
 
 def members_by_role(scope: Scope) -> Counter[str]:
     """How many people of the business have each role, by its key. Whoever holds a role of the business counts in it and
-    not in the role of their invitation, save the owner, whom it never rules (``base.permissions.access_for``)."""
+    not in the role of their invitation, save the owner and the accountancy firm, whom it never rules
+    (``base.permissions.INVITATION_ALONE``)."""
     invited = {person["id"]: person["role"] for person in people_of(scope.key)}
-    ruled = [username for username, role in invited.items() if role != Membership.Role.OWNER]
+    ruled = [username for username, role in invited.items() if role not in INVITATION_ALONE]
     holders = HubUser.objects.filter(username__in=ruled, business_role__isnull=False)
     own = {username: str(role) for username, role in holders.values_list("username", "business_role_id")}
     return Counter((invited | own).values())
 
 
-def role_row(scope: Scope, role: BusinessRole) -> dict[str, Any]:
+def role_row(ctx: OperationContext, role: BusinessRole) -> dict[str, Any]:
     """A role of the business as the list shows it."""
-    return _own_row(role, members_by_role(scope), configs_on(scope))
+    row = _own_row(role, members_by_role(ctx.scope), configs_on(ctx.scope))
+    return {**row, "mine": row["key"] == ruling_key(ctx)}
 
 
 def _own_row(role: BusinessRole, members: Counter[str], on: list[LiveAppConfig]) -> dict[str, Any]:

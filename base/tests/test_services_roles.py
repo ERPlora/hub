@@ -91,7 +91,7 @@ class TestCreate:
         }
         assert response.json() == {
             "key": str(role.pk), "label": "Cashier", "description": "The till", "origin": "own", "members": 0,
-            "permissions": len(permissions_of_role(EMPLOYEE)), "to_review": False,
+            "permissions": len(permissions_of_role(EMPLOYEE)), "to_review": False, "mine": False,
         }
         assert facts(events.ROLE_CREATED) == [{"id": str(role.pk)}]
 

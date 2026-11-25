@@ -36,6 +36,7 @@ class RoleOut(Schema):
     to_review: bool = Field(
         description="The business's own: an app turned on or a permission added after it was saved is still to look at."
     )
+    mine: bool = Field(description="The role that rules what who asks may do: they see it and never change it.")
 
 
 class RoleRowOut(RoleOut):
