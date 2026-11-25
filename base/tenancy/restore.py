@@ -32,7 +32,7 @@ time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewe
 6. **Ended**: opened to the app, and control ends the restore and dates the kept copy in one transaction.
 
 Every step that drops, renames or ends first checks that the restore is still this worker's: it holds the hub's lease
-and the hub is still restored from that cluster, unasked to be undone (``control.services.still_restoring``; the end
+and the hub is still restored from that cluster, unasked to be undone (``control.services.worker_move.still_restoring``; the end
 checks it again on its locked row). A worker whose lease ran out leaves everything to whoever holds it now.
 
 Any failure before the end puts the hub's own database back, nothing lost: the new one dropped (only while the kept copy
@@ -101,7 +101,7 @@ def run_due(
     while); how many it worked on. ``roles``: the app's roles its database is closed to (default the environment's);
     ``cancelled``: whether the worker is stopping; ``source``: where each hub's copy is on its temporary cluster."""
     now = now or timezone.now()
-    for hub_id in control_services.hubs_restoring():
+    for hub_id in control_services.worker_move.hubs_restoring():
         # By the clock, never ``now``: a move before it in the same tick may have taken longer than the lease.
         if provisioning.claim_hub(hub_id, timezone.now(), LEASE) is None:
             continue
@@ -124,13 +124,13 @@ def restore_hub(
     """Put ``hub_id``'s database back from its copy, or undo its restore when it is to be undone, its lease held (see
     the module); a failure is undone and noted on it, never raised."""
     now = now or timezone.now()
-    hub = control_services.moving_row(hub_id)
+    hub = control_services.worker_move.moving_row(hub_id)
     if hub is None or hub.restoring_from is None:
         return
     control = tenancy_connections.control_name()
     roles = ops.environment_roles(control) if roles is None else roles
     origin = hub.restoring_from
-    note = control_services.pending_copy(hub.id)
+    note = control_services.worker_move.pending_copy(hub.id)
     kept_name = note.db_name if note is not None else names.kept_db_name(control, uuid.uuid7())
 
     def heartbeat() -> None:
@@ -139,8 +139,8 @@ def restore_hub(
     def ours(*, forward: bool = True) -> None:
         heartbeat()
         try:
-            control_services.still_restoring(hub.id, origin.pk, provisioning.LEASE_OWNER, forward=forward)
-        except control_services.MoveTaken as taken:
+            control_services.worker_move.still_restoring(hub.id, origin.pk, provisioning.LEASE_OWNER, forward=forward)
+        except control_services.worker_move.MoveTaken as taken:
             raise move.MoveStopped(str(taken)) from taken
 
     try:
@@ -192,9 +192,9 @@ def _back(hub, kept_name: str, roles, ours, *, reason: str) -> None:
         return
     except Exception as undo_error:
         logger.exception("base.tenancy.restore.undo_failed hub=%s: it stays restoring, undone next time.", hub.slug)
-        control_services.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
+        control_services.worker_move.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
         return
-    control_services.move_undone(hub.id, hub.cluster_id, kept_name, reason)
+    control_services.worker_move.move_undone(hub.id, hub.cluster_id, kept_name, reason)
     logger.info("base.tenancy.restore.undone hub=%s: %s", hub.slug, reason)
 
 
@@ -212,14 +212,14 @@ def run_aside_due(
     pass), then drop the copies past their days; how many it worked on. ``roles``, ``cancelled`` and ``source`` as in
     :func:`run_due` (``source`` by default :func:`source_name`)."""
     now = now or timezone.now()
-    for copy_id in control_services.copies_to_make():
-        row = control_services.claim_copy(copy_id, timezone.now(), LEASE, provisioning.LEASE_OWNER)
+    for copy_id in control_services.worker_copy.copies_to_make():
+        row = control_services.worker_copy.claim_copy(copy_id, timezone.now(), LEASE, provisioning.LEASE_OWNER)
         if row is None:
             continue
         try:
             make_aside(row, now=now, roles=roles, cancelled=cancelled, source=source or source_name)
         finally:
-            control_services.release_copy(copy_id, provisioning.LEASE_OWNER)
+            control_services.worker_copy.release_copy(copy_id, provisioning.LEASE_OWNER)
         drop_old_aside_copies(now)
         return 1
     drop_old_aside_copies(now)
@@ -240,10 +240,10 @@ def make_aside(
     roles = ops.environment_roles(tenancy_connections.control_name()) if roles is None else roles
 
     def ours() -> None:
-        control_services.renew_copy(row.pk, LEASE, provisioning.LEASE_OWNER)
+        control_services.worker_copy.renew_copy(row.pk, LEASE, provisioning.LEASE_OWNER)
         try:
-            control_services.still_making(row.pk, provisioning.LEASE_OWNER)
-        except control_services.MoveTaken as taken:
+            control_services.worker_copy.still_making(row.pk, provisioning.LEASE_OWNER)
+        except control_services.worker_move.MoveTaken as taken:
             raise move.MoveStopped(str(taken)) from taken
 
     try:
@@ -279,8 +279,8 @@ def aside_dump_kind(row) -> str:
 
 def _made(row, now: dt.datetime) -> None:
     try:
-        control_services.copy_made(row.pk, now, provisioning.LEASE_OWNER)
-    except control_services.MoveTaken as taken:
+        control_services.worker_copy.copy_made(row.pk, now, provisioning.LEASE_OWNER)
+    except control_services.worker_move.MoveTaken as taken:
         raise move.MoveStopped(str(taken)) from taken
 
 
@@ -298,8 +298,8 @@ def _aside_failed(row, ours, reason: str) -> None:
     except Exception:
         logger.exception("base.tenancy.restore.aside_kept copy=%s: it could not be dropped now.", row.db_name)
     try:
-        control_services.copy_failed(row.pk, reason, provisioning.LEASE_OWNER)
-    except control_services.MoveTaken as taken:
+        control_services.worker_copy.copy_failed(row.pk, reason, provisioning.LEASE_OWNER)
+    except control_services.worker_move.MoveTaken as taken:
         logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, taken)
 
 
@@ -307,10 +307,10 @@ def drop_old_aside_copies(now: dt.datetime) -> int:
     """Drop the separate copies past :data:`ASIDE_COPY_DAYS` by ``now`` (and what a failed one may have left), with
     their rows; how many. One that cannot be dropped now stays, and the next pass tries again."""
     dropped = 0
-    for row in control_services.aside_copies_due(now - dt.timedelta(days=ASIDE_COPY_DAYS)):
+    for row in control_services.worker_copy.aside_copies_due(now - dt.timedelta(days=ASIDE_COPY_DAYS)):
         try:
             move._drop_copy(row.db_name, row.cluster)
-            control_services.forget_aside_copy(row.pk)
+            control_services.worker_copy.forget_aside_copy(row.pk)
         except Exception:
             logger.exception(
                 "base.tenancy.restore.aside_kept copy=%s: it could not be dropped; tried again.", row.db_name
@@ -333,7 +333,7 @@ def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str
     try:
         with ops.connect_ops(cluster=cluster) as conn:
             present = move._present(conn, name, kept_name)
-        kept_already = control_services.pending_copy(hub.id) is not None and kept_name in present
+        kept_already = control_services.worker_move.pending_copy(hub.id) is not None and kept_name in present
         if not kept_already and name not in present:
             raise move.MoveFailed("restore_database_missing", f"{name} is not on its cluster")
         live = kept_name if kept_already else name
@@ -344,7 +344,7 @@ def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str
         _refuse_fiscal_changes(live, cluster, copy, origin)
         if kept_already:
             return
-        control_services.copy_pending(
+        control_services.worker_move.copy_pending(
             hub.id, getattr(cluster, "pk", None), kept_name, schema_state=hub.schema_state, schema_apps=hub.schema_apps
         )
         with ops.connect_ops(cluster=cluster) as conn:
@@ -362,7 +362,7 @@ def _make_new(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
     data (``restore_copy_missing`` otherwise, and it is put back)."""
     ours()
     with ops.connect_ops(cluster=hub.cluster) as conn:
-        kept = control_services.pending_copy(hub.id) is not None and kept_name in move._present(conn, kept_name)
+        kept = control_services.worker_move.pending_copy(hub.id) is not None and kept_name in move._present(conn, kept_name)
     if not kept:
         raise move.MoveFailed("restore_copy_missing", f"{hub.db_name} was not kept aside as {kept_name}: none is made")
     move._clone_emptied(hub, hub.cluster, roles)
@@ -377,10 +377,10 @@ def _finish(hub, origin, kept_name: str, roles: bootstrap.Names, ours, now: dt.d
     with ops.connect_ops(cluster=hub.cluster) as conn:
         move._open(conn, hub.db_name, roles)
     try:
-        control_services.restore_finished(
+        control_services.worker_move.restore_finished(
             hub.id, origin.pk, hub.cluster_id, kept_name, now, owner=provisioning.LEASE_OWNER
         )
-    except control_services.MoveTaken as taken:
+    except control_services.worker_move.MoveTaken as taken:
         raise move.MoveStopped(str(taken)) from taken
 
 
@@ -389,7 +389,7 @@ def _put_back(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
     the rename): then what has the hub's name is dropped and the kept copy renamed back. Without the note, the data
     never left: its database is opened to the app again when it is there."""
     ours(forward=False)
-    noted = control_services.pending_copy(hub.id) is not None
+    noted = control_services.worker_move.pending_copy(hub.id) is not None
     with ops.connect_ops(cluster=hub.cluster) as conn:
         present = move._present(conn, hub.db_name, kept_name)
     if noted and kept_name in present:

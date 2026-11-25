@@ -16,7 +16,7 @@ from control.admin_shared import is_platform_admin, saved_by, staff_context
 from control.models import Freeze
 from control.queries import freeze_get
 from control.schemas import FreezeGetIn, FreezeIn
-from control.services import freeze_set
+from control.services.freeze import freeze_set
 
 
 class FreezeForm(forms.ModelForm):

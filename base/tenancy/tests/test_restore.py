@@ -305,7 +305,7 @@ class TestClosedToTheApp:
         real = move._restore_from_bucket
 
         def restoring(key, name, cluster, heartbeat, cancelled=None):
-            kept = control_services.pending_copy(hub.id).db_name
+            kept = control_services.worker_move.pending_copy(hub.id).db_name
             seen.append((hubs.reaches(app_role, name), hubs.reaches(app_role, kept)))
             return real(key, name, cluster, heartbeat, cancelled)
 
@@ -588,14 +588,14 @@ class TestTwoWorkers:
     def test_a_lease_taken_right_before_the_end_is_checked_again_on_the_locked_row(self, restores, monkeypatch, caplog):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        real = control_services.restore_finished
+        real = control_services.worker_move.restore_finished
 
         def taken_then_ended(*args, **kwargs):
             with use_control():
                 HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
             return real(*args, **kwargs)
 
-        monkeypatch.setattr(control_services, "restore_finished", taken_then_ended)
+        monkeypatch.setattr(control_services.worker_move, "restore_finished", taken_then_ended)
 
         run(restores)
 

@@ -158,7 +158,7 @@ def cancel(hub) -> None:
     from control.schemas import HubIdIn
 
     with use_control():
-        move.control_services.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=hub.pk))
+        move.control_services.move.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=hub.pk))
 
 
 class TestACancelBeforeTheWorkerStarted:
@@ -292,7 +292,7 @@ class TestTheMinorPoints:
         with use_control():
             move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
             with CaptureQueriesContext(connections["default"]) as queries:
-                move.control_services.move_finished(
+                move.control_services.worker_move.move_finished(
                     hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.provisioning.LEASE_OWNER
                 )
 
