@@ -1,4 +1,4 @@
-import { ApiError } from '@erplora/ui/sdk';
+import { ApiError, type SubListener } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { memoryStorage } from '../__tests__/mount-base';
@@ -256,6 +256,15 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     return doc;
   }
 
+  /** The tab's live stream, with `answer` sending what `base.session.idle` re-runs to. */
+  function liveStream() {
+    let listener: SubListener = () => undefined;
+    const leave = Object.assign(vi.fn(), { id: 'idle' });
+    const subscribe = vi.fn((_op: string, _params: unknown, heard: SubListener) => ((listener = heard), leave));
+    const answer = (idle_minutes: number | null) => listener({ type: 'result', data: { idle_minutes }, rev: 1 });
+    return { subscribe, answer, fail: () => listener({ type: 'error', error: new ApiError(500, 'internal', '') }), leave };
+  }
+
   function deps(storage = memoryStorage()) {
     return {
       translate: vi.fn((key: string, values?: Record<string, unknown>) => `${key} ${JSON.stringify(values ?? {})}`),
@@ -266,6 +275,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
       label: () => 'Bea',
       storage,
       target: window,
+      stream: liveStream(),
     };
   }
 
@@ -286,6 +296,63 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     vi.advanceTimersByTime(60 * 60_000);
     expect(d.logout).not.toHaveBeenCalled();
     stop();
+  });
+
+  // A till already open when the business changes «Ask again after inactivity» (BASE-F59, F67), without reloading.
+  it('an open till follows the business’s new idle minutes from the moment they are saved', () => {
+    const d = deps();
+    const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d);
+    expect(d.stream.subscribe).toHaveBeenCalledWith('base.session.idle', {}, expect.any(Function));
+    d.stream.answer(null);
+    d.stream.answer(1);
+    vi.advanceTimersByTime(60_000 - 1);
+    expect(d.logout).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('back to «Until sign out», the open till stops locking', () => {
+    const d = deps();
+    const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    d.stream.answer(null);
+    vi.advanceTimersByTime(60 * 60_000);
+    expect(d.logout).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('the same minutes answered again (the stream reconnecting) keep counting from the last touch', () => {
+    const d = deps();
+    const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    vi.advanceTimersByTime(4 * 60_000);
+    d.stream.answer(5);
+    vi.advanceTimersByTime(60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('a live read that fails keeps the minutes the till had', () => {
+    const d = deps();
+    const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    d.stream.fail();
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('stopped, it leaves the live query and nothing it answers locks', () => {
+    const d = deps();
+    startWayIn(page({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d)();
+    expect(d.stream.leave).toHaveBeenCalledOnce();
+    d.stream.answer(1);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(d.logout).not.toHaveBeenCalled();
+  });
+
+  it('a page without a session in the hub (no way in) follows nothing: the stream would refuse it', () => {
+    const d = deps();
+    startWayIn(page({ name: 'Bar', preferences: NONE }), d)();
+    expect(d.stream.subscribe).not.toHaveBeenCalled();
   });
 
   it('paints the person’s own appearance', () => {

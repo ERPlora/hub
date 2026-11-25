@@ -6,14 +6,21 @@ from uuid import UUID
 from django.contrib.auth.hashers import check_password
 from django.http import HttpRequest
 from live.context import OperationContext
-from live.operations import AI, operation
+from live.operations import AI, INTERNAL, operation
 
 from base import access, saas_store
 from base.models.access import AccessSettings, Credential
 from base.models import Membership
 from base.models.sessions import SessionOwner
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas.access import AccessDoorIn, AccessDoorOut, AccessSettingsIn, AccessSettingsOut
+from base.schemas.access import (
+    AccessDoorIn,
+    AccessDoorOut,
+    AccessSettingsIn,
+    AccessSettingsOut,
+    SessionIdleIn,
+    SessionIdleOut,
+)
 from base.throttle import client_key
 
 from .devices import device_of
@@ -184,11 +191,30 @@ def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
         SessionOwner.objects.filter(session_id=request.session.session_key).values_list("credential", flat=True).first()
         or SessionOwner.Credential.ACCOUNT
     )
-    device = device_of(request)
     settings = access_settings()
-    offered = device is not None and access.pin_offered(device.mode, settings.pin_policy)
+    offered = _pin_offered_here(request, settings)
     return {
         "credential": credential,
         "switch_user": offered and bool(pin_people(slug)),
-        "idle_minutes": settings.pin_inactivity_minutes if offered and settings.pin_policy == access.ALWAYS else None,
+        "idle_minutes": _idle_minutes(offered, settings),
     }
+
+
+# Not an assistant tool: what an open till follows to arm its idle lock again.
+@operation("base.session.idle", kind="query", permission=VIEW_HOME, input=SessionIdleIn, output=SessionIdleOut, ai=INTERNAL)
+def session_idle(ctx: OperationContext, data: SessionIdleIn) -> dict[str, int | None]:
+    """``shell_access``'s ``idle_minutes`` for the device that asks, followed live: when the business changes «Ask
+    again after inactivity», or this device stops being a shared one, a till already open counts with the new minutes
+    without reloading. The Home's permission, which every role of the business holds: a live query needs one."""
+    settings = access_settings()
+    return {"idle_minutes": _idle_minutes(_pin_offered_here(ctx.request, settings), settings)}
+
+
+def _pin_offered_here(request: HttpRequest | None, settings: AccessSettings) -> bool:
+    device = device_of(request)
+    return device is not None and access.pin_offered(device.mode, settings.pin_policy)
+
+
+def _idle_minutes(offered: bool, settings: AccessSettings) -> int | None:
+    """Only a till that offers the PIN pad, of a business that always asks, closes its session when nobody uses it."""
+    return settings.pin_inactivity_minutes if offered and settings.pin_policy == access.ALWAYS else None

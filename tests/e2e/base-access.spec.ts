@@ -427,15 +427,14 @@ test('a till of a business that always asks goes back to the PIN pad after its i
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
   await press(till, OWNER_PIN);
   await expect(till).toHaveURL(`${origin}/settings`);
+  await till.clock.install();
   const again = shown(till).getByTestId('pin-policy-again');
   await again.locator('ion-segment-button', { hasText: /^1 min$/ }).click();
   await expect(shown(till).getByTestId('pin-policy-card')).toContainText('A till nobody touches for 1 minutes');
   expect(own('SELECT pin_policy || pin_inactivity_minutes FROM base_accesssettings')).toBe('always1');
-  await till.clock.install();
-  await till.reload();
-  await expect(shown(till).getByTestId('pin-policy-card')).toBeVisible();
-  await till.clock.fastForward('01:05');
-  await expect(till).toHaveURL(/\/login(\?|$)/, { timeout: SAAS_STEP });
+  // Without reloading: the open till counts with the new minutes once its live stream brings them.
+  const idle = async () => (await till.clock.fastForward('00:20').catch(() => undefined), till.url());
+  await expect.poll(idle, { timeout: SAAS_STEP }).toMatch(/\/login(\?|$)/);
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
   await press(till, OWNER_PIN);
   await expect(till).toHaveURL(`${origin}/`);

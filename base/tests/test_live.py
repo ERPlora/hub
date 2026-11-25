@@ -31,7 +31,7 @@ DATA = {BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET}
 FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED)
 
 #: The way in's live queries have their own test: base/tests/test_access_live.py.
-WAY_IN = ("base.access.", "base.device.", "base.profile.")
+WAY_IN = ("base.access.", "base.device.", "base.profile.", "base.session.idle")
 #: People and permissions' too: base/tests/test_people.py and base/tests/test_approvals.py.
 PEOPLE = ("base.person.", "base.role.", "base.api_key.", "base.approval.", "base.api_doc.")
 
