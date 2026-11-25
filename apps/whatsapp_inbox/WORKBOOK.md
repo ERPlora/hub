@@ -1759,7 +1759,7 @@ aplica F16 a un origen de clienta), `on_behalf_of_customer` y `customer_id` al m
 existe a una cita de otra: `appointment.appointment_not_found`) y `for_customer` en los huecos (los de una clienta). El
 asistente no los ve y lo que mande por ellos se pisa; `customer` por nombre sigue en su esquema, pero Citas toma la ficha
 por el id antes que cualquier nombre. La tarjeta de **Esperan tu respuesta** nombra la clienta y la profesional porque
-`customer_id` y `staff_id` llevan su marca `refers` (`apps/appointment/schemas.py`); el resto de Citas sigue en hub#635.
+`customer_id` y `staff_id` llevan su marca `refers` (`apps/appointment/schemas/fields.py`); el resto de Citas sigue en hub#635.
 Los servicios salen por su nombre: cada uno es una línea que solo lleva su registro (`service_id`, con su marca), y la
 tarjeta dice una lista así por el nombre de cada línea (hub#835, BASE-F97). La
 tarjeta de Ajustes restaura el mutuo excluyente de cuando había dos (`rival`): al encender una, se apaga la otra con su

@@ -2,7 +2,7 @@
 
 from apps.appointment.models import Appointment, Settings
 from apps.appointment.queries.settings import settings_out
-from apps.appointment.schemas import SettingsOut
+from apps.appointment.schemas.settings import SettingsOut
 
 from .conftest import HUB_DB, make_settings, run
 
