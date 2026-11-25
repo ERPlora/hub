@@ -8,6 +8,8 @@ import copy
 import json
 
 import pytest
+from django.conf import settings as deployed_settings
+
 from app_env_doubles import (
     COMMIT,
     HUB_DIR,
@@ -51,6 +53,13 @@ def test_the_repository_file_keeps_the_settings_the_tasks_run_with_today():
     data = json.loads(SETTINGS_FILE.read_text())
 
     assert data == {"prod": PROD, "pre": PRE}
+
+
+def test_a_task_without_its_name_names_the_platform_hub_as_every_environment_does():
+    assert app_env.SETTINGS["PLATFORM_HUB_SLUG"].default == deployed_settings.PLATFORM_HUB_SLUG
+    assert {family["PLATFORM_HUB_SLUG"] for section in (PROD, PRE) for family in section.values()} == {
+        deployed_settings.PLATFORM_HUB_SLUG
+    }
 
 
 def test_charging_in_prod_finds_the_repository_file_sending_to_the_aeat():

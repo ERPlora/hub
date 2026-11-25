@@ -372,6 +372,10 @@ msgstr "La petición puede pesar %(mb)s MB como máximo."
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
 
+#: services/platform_hub.py:31
+msgid "ERPlora's own business is never changed, closed or emptied here."
+msgstr "El negocio propio de ERPlora no se cambia, no se cierra ni se vacía aquí."
+
 #: services.py:417
 msgid "Another hub has this address."
 msgstr "Otro hub ya tiene esta dirección."
@@ -2383,6 +2387,101 @@ msgctxt "workbook"
 msgid "Involved"
 msgstr "Implicados"
 
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Home · Summary"
+msgstr "Inicio · Resumen"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Home · Activity"
+msgstr "Inicio · Actividad"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Staff"
+msgstr "Empleados · Personal"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Roles"
+msgstr "Empleados · Roles"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Roles · What it allows"
+msgstr "Empleados · Roles · Qué permite"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · API keys"
+msgstr "Empleados · API keys"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Approvals"
+msgstr "Empleados · Aprobaciones"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "A person's page"
+msgstr "Ficha de una persona"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Files"
+msgstr "Archivos"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Apps"
+msgstr "Apps"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Usage and plan"
+msgstr "Sistema · Uso y plan"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Updates"
+msgstr "Sistema · Actualizaciones"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Failed events"
+msgstr "Sistema · Eventos caídos"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Logs"
+msgstr "Sistema · Registros"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · General"
+msgstr "Ajustes · General"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Business"
+msgstr "Ajustes · Negocio"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Printing"
+msgstr "Ajustes · Impresión"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Data and backups"
+msgstr "Ajustes · Datos y copias"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "My profile"
+msgstr "Mi perfil"
+
 #: queries/app_help.py
 msgctxt "workbook"
 msgid "Settings"
@@ -2489,6 +2588,9 @@ msgstr "Borrar archivos"
 msgid "Open this business on erplora.com"
 msgstr "Abrir este negocio en erplora.com"
 
+msgid "Manage roles"
+msgstr "Gestionar roles"
+
 msgid "View costs"
 msgstr "Ver costes"
 
@@ -2512,6 +2614,78 @@ msgstr "Datos sensibles"
 
 msgid "This role does not exist in this business."
 msgstr "Este rol no existe en este negocio."
+
+#: schemas/roles.py
+msgid "Name"
+msgstr "Nombre"
+
+#: schemas/roles.py
+msgid "Description"
+msgstr "Descripción"
+
+#: schemas/roles.py
+msgid "Role"
+msgstr "Rol"
+
+#: schemas/roles.py
+msgid "Based on"
+msgstr "A partir de"
+
+#: schemas/roles.py
+msgid "What it allows"
+msgstr "Qué permite"
+
+#: schemas/roles.py
+msgid "People with this role"
+msgstr "Personas con este rol"
+
+#: services/roles.py
+msgid "Allowed"
+msgstr "Permitido"
+
+#: services/roles.py
+msgid "With approval"
+msgstr "Con aprobación"
+
+#: services/roles.py
+msgid "No"
+msgstr "No"
+
+#: services/roles.py
+msgid "Give the role a name."
+msgstr "Ponle nombre al rol."
+
+#: services/roles.py
+msgid "There is already a role with that name. Choose another."
+msgstr "Ya hay un rol con ese nombre. Elige otro."
+
+#: services/roles.py
+msgid "This is one of erplora.com's roles. Duplicate it and change the copy."
+msgstr "Este rol es de erplora.com. Duplícalo y cambia la copia."
+
+#: services/roles.py
+msgid "A role may not allow more than you may do yourself."
+msgstr "Un rol no puede permitir más de lo que puedes hacer tú."
+
+#: services/roles.py
+msgid "That is only the owner's of the business: no role gives it."
+msgstr "Eso es solo del propietario del negocio: ningún rol lo da."
+
+#: services/roles.py
+msgid "That permission is not of any app that is on in this business."
+msgstr "Ese permiso no es de ninguna app encendida de este negocio."
+
+#: services/roles.py
+msgid "That cannot be approved with a PIN: choose allowed or no."
+msgstr "Eso no se puede aprobar con un PIN: elige permitido o no."
+
+#: services/roles.py
+#, python-format
+msgid "%(n)s person has this role. Give them another before deleting it."
+msgid_plural "%(n)s people have this role. Give them another before deleting it."
+msgstr[0] "%(n)s persona tiene este rol. Dale otro antes de borrarlo."
+msgstr[1] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
+msgstr[2] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
 
 msgid "Last used"
 msgstr "Último uso"
@@ -2648,3 +2822,39 @@ msgstr "entrada de soporte"
 msgctxt "support visit"
 msgid "support entries"
 msgstr "entradas de soporte"
+
+#: people.py
+msgid "The owner is always the owner: nobody gives them another role."
+msgstr "El propietario siempre es el propietario: nadie le da otro rol."
+
+#: people.py
+msgid "Nobody changes their own role: ask somebody above you."
+msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
+
+#: people.py
+msgid "You may only give a role to people below you in the business."
+msgstr "Solo puedes dar un rol a quien está por debajo de ti en el negocio."
+
+#: services/roles.py
+msgid "That role is given on erplora.com. Here you give one of the business's own."
+msgstr "Ese rol se da en erplora.com. Aquí se da uno propio del negocio."
+
+#: bell.py
+msgid "Roles to review"
+msgstr "Roles por revisar"
+
+#: bell.py
+#, python-format
+msgid "%(count)d role to review"
+msgid_plural "%(count)d roles to review"
+msgstr[0] "%(count)d rol por revisar"
+msgstr[1] "%(count)d roles por revisar"
+msgstr[2] "%(count)d roles por revisar"
+
+#: bell.py
+msgid "An app turned on or a new permission is not in them yet: look at what each role allows."
+msgstr "Hay una app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol."
+
+#: bell.py
+msgid "Review the roles"
+msgstr "Revisar los roles"

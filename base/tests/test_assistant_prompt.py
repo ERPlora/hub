@@ -171,6 +171,33 @@ def test_without_a_role_of_the_business_no_role_is_named(role):
     assert "You talk to the" not in _said(role=role)
 
 
+# ── A role of the business: its own name, and who can do what it cannot ──────────────────────────────────────────
+
+
+def _own(invitation) -> str:
+    return " ".join(assistant.prompt.own_role("Cajero sin anulaciones", invitation).split())
+
+
+def test_a_role_of_the_business_is_named_as_the_business_wrote_it():
+    assert (
+        "You talk to the «Cajero sin anulaciones» of this business: your tools are the ones this role may use, no more."
+    ) in _own(Membership.Role.EMPLOYEE)
+
+
+@pytest.mark.parametrize(
+    ("invitation", "who"),
+    [
+        (Membership.Role.EMPLOYEE, "a manager or the owner"),
+        (Membership.Role.MANAGER, "the owner or an administrator"),
+        (Membership.Role.ACCOUNTANT, "the owner or an administrator"),
+        # A role of the business may give an administrator less than all: above them there is only the owner.
+        (Membership.Role.ADMIN, "the owner"),
+    ],
+)
+def test_who_can_do_what_it_cannot_goes_by_the_rank_of_the_invitation(invitation, who):
+    assert f"and that {who} can, or on which screen it is done." in _own(invitation)
+
+
 def test_a_write_a_manager_approves_is_said_to_ask_for_that_approval():
     """BASE-F100 step 1: an employee is offered the write their app lets a manager approve; the model says it will ask
     a manager to approve it, instead of running it as if it were theirs or saying they cannot."""

@@ -27,24 +27,24 @@ app_env = load("app_env")
 
 PROD = {
     "hub": {
-        "PLATFORM_HUB_SLUG": "erplora",
+        "PLATFORM_HUB_SLUG": "erp",
         "VERIFACTU_PRODUCTION_ENABLED": "true",
         "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
     },
     "worker": {
-        "PLATFORM_HUB_SLUG": "erplora",
+        "PLATFORM_HUB_SLUG": "erp",
         "VERIFACTU_PRODUCTION_ENABLED": "true",
         "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
     },
 }
 PRE = {
     "hub": {
-        "PLATFORM_HUB_SLUG": "erplora",
+        "PLATFORM_HUB_SLUG": "erp",
         "VERIFACTU_PRODUCTION_ENABLED": "false",
         "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
     },
     "worker": {
-        "PLATFORM_HUB_SLUG": "erplora",
+        "PLATFORM_HUB_SLUG": "erp",
         "VERIFACTU_PRODUCTION_ENABLED": "false",
         "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
     },

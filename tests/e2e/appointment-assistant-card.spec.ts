@@ -22,8 +22,8 @@ const DAY = aMonday();
 /** What the card calls each record, how a weekly series repeats and how many records one appointment is (the
  *  singular, never «1 registros»), by the language of the card. */
 const WORDS = {
-  es: { appointments: 'Citas', series: 'Cita periódica', block: 'Bloqueo', professional: 'Profesional', weekly: 'Cada semana · Lunes', oneRecord: 'Afecta a 1 registro.' },
-  en: { appointments: 'Appointments', series: 'Repeating appointment', block: 'Blocked period', professional: 'Professional', weekly: 'Every week · Monday', oneRecord: 'It acts on 1 record.' },
+  es: { appointments: 'Citas', series: 'Cita periódica', block: 'Bloqueo', professional: 'Profesional', when: 'Cuándo', title: 'Título', weekly: 'Cada semana · Lunes', oneRecord: 'Afecta a 1 registro.' },
+  en: { appointments: 'Appointments', series: 'Repeating appointment', block: 'Blocked period', professional: 'Professional', when: 'When', title: 'Title', weekly: 'Every week · Monday', oneRecord: 'It acts on 1 record.' },
 };
 /** The words the card would call them by if nothing titled them, in each language. */
 const UNTITLED = { es: ['Registro', 'Ids', 'Staff Id'], en: ['Record', 'Ids', 'Staff Id'] };
@@ -161,7 +161,7 @@ for (const language of ['es', 'en'] as const) {
       'staff_id',
     );
     expect([blocking.label, blocking.value]).toEqual([words.professional, diary.member.full_name]);
-    await expect(card(page)).toContainText(new RegExp(`${diary.member.full_name} · [^·]+ · ${TAG} Descanso`));
+    await expect(card(page)).toContainText(new RegExp(`${diary.member.full_name} · ${words.when}: [^·]+ · ${words.title}: ${TAG} Descanso`));
     await cancel(page);
 
     // «Pasa la cita de Lucía a Bea»: in that one line, the appointment as the Agenda tells it and Bea by her name.
@@ -174,7 +174,7 @@ for (const language of ['es', 'en'] as const) {
     expect([handedOver.label, handedOver.value]).toEqual([words.professional, diary.other.full_name]);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await expect(card(page)).toContainText(`${detail.data.label} · ${diary.other.full_name}`);
+      await expect(card(page)).toContainText(`${detail.data.label} · ${words.professional}: ${diary.other.full_name}`);
       await expect(card(page)).not.toContainText(AN_ID);
       await capture(page, `hub-635-update-staff-${language}-${vp.label}`);
     }

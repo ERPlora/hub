@@ -279,6 +279,17 @@ def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
     assert total(owner, "inventory.product.list") == 16  # nothing removed
 
 
+@pytest.mark.parametrize("asked", [{"dry_run": True}, {"apps": ["table"], "confirm": A.key}], ids=["plan", "reset"])
+def test_erploras_own_hub_is_never_emptied(owner, asked):
+    Hub.objects.filter(slug=A.key).update(is_platform=True)
+
+    with pytest.raises(Conflict) as refused:
+        call(owner, "base.hub.reset", **asked)
+
+    assert refused.value.code == "base.platform_hub_kept"
+    assert Hub.objects.get(slug=A.key).reset_requested_at is None
+
+
 def test_without_a_business_name_the_hubs_address_is_typed(owner):
     assert call(owner, "base.hub.reset", dry_run=True).confirm_with == A.key
 

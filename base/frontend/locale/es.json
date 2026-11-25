@@ -918,6 +918,7 @@
         "permissions": "Permisos"
       },
       "basic": "Básico",
+      "own": "Propio",
       "always": "Siempre disponible",
       "search": "Buscar rol…",
       "empty": "Este negocio no tiene roles.",
@@ -927,6 +928,7 @@
     "role": {
       "title": "Qué permite",
       "intro": "Lo que este rol deja hacer en este negocio, app por app. Se da en erplora.com y aquí no se cambia.",
+      "introOwn": "Lo que este rol deja hacer en este negocio, app por app.",
       "members": "Personas con este rol: {n}",
       "loading": "Cargando lo que permite este rol…",
       "error": "No se pudo cargar lo que permite este rol.",

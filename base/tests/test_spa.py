@@ -155,16 +155,16 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
             "linux": f"{saas}/app/download/linux/",
             "android": f"{saas}/app/download/android/",
         },
-        # The modules whose help window is ready, those that declare it (the test below).
+        # The apps whose help is ready, those that declare it (the test below).
         "help_apps": app_help.ready_apps(),
     }
 
 
-def test_the_shell_names_the_modules_whose_help_is_ready_so_only_they_show_the_help_button(client, make_user, monkeypatch):
+def test_the_shell_names_the_apps_whose_help_is_ready_so_only_they_show_the_help_button(client, make_user, monkeypatch):
     from django.apps import apps
-    from live.meta import Help, module_configs
+    from live.meta import Help, all_live_app_configs
 
-    for config in module_configs():
+    for config in all_live_app_configs():
         monkeypatch.setattr(config, "help", None)
     monkeypatch.setattr(apps.get_app_config("table"), "help", Help())
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))

@@ -11,7 +11,7 @@ import json
 
 import pytest
 from django.test import RequestFactory
-from django.utils import timezone, translation
+from django.utils import timezone
 from live import assistant as shared
 from live.context import OperationContext
 from live.operations import get
@@ -19,13 +19,15 @@ from live.operations import get
 from base import access
 from base.models.access import TrustedDevice
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests import card_turn
+from base.tests.card_turn import call
 
 __all__ = ["in_business_a"]
 
 pytestmark = HUB_DB
 
 ADMIN = frozenset({"base.view_home", "base.administer_hub"})
-ASK = {"role": "user", "content": "Clear out the old devices nobody uses any more, but keep this one."}
+ASK = "Clear out the old devices nobody uses any more, but keep this one."
 PRUNE_LABELS = {"en": ("Devices to remove", "Which"), "es": ("Dispositivos que se quitan", "Cuáles")}
 NOTHING_TO_REMOVE = {
     "en": "No device has gone 30 days without being used, so there is nothing to remove.",
@@ -41,27 +43,12 @@ def a_device(days_ago: float = 0, **fields) -> tuple[TrustedDevice, str]:
     return device, token
 
 
-def call(name: str, arguments: dict) -> dict:
-    return {"call_id": "c1", "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
-
-
 def turn(token: str, pending: dict, *, language: str = "en", decision: dict | None = None) -> dict:
-    """A turn of the assistant asked from the device whose cookie is ``token`` (the one in hand), in ``language`` as
-    the request's middleware turns it on."""
+    """A turn of the assistant asked from the device whose cookie is ``token`` (the one in hand)."""
     request = RequestFactory().get("/")
     request.COOKIES[access.DEVICE_COOKIE] = token
     context = OperationContext(scope=A, actor="ana", permissions=ADMIN, language=language, request=request)
-    asked = {
-        "role": "assistant",
-        "content": "",
-        "tool_calls": [
-            {"id": "c1", "type": "function", "function": {"name": pending["name"], "arguments": pending["arguments"]}}
-        ],
-    }
-    op = get("base.assistant.turn")
-    data = op.input.model_validate({"messages": [ASK, asked], "pending": [pending], "decision": decision})
-    with translation.override(language):
-        return op(context, data).model_dump(mode="json")
+    return card_turn.turn(context, pending, said=ASK, decision=decision)
 
 
 def preview_lines(card: dict) -> list[tuple]:

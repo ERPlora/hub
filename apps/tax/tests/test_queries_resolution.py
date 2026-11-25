@@ -58,17 +58,17 @@ def test_a_territory_with_its_own_tax_never_takes_the_national_vat(no_seed, regi
     # their own, a category has no rule there, as one without any rule in the peninsula, never the 21 % VAT.
     national = rule(category(), "21")
     assert resolve(region=region) is None
-    assert queries.pick_root([national], region) is None
+    assert queries.resolution.pick_root([national], region) is None
     with pytest.raises(Conflict) as refusal:
-        queries.calculate_tax(amount=10_000, category_key="product.generic", country_code="ES", region_code=region, on=TODAY)
+        queries.calculation.calculate_tax(amount=10_000, category_key="product.generic", country_code="ES", region_code=region, on=TODAY)
     assert refusal.value.code == "tax.no_rate"
 
 
 def test_a_region_without_its_own_tax_and_the_whole_country_keep_the_national_rule(no_seed):
     national = rule(category(), "21")
-    assert queries.pick_root([national], "ES-MD") == national
-    assert queries.pick_root([national], None) == national
-    assert queries.pick_root([national], "PT-20") == national  # the region names another country: VAT
+    assert queries.resolution.pick_root([national], "ES-MD") == national
+    assert queries.resolution.pick_root([national], None) == national
+    assert queries.resolution.pick_root([national], "PT-20") == national  # the region names another country: VAT
 
 
 @pytest.mark.parametrize(
@@ -86,7 +86,7 @@ def test_current_rates_never_fill_a_territory_with_the_national_vat(no_seed, reg
     rule(generic, "21")
     rule(generic, "7", region="ES-CN", tax_type="igic")
     rule(food, "10")
-    rates = queries.current_rates([generic, food], "ES", region, TODAY)
+    rates = queries.resolution.current_rates([generic, food], "ES", region, TODAY)
     found = {cat.key: (str(rates[cat.id].rate_pct) if rates[cat.id] else None) for cat in (generic, food)}
     assert found == expected
 
@@ -103,9 +103,9 @@ def test_country_and_region_are_read_in_any_case(no_seed):
     rule(generic, "21")
     canary = rule(generic, "7", region="ES-CN", tax_type="igic")
     assert resolve(country=" es ", region="es-cn").root == canary
-    result = queries.calculate_tax(amount=10_000, category_key="product.generic", country_code="es", on=TODAY)
+    result = queries.calculation.calculate_tax(amount=10_000, category_key="product.generic", country_code="es", on=TODAY)
     assert (result["tax"], result["tax_country_code"], result["tax_region_code"]) == (2_100, "ES", None)
-    regional = queries.calculate_tax(
+    regional = queries.calculation.calculate_tax(
         amount=10_000, category_key="product.generic", country_code="es", region_code="es-cn", on=TODAY
     )
     assert (regional["tax"], regional["tax_region_code"]) == (700, "ES-CN")
@@ -137,7 +137,7 @@ def test_inside_a_level_the_newest_start_wins_then_the_lowest_id(no_seed):
     # Two roots of one slot with the same first day cannot be saved any more (the natural key
     # tax_rule_root_natural_key, review point 6): the id tie-break is checked on unsaved rows.
     twins = [TaxRule(valid_from=date(2020, 1, 1)) for _ in range(3)]
-    assert queries.pick_root(twins, None) == min(twins, key=lambda r: r.pk.int)
+    assert queries.resolution.pick_root(twins, None) == min(twins, key=lambda r: r.pk.int)
 
 
 def test_the_root_expands_into_its_components(no_seed):

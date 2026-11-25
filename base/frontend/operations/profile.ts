@@ -22,7 +22,7 @@ export interface Profile {
   pin_length: number;
 }
 
-/** `base.PreferencesIn` / `PreferencesOut`. */
+/** `base.PreferencesOut`. `PreferencesIn` takes any of them, at least one: what is not sent stays as it is. */
 export interface Preferences {
   language: ProfileLanguage;
   theme_mode: ProfileThemeMode;
@@ -34,7 +34,7 @@ declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.profile.get': { input: NoInput; output: Profile };
     'base.profile.update': { input: { first_name: string; last_name: string; contact_email: string }; output: Profile };
-    'base.profile.preferences_set': { input: Preferences; output: Preferences };
+    'base.profile.preferences_set': { input: Partial<Preferences>; output: Preferences };
     'base.profile.avatar_set': {
       input: { content_type: 'image/jpeg' | 'image/png' | 'image/webp'; data_base64: string };
       output: { avatar_url: string };

@@ -10,14 +10,14 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live.meta import Help
+from live.meta import Help, all_live_app_configs
 
 from base.queries import app_help
 from base.tests.help_workbooks import ready_tables
 
 FLOW = re.compile(r"^### +([A-Z][A-Z0-9_]*-F\d+)\b", re.MULTILINE)
 LANGUAGES = [code for code, _name in settings.LANGUAGES]
-WITH_VIDEOS = [config.label for config in app_help.module_configs() if config.help and config.help.flow_videos]
+WITH_VIDEOS = [config.label for config in all_live_app_configs() if config.help and config.help.flow_videos]
 VIDEO = "L4LipaZOq40"
 
 
@@ -36,7 +36,7 @@ def video_problems(config, language: str) -> list[str]:
 @pytest.mark.parametrize("language", LANGUAGES)
 @pytest.mark.parametrize("label", WITH_VIDEOS)
 def test_a_module_s_task_videos_are_of_flows_its_help_publishes(label, language):
-    config = next(config for config in app_help.module_configs() if config.label == label)
+    config = next(config for config in all_live_app_configs() if config.label == label)
     assert video_problems(config, language) == []
 
 

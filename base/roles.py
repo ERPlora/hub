@@ -39,6 +39,25 @@ def effective(
     return allowed
 
 
+def saved(
+    states: Mapping[str, str],
+    apps: Mapping[str, Collection[str]],
+    given: Collection[str],
+    approvable: Collection[str],
+    changes: Mapping[str, str],
+) -> dict[str, str]:
+    """What a role saved with ``states`` keeps once ``changes`` are saved in it.
+
+    Only what the changes name moves: an app it was not saved with, of which they name some permission, is saved whole,
+    with what it gave (its origin's, as ``effective`` reads it)."""
+    kept = dict(states)
+    for permissions in apps.values():
+        if any(permission in changes for permission in permissions):
+            if not any(permission in states for permission in permissions):
+                kept.update({permission: basic_state(permission, given, approvable) for permission in permissions})
+    return kept | dict(changes)
+
+
 def to_review(states: Mapping[str, str], apps: Mapping[str, Collection[str]]) -> frozenset[str]:
     """The permissions of ``apps`` a role saved with ``states`` has not seen: every one of an app turned on after it
     was saved, and each one an app added since."""

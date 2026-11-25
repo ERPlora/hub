@@ -25,7 +25,7 @@ from apps.service.schemas.catalog import (
 )
 from apps.service.schemas.fields import ServiceRefIn
 from apps.service.services.writes import TAX_UNKNOWN, _actor, _apply, _changes, _refuse, _tax_category
-from apps.tax.queries import held_categories
+from apps.tax.queries.categories import held_categories
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 

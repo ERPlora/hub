@@ -178,7 +178,7 @@ methods yet. Create one in Methods before recording a payment.".
 Involved: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F02 Record a payment
-<!-- from WORKBOOK.md sha256:645d8569c722 -->
+<!-- from WORKBOOK.md sha256:8801dc029ca0 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Payments
@@ -202,8 +202,9 @@ Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
 recorded instead of recording another. The assistant's card says on its line who is paid, the supplier
-invoice and the amount ("Create in Payments: Pescados QA · F-2611 · €180.00"); without an invoice, the
-method it leaves from goes after the amount ("Pescados QA · €180.00 · Cuenta BBVA"), and the other data
+invoice and the amount, these two with their names ("Create in Payments: Pescados QA · Supplier invoice: F-2611 ·
+Amount: €180.00"); without an invoice, the method it leaves from goes after the amount ("Pescados QA · Amount:
+€180.00 · Method: Cuenta BBVA"), and the other data
 follow, each one once. The method shows as the payment finds it, even when it was said in other words
 ("Cuenta BBVA" when "the BBVA one" was said).
 Out: a draft payment with reference `PAY-YYYYMMDD-NNNN` — the date is that of the business day on which
@@ -317,7 +318,7 @@ starts anything in another. This app listens to no other.
 Involved: FLOW-F21
 
 ### PAYMENT-F08 Edit, deactivate and reactivate a payment method
-<!-- from WORKBOOK.md sha256:70994c7eec84 -->
+<!-- from WORKBOOK.md sha256:d2a335812177 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
@@ -332,7 +333,7 @@ Steps:
    "New payment". **Activate** brings it back.
 In: the method (through the assistant, by its name) and what changes. The assistant's card says the
 method it is going to change as it finds it, even when it was said in other words ("Change in Payments:
-Cuenta BBVA 4821 · BBVA QA proveedores" when "the BBVA one" was said).
+Cuenta BBVA 4821 · Name: BBVA QA proveedores" when "the BBVA one" was said).
 Out: the changed method (`payment.method.updated`, `.deactivated`, `.activated`). The payments that
 already used it keep it and show its new name.
 If it fails: a name that another method already has is refused under Name. Deactivating a deactivated

@@ -52,7 +52,7 @@ from apps.online_booking.schemas import (
 from apps.service.models import Service
 from apps.service.queries.settings import current_settings as service_settings
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 from base.business import business_zone, zone_name
 from base.ordering import list_order
 

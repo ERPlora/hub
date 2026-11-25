@@ -1231,7 +1231,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `ServiceSettings.default_tax_category` son claves ajenas a `tax.TaxCategory`;
   `Assignment.member` y `Redemption.member` (la profesional que hizo una sesión gastada fuera del cobro, F21;
   `PROTECT`: una ficha no se borra, se da de baja), a `staff.Member`; `Grant.customer`, a `customer.Customer`. Los nombres se
-  resuelven con `apps.staff.queries.resolve_member` y `apps.customer.queries.reads.find_customer`. La venta
+  resuelven con `apps.staff.queries.reads.resolve_member` y `apps.customer.queries.reads.find_customer`. La venta
   y la cita de una sesión o de una compra son identificadores opacos (`sale_id`, `appointment_id`),
   sin clave ajena: Ventas y Citas no son requisito (como `sale` guarda `staff_id`).
 - Modelos: `ServiceSettings` (una fila, restricción `service_settings_singleton`), `Category`,
@@ -1290,7 +1290,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `base.images.from_copy` la deja: la de la librería, salvo una que la librería dice que ya no tiene; nunca una foto
   propia; con la librería sin leer, tal como estaba, para no dejar el servicio fuera (hub#1429); y cada profesional
   que lo hacía en la copia y el
-  negocio sigue teniendo (no dado de baja, por su id: `staff.queries.live_members`), por `service.assignment.assign`
+  negocio sigue teniendo (no dado de baja, por su id: `staff.queries.reads.live_members`), por `service.assignment.assign`
   con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
   entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
   más, para que solo se asigne en los servicios que vuelven: en uno que el negocio conserva o rehízo a mano no se toca

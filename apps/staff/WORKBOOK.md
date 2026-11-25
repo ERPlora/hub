@@ -740,9 +740,10 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas/`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
-  `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
-  abajo), `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui` y `README.md` es la ficha de la app.
+  `queries/`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `tests/test_<fichero>.py` por fichero (los de las lecturas, `test_queries_<módulo>.py`). Las páginas viven en
+  `frontend/` («Cómo son las páginas», abajo), `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui` y `README.md` es
+  la ficha de la app.
 - Modelos: `Role` (el rol de catálogo), `Member` (la ficha), `Schedule` y `ScheduleDay` (el horario y
   sus días, lunes = 0; un día que no está es libre), `TimeOff` (la ausencia) y `StaffSettings` (una
   sola fila, restricción `staff_settings_singleton`). UUIDv7, sin `hub_id`.
@@ -770,7 +771,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   primera y deciden sobre lo que dejó. Aprobar, rechazar, cancelar y tocar un horario bloquean la ficha
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
-- El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
+- El «hoy» es el del reloj del negocio (`business_today()` de `queries/reads.py`, por `base.business.business_zone`,
   hub#771). Las comisiones piden las ventas por su día, que va en el mismo reloj.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).

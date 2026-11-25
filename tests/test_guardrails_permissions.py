@@ -82,6 +82,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.purge": (PLATFORM, "The worker leaves the tombstone of a business past its 90 days."),
     "base.hub.restore": (PLATFORM, "The SaaS restores a cancelled business (/internal)."),
+    "base.hub.platform_rename": (PLATFORM, "manage.py create_platform_hub --rename; internal_only refuses anyone else."),
     "base.hub.seed_local": (PLATFORM, "seed_local_hubs registers a and b, in local development only (DEBUG)."),
     "base.hub.state_apply": (PLATFORM, "The SaaS's photo of a business: plan, apps, members and roles (/internal)."),
     "base.hub_user.sync": (PLATFORM, "Inside the photo's own transaction: the people of the business's database."),
@@ -239,7 +240,7 @@ def test_the_platform_s_operations_refuse_a_business_s_owner_with_every_permissi
 @HUB_DB
 @pytest.mark.parametrize("name", of_kind(CHECKED_INSIDE))
 def test_what_checks_its_permissions_itself_refuses_without_them(name, hub_a):
-    # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries.py,
+    # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries_accounts.py,
     # test_accounts_for_whoever_adds_or_edits_records).
     op = registry[name]
     employee = get_user_model().objects.create_user(username="saas:2")
