@@ -1084,8 +1084,9 @@ configurar nada.
   al forinto. El documento A4 escribe los importes con esos decimales. Los importes y precios unitarios agrupan
   los millares desde cuatro cifras («1.234,56 €», hub#1090) en la lista, la ficha y el aviso del tope del tique.
 - **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4): el hub propio de
-  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
-  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal_platform.py`
+  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erp`, reservado en `live.slugs`: ningún negocio lo puede
+  coger y el alta normal del SaaS no lo crea). Mientras su fila conserva el nombre que tuvo antes (`erplora`), es el
+  mismo hub y sus facturas entran igual (`base/platform_hub.py`). Las cuatro puertas viven en `base/internal_platform.py`
   (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el
@@ -1143,7 +1144,9 @@ configurar nada.
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual de la familia `worker`, que tiene las credenciales del
   migrador para hacer la BD, con el comando `python manage.py create_platform_hub --execute` (primero sin
-  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
+  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve. Una fila que ya existe
+  nunca se hace otra vez, se llame como se llame, y solo `--rename` le pone el nombre `PLATFORM_HUB_SLUG` (los pasos, en
+  el `README.md` del Hub, «Registro de hubs y `/internal`»).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;

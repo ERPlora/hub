@@ -50,9 +50,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_safe
 from live.errors import OperationError
-from live.slugs import validate_hub_slug
 
-from base import access, auth, queries, services
+from base import access, auth, platform_hub, queries, services
 from base.services import demos, sessions
 from base.chosen_language import supported_language, with_language_cookie
 from base.models.sessions import SessionOwner
@@ -208,9 +207,10 @@ def admin_hub_slug(value: str | None) -> str | None:
 
 
 def _hub_slug(value: str) -> str | None:
-    """``value`` if it is a hub's slug (``live.slugs``: not reserved, valid label); else ``None``."""
+    """``value`` if a hub is opened under it (``base.platform_hub``: not reserved but for ERPlora's own hub's, valid
+    label); else ``None``."""
     try:
-        return validate_hub_slug(value)
+        return platform_hub.validate_served_slug(value)
     except ValueError:
         return None
 

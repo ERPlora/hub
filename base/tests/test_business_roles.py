@@ -11,7 +11,7 @@ from django.db.models import ProtectedError
 
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
-from base.roles import APPROVAL, OFF, ON, effective, to_review
+from base.roles import APPROVAL, OFF, ON, effective, saved, to_review
 from base.tenancy.tests.business import HUB_DB, in_business_a
 
 __all__ = ["in_business_a"]
@@ -53,6 +53,35 @@ class TestWhatItAllows:
         allowed = effective({**REVIEWED_SALE, "inventory.view": ON}, {"sale": SALE}, given=set())
 
         assert set(allowed) == set(SALE)
+
+
+class TestWhatSavingAChangeKeeps:
+    APPS = {"sale": SALE, "inventory": STOCK}
+
+    def change(self, states, **changes) -> dict:
+        named = {permission.replace("__", "."): state for permission, state in changes.items()}
+        return saved(states, self.APPS, {"inventory.view"}, {"inventory.manage"}, named)
+
+    def test_only_what_the_change_names_of_an_app_it_was_saved_with(self):
+        assert self.change(REVIEWED_SALE, sale__view_sale=OFF) == {"sale.view_sale": OFF, "sale.void_sale": APPROVAL}
+
+    def test_an_app_it_was_not_saved_with_is_saved_whole_with_what_it_gave(self):
+        kept = self.change(REVIEWED_SALE, inventory__view=OFF)
+
+        assert kept == {**REVIEWED_SALE, "inventory.view": OFF, "inventory.manage": APPROVAL}
+
+    def test_a_permission_an_app_added_after_it_was_saved_is_saved_alone(self):
+        assert self.change({"sale.view_sale": ON}, sale__void_sale=ON) == {"sale.view_sale": ON, "sale.void_sale": ON}
+
+    def test_what_it_was_saved_with_of_an_app_that_is_off_stays(self):
+        assert self.change({"task.view": ON}, sale__view_sale=ON)["task.view"] == ON
+
+    def test_what_it_was_saved_with_is_not_changed_in_place(self):
+        states = dict(REVIEWED_SALE)
+
+        self.change(states, sale__view_sale=OFF)
+
+        assert states == REVIEWED_SALE
 
 
 class TestWhatIsLeftToReview:

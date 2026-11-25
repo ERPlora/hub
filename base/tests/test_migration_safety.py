@@ -151,6 +151,9 @@ ACCEPTED = {
     # migration taking ``extra`` out too. The code of before never names ``extra``, which its database default (0)
     # fills, so every tender it writes keeps passing it: change = tendered - amount, as before.
     ("sale", "0022_salepayment_extra", "AddConstraint", "salepayment.sale_payment_change"),
+    # The name of a role of the business: base/0028 made the table and no code before this one writes a row in it, so
+    # none can break the constraint.
+    ("base", "0030_business_role_name_unique", "AddConstraint", "businessrole.base_businessrole_name_unique"),
     # The contract of the move to base.HubUser, a later deploy's, once no code from before the move runs (written here,
     # not applied): the old columns to control's users, which the move took out of the state and nobody writes any
     # more, leave the database through

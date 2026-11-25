@@ -82,6 +82,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.purge": (PLATFORM, "The worker leaves the tombstone of a business past its 90 days."),
     "base.hub.restore": (PLATFORM, "The SaaS restores a cancelled business (/internal)."),
+    "base.hub.platform_rename": (PLATFORM, "manage.py create_platform_hub --rename; internal_only refuses anyone else."),
     "base.hub.seed_local": (PLATFORM, "seed_local_hubs registers a and b, in local development only (DEBUG)."),
     "base.hub.state_apply": (PLATFORM, "The SaaS's photo of a business: plan, apps, members and roles (/internal)."),
     "base.hub_user.sync": (PLATFORM, "Inside the photo's own transaction: the people of the business's database."),

@@ -275,7 +275,9 @@ def test_internal_calls_for_a_business_without_its_own_database_answer_503_and_e
 @HUB_DB
 def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch, settings, hub_a):
     from base import internal, internal_platform
+    from control.models import Hub
 
+    Hub.objects.filter(pk=hub_a.pk).update(is_platform=True)
     settings.PLATFORM_HUB_SLUG = hub_a.slug
     seen = []
 

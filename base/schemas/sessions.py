@@ -55,7 +55,8 @@ class SessionAccessIn(Schema):
 
 
 class SessionAccessOut(Schema):
-    """A fingerprint of what the session may do: it changes exactly when its permissions do."""
+    """A fingerprint of what the session may do: it changes exactly when its permissions, the name of its role or what a
+    manager may approve for it do."""
 
     key: str
 
@@ -68,6 +69,11 @@ class SessionMeOut(Schema):
     apps: list[AppState]
     #: Per app, the paths of the menu entries this person may not open: the router's gate says «No access» on them.
     locked: dict[str, list[str]]
+    #: The name of the role that rules what this person may do: the business's own, or the one of their invitation in
+    #: their language; ``None`` without a role here.
+    role: str | None
+    #: The permissions this person lacks whose commands a manager may approve with their PIN.
+    approvable: list[str]
     language: str
     #: Always there; ``None`` on a business's hub.
     demo: SessionDemo | None

@@ -6,12 +6,16 @@ import RolesList from './RolesList.vue';
 
 const MEMBERS_URL = 'http://localhost:8001/businesses/0199a1b2-0000-7000-8000-000000000001/members';
 
+function basic(key: string, label: string, members: number, permissions: number): HubRoleRow {
+  return { key, label, description: '', origin: 'basic', members, to_review: false, permissions };
+}
+
 const ROLES: HubRoleRow[] = [
-  { key: 'hub_owner', label: 'Owner', origin: 'basic', members: 1, permissions: 149 },
-  { key: 'hub_admin', label: 'Admin', origin: 'basic', members: 0, permissions: 149 },
-  { key: 'hub_manager', label: 'Manager', origin: 'basic', members: 2, permissions: 120 },
-  { key: 'hub_employee', label: 'Employee', origin: 'basic', members: 5, permissions: 43 },
-  { key: 'hub_accountant', label: 'Accountant', origin: 'basic', members: 1, permissions: 8 },
+  basic('hub_owner', 'Owner', 1, 149),
+  basic('hub_admin', 'Admin', 0, 149),
+  basic('hub_manager', 'Manager', 2, 120),
+  basic('hub_employee', 'Employee', 5, 43),
+  basic('hub_accountant', 'Accountant', 1, 8),
 ];
 
 function embed(block: object | null) {
@@ -49,6 +53,19 @@ describe('RolesList', () => {
     expect(rows[3].find('[data-testid="roles-members"]').text()).toBe('5');
     expect(rows[3].find('[data-testid="roles-permissions"]').text()).toBe('43');
     expect(rows[4].text()).toContain('Gestoría');
+  });
+
+  it('a role the business made goes by its own name, as its own', async () => {
+    const own: HubRoleRow = { ...basic('0199aaaa-0000-7000-8000-000000000001', 'Cajero', 3, 12), origin: 'own' };
+    const m = await open({ locale: 'es', routes: ['/employees', '/employees/roles/:role'] });
+    await m.result(m.call, 'base.role.list', { roles: [...ROLES, own] });
+    const row = m.wrapper.findAll('[data-testid="roles-row"]')[5];
+    expect(row.text()).toContain('Cajero');
+    expect(row.text()).toContain('Propio');
+    expect(row.text()).not.toContain('Básico');
+    await row.trigger('click');
+    await flush();
+    expect(m.router.currentRoute.value.path).toBe(`/employees/roles/${own.key}`);
   });
 
   it('who runs the business changes them on erplora.com; anyone else is only shown them', async () => {

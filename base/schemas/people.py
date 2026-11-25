@@ -1,4 +1,4 @@
-"""Schemas of the business's people (``base.person.*``) and roles (``base.role.list``)."""
+"""Schemas of the business's people (``base.person.*``)."""
 
 import datetime as dt
 from typing import Literal
@@ -12,7 +12,7 @@ from base.schemas.assistant import names
 from base.sensitive import TEAM_CONTACT
 
 
-# ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
+# ── People and permissions: people ──────────────────────────────────────────────────────────────────────────────────
 
 #: erplora.com's roles of a business, as its photo and its login send them.
 HubRole = Literal[*Membership.Role.values]
@@ -83,20 +83,4 @@ class PersonDetailOut(PersonOut):
 
 class BadgeSetIn(PersonIn):
     badge: str = Field(max_length=200, description="The card's number, as the reader types it (4 to 64 characters).")
-
-
-class RoleListIn(Schema):
-    """No input: the roles of the business of the request."""
-
-
-class RoleOut(Schema):
-    key: HubRole
-    label: str
-    origin: Literal["basic"] = Field(description="Where the role comes from: erplora.com's own.")
-    members: int
-    permissions: int = Field(description="How many permissions of the apps of this deployment it gives.")
-
-
-class RoleListOut(Schema):
-    roles: list[RoleOut]
 

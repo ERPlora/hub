@@ -127,14 +127,33 @@ ERPlora/knowledge): `HubHostRequiredMiddleware` busca la fila del slug del `Host
 en los tests, la fixture autouse `local_hubs` de `conftest.py` hace lo mismo en todo test con BD (un test sin BD que
 pide la página de un hub necesita `django_db`).
 
+**El negocio propio de ERPlora** (`Hub.is_platform`), el que emite sus facturas, se llama `PLATFORM_HUB_SLUG` (`erp`):
+el único nombre reservado que el Hub sirve como negocio (`base/platform_hub.py`), en su host, en `/admin/hub/erp/` y en el
+salto del personal. Los demás reservados responden 404, también `erplora`, el que tuvo antes. Nadie lo crea ni lo reclama
+(`base.hub.register`: 422 `base.slug_invalid` por su nombre, 409 `base.platform_hub_kept` por su id), lo da de baja ni lo
+vacía (409 `base.platform_hub_kept` en `base.hub.cancel` y `base.hub.reset`). Su fila nace con
+`create_platform_hub --execute` y solo cambia de nombre con `create_platform_hub --rename --execute` (sin `--execute`, un
+ensayo), como cualquier cambio de dirección («Cambio de dirección web», abajo): su id y su BD siguen, van con él sus
+personas, quién entró y sus apps, y acaban las sesiones abiertas con el nombre anterior. Mientras la fila conserva el nombre anterior
+(`PLATFORM_HUB_FORMER_SLUG`), el Hub la trata como el mismo negocio y sus facturas siguen entrando, pero ningún host lo
+abre. El renombrado, en este orden:
+
+1. Todas las tareas del entorno corren una release que conoce los dos nombres.
+2. La pasarela fiscal de erplora.com acepta los dos a la vez: el Hub se presenta en ella con su nombre, y lo que la
+   pasarela rechaza (`hub_unknown`) no se reenvía solo.
+3. `python manage.py create_platform_hub --rename --execute`, como tarea puntual de la familia `worker`.
+
+Para deshacerlo, la misma orden con `PLATFORM_HUB_SLUG=erplora`, siempre **antes** de volver a una release que solo
+conoce `erplora`.
+
 Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v2 y dos secretos
 (`base/signing.py`, el mismo esquema que `accounts/signing.py` del SaaS); cada ruta es una operación de `base`:
 
 | Ruta | Operación | Respuesta |
 |---|---|---|
-| `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged` |
+| `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged`, `base.platform_hub_kept` |
 | `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; `maintenance`, la congelación activa de la plataforma (`null` sin ella), y `move_scheduled_for`, cuándo empieza el traslado del negocio pedido para su madrugada (un instante en UTC; `null` sin traslado, una vez arrancado o cancelado); nunca dónde está su BD ni adónde se traslada; 404 |
-| `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged` |
+| `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged`, `base.platform_hub_kept` |
 | `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged` |
 | `GET /internal/hubs/{id}/dumps` | `base.hub.dump_list` | 200 `{available, dumps: [{id, kind, created_at, bytes, url}]}`: las copias de sus datos de la más nueva a la más vieja (`id` = su clave en el bucket, `url` prefirmada de 15 min, descarga como fichero); `available: false` si nunca tendrá copia (sin BD propia, o dado de baja antes de terminarla); 200 también dado de baja; 404 desconocido o purgado; 503 `base.dumps_unavailable` sin bucket |
 | `GET /internal/usage?day=AAAA-MM-DD[&cursor=]` | `base.usage.list` | 200 `{day, hubs: [{id, s3_bytes, db_bytes, active_users_1d, active_users_30d}], next_cursor}`: lo que usó ese día (UTC) cada negocio con BD propia, medido esa noche (`base/usage.py`), por páginas de 500; 409 `usage_not_ready` antes de medirlo; 422 `internal.payload_invalid` sin `day`, mal escrito o con un cursor ajeno |
@@ -456,8 +475,8 @@ demos que acaban): es el worker del e2e, cuyas specs juegan ellas mismas el repa
 `REACTIONS` de su `events.py`; `"*"` = todo evento de las demás): la venta cobrada baja el stock y cuenta en la ficha
 del cliente, la ronda enviada abre su comanda en cocina, etc. Un evento que no es de un hub (los del registro y las
 demos, en el outbox de control) no lo oye ninguna app: no hay hub en el que correr su reacción. Cada app lo recibe **una vez** (`base.EventDelivery`, en
-la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó (su aviso vivo sale por el
-canal de ese hub). Una reacción que falla se deshace y reintenta a los 2, 4, 8… s (una hora como mucho); al octavo
+la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó, con la dirección que tiene al
+entregarlo aunque la haya cambiado desde entonces (su aviso vivo sale por el canal de ese hub). Una reacción que falla se deshace y reintenta a los 2, 4, 8… s (una hora como mucho); al octavo
 intento queda `dead` con su error, en el log y en la fila. Los eventos que una reacción anota se reparten un nivel
 más abajo, y pasado el 16 no se entregan. Lo que una reacción o una tarea deja para después del COMMIT y espera a la
 red (la llamada a otro sistema o el paso del asistente de Automatizaciones, y lo que la Bandeja de WhatsApp entrega a

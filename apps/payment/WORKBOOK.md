@@ -196,8 +196,9 @@ Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
 quiere, una clave del intento: repetir la misma llamada con la misma clave responde el pago ya registrado
 en vez de registrar otro. La tarjeta del asistente dice en su línea a quién se paga, la factura del
-proveedor y el importe («Crear en Pagos: Pescados QA · F-2611 · 180,00 €»); sin factura, el método del que
-sale va detrás del importe («Pescados QA · 180,00 € · Cuenta BBVA»), y los demás datos siguen, cada uno una vez.
+proveedor y el importe, estos dos con su nombre («Crear en Pagos: Pescados QA · Factura del proveedor: F-2611 ·
+Importe: 180,00 €»); sin factura, el método del que sale va detrás del importe («Pescados QA · Importe: 180,00 € ·
+Método: Cuenta BBVA»), y los demás datos siguen, cada uno una vez.
 El método sale tal como lo encuentra el pago, aunque se dijera con otras palabras («Cuenta BBVA» cuando se
 dijo «el del BBVA»).
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` — la fecha es la del día del negocio en
@@ -320,7 +321,7 @@ Pasos:
    «Nuevo pago». **Activar** lo devuelve.
 Entra: el método (por el asistente, por su nombre) y lo que cambia. La tarjeta del asistente dice el
 método que va a cambiar tal como lo encuentra, aunque se dijera con otras palabras («Cambiar en Pagos:
-Cuenta BBVA 4821 · BBVA QA proveedores» cuando se dijo «el del BBVA»).
+Cuenta BBVA 4821 · Nombre: BBVA QA proveedores» cuando se dijo «el del BBVA»).
 Sale: el método cambiado (`payment.method.updated`, `.deactivated`, `.activated`). Los pagos que ya
 lo usaron lo conservan y enseñan su nombre nuevo.
 Si falla: un nombre que ya tiene otro método se rechaza debajo de Nombre. Desactivar uno desactivado

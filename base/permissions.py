@@ -6,7 +6,7 @@ cannot go through one. This module only reads.
 """
 
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, NamedTuple
 
 from django.contrib.auth import get_user_model
 from live.context import Scope
@@ -22,6 +22,9 @@ from base.tenancy.context import PLATFORM_SCOPE_KIND
 #: its devices and the way in. Here, not in ``base.queries``, so ``base.services`` can name them too.
 VIEW_HOME = "base.view_home"
 ADMINISTER_HUB = "base.administer_hub"
+#: Who makes, adjusts and deletes the roles of the business (``base.role.*``): the owner, an administrator and whoever a
+#: role of the business lets.
+MANAGE_ROLES = "base.manage_roles"
 #: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
 OPEN_MANAGEMENT = "base.open_management"
 
@@ -30,6 +33,26 @@ OPEN_MANAGEMENT = "base.open_management"
 OWN_BUSINESS = "base.own_business"
 #: What the owner holds and no other role does: an administrator runs the business, it does not own it.
 OWNER_ONLY = frozenset({OWN_BUSINESS})
+
+
+class RoleHeld(NamedTuple):
+    """What a person is in a business: the role of their invitation (a ``Membership.Role`` value) and, if they were given
+    one, the role of the business that rules over it."""
+
+    invitation: str
+    own: BusinessRole | None
+
+
+def role_held(user: Any, scope: Scope) -> RoleHeld | None:
+    """The role of ``user`` on ``scope``, read from the business at work; ``None`` without a ``Membership`` there. The
+    owner keeps the role of their invitation whatever role of the business their row names."""
+    invitation = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
+    if invitation is None:
+        return None
+    own = None
+    if invitation != Membership.Role.OWNER:
+        own = BusinessRole.objects.filter(people__username=user.get_username()).first()
+    return RoleHeld(invitation, own)
 
 
 def access_for(user: Any, scope: Scope) -> frozenset[str]:
@@ -47,15 +70,16 @@ def access_for(user: Any, scope: Scope) -> frozenset[str]:
         return frozenset()
     if user.is_superuser and scope.kind == PLATFORM_SCOPE_KIND:
         return frozenset({"*"})
-    role = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
-    if role is None:
+    held = role_held(user, scope)
+    if held is None:
         return frozenset()
-    own = None
-    if role != Membership.Role.OWNER:
-        own = BusinessRole.objects.filter(people__username=user.get_username()).first()
-    if own is None:
-        return permissions_of_role(role)
-    allowed = roles.effective(own.states, grantable(all_live_app_configs()), given=permissions_of_role(own.origin))
+    return permissions_of_role(held.invitation) if held.own is None else permissions_of_business_role(held.own)
+
+
+def permissions_of_business_role(role: BusinessRole) -> frozenset[str]:
+    """What a role of the business allows, of every app of this deployment: one turned on later gives what it gives the
+    basic role it came from (``base.roles``)."""
+    allowed = roles.effective(role.states, grantable(all_live_app_configs()), given=permissions_of_role(role.origin))
     return frozenset(permission for permission, state in allowed.items() if state == roles.ON)
 
 

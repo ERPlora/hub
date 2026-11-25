@@ -1,5 +1,11 @@
 ## What it is for and who it is for
-<!-- from WORKBOOK.md sha256:293a7969e5b1 -->
+<!-- from WORKBOOK.md sha256:22f1600b7c0a -->
+
+It is what the Hub always brings, without turning on any app: the **Home**, the business's **people**, its **files**, its
+**apps**, the **system** and the **settings**. From here each app is opened and the business is set up to work.
+
+### At a glance
+<!-- from WORKBOOK.md sha256:aad62a55216c -->
 
 The Home is the first thing anyone in the business sees on coming in. At a glance:
 
@@ -57,35 +63,40 @@ against what the plan includes and, like Google Workspace, the yellow notice at 
 <!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Home · Summary
-<!-- from WORKBOOK.md sha256:4d554b656fdc -->
-On top, the business's name and "Today" with the long date; while the business has no name, a greeting
-by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this order:
+<!-- from WORKBOOK.md sha256:01b114f3b5e8 -->
+On top, the business's name and "Today" with the long date. Below, in this order:
 
 - **How the business is working**, only for who administers it: a coloured label for each app on that says how it is
   doing (the receipt printer, the WhatsApp number), with what fixes it, and "View system".
 - **"Start with a business like yours"**, only for who administers the business and while the business has
-  nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
+  nothing a template brings.
 - **"My apps"**: one tile per app the person can open, with its icon and its name; the ones opened most in this
-  browser, first. On a phone, with six apps or more, the first four and "View all apps".
-- **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
-  icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
-  available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
-  with "View all" and "Show less". When nothing is left: "Your business is ready".
+  browser, first.
+- **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with "Set up".
 - **The board of panels**, with "Customize panel" (⋮) at the top right.
 
+#### What each part brings
+<!-- from WORKBOOK.md sha256:13672a1e55bb -->
+- **The business's name**: while it has none, a greeting by the hour ("Good morning", "Good afternoon", "Good evening").
+- **The templates**: up to four, with "Use this one", "See all templates" and "Not now".
+- **"My apps"**: on a phone, with six apps or more, the first four and "View all apps".
+- **Each step to set up**: its icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done"
+  or "Not available yet") and "Set up". The list, folded: five steps (two on a phone), first the ones that stop
+  invoicing, with "View all" and "Show less". When nothing is left: "Your business is ready".
+
 ### Home · Activity
-<!-- from WORKBOOK.md sha256:c518a2841f2f -->
+<!-- from WORKBOOK.md sha256:156a3e1e3dcb -->
 The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" and "Status", with
 "Search activity…", the filters funnel (method and status), the order, the cards view and "Columns". It
-also opens with the Home's link ending in `#actividad`.
+also opens with the Home's link ending in #actividad.
 
 ### The bell
-<!-- from WORKBOOK.md sha256:da35e3c96625 -->
+<!-- from WORKBOOK.md sha256:0a2c21fb32cc -->
 At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
 "Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
 until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
-plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
-print… No notice is dismissed: it goes by itself once it is solved.
+plan's limits, the roles to review, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer
+that does not print… No notice is dismissed: it goes by itself once it is solved.
 
 - **The bell.** With nothing pending, just the bell. With something, it becomes a pill with the bell and the number,
   in the colour and with the icon of the gravest notice (urgent, attention or information). If a notice has a
@@ -147,17 +158,20 @@ own ("Set up VeriFactu"). To whoever cannot set it up it says, with no buttons, 
 up.". It goes by itself as soon as the step is done, on any device.
 
 ### Apps
-<!-- from WORKBOOK.md sha256:7251980958b0 -->
+<!-- from WORKBOOK.md sha256:01594a5ed527 -->
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
 apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business has
-turned on (those in "My apps", also the ones born on, like Taxes, and the ones that came along with another) and how
-many of the ones its plan allows it has chosen: "27 apps turned on · 17 of 20 in your plan" or, with no limit, "27
-apps turned on · Unlimited". A business just signed up: "1 app turned on · 0 of 20 in your plan" (hub#1286).
+turned on and how many of the ones its plan allows it has chosen: "27 apps turned on · 17 of 20 in your plan".
 Each tab, a table (or cards) with its search, the filters funnel, the order and "Columns": "App" (icon and name),
 "Category" and "Status"; in "Add apps" and "Paid", also "Description", "Price" and "Comes with". "Open" on the
-row of an app the person can open and, for whoever runs the business, "Turn on" or "Turn off". Above the table,
-when it applies, the notice of the plan's limit or the one saying why an app was not changed.
+row of an app the person can open and, for whoever runs the business, "Turn on" or "Turn off".
 "Paid" and "Price" only show if some app is subscribed to separately; today none is: every app comes with every plan.
+
+#### The count of apps and the notices
+<!-- from WORKBOOK.md sha256:f36306390a00 -->
+It counts those in "My apps", also the ones born on, like Taxes, and the ones that came along with another. With no
+limit: "27 apps turned on · Unlimited". A business just signed up: "1 app turned on · 0 of 20 in your plan" (hub#1286).
+Above the table, when it applies, the notice of the plan's limit or the one saying why an app was not changed.
 
 ### The screen of an app that does not open
 <!-- from WORKBOOK.md sha256:8097e7649eb4 -->
@@ -240,27 +254,30 @@ photo), "Preferences" (language and appearance: palette, theme and interface siz
 "PIN".
 
 ### Settings · General
-<!-- from WORKBOOK.md sha256:a6d9e7ca4e48 -->
+<!-- from WORKBOOK.md sha256:20223bfae72a -->
 What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device" (in the
 ERPlora app on a computer, also "Start on login"), "PIN pad", for whoever runs the business "Devices" and, at the
-end, "API documentation".
+end, the card of the API's documentation.
 
 ### Your business is being prepared
 <!-- from WORKBOOK.md sha256:d89dba046a9c -->
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
 ### Files
-<!-- from WORKBOOK.md sha256:26d174fa1ff9 -->
+<!-- from WORKBOOK.md sha256:fc8ee636158c -->
 From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
 which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
 "Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
-folder" and "Upload file". Below, the open folder's path, with ⋮ beside it to rename, move or delete that folder;
-"Space", with what is used and the plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder
-holds: the folders first and then the files, each with its icon, its name, its size (in the list, also when it
-changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". In the list, each name takes one line:
-what does not fit is cut with "…" and the extension always shows whole; on a phone, the size and the date go under
-the name, in grey. Tapping a file opens it in the viewer, with
-its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
+folder" and "Upload file". Below, what the open folder holds: tapping a file opens it.
+
+#### The open folder
+<!-- from WORKBOOK.md sha256:3e9218268628 -->
+On top, the folder's path, with ⋮ beside it to rename, move or delete that folder; "Space", with what is used and the
+plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder holds: the folders first and then
+the files, each with its icon, its name, its size (in the list, also when it changed) and its ⋮: "Open", "Download",
+"Rename", "Move to…" and "Delete". In the list, each name takes one line: what does not fit is cut with "…" and the
+extension always shows whole; on a phone, the size and the date go under the name, in grey. Tapping a file opens it in
+the viewer, with its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
 
 ### Employees · Staff
 <!-- from WORKBOOK.md sha256:976a92f8783f -->
@@ -271,19 +288,19 @@ only for whoever runs the business, "API keys" and "Approvals"; each one in the 
 Employees.
 
 ### Employees · Roles
-<!-- from WORKBOOK.md sha256:75bff4edda7b -->
-The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
-give. Tapping one opens "What it allows".
+<!-- from WORKBOOK.md sha256:96f57230a6d8 -->
+The five roles of erplora.com and, below them, the business's own, with where they come from, how many people have
+them and how many permissions they give. Tapping one opens "What it allows".
 
 ### Employees · Roles · What it allows
-<!-- from WORKBOOK.md sha256:a821154de0ac -->
-A basic role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
+<!-- from WORKBOOK.md sha256:38cb46544de6 -->
+A role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
 and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
 
 ### Employees · API keys
-<!-- from WORKBOOK.md sha256:c4cd502dadae -->
-The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
-"API documentation".
+<!-- from WORKBOOK.md sha256:c4e8c06601f5 -->
+The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom, the
+link to the API's documentation.
 
 ### Employees · Approvals
 <!-- from WORKBOOK.md sha256:5b086a34c109 -->
@@ -375,7 +392,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:98efb2b95b30 -->
+<!-- from WORKBOOK.md sha256:a8ada64d0106 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -499,6 +516,11 @@ On the Employees screens and the API documentation:
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
 | BASE-F126 | Turn ERPlora's support access on or off | partial |
+| BASE-F127 | Make a role of your own from another | partial |
+| BASE-F128 | Adjust what a role of your own allows | partial |
+| BASE-F129 | Delete a role of your own | partial |
+| BASE-F130 | Give a person a role of your own | partial |
+| BASE-F131 | See in the bell the roles to review | partial |
 
 ### BASE-F01 See what the business still has to set up
 <!-- from WORKBOOK.md sha256:b63e81f97d68 -->
@@ -815,13 +837,14 @@ If it fails: without the assistant, the steps keep leading to their screen from 
 Involved: BASE-F103, INVENTORY-F28
 
 ### BASE-F13 A role change or leaving the business with the hub open
-<!-- from WORKBOOK.md sha256:ed7f6dfad3c8 -->
+<!-- from WORKBOOK.md sha256:15bd3236782e -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: any screen of the hub
 Steps:
   1. At erplora.com, whoever manages the business changes a person's role, removes them from the business
-     or hands the ownership over to them.
+     or hands the ownership over to them; or in the Hub gives them a role of your own or changes what theirs allows
+     (BASE-F130, BASE-F128).
   2. If their role changed, their session stays open and what they have open, on all their devices, moves
      at that moment to what the new role allows, without reloading or signing in again: the menu, "My apps"
      and the tabs show only what they may open; the screen in front of them turns into "No access" if the
@@ -840,7 +863,7 @@ Out: their role in the business, up to date, and what they have open with what t
 sessions of whoever is no longer in the business, ended.
 If it fails: if the hub does not answer at that moment, erplora.com passes it again shortly and the change
 arrives then. A device without a connection gets it when it reconnects.
-Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
+Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118, BASE-F128, BASE-F130
 
 ### BASE-F14 See the business's apps
 <!-- from WORKBOOK.md sha256:de8a48d10c48 -->
@@ -1059,7 +1082,7 @@ If it fails: if another running app needs it, nothing changes; if it cannot be t
 Involved: VERIFACTU-F32
 
 ### BASE-F24 Turn an app back on
-<!-- from WORKBOOK.md sha256:b586e4517540 -->
+<!-- from WORKBOOK.md sha256:9200f98dc973 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -1074,12 +1097,12 @@ Steps:
      language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and before the yes it
-     names the ones it needs that are off, as the notice of step 2 does: "Turn on in Apps: Reservations ·
-     Reservations needs Schedules and Tables: they turn on with it.". If it was on already the assistant says so
+     names the ones it needs that are off, as the notice of step 2 does: "Turn on in Apps: Reservations · Other
+     apps: Reservations needs Schedules and Tables: they turn on with it.". If it was on already the assistant says so
      ("Customers was on already") instead of "turned on".
   5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
-     longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · VeriFactu is mandatory for
-     businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
+     longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · Once on: VeriFactu is mandatory
+     for businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
   6. If the assistant is asked for something of an app that is off by saying its name, even without saying "app" ("I
      want to manage reservations", "book an appointment"), or if what the assistant searches for to do it names it, it
      says which app does it, what it is for as Apps says it and that it is off, instead of saying it cannot or trying it
@@ -1320,7 +1343,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:4a93be6f88d4 -->
+<!-- from WORKBOOK.md sha256:fee359cfd24c -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Export
@@ -1333,14 +1356,18 @@ Steps:
      or "Template to share" (it never takes customers).
   4. Choose the apps and their data (BASE-F36) and tap "Export" ("Exporting…").
   5. The file downloads with the browser and "{file} downloaded." shows.
+  6. Asked of the assistant ("I'm opening another bar and want to take the menu and the customers"), it says it is
+     done here, in Settings › Data and backups › Export, with "Template to share" or "Backup of this business", and
+     what it takes: the products and the services go with their own photos inside. It does not make the file itself.
 In: the name, the language, what it is for and what is ticked.
-Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows; never people,
-PINs nor fiscal data. Nothing is kept in the business.
+Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows, with the products' and
+the services' own photos inside (INVENTORY-F33); never the sales, people, PINs nor fiscal data. Nothing is kept in the
+business.
 If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
 administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset
 (BASE-F37).
-Involved: BASE-F112 (inside the app), BASE-F37
+Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F33
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
 <!-- from WORKBOOK.md sha256:87d90fd8e515 -->
@@ -1979,7 +2006,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:640c21db2c07 -->
+<!-- from WORKBOOK.md sha256:f5fff0f123b1 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1996,9 +2023,11 @@ Steps:
      and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
      (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
      Home.
-  5. If they ask the assistant for it ("switch me to English") and confirm the card, the new language applies just as
-     from the selector: the open application switches to it without reloading, and stays in it on reloading or opening
-     it again on this device.
+  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for ("English";
+     what goes back to the business's, by its name: "The business's language"). On confirming it only that changes, and
+     the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
+     selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
+     on this device.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
@@ -2382,7 +2411,7 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles and what each one allows
-<!-- from WORKBOOK.md sha256:92addcfa0da0 -->
+<!-- from WORKBOOK.md sha256:cd9c70187deb -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles; Employees · Roles · What it allows
@@ -2392,7 +2421,8 @@ Steps:
   2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
      available", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
      each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
-     features call for it.
+     features call for it. Below them, by their name, the business's own roles (BASE-F127), with "Custom": whoever
+     has one counts in it and not in the one of their invitation, save the owner, who is always the owner.
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
@@ -2403,13 +2433,15 @@ Steps:
      In each panel, the phrase of each permission and its state: "Allowed", "With approval" (the person does it if a
      manager approves it with their PIN there and then, BASE-F84) or "No". For example, the employee sees in "Sales
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
-     changed here.
+     changed here. A role of the business's own says "What this role lets a person do in this business, app by app."
+     and shows what the business saved; what no role of the business can give, owning the business, does not show.
   5. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles, the people of the business, the apps that are on and what each app gives each role.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
-allows." with "Retry", and a role that is not one of the five, "This role does not exist in this business.".
-Involved: BASE-F83, BASE-F84
+allows." with "Retry", and a role that is not one of the five nor one of the business's own, "This role does not exist
+in this business.".
+Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131
 
 ### BASE-F83 Give a person a role
 <!-- from WORKBOOK.md sha256:e0c7ae2348e6 -->
@@ -2427,6 +2459,115 @@ In: the role chosen on erplora.com.
 Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
+
+### BASE-F127 Make a role of your own from another
+<!-- from WORKBOOK.md sha256:37c95552ec56 -->
+Status: partial — it is made by asking the assistant or through the Hub's API; its screen is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant for a role from another, with its name: "create the role Cashier from Employee". It can come
+     from a basic one or from one of your own, and carry a description.
+  2. The card says "Based on: Employee" and "Name: Cashier" (BASE-F97). Once accepted, the role is made with the same
+     the other one allows, app by app, save owning the business, which no role of your own gives.
+  3. It shows at once in **Employees › Roles**, with "Custom" and nobody in it. What it allows is seen by tapping it
+     (BASE-F82) and changed with BASE-F128; it is given to a person with BASE-F130. From then on it does not change with
+     the role it came from.
+In: the role it comes from, the name (up to 80 letters) and, if wanted, the description.
+Out: the business's own role. Event `base.role.created`. It never leaves the business: erplora.com does not know it.
+If it fails: without a name, "Give the role a name."; with the name of another role of your own, capitals aside, "There
+is already a role with that name. Choose another."; a role that is not there, "This role does not exist in this
+business.". Nobody gives what they do not have: if the role it comes from allows something whoever makes it may not do,
+"A role may not allow more than you may do yourself." and it is not made. The assistant does not offer it to who does
+not manage roles, and the API answers 403.
+Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
+
+### BASE-F128 Adjust what a role of your own allows
+<!-- from WORKBOOK.md sha256:b3009bb37d77 -->
+Status: partial — it is adjusted by asking the assistant or through the Hub's API; its screen is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant for the change: "the Cashier role can't void sales", "call the Cashier role Evening till".
+  2. The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
+     "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM
+     (BASE-F98).
+  3. Once accepted, only what was asked for changes. If somebody has the role, what they see and what they may do change
+     at once on their devices, without ending their session (BASE-F13).
+  4. An app turned on after the role was saved gives what it gives the basic role it came from; a permission an app adds
+     later comes in as "No". In both cases the role is left to review until it is saved with them, and the bell says so
+     (BASE-F131).
+In: the role and what changes: the name, the description or the state of each permission.
+Out: the role changed. Event `base.role.updated`.
+If it fails: a basic role is not changed: "This is one of erplora.com's roles. Duplicate it and change the copy.".
+Nobody gives what they do not have: "A role may not allow more than you may do yourself."; and owning the business is
+given to nobody: "That is only the owner's of the business: no role gives it.". A permission that is not of an app that
+is on, "That permission is not of any app that is on in this business."; "With approval" for something a manager cannot
+approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it.
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
+
+### BASE-F129 Delete a role of your own
+<!-- from WORKBOOK.md sha256:46cbe2e843b2 -->
+Status: partial — it is deleted by asking the assistant or through the Hub's API; its screen is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant "delete the Cashier role".
+  2. The card says the role and, under "What will happen", how many people have it, and asks to type CONFIRM (BASE-F98).
+     Once accepted, the role disappears from **Employees › Roles**.
+  3. Whoever left the business with that role, if they come back, enters with the one of their invitation.
+In: the role.
+Out: the role deleted. Event `base.role.deleted`.
+If it fails: if somebody of the business has it, it is not deleted: "2 people have this role. Give them another before
+deleting it.". A basic role is not deleted: "This is one of erplora.com's roles. Duplicate it and change the copy.".
+Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
+
+### BASE-F130 Give a person a role of your own
+<!-- from WORKBOOK.md sha256:f852186014a5 -->
+Status: partial — it is given by asking the assistant or through the Hub's API; its place in the person's page is missing
+Actor: owner, administrator
+Screen: Assistant
+Steps:
+  1. Ask the assistant "give Luis the Cashier role" or "take the Cashier role away from Luis".
+  2. The card says the person and the role by their names and, under "What will happen", how many people have that role.
+     It asks to type CONFIRM (BASE-F98).
+  3. Once accepted, the person has that role, which rules over the one of their invitation: what they see and what they
+     may do change at once on their devices, without ending their session (BASE-F13), and whoever may now do something
+     with that role approves it with their PIN too (BASE-F84). Each person has a single role.
+  4. To return them to the one of their invitation, ask for that role ("Employee"): it is the one they have from then on.
+  5. That person's assistant knows the role it talks to: the role of your own, by the name the business gave it
+     (BASE-F100).
+In: the person and the role, one of the business's own or the one of their invitation.
+Out: the person with that role. Event `base.role.assigned`. erplora.com does not know: there they keep the one of their
+invitation.
+If it fails: nobody gives the owner another role, "The owner is always the owner: nobody gives them another role.";
+nobody changes their own, "Nobody changes their own role: ask somebody above you."; nor the one of somebody who is not
+below them by their invitation, "You may only give a role to people below you in the business.". Nobody gives a role that
+allows more than they may do themselves, the one of the invitation when returning a person to it and what an app that is
+off would give included: "A role may not allow more than you may do yourself.". Another basic role, "That role is given
+on erplora.com. Here you give one of the business's own."; a role that is not there, "This role does not exist in this
+business."; a person who is not of the business, "That person is not in this business.". If somebody deletes the role at
+the same time, it is either deleted or given, never both: one hears "This role does not exist in this business." or "2
+people have this role. Give them another before deleting it.".
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+
+### BASE-F131 See in the bell the roles to review
+<!-- from WORKBOOK.md sha256:d94ce903422c -->
+Status: partial — the bell counts them and leads to the roles; the screen where they are reviewed is missing
+Actor: owner, administrator
+Screen: The bell
+Steps:
+  1. An app is turned on, or an app gains a permission, after a role of your own was saved: that role is left to review
+     (BASE-F128).
+  2. The bell of whoever manages the roles goes up without reloading with the notice "2 roles to review" and its
+     sentence: "An app turned on or a new permission is not in them yet: look at what each role allows.".
+  3. "Review the roles" opens **Employees › Roles**.
+  4. Once a role is saved with what it lacked (BASE-F128), it stops counting; with none left, the notice goes away.
+In: the business's own roles and the apps that are on.
+Out: nothing is saved.
+If it fails: whoever does not manage the roles does not see the notice. If the notices cannot be read, the bell keeps
+the last it knew, as in BASE-F10.
+Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
 <!-- from WORKBOOK.md sha256:05dd4133812d -->
@@ -2757,7 +2898,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:63406cec4761 -->
+<!-- from WORKBOOK.md sha256:986a02e69f6b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2767,7 +2908,13 @@ Steps:
      for it in one short question and never makes it up ("Which tax do you sell it with?"), and if the request fits
      several records, it asks which one. It never asks in its text whether to go ahead: the card asks that.
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
-     for example "Create in Services: Haircut · €15.00 · 30". An amount, every datum its app declares as money, shows
+     for example "Create in Services: Haircut · Price: €15.00 · Duration (minutes): 30". The first, what the action
+     touches (its record or its name), shows by its value alone when it reads on its own (a name, a record, a date or
+     records by their names); each datum after it, and a figure, an amount or a yes or a no in first place, carries the
+     name of its datum in front, the same as on its screen, because alone it does not say what it is: "Change in
+     Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same as its price;
+     "Create in Sales & POS: Misc · Tax category: Product — general · Position: 0"; "Open in Tables: Table: 4 ·
+     Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
@@ -2926,7 +3073,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-<!-- from WORKBOOK.md sha256:ecc553290c6d -->
+<!-- from WORKBOOK.md sha256:9e8f8f1f0472 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2935,7 +3082,8 @@ Steps:
      and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
      permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
      its button on the screen is. The assistant knows the role it talks to (owner, administrator, manager or
-     employee, said in the language of the conversation) and that its tools are that role's: asked for something none
+     employee, said in the language of the conversation, or the role of your own the person was given, by its name,
+     BASE-F130) and that its tools are that role's: asked for something none
      of them does, it neither looks for another way nor tells the state of something else, but says in one sentence
      that it is not available to them here, because their role cannot do it or because that app is not on, and who
      can (to an employee, a manager or the owner; to a manager, the owner or an administrator) or on which screen it
@@ -2955,7 +3103,7 @@ and for two minutes, and it is spent together with the action (BASE-F84).
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
 says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
 failed: …" and the assistant tells it.
-Involved: BASE-F13, BASE-F84, BASE-F97
+Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
 <!-- from WORKBOOK.md sha256:d13d6abe2da3 -->

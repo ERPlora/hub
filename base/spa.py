@@ -8,8 +8,8 @@ Home), where its plan is changed on the SaaS (``/dashboard/store/plans?business=
 plan»), the SaaS's account page (the user menu's «My account»; its «Report a problem» is the hub's own dialog) and this
 business on the SaaS's panel (``manage_url``, the bar's «erplora.com»; only with ``base.open_management``), those only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock;
-``base.queries.access.shell_access``), the person's own appearance (``preferences``) and the modules whose help window
-is ready (``help_apps``, ``base.help.get``). The addresses on erplora.com
+``base.queries.access.shell_access``), the person's own appearance (``preferences``) and the apps whose help is ready
+(``help_apps``, ``base.help.get``). The addresses on erplora.com
 are the usual ones, which ask to sign in: their click goes with the pass ``base.saas_pass.create`` signs, never
 embedded here, where it would expire in a minute and any script could read it. ``widget-list`` carries
 ``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
@@ -109,7 +109,7 @@ def shell(request: HttpRequest, *, blocks: dict | None = None) -> HttpResponse:
             # The ERPlora app of each system erplora.com publishes, always its latest build. Public pages, so they go
             # to anyone, whatever the way in.
             "app_downloads": {platform: saas_url(f"/app/download/{platform}/") for platform in APP_PLATFORMS},
-            # The modules whose screens show the help button (base.help.get).
+            # The apps whose help is ready (base.help.get).
             "help_apps": queries.app_help.ready_apps(),
         }
         widgets = _widgets(request)

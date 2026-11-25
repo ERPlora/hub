@@ -1,6 +1,6 @@
 // What the card of the Hub's assistant says of each datum, in Spanish, set up as in base-assistant.spec.ts: its
 // label, an object by its values, no attempt key, a file by its name and an amount in its currency.
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { ask, askForACard, askForAPriceInDollars, cancelAtComputerSize, captureConfirmation, captureStill, card, decide, lastAnswer, leave, openPanelAtTheDesk, openPanelInSpanish, panel, sentCard, signedInWith } from './assistant-panel';
 import { A, api, login, THREE_SIZES as VIEWPORTS } from './helpers';
@@ -11,6 +11,13 @@ panelSpec();
 
 /** The last receipt under the answers: what the Hub says it did with a write (BASE-F97, step 5). */
 const receipt = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]').last();
+
+/** A payment method of its own, through Payments' API: a payment's card comes only for a method the business has. */
+async function aMethod(context: BrowserContext): Promise<string> {
+  const name = `E2E Caja ${Date.now().toString(36)}`;
+  await post(context, '/payment/methods', { name, bank_account_ref: '' });
+  return name;
+}
 
 // Cancelled: nothing changes, so the only thing to clean is the language cookie's context, closed at the end.
 test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, also one the screen does not name itself, and the platform by its screen', async ({ browser }) => {
@@ -31,8 +38,8 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Cambiar en Ajustes. Revisa cada dato antes de seguir.');
-    await expect(card(page)).toContainText('Volver a pedir tras (minutos): 10');
-    await expect(card(page)).toContainText('Dígitos del PIN: 6');
+    await expect(card(page)).toContainText('Volver a preguntar tras inactividad: Hasta cerrar sesión');
+    await expect(card(page)).toContainText('Dígitos del PIN: 6 dígitos');
     await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
   await cancelAtComputerSize(page);
@@ -83,7 +90,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     // The document by the queue's word for it, never as the model sent it.
-    await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · ${product}`);
+    await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · Documento: ${product}`);
     await expect(card(page)).not.toContainText(jobKey);
     await captureStill(page, `${KEY}-${vp.label}`);
   }
@@ -146,12 +153,13 @@ test('whatsapp_inbox-assistant-card — in Spanish a template names its header f
 test('base-assistant-money-mark — in Spanish a payment says its amount in the business’s currency, never in its minor unit', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS';
   const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
+  const method = await aMethod(context);
   await openPanelInSpanish(page);
-  const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
+  const payment = { method, payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
   await askForACard(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
+    await expect(card(page)).toContainText(new RegExp(`Cafés del Sur · Importe: 15,00\\s€ · Método: ${method}`));
     await expect(card(page)).not.toContainText('1500');
     await captureStill(page, `${KEY}-${vp.label}`);
   }
@@ -165,19 +173,20 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
 test('base-assistant-money-mark — in Spanish a payment in another currency says its amount in it, with its decimals', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-USD';
   const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
+  const method = await aMethod(context);
   await openPanelInSpanish(page);
-  const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
+  const payment = { method, payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
   await askForACard(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
+    await expect(card(page)).toContainText(new RegExp(`Cafés del Sur · Importe: 15,00\\s\\$ · Método: ${method}`));
     await expect(card(page)).not.toContainText('€');
     await captureStill(page, `${KEY}-${vp.label}`);
   }
   await cancelAtComputerSize(page);
   // In yen, without decimals: 1500 is ¥1,500, never «15,00».
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
-  await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1\.500\s¥/); // Its thousands grouped, as every amount of the Hub (hub#734).
+  await expect(card(page)).toContainText(new RegExp(`Cafés del Sur · Importe: 1\\.500\\s¥ · Método: ${method}`)); // Its thousands grouped, as every amount of the Hub (hub#734).
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   await leave(context, turnedOn);
@@ -203,14 +212,14 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
   await askForAPriceInDollars(page, 'pricing__price_item__add', price);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`));
+    await expect(card(page)).toContainText(new RegExp(`Tarifa: ${PRICING_CODE}USD · Precio: 15,00\\s\\$`));
     await expect(card(page)).not.toContainText('€');
     await captureStill(page, `${KEY}-${vp.label}`);
   }
   await cancelAtComputerSize(page);
   // In zlotys, the list's, never the business's euros.
   await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify({ ...price, price_list: `${PRICING_CODE}PLN` })}`, { settle: false });
-  await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}PLN · 15,00\\szł`));
+  await expect(card(page)).toContainText(new RegExp(`Tarifa: ${PRICING_CODE}PLN · Precio: 15,00\\szł`));
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   cleanPricing();
