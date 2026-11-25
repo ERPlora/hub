@@ -3760,7 +3760,8 @@ Pasos:
   1. Abre por su dirección (un enlace, el historial, una pestaña que se quedó abierta o escribiéndola) una pantalla que
      su rol no abre: una entrada de una app que no sale en su menú, como «Reglas» de Impuestos para un empleado, una
      de la plataforma que no sale en su menú lateral, como «Sistema» para quien no administra el negocio, o cualquier
-     pantalla que cuelgue de ellas.
+     pantalla que cuelgue de ellas. También la ficha de otra persona en **Empleados** para quien no administra el
+     negocio, aunque llegue a ella porque la caja cambió de usuario con la ficha abierta (BASE-F60).
   2. En lugar de la pantalla, en la misma dirección, sale «Sin acceso»: «No tienes acceso a esta pantalla» — «Tu rol en
      este negocio no la abre.». Mientras busca a quién pedirlo: «Buscando quién puede darte acceso…».
   3. Debajo, «Pide acceso a una de estas personas:» y el nombre de cada una, con su avatar: quien le puede cambiar el
