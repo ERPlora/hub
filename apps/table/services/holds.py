@@ -12,7 +12,8 @@ from live.outbox import record_event
 
 from apps.table import events
 from apps.table.models import Hold, Table
-from apps.table.queries import HOLD_NOT_FOUND, business_zone, find_table, hold_row
+from apps.table.queries.holds import HOLD_NOT_FOUND, hold_row
+from apps.table.queries.lookups import find_table
 from apps.table.schemas import (
     CustomerErasedIn,
     ExpiredOut,
@@ -25,6 +26,7 @@ from apps.table.schemas import (
     ReservationUpdatedIn,
 )
 from apps.table.services.writes import SYSTEM, TABLE_NOT_AVAILABLE, _stamp
+from base.business import business_zone
 
 #: How long a reservation holds its table when it does not say.
 DEFAULT_RESERVATION_MINUTES = 120
