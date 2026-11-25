@@ -665,14 +665,14 @@ are joined with CUSTOMER-F13).
 Involved: SALE-F05, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F19 Link the customer to the open order
-<!-- from WORKBOOK.md sha256:95c1e8de50b0 -->
+<!-- from WORKBOOK.md sha256:8e10cfecae79 -->
 Status: done
 Actor: system (Sales & POS asks for it)
 Screen: none
 Steps:
 1. With a customer assigned, Sales & POS opens or saves the order (the table's check, the cart) and asks
    Customers to link it. Appointments does the same with the check it opens when an appointment is
-   charged, with the appointment's customer (APPOINTMENT-F17).
+   charged, with the appointment's customer.
 2. Customers notes which customer that order has. Reassigning another customer to the same order
    replaces the previous one (an order, at most one customer); the same customer again rewrites nothing.
 3. On letting go of the customer (removing them, leaving the check at the table, deleting the check),

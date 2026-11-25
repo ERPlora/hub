@@ -639,7 +639,7 @@ Pantalla: ninguna
 Pasos:
 1. Con un cliente asignado, Venta abre o guarda el pedido (la cuenta de la mesa, el carrito) y le
    pide a Clientes que lo enlace. Citas hace lo mismo con la cuenta que abre al cobrar una cita, con la
-   clienta de la cita (APPOINTMENT-F17).
+   clienta de la cita.
 2. Clientes anota qué cliente tiene ese pedido. Reasignar otro cliente al mismo pedido sustituye el
    anterior (un pedido, como mucho un cliente); el mismo cliente otra vez no reescribe nada.
 3. Al soltar el cliente (quitarlo, dejar la cuenta en la mesa, eliminar la cuenta), Venta pide el

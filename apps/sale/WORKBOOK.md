@@ -1004,8 +1004,8 @@ Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
 1. En la agenda de Citas, «Cobrar» abre la cuenta de la cita (con una línea por servicio, a su precio
-   reservado y con la profesional), ya a nombre de la clienta de la cita (CUSTOMER-F19), y lleva a
-   **Vender** con esa cuenta en pantalla.
+   reservado y con la profesional), ya a nombre de la clienta de la cita, y lleva a **Vender** con esa
+   cuenta en pantalla.
 2. Se cobra como siempre; si se aparca y se recupera, la cuenta sigue atada a la cita.
 3. Pulsar «Cobrar» otra vez (o en otro dispositivo a la vez) vuelve a la misma cuenta abierta: una cita
    tiene una sola cuenta abierta, nunca dos.

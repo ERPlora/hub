@@ -573,10 +573,10 @@ Pasos:
    con el profesional que lo hizo y **al precio con que se reservó** (el propio de la
    profesional incluido), aunque el catálogo haya cambiado desde entonces, y lleva a **Venta** con esa
    cuenta en pantalla. La cuenta ya lleva **asignada a la clienta** de la cita, como si se hubiera
-   elegido en «Asignar cliente» (CUSTOMER-F19).
+   elegido en «Asignar cliente».
 3. En el TPV se añaden productos o descuentos, un servicio se
    puede pagar con un **bono** de la clienta y se cobra como cualquier venta: la venta es de la clienta y
-   la compra suma en su ficha (CUSTOMER-F20). Si en el TPV se le quita o se cambia la clienta, volver con
+   la compra suma en su ficha. Si en el TPV se le quita o se cambia la clienta, volver con
    **Ir a la cuenta** la deja como la dejó el TPV.
 4. Una cita tiene **una sola cuenta**: mientras sigue abierta, el botón se llama **Ir a la cuenta** y
    vuelve a ella (nunca abre otra, aunque se pulse a la vez en dos dispositivos); si se anula la cuenta

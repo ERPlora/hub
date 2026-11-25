@@ -1047,15 +1047,15 @@ If it fails: Tables will say.
 Involved: TABLE-F15
 
 ### SALE-F26 Charge an appointment from the calendar
-<!-- from WORKBOOK.md sha256:ab21f5bf5b1e -->
+<!-- from WORKBOOK.md sha256:668681fa4a91 -->
 Status: done (the calendar's "Charge" button belongs to Appointments: APPOINTMENT-F17)
 Vertical: hair salon
 Actor: employee, manager
 Screen: Sell
 Steps:
 1. In the Appointments calendar, "Charge" opens the appointment's check (with one line per service, at
-   its booked price and with the professional), already in the name of the appointment's customer
-   (CUSTOMER-F19), and goes to **Sell** with that check on screen.
+   its booked price and with the professional), already in the name of the appointment's customer, and
+   goes to **Sell** with that check on screen.
 2. It is charged as always; if it is parked and retrieved, the check stays tied to the appointment.
 3. Pressing "Charge" again (or on another device at the same time) goes back to the same open check: an
    appointment has a single open check, never two.

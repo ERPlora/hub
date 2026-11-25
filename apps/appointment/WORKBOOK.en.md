@@ -599,7 +599,7 @@ does not exist in this business.".
 Involved: none
 
 ### APPOINTMENT-F17 Charge the appointment at the till
-<!-- from WORKBOOK.md sha256:870dc80d4d32 -->
+<!-- from WORKBOOK.md sha256:7f41050ab344 -->
 Status: done
 Actor: manager, employee (their own appointments), with the right to sell in Sales
 Screen: Agenda
@@ -610,10 +610,10 @@ Steps:
    of the till), with the professional who performed it and **at the price it was booked at**
    (the professional's own included), even if the catalogue has changed since then, and takes you to
    **Sales** with that check on screen. The check already has **the appointment's customer assigned**,
-   as if she had been chosen in "Assign customer" (CUSTOMER-F19).
+   as if she had been chosen in "Assign customer".
 3. At the till products or discounts are added, a service
    can be paid with a **voucher** of the customer and it is charged like any sale: the sale is the
-   customer's and the purchase counts on her card (CUSTOMER-F20). If the customer is taken off or changed
+   customer's and the purchase counts on her card. If the customer is taken off or changed
    at the till, going back with **Go to the check** leaves it as the till left it.
 4. An appointment has **a single check**: while it is still open, the button is called **Go to the check**
    and goes back to it (it never opens another one, even if it is tapped at the same time on two devices);
