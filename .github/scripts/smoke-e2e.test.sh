@@ -76,7 +76,7 @@ expect "it runs the night's stack once" 1 "$(calls 'night args=')"
 expect "only the tests tagged @smoke" 1 "$(calls 'GREP=@smoke ')"
 expect "on the commit checked out, even one not pushed" 1 "$(calls "REF=$head ")"
 expect "cut at its measured cap" 1 "$(calls "MAX=$CAP_MINUTES ")"
-expect "never writing to the nightly issue" 1 "$(calls 'night args=--no-publish GREP=')"
+expect "with no argument but its --spec" 1 "$(calls 'night args= GREP=')"
 expect "in a folder of its own, so a night and a smoke never share a lock" 1 \
   "$(calls "DIR=$root/home/.erplora/hub-smoke-e2e ")"
 expect "on ports of its own, beside the night's 9770" 1 "$(calls 'PORT=9780')"
@@ -96,7 +96,7 @@ expect "a worker moves it to its own folder and ports" 1 "$(calls "DIR=$root/sta
 
 smoke -- --spec tests/e2e/login-and-shell.spec.ts --spec tests/e2e/two-orgs-isolated.spec.ts
 expect "--spec narrows it to those specs' @smoke tests" 1 \
-  "$(calls 'night args=--no-publish --spec tests/e2e/login-and-shell.spec.ts --spec tests/e2e/two-orgs-isolated.spec.ts GREP=@smoke ')"
+  "$(calls 'night args=--spec tests/e2e/login-and-shell.spec.ts --spec tests/e2e/two-orgs-isolated.spec.ts GREP=@smoke ')"
 expect "and a narrowed smoke still ends green (0)" 0 "$status"
 
 for arguments in "--spec" "--spec --publish" "--spec tests/e2e/sale-pos.spec.ts --publish" "--grep ." "--publish"; do
