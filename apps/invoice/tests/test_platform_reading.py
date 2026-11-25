@@ -147,10 +147,10 @@ def test_the_source_filter_leaves_out_what_erplora_com_issued(platform_hub):
 @HUB_DB
 @pytest.mark.parametrize(("direction", "order"), [("asc", ["issued", "paid", "paid"]), ("desc", ["paid", "paid", "issued"])])
 def test_the_list_sorts_by_the_status_it_shows(platform_hub, direction, order):
+    issue()
+    manual()
     collected = manual()
     run("invoice.invoice.mark_paid", {"number": collected.number})
-    manual()
-    issue()
     rows = run("invoice.invoice.list", {"sort": "status", "dir": direction}).rows
     assert [row.status for row in rows] == order
 
