@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hub-next online_order\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-25 01:43+0100\n"
-"PO-Revision-Date: 2026-11-25 01:45+0100\n"
+"POT-Creation-Date: 2026-11-25 10:51+0100\n"
+"PO-Revision-Date: 2026-11-25 08:56+0100\n"
 "Last-Translator: ERPlora\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
@@ -41,30 +41,34 @@ msgstr ""
 "que un empleado lo acepte. El cobro sigue en el TPV. Si un QR tiene que "
 "dejar de valer, regéneralo e imprime el nuevo."
 
-#: apps.py:29
+#: apps.py:32
 msgid "See the tables' QR codes"
 msgstr "Ver los QR de las mesas"
 
-#: apps.py:30
+#: apps.py:33
 msgid "Regenerate the tables' QR codes"
 msgstr "Regenerar los QR de las mesas"
 
-#: models.py:10
+#: apps.py:45
+msgid "QR codes"
+msgstr "Códigos QR"
+
+#: models.py:11
 msgid "table"
 msgstr "mesa"
 
-#: models.py:12
+#: models.py:13
 msgid "code"
 msgstr "código"
 
-#: models.py:13
+#: models.py:14
 msgid "generated at"
 msgstr "generado el"
 
-#: models.py:16
+#: models.py:17
 msgid "table code"
 msgstr "código de mesa"
 
-#: models.py:17
+#: models.py:18
 msgid "table codes"
 msgstr "códigos de mesa"

@@ -4,7 +4,7 @@ vertical: restaurant
 roles: administrador, responsable
 ---
 
-Para qué: dibujar la sala con sus zonas y mesas, repartir la carta por estaciones de cocina y preparar el cajón.
+Para qué: dibujar la sala con sus zonas y mesas, repartir la carta por estaciones de cocina, preparar el cajón e imprimir el QR de cada mesa.
 
 ## Punto de partida
 
@@ -27,4 +27,6 @@ Para qué: dibujar la sala con sus zonas y mesas, repartir la carta por estacion
 12. KITCHEN-F03 — se borra una estación de prueba.
 13. KITCHEN-F26 — la pantalla de cocina, en la tableta de la cocina.
 14. CASH_REGISTER-F02 — el cajón de la barra.
-15. TABLE-F09 — la sala, lista para el servicio.
+15. ONLINE_ORDER-F01 — con Pedidos online encendida, los QR que faltan de golpe y, después, el de la mesa 7 regenerado.
+16. ONLINE_ORDER-F02 — la hoja con el QR de cada mesa para recortar, y la de la mesa 7 sola.
+17. TABLE-F09 — la sala, lista para el servicio.
