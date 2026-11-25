@@ -10,7 +10,7 @@ from live.errors import Conflict
 from pydantic import ValidationError
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import HUB_DB, fields, run
+from apps.invoice.tests.conftest import HUB_DB, ctx_for, fields, run
 from apps.invoice.tests.manual import LINE, RECIPIENT, manual
 from apps.verifactu.models import Record
 
@@ -214,8 +214,6 @@ def test_the_full_invoice_that_replaces_a_ticket_keeps_its_due_date(at):
 
 @pytest.mark.parametrize(("language", "label", "day"), [("en", "Due date", "12/24/2026"), ("es", "Vencimiento", "24/12/2026")])
 def test_the_printed_document_says_when_it_falls_due_only_if_it_does(at, language, label, day):
-    from apps.invoice.tests.conftest import ctx_for
-
     at(NOON)
 
     def page(answer) -> str:

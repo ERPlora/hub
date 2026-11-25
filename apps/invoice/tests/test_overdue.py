@@ -5,11 +5,13 @@ import datetime as dt
 import io
 
 import pytest
+from live.context import OperationContext
 from openpyxl import load_workbook
 
-from apps.invoice.models import Invoice
-from apps.invoice.tests.conftest import HUB_DB, ctx_for, run
+from apps.invoice.tests.conftest import A, HUB_DB, run
 from apps.invoice.tests.manual import LINE, RECIPIENT, manual
+from base.models import Membership
+from base.permissions import access_for
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("issuer", "nothing_leaves")]
 
@@ -105,8 +107,11 @@ def test_the_excel_keeps_the_overdue_ones_as_the_list_does(due, at):
     assert file.invoices == 1
 
 
-def test_someone_who_sees_only_theirs_filters_only_theirs(due, at):
+def test_someone_who_sees_only_theirs_filters_only_theirs(due, at, make_user):
+    ana = make_user("ana", role=Membership.Role.EMPLOYEE)
+    employee = OperationContext(scope=A, actor=ana, permissions=access_for(ana, A), language="en")
+    at(ISSUED)
+    hers = manual(employee, due_date=DUE)
     at((ZONE, NEXT_DAY))
-    Invoice.objects.filter(pk=due.id).update(created_by="somebody-else")
-    page = run("invoice.invoice.list", {"status": "overdue"}, ctx_for("hub_employee", actor="tester"))
-    assert page.rows == []
+    assert [row.number for row in run("invoice.invoice.list", {"status": "overdue"}, employee).rows] == [hers.number]
+    assert overdue_numbers() == [hers.number, due.number]
