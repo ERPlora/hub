@@ -13,7 +13,8 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import PrintDevice, Printer, PrintJob
-from apps.printing.queries import LEASE, MAX_ATTEMPTS, active_devices, actor, find_job, job_row
+from apps.printing.queries.device_reads import active_devices
+from apps.printing.queries.jobs import LEASE, MAX_ATTEMPTS, actor, find_job, job_row
 from apps.printing.schemas import JobAckOut, JobClaimIn, JobClaimOut, JobCompleteIn, JobFailIn
 from apps.printing.services.writes import MANAGE_SETTINGS, _queued
 

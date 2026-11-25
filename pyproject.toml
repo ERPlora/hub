@@ -161,8 +161,8 @@ name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
     "base", "base.api", "base.blueprint", "base.home", "base.models", "base.tenancy", "base.tenancy.migrator",
-    "base.services", "base.queries", "base.schemas", "control", "control.services", "control.queries", "apps.*",
-    "apps.*.services", "apps.*.queries", "apps.*.schemas",
+    "base.services", "base.queries", "base.schemas", "base.ws_print", "control", "control.services", "control.queries",
+    "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
 ]
 depth = 0
 ignore_imports = [

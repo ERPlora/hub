@@ -22,7 +22,7 @@ from live.operations import registry
 
 from apps.printing import events as E
 from base import home
-from base.ws_print import presence_operation
+from base.ws_print.presence import presence_operation
 from base.tenancy.tests.business import HUB_DB
 from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry

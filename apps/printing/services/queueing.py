@@ -15,8 +15,11 @@ from live.operations import get as operation_named
 
 from apps.printing import documents
 from apps.printing.models import Printer, PrintJob
-from apps.printing.queries import actor, current_settings, find_printer, job_row, this_device_key
+from apps.printing.queries.device_reads import this_device_key
 from apps.printing.queries.job_printer import job_printer
+from apps.printing.queries.jobs import actor, job_row
+from apps.printing.queries.printers import find_printer
+from apps.printing.queries.settings import current_settings
 from apps.printing.schemas import JobCreateIn, JobCreateOut, JobOut, PrinterRefIn
 from base import operations as platform
 from base.business import business_zone
