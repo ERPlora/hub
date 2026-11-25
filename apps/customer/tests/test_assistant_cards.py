@@ -99,3 +99,14 @@ def test_a_field_the_person_may_not_read_leaves_the_list_said_by_how_many():
     said = values_of("boolean", "true", ctx=blind)
     assert said.get(NAMED) is None
     assert said["value"] == [{"value": "true"}]
+
+
+@HUB_DB
+def test_a_line_the_card_cannot_say_leaves_every_value_as_sent():
+    """A datum the write does not know keeps the list counted, and its values are not put in words either."""
+    field = CustomField.objects.create(name="VIP", field_type="boolean")
+    card = Customer.objects.create(name="Lucía QA")
+    lines = [{"field_id": str(field.id), "value": "true", "colour": "green"}]
+    said = fields_of(UPDATE, {"id": str(card.id), "field_values": lines})["field_values"]
+    assert said.get(NAMED) is None
+    assert [line["value"] for line in said["value"]] == ["true"]
