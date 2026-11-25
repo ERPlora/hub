@@ -22,7 +22,7 @@ from apps.schedule.schemas.special_days import (
     SpecialDayRefIn,
 )
 
-from .writes import _checked, _same, _stored, _write_intervals
+from .writes import _apply_sent, _checked, _same, _stored, _write_intervals
 
 SPECIAL_DAY_EXISTS = _("There is already a special day on that date.")
 SPECIAL_DAY_DATE_UNIQUE = "schedule_special_day_date_unique"
@@ -197,11 +197,7 @@ def update_special_day(ctx: OperationContext, data: SpecialDayPatchIn) -> dict:
         exclude_unset=True, exclude={"id", "special_day", "intervals"}
     )
     before = _stored(row)
-    fields_changed = False
-    for field, value in sent.items():
-        if value is not None and getattr(row, field) != value:
-            setattr(row, field, value)
-            fields_changed = True
+    fields_changed = _apply_sent(row, sent)
     intervals = data.intervals if data.intervals is not None else before
     if data.intervals is not None and row.is_closed and "is_closed" not in sent:
         # Hours sent for a closed day open it.

@@ -3,7 +3,7 @@
 // found by name as that app's operations are. Each is one of `apps/<app>/frontend/components/<name>.vue`, named by its file, and
 // loads on demand in its own chunk; a name its app does not have gives none (a path never names one: the glob's keys
 // are the files themselves), and whoever asked says so.
-import type { Component } from 'vue';
+import { type Component, defineAsyncComponent } from 'vue';
 
 export type ComponentLoader = () => Promise<{ default: Component }>;
 
@@ -12,4 +12,17 @@ const COMPONENTS = import.meta.glob<{ default: Component }>('../../../apps/*/fro
 
 export function appComponent(app: string, name: string): ComponentLoader | undefined {
   return COMPONENTS[`../../../apps/${app}/frontend/components/${name}.vue`];
+}
+
+/** What `loader` brings, as a component that loads once it renders; none without a loader (its app has no such
+ *  component). When the code does not arrive, `failed` hears why and it renders nothing. */
+export function loadedComponent(loader: ComponentLoader | undefined, failed: (error: unknown) => void): Component | null {
+  if (!loader) return null;
+  return defineAsyncComponent({
+    loader: () => loader().then((module) => module.default),
+    onError(error, _retry, fail) {
+      failed(error);
+      fail();
+    },
+  });
 }

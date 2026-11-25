@@ -14,7 +14,14 @@ from apps.printing import events
 from apps.printing.models import PrintDevice, Printer
 from apps.printing.queries.device_reads import active_devices, device_row, find_device, this_device_key
 from apps.printing.queries.jobs import actor
-from apps.printing.schemas import DeviceOut, DeviceRefIn, DeviceRegisterIn, DeviceSeenIn, DeviceSeenOut, DeviceUpdateIn
+from apps.printing.schemas.devices import (
+    DeviceOut,
+    DeviceRefIn,
+    DeviceRegisterIn,
+    DeviceSeenIn,
+    DeviceSeenOut,
+    DeviceUpdateIn,
+)
 from apps.printing.services.writes import MANAGE_SETTINGS
 
 DEVICE_UNKNOWN = _("Set a device up from the device itself: this request does not say which device it is.")

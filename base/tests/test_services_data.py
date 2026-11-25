@@ -32,7 +32,7 @@ from base.models.blueprints import ImportBatch
 from base.permissions import access_for
 from base.tenancy.context import HubWithoutDatabase, current_alias, use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 __all__ = ["in_business_a"]
 pytestmark = HUB_DB

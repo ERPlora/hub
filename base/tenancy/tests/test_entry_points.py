@@ -182,7 +182,7 @@ def test_a_live_rerun_of_a_business_without_its_own_database_closes_the_stream()
 
 @pytest.mark.django_db
 def test_a_live_rerun_of_a_hub_that_ended_closes_the_stream():
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(slug="a").update(status=Hub.Status.CANCELLED)
     ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}))
@@ -275,7 +275,7 @@ def test_internal_calls_for_a_business_without_its_own_database_answer_503_and_e
 @HUB_DB
 def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch, settings, hub_a):
     from base import internal, internal_platform
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(pk=hub_a.pk).update(is_platform=True)
     settings.PLATFORM_HUB_SLUG = hub_a.slug
@@ -312,7 +312,7 @@ def test_the_worker_opens_a_context_for_each_pass(caplog, worker_visits):
 
 @pytest.mark.django_db(transaction=True)
 def test_the_demo_reaper_purges_on_control(caplog):
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.create(
         slug="demo-0000beef", is_demo=True, status=Hub.Status.READY, expires_at=timezone.now() - dt.timedelta(minutes=1)
@@ -325,7 +325,7 @@ def test_the_demo_reaper_purges_on_control(caplog):
 
 @pytest.mark.django_db
 def test_seed_local_hubs_and_demo_expire_open_their_context(settings):
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     settings.DEBUG = True
     Hub.objects.create(slug="demo-0000cafe", is_demo=True, status=Hub.Status.READY, expires_at=timezone.now())

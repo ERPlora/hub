@@ -10,7 +10,7 @@ from base.tenancy.tests.hubs import (
     new_database,
 )
 from base.tenancy.tests.test_migrator import PLATFORM, leaves
-from control.models import Hub
+from control.models.hubs import Hub
 
 __all__ = ["committed_database", "make_cluster", "make_database", "make_hub", "new_database"]
 

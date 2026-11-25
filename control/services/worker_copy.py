@@ -6,7 +6,7 @@ from uuid import UUID
 from django.db.models import Q
 from django.utils import timezone
 
-from control.models import RestoredCopy
+from control.models.copies import RestoredCopy
 from control.services.worker_move import MoveTaken, _control_transaction
 
 

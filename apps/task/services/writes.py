@@ -11,7 +11,7 @@ from live.errors import InvalidPayload, NotFound, PermissionDenied
 from apps.staff.models import Member
 from apps.staff.queries.reads import resolve_member
 from apps.task.models import Project, Task
-from apps.task.queries import PROJECT_NOT_FOUND, TASK_NOT_FOUND, Caller, resolve_project, resolve_task
+from apps.task.queries.reads import PROJECT_NOT_FOUND, TASK_NOT_FOUND, Caller, resolve_project, resolve_task
 
 MEMBER_INACTIVE = _("That person is not active in the team.")
 

@@ -15,7 +15,7 @@ from live.context import OperationContext
 from live.errors import OperationError
 
 from base.registry import REGISTRY_SCOPE
-from control.models import RestoredCopy
+from control.models.copies import RestoredCopy
 from control.queries import cluster_sizes
 from control.schemas import ClusterSizesIn
 

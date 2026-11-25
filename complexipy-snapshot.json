@@ -322,8 +322,8 @@
     ]
   },
   {
-    "path": "apps/task/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/task/queries/reads.py",
+    "file_name": "reads.py",
     "functions": [
       {
         "name": "resolve_project",
@@ -332,7 +332,13 @@
       {
         "name": "resolve_task",
         "complexity": 17
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/task/queries/tasks.py",
+    "file_name": "tasks.py",
+    "functions": [
       {
         "name": "filter_tasks",
         "complexity": 22

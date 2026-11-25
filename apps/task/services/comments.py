@@ -6,7 +6,8 @@ from live.outbox import record_event
 
 from apps.task import events
 from apps.task.models import Comment
-from apps.task.queries import Caller, comment_row
+from apps.task.queries.comments import comment_row
+from apps.task.queries.reads import Caller
 from apps.task.schemas import CommentIn, CommentOut
 from apps.task.services.writes import _changeable
 from base.services.sessions import acting_hub_user

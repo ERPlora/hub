@@ -168,7 +168,7 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
       },
     ],
     payments: [
-      { id: 'pay1', position: 1, method_id: 'm1', method_name: 'Efectivo', method_type: 'cash', amount: 1250, tendered: 2000, change: 750, reference: '' },
+      { id: 'pay1', position: 1, method_id: 'm1', method_name: 'Efectivo', method_type: 'cash', amount: 1250, tendered: 2000, change: 750, reference: '', extra: 0, extra_label: '' },
     ],
     already: false,
     ...over,

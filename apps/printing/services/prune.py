@@ -11,7 +11,8 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import PrintJob
-from apps.printing.schemas import EmptyIn, PruneOut
+from apps.printing.schemas.fields import EmptyIn
+from apps.printing.schemas.jobs import PruneOut
 
 # Named after the package, not this module, so the prune's log lines keep the logger name they are filtered by.
 logger = logging.getLogger("apps.printing.services")

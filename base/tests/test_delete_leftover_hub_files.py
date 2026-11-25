@@ -22,7 +22,7 @@ from base import files
 from base.storage import hub_prefix
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, hub_files_bucket, moto_s3  # noqa: F401
-from control.models import Hub
+from control.models.hubs import Hub
 
 pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 

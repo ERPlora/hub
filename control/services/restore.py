@@ -13,7 +13,8 @@ from live.outbox import record_event
 from base.tenancy import names
 from base.tenancy.connections import control_name
 from control import events, queries
-from control.models import Cluster, Hub, RestoredCopy
+from control.models.copies import RestoredCopy
+from control.models.hubs import Cluster, Hub
 from control.schemas import HubRestoreIn, HubRestoreOut, RestoredCopyOut
 from control.services.actor import _who, platform_admin_only
 from control.services.clusters import _locked, living_hubs

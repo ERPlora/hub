@@ -14,7 +14,7 @@ from apps.schedule.queries import override_out, resolve_override
 from apps.schedule.schemas.fields import RANGE_BACKWARDS, DeletedOut
 from apps.schedule.schemas.overrides import OverrideIn, OverrideOut, OverridePatchIn, OverrideRefIn
 
-from .writes import _checked, _locked_settings, _same, _stored, _write_intervals
+from .writes import _apply_sent, _checked, _locked_settings, _same, _stored, _write_intervals
 
 OVERRIDE_OVERLAPS = _(
     "Those dates overlap the temporary change “%(reason)s” (%(start)s – %(end)s)."
@@ -122,11 +122,7 @@ def update_override(ctx: OperationContext, data: OverridePatchIn) -> dict:
     row = resolve_override(data.id, data.override, lock=True)
     sent = data.model_dump(exclude_unset=True, exclude={"id", "override", "intervals"})
     before = _stored(row)
-    fields_changed = False
-    for field, value in sent.items():
-        if value is not None and getattr(row, field) != value:
-            setattr(row, field, value)
-            fields_changed = True
+    fields_changed = _apply_sent(row, sent)
     if row.end_date < row.start_date:
         raise InvalidPayload(
             str(RANGE_BACKWARDS), fields={"end_date": str(RANGE_BACKWARDS)}

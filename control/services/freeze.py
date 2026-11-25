@@ -6,7 +6,7 @@ from live.operations import INTERNAL, operation
 from live.outbox import record_event
 
 from control import events, queries
-from control.models import Freeze
+from control.models.freeze import Freeze
 from control.schemas import FreezeIn, FreezeOut
 from control.services.actor import _who, platform_admin_only
 

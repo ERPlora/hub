@@ -8,7 +8,8 @@ from django.contrib.admin.models import CHANGE, LogEntry
 from django.utils import timezone
 
 from control import admin_freeze
-from control.models import Freeze, Hub, HubDue
+from control.models.freeze import Freeze
+from control.models.hubs import Hub, HubDue
 from control.tests.conftest import events
 from control.tests.test_admin import PLATFORM, nothing_kept, page, root, row_of, support
 

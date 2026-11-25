@@ -297,6 +297,7 @@
       "noMethods": "This business has no payment method to charge with.",
       "payingPartOne": "Paying 1 line of {total}",
       "payingPart": "Paying {n} lines of {total}",
+      "added": "+ {amount} {label}",
       "remaining": "Remaining",
       "documentFormat": "Document",
       "docTicket": "Receipt",

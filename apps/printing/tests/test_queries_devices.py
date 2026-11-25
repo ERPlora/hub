@@ -5,7 +5,7 @@ from django.utils import timezone
 from live.errors import PermissionDenied
 
 from apps.printing.queries.devices import list_devices
-from apps.printing.schemas import DeviceListIn
+from apps.printing.schemas.devices import DeviceListIn
 from apps.printing.tests.conftest import HUB_DB, ctx_for, printer, run
 
 pytestmark = HUB_DB

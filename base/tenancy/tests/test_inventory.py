@@ -51,7 +51,7 @@ def test_each_model_is_classified_in_its_expected_database():
     from base.models import Membership
     from base.models.sessions import SessionOwner
     from base.models.scheduler import TaskSchedule
-    from control.models import Cluster, DemoCode, Hub, HubDue
+    from control.models.hubs import Cluster, DemoCode, Hub, HubDue
     from shared.models import App
 
     expected = {

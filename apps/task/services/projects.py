@@ -12,7 +12,8 @@ from live.outbox import record_event
 
 from apps.task import events
 from apps.task.models import Project
-from apps.task.queries import Caller, load_project
+from apps.task.queries.projects import load_project
+from apps.task.queries.reads import Caller
 from apps.task.schemas import DeletedOut, ProjectIn, ProjectOut, ProjectPatchIn, ProjectRefIn
 from apps.task.services.writes import _locked_project, _member
 

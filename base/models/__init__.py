@@ -130,4 +130,4 @@ class HubUser(UUIDModel):
 
 # The registry lives in control: base/migrations/0004 and 0005 name the validator here, and older code imports the
 # models from here.
-from control.models import DemoCode, Hub, registry_slug_validator  # noqa: E402, F401
+from control.models.hubs import DemoCode, Hub, registry_slug_validator  # noqa: E402, F401

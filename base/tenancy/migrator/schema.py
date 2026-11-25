@@ -14,7 +14,7 @@ from django.utils import timezone
 from base import activation
 from base.tenancy import names, sequences
 from base.tenancy.migrator import app_sets, servers
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger("base.tenancy.migrator")  # logged as the migrator, whose steps these are
 

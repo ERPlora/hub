@@ -52,3 +52,11 @@ def _same(left: list[IntervalIn], right: list[IntervalIn]) -> bool:
     return [(i.open_time, i.close_time) for i in left] == [
         (i.open_time, i.close_time) for i in right
     ]
+
+
+def _apply_sent(row: SpecialDay | Override, sent: dict[str, Any]) -> bool:
+    """Sets on ``row`` each sent value that changes it (``None`` changes nothing); whether any did."""
+    changed = {field: value for field, value in sent.items() if value is not None and getattr(row, field) != value}
+    for field, value in changed.items():
+        setattr(row, field, value)
+    return bool(changed)

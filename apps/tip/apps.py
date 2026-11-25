@@ -2,7 +2,7 @@
 belongs to, and entered in the open drawer as its own line (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig
+from live.meta import Category, CheckoutStep, LiveAppConfig
 
 
 class TipConfig(LiveAppConfig):
@@ -33,6 +33,8 @@ class TipConfig(LiveAppConfig):
     # «gratuity» is a tip (tip.tip).
     assistant_synonyms = (("propina", "propinas", "bote", "gratuity", "tip"),)
     assistant_settings = ("tip.settings.get",)
+    # The «Tip» row of the charge sheet, which Sales mounts without knowing Tips (frontend/components/TipStep.vue).
+    checkout = [CheckoutStep(key="tip", component="TipStep", permission="tip.add_tip")]
     permissions = {
         "tip.view_tip": _("View tips (an employee, their own)"),
         "tip.add_tip": _("Record tips"),

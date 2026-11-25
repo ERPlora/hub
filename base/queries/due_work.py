@@ -11,7 +11,7 @@ from live.operations import atomic
 
 from base.models.relay import EventDelivery
 from base.models.scheduler import TaskSchedule
-from control.models import Hub, HubDue
+from control.models.hubs import Hub, HubDue
 
 
 @dataclass(frozen=True)

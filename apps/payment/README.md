@@ -38,7 +38,7 @@ con ningún banco.
 | Usa de otras apps | nada; de la plataforma, la moneda del negocio (`base.operations.business_currency`, BASE-F50, y `useBusinessMoney` en la pantalla) |
 | Quién la lee | Automatizaciones: oye sus nueve avisos (FLOW-F21) y sus pasos pueden usar las consultas y las acciones sin riesgo alto (FLOW-F11: registrar un pago y crear, cambiar, desactivar o activar un método). Ninguna otra app |
 | Pantallas | `/payment/payments` (Pagos) y `/payment/methods` (Métodos) |
-| Operaciones | 5 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=` (`risk = "high"` en aprobar, enviar, completar y cancelar); 13 rutas en `/api/payment/…` (sin ruta: `payment.payment.check`, que comprueba el método de un pago nuevo antes de la tarjeta del asistente) |
+| Operaciones | 5 consultas (`queries.py`) y 9 acciones (`services/`), todas con `ai=` (`risk = "high"` en aprobar, enviar, completar y cancelar); 13 rutas en `/api/payment/…` (sin ruta: `payment.payment.check`, que comprueba el método de un pago nuevo antes de la tarjeta del asistente) |
 | Eventos | 9, `payment.payment.{created,approved,sent,completed,cancelled}` y `payment.method.{created,updated,deactivated,activated}` (`events.py`); no reacciona a ninguno de otra app |
 | Tarea programada | ninguna |
 | Migraciones | `0001_initial`, `0002_payment_trail`, `0003_payment_idempotency_key`, `0004_payment_currency_without_default`, `0005_actors_without_address` |

@@ -46,7 +46,9 @@ from base.tenancy.context import use_control
 from base.tenancy.tests import hubs, s3
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
 from control import services as control_services
-from control.models import Cluster, Hub, HubDue, HubDump, MovedCopy
+from control.models.copies import MovedCopy
+from control.models.dumps import HubDump
+from control.models.hubs import Cluster, Hub, HubDue
 
 AT = dt.datetime(2026, 11, 11, 12, 0, tzinfo=dt.UTC)
 #: The moment the copy is of.

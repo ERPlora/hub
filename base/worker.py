@@ -85,7 +85,7 @@ from base.tenancy.context import use_control
 from base.worker_activations import _activations
 from base.worker_data import _data, _moves, _usage
 from control import queries as control_queries
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 

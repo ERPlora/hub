@@ -1,0 +1,15 @@
+{
+  "tip": {
+    "step": {
+      "title": "Tip",
+      "label": "Tip",
+      "none": "No tip",
+      "custom": "Other amount",
+      "amount": "Tip amount",
+      "loading": "Loading the tips…",
+      "retry": "Retry",
+      "invalid": "Write the tip as an amount.",
+      "notSaved": "The sale is charged, but the tip has not been saved."
+    }
+  }
+}

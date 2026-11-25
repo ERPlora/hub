@@ -25,7 +25,7 @@ from base import admin as base_admin
 from base.tenancy import credentials
 from control import admin as control_admin
 from control import admin_clusters, admin_shared
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.tests.conftest import events
 
 pytestmark = pytest.mark.django_db
