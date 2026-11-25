@@ -45,6 +45,7 @@ CYCLE_ANCESTORS = {
     "base.services",
     "base.queries",
     "base.schemas",
+    "base.ws_print",
     "control",
     "control.services",
     "control.queries",

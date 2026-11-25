@@ -493,7 +493,7 @@ el primer despliegue) se da por repartido sin aplicarse.
 ## `/ws/print`: el canal del dispositivo que imprime
 
 El único WebSocket del Hub (PLAN-HUB §5). `config/asgi.py` manda el HTTP a Django, como siempre, y el WebSocket de
-`/ws/print` a `base/ws_print.py`, una aplicación ASGI propia, **sin Channels** (ronda 11: sin capa de canales); otra
+`/ws/print` a `base/ws_print/`, una aplicación ASGI propia, **sin Channels** (ronda 11: sin capa de canales); otra
 ruta WebSocket se rechaza en el saludo (Daphne contesta 403). Lo sirve el mismo `daphne` del servicio `hub`, y el ALB
 ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su `idle_timeout` de 120 s).
 
@@ -502,7 +502,7 @@ ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su 
   saludo, comprobada en `hello` y en cada mensaje (un cierre de sesión corta el socket en el siguiente latido).
 - **Protocolo**: el del Hub viejo (`print_ws.rs`), mismos mensajes y campos: `hello` (con `deviceId` y las
   `printers` a las que llega el dispositivo) → `ready`; `claim` → `job` o `idle`; `done`/`failed` → `ack`; `beat`;
-  y del Hub, `wake` y `error` con su código. La tabla de códigos está en el docstring de `base/ws_print.py`.
+  y del Hub, `wake` y `error` con su código. La tabla de códigos está en el docstring de `base/ws_print/`.
 - **Quién imprime lo decide Impresión** (PRINTING-F18): en `hello` el canal lee el alta del dispositivo por su
   `deviceId` (`printing.device.get`) y sus impresoras son las activas de esa alta, como en el Hub viejo. Un
   dispositivo sin alta (o retirado) se rechaza ya en `hello` con `print.host_not_registered` (4403). Con la sesión de

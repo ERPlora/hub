@@ -67,7 +67,7 @@ msgstr ""
 "%(app)s necesita una suscripción que este negocio no tiene. Se contrata en "
 "erplora.com, en la Tienda."
 
-#: middleware.py:107 registry.py:85 ws_print.py:244 ws_print.py:246
+#: middleware.py:107 registry.py:85 ws_print/handshake.py:35 ws_print/handshake.py:37
 msgid "Not found"
 msgstr "No encontrado."
 
@@ -496,43 +496,43 @@ msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
 msgid "January"
 msgstr ""
 
-#: ws_print.py:274
+#: ws_print/protocol.py:101
 #, python-format
 msgid "No hello within %(seconds)s seconds."
 msgstr "No ha llegado el hello en %(seconds)s segundos."
 
-#: ws_print.py:300
+#: ws_print/protocol.py:127
 msgid "Say hello with a deviceId before draining."
 msgstr "Envía hello con un deviceId antes de recoger trabajos."
 
-#: ws_print.py:364
+#: ws_print/protocol.py:191
 msgid ""
 "This channel speaks JSON text frames: hello, claim, done, failed and beat."
 msgstr ""
 "Este canal habla con mensajes de texto JSON: hello, claim, done, failed y "
 "beat."
 
-#: ws_print.py:369
+#: ws_print/protocol.py:196
 #, python-format
 msgid "A frame of %(size)s bytes is over this channel's cap of %(cap)s bytes."
 msgstr ""
 "Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
 
-#: ws_print.py:378
+#: ws_print/protocol.py:205
 msgid "This channel speaks hello, claim, done, failed and beat."
 msgstr "Este canal habla hello, claim, done, failed y beat."
 
-#: ws_print.py:393
+#: ws_print/protocol.py:222
 msgid "This channel drains for one device: send its deviceId."
 msgstr "Este canal recoge trabajos para un dispositivo: envía su deviceId."
 
-#: ws_print.py:397
+#: ws_print/protocol.py:226
 msgid "printers is the list of the ids of the printers this device reaches."
 msgstr ""
 "printers es la lista de los id de las impresoras a las que llega este "
 "dispositivo."
 
-#: ws_print.py:408
+#: ws_print/protocol.py:237
 msgid ""
 "This device is not set up to print in this hub: someone who manages the "
 "printers sets it up in Printing → Devices."
@@ -540,7 +540,7 @@ msgstr ""
 "Este dispositivo no está dado de alta para imprimir en este hub: quien "
 "gestiona las impresoras lo da de alta en Impresión → Dispositivos."
 
-#: ws_print.py:416
+#: ws_print/protocol.py:245
 msgid ""
 "This device reaches no active printer of this hub: choose its printers "
 "before printing."
@@ -548,34 +548,34 @@ msgstr ""
 "Este dispositivo no llega a ninguna impresora activa de este hub: elige sus "
 "impresoras antes de imprimir."
 
-#: ws_print.py:427
+#: ws_print/protocol.py:256
 #, python-format
 msgid "This device does not print «%(role)s» for this hub."
 msgstr "Este dispositivo no imprime «%(role)s» para este hub."
 
-#: ws_print.py:497
+#: ws_print/access.py:32
 msgid "Sign in to this hub to print: this connection has no session."
 msgstr ""
 "Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
 
-#: ws_print.py:504
+#: ws_print/access.py:41
 msgid "This connection's session is not valid on this hub: sign in again."
 msgstr ""
 "La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
 
-#: ws_print.py:625
+#: ws_print/protocol.py:366
 msgid "jobId is the id of a job this hub handed out."
 msgstr "jobId es el id de un trabajo que entregó este hub."
 
-#: ws_print.py:653
+#: ws_print/printing.py:29
 msgid "Printing is not on in this hub."
 msgstr "Impresión no está activada en este hub."
 
-#: ws_print.py:664
+#: ws_print/printing.py:40
 msgid "Invalid frame."
 msgstr "Mensaje no válido."
 
-#: ws_print.py:690
+#: ws_print/protocol.py:372
 #, python-format
 msgid "%(field)s is text."
 msgstr "%(field)s es un texto."
@@ -615,7 +615,7 @@ msgstr[0] "Vuelve a intentarlo en %(minutes)s minuto."
 msgstr[1] "Vuelve a intentarlo en %(minutes)s minutos."
 msgstr[2] "Vuelve a intentarlo en %(minutes)s minutos."
 
-#: ws_print.py
+#: ws_print/access.py
 #, python-format
 msgid "Too many failed sign-ins from this connection. Try again in %(minutes)s minute."
 msgid_plural "Too many failed sign-ins from this connection. Try again in %(minutes)s minutes."
