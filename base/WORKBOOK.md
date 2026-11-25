@@ -2539,7 +2539,7 @@ Pasos:
      dice «Copiado»). «Hecho» la cierra.
   4. Lo que puede hacer una llave son cuatro acciones, en todas las apps (también las que se añadan después) o app
      por app: leer, crear, modificar y borrar, cada una por separado. Una llave con «Leer» en Inventario lee sus
-     productos; crear, modificar o borrar uno, o abrir otra app, contesta 403 `base.api_key_scope`.
+     productos; crear, modificar o borrar uno, o abrir otra app, se le niega.
   5. Una llave nunca recibe más de lo que puede hacer quien la crea: en una app, una acción que no puede hacer en
      ninguna de sus llamadas; en todas las apps, una acción que no puede hacer en alguna app que la publica.
 Entra: el nombre, el ritmo y lo que puede hacer.

@@ -270,6 +270,29 @@ describe('ApiKeysPanel', () => {
     expect(posted(m)).toEqual([['/api/keys', { name: 'Tienda', rate_per_minute: 60, scopes: { cart_checkout: ['read'] } }]]);
   });
 
+  it('who may no longer give anything on every app, with «All apps» chosen, is back on the apps', async () => {
+    const m = await newKeyForm();
+    await named('Tienda');
+    await where('all');
+    await tick('*', 'read');
+    await m.result(m.call, 'base.api_key.list', { ...LIST, grantable: { tax: ['read'] } });
+    expect([byTestId('api-key-form-where'), offered('tax'), submitOff()]).toEqual([null, ['read'], true]);
+  });
+
+  it('the next key starts with nothing written, chosen or ticked', async () => {
+    const m = await newKeyForm({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
+    await createOnEveryApp('Gestoría', ['read']);
+    (byTestId('api-key-token-done') as HTMLElement).click();
+    await flush();
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    expect(offered('tax')).toEqual(['read']);
+    await named('Tienda');
+    expect(submitOff()).toBe(true);
+    await where('all');
+    expect(submitOff()).toBe(true);
+  });
+
   it('more than who asks may do is refused in words', async () => {
     const reason = 'Una key no puede hacer más de lo que puedes hacer tú.';
     await newKeyForm({

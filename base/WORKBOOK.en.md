@@ -2642,7 +2642,7 @@ and nothing is downloaded.
 Involved: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
-<!-- from WORKBOOK.md sha256:b7bbe1160003 -->
+<!-- from WORKBOOK.md sha256:13209079c453 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2660,7 +2660,7 @@ Steps:
      "Copied"). "Done" closes it.
   4. What a key may do is four actions, on every app (also the ones added later) or app by app: read, create,
      update and delete, each on its own. A key with "Read" on Inventory reads its products; creating, updating or
-     deleting one, or opening another app, answers 403 `base.api_key_scope`.
+     deleting one, or opening another app, is refused.
   5. A key is never given more than whoever makes it may do: on an app, an action they may do in none of its calls;
      on every app, an action they may not do on some app that publishes it.
 In: the name, the pace and what it may do.
