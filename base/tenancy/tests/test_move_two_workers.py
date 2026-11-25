@@ -130,10 +130,10 @@ class TestTwoWorkers:
     ):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        stale = move.moving.control_services.moving_row(hub.id)  # read before the other worker's switch
+        stale = move.moving.control_services.worker_move.moving_row(hub.id)  # read before the other worker's switch
         run()
         assert fresh(hub).cluster_id == target.pk
-        monkeypatch.setattr(move.moving.control_services, "moving_row", lambda hub_id: stale)
+        monkeypatch.setattr(move.moving.control_services.worker_move, "moving_row", lambda hub_id: stale)
         with use_control():
             move.moving.services.provisioning.claim_hub(hub.id, AT, move.moving.LEASE)
 

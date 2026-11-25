@@ -542,6 +542,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "flow.question.answer",
         "flow.run.retry",
         "inventory.product.upload_image",
+        "invoice.email.send",
         "invoice.invoice.create",
         "invoice.invoice.create_from_sale",
         "invoice.invoice.mark_paid",

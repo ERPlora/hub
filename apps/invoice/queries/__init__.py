@@ -15,6 +15,7 @@ from . import (
     invoices as invoices,
     export as export,
     pdf as pdf,
+    emails as emails,
     refunds as refunds,
     series as series,
     rectifying as rectifying,

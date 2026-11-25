@@ -62,7 +62,7 @@ class TestAMoveAskedForTheNight:
 
         waiting = fresh(hub)
         assert (waiting.cluster_id, waiting.moving_to_id, waiting.move_scheduled_to_id) == (None, None, target.pk)
-        assert waiting.move_scheduled_for == move.worker_pass.control_services.night_start(
+        assert waiting.move_scheduled_for == move.worker_pass.control_services.move.night_start(
             now, ZoneInfo(waiting.timezone)
         )
         assert waiting.move_scheduled_for > now
@@ -74,10 +74,10 @@ class TestAMoveAskedForTheNight:
 
         assert run(now) == 0
         with use_control():
-            assert hub.id not in move.worker_pass.control_services.moves_scheduled_due(now)
+            assert hub.id not in move.worker_pass.control_services.worker_move.moves_scheduled_due(now)
             # Even listed (a pass that read it before it was put off), its locked row says it is not due.
             assert provisioning.claim_hub(hub.id, now, move.moving.LEASE, owner="a:1") is not None
-            assert move.worker_pass.control_services.start_scheduled_move(hub.id, now, owner="a:1") is False
+            assert move.worker_pass.control_services.worker_move.start_scheduled_move(hub.id, now, owner="a:1") is False
 
         assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
 
@@ -100,11 +100,11 @@ class TestAMoveAskedForTheNight:
         target = moves.cluster()
         now = timezone.now()
         hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
-        start = move.worker_pass.control_services.start_scheduled_move
+        start = move.worker_pass.control_services.worker_move.start_scheduled_move
 
         with use_control():
             assert provisioning.claim_hub(hub.id, now, move.moving.LEASE, owner="a:1") is not None
-            with pytest.raises(move.worker_pass.control_services.MoveTaken):
+            with pytest.raises(move.worker_pass.control_services.worker_move.MoveTaken):
                 start(hub.id, now, owner="b:2")
             assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
 

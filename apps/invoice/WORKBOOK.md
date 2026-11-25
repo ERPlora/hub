@@ -27,8 +27,8 @@ peluquería: no hay nada propio de un vertical.
 
 ### Quién la usa y qué hace cada uno
 
-- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, las descarga en PDF, emite una
-  factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
+- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, las descarga en PDF, las envía
+  por correo, emite una factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
 - El **responsable**, además, ve las facturas de todos, las descarga en Excel, rectifica y lleva las series de
   numeración.
 - El **propietario** y el **administrador**, además, configuran el **emisor** (la identidad fiscal del
@@ -127,14 +127,16 @@ una acción de fila sale como aviso encima de la tabla.
 
 #### Ficha de factura
 Se abre desde una fila de **Facturas** (`/invoice/invoices/<id>`). Arriba, «Factura {número}» con la
-etiqueta de estado y los botones «Imprimir / PDF», «Descargar PDF» y «← Volver». Si es una factura completa o una
+etiqueta de estado y los botones «Imprimir / PDF», «Descargar PDF», «Enviar por correo» (para quien emite facturas) y
+«← Volver». Si el último correo no salió, el aviso «La factura no se ha enviado por correo» y por qué. Si es una factura completa o una
 rectificativa de una factura completa sin NIF del cliente, el aviso «Esta factura no tiene el NIF del
 cliente: la impresora de tiques no puede sacarla como factura completa.». Debajo, «Tipo», «Serie»,
 «Fecha de emisión», «Fecha de operación» (si es otra), «Vencimiento» (si lo tiene), «Cliente», «NIF cliente», «Dirección», «Emisor»,
 «Origen» («Venta del TPV», «Alta manual», «Sustituye a una factura simplificada», «Rectificación»,
 «Devolución de la venta», «Anulación de la venta»), «Venta» (su número), «Rectifica a» (el número de la
 original, que la abre), «Sustituye a» / «Sustituida por» (enlaces), «Rectificativas» (las que la
-corrigen), «Pagada el» y «Notas». Las líneas: «#», «Descripción», «Cant.», «Precio», el tipo con el
+corrigen), «Pagada el» y «Notas»; debajo, «Correo»: a quién y cuándo se ha enviado cada vez («Enviada a … el …»,
+«Enviando a …» o «No enviada a …»). Las líneas: «#», «Descripción», «Cant.», «Precio», el tipo con el
 nombre del impuesto que declara la factura («IVA %», «IGIC %» o «IPSI %»; «Imp. %» si mezcla impuestos),
 «Base», «Impuesto», «Total» (en el móvil, cada línea en bloque); sin líneas, «Sin líneas de detalle.». El
 desglose por tipo («IVA 21 %», «Recargo de equivalencia 5,2 %», «Exento (E1)», «No sujeto»,
@@ -147,6 +149,12 @@ permiso para ver sus registros, debajo, la tarjeta «Justificante VeriFactu»: e
 pruebas)» si es del entorno de pruebas), el «CSV» cuando la AEAT ya contestó, el QR y «Validar en la Agencia
 Tributaria ↗». Sin VeriFactu, sin registro todavía o sin permiso, no sale la tarjeta.
 Error al abrir: «Factura no encontrada» o el mensaje del fallo, con «← Volver».
+
+#### Enviar por correo
+Ventana que abre «Enviar por correo» en la ficha. Lleva el campo «Correo del cliente», con el correo de la ficha del
+cliente ya puesto (vacío si no lo tiene o si la factura no es de ninguna ficha), que se puede cambiar, la nota «La
+factura … va adjunta en PDF. Las respuestas llegan al correo del propietario del negocio.», «Enviar» (gris mientras no hay
+correo) y «Cancelar». Al enviar se cierra y un aviso dice «Enviando la factura a …».
 
 #### Rectificar
 Ventana que abre «Rectificar», desde la fila o desde la ficha. Título «Rectificar {número}», la nota
@@ -268,6 +276,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
 | INVOICE-F24 | Descargar en Excel las facturas emitidas | hecho |
 | INVOICE-F25 | Descargar en PDF una factura | hecho |
+| INVOICE-F26 | Enviar una factura por correo | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 Estado: hecho — Ventas lo pide dentro del mismo cobro
@@ -943,6 +952,39 @@ imprime sin su QR.»; si el servidor no puede hacerlo, «El PDF no se puede hace
 de otro, para un empleado, no se descarga, tampoco por la API ni con el asistente: «Factura no encontrada.».
 Implicados: INVOICE-F17, INVOICE-F18, INVOICE-F23, VERIFACTU-F19, BASE-F112
 
+### INVOICE-F26 Enviar una factura por correo
+Estado: hecho
+Actor: empleado (sus facturas), responsable, administrador y propietario (las de todos), asistente
+Pantalla: Ficha de factura
+Pasos:
+1. En **Facturas**, abre la factura y pulsa «Enviar por correo».
+2. La ventana propone el correo de la ficha del cliente. Déjalo o escribe otro: el que escribas vale para este envío y no
+   cambia la ficha.
+3. Pulsa «Enviar». La ventana se cierra y la ficha dice «Enviando a …» hasta que sale; entonces dice «Enviada a …» con el
+   día y la hora, sin que haya que hacer nada más.
+4. Al cliente le llega un correo en el idioma del negocio (el de la factura, si lo tiene guardado) con el número, la
+   fecha, el vencimiento si lo lleva y el total, o el «Total a pagar» si lleva retención, y con la factura adjunta en PDF:
+   el mismo fichero de «Descargar PDF», con el QR de su registro de VeriFactu.
+5. Lo envía ERPlora (noreply@erplora.com) en nombre del negocio. Si el cliente contesta, su respuesta llega al correo de
+   la cuenta del propietario.
+6. Se puede volver a enviar las veces que haga falta, a la misma dirección o a otra: la ficha guarda cada envío, con el
+   último arriba.
+7. Lo mismo se puede pedir al asistente («mándale la FACT-2026-000003 por correo a Ana»), que antes de enviarla enseña a
+   qué dirección va y pide confirmación.
+Entra: la factura y la dirección (sin ella, la de la ficha del cliente).
+Sale: un correo y su línea en la ficha. La factura, su registro de VeriFactu y su estado no cambian. Si se vuelve a
+enviar la misma petición tras un fallo de la red, el cliente no lo recibe dos veces.
+Si falla: una dirección mal escrita sale bajo su campo y no se envía nada. Si el correo no puede salir, la ficha no dice
+que se ha enviado: dice «No enviada a …» y, arriba, «La factura no se ha enviado por correo» con el motivo: «El correo no
+se ha podido enviar ahora mismo. Vuelve a intentarlo en unos minutos.», «Esa dirección no acepta el correo. Revísala y
+vuelve a enviarlo.», que no se puede hacer su PDF o leer su registro de VeriFactu, o que no se ha podido confirmar. Se
+envía otra vez con el mismo botón; solo no se repite. Que el buzón del cliente lo devuelva después no se sabe aquí. Si la
+cuenta del propietario no tiene correo, no se envía y lo dice; una demo no envía correos. Un negocio envía como mucho 50
+correos por hora, porque todos comparten el buzón de envío de ERPlora; el siguiente no se envía y dice «Este negocio ya
+ha enviado todos los correos que puede enviar en una hora. Vuelve a intentarlo más tarde.». La de otro, para un
+empleado, no se envía: «Factura no encontrada.». La gestoría ve los envíos y no envía.
+Implicados: INVOICE-F17, INVOICE-F25, CUSTOMER-F16, VERIFACTU-F19
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
@@ -950,7 +992,7 @@ persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la 
 nombra por su número (`FACT-2026-000012`), una venta por su número del día (`20261014-0003`), un
 cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie por su código.
 
-Lo que lee o toca una factura ya emitida (la lista, la factura, su documento, su PDF y su papel, pasarla a completa,
+Lo que lee o toca una factura ya emitida (la lista, la factura, su documento, su PDF, su papel y sus correos, pasarla a completa,
 marcarla pagada y rectificarla) y la factura de una venta solo alcanzan las que la persona ve: sin «Ver todas
 las facturas», las que emitió, las de sus ventas y lo que rectifica o sustituye a una de ellas. Una que no ve no
 existe para ella (404 `invoice.not_found`;
@@ -969,6 +1011,7 @@ entera.
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
 | El PDF de una factura, con el QR de VeriFactu, en un fichero | ver | F25 | `invoice.invoice.pdf` |
+| Los correos en que se ha enviado una factura (a quién, cuándo y cómo acabó cada uno) y el correo de la ficha del cliente | ver | F26 | `invoice.email.list` |
 | La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación y dentro de ella) | rectificar | F08 | `invoice.invoice.rectification_preview` |
 | El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
@@ -1001,6 +1044,8 @@ Todas menos el Excel y el PDF se pueden seguir en vivo.
 | Cambia una serie | llevar las series | F13 | `invoice.series.update` |
 | Guarda el emisor | configurar el emisor | F21 | `invoice.issuer.update` |
 | Manda la página A4 de una factura a la cola de Impresión (sin una impresora que la reciba, falla y dice por qué) | ver | F18 | `invoice.invoice.print` |
+| Envía una factura por correo con su PDF (una sola vez por clave de petición) | emitir | F26 | `invoice.email.send` |
+| Toma un correo para enviarlo, guarda cómo acabó y, cada cinco minutos, retoma los que nadie tomó y da por no confirmados los que se quedaron a medias | solo el sistema | F26 | `invoice.email.claim`, `invoice.email.record`, `invoice.email.resume` |
 | Guarda el emisor como el sistema; hoy no la llama nadie | solo el sistema | — | `invoice.issuer.sync` |
 | Emite una factura de ERPlora con su registro de VeriFactu | solo el sistema | F23 | `invoice.invoice.issue_platform` |
 
@@ -1014,6 +1059,7 @@ Todas menos el Excel y el PDF se pueden seguir en vivo.
 | Serie nueva | Crear una serie | `id`, `code`, `year` | `invoice.series.created` |
 | Serie cambiada | Cambiar una serie | `id`, `code`, `year`, `fields` | `invoice.series.updated` |
 | Emisor cambiado | Guardar o recibir el emisor | `source` | `invoice.issuer.updated` |
+| Correo pedido, enviado o no enviado | Pedir que se envíe una factura, que el servidor de correo lo acepte o que no salga | `id` (del correo), `invoice_id`, `number`; nunca la dirección | `invoice.email.requested`, `invoice.email.sent`, `invoice.email.failed` |
 
 Contrato del origen con Ventas: `source.type` es el `source_type` del documento (`sale`, `manual`,
 `substitution`, `rectification`, `refund`, `void`); `source.sale_id` la venta de la que sale (también en
@@ -1026,7 +1072,8 @@ cuando le llega después, ya no cambia nada.
 
 Qué refresca cada aviso: la lista, la ficha, la factura de una venta y el documento, con «emitido»,
 «rectificada» y «pagada»; las series, el siguiente número, el estado de la numeración, los huecos y el
-libro, con «emitido» y los de series; el emisor, con «emisor cambiado».
+libro, con «emitido» y los de series; los correos de una factura, con los tres avisos del correo y con los cambios de la ficha del
+cliente; el emisor, con «emisor cambiado».
 
 ### A qué reacciona
 
@@ -1035,6 +1082,7 @@ libro, con «emitido» y los de series; el emisor, con «emisor cambiado».
 | Venta cobrada (`sale.sale.completed`) | Ventas | Emite su F2 o su F1 (F01, F02) | `invoice.invoice.create_from_sale` |
 | Venta devuelta (`sale.sale.refunded`) | Ventas | Emite la rectificativa de la devolución (F09, F10) | `invoice.invoice.rectify_from_refund` |
 | Venta anulada (`sale.sale.voided`) | Ventas | Emite la rectificativa del tique entero (F07) | `invoice.invoice.rectify_from_void` |
+| Datos de un cliente borrados (`customer.customer.erased`) | Clientes | Quita la dirección de los correos de sus facturas; las facturas se conservan (F26) | `invoice.email.forget_customer` |
 
 Cada reacción corre como el sistema, en su propia transacción, y es idempotente: una por venta, una
 por devolución y una por anulación. El documento lo pide antes Ventas dentro de su cobro, su anulación o
@@ -1058,12 +1106,15 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
   nunca por el territorio de hoy: la misma regla que la cifra de impuestos de Ventas (SALE-F28), que dice el
   impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
-  los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
+  los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae; y su correo, el que se
+  propone al enviar una factura (F26).
 - **Plataforma**: la moneda del negocio (`base.business.get`, la de su país), que guarda la factura que haces a mano.
 - **Impresión** (por nombre, sin requisito): `printing.job.create` con la página A4 de una factura para la
   impresora del sistema (F18), en un punto de guardado propio; sin Impresión encendida, sin impresora del
   sistema o si la rechaza, no se encola nada y la imprime el dispositivo.
 - **VeriFactu** (por nombre, sin requisito): `verifactu.record.by_invoice`, el QR que lleva esa página A4.
+- **Plataforma, el correo** (`base.business_mail`): el remitente de ERPlora, el correo del propietario para las respuestas y
+  el servidor de correo (F26).
 
 ### Quién la usa
 
@@ -1082,7 +1133,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 | Ver facturas, series, numeración y emisor; imprimir y descargar en PDF una factura | sí | sí | sí | sí | `invoice.view_invoice` |
 | Ver las facturas de todos (sin él, solo las suyas: las que emitió, las de sus ventas y lo que las rectifica o sustituye) | sí | sí | sí | no | `invoice.view_all_invoices` |
 | Descargar en Excel las facturas emitidas | sí | sí | sí | no | `invoice.view_all_invoices` |
-| Emitir a mano, facturar una venta, sustituir un tique, marcar pagada | sí | sí | sí | sí | `invoice.add_invoice` |
+| Emitir a mano, facturar una venta, sustituir un tique, marcar pagada, enviar una factura por correo | sí | sí | sí | sí | `invoice.add_invoice` |
 | Rectificar (a mano, por devolución y por anulación) | sí | sí | sí | no | `invoice.rectify_invoice` |
 | Crear y cambiar series | sí | sí | sí | no | `invoice.manage_series` |
 | Configurar el emisor | sí | sí | no | no | `invoice.manage_issuer` |
@@ -1148,6 +1199,16 @@ configurar nada.
     recomendado, mientras se puede (antes del primer documento: luego la serie congela su prefijo y su formato), y
     queda hecho para siempre en cuanto el negocio tiene su numeración (la serie de un año nuevo hereda la del
     anterior). La respuesta de la API (`configured`: una ordinaria y una rectificativa del año) no cambia.
+- **El correo de una factura** (INVOICE-F26): `InvoiceEmail` (`models_email.py`, migración `0010`) es el registro de cada
+  envío (dirección, estado `queued` → `sending` → `sent` o `failed`, cuándo, el código del fallo y la clave de la
+  petición, única); la factura no se toca. `invoice.email.send` lo guarda en una transacción corta y, tras el COMMIT,
+  `base.outbound` lo entrega en un hilo: `invoice.email.claim` lo toma con `SKIP LOCKED`, el PDF se imprime sin
+  transacción (`queries/emails.py::message_of`, con `printed`), el servidor de correo se espera sin conexión a la BD y
+  `invoice.email.record` guarda cómo acabó, también ante un fallo que nadie previó. `invoice.email.resume` (cada 5 minutos)
+  entrega los que llevan más de 2 minutos sin que nadie los tome y da por `invoice.email_unconfirmed` los que llevan más de
+  10 enviándose. Un documento de una venta va como «Copia», igual que al descargarlo. El remitente, el «Responder a» y
+  los fallos del servidor de correo son de `base/business_mail.py`: hoy el SMTP de OVH, o SES si el despliegue lo vuelve a
+  elegir (`config/settings/mail.py`). `Message-ID` sale del id del envío. El registro no está en el archivo fiscal.
 - **Moneda**: la factura hecha a mano guarda la moneda del negocio, que Facturas pregunta a
   `base.operations.business_currency` como toda app que cobra (BASE-F50), sin copia propia: la de su país, que contesta
   `base.business.get` leído como la plataforma (una API key solo tiene el permiso de su operación); la nacida de una
@@ -1677,12 +1738,46 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 
     De Contasimple, Anfix y FacturaDirecta no hay documentación pública de este paso.
 
+28. **El correo de una factura** (INVOICE-F26):
+    - **Un botón en la factura y una ventana con la dirección propuesta, editable**: así en FacturaDirecta, Quipu y Holded;
+      en Sage 50 el correo sale de la ficha del cliente. Un campo y un texto fijo: los demás dejan además asunto, texto, Cc
+      y plantillas, que aquí no hacen falta para mandar una factura.
+    - **Quien emite, envía** (`invoice.add_invoice`): en Odoo el botón «Send» es de quien factura. La Gestoría sigue siendo
+      de solo lectura: ve los envíos.
+    - **El remitente es de ERPlora y las respuestas van al negocio**: un remitente de la plataforma con «Responder a» del
+      negocio es lo que hace FacturaDirecta por defecto. En Square, que las respuestas no lleguen al negocio es una queja
+      repetida en su foro. El Hub no guarda un correo del negocio: se usa el de la cuenta del propietario, y sin él no se
+      envía. El «Responder a» lo pone el servidor, nunca quien llama.
+    - **Se reenvía cuanto haga falta y queda cada envío** con su fecha y su dirección (FacturaDirecta, Stripe, Square).
+    - **Un fallo se dice y no se reintenta solo** (FacturaDirecta). Un correo no tiene clave que el servidor de correo
+      entienda: repetir uno que quizá salió duplicaría el envío, así que el que se queda a medias se da por no confirmado
+      (Odoo lo marca como fallido antes de enviarlo por lo mismo:
+      https://github.com/odoo/odoo/blob/18.0/addons/mail/models/mail_mail.py). Lo que devuelva después el buzón del cliente no se lee:
+      el de ERPlora descarta lo que recibe.
+    - **Una demo no envía**: la lleva cualquiera y saldría con el remitente de todos los negocios.
+    - **Fuera de Automatizaciones**: lo que sale no se puede recoger; cada correo lo pide una persona.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | FacturaDirecta | «Enviar» en la factura; correos del contacto propuestos y editables, PDF adjunto; se reenvía cuanto se quiera y cada envío queda en el registro; un rechazo se ve y no se reintenta | https://help.facturadirecta.com/es/articles/15121935-enviar-factura-por-email |
+    | FacturaDirecta | el remitente es un dominio de la plataforma y «Responder a» es el correo de la empresa | https://www.facturadirecta.com/novedades/nuevo-modo-envio/ |
+    | Holded | enviar el documento, revisar el destinatario y el mensaje, confirmar | https://help.holded.com/en/articles/6836216-send-your-invoices-by-email |
+    | Quipu | «Enviar por correo» abre una ventana para la factura o el ticket | https://getquipu.com/Manual-de-usuario-de-Quipu-2-0.pdf |
+    | Odoo | «Send» en la factura emitida, con el PDF; filtro de las no enviadas | https://www.odoo.com/documentation/18.0/applications/finance/accounting/customer_invoices.html |
+    | Contasimple | se envía al cliente desde la factura guardada o la lista | https://www.contasimple.com/academia/como-crear-facturas/ |
+    | TeamSystem Facturas (Billin) | se envía desde la lista y desde la vista de cada factura, y se ve el estado del envío | https://www.billin.net/crear-enviar-facturas/ |
+    | Anfix | asunto y texto propuestos; dice qué pasó con el correo | https://www.anfix.com/facturacion/notificaciones-de-estado |
+    | Sage 50 | el correo va a la dirección de la ficha del cliente, con el PDF | https://communityhub.sage.com/es/sage-50/f/discusion-general/266223/ya-se-puede-enviar-facturas-desde-el-programa |
+    | Stripe | enviar y reenviar desde la factura, con registro de los correos | https://docs.stripe.com/invoicing/send-email |
+    | Square | se reenvía desde la factura; las respuestas no llegan al negocio, y se quejan | https://community.squareup.com/t5/Questions-How-to/Reply-to-Invoice/m-p/133019 |
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
 - No cobra ni devuelve dinero: «Marcar pagada» no toca la caja y «Rectificar» no devuelve dinero.
 - No guarda la forma de pago: vive en la venta.
-- No envía facturas por correo ni por WhatsApp.
+- No envía facturas por WhatsApp, ni por correo sola: cada correo lo pide una persona (INVOICE-F26). No envía varias a la
+  vez, no deja escribir el texto del correo y no sabe si el cliente lo abrió.
 - No hace presupuestos, proformas, borradores ni albaranes.
 - No lleva cobros parciales, plazos ni recordatorios de impago.
 - No recuerda la retención de un cliente ni la pone sola: se elige en cada factura. Tampoco lleva las retenciones de las
@@ -1690,7 +1785,8 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 - No exporta el libro registro de facturas expedidas en el formato oficial de la AEAT; el Excel de las facturas emitidas
   es una hoja sencilla para la gestoría (INVOICE-F24).
 - No vigila el techo de la factura simplificada: lo pide Ventas al cobrar.
-- No borra ni anonimiza los datos de un cliente en sus facturas (la ley obliga a conservarlas).
+- No borra ni anonimiza los datos de un cliente en sus facturas (la ley obliga a conservarlas); de sus correos sí quita la
+  dirección.
 
 ### Qué queda fuera
 

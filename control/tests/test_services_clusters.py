@@ -84,7 +84,7 @@ def update_in(cluster: Cluster, **changes) -> ClusterUpdateIn:
 
 class TestCreate:
     def test_a_platform_admin_registers_a_cluster_with_its_limit_and_its_event(self, admin_ctx):
-        out = services.cluster_create(admin_ctx, cluster_in())
+        out = services.clusters.cluster_create(admin_ctx, cluster_in())
 
         row = Cluster.objects.get(pk=out.id)
         assert (row.name, row.host, row.port, row.pooler_host, row.pooler_port, row.is_open, row.max_hubs) == (
@@ -100,14 +100,14 @@ class TestCreate:
         assert events("control.cluster.created") == [{"id": str(row.pk), "name": "cluster-2"}]
 
     def test_the_platform_itself_may_register_one(self):
-        out = services.cluster_create(system_context(REGISTRY_SCOPE), cluster_in())
+        out = services.clusters.cluster_create(system_context(REGISTRY_SCOPE), cluster_in())
 
         assert Cluster.objects.filter(pk=out.id).exists()
 
     @pytest.mark.parametrize("flags", [{"is_staff": True}, {}, {"is_superuser": True}])
     def test_support_a_customer_or_a_superuser_who_is_no_staff_may_not(self, flags):
         with pytest.raises(PermissionDenied):
-            services.cluster_create(as_actor(person("someone", **flags)), cluster_in())
+            services.clusters.cluster_create(as_actor(person("someone", **flags)), cluster_in())
 
         assert not Cluster.objects.exists()
 
@@ -115,14 +115,14 @@ class TestCreate:
         a_cluster(name="cluster-2")
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_create(admin_ctx, cluster_in())
+            services.clusters.cluster_create(admin_ctx, cluster_in())
 
         assert refused.value.code == "control.cluster_name_taken"
         assert set(refused.value.fields) == {"name"}
         assert Cluster.objects.count() == 1
 
     def test_its_secret_is_read_before_it_is_saved_and_only_the_apps(self, admin_ctx, secrets):
-        out = services.cluster_create(admin_ctx, cluster_in(secret_name=SECRET))
+        out = services.clusters.cluster_create(admin_ctx, cluster_in(secret_name=SECRET))
 
         assert Cluster.objects.get(pk=out.id).secret_name == SECRET
         assert secrets.reads == [f"{SECRET}/app"]
@@ -138,7 +138,7 @@ class TestCreate:
         monkeypatch.setattr(credentials, "secrets_client", lambda: fake)
 
         with pytest.raises(InvalidPayload) as refused:
-            services.cluster_create(admin_ctx, cluster_in(secret_name=SECRET))
+            services.clusters.cluster_create(admin_ctx, cluster_in(secret_name=SECRET))
 
         assert refused.value.code == "control.cluster_secret_unavailable"
         assert reason in refused.value.fields["secret_name"]
@@ -156,7 +156,7 @@ class TestUpdate:
     def test_changes_its_limit_its_door_and_its_secret_with_its_event(self, admin_ctx, secrets):
         cluster = a_cluster(max_hubs=10)
 
-        out = services.cluster_update(
+        out = services.clusters.cluster_update(
             admin_ctx, update_in(cluster, max_hubs=500, pooler_host="pooler-1b.example", secret_name=SECRET)
         )
 
@@ -171,7 +171,7 @@ class TestUpdate:
         monkeypatch.setattr(credentials, "secrets_client", lambda: fake)
 
         with pytest.raises(InvalidPayload) as refused:
-            services.cluster_update(admin_ctx, update_in(cluster, secret_name=SECRET, max_hubs=7))
+            services.clusters.cluster_update(admin_ctx, update_in(cluster, secret_name=SECRET, max_hubs=7))
 
         assert refused.value.code == "control.cluster_secret_unavailable"
         cluster.refresh_from_db()
@@ -182,7 +182,7 @@ class TestUpdate:
         fake = FakeSecrets({})
         monkeypatch.setattr(credentials, "secrets_client", lambda: fake)
 
-        services.cluster_update(admin_ctx, update_in(cluster, max_hubs=7))
+        services.clusters.cluster_update(admin_ctx, update_in(cluster, max_hubs=7))
 
         assert fake.reads == []
         cluster.refresh_from_db()
@@ -193,7 +193,7 @@ class TestUpdate:
         cluster = a_cluster()
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_update(admin_ctx, update_in(cluster, name="cluster-2"))
+            services.clusters.cluster_update(admin_ctx, update_in(cluster, name="cluster-2"))
 
         assert (refused.value.code, set(refused.value.fields)) == ("control.cluster_name_taken", {"name"})
 
@@ -203,7 +203,7 @@ class TestUpdate:
         Hub.objects.create(slug="acme", status=Hub.Status.READY, cluster=cluster)
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_update(admin_ctx, update_in(cluster, **change))
+            services.clusters.cluster_update(admin_ctx, update_in(cluster, **change))
 
         assert refused.value.code == "control.cluster_holds_hubs"
         assert set(refused.value.fields) == set(change)
@@ -244,7 +244,7 @@ class TestUpdate:
             LeftoverDatabase.objects.create(hub=hub, cluster=cluster, db_name=hub.db_name, noted_at="2026-10-31T10:00Z")
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_update(admin_ctx, update_in(cluster, host="writer-9.example"))
+            services.clusters.cluster_update(admin_ctx, update_in(cluster, host="writer-9.example"))
 
         assert refused.value.code == "control.cluster_holds_hubs"
 
@@ -252,7 +252,7 @@ class TestUpdate:
         cluster = a_cluster()
         Hub.objects.create(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=cluster)
 
-        services.cluster_update(admin_ctx, update_in(cluster, host="writer-9.example", port=5433))
+        services.clusters.cluster_update(admin_ctx, update_in(cluster, host="writer-9.example", port=5433))
 
         cluster.refresh_from_db()
         assert (cluster.host, cluster.port) == ("writer-9.example", 5433)
@@ -262,7 +262,7 @@ class TestUpdate:
         fake = FakeSecrets({})
         monkeypatch.setattr(credentials, "secrets_client", lambda: fake)
 
-        out = services.cluster_update(admin_ctx, update_in(cluster))
+        out = services.clusters.cluster_update(admin_ctx, update_in(cluster))
 
         assert (out.id, out.secret_name, fake.reads) == (cluster.pk, SECRET, [])
         assert events("control.cluster.updated") == []
@@ -271,13 +271,13 @@ class TestUpdate:
         ghost = Cluster(id=uuid.uuid7(), name="ghost", host="nowhere.example")
 
         with pytest.raises(NotFound):
-            services.cluster_update(admin_ctx, update_in(ghost))
+            services.clusters.cluster_update(admin_ctx, update_in(ghost))
 
     def test_support_may_not(self):
         cluster = a_cluster()
 
         with pytest.raises(PermissionDenied):
-            services.cluster_update(as_actor(person("support", is_staff=True)), update_in(cluster, max_hubs=1))
+            services.clusters.cluster_update(as_actor(person("support", is_staff=True)), update_in(cluster, max_hubs=1))
 
 
 class TestClose:
@@ -287,7 +287,7 @@ class TestClose:
         # A purged demo has no database left there: not counted among its hubs.
         Hub.objects.create(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=cluster)
 
-        out = services.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
+        out = services.clusters.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
 
         cluster.refresh_from_db()
         hub.refresh_from_db()
@@ -297,16 +297,16 @@ class TestClose:
     def test_a_closed_one_stays_closed_and_says_nothing_new(self, admin_ctx):
         cluster = a_cluster(is_open=False)
 
-        services.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
+        services.clusters.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
 
         assert events("control.cluster.closed") == []
 
     def test_support_may_not_and_an_unknown_one_is_not_found(self, admin_ctx):
         cluster = a_cluster()
         with pytest.raises(PermissionDenied):
-            services.cluster_close(as_actor(person("support", is_staff=True)), ClusterIdIn(id=cluster.pk))
+            services.clusters.cluster_close(as_actor(person("support", is_staff=True)), ClusterIdIn(id=cluster.pk))
         with pytest.raises(NotFound):
-            services.cluster_close(admin_ctx, ClusterIdIn(id=uuid.uuid7()))
+            services.clusters.cluster_close(admin_ctx, ClusterIdIn(id=uuid.uuid7()))
         cluster.refresh_from_db()
         assert cluster.is_open
 
@@ -315,7 +315,7 @@ class TestDelete:
     def test_deletes_one_without_hubs_with_its_event(self, admin_ctx):
         cluster = a_cluster()
 
-        out = services.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
+        out = services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
 
         assert out.id == cluster.pk
         assert not Cluster.objects.exists()
@@ -327,7 +327,7 @@ class TestDelete:
         Hub.objects.create(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=cluster)
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
+            services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
 
         assert refused.value.code == "control.cluster_holds_hubs"
         assert "2" in refused.value.message
@@ -337,9 +337,9 @@ class TestDelete:
     def test_support_may_not_and_an_unknown_one_is_not_found(self, admin_ctx):
         cluster = a_cluster()
         with pytest.raises(PermissionDenied):
-            services.cluster_delete(as_actor(person("support", is_staff=True)), ClusterIdIn(id=cluster.pk))
+            services.clusters.cluster_delete(as_actor(person("support", is_staff=True)), ClusterIdIn(id=cluster.pk))
         with pytest.raises(NotFound):
-            services.cluster_delete(admin_ctx, ClusterIdIn(id=uuid.uuid7()))
+            services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=uuid.uuid7()))
         assert Cluster.objects.filter(pk=cluster.pk).exists()
 
 
@@ -349,4 +349,4 @@ def test_every_write_is_an_internal_command_of_control():
 
     for name in ("control.cluster.create", "control.cluster.update", "control.cluster.close", "control.cluster.delete"):
         op = get_operation(name)
-        assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services")
+        assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services.clusters")

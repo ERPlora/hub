@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.table import events
 from apps.table.models import TableSettings
-from apps.table.queries import current_settings, settings_row
+from apps.table.queries.settings import current_settings, settings_row
 from apps.table.schemas import SettingsIn, SettingsOut
 from apps.table.services.writes import actor_label
 

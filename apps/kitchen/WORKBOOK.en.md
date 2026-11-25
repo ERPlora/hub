@@ -720,7 +720,7 @@ If it fails: a Served or Cancelled ticket is not cancelled. One that never came 
 Involved: KITCHEN-F21, KITCHEN-F25, KITCHEN-F28, KITCHEN-F29, PRINTING-F10
 
 ### KITCHEN-F23 Create a ticket by hand
-<!-- from WORKBOOK.md sha256:2160503c514b -->
+<!-- from WORKBOOK.md sha256:348802b60a9e -->
 Status: done
 Actor: employee, manager
 Screen: Tickets
@@ -729,7 +729,10 @@ Steps:
    if you want, and add its dishes (product of the catalogue, quantity and note).
 2. "Create ticket": the panel closes and the ticket shows at the top of the list (even if you were on
    another page, the list goes back to the first) and on the display.
-In: the type, the destination, the notes and the dishes.
+In: the type, the destination, the notes and the dishes. Through the assistant, each dish goes by a product of the
+catalogue, by its name or by what is cooked, and its card says on its line the destination and the dishes, each by
+what was said, its note and how many ("Create in Kitchen: Staff · Dishes: Espresso · 2, Latte · 1"); the type and
+the notes come after.
 Out: a ticket To prepare, round 1, without a check, with the name of whoever creates it (announces: ticket
 created; History "Created"); its dishes go to their station like those of a round.
 If it fails: inside the panel, and what was typed stays. A ticket without dishes is rejected ("Add at least

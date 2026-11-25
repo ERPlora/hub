@@ -1,10 +1,11 @@
 """Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's
-schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``), a file the person attaches in
-the chat (``AN_ATTACHED_FILE``), a file a read hands the person (``A_HANDED_FILE``) and the names it reads
-(``exactly_one``, ``RecordNameOut``)."""
+schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``) or says as written
+(``IN_OWN_WORDS``), a file the person attaches in the chat (``AN_ATTACHED_FILE``), a file a read hands the person
+(``A_HANDED_FILE``) and the names it reads (``exactly_one``, ``RecordNameOut``)."""
 
 from typing import Annotated, Any, Literal
 
+from live.assistant import OWN_WORDS
 from ninja import Schema
 from pydantic import Field, StringConstraints, field_validator
 
@@ -40,6 +41,11 @@ def unless_given(mark: dict, *data: str) -> dict:
     once, beside the datum each object takes its record by instead (a course's ``id``, a menu's ``combo_id``)."""
     return {"refers": {**mark["refers"], "unless": list(data)}}
 
+
+#: The mark of a text of a list, or of its lines, that is the person's own words (``live.assistant.OWN_WORDS``): an
+#: option of a select field, the value of a custom field, what an invoice line bills. The card says it as written, so
+#: a list of them is said item by item, never by how many it carries.
+IN_OWN_WORDS: dict = {OWN_WORDS: True}
 
 #: The mark of a datum that takes a whole file in base64 (base/assistant/attachments.py): from the chat, the model gives
 #: the name of a file the person attached, and the turn gives the operation that file.

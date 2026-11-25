@@ -496,7 +496,7 @@ def switch(db):
 
     from control.models import Freeze
     from control.schemas import FreezeIn
-    from control.services import freeze_set
+    from control.services.freeze import freeze_set
     from live.context import system_context
     from live.models import OutboxEvent
 

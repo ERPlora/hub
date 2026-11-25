@@ -33,6 +33,7 @@ from apps.invoice.schemas.fields import (
 )
 from apps.invoice.withholding import RATES
 from apps.tax.schemas.references import A_TAX_CATEGORY
+from base.schemas.assistant import IN_OWN_WORDS
 
 RATE_OR_CATEGORY = _("Enter the VAT % of the line, or its tax category.")
 
@@ -136,7 +137,7 @@ class LineDefaultsOut(Schema):
 
 
 class ManualLineIn(Schema):
-    description: _text(255, min_length=1) = Field(description="What is invoiced.")
+    description: _text(255, min_length=1) = Field(description="What is invoiced.", json_schema_extra=IN_OWN_WORDS)
     quantity: Decimal = Field(
         gt=0,
         max_digits=15,

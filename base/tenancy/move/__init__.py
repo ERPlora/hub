@@ -31,7 +31,7 @@ other.
    register the hub's alias anew when its server changed (``base.tenancy.connections``).
 
 Every step that drops, renames or switches first checks that the move is still this worker's: it holds the hub's lease
-(renewed by then) and the hub still moves to its destination, unasked to be undone (``control.services.still_ours``;
+(renewed by then) and the hub still moves to its destination, unasked to be undone (``control.services.worker_move.still_ours``;
 the switch checks it again on its locked row). A worker whose lease ran out (each deploy starts the new one before the
 old one stops) thus never drops a destination another worker made live, nor switches a move another one finished; it
 stops, as one that is stopping or whose lease went elsewhere does, and leaves everything to whoever holds it now.

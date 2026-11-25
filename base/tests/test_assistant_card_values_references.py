@@ -20,7 +20,7 @@ from django.conf import settings
 from django.utils import timezone, translation
 from live import assistant as shared
 from live.context import OperationContext, Scope
-from live.assistant import CHOICES_OF, NAMED, REFERS, choices_of
+from live.assistant import CHOICES_OF, NAMED, OWN_WORDS, REFERS, choices_of
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
@@ -366,8 +366,8 @@ def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
 
 
 def text_lists() -> dict[str, list[str]]:
-    """Each list of texts of the assistant's writes no schema says anything of (no record, moment or closed list): the
-    write and its datum."""
+    """Each list of texts of the assistant's writes no schema says anything of (no record, moment, closed list or the
+    person's own words): the write and its datum."""
     found: dict[str, list[str]] = {}
     for op in writes():
         schema = op.input.model_json_schema()
@@ -377,15 +377,16 @@ def text_lists() -> dict[str, list[str]]:
             if prop.get("type") != "array":
                 continue
             items = shared.resolved(prop.get("items", {}), defs)
-            if items.get("type") == "string" and not {"enum", "format", REFERS} & {*prop.keys(), *items.keys()}:
+            if items.get("type") == "string" and not {"enum", "format", REFERS, OWN_WORDS} & {*prop.keys(), *items.keys()}:
                 found.setdefault(op.name, []).append(name)
     return found
 
 
 @HUB_DB
 def test_no_list_of_texts_sent_as_they_are_is_named():
-    """Every one of them, codes or a person's own words: as sent, so never said item by item as if the server had named
-    it. A list the server says in words is (positive control: a series of visits, said as moments)."""
+    """Every one of them, codes or texts no schema marks as the person's own words: as sent, so never said item by item
+    as if the server had named it. A list the server says in words is (positive controls: a series of visits, said as
+    moments; the options of a select field, the person's own words, hub#2288)."""
     found = text_lists()
     assert "flow.draft.propose" in found
     named = [
@@ -398,6 +399,9 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
     starts = ["2026-11-02T10:00:00+01:00", "2026-11-09T10:00:00+01:00"]
     visits = list_field(assistant.cards.card(get("appointment.appointment.bulk_create"), {"starts": starts}, "es"), "starts")
     assert (visits["value"], visits.get(NAMED)) == (["2 nov 2026, 10:00", "9 nov 2026, 10:00"], True)
+    field = assistant.cards.card(get("customer.field.create"), {"options": ["Terraza", "Dentro"]}, "es")
+    options = list_field(field, "options")
+    assert (options["value"], options.get(NAMED)) == (["Terraza", "Dentro"], True)
 
 
 # ── The ratchet: references nobody marks and lists nobody labels, by app ──────────────────────────────────────────────

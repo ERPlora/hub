@@ -31,7 +31,7 @@ def run_due(
     now = now or timezone.now()
     launch_due(now)
     worked = 0
-    for hub_id in control_services.hubs_moving():
+    for hub_id in control_services.worker_move.hubs_moving():
         if services.provisioning.claim_hub(hub_id, now, moving.LEASE) is None:
             continue
         try:
@@ -47,14 +47,14 @@ def run_due(
 
 def launch_due(now: dt.datetime) -> int:
     """Start each move asked for a night that is due by ``now`` whose hub's lease nobody else holds
-    (``control.services.start_scheduled_move``): one whose night has not come on the business's clock waits for it, one
+    (``control.services.worker_move.start_scheduled_move``): one whose night has not come on the business's clock waits for it, one
     refused says why; a failure of one is logged and it is tried again on the next pass. How many started."""
     started = 0
-    for hub_id in control_services.moves_scheduled_due(now):
+    for hub_id in control_services.worker_move.moves_scheduled_due(now):
         if services.provisioning.claim_hub(hub_id, now, moving.LEASE) is None:
             continue
         try:
-            if control_services.start_scheduled_move(hub_id, now, owner=services.provisioning.LEASE_OWNER):
+            if control_services.worker_move.start_scheduled_move(hub_id, now, owner=services.provisioning.LEASE_OWNER):
                 started += 1
                 logger.info("move: the move of %s asked for its night started.", hub_id)
         except Exception:
@@ -68,10 +68,10 @@ def drop_old_copies(now: dt.datetime) -> int:
     """Drop the copies left behind more than :data:`MOVED_COPY_DAYS` before ``now``, with their rows; how many. One that
     cannot be dropped now stays, and the next pass tries again."""
     dropped = 0
-    for kept in control_services.copies_due(now - dt.timedelta(days=MOVED_COPY_DAYS)):
+    for kept in control_services.worker_move.copies_due(now - dt.timedelta(days=MOVED_COPY_DAYS)):
         try:
             databases._drop_copy(kept.db_name, kept.cluster)
-            control_services.forget_copy(kept.cluster_id, kept.db_name)
+            control_services.worker_move.forget_copy(kept.cluster_id, kept.db_name)
         except Exception:
             logger.exception("base.tenancy.move.copy_kept copy=%s: it could not be dropped; tried again.", kept.db_name)
             continue
@@ -87,19 +87,19 @@ def drop_leftovers(now: dt.datetime) -> int:
     lease, taken on the clock and checked again under it; one that cannot be dropped now stays, and the next pass tries
     again."""
     dropped = 0
-    for left in control_services.leftovers():
+    for left in control_services.worker_move.leftovers():
         if not _leftover_droppable(left.hub, left):
-            control_services.forget_leftover(left.cluster_id, left.db_name)
+            control_services.worker_move.forget_leftover(left.cluster_id, left.db_name)
             continue
         if services.provisioning.claim_hub(left.hub_id, timezone.now(), moving.LEASE) is None:
             continue
         try:
-            hub = control_services.moving_row(left.hub_id)
+            hub = control_services.worker_move.moving_row(left.hub_id)
             if hub is None or not _leftover_droppable(hub, left):
-                control_services.forget_leftover(left.cluster_id, left.db_name)
+                control_services.worker_move.forget_leftover(left.cluster_id, left.db_name)
                 continue
             ops.drop_database(left.db_name, cluster=left.cluster)
-            control_services.forget_leftover(left.cluster_id, left.db_name)
+            control_services.worker_move.forget_leftover(left.cluster_id, left.db_name)
             dropped += 1
             logger.info("base.tenancy.move.leftover_dropped database=%s cluster=%s", left.db_name, left.cluster.name)
         except Exception:
@@ -111,5 +111,5 @@ def drop_leftovers(now: dt.datetime) -> int:
 
 def _leftover_droppable(hub, left) -> bool:
     return not (
-        control_services.attributed(left.cluster_id, left.db_name) or databases._same_server(hub.cluster, left.cluster)
+        control_services.worker_move.attributed(left.cluster_id, left.db_name) or databases._same_server(hub.cluster, left.cluster)
     )

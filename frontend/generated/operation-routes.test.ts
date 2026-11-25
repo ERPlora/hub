@@ -317,7 +317,7 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(19);
   });
 
-  it('binds the twenty-seven routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
+  it('binds the twenty-nine routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'invoice.invoice.list': { method: 'get', path: '/api/invoice/invoices' },
       'invoice.invoice.export': { method: 'get', path: '/api/invoice/invoices/export' },
@@ -325,6 +325,8 @@ describe('OPERATION_ROUTES', () => {
       'invoice.invoice.by_source': { method: 'get', path: '/api/invoice/invoices/by_source' },
       'invoice.invoice.document': { method: 'get', path: '/api/invoice/invoices/document' },
       'invoice.invoice.pdf': { method: 'get', path: '/api/invoice/invoices/pdf' },
+      'invoice.email.list': { method: 'get', path: '/api/invoice/emails' },
+      'invoice.email.send': { method: 'post', path: '/api/invoice/emails/send' },
       'invoice.invoice.print': { method: 'post', path: '/api/invoice/invoices/print' },
       'invoice.invoice.line_defaults': { method: 'get', path: '/api/invoice/invoices/line_defaults' },
       'invoice.invoice.create': { method: 'post', path: '/api/invoice/invoices' },
@@ -347,7 +349,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
       'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(27);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(29);
   });
 
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {

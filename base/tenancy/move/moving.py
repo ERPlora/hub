@@ -33,7 +33,7 @@ def move_hub(
     """Move ``hub_id`` to the cluster it is moving to, or undo its move when it is to be undone, its lease held (see the
     module); a failure is undone and noted on it, never raised."""
     now = now or timezone.now()
-    hub = control_services.moving_row(hub_id)
+    hub = control_services.worker_move.moving_row(hub_id)
     if hub is None or hub.moving_to is None:
         return
     control = tenancy_connections.control_name()
@@ -47,8 +47,8 @@ def move_hub(
     def ours(*, forward: bool = True) -> None:
         heartbeat()
         try:
-            control_services.still_ours(hub.id, target.pk, services.provisioning.LEASE_OWNER, forward=forward)
-        except control_services.MoveTaken as taken:
+            control_services.worker_move.still_ours(hub.id, target.pk, services.provisioning.LEASE_OWNER, forward=forward)
+        except control_services.worker_move.MoveTaken as taken:
             raise MoveStopped(str(taken)) from taken
 
     back = {"hub": hub, "copy_name": copy_name, "origin": origin, "target": target, "roles": roles, "now": now}
@@ -94,9 +94,9 @@ def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str)
         return
     except Exception as undo_error:
         logger.exception("base.tenancy.move.undo_failed hub=%s: it stays moving and is undone next time.", hub.slug)
-        control_services.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
+        control_services.worker_move.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
         return
-    control_services.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason)
+    control_services.worker_move.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason)
     logger.info("base.tenancy.move.undone hub=%s: %s", hub.slug, reason)
 
 
@@ -104,10 +104,10 @@ def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
     """Step 5: control moves the hub and dates its copy, in one transaction on its locked row, only if the move is
     still this worker's (``MoveStopped`` otherwise: nothing written)."""
     try:
-        control_services.move_finished(
+        control_services.worker_move.move_finished(
             hub_id, target.pk, getattr(origin, "pk", None), copy_name, now, owner=services.provisioning.LEASE_OWNER
         )
-    except control_services.MoveTaken as taken:
+    except control_services.worker_move.MoveTaken as taken:
         raise MoveStopped(str(taken)) from taken
 
 

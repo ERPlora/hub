@@ -288,14 +288,18 @@ only for whoever runs the business, "API keys" and "Approvals"; each one in the 
 Employees.
 
 ### Employees · Roles
-<!-- from WORKBOOK.md sha256:96f57230a6d8 -->
-The five roles of erplora.com and, below them, the business's own, with where they come from, how many people have
-them and how many permissions they give. Tapping one opens "What it allows".
+<!-- from WORKBOOK.md sha256:5d1d35230555 -->
+The five roles of erplora.com and, below them, the business's own, with "Basic" or "Custom", how many people have them
+and how many permissions they give; one of its own with new permissions carries "To review". Tapping one opens "What it
+allows". Whoever manages the roles has "New role" at the top and, in each row, "Duplicate"; in the business's own, also
+"Edit" and "Delete" in "⋮".
 
 ### Employees · Roles · What it allows
-<!-- from WORKBOOK.md sha256:38cb46544de6 -->
-A role, read only: how many people have it and, in a panel per app that is on, each permission with its phrase
+<!-- from WORKBOOK.md sha256:b6e877da5f77 -->
+A role: how many people have it and, in a panel per app that is on, each permission with its phrase
 and whether the role gives it ("Allowed"), lets a person do it with a manager's approval ("With approval") or not ("No").
+It is read only, save one of the business's own for whoever manages the roles, who changes its name, its description
+and what it allows right there, and presses "Save".
 
 ### Employees · API keys
 <!-- from WORKBOOK.md sha256:c4e8c06601f5 -->
@@ -393,7 +397,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:3ed52f8f4208 -->
+<!-- from WORKBOOK.md sha256:69c8d20bce7b -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -478,7 +482,7 @@ On the Employees screens and the API documentation:
 | BASE-F80 | Bring back a person who left the business | done |
 | BASE-F81 | Understand how each person gets in | done |
 | BASE-F82 | See the business's roles and what each one allows | done |
-| BASE-F83 | Give a person a role | done |
+| BASE-F83 | Give a person a basic role | done |
 | BASE-F84 | Approve with a manager's PIN | done |
 | BASE-F85 | Look up who approved what | done |
 | BASE-F86 | Create an API key and copy its token | done |
@@ -517,11 +521,11 @@ On the Employees screens and the API documentation:
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
 | BASE-F126 | Turn ERPlora's support access on or off | done |
-| BASE-F127 | Make a role of your own from another | partial |
-| BASE-F128 | Adjust what a role of your own allows | partial |
-| BASE-F129 | Delete a role of your own | partial |
+| BASE-F127 | Make a role of your own from another | done |
+| BASE-F128 | Adjust what a role of your own allows | done |
+| BASE-F129 | Delete a role of your own | done |
 | BASE-F130 | Give a person a role of your own | partial |
-| BASE-F131 | See in the bell the roles to review | partial |
+| BASE-F131 | See in the bell the roles to review | done |
 
 ### BASE-F01 See what the business still has to set up
 <!-- from WORKBOOK.md sha256:ed75c3653f5d -->
@@ -2407,18 +2411,19 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles and what each one allows
-<!-- from WORKBOOK.md sha256:986be0c21bab -->
+<!-- from WORKBOOK.md sha256:3e9bff34693d -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles; Employees · Roles · What it allows
 Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
-  2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
-     available", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
+  2. A row per role (on a phone, a card): "Owner", "Administrator", "Manager", "Employee" and "Accountant", with
+     "Basic", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
      each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
      features call for it. Below them, by their name, the business's own roles, with "Custom": whoever
-     has one counts in it and not in the one of their invitation, save the owner, who is always the owner.
+     has one counts in it and not in the one of their invitation, save the owner, who is always the owner. One of the
+     business's own with permissions it does not carry yet also says "To review".
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
@@ -2431,16 +2436,19 @@ Steps:
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
      changed here. A role of the business's own says "What this role lets a person do in this business, app by app."
      and shows what the business saved; what no role of the business can give, owning the business, does not show.
-  5. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
+     Whoever manages the roles adjusts it right there.
+  5. Whoever manages the roles (the owner and the administrator, or whoever has it in a role of the business's own)
+     makes one with "New role" or "Duplicate" and, in "⋮", edits or deletes the business's own.
+  6. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles, the people of the business, the apps that are on and what each app gives each role.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
 allows." with "Retry", and a role that is not one of the five nor one of the business's own, "This role does not exist
 in this business.".
-Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131, BASE-F77
+Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F129, BASE-F130, BASE-F131, BASE-F77
 
-### BASE-F83 Give a person a role
-<!-- from WORKBOOK.md sha256:189c96bdb8bb -->
+### BASE-F83 Give a person a basic role
+<!-- from WORKBOOK.md sha256:45776a5fe453 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles
@@ -2450,50 +2458,62 @@ Steps:
      them).
   2. There they change the role.
   3. Back here, the person shows with their new role. If they have the hub open, what they see and what
-     they may do change at once, without ending their session.
+     they may do change at once, without ending their session. If the business gave them a role of its own, that one
+     still rules.
 In: the role chosen on erplora.com.
 Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
-Involved: BASE-F82, BASE-F13
+Involved: BASE-F82, BASE-F13, BASE-F130
 
 ### BASE-F127 Make a role of your own from another
-<!-- from WORKBOOK.md sha256:2f11a6c0c5cd -->
-Status: partial — it is made by asking the assistant or through the Hub's API; its screen is missing
+<!-- from WORKBOOK.md sha256:3de28f523a3f -->
+Status: done
 Actor: owner, administrator
-Screen: Assistant
+Screen: Employees · Roles; Assistant
 Steps:
-  1. Ask the assistant for a role from another, with its name: "create the role Cashier from Employee". It can come
-     from a basic one or from one of your own, and carry a description.
-  2. The card says "Based on: Employee" and "Name: Cashier" (BASE-F97). Once accepted, the role is made with the same
-     the other one allows, app by app, save owning the business, which no role of your own gives.
-  3. It shows at once in **Employees › Roles**, with "Custom" and nobody in it. What it allows is seen by tapping it
-     (BASE-F82) and changed with BASE-F128; it is given to a person with BASE-F130. From then on it does not change with
-     the role it came from.
+  1. In **Employees › Roles**, "Duplicate" in the row of a role, basic or one of your own, or "New role" at the top,
+     which starts from the employee's.
+  2. In "New role" they type the "Name" and, if they want another, choose "Based on" among all the roles: "It will allow
+     the same as that role. Then adjust what it allows.".
+  3. "Create role": the role is made with the same the other one allows, app by app, save owning the business, which no
+     role of your own gives. "Role Cashier created" shows and it opens to adjust it.
+  4. It shows at once in **Employees › Roles**, with "Custom" and nobody in it; it is given to a person by asking the
+     assistant. From then on it does not change with the role it came from.
+  5. It is also asked of the assistant: "create the role Cashier from Employee", with a description if wanted. The card
+     says "Based on: Employee" and "Name: Cashier", and once accepted it is made the same way.
 In: the role it comes from, the name (up to 80 letters) and, if wanted, the description.
 Out: the business's own role. Event `base.role.created`. It never leaves the business: erplora.com does not know it.
-If it fails: without a name, "Give the role a name."; with the name of another role of your own, capitals aside, "There
+If it fails: without a name, "Create role" cannot be pressed (the assistant and the API: "Give the role a name."); with
+the name of another role of your own, capitals aside, "There
 is already a role with that name. Choose another."; a role that is not there, "This role does not exist in this
 business.". Nobody gives what they do not have: if the role it comes from allows something whoever makes it may not do, or
 leaves "With approval" something their own role says "No" to, "A role may not allow more than you may do yourself." and
-it is not made. The assistant does not offer it to who does
-not manage roles, and the API answers 403.
+it is not made. What is refused is said in the window itself, which stays open. Whoever does not manage roles has no
+"New role" nor "Duplicate", the assistant does not offer it to them and the API answers 403.
 Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
-<!-- from WORKBOOK.md sha256:ef43ab553ddc -->
-Status: partial — it is adjusted by asking the assistant or through the Hub's API; its screen is missing
+<!-- from WORKBOOK.md sha256:784762e39360 -->
+Status: done
 Actor: owner, administrator
-Screen: Assistant
+Screen: Employees · Roles · What it allows; Assistant
 Steps:
-  1. Ask the assistant for the change: "the Cashier role can't void sales", "call the Cashier role Evening till".
-  2. The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
-     "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM
-     (BASE-F98).
-  3. Once accepted, only what was asked for changes. If somebody has the role, what they see and what they may do change
-     at once on their devices, without ending their session (BASE-F13).
-  4. An app turned on after the role was saved gives what it gives the basic role it came from; a permission an app adds
-     later comes in as "No". In both cases the role is left to review until it is saved with them, and the bell says so
-     (BASE-F131).
+  1. In **Employees › Roles**, tap a role of your own, or "Edit" in its "⋮". At the top, "What this role lets a person do
+     in this business, app by app. Whoever has it notices as soon as it is saved.", how many people have it and its
+     "Name" and "Description", changed right there. Below, the same panels of "What it allows": each permission
+     with its phrase and a switch or, for what a manager can approve with their PIN, "Allowed", "With approval" or "No".
+  2. They change what they want and press "Save" at the end: "Role saved.". With nothing changed, "Save" cannot be pressed.
+  3. If another person saves it meanwhile, what was not touched here is brought up to date.
+  4. It is also asked of the assistant: "the Cashier role can't void sales", "call the Cashier role Evening till".
+     The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
+     "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM,
+     and once accepted only what was asked for changes.
+  5. If somebody has the role, what they see and what they may do change at once on their devices, without ending their
+     session.
+  6. An app turned on after the role was saved gives what it gives the basic role it came from; a permission an app adds
+     later comes in as "No". In both cases the role is left to review until it is saved with them, and the bell says so.
+     Opened, it says "New permissions to review" at the top and "To review" on each: "Save", changing something or
+     nothing, leaves them reviewed.
 In: the role and what changes: the name, the description or the state of each permission.
 Out: the role changed. Event `base.role.updated`.
 If it fails: a basic role is not changed: "This is one of erplora.com's roles. Duplicate it and change the copy.".
@@ -2501,23 +2521,27 @@ Nobody gives what they do not have, nor "With approval" what their own role refu
 than you may do yourself."; and owning the business is
 given to nobody: "That is only the owner's of the business: no role gives it.". A permission that is not of an app that
 is on, "That permission is not of any app that is on in this business."; "With approval" for something a manager cannot
-approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it.
+approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it. What
+the screen refuses is said next to "Save", with "The role could not be saved", or under the name, and what was being
+changed stays. Whoever does not manage the roles sees it read only.
 Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Delete a role of your own
-<!-- from WORKBOOK.md sha256:46cbe2e843b2 -->
-Status: partial — it is deleted by asking the assistant or through the Hub's API; its screen is missing
+<!-- from WORKBOOK.md sha256:b4f8224d9655 -->
+Status: done
 Actor: owner, administrator
-Screen: Assistant
+Screen: Employees · Roles; Assistant
 Steps:
-  1. Ask the assistant "delete the Cashier role".
-  2. The card says the role and, under "What will happen", how many people have it, and asks to type CONFIRM (BASE-F98).
-     Once accepted, the role disappears from **Employees › Roles**.
-  3. Whoever left the business with that role, if they come back, enters with the one of their invitation.
+  1. In **Employees › Roles**, "Delete" in the "⋮" of a role of your own.
+  2. "Delete the role Cashier? This cannot be undone.": once confirmed, "Role Cashier deleted", and it leaves the list.
+  3. It is also asked of the assistant: "delete the Cashier role". The card says the role and, under "What will happen",
+     how many people have it, and asks to type CONFIRM.
+  4. Whoever left the business with that role, if they come back, enters with the one of their invitation.
 In: the role.
 Out: the role deleted. Event `base.role.deleted`.
 If it fails: if somebody of the business has it, it is not deleted: "2 people have this role. Give them another before
-deleting it.". A basic role is not deleted: "This is one of erplora.com's roles. Duplicate it and change the copy.".
+deleting it.", in the question itself, which stays open. A basic role has no "Delete"; the assistant and the API are
+answered "This is one of erplora.com's roles. Duplicate it and change the copy.".
 Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
 
 ### BASE-F130 Give a person a role of your own
@@ -2551,21 +2575,22 @@ people have this role. Give them another before deleting it.".
 Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
 
 ### BASE-F131 See in the bell the roles to review
-<!-- from WORKBOOK.md sha256:d94ce903422c -->
-Status: partial — the bell counts them and leads to the roles; the screen where they are reviewed is missing
+<!-- from WORKBOOK.md sha256:a1822b65cbe1 -->
+Status: done
 Actor: owner, administrator
-Screen: The bell
+Screen: The bell; Employees · Roles; Employees · Roles · What it allows
 Steps:
-  1. An app is turned on, or an app gains a permission, after a role of your own was saved: that role is left to review
-     (BASE-F128).
+  1. An app is turned on, or an app gains a permission, after a role of your own was saved: that role is left to review.
   2. The bell of whoever manages the roles goes up without reloading with the notice "2 roles to review" and its
      sentence: "An app turned on or a new permission is not in them yet: look at what each role allows.".
-  3. "Review the roles" opens **Employees › Roles**.
-  4. Once a role is saved with what it lacked (BASE-F128), it stops counting; with none left, the notice goes away.
+  3. "Review the roles" opens **Employees › Roles**, where that role carries "To review".
+  4. Opened, "New permissions to review" and each one marked "To review". They choose what the role does with each one
+     and press "Save", even if nothing changes.
+  5. Once saved it no longer carries the mark nor counts; with none left, the notice goes away.
 In: the business's own roles and the apps that are on.
 Out: nothing is saved.
 If it fails: whoever does not manage the roles does not see the notice. If the notices cannot be read, the bell keeps
-the last it knew, as in BASE-F10.
+the last it knew, as with the other notices.
 Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
@@ -2642,7 +2667,7 @@ and nothing is downloaded.
 Involved: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
-<!-- from WORKBOOK.md sha256:22135d71b36c -->
+<!-- from WORKBOOK.md sha256:13209079c453 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2650,23 +2675,26 @@ Steps:
   1. In **Employees › API keys**: "A key lets another system (your accountant's, your online shop) read or write
      this business's data through its API." and "New API key".
   2. In "New API key", the "Name" ("Accountant — invoices"), the "Requests per minute" ("From 1 to 10,000.") and
-     "What this key may do": "Full access", "Read only", "Write only" or "Per app", ticking "Read" and "Write" on
-     each app; only the box of what whoever makes it may do on that app shows.
+     "What this key may do": "Choose apps" or "All apps", with the boxes "Read", "Create", "Update" and "Delete" of
+     each app or, on "All apps", only once for all of them ("Every app of your business, also the ones you add
+     later."). Only the box of what whoever makes it may give shows: the rest has a dash, and the app they may give
+     nothing on does not show, nor "All apps" if they may give nothing on all of them. "Create key" takes what is
+     ticked on the chosen option.
   3. They tap "Create key": "API key created" shows with "Copy the token now", "This is the only time the whole
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
   4. What a key may do is four actions, on every app (also the ones added later) or app by app: read, create,
-     update and delete. "Read" is reading and "Write" creating, updating and deleting, of what whoever makes it may
-     give; "Full access", the four on every app. Through the API each action is chosen on its own: a key that only
-     reads and creates in Inventory.
+     update and delete, each on its own. A key with "Read" on Inventory reads its products; creating, updating or
+     deleting one, or opening another app, is refused.
   5. A key is never given more than whoever makes it may do: on an app, an action they may do in none of its calls;
      on every app, an action they may not do on some app that publishes it.
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
 (BASE-F125). Event `base.api_key.created`.
-If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That app
-does not publish what the key would do on it.", "A key may not do more than you may do yourself." or "It could not be
-copied to the clipboard.".
+If it fails: with no name or no box ticked, "Create key" cannot be tapped; with no app to give anything on, "There is
+no app you may give access to.". "The API key could not be created.", "Choose at least one app and what the key may do
+on it.", "That app does not publish what the key would do on it.", "A key may not do more than you may do yourself."
+or "It could not be copied to the clipboard.".
 Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
@@ -2701,22 +2729,23 @@ If it fails: "The API key could not be revoked.".
 Involved: BASE-F89
 
 ### BASE-F89 See the API keys and what each one may do
-<!-- from WORKBOOK.md sha256:6a048ed2a1f5 -->
+<!-- from WORKBOOK.md sha256:d4d99d2ecb4a -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
   1. In **Employees › API keys** (the tab exists only for whoever runs the business), a row per key: "Name",
-     "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created", "Last use" ("Never" if
-     unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so on every
-     app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U (update) and
-     D (delete), as "Online shop R/C · Taxes R".
+     "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created by", "Created", "Last use"
+     ("Never" if unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so
+     on every app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U
+     (update) and D (delete), as "Online shop R/C · Taxes R". "Created by" says the name of whoever made it, never
+     their email address.
   2. They search with "Search API key…". At the bottom, a link leads to the API documentation.
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
 another system can read or write your business's data.".
-Involved: BASE-F86, BASE-F87, BASE-F88
+Involved: BASE-F86, BASE-F87, BASE-F88, BASE-F125
 
 ### BASE-F90 Read the API documentation
 <!-- from WORKBOOK.md sha256:06bbdedbe93f -->
@@ -2912,7 +2941,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:ebc90db105a2 -->
+<!-- from WORKBOOK.md sha256:2ac115069559 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2957,13 +2986,22 @@ Steps:
      category: Restaurant — food · 10%"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
-     it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
-     record and, beside it, only figures — those of a goods receipt (product and quantity) or the services of a voucher
-     (service and sessions) —, by the name of the record followed by its figures, the quantity as it is written in the
-     person's language and an amount as money ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
-     Colour · 3"; when a line cannot be named, the list says how many it carries: it would read as a bare figure); and
-     any other, such as a line with two records (the employee and the product of a sale), one with a text of its own or
-     a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
+     it sends the service and a name as well, it says the service that is booked); a list of what the person wrote,
+     such as the options of a select field, by each one as written ("Options: Terrace, Inside"); a list of lines that
+     carry in words their record, the name the person said, what they wrote or a time or a date and, beside it, only
+     figures — a goods receipt (product and quantity), the services of a voucher (service and sessions), the dishes of
+     a ticket made by hand, the intervals of a day's hours or the lines of an invoice made by hand —, by its words
+     followed by its figures, the quantity as it is written in the person's language, an amount as money and a VAT
+     rate typed by hand as a percentage ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
+     Colour · 3"; "Dishes: Espresso · 2, Latte · 1"; "Opening intervals: 9:00 AM · 2:00 PM"; "Lines: Private birthday
+     menus · 10% · 1 · €681.82"; when a line cannot be named, the list says how many it carries: it would read as a
+     bare figure); the custom fields of a customer's card, each by its name and its value as the card shows it: a yes
+     or no in the person's language, a date as it is written in it and a field that is cleared, with a dash ("Custom
+     fields: Table preference · Terrace, VIP · Yes"; "VIP · —"); the special days loaded at once, by their date and
+     their name and, when that day opens, its hours ("Jan 1, 2027 · New Year's Day; Jan 6, 2027 · Epiphany; Mar 26,
+     2027 · Good Friday and 7 more"); a line with two records the card names, by both (the product and who serves it in
+     a sale, "Shampoo · Bea Ruiz · 2"); and any other, such as a line with a record the card cannot name, one with a
+     yes or no or a list inside or a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
      **Charge** sheet: the total, as the POS works it out for whoever asks ("Total: €12.50"), and each payment method
      with what it pays ("Payments: Cash · €12.50"; the one without an amount pays what the others leave and, when none
      is said, all of it in cash, as the action charges), never "1 item" nor the check's version, which only the
