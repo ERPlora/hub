@@ -9,7 +9,7 @@ import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INVOICE, OP, setup } from '../__tests__/invoice-detail';
-import { click, EMPLOYEE, errorFrame, flush, OWNER } from '../__tests__/mount-invoice';
+import { click, EMPLOYEE, errorFrame, flush, type MountOptions, OWNER } from '../__tests__/mount-invoice';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
 import RectifyModal from '../components/RectifyModal.vue';

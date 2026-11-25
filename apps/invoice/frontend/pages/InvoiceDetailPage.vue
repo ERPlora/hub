@@ -5,7 +5,8 @@
 // Customer, Customer tax ID, Address, Issuer, Source, Sale, Rectifies / Replaces / Replaced by / Rectifying
 // invoices (each opens), Paid on and Notes (a rectifying invoice's note says what it rectifies and why, in
 // the reader's language); the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full
-// invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» asks the
+// invoice» where they apply and for whoever may, a refusal said right above them. «Download PDF» saves the
+// server's PDF of its A4. «Print / PDF» asks the
 // printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
 // it; refused (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
 // browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why), and a document of a
@@ -15,13 +16,15 @@
 // paper, which waits for it and is never printed without it (a record it cannot read prints nothing). It follows
 // `invoice.invoice.get` live: a payment or a rectification made elsewhere shows by itself.
 import { formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
-import { useCommand, useLive } from '@erplora/ui/sdk';
+import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import FiscalRecordFollower, { type FiscalRecordState } from '../../../sale/frontend/components/document/FiscalRecordFollower.vue';
+import ExportButton from '../../../../base/frontend/components/ExportButton.vue';
+import { base64ToBlob } from '../../../../base/frontend/lib/data';
 import { printRefusal, withReason } from '../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../../sale/frontend/lib/print';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
@@ -40,6 +43,7 @@ import type { InvoiceLinkOut, InvoiceOut } from '../operations';
 const props = defineProps<{ id: string }>();
 
 const router = useRouter();
+const client = useLiveClient();
 const session = useSession();
 const canAdd = computed(() => session.can('invoice.add_invoice'));
 const canRectify = computed(() => session.can('invoice.rectify_invoice'));
@@ -157,6 +161,12 @@ async function queued(): Promise<boolean> {
   }
 }
 
+/** The PDF of its A4, as the server prints it (INVOICE-F25). */
+async function pdfFile(): Promise<{ filename: string; blob: Blob }> {
+  const file = await client.api.call('invoice.invoice.pdf', { invoice_id: props.id, duplicate: duplicate.value });
+  return { filename: file.filename, blob: base64ToBlob(file.content_base64, file.content_type) };
+}
+
 function onSubstituted(full: InvoiceOut): void {
   void router.push(`/invoice/invoices/${full.id}`);
 }
@@ -218,6 +228,14 @@ function onSubstituted(full: InvoiceOut): void {
             />
             {{ $t('invoice.detail.print') }}
           </ion-button>
+          <ExportButton
+            testid="invoice-detail-pdf"
+            size="default"
+            :label="$t('invoice.detail.pdf.button')"
+            :pending-label="$t('invoice.detail.pdf.pending')"
+            :failed="(reason: string) => $t('invoice.detail.pdf.failed', { reason })"
+            :load="pdfFile"
+          />
           <ion-button
             fill="outline"
             color="medium"

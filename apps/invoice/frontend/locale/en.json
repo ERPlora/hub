@@ -113,6 +113,11 @@
       "print": "Print / PDF",
       "printFailed": "Could not print the invoice",
       "queued": "Sent to {printer}.",
+      "pdf": {
+        "button": "Download PDF",
+        "pending": "Preparing…",
+        "failed": "The PDF could not be downloaded: {reason}"
+      },
       "missingTaxId": "This invoice has no customer tax ID: the ticket printer cannot print it as a full invoice.",
       "fields": {
         "type": "Type",

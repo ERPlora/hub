@@ -95,10 +95,11 @@ describe('InvoiceDetailPage: «Download PDF»', () => {
     expect(invoke).toHaveBeenCalledWith('save_download', { name: 'FACT-2026-000001.pdf', dataBase64: btoa('%PDF-1.7 x') });
   });
 
-  it('is as tall as «Print / PDF» beside it', async () => {
+  it('is as tall as «Print / PDF» beside it, whose size is Ionic’s own', async () => {
     const s = await opened();
-    const size = (testid: string) => s.wrapper.findAllComponents(IonButton).find((b) => b.attributes('data-testid') === testid)?.props('size');
-    expect(size('invoice-detail-pdf')).toBe(size('invoice-detail-print'));
+    const sizeOf = (testid: string) => s.wrapper.findAllComponents(IonButton).find((b) => b.attributes('data-testid') === testid)?.props('size');
+    expect(sizeOf('invoice-detail-pdf')).toBe('default');
+    expect(sizeOf('invoice-detail-print')).not.toBe('small');
   });
 
   it('speaks Spanish', async () => {
