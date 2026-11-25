@@ -8,7 +8,8 @@ from live.models import OutboxEvent
 
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import ANA, LUIS, MARTA, fresh, in_the_copy, run, run_in
-from control.models import CopyRecovery, Hub, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
+from control.models.hubs import Hub
 
 
 APPOINTMENTS = {

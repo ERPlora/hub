@@ -16,7 +16,8 @@ from base import schemas, services, usage
 from base.tenancy import dumps, move, offboarding, provision, recovery, restore
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub
-from control.models import Hub, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub
 
 logger = logging.getLogger("base.worker")  # logged as the worker, whose passes these are
 

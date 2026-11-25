@@ -5,7 +5,7 @@ import datetime as dt
 from uuid import UUID
 
 from base.services.provisioning import _control_transaction
-from control.models import HubDump
+from control.models.dumps import HubDump
 
 
 def expired_dumps_forgotten(*, before: dt.datetime) -> int:

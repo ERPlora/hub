@@ -5,7 +5,7 @@ from uuid import UUID
 
 from django.utils import timezone
 
-from control.models import CopyRecovery, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
 from control.services.worker_copy import _claim, _release
 from control.services.worker_move import MoveTaken, _control_transaction
 

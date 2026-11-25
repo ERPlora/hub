@@ -3898,7 +3898,7 @@ If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
 ### BASE-F118 Open a screen without permission: "No access" and whom to ask
-<!-- from WORKBOOK.md sha256:6aed37103d8d -->
+<!-- from WORKBOOK.md sha256:f2f551451108 -->
 Status: done
 Actor: manager, employee
 Screen: No access
@@ -3906,7 +3906,8 @@ Steps:
   1. They open by its address (a link, the history, a tab left open or typing it) a screen their role does not open:
      an entry of an app that does not show in their menu, such as Taxes' "Rules" for an employee, one of the platform
      that does not show in their side menu, such as "System" for whoever does not run the business, or any screen
-     that hangs from them.
+     that hangs from them. Also another person's page in **Employees** for whoever does not run the business, even
+     when they reach it because the till switched user with the page open (BASE-F60).
   2. Instead of the screen, in the same address, "No access" shows: "You do not have access to this screen" — "Your
      role in this business does not open it.". While it looks for whom to ask: "Looking for who can give you access…".
   3. Below, "Ask one of these people to give you access:" and the name of each one, with their avatar: whoever can

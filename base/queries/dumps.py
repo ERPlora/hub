@@ -13,7 +13,7 @@ from base.permissions import OWN_BUSINESS
 from base.registry import internal_only
 from base.schemas.dumps import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, InternalDumpsOut
 from base.schemas.hub_registry import HubGetIn
-from control.models import HubDump
+from control.models.dumps import HubDump
 
 
 # ── The copies of the business's data ─────────────────────────────────────────────────────────────────────────────

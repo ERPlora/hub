@@ -36,7 +36,7 @@ from base.registry import REGISTRY_SCOPE
 from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
 from base.tenancy.context import HubContextMissing, use_hub
 from base.tenancy.tests.business import A, HUB_DB, on_hub_a
-from control.models import Hub
+from control.models.hubs import Hub
 
 # ── Why an operation may have no permission ───────────────────────────────────────────────────────────────────────
 

@@ -34,7 +34,7 @@ from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklo
 from base.models.activation import AppActivation
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 NOW = dt.datetime(2026, 11, 1, 10, 0, tzinfo=dt.UTC)
 DIMENSIONS = [{"Name": "Environment", "Value": "prod"}]

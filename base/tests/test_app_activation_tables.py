@@ -22,7 +22,7 @@ from base.models.activation import AppActivation
 from base.tenancy.context import HubContextMissing, HubWithoutDatabase, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import HOST, HUB_DB, A
-from control.models import Hub, HubDue
+from control.models.hubs import Hub, HubDue
 
 # ── The row: its states and what a failure leaves on it ─────────────────────────────────────────────────────────
 

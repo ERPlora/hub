@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
 import type { PersonDetail } from '../operations/people';
 import PersonPage from './PersonPage.vue';
 
@@ -192,5 +192,32 @@ describe('PersonPage', () => {
     other.call.push(errorFrame(subId(other.client, 'base.person.detail'), 'server_error'));
     await flush();
     expect(other.wrapper.text()).toContain('This person could not be opened.');
+  });
+
+  // Somebody who does not run the business reaches a person's address: a link, or the till switching to them on it.
+  it('whoever may not open it gets «No access» with who can give it, never a failure to retry', async () => {
+    const m = await open({ session: EMPLOYEE });
+    m.call.push(errorFrame(subId(m.client, 'base.person.detail'), 'permission_denied'));
+    await flush();
+    expect(m.wrapper.find('[data-testid="person-error"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="no-access"]').exists()).toBe(true);
+    await m.result(m.call, 'base.access.grantors', { grantors: [{ name: 'Olga Ruiz' }] });
+    expect(m.wrapper.findAll('[data-testid="no-access-grantor"]').map((row) => row.text())).toEqual([
+      expect.stringContaining('Olga Ruiz'),
+    ]);
+  });
+
+  it('a failure that is no refusal says so, and «Retry» reads the person again', async () => {
+    const m = await open();
+    m.call.push(errorFrame(subId(m.client, 'base.person.detail'), 'internal_error'));
+    await flush();
+    expect(m.wrapper.find('[data-testid="no-access"]').exists()).toBe(false);
+    const streams = m.net.streams.length;
+    await m.wrapper.get('[data-testid="person-error"] ion-button').trigger('click');
+    await flush();
+    expect(m.net.streams.length).toBeGreaterThan(streams);
+    await m.result(m.net.lastStream(), 'base.person.detail', detail());
+    expect(m.wrapper.find('[data-testid="person-error"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="person-data"]').exists()).toBe(true);
   });
 });

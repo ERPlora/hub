@@ -53,7 +53,7 @@ from base.schemas.demos import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops
 from base.tenancy.context import use_control, use_hub
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 

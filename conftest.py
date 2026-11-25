@@ -277,7 +277,7 @@ def _hub_with_its_database(request, hub_databases, hub_id, slug, db_name):
     from base.tenancy import identity
     from base.tenancy.context import use_hub
     from base.tenancy.tests import hubs
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     hub = Hub.objects.create(
         id=hub_id, slug=slug, status=Hub.Status.READY, db_name=db_name, schema_apps=hub_databases.schema_apps[db_name]

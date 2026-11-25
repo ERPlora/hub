@@ -38,7 +38,7 @@ from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.before_the_cut import drop_hub_tables, make_hub_tables
 from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
-from control.models import Hub
+from control.models.hubs import Hub
 
 #: Where a business kept its rows before the cut: control's database, named.
 CONTROL = "default"
@@ -511,7 +511,7 @@ def test_the_last_step_of_a_second_copy_all_is_refused_even_when_two_runs_raced(
 def test_without_a_cluster_with_room_the_cut_says_so_and_makes_nothing(phase_one):
     from django.db import connections as django_connections
 
-    from control.models import Cluster
+    from control.models.hubs import Cluster
 
     aurora = phase_one.business("aurora")
     default = django_connections.settings["default"]
@@ -579,7 +579,7 @@ def test_a_cut_whose_lease_is_taken_meanwhile_stops_and_never_drops_what_the_oth
     copy = cut.copy_rows
 
     def taken_meanwhile(hub, **kwargs):
-        from control.models import HubDue
+        from control.models.hubs import HubDue
 
         # Another cut took the lease once this one's ran out: what it makes now is its own.
         HubDue.objects.filter(pk=hub.id).update(lease_owner="another-cut", lease_until=timezone.now() + cut.LEASE)

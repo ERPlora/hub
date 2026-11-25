@@ -1,12 +1,12 @@
 // BASE-F118: an employee who opens by its address a screen its role does not open (Taxes' «Rules», an entry its menu
-// does not show, and System, a platform screen its side menu does not show) gets «No access» in that same address, with
-// the names of who can give it, in the three widths; the owner, the positive control, opens the same screens. A screen
-// of the employee's own work still opens.
+// does not show; System, a platform screen its side menu does not show; and another person's page in Employees, whose
+// read the server refuses them) gets «No access» in that same address, with the names of who can give it, in the three
+// widths; the owner, the positive control, opens the same screens. A screen of the employee's own work still opens.
 import { expect, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, hostPage, saveSessionForTheSweep, shown, testid, THREE_SIZES } from './helpers';
 
-type People = { people: { name: string; role: string; me: boolean }[] };
+type People = { people: { id: string; name: string; role: string; me: boolean }[] };
 
 test('BASE-F118: an employee opening by its address a screen its role does not open sees «No access» and whom to ask @smoke', async ({ browser }) => {
   const owner = await hostPage(browser, A, { next: '/tax/rules' });
@@ -23,6 +23,10 @@ test('BASE-F118: an employee opening by its address a screen its role does not o
     const ownerName = nameOf('hub_owner');
     const employeeName = nameOf('hub_employee');
     expect(ownerName).not.toBe('');
+    const ownerPerson = `/employees/${people.find((person) => person.role === 'hub_owner')?.id ?? ''}`;
+    await owner.page.goto(`${A}${ownerPerson}`);
+    await expect(testid(owner.page, 'person-data')).toBeVisible();
+    await expect(testid(owner.page, 'no-access')).toHaveCount(0);
 
     const { page } = employee;
     await saveSessionForTheSweep(employee.context);
@@ -31,10 +35,11 @@ test('BASE-F118: an employee opening by its address a screen its role does not o
       for (const [path, shot, inside] of [
         ['/tax/rules', 'base-no-access', 'tax-rules-add'],
         ['/system', 'base-no-access-system', 'tab-usage'],
-      ] as const) {
+        [ownerPerson, 'base-no-access-person', 'person-data'],
+      ]) {
         await page.goto(`${A}${path}`);
         await expect(testid(page, 'no-access')).toContainText(/You do not have access to this screen|No tienes acceso a esta pantalla/);
-        expect(new URL(page.url()).pathname).toBe(path);
+        expect(decodeURIComponent(new URL(page.url()).pathname)).toBe(path);
         const grantors = testid(page, 'no-access-grantor');
         await expect(grantors.filter({ hasText: ownerName })).toBeVisible();
         if (employeeName) await expect(grantors.filter({ hasText: employeeName })).toHaveCount(0);

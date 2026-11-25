@@ -13,7 +13,8 @@ from base.tenancy.tests import hubs, s3
 from base.tenancy.tests.hubs import marker, says_it_is
 from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, objects
 from base.tenancy.tests.test_move import MARKER, fresh, nothing_checked_yet, run
-from control.models import HubDump, MovedCopy
+from control.models.copies import MovedCopy
+from control.models.dumps import HubDump
 
 #: The moves' own autouse fixture and the bucket the ``moves`` of ``conftest.py`` asks for.
 __all__ = ["aws_test_credentials", "dumps_bucket", "moto_s3", "nothing_checked_yet"]

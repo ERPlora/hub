@@ -37,7 +37,7 @@ from base.models.scheduler import TaskSchedule
 from base.services import relay_runs
 from base.tenancy.context import current, use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
@@ -542,7 +542,7 @@ def test_a_demo_whose_time_is_up_is_never_entered(hub_a, worker_visits, monkeypa
 def test_a_hub_being_restored_or_moving_to_another_cluster_is_never_entered(hub_a, worker_visits, monkeypatch):
     # Its database is being put back as it was at a moment (base.tenancy.restore) or copied to another cluster
     # (base.tenancy.move): nothing is relayed nor run in it meanwhile.
-    from control.models import Cluster
+    from control.models.hubs import Cluster
 
     Hub.objects.filter(pk=hub_a.pk).update(
         restoring_from=Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False)

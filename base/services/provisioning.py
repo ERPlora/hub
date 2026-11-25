@@ -21,7 +21,8 @@ from base import auth, registry, signing
 from base.models import Hub
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
-from control.models import Cluster, HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Cluster, HubDue
 
 logger = logging.getLogger(__name__)
 

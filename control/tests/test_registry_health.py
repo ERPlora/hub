@@ -12,7 +12,7 @@ import pytest
 from django.db import connections
 from django.utils import timezone
 
-from control.models import Hub
+from control.models.hubs import Hub
 from control.queries import RegistryHealth, registry_health
 
 pytestmark = pytest.mark.django_db

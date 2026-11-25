@@ -10,7 +10,7 @@ from base.models import Hub, Membership
 from base.models.activation import AppActivation
 from base.models.sessions import SessionOwner
 from base.services.sessions import _end_sessions
-from control.models import HubVisit
+from control.models.usage import HubVisit
 
 
 def forget_address(address: str) -> None:

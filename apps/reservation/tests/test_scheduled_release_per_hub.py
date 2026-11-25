@@ -24,7 +24,7 @@ from apps.reservation import events
 from apps.reservation.models import Reservation
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 from .conftest import NOW, TODAY, TOMORROW, make_reservation, pin_clock
 

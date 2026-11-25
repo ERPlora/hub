@@ -29,7 +29,7 @@ from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B
 from base.tenancy.tests.concurrency import meanwhile, plan_with_room
 from base.tests.test_internal import code, signed
 from base.tests.test_session_revoke import ANA, OLGA, REVOKE, alive, login
-from control.models import HubVisit
+from control.models.usage import HubVisit
 
 #: Room for two sessions of business A at once.
 __all__ = ["plan_with_room"]

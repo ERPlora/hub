@@ -37,7 +37,7 @@ from base.models.access import TrustedDevice
 from base.permissions import is_a_person
 from base.registry import internal_only
 from base.schemas.sessions import HubUserSyncIn, HubUserSyncOut, SessionRevokeIn, SessionRevokeOut
-from control.models import HubVisit
+from control.models.usage import HubVisit
 
 
 MODEL_BACKEND = "django.contrib.auth.backends.ModelBackend"

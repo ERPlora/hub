@@ -17,7 +17,8 @@ from django.db import connection, connections
 from django.utils import timezone
 
 from base import meter, services
-from control.models import Hub, HubActivityDaily, HubVisit
+from control.models.hubs import Hub
+from control.models.usage import HubActivityDaily, HubVisit
 
 DAY = dt.date(2026, 3, 10)
 NEXT_DAY = DAY + dt.timedelta(days=1)
