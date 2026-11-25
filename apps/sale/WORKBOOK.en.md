@@ -708,7 +708,7 @@ A line already sent to the kitchen has no note button.
 Involved: none
 
 ### SALE-F14 Apply a discount to a line or to the check
-<!-- from WORKBOOK.md sha256:16e938b33b1d -->
+<!-- from WORKBOOK.md sha256:d71ed1a11dec -->
 Status: done
 Vertical: common
 Actor: employee, manager; above the maximum, the cashier with a manager's approval
@@ -729,7 +729,8 @@ Steps:
    with their PIN (or their badge) on that same device. The check keeps who authorized it and it is not
    asked again when charging; if, when charging, the discount goes over the maximum without
    authorization, it asks just the same, with "Approving: Charge with a discount above the maximum".
-   Employees › Approvals keeps what was approved with its figure.
+   Employees › Approvals keeps what was approved with its figure, and also what is given by whoever may give
+   it by themselves.
 In: "Allow discounts" and the maximum discount of the settings. The assistant only sets one on a check it is
 told about (its table or its name): the discount a product or a category gets on every sale is a rule of Price
 Lists (PRICING-F11).
@@ -1235,7 +1236,7 @@ cannot be read, "Its VeriFactu record could not be read, and its paper never pri
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
-<!-- from WORKBOOK.md sha256:4b57436eacba -->
+<!-- from WORKBOOK.md sha256:f0831c2c8ad4 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1264,12 +1265,12 @@ at the same time, "This sale is already voided.". A refusal is read inside the w
 If "Cancel" is pressed in "An approval is needed", nothing is voided and the window says "This needs a
 manager's approval.". The approved void does the same as the manager's, only once: the corrective
 invoice in the same void, the voucher sessions that go back, the stock and the customer's record; who
-approved it stays in **Employees › Approvals**. If the role becomes "No" with the window open, the void is refused and
-nothing is voided, even if a manager had already approved it.
-Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
+approved it, or that whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role
+becomes "No" with the window open, the void is refused and nothing is voided, even if a manager had already approved it.
+Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Refund a sale (all of it, part of it or through another method)
-<!-- from WORKBOOK.md sha256:cf834b29ea28 -->
+<!-- from WORKBOOK.md sha256:a78b311b17a5 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1306,10 +1307,10 @@ another refund takes the last of a marked line at the same time: "One of the lin
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
 pressing again does not refund twice. If "Cancel" is pressed in "An approval is needed",
 nothing is refunded and the window says "This needs a manager's approval.". The approved refund is the
-same, only once, with its corrective invoice and the voucher sessions that go back; who approved it stays
-in **Employees › Approvals**. If the role becomes "No" with the window open, the refund is refused and nothing is
-refunded, even if a manager had already approved it.
-Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
+same, only once, with its corrective invoice and the voucher sessions that go back; who approved it, or that
+whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role becomes "No" with the
+window open, the refund is refused and nothing is refunded, even if a manager had already approved it.
+Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Customers takes what was refunded off the record's spending on hearing "sale refunded" (CUSTOMER-F22)
 and Inventory puts back the units that go back (INVENTORY-F24), once per refund.
 
@@ -1806,7 +1807,7 @@ the quick notes and what is refundable can be followed live.
 | Kitchen | Opens the kitchen order of each round sent and brings it up to date when the check is charged in full, voided or one of its lines is voided (KITCHEN-F05, KITCHEN-F27 to KITCHEN-F29) | `sale.order.fired`, `sale.order.completed`, `sale.order.voided`, `sale.order.line_voided` |
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:6eeabb1c220e -->
+<!-- from WORKBOOK.md sha256:bbb3ec1467dc -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
@@ -1835,8 +1836,8 @@ their PIN or their badge ("An approval is needed", BASE-F84), once and for that 
 refunding a sale, voiding a line sent to the kitchen, deleting a check with something ordered, selling at
 an open price and discounts above the maximum. The approved action does everything the manager's does
 (also what Invoicing and Services move: the corrective invoice and the voucher sessions that go back) and
-stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the whole business's figures, the
-settings and creating payment methods are not approved.
+stays in **Employees › Approvals**, like the one the manager does by themselves (BASE-F85). Seeing everyone's
+sales, the whole business's figures, the settings and creating payment methods are not approved.
 
 The accountancy firm (`hub_accountant`) only reads: "See sales, checks, POS settings, sections and quick notes",
 "See the payment methods" and "See everyone's sales". It does not build checks, charge, void or refund, nobody
