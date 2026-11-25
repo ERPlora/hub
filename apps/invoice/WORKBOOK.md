@@ -979,8 +979,10 @@ que se ha enviado: dice «No enviada a …» y, arriba, «La factura no se ha en
 se ha podido enviar ahora mismo. Vuelve a intentarlo en unos minutos.», «Esa dirección no acepta el correo. Revísala y
 vuelve a enviarlo.», que no se puede hacer su PDF o leer su registro de VeriFactu, o que no se ha podido confirmar. Se
 envía otra vez con el mismo botón; solo no se repite. Que el buzón del cliente lo devuelva después no se sabe aquí. Si la
-cuenta del propietario no tiene correo, no se envía y lo dice; una demo no envía correos. La de otro, para un empleado, no
-se envía: «Factura no encontrada.». La gestoría ve los envíos y no envía.
+cuenta del propietario no tiene correo, no se envía y lo dice; una demo no envía correos. Un negocio envía como mucho 50
+correos por hora, porque todos comparten el buzón de envío de ERPlora; el siguiente no se envía y dice «Este negocio ya
+ha enviado todos los correos que puede enviar en una hora. Vuelve a intentarlo más tarde.». La de otro, para un
+empleado, no se envía: «Factura no encontrada.». La gestoría ve los envíos y no envía.
 Implicados: INVOICE-F17, INVOICE-F25, CUSTOMER-F16, VERIFACTU-F19
 
 ## Servicios: lo que entra y lo que sale

@@ -1291,6 +1291,12 @@ msgstr "Una demo no envía correos."
 msgid "That request key already belongs to another email."
 msgstr "Esa clave de petición ya es de otro correo."
 
+#: services/emails.py
+msgid "This business has sent all the emails it can send in an hour. Try again later."
+msgstr ""
+"Este negocio ya ha enviado todos los correos que puede enviar en una hora. "
+"Vuelve a intentarlo más tarde."
+
 #: templates/invoice/email.txt
 #, python-format
 msgid "Hello, %(customer)s:"

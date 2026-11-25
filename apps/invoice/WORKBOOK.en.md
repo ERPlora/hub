@@ -998,7 +998,7 @@ employee, is not downloaded, through the API or with the assistant either: "Invo
 Involved: INVOICE-F17, INVOICE-F18, INVOICE-F23, VERIFACTU-F19, BASE-F112
 
 ### INVOICE-F26 Send an invoice by email
-<!-- from WORKBOOK.md sha256:6e21d4d46e2c -->
+<!-- from WORKBOOK.md sha256:adc0599b2824 -->
 Status: done
 Actor: employee (their invoices), manager, administrator and owner (everyone's), assistant
 Screen: Invoice detail
@@ -1025,8 +1025,10 @@ does not say it was sent: it says "Not sent to …" and, on top, "The invoice wa
 email could not be sent right now. Try again in a few minutes.", "That address does not accept the email. Check it and
 send it again.", that its PDF cannot be made or its VeriFactu record read, or that it could not be confirmed. It is sent
 again with the same button; it is never repeated on its own. If the customer's mailbox returns it later, nothing is known
-here. If the owner's account has no email, it is not sent and it says so; a demo sends no emails. Someone else's, for an
-employee, is not sent: "Invoice not found.". The accountancy firm sees the emails and sends none.
+here. If the owner's account has no email, it is not sent and it says so; a demo sends no emails. A business sends at
+most 50 emails an hour, because every business shares ERPlora's sending mailbox; the next one is not sent and says "This
+business has sent all the emails it can send in an hour. Try again later.". Someone else's, for an employee, is not
+sent: "Invoice not found.". The accountancy firm sees the emails and sends none.
 Involved: INVOICE-F17, INVOICE-F25, CUSTOMER-F16, VERIFACTU-F19
 
 ## Services: what goes in and what comes out

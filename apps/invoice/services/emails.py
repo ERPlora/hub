@@ -28,7 +28,7 @@ from apps.invoice.schemas.emails import (
     SendEmailIn,
 )
 from apps.invoice.services.writes import _now, actor
-from base import business_mail, outbound
+from base import business_mail, outbound, throttle
 from base.operations import is_demo_hub
 
 #: Only the system context (``*``) holds it: no role declares it.
@@ -39,10 +39,14 @@ QUEUED_AT_MOST = dt.timedelta(minutes=2)
 SENDING_AT_MOST = dt.timedelta(minutes=10)
 #: How many one pass of the worker takes per business.
 RESUME_BATCH = 50
+#: Every business shares the platform's mailbox and its hourly quota: one may not use it up for the rest.
+EMAILS_PER_HOUR = 50
+HOUR = 3600
 
 ADDRESS_MISSING = _("Enter the email to send it to.")
 DEMO = _("A demo does not send emails.")
 KEY_REUSED = _("That request key already belongs to another email.")
+TOO_MANY = _("This business has sent all the emails it can send in an hour. Try again later.")
 
 
 def _refuse_unless_it_may_send(ctx: OperationContext) -> None:
@@ -51,6 +55,12 @@ def _refuse_unless_it_may_send(ctx: OperationContext) -> None:
             raise Conflict(str(DEMO), code="invoice.email_demo")
         if not business_mail.reply_address(ctx.scope):
             raise Conflict(str(REASONS[NO_REPLY]), code=NO_REPLY)
+
+
+def _count_one_more(ctx: OperationContext) -> None:
+    if not throttle.allow(f"invoice.email:{ctx.scope.key}", limit=EMAILS_PER_HOUR, window=HOUR):
+        with translation.override(ctx.language):
+            raise throttle.RateLimited(str(TOO_MANY))
 
 
 def _address(ctx: OperationContext, data: SendEmailIn, invoice: Invoice) -> str:
@@ -111,6 +121,7 @@ def send_email(ctx: OperationContext, data: SendEmailIn) -> dict:
             with translation.override(ctx.language):
                 raise Conflict(str(KEY_REUSED), code="invoice.email_key_reused")
         return _said(ctx, email)
+    _count_one_more(ctx)
     _tell(ctx, events.EMAIL_REQUESTED, email)
     outbound.after_commit(deliver, ctx.scope, email.id)
     return _said(ctx, email)

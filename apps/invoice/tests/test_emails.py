@@ -30,6 +30,7 @@ from apps.verifactu.models import Record
 from base import outbound, pdf
 from base.models import Hub
 from base.tenancy.context import current_alias, use_hub
+from base.throttle import RateLimited
 
 __all__ = ["owner", "send"]
 
@@ -161,6 +162,35 @@ def test_a_key_is_of_one_request_only(send):
     with pytest.raises(Conflict) as refused:
         asked(manual(), to=ANA, attempt_key=attempt)
     assert refused.value.code == "invoice.email_key_reused"
+
+
+def test_a_business_sends_at_most_so_many_an_hour_and_past_them_nothing_leaves(monkeypatch, send):
+    monkeypatch.setattr(service, "EMAILS_PER_HOUR", 2)
+    invoice = manual()
+    send(invoice, to=ANA)
+    send(invoice, to=ANA)
+    with pytest.raises(RateLimited) as refused:
+        send(invoice, to=ANA)
+    assert (refused.value.status, refused.value.code) == (429, "base.rate_limited")
+    assert (len(mail.outbox), InvoiceEmail.objects.count()) == (2, 2)
+    with translation.override("es"):
+        assert str(service.TOO_MANY).startswith("Este negocio ya ha enviado todos los correos")
+
+
+def test_a_request_asked_again_never_counts_twice_against_the_limit(monkeypatch, send):
+    monkeypatch.setattr(service, "EMAILS_PER_HOUR", 1)
+    invoice, attempt = manual(), key()
+    first = send(invoice, to=ANA, attempt_key=attempt)
+    assert send(invoice, to=ANA, attempt_key=attempt).id == first.id
+    with pytest.raises(RateLimited):
+        send(invoice, to=ANA)
+
+
+def test_the_limit_is_counted_for_each_business_apart(monkeypatch, send):
+    counted = []
+    monkeypatch.setattr(service.throttle, "allow", lambda name, **limit: counted.append(name) or True)
+    send(manual(), to=ANA)
+    assert counted == [f"invoice.email:{A.key}"]
 
 
 # What it says
