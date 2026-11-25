@@ -19,7 +19,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { approvalDialog, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, type Side } from './approval-helpers';
-import { A, api, psql, shot, shown, untilStill } from './helpers';
+import { A, api, capture, psql, shown, untilStill } from './helpers';
 import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -93,7 +93,7 @@ async function shotAtEverySize(page: Page, name: string, check?: () => Promise<v
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await untilStill(page);
     await check?.();
-    await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
+    await capture(page, `${name}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
 }
