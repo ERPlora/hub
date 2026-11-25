@@ -86,6 +86,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "kitchen",
     "modifier",
     "online_booking",
+    "online_order",
     "payment",
     "pricing",
     "printing",

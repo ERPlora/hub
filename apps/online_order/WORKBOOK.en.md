@@ -22,12 +22,12 @@ at the POS as always.
 - The check is charged at the POS like any other.
 
 ### Who uses it and what each one does
-<!-- from WORKBOOK.md sha256:5aa06099f8aa -->
+<!-- from WORKBOOK.md sha256:dbbf7a81d3b8 -->
 
 - The **owner**, the **administrator** and the **manager** see each table's code and regenerate it.
 - The **employee** does not see the tables' codes.
 - The **assistant** (by voice or text, with the session of whoever speaks) does the same: «which tables already have
-  their QR?», «regenerate the QR of table 4 on the terrace». Before regenerating it asks for confirmation with its
+  their ordering QR code?», «regenerate the QR code of table 4 on the terrace». Before regenerating it asks for confirmation with its
   card, which names the table by its number and its zone, as the floor plan names it.
 
 ## Reference adopted
@@ -63,7 +63,7 @@ for permission and fails indoors; generating a table's QR again is the way out w
 | ONLINE_ORDER-F08 | The check says the order is online | not done |
 
 ### ONLINE_ORDER-F01 Generate or regenerate a table's QR
-<!-- from WORKBOOK.md sha256:4d7162102384 -->
+<!-- from WORKBOOK.md sha256:bbcf3dd90c94 -->
 Status: partial — done through the API and with the assistant; the «Regenerate QR» button of the QR sheet is missing
 Actor: owner, administrator or manager; the assistant, with the session of whoever speaks
 Screen: none yet (it will come with the tables' QR sheet)
@@ -75,8 +75,8 @@ Steps:
    that had no code yet gets its first one.
 In: the table, from Tables.
 Out: the table's new code, the address of its page and when it was generated; the notice that it was regenerated.
-If it fails: nothing changes. The table does not exist or was deleted («This table no longer exists.»); the number
-repeats across zones and no zone is said (Tables asks for the zone); whoever asks cannot change the tables' QR codes
+If it fails: nothing changes. The table does not exist or was deleted («That table does not exist in this business.»); the
+number repeats across zones and no zone is said (Tables asks for the zone); whoever asks cannot change the tables' QR codes
 («You do not have permission»).
 Involved: TABLE-F02, TABLE-F04
 
@@ -192,28 +192,28 @@ speaks), with the same rules and permissions; the screens will come with the QR 
 as a person says it: its number and, if it repeats, its zone.
 
 ### What it offers: queries
-<!-- from WORKBOOK.md sha256:bdd73885924b -->
+<!-- from WORKBOOK.md sha256:3310f0dd2146 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The tables in the floor plan's order, each with its zone and, if it already has one, its code, the address of its page and when it was generated, in pages (up to 100) | see the tables' QR codes (+ see tables) | F02 | `online_order.table_code.list` |
+| The tables in the floor plan's order, each with its zone and, if it already has one, its code, the address of its page and when it was generated, in pages (up to 100) | see the tables' QR codes (+ see tables) | F02 | `online_order.qr_code.list` |
 
 ### What it offers: actions
-<!-- from WORKBOOK.md sha256:19f96baf3ccf -->
+<!-- from WORKBOOK.md sha256:6fd3529a003d -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
-| Gives a table a new code; the previous one stops working at once | regenerate the tables' QR codes (+ see tables) | F01 | `online_order.table_code.regenerate` |
+| Gives a table a new code; the previous one stops working at once | regenerate the tables' QR codes (+ see tables) | F01 | `online_order.qr_code.regenerate` |
 
 Regenerating is **high risk** for the assistant: the printed QR stops working and it cannot be undone, so its card
 asks for confirmation before doing it.
 
 ### What it announces
-<!-- from WORKBOOK.md sha256:ca2130757d75 -->
+<!-- from WORKBOOK.md sha256:5585cdb52d23 -->
 
 | Notice | When | What it carries |
 |---|---|---|
-| `online_order.table_code.regenerated` | A table's code is generated or regenerated | The table (`table_id`); never the code |
+| `online_order.qr_code.regenerated` | A table's code is generated or regenerated | The table (`table_id`); never the code |
 
 ### What it reacts to
 <!-- from WORKBOOK.md sha256:2d292dad27bb -->
@@ -221,12 +221,12 @@ asks for confirmation before doing it.
 No notice of another app.
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:3f5edbe3e01d -->
+<!-- from WORKBOOK.md sha256:72def8cbadcc -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
-| See the tables' QR codes | yes | yes | yes | no | `online_order.view_table_code` |
-| Regenerate the tables' QR codes | yes | yes | yes | no | `online_order.change_table_code` |
+| See the tables' QR codes | yes | yes | yes | no | `online_order.view_qr_code` |
+| Regenerate the tables' QR codes | yes | yes | yes | no | `online_order.change_qr_code` |
 
 Tables are read by Tables with the permission of whoever asks: this app's permission **and** the one to see tables
 are needed.

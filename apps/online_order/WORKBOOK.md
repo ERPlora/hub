@@ -1,6 +1,6 @@
 # Workbook — Pedidos online (app)
 Prefijo: ONLINE_ORDER
-Alcance MVP: restaurante
+Alcance MVP: restaurante (en la tienda; no viene en ninguna plantilla)
 Estado de la app: en construcción — hoy, el código de cada mesa y su regeneración por la API y el asistente
 
 > Manual de usuario y especificación de la app `online_order`. Se escribe **antes** que el código: no se
@@ -31,9 +31,9 @@ siempre.
 
 - El **propietario**, el **administrador** y el **responsable** ven el código de cada mesa y lo regeneran.
 - El **empleado** no ve los códigos de las mesas.
-- El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «¿qué mesas tienen ya su QR?»,
-  «regenera el QR de la mesa 4 de la terraza». Antes de regenerar pide confirmar con su tarjeta, que nombra la mesa
-  por su número y su zona, como la nombra el plano de sala.
+- El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «¿qué mesas tienen ya su código
+  QR para pedir?», «regenera el código QR de la mesa 4 de la terraza». Antes de regenerar pide confirmar con su
+  tarjeta, que nombra la mesa por su número y su zona, como la nombra el plano de sala.
 
 ## Referencia adoptada
 
@@ -75,8 +75,8 @@ Pasos:
    mesa que aún no tenía código recibe el primero.
 Entra: la mesa, de Mesas.
 Sale: el código nuevo de la mesa, la dirección de su página y cuándo se generó; el aviso de que se ha regenerado.
-Si falla: no cambia nada. La mesa no existe o está borrada («Esta mesa ya no existe.»); el número se repite en varias
-zonas y no se dice cuál (Mesas pide la zona); quien lo pide no puede cambiar los QR de las mesas («No tienes
+Si falla: no cambia nada. La mesa no existe o está borrada («Esa mesa no existe en este negocio.»); el número se repite en
+varias zonas y no se dice cuál (Mesas pide la zona); quien lo pide no puede cambiar los QR de las mesas («No tienes
 permiso»).
 Implicados: TABLE-F02, TABLE-F04
 
@@ -187,13 +187,13 @@ su número y, si se repite, su zona.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Las mesas en el orden del plano de sala, cada una con su zona y, si ya lo tiene, su código, la dirección de su página y cuándo se generó, en páginas (hasta 100) | ver los QR de las mesas (+ ver mesas) | F02 | `online_order.table_code.list` |
+| Las mesas en el orden del plano de sala, cada una con su zona y, si ya lo tiene, su código, la dirección de su página y cuándo se generó, en páginas (hasta 100) | ver los QR de las mesas (+ ver mesas) | F02 | `online_order.qr_code.list` |
 
 ### Lo que ofrece: acciones
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Da a una mesa un código nuevo; el anterior deja de valer al momento | regenerar los QR de las mesas (+ ver mesas) | F01 | `online_order.table_code.regenerate` |
+| Da a una mesa un código nuevo; el anterior deja de valer al momento | regenerar los QR de las mesas (+ ver mesas) | F01 | `online_order.qr_code.regenerate` |
 
 Regenerar es de **riesgo alto** para el asistente: el QR impreso deja de valer y no se puede volver atrás, así que su
 tarjeta pide la confirmación antes de hacerlo.
@@ -202,7 +202,7 @@ tarjeta pide la confirmación antes de hacerlo.
 
 | Aviso | Cuándo | Qué lleva |
 |---|---|---|
-| `online_order.table_code.regenerated` | Se genera o se regenera el código de una mesa | La mesa (`table_id`); nunca el código |
+| `online_order.qr_code.regenerated` | Se genera o se regenera el código de una mesa | La mesa (`table_id`); nunca el código |
 
 ### A qué reacciona
 
@@ -212,8 +212,8 @@ A ningún aviso de otra app.
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver los QR de las mesas | sí | sí | sí | no | `online_order.view_table_code` |
-| Regenerar los QR de las mesas | sí | sí | sí | no | `online_order.change_table_code` |
+| Ver los QR de las mesas | sí | sí | sí | no | `online_order.view_qr_code` |
+| Regenerar los QR de las mesas | sí | sí | sí | no | `online_order.change_qr_code` |
 
 Las mesas las lee Mesas con el permiso de quien pregunta: hace falta el de esta app **y** el de ver mesas.
 
@@ -231,7 +231,7 @@ Las mesas las lee Mesas con el permiso de quien pregunta: hace falta el de esta 
   cuando la app declare `public_pages = {"order": "online_order.public"}`, con ONLINE_ORDER-F03.
 - Las mesas borradas en Mesas no salen en la lista; su fila de `TableCode` se queda y no abre nada, porque la página
   de la mesa comprobará que la mesa sigue existiendo.
-- El aviso `online_order.table_code.regenerated` no lleva el código: los avisos llegan a Automatizaciones y al
+- El aviso `online_order.qr_code.regenerated` no lleva el código: los avisos llegan a Automatizaciones y al
   registro, y el código abre la página de la mesa.
 
 ## Lo que queda fuera
