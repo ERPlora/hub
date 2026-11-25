@@ -103,6 +103,14 @@ def _same(left: list[IntervalIn], right: list[IntervalIn]) -> bool:
     ]
 
 
+def _apply_sent(row: SpecialDay | Override, sent: dict[str, Any]) -> bool:
+    """Sets on ``row`` each sent value that changes it (``None`` changes nothing); whether any did."""
+    changed = {field: value for field, value in sent.items() if value is not None and getattr(row, field) != value}
+    for field, value in changed.items():
+        setattr(row, field, value)
+    return bool(changed)
+
+
 def _date_taken() -> Conflict:
     return Conflict(
         str(SPECIAL_DAY_EXISTS),
@@ -385,11 +393,7 @@ def update_special_day(ctx: OperationContext, data: SpecialDayPatchIn) -> dict:
         exclude_unset=True, exclude={"id", "special_day", "intervals"}
     )
     before = _stored(row)
-    fields_changed = False
-    for field, value in sent.items():
-        if value is not None and getattr(row, field) != value:
-            setattr(row, field, value)
-            fields_changed = True
+    fields_changed = _apply_sent(row, sent)
     intervals = data.intervals if data.intervals is not None else before
     if data.intervals is not None and row.is_closed and "is_closed" not in sent:
         # Hours sent for a closed day open it.
@@ -509,11 +513,7 @@ def update_override(ctx: OperationContext, data: OverridePatchIn) -> dict:
     row = resolve_override(data.id, data.override, lock=True)
     sent = data.model_dump(exclude_unset=True, exclude={"id", "override", "intervals"})
     before = _stored(row)
-    fields_changed = False
-    for field, value in sent.items():
-        if value is not None and getattr(row, field) != value:
-            setattr(row, field, value)
-            fields_changed = True
+    fields_changed = _apply_sent(row, sent)
     if row.end_date < row.start_date:
         raise InvalidPayload(
             str(RANGE_BACKWARDS), fields={"end_date": str(RANGE_BACKWARDS)}
