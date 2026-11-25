@@ -34,12 +34,14 @@ def test_it_is_a_free_module_of_the_people_group_with_a_registered_icon():
     assert f"'{config().icon.removeprefix('ion:')}'" in shell_icon_registry()
 
 
-def test_it_is_in_the_store_for_restaurants_and_hair_salons():
+def test_it_stays_out_of_the_store_and_of_every_template_until_it_has_its_screens():
     assert str(config().verbose_name) == "Tips"
     assert 0 < len(str(config().summary)) <= 120
     assert str(config().description)
-    assert config().verticals == ["hair_salon", "restaurant"]
-    assert config().listed is True
+    # A business that turned it on, or a new restaurant or hair salon born with it, would find no screen of it: only
+    # the API and the assistant would reach it.
+    assert config().listed is False
+    assert config().verticals == []
 
 
 def test_permissions():

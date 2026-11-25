@@ -4,7 +4,7 @@ La propina que el cliente deja al pagar, con tarjeta o en efectivo, guardada apa
 La propina no es una venta: no lleva IVA, no cambia el tique y no llega a la AEAT. La de efectivo entra en el cajón y
 la caja la enseña en su propia línea.
 
-- **Estado**: parcial. Hoy una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la
+- **Estado**: parcial, fuera de la tienda y de las plantillas hasta que tenga sus pantallas. Hoy una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la
   caja (TIP-F01, F03 a F06 en `parcial`); faltan las pantallas, el paso del cobro, el informe, «Mis propinas» y el
   reparto.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta «Para quien
@@ -29,7 +29,7 @@ la caja la enseña en su propia línea.
 | Qué | Valor |
 |---|---|
 | `LiveAppConfig` | `kind = "app"`, icono `ion:wallet-outline`, categoría `people`, gratuita (`premium = False`) |
-| Verticales | `hair_salon` y `restaurant` |
+| Verticales y tienda | ninguna vertical y fuera de la tienda (`listed = False`) hasta que tenga sus pantallas: entonces, `hair_salon` y `restaurant` |
 | `requires` | `sale` (la venta y su forma de pago), `cash_register` (el cajón) y `staff` (de quién es) |
 | Operaciones | 3 consultas (`queries.py`) y 6 acciones (`services/`), todas con `ai=`; 7 rutas en `/api/tip/…` (sin ruta: `tip.sale.void` y `tip.sale.refund`, las reacciones a Ventas) |
 | Eventos | 4, `tip.settings.updated` y `tip.tip.{added,adjusted,voided}` (`events.py`); reacciona a `sale.sale.voided` y `sale.sale.refunded` |

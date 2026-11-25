@@ -192,7 +192,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05); the drawer chosen by itself and the cash the closing proposes from the last count are no change.
 
 ## Flows
-<!-- from WORKBOOK.md sha256:abecb0155ecb -->
+<!-- from WORKBOOK.md sha256:60a21bffebfe -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -213,7 +213,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
-| CASH_REGISTER-F18 | See the tips in the cash register | common | done |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | partial — Tips is not in the store yet |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 <!-- from WORKBOOK.md sha256:0654bfa2fb50 -->
@@ -672,8 +672,9 @@ If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
-<!-- from WORKBOOK.md sha256:56383bb55b12 -->
-Status: done
+<!-- from WORKBOOK.md sha256:529ae2f7d0f8 -->
+Status: partial — the Cash register shows apart what Tips records, in the Session detail, in Movements, in the
+"Close session" window and on the X or Z report; Tips coming to the store with its screens is missing (hub#1498)
 Vertical: common
 Actor: system, employee, manager
 Screen: Cash register, Session detail

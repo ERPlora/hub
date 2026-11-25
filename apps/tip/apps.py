@@ -21,7 +21,10 @@ class TipConfig(LiveAppConfig):
         "ticket. A tip in cash enters the drawer and one by card shows apart in the cash register, a tip can be "
         "corrected or voided with its reason, and voiding or refunding a sale voids its tip by itself."
     )
-    verticals = ["hair_salon", "restaurant"]
+    # Out of the store and of the restaurant and hair salon templates until its screens exist: turned on, it would
+    # offer nothing but the API and the assistant.
+    verticals = []
+    listed = False
     # A tip goes with its sale and its payment method (Sales), enters the open drawer (Cash register) and belongs to a
     # member of the team (Staff).
     requires = ["sale", "cash_register", "staff"]

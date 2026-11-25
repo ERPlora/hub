@@ -1,8 +1,8 @@
 # Workbook — Propinas (app)
 Prefijo: TIP
 Alcance MVP: etapa TPV (restaurante y peluquería)
-Estado de la app: parcial — una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la caja;
-faltan sus pantallas, su paso en el Cobro, el informe y «Mis propinas» (hub#1498, hub#1500) y el reparto (hub#1501)
+Estado de la app: parcial, fuera de la tienda — una propina se anota, se ajusta y se anula por la API y el asistente, y sale
+aparte en la caja; faltan sus pantallas, su paso en el Cobro, el informe y «Mis propinas» (hub#1498, hub#1500) y el reparto (hub#1501)
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y

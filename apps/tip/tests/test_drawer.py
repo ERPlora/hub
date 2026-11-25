@@ -7,8 +7,9 @@ from live.errors import Conflict
 
 from apps.cash_register.models import Movement
 from apps.tip.models import Tip
+from apps.tip.services import drawer
 
-from .conftest import CARD, HUB_DB, add_tip, charge, open_session, run
+from .conftest import CARD, HUB_DB, add_tip, charge, ctx_for, open_session, run
 from .test_tips import (
     added_events,
     adjust,
@@ -108,3 +109,31 @@ def test_with_no_session_open_a_change_is_kept_in_tips_only(coffee):
     assert tip_movements() == [("in", "card", 300)]
 
 
+
+
+def test_voiding_by_hand_a_cash_tip_the_drawer_no_longer_holds_is_refused_and_leaves_it_active(coffee):
+    open_session(0)
+    sale = charge()
+    tip = add_tip(300, "cash", sale_id=str(sale.id))
+    run("cash_register.movement.add", {"type": "out", "amount": 400, "description": "to the bank"})
+    with pytest.raises(Conflict) as refused:
+        void_tip(tip)
+    assert refused.value.code == "cash_register.negative_balance_not_allowed"
+    assert Tip.objects.get(pk=tip.id).status == "active"
+
+
+def test_with_its_sale_only_a_drawer_that_would_go_below_zero_is_let_go(monkeypatch):
+    tip = Tip(amount=300, method_type="cash")
+
+    def refused_with(code):
+        def move(*args, **kwargs):
+            raise Conflict("refused", code=code)
+
+        return move
+
+    monkeypatch.setattr(drawer, "move", refused_with("cash_register.negative_balance_not_allowed"))
+    drawer.move_with_its_sale(ctx_for(), tip)
+    monkeypatch.setattr(drawer, "move", refused_with("cash_register.session_auto_close_due"))
+    with pytest.raises(Conflict) as other:
+        drawer.move_with_its_sale(ctx_for(), tip)
+    assert other.value.code == "cash_register.session_auto_close_due"
