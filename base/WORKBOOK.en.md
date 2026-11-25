@@ -2912,7 +2912,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:fa08da60e4f1 -->
+<!-- from WORKBOOK.md sha256:ebc90db105a2 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2978,7 +2978,8 @@ Steps:
      Gil"): otherwise the card leaves it out, never by its code. A tax category also carries the rate it charges today
      in the business's country and region, as the **Sections** screen does ("Tax category: Product — generic · 21%");
      without a rule in force, its name alone, and its name alone too in a rule of Taxes, which carries its own country
-     and its own rate. A record said in words is looked up as the action will
+     and its own rate. Adding a product says it on its line, after the name and the price ("Create in Inventory: Spoon ·
+     Price: €2.50 · Tax category: Product — generic · 21%"). A record said in words is looked up as the action will
      look it up, also inside another (a course inside its menu), and the one it finds comes up ("Course: Homemade
      desserts" when "desserts" was said); if those words fit several or none, they come up as they were said; and if the action does
      not use them because its record's identifier comes, they are neither read nor shown. Nor does

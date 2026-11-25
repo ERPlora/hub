@@ -2856,7 +2856,8 @@ Pasos:
      no lo pone, nunca por su código. Una categoría fiscal lleva además el tipo que cobra hoy en el país y la región
      del negocio, como la pantalla **Secciones** («Categoría fiscal: Producto — general · 21 %»); sin una regla en
      vigor, solo su nombre, y también solo su nombre en una regla de Impuestos, que lleva su propio país y su propio
-     tipo. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     tipo. El alta de un producto la dice en su línea, tras el nombre y el precio («Crear en Inventario: Cuchara · Precio:
+     2,50 € · Categoría fiscal: Producto — general · 21 %»). Un registro que se dijo con palabras se busca como lo buscará la acción, también
      dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
      «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron; y si la acción no las usa
      porque llega el identificador de su registro, ni se leen ni salen. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
