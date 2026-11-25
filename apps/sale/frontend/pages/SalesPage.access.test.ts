@@ -7,33 +7,12 @@ import { describe, expect, it } from 'vitest';
 import { ref } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, mountSale, type MountOptions, type SaleSession } from '../__tests__/mount-sale';
+import { saleRow } from '../__tests__/sale-row';
 import RefundModal from '../components/sales/RefundModal.vue';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
-import type { SaleRow } from '../operations';
 import SalesPage from './SalesPage.vue';
 
-const SALE: SaleRow = {
-  id: 's1',
-  number: '20261014-0001',
-  business_day: '2026-10-14',
-  currency: 'EUR',
-  currency_decimals: 2,
-  created_at: '2026-10-14T10:05:00Z',
-  status: 'completed',
-  document_type: 'ticket',
-  customer_id: null,
-  customer_name: '',
-  payment_method_name: 'Cash',
-  staff_id: null,
-  total: 1250,
-  tax_total: 114,
-  refunded_total: 0,
-  refundable_total: 1250,
-  sessions_to_return: 0,
-  has_refunds: false,
-  invoice_status: 'issued',
-  documents_pending: false,
-};
+const SALE = saleRow('s1');
 
 const WITHOUT_VOIDS: SaleSession = { ...EMPLOYEE, approvable: ['sale.refund_sale'] };
 const WITHOUT_REFUNDS: SaleSession = { ...EMPLOYEE, approvable: ['sale.void_sale'] };

@@ -7,13 +7,14 @@
 // owner approves it with their PIN. The role changes with the screen open and the till follows it without a reload: with
 // approval, the window opens and asks; back to no, the window already open is refused and asks nobody. Screenshots of
 // both notices in the three viewports.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
+import { approvalDialog, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, type Side } from './approval-helpers';
 import { usernameOf } from './business';
-import { A, api, capture, EMPLOYEE, hostPage, OWNER, psql, THREE_SIZES, uniqueName, usernamesOf } from './helpers';
+import { A, api, capture, EMPLOYEE, psql, THREE_SIZES, uniqueName, usernamesOf } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
-import { approvalDialog, findSale, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, saleRow } from './sale-approval-helpers';
-import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { findSale, leaveTheTill, ownerAtSales, refundAll, saleRow } from './sale-approval-helpers';
+import { cashiersTill, chargeByApi, cleanSales, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -25,8 +26,8 @@ const REFUND_WITH_APPROVAL = /A manager will have to approve this refund|Un enca
 
 test.describe.configure({ mode: 'serial' });
 
-let owner: { context: BrowserContext; page: Page } | undefined;
-let cashier: { context: BrowserContext; page: Page } | undefined;
+let owner: Side | undefined;
+let cashier: Side | undefined;
 let role = '';
 let person = '';
 let toVoid: SaleOut;
@@ -50,9 +51,8 @@ const statusOf = async (sale: SaleOut): Promise<string> =>
 const voidWindow = (page: Page) => page.locator('ion-modal[data-testid=sale-void]');
 
 test.beforeAll(async ({ browser }) => {
-  forgetThePinAndTheApprovals();
-  owner = await hostPage(browser, A, { next: '/sale/sales', credentials: OWNER });
-  await drawerOff(owner.context);
+  forgetThePinAndTheApprovals('sale');
+  owner = await ownerAtSales(browser);
   await createProduct(owner.context, { name: 'E2E Approval states', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   role = (await ownerPosts<{ key: string }>('/roles', { based_on: 'hub_employee', name: uniqueName('Cashier without voids') })).key;
   await ownerPosts('/roles/update', { role, states: { 'sale.void_sale': 'off', 'sale.refund_sale': 'approval' } });
@@ -68,13 +68,11 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   if (owner && person) await give('hub_employee');
   if (owner && role) await ownerPosts('/roles/delete', { role });
-  forgetThePinAndTheApprovals();
+  forgetThePinAndTheApprovals('sale');
   cleanSales();
   cleanInventory();
   restoreDrawer();
-  if (process.env.E2E_SAVE_STORAGE_STATE) await cashier?.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  await cashier?.context.close();
-  await owner?.context.close();
+  await leaveTheTill(cashier, owner);
 });
 
 test('SALE-F30: the role says no to voids: the till tells it before it begins, and the hub refuses it with nobody asked', async () => {
@@ -111,9 +109,7 @@ test('SALE-F31: the role refunds with approval: the till says so as it begins, a
     await modal.locator('[data-testid=sale-refund-close]').click();
     await expect(modal).toBeHidden();
   }
-  await modal.locator('[data-testid=refund-propose-all]').click();
-  await modal.locator('[data-testid=refund-reason] textarea, [data-testid=refund-reason] input').first().fill('e2e returned');
-  await modal.locator('[data-testid=refund-confirm]').click();
+  await refundAll(page, toRefund);
   await expect(approvalDialog(page).getByTestId('approval-action')).toHaveText(/^(Approving: Refund a sale|Se aprueba: Devolver una venta)$/);
   await ownerApproves(page);
   await expect(modal).toBeHidden();

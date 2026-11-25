@@ -5,7 +5,7 @@
 // «An approval is needed» over the window, the owner approves it with their PIN on the cashier's own device and it is
 // done once, as the server then says; «Cancel» leaves the refusal inside the window, which stays open, and nothing is
 // voided. Screenshots of the dialog over Sales in the three viewports. The owner's PIN and the approvals go with the
-// file (sale-approval-helpers.ts), as everything else it creates (`afterAll`).
+// file (approval-helpers.ts), as everything else it creates (`afterAll`).
 // SALE-F30, F32 and BASE-F84: what the approved void asks of other
 // apps goes with it by the platform's rule: a sale paid with Lucía's voucher and a shampoo by card, voided by the
 // cashier with the owner's PIN, gives its session back to the voucher and its rectifying invoice is issued in the void
@@ -18,13 +18,14 @@
 // figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { approvalDialog, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, type Side } from './approval-helpers';
+import { A, api, psql, shot, shown, untilStill } from './helpers';
 import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { ensureIssuer, snapshotSeries } from './invoice-helpers';
-import { approvalDialog, findSale, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, saleRow } from './sale-approval-helpers';
-import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { ensureIssuer } from './invoice-helpers';
+import { findSale, leaveTheTill, ownerAtSales, refundAll, saleRow } from './sale-approval-helpers';
+import { cashiersTill, chargeByApi, cleanSales, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -42,8 +43,8 @@ const VIEWPORTS = [
 
 test.describe.configure({ mode: 'serial' });
 
-let owner: { context: BrowserContext; page: Page };
-let cashier: { context: BrowserContext; page: Page };
+let owner: Side;
+let cashier: Side;
 let toVoid: SaleOut;
 let toRefund: SaleOut;
 let toKeep: SaleOut;
@@ -56,16 +57,11 @@ let discountsWere: { allow_discounts: boolean; max_discount_percent: number } | 
 test.beforeAll(async ({ browser }) => {
   // What a run that failed left: with the owner's PIN still set, the way in to hub `a` asks for a PIN and the logins
   // below never reach Sales (the cashier's lands on `/pin/setup`).
-  forgetThePinAndTheApprovals();
-  // Card charges issue tickets when the hub has an issuer, and a void its rectifying invoice: the cleanup gives
-  // their numbers back.
-  snapshotSeries();
-  const context = await browser.newContext({ baseURL: A });
-  owner = { context, page: await context.newPage() };
-  await login(owner.page, A, '/sale/sales');
-  ownerName = await usernameOf(context);
-  await drawerOff(context);
-  article = await createProduct(context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
+  forgetThePinAndTheApprovals('sale');
+  const side = await ownerAtSales(browser);
+  owner = side;
+  ownerName = side.name;
+  article = await createProduct(owner.context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   // The cashier enters while nobody of the business has a PIN: the way in is erplora.com's, as every spec's.
   cashier = await cashiersTill(browser);
   const till = cashier.context;
@@ -74,7 +70,7 @@ test.beforeAll(async ({ browser }) => {
   toRefund = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toKeep = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   // Only now: a PIN of the business's turns the next way in into the PIN pad.
-  await ownerChoosesPin(context);
+  await ownerChoosesPin(owner.context);
 });
 
 test.afterAll(async () => {
@@ -82,17 +78,25 @@ test.afterAll(async () => {
     const back = await api(owner.context, A, 'POST', '/sale/settings', discountsWere);
     expect(back.status, 'the discount settings back as they were').toBe(200);
   }
-  forgetThePinAndTheApprovals();
+  forgetThePinAndTheApprovals('sale');
   cleanSales();
   cleanServices();
   cleanCustomers();
   cleanInventory();
   restoreDrawer();
-  // The cashier's session, for a sweep of what they see (as base-employees.spec.ts saves the owner's).
-  if (process.env.E2E_SAVE_STORAGE_STATE) await cashier?.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  await cashier?.context.close();
-  await owner?.context.close();
+  await leaveTheTill(cashier, owner);
 });
+
+/** The screen at every size of `VIEWPORTS`, once `check` holds at it, and back to the desk the tests run on. */
+async function shotAtEverySize(page: Page, name: string, check?: () => Promise<void>): Promise<void> {
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await untilStill(page);
+    await check?.();
+    await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
+}
 
 interface Detail {
   status: string;
@@ -150,12 +154,7 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
   const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Void a sale|Se aprueba: Anular una venta)$/);
   await expect(dialog.getByTestId('pinpad').or(dialog.getByTestId('pin-face').first())).toBeVisible();
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await untilStill(page);
-    await page.screenshot({ path: shot(`${KEY}-${viewport.label}`) });
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  await shotAtEverySize(page, KEY);
 
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
@@ -172,12 +171,7 @@ test('SALE-F31: the cashier refunds a charged ticket and the owner approves it w
   const { page } = cashier;
   await findSale(page, toRefund);
   await rowAction(page, 'sales-table', toRefund.id, 'refund');
-  const modal = page.locator('ion-modal[data-testid=sale-refund]');
-  await expect(modal).toBeVisible();
-  await expect(modal.locator(`[data-testid=refund-tender-${toRefund.payments[0].id}]`)).toBeVisible();
-  await modal.locator('[data-testid=refund-propose-all]').click();
-  await modal.locator('[data-testid=refund-reason] textarea, [data-testid=refund-reason] input').first().fill('e2e returned');
-  await modal.locator('[data-testid=refund-confirm]').click();
+  const modal = await refundAll(page, toRefund);
 
   const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Refund a sale|Se aprueba: Devolver una venta)$/);
@@ -217,12 +211,7 @@ test('SALE-F30, SALE-F32: an approved void of a sale paid with a voucher gives t
   const { page } = cashier;
   const { modal, dialog } = await askToVoid(page, sale, 'e2e wrong customer');
   await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Void a sale|Se aprueba: Anular una venta)$/);
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await untilStill(page);
-    await page.screenshot({ path: shot(`${VOUCHER_KEY}-${viewport.label}`) });
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  await shotAtEverySize(page, VOUCHER_KEY);
 
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
@@ -297,13 +286,7 @@ test('SALE-F14: a line discount above the maximum says its 50 % in «Hace falta 
   const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(approving('Descontar una línea un 50 %'));
   await expect(dialog.getByTestId('pinpad').or(dialog.getByTestId('pin-face').first())).toBeVisible();
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await untilStill(page);
-    await expect(dialog.getByTestId('approval-action')).toBeInViewport();
-    await page.screenshot({ path: shot(`${FIGURE_KEY}-${viewport.label}`) });
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  await shotAtEverySize(page, FIGURE_KEY, () => expect(dialog.getByTestId('approval-action')).toBeInViewport());
 
   await ownerApproves(page);
   await expect(dialog).toBeHidden();

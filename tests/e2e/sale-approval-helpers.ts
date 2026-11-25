@@ -1,29 +1,21 @@
-// Shared steps of the specs where the cashier of Sales needs a manager (BASE-F84, SALE-F30, SALE-F31): a sale found in
-// Sales, «An approval is needed» and the owner approving with their PIN on the cashier's own device. The owner's PIN
-// exists only while a file runs, after the cashier has entered (a PIN in hub `a` turns every browser's way in into the
-// PIN pad: base-access.spec.ts), and it goes with the approvals it recorded, before and after. The owner and the cashier
-// are told by their session, not by their email (a hub database kept from a stack whose SaaS was created again holds an
-// older account with each email): the PIN and the approvals of every account of those emails go.
-import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+// Shared steps of the specs where the cashier of Sales needs a manager (SALE-F30, SALE-F31), over approval-helpers.ts: the
+// owner in Sales, a sale found there, its whole refund filled in and the cashier leaving.
+import { type Browser, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, EMPLOYEE, OWNER, psql, shown, usernamesOf } from './helpers';
-import type { SaleOut } from './sale-helpers';
+import type { Side } from './approval-helpers';
+import { usernameOf } from './business';
+import { A, hostPage, shown } from './helpers';
+import { snapshotSeries } from './invoice-helpers';
+import { drawerOff, type SaleOut } from './sale-helpers';
 
-export const OWNER_PIN = '2468';
-
-/**
- * No PIN of the owner's left behind, in any of their accounts (the business's way in stays erplora.com's), and no
- * approval of a Sales action the cashier asked for, in any of theirs.
- */
-export function forgetThePinAndTheApprovals(): void {
-  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${usernamesOf(OWNER.email)})`);
-  psql(`DELETE FROM base_approval WHERE requested_by IN (${usernamesOf(EMPLOYEE.email)}) AND operation LIKE 'sale.%'`);
-}
-
-/** The owner chooses a PIN («My profile»): who may approve, on the cashier's device. */
-export async function ownerChoosesPin(owner: BrowserContext): Promise<void> {
-  const pin = await api<{ set: boolean }>(owner, A, 'POST', '/me/pin', { pin: OWNER_PIN });
-  expect(pin.status, JSON.stringify(pin.data)).toBe(200);
+/** The owner in Sales, by their username, with the cash drawer off for the run and the numbers of the tickets the card
+ *  charges issue, and of the rectifying invoices of their voids, kept for the cleanup to give back. */
+export async function ownerAtSales(browser: Browser): Promise<Side & { name: string }> {
+  snapshotSeries();
+  const owner = await hostPage(browser, A, { next: '/sale/sales' });
+  const name = await usernameOf(owner.context);
+  await drawerOff(owner.context);
+  return { ...owner, name };
 }
 
 export const saleRow = (page: Page, sale: SaleOut): Locator => shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
@@ -36,13 +28,20 @@ export async function findSale(page: Page, sale: SaleOut): Promise<void> {
   await expect(saleRow(page, sale)).toBeVisible();
 }
 
-/** «An approval is needed», over the window that asked. */
-export const approvalDialog = (page: Page): Locator => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
+/** The refund window, open on `sale`, asked to give it all back. */
+export async function refundAll(page: Page, sale: SaleOut): Promise<Locator> {
+  const modal = page.locator('ion-modal[data-testid=sale-refund]');
+  await expect(modal).toBeVisible();
+  await expect(modal.locator(`[data-testid=refund-tender-${sale.payments[0].id}]`)).toBeVisible();
+  await modal.locator('[data-testid=refund-propose-all]').click();
+  await modal.locator('[data-testid=refund-reason] textarea, [data-testid=refund-reason] input').first().fill('e2e returned');
+  await modal.locator('[data-testid=refund-confirm]').click();
+  return modal;
+}
 
-/** The owner approves on the cashier's device: their face (when there is a choice) and their PIN. */
-export async function ownerApproves(page: Page): Promise<void> {
-  const dialog = approvalDialog(page);
-  const faces = dialog.getByTestId('pin-face');
-  if (await faces.count()) await faces.first().click();
-  for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
+/** Both leave; the cashier's session is kept for a sweep of what they see when the run asks for it. */
+export async function leaveTheTill(cashier: Side | undefined, owner: Side | undefined): Promise<void> {
+  if (process.env.E2E_SAVE_STORAGE_STATE) await cashier?.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  await cashier?.context.close();
+  await owner?.context.close();
 }
