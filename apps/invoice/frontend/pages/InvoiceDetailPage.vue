@@ -230,7 +230,7 @@ function onSubstituted(full: InvoiceOut): void {
           </ion-button>
           <ExportButton
             testid="invoice-detail-pdf"
-            size="default"
+            regular
             :label="$t('invoice.detail.pdf.button')"
             :pending-label="$t('invoice.detail.pdf.pending')"
             :failed="(reason: string) => $t('invoice.detail.pdf.failed', { reason })"
@@ -393,8 +393,11 @@ function onSubstituted(full: InvoiceOut): void {
 }
 .invoice-detail__header-actions {
   display: flex;
-  flex: none;
+  flex-wrap: wrap;
+  flex: 0 1 auto;
   gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
   margin-inline-start: auto;
 }
 .invoice-detail__header-actions ion-button,

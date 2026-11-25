@@ -98,8 +98,7 @@ describe('InvoiceDetailPage: «Download PDF»', () => {
   it('is as tall as «Print / PDF» beside it, whose size is Ionic’s own', async () => {
     const s = await opened();
     const sizeOf = (testid: string) => s.wrapper.findAllComponents(IonButton).find((b) => b.attributes('data-testid') === testid)?.props('size');
-    expect(sizeOf('invoice-detail-pdf')).toBe('default');
-    expect(sizeOf('invoice-detail-print')).not.toBe('small');
+    expect(sizeOf('invoice-detail-pdf')).toBe(sizeOf('invoice-detail-print'));
   });
 
   it('speaks Spanish', async () => {

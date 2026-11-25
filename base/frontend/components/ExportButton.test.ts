@@ -61,7 +61,7 @@ describe('ExportButton', () => {
     const load = vi.fn();
     const sizeOf = async (over?: Record<string, unknown>) => (await mount(load as never, over)).wrapper.getComponent(IonButton).props('size');
     expect(await sizeOf()).toBe('small');
-    expect(await sizeOf({ size: 'default' })).toBe('default');
+    expect(await sizeOf({ regular: true })).not.toBe('small');
   });
 
   it('does nothing while disabled', async () => {

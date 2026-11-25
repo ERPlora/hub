@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-import { A, api, EMPLOYEE, login, shown } from './helpers';
+import { A, api, EMPLOYEE, login, settled, shown } from './helpers';
 import { cleanInvoices, flowShots, issuedIds, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 
@@ -72,6 +72,25 @@ test('«Download PDF» saves the invoice as a real PDF under its number, with wh
   await flowShots(page, 'F25', async (shot) => {
     await expect(shown(shot).locator('[data-testid=invoice-detail-pdf]')).toBeVisible();
   });
+});
+
+const ACTIONS = ['print', 'pdf', 'back'].map((name) => `[data-testid=invoice-detail-${name}]`);
+
+test('the buttons of the invoice fit in the three sizes, as tall as each other', async ({ page }) => {
+  await login(page, A, '/invoice/invoices');
+  await open(page);
+  for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
+    await page.setViewportSize({ width, height });
+    await settled(page);
+    const boxes = await Promise.all(ACTIONS.map(async (one) => (await shown(page).locator(one).boundingBox())!));
+    expect(boxes.map((box) => Math.round(box.height))).toEqual([44, 44, 44]);
+    for (const box of boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+    }
+    const inARow = boxes.every((box) => Math.abs(box.y - boxes[0].y) <= 1);
+    expect(inARow || width === 375, `the buttons of ${width}px are in a row`).toBe(true);
+  }
 });
 
 test('an employee downloads their own invoices', async ({ browser }) => {
