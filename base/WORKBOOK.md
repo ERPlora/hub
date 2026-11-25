@@ -2984,13 +2984,16 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. La persona pide una cadena («crea la categoría Bebidas y el producto Caña a 2,50 €»).
-  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar, pide una acción, se hace y sigue. Todo lo
-     que dice va a la misma burbuja, y lo de cada ronda en su propio párrafo: nunca pegado a lo de la anterior.
-  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra: aceptar la primera no acepta
-     las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
+  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar (varias cosas en la misma ronda, si le
+     hacen falta), pide una acción, se hace y sigue. Todo lo que dice va a la misma burbuja, y lo de cada ronda en su
+     propio párrafo: nunca pegado a lo de la anterior.
+  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra, también las que pide en la
+     misma ronda: aceptar o cancelar la primera no responde por las siguientes. Si detrás esperan más, la tarjeta lleva
+     «Cancelar todo», que cancela esta y las que faltan.
   4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
-  5. Una petición admite como mucho veinte rondas, y cada acción es una: es un freno contra los bucles, no un cupo, y
-     una lectura y un cambio por cada día de la semana caben de sobra. En la vigésima el asistente ya no puede hacer
+  5. Una petición admite como mucho veinte rondas, cada una con todo lo que el asistente pide de una vez: es un freno
+     contra los bucles, no un cupo, y una lectura y un cambio por cada día de la semana caben de sobra aunque los pida
+     de uno en uno. En la vigésima el asistente ya no puede hacer
      nada más y contesta con lo que ha hecho y lo que falta, para pedirlo en otro mensaje; si aun así pide una acción,
      no se hace ni sale su tarjeta, y se le dice que conteste. Si sigue intentándolo, «He parado: esto necesitaba
      demasiados pasos. Pídelo por partes.».
@@ -4675,8 +4678,11 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   todas las herramientas del Hub, sin excepciones (hub#1175 arregló las nueve que quedaban en Control horario,
   Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
-  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; la ronda que llega
-  a `MAX_ROUNDS` = 20 (de live: una herramienta por ronda) va a la pasarela sin herramientas y con `LAST_ROUND` en las
+  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; una respuesta del
+  modelo puede pedir varias herramientas y es una sola ronda (`rounds` de live): sus lecturas corren seguidas en la
+  misma vuelta y cada escritura espera su tarjeta, de una en una, con un sí o un no que vale solo para la llamada que
+  nombra (`base/tests/test_services_assistant.py`, `…_in_one_answer_…`); la ronda que llega
+  a `MAX_ROUNDS` = 20 (de live) va a la pasarela sin herramientas y con `LAST_ROUND` en las
   instrucciones, para que el modelo conteste con lo hecho y lo que falta; lo que pide después no corre ni saca tarjeta
   ni recibo, y vuelve con `base.assistant_out_of_steps` (`OUT_OF_STEPS`) para que conteste, y si aun así pide otra
   cosa, corta con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
