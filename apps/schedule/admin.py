@@ -2,7 +2,7 @@
 
 The Hub admin has full CRUD over all of a hub's tables. The intervals are lines of their day. A raw admin
 write records no event and skips the rules of engine.py (sorted, never overlapping): the screens and the
-assistant go through services.py.
+assistant go through services/.
 """
 
 from django.contrib import admin

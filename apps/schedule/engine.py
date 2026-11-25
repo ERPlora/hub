@@ -1,4 +1,4 @@
-"""The rules of the business's hours, without a database: queries.py and services.py feed them.
+"""The rules of the business's hours, without a database: queries.py and services/ feed them.
 
 - An **interval** is ``open_time``–``close_time`` on the business's wall clock; closing at or before it
   opens crosses midnight (22:00–02:00) and 00:00–00:00 is open 24 hours (Google Business Profile).

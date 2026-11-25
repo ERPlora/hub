@@ -117,7 +117,7 @@ def test_spanish_texts_are_the_old_modules():
             == "La fecha de fin no puede ser anterior a la de inicio."
         )
         assert (
-            str(services.SPECIAL_DAY_EXISTS)
+            str(services.special_days.SPECIAL_DAY_EXISTS)
             == "Ya existe un día especial en esa fecha."
         )
         assert (
