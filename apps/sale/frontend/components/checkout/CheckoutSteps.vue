@@ -5,8 +5,8 @@
 // lib/checkout/steps.ts. What they add is added up for the charge (`update:added`). Once the sale is charged,
 // `afterCharge` has each step record its part; when one cannot, its own words stay here with «Retry», which asks only
 // that one again, and «Close», which leaves it so (the sale is charged: the app records it later). `done` comes when
-// they are all recorded or closed. A step whose app lacks its component, or whose code does not arrive, is left out and
-// logged, and the others stay; while the list loads there is none.
+// they are all recorded or closed. A step whose app lacks its component, or whose code does not arrive, paints nothing
+// and is logged, and the others stay; while the list loads there is none.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
@@ -24,14 +24,12 @@ const read = useLive('sale.checkout.steps', {});
 
 /** Each step's component, made once; `null`: its app has no such component. */
 const made = new Map<string, Component | null>();
-const unloaded = reactive(new Set<string>());
 
 function componentOf(step: CheckoutStepOut): Component | null {
   if (!made.has(step.key)) {
-    const component = loadedComponent(appComponent(step.app, step.component), (error) => {
-      console.warn(`sale: the step ${step.key} of the charge could not load its component`, error);
-      unloaded.add(step.key);
-    });
+    const component = loadedComponent(appComponent(step.app, step.component), (error) =>
+      console.warn(`sale: the step ${step.key} of the charge could not load its component`, error),
+    );
     if (!component) console.warn(`sale: the step ${step.key} of the charge names ${step.component}, which its app does not have`);
     made.set(step.key, component);
   }
@@ -41,7 +39,7 @@ function componentOf(step: CheckoutStepOut): Component | null {
 const steps = computed(() =>
   (read.data.value?.steps ?? []).flatMap((step) => {
     const component = componentOf(step);
-    return component && !unloaded.has(step.key) ? [{ key: step.key, component }] : [];
+    return component ? [{ key: step.key, component }] : [];
   }),
 );
 

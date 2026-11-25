@@ -65,10 +65,11 @@ describe('CheckoutSteps: the steps of the apps on', () => {
     expect(s.added()).toEqual({ amount: 0, label: '', issue: '' });
   });
 
-  it('leaves out a step whose code does not arrive and keeps the others', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('a step whose code does not arrive paints nothing and is logged, and the others stay', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const s = await setup([{ key: 'x.broken', app: 'x', component: 'Broken' }, TIP]);
     expect(s.added()).toEqual({ amount: 50, label: 'Tip', issue: '' });
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('the step x.broken of the charge could not load'), expect.any(Error)));
   });
 
   it('a list that cannot be read says the server’s words with «Retry»', async () => {
