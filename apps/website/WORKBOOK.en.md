@@ -433,11 +433,11 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 speaks) and the API, with the same rules and the same permissions.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:bcd8a87c5523 -->
+<!-- from WORKBOOK.md sha256:1275433dd314 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The draft, its publication status and the public address (can be followed live) | view | F01–F03, F07, F08 | `website.site.get` |
+| The draft, its publication status and the public address (can be followed live) | view | F01–F03, F07, F08, F11, F12 | `website.site.get` |
 | The draft painted as the public page (HTML, for the preview) | manage | F06 | `website.site.preview` |
 | The categories of Inventory or Services to choose from | manage | F05 | `website.catalog.categories` |
 | An uploaded image by the name of its file: what the assistant's card reads to name it (BASE-F97) | view | F04, F11 | `website.image.get` |
@@ -451,11 +451,11 @@ The three public ones answer only with the page online (otherwise, 404 `website.
 60 reads a minute per address, then 429 `base.rate_limited`. The public catalog is kept for a minute.
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:768de104654c -->
+<!-- from WORKBOOK.md sha256:fd5b82001640 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
-| Saves the draft (template, palette and background, content) | manage | F01–F03, F05 | `website.site.save` |
+| Saves the draft (template, palette and background, content) | manage | F01–F03, F05, F11, F12 | `website.site.save` |
 | Publishes the draft with the catalog's copy | manage | F07 | `website.site.publish` |
 | Takes the page offline | manage | F08 | `website.site.unpublish` |
 | Uploads an image (base64, up to 5 MB) | manage | F04 | `website.image.upload` |

@@ -158,6 +158,29 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
     assert (plan["confirm"], plan["pending"]) == (None, [])
 
 
+def test_the_reads_asked_for_in_one_answer_all_run_in_the_same_turn_in_the_order_asked():
+    """A model may ask for several tools in one answer: its reads run one after the other, without the person, and each
+    result goes back by its call before the model is asked again."""
+    run("demo.item.create", name="Terraza")
+    listed, counted = call("demo.item.list", {}, "c1"), call("demo.item.open_count", {}, "c2")
+    plan = turn(listed, counted)
+    assert [(row["call_id"], row["outcome"]) for row in plan["executed"]] == [("c1", "ok"), ("c2", "ok")]
+    assert [result["tool_call_id"] for result in plan["append"]] == ["c1", "c2"]
+    assert "Terraza" in plan["append"][0]["content"]
+    assert json.loads(plan["append"][1]["content"]) == {"count": 1}
+    assert (plan["confirm"], plan["pending"], bool(plan["tools"])) == (None, [], True)
+
+
+def test_a_read_asked_for_with_a_write_in_one_answer_runs_and_the_write_waits_for_its_card():
+    listed, write = call("demo.item.list", {}, "c1"), call("demo.item.create", {"name": "Mesa 4"}, "c2")
+    plan = turn(listed, write)
+    assert [(row["call_id"], row["outcome"]) for row in plan["executed"]] == [("c1", "ok")]
+    assert [result["tool_call_id"] for result in plan["append"]] == ["c1"]
+    assert plan["confirm"]["operation"] == "demo.item.create"
+    assert waiting(plan) == [write]
+    assert "Mesa 4" not in items()
+
+
 # ── A write waits for the person ─────────────────────────────────────────────────────────────────────────────────
 
 
@@ -397,6 +420,33 @@ def test_each_write_of_a_chain_asks_its_own_yes():
     assert "Uno" in items() and "Dos" not in items()
 
 
+def test_a_no_to_the_first_of_two_writes_asked_in_one_answer_cancels_that_one_alone():
+    """Two changes asked for in one answer show their cards one after the other: a «no» to the first cancels it alone,
+    and the second still waits for its own answer, which runs it."""
+    first = call("demo.item.create", {"name": "Uno"}, "c1")
+    second = call("demo.item.create", {"name": "Dos"}, "c2")
+    plan = answered(first, second, decision={"call_id": "c1", "accepted": False})
+    assert [(row["call_id"], row["outcome"]) for row in plan["executed"]] == [("c1", "cancelled")]
+    assert plan["confirm"]["fields"][0]["value"] == "Dos"
+    assert waiting(plan) == [second]
+    assert items() == []
+    ran = turn(*plan["pending"], decision={"call_id": "c2", "accepted": True})
+    assert [(row["call_id"], row["outcome"]) for row in ran["executed"]] == [("c2", "ok")]
+    assert items() == ["Dos"]
+
+
+def test_a_yes_for_the_second_of_two_writes_asked_in_one_answer_runs_neither_while_the_first_waits():
+    """A yes names the call of its card: one for the second change while the first's card waits runs nothing, and the
+    first's card is shown again."""
+    first = call("demo.item.create", {"name": "Uno"}, "c1")
+    second = call("demo.item.create", {"name": "Dos"}, "c2")
+    plan = answered(first, second, decision={"call_id": "c2", "accepted": True})
+    assert (plan["executed"], plan["append"]) == ([], [])
+    assert plan["confirm"]["fields"][0]["value"] == "Uno"
+    assert waiting(plan) == [first, second]
+    assert items() == []
+
+
 def test_stop_cancels_this_write_and_the_rest_of_the_chain():
     first = call("demo.item.create", {"name": "Uno"}, "c1")
     read = call("demo.item.list", {}, "c2")
@@ -505,8 +555,8 @@ def test_the_reads_of_the_last_round_run_before_the_model_answers_without_tools(
 
 
 def answered_writes(messages, count):
-    """``messages`` and ``count`` rounds more, each a write the person said yes to: the gateway asks the model for one
-    tool at a time, so every change of a request is a round of its own."""
+    """``messages`` and ``count`` rounds more, each a write the person said yes to: a model that asks for one change
+    at a time takes a round for each."""
     for at in range(count):
         write = call("demo.item.create", {"name": f"Mesa {at}"}, f"w{at}")
         messages = [*messages, asked(write), {"role": "tool", "tool_call_id": f"w{at}", "content": "{}"}]

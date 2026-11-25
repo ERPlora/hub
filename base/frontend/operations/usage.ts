@@ -84,6 +84,8 @@ export interface PlanUsage {
   known: boolean;
   /** A demo: nothing of it is measured. */
   demo: boolean;
+  /** ERPlora's own business: it has no plan and never will. */
+  platform: boolean;
   /** The plan the business is on (`free`, `starter`…); null: not known. */
   plan_slug: string | null;
   people: PlanLimit;

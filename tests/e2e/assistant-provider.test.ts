@@ -21,13 +21,16 @@ import {
   NO_REASON,
   NOT_DONE,
   type Provider,
+  READS_MISSING,
+  READS_SAID,
   rectifyPreview,
   SLOW_ANSWER,
   startProvider,
   STEPS_SAID,
 } from './assistant-provider';
 
-type Frame = { choices: { delta: { content?: string; tool_calls?: { function: { name?: string; arguments?: string } }[] }; finish_reason: string | null }[] };
+type Piece = { index?: number; id?: string; function: { name?: string; arguments?: string } };
+type Frame = { choices: { delta: { content?: string; tool_calls?: Piece[] }; finish_reason: string | null }[] };
 
 const textOf = (frames: unknown[]) =>
   (frames as Frame[]).flatMap((frame) => frame.choices.map((choice) => choice.delta.content ?? '')).join('');
@@ -35,6 +38,17 @@ const finish = (frames: unknown[]) => (frames as Frame[]).flatMap((frame) => fra
 const toolOf = (frames: unknown[]) => {
   const pieces = (frames as Frame[]).flatMap((frame) => frame.choices.flatMap((c) => c.delta.tool_calls ?? []));
   return { name: pieces.map((p) => p.function.name ?? '').join(''), arguments: pieces.map((p) => p.function.arguments ?? '').join('') };
+};
+/** Each tool asked for in one answer, by its index: its id, its name and its arguments, put together from its fragments. */
+const callsOf = (frames: unknown[]) => {
+  const calls: { id: string; name: string; arguments: string }[] = [];
+  for (const piece of (frames as Frame[]).flatMap((frame) => frame.choices.flatMap((c) => c.delta.tool_calls ?? []))) {
+    const call = (calls[piece.index ?? 0] ??= { id: '', name: '', arguments: '' });
+    call.id += piece.id ?? '';
+    call.name += piece.function.name ?? '';
+    call.arguments += piece.function.arguments ?? '';
+  }
+  return calls;
 };
 const user = (content: string) => ({ role: 'user', content });
 
@@ -139,6 +153,22 @@ describe('answerTo', () => {
     expect(toolOf(answerTo(read).frames)).toEqual({ name: 'demo__item__create', arguments: '{"name":"Mesa 7"}' });
     const written = [...read, asked('demo__item__create'), { role: 'tool', content: '{"id": "1"}' }];
     expect(textOf(answerTo(written).frames)).toBe(DONE.en);
+  });
+
+  it('two reads in one answer (E2E-READS): each with its index and its own id; then, each result back by its call, what both say', () => {
+    const question = user('E2E-READS');
+    const asked = answerTo([question]);
+    const [listed, counted] = callsOf(asked.frames);
+    expect([listed.name, listed.arguments, counted.name, counted.arguments]).toEqual(['demo__item__list', '{}', 'demo__item__open_count', '{}']);
+    expect(listed.id && counted.id && listed.id !== counted.id).toBeTruthy();
+    expect(finish(asked.frames)).toEqual(['tool_calls']);
+    const both = { role: 'assistant', content: '', tool_calls: [{ id: 'r1', function: { name: 'demo__item__list' } }, { id: 'r2', function: { name: 'demo__item__open_count' } }] };
+    const rows = { role: 'tool', tool_call_id: 'r1', content: '{"rows": [{}, {}, {}]}' };
+    const open = { role: 'tool', tool_call_id: 'r2', content: '{"count": 1}' };
+    expect(textOf(answerTo([question, both, rows, open]).frames)).toBe(READS_SAID.en(3, 1));
+    expect(textOf(answerTo([IN.es, question, both, rows, open]).frames)).toBe(READS_SAID.es(3, 1));
+    // A result that answers another call is a read that did not come back.
+    expect(textOf(answerTo([question, both, rows, { ...open, tool_call_id: 'r1' }]).frames)).toBe(READS_MISSING.en);
   });
 
   it('a chain that speaks in every round (BASE-F101): its words before the read, before the write, then the outcome', () => {
