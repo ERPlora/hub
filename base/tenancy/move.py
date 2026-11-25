@@ -25,7 +25,7 @@ other.
    ``pg_restore`` in one transaction, reading the copy from the bucket on its input. The template's extensions stay:
    the restore leaves them out (on Aurora only the master makes ``vector``).
 4. **Checked**: its identity (``base_hub_identity``) says it is this hub, and its schema is brought to the code's leaf
-   (``migrator.ensure_schema``).
+   (``migrator.schema.ensure_schema``).
 5. **Switched**: control moves the hub to the destination and keeps the copy's row (``MovedCopy``) in one transaction.
    From then on every process reaches it there: a request, a live re-run and the worker read the row again and
    register the hub's alias anew when its server changed (``base.tenancy.connections``).
@@ -694,7 +694,7 @@ def _ensure_schema(hub, target, heartbeat=None) -> None:
     moved = copying.copy(hub)
     moved.cluster = target
     try:
-        migrator.ensure_schema(moved, heartbeat=heartbeat)
+        migrator.schema.ensure_schema(moved, heartbeat=heartbeat)
     except Exception as error:
         raise MoveFailed("move_schema_failed", f"{type(error).__name__}: {error}") from error
 

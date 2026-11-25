@@ -353,10 +353,11 @@ If it fails: the message in red at the top; the row stays.
 Involved: FLOW-F02, FLOW-F16, FLOW-F23
 
 ### FLOW-F08 Read the guide
-<!-- from WORKBOOK.md sha256:9102e80b1746 -->
+<!-- from WORKBOOK.md sha256:5af1fcb3610e -->
 Status: done (screen)
 Actor: owner, administrator
 Screen: Guide
+Operations: none
 Steps:
 1. In the gallery, press **How does this work?**.
 2. Read the five sections. "What it cannot do yet" says what is really missing: branches, counting back
@@ -1289,49 +1290,49 @@ what it asks. A record the person confirming cannot see (a run, for whoever only
 question asked of another role) does not show on the card.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:c9a5198ff978 -->
+<!-- from WORKBOOK.md sha256:ada15a0332da -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
-| The automations, with search, filters, order and their last run, in pages of up to 100 (live) | see | F02 | `flow.flow.list` |
-| An automation, with the permissions it needs and those it lacks (live) | see | F09–F16 | `flow.flow.detail` |
+| The automations, with search, filters, order and their last run, in pages of up to 100 (live) | see | F01, F02, F05 | `flow.flow.list` |
+| An automation, with the permissions it needs and those it lacks (live) | see | F09–F16, F25, F27, F28, F31, F32, F37 | `flow.flow.detail` |
 | An automation's runs, 20 at a time, and how many failed (live) | see | F16 | `flow.run.list` |
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
-| The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
+| The assistant's pending drafts (live) | see | F01, F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object); all of them, or only those of some apps or some names, whole or only their names | see | F10, F11, F17 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object); all of them, or only those of some apps or some names, whole or only their names | see | F01, F05, F10, F11, F17, F25, F27, F28, F31, F37 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |
-| The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26 | `flow.secret.list` |
-| The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F29, F38 | `flow.question.list` |
+| The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26, F27 | `flow.secret.list` |
+| The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F01, F29, F38 | `flow.question.list` |
 | A question waiting for an answer, as it shows in "Waiting for your answer", only for whoever can answer it | answer (their role) | F29 | `flow.question.get` |
-| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F33–F36 | `flow.recipe.list` |
+| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F01, F33–F36 | `flow.recipe.list` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:23d2ce697d5c -->
+<!-- from WORKBOOK.md sha256:fc67ed817046 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
 | Creates an automation (from scratch, from a card or from a draft), paused and without permissions | manage | F04, F09, F18 | `flow.flow.create` |
-| Changes the name, the trigger or the steps (the switch is `set_enabled`); it does not let what its recipe's app fixes be removed (`flow.recipe_fixed`) | manage | F10, F11, F14, F36 | `flow.flow.update` |
+| Changes the name, the trigger or the steps (the switch is `set_enabled`); it does not let what its recipe's app fixes be removed (`flow.recipe_fixed`) | manage | F10, F11, F14, F25, F27, F28, F31, F32, F36, F37 | `flow.flow.update` |
 | Turns on or pauses | manage | F03, F14 | `flow.flow.set_enabled` |
 | Makes a copy, paused and without permissions | manage | F06 | `flow.flow.duplicate` |
 | Deletes (its history stays) | manage | F07 | `flow.flow.delete` |
-| Sets the whole list of actions and queries it can do | manage | F12 | `flow.flow.grant` |
+| Sets the whole list of actions and queries it can do | manage | F12, F27, F31, F37 | `flow.flow.grant` |
 | Runs it now | manage | F15 | `flow.flow.run` |
 | Leaves an assistant's draft | manage | F17 | `flow.draft.propose` |
 | Discards a draft | manage | F19 | `flow.draft.dismiss` |
 | Starts the automations of a notice | only the platform | F21 | `flow.run.react` |
-| When a customer's data are erased, cancels the runs that could still go on with hers and makes every run that names her card, also one that has ended, forget what it read and the free texts of its history (CUSTOMER-F16) | only the platform | F16, F23, F24 | `flow.customer.erase` |
+| When a customer's data are erased, cancels the runs that could still go on with hers and makes every run that names her card, also one that has ended, forget what it read and the free texts of its history (CUSTOMER-F16) | only the platform | F23 | `flow.customer.erase` |
 | Starts the scheduled or dated ones that are due | only the platform | F22 | `flow.schedule.fire_due` |
 | Carries on the runs whose wait is over | only the platform | F23 | `flow.run.resume_due` |
 | Resumes a run stopped by an error at the step that failed | manage | F24 | `flow.run.retry` |
 | Saves (or changes) a secret, sealed | manage (never the assistant) | F26 | `flow.secret.set` |
 | Deletes a secret | manage | F26 | `flow.secret.delete` |
-| Makes, in the background, the call of a run that is waiting for it | only the platform | F27 | `flow.run.call` |
-| Takes a run's call to make it | only the platform | F27 | `flow.run.claim_call` |
-| Writes down how the call ended and carries the run on | only the platform | F27 | `flow.run.record_call` |
+| Makes, in the background, the call of a run that is waiting for it | only the platform | — | `flow.run.call` |
+| Takes a run's call to make it | only the platform | — | `flow.run.claim_call` |
+| Writes down how the call ended and carries the run on | only the platform | — | `flow.run.record_call` |
 | Answers yes or no, with a note, to an automation's question | answer (their role) | F29 | `flow.question.answer` |
 | Closes the questions nobody answered in time | only the platform | F30 | `flow.question.expire_due` |
 | Turns on an automation another app brings: the first time it creates it on with exactly its permissions; afterwards it only turns it on | manage | F33 | `flow.recipe.enable` |
@@ -1366,7 +1367,7 @@ question asked of another role) does not show on the card.
 Notices carry ids, never names or contents.
 
 ### What it reacts to and what it needs from other apps
-<!-- from WORKBOOK.md sha256:2d3bff5d01aa -->
+<!-- from WORKBOOK.md sha256:02348b741259 -->
 - **To all the notices of the active apps** (FLOW-F21), except its own: it is the only app that listens to
   any notice. It does other apps' actions and queries **by their name** (`task.task.create`), with their
   rules and their messages, never touching their data; that is why it needs no app (`requires` empty): an
@@ -1392,6 +1393,11 @@ Notices carry ids, never names or contents.
   notice changes nothing.
 - From the platform: the business's time zone (the schedules) and the outbox's notices (the last one of a
   kind, for Try it and the examples).
+
+| From | What for | Flows | Service |
+|---|---|---|---|
+| WhatsApp inbox | The templates it can fill in, to choose one in the step | F31, F32 | `whatsapp_inbox.template.list` |
+| WhatsApp inbox | Keeping the header's file and reading it when the step opens | F32 | `whatsapp_inbox.template_sample.upload`, `.detail` |
 
 ### Who may do what
 <!-- from WORKBOOK.md sha256:3e06ba799884 -->

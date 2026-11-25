@@ -338,7 +338,7 @@ without the tax ID (it stays in the application's log), so that it never stays "
 Involved: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Issue an invoice by hand
-<!-- from WORKBOOK.md sha256:33835fbb839e -->
+<!-- from WORKBOOK.md sha256:869d0ff8396d -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoices, New manual invoice
@@ -389,7 +389,7 @@ too. If the tax territory cannot be read, the rate is called "Tax %", comes empt
 read the business’s tax territory: type the rate of each line."; the invoice is issued anyway, with the
 territory's tax. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up.
-Involved: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18
+Involved: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18, INVOICE-F23
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
 <!-- from WORKBOOK.md sha256:91d0d524459a -->
@@ -862,10 +862,10 @@ next try is refused too; a refusal that names no field shows above the form and 
 Involved: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
-<!-- from WORKBOOK.md sha256:a925f3713a94 -->
+<!-- from WORKBOOK.md sha256:1c10fa35b8a2 -->
 Status: done
 Actor: system (the ERPlora account)
-Screen: none (nobody enters the platform hub)
+Screen: none (the account issues it; it shows in Invoices)
 Steps:
 1. Before charging real money, the account asks the platform hub whether it is ready: it is with its issuer
    and VeriFactu and, in production, only while real filing with the AEAT is open on the server
@@ -882,6 +882,12 @@ Steps:
    "accepted with errors" or "rejected" when it answers (with its code and its message).
 5. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
    tributario:", "VERI*FACTU") only once the AEAT has accepted it, as in the old account.
+6. In ERPlora's own business `ERP` and `ERPR` belong to the account alone: nobody numbers in them by hand, nor creates
+   or changes them (INVOICE-F12, INVOICE-F13), and they are not offered when making an invoice (INVOICE-F03), in
+   **Series** or when asking about the numbering (INVOICE-F14). Sales and invoices made by hand go in the business's
+   own series ("TICKET", "FACT", "RECT" or the ones it creates), in the same VeriFactu chain. An invoice of the account
+   is corrected in the account, with its credit note: "Rectify" (INVOICE-F08) and "Full invoice" (INVOICE-F05) are not
+   offered here.
 In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines
 (each with its discount) and, in a credit note, the invoice it corrects.
 Out: the invoice, with the account's reference (announces `invoice.invoice.issued`; a credit note, also
@@ -891,8 +897,12 @@ writing anything; a credit note of an invoice that did not arrive is refused; ab
 payer's tax ID it is refused; an invoice that does not follow the contract is refused with its reason; a
 VeriFactu refusal undoes the whole invoice; in production with real filing with the AEAT closed, "not ready":
 "Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it.", and the account
-does not charge.
-Involved: VERIFACTU-F13
+does not charge. Through the window, the API, the assistant or an automation, choosing, creating or changing one of
+those two series, or giving another one a prefix or a format that would print its numbers (`ERP-2026-00123`),
+"erplora.com numbers the ERP and ERPR series: use another series."; rectifying or replacing an invoice of the account,
+"erplora.com issued this invoice and corrects it, in its ERPR series: it cannot be corrected by hand here.". Nothing is
+written and no number is used.
+Involved: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14
 
 ### INVOICE-F24 Download the issued invoices in Excel
 <!-- from WORKBOOK.md sha256:65867a5954c1 -->

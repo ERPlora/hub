@@ -162,16 +162,6 @@
     ]
   },
   {
-    "path": "apps/invoice/services/series.py",
-    "file_name": "series.py",
-    "functions": [
-      {
-        "name": "update_series",
-        "complexity": 17
-      }
-    ]
-  },
-  {
     "path": "apps/kitchen/queries/state.py",
     "file_name": "state.py",
     "functions": [

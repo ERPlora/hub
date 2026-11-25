@@ -109,7 +109,6 @@ max-statements = 50
 "apps/service/tests/test_recovery_categories.py" = ["B905"]
 "apps/service/tests/test_services.py" = ["F841"]
 "apps/staff/tests/test_integration_sale.py" = ["F841"]
-"apps/staff/tests/test_services.py" = ["F841"]
 "apps/task/tests/test_services.py" = ["F841"]
 "apps/tax/tests/test_queries_rules.py" = ["E731"]
 "apps/verifactu/schemas/fields.py" = ["E731"]
@@ -161,9 +160,9 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.api", "base.blueprint", "base.home", "base.models", "base.tenancy", "base.services", "base.queries",
-    "base.schemas", "base.ws_print", "control", "control.services", "control.queries", "apps.*", "apps.*.services",
-    "apps.*.queries", "apps.*.schemas",
+    "base", "base.api", "base.blueprint", "base.home", "base.models", "base.tenancy", "base.tenancy.migrator",
+    "base.services", "base.queries", "base.schemas", "base.ws_print", "control", "control.services", "control.queries",
+    "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
 ]
 depth = 0
 ignore_imports = [

@@ -32,7 +32,7 @@ def live_members() -> QuerySet[Member]:
 
 
 def load_member(member_id: UUID) -> Member | None:
-    """A live record (a ``MemberDetailOut``), or ``None``; services.py returns it after a write."""
+    """A live record (a ``MemberDetailOut``), or ``None``; services returns it after a write."""
     return live_members().filter(pk=member_id).first()
 
 

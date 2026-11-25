@@ -8,6 +8,7 @@ from live.operations import operation
 
 from apps.invoice import platform
 from apps.invoice.models import Invoice, InvoiceSeries
+from apps.invoice.platform_series import PLATFORM_SERIES_TYPES
 from apps.invoice.queries.platform_invoices import find_platform_invoice, platform_answer
 from apps.invoice.schemas.platform import PlatformInvoiceIn, PlatformInvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
@@ -22,9 +23,6 @@ PLATFORM_ORIGINAL_UNKNOWN = _(
 
 #: The SaaS's number (``ERP-2026-00123``): the platform hub's series prints the same, though it never counts one.
 PLATFORM_FORMAT = "{prefix}-{year}-{seq:05d}"
-
-
-PLATFORM_SERIES_TYPES = {"ERP": "F1", "ERPR": "R1"}
 
 
 def _platform_series(ctx: OperationContext, code: str, year: int) -> InvoiceSeries:

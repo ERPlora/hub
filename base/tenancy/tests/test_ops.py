@@ -271,7 +271,7 @@ def test_a_migrators_alias_registered_again_never_keeps_another_roles_connection
 
 def test_forgetting_an_alias_drops_this_threads_connection_object_too(hub_databases):
     """``hubs.forget_aliases`` leaves no connection object behind for an alias it forgets, as
-    ``migrator._forget_alias`` does: a leftover one breaks the next registration of that alias."""
+    ``migrator.servers._forget_alias`` does: a leftover one breaks the next registration of that alias."""
     from base.tenancy.tests import hubs as test_hubs
 
     before = django_connections.settings
