@@ -77,6 +77,9 @@ async function where(value: 'all' | 'apps'): Promise<void> {
   await flush();
 }
 
+/** Whether «All apps» or «Choose apps» can be chosen. */
+const choiceShown = () => byTestId('api-key-form-where') !== null;
+
 /** The actions the form offers on `app`. */
 const offered = (app: string) => ALL.filter((action) => byTestId(`api-key-form-${app}-${action}`) !== null);
 
@@ -253,7 +256,7 @@ describe('ApiKeysPanel', () => {
 
   it('who may give nothing on every app chooses among the apps, with no «All apps»', async () => {
     await newKeyForm({}, { ...LIST, grantable: { tax: ['read'] } });
-    expect(byTestId('api-key-form-where')).toBeNull();
+    expect(choiceShown()).toBe(false);
     expect(offered('tax')).toEqual(['read']);
   });
 
@@ -283,7 +286,7 @@ describe('ApiKeysPanel', () => {
     await where('all');
     await tick('*', 'read');
     await m.result(m.call, 'base.api_key.list', { ...LIST, grantable: { tax: ['read'] } });
-    expect([byTestId('api-key-form-where'), offered('tax'), submitOff()]).toEqual([null, ['read'], true]);
+    expect([choiceShown(), offered('tax'), submitOff()]).toEqual([false, ['read'], true]);
   });
 
   it('the next key starts with nothing written, chosen or ticked', async () => {
