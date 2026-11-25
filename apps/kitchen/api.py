@@ -9,28 +9,22 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.kitchen import queries, services
-from apps.kitchen.schemas import (
-    AllDayIn,
-    BoardIn,
+from apps.kitchen.schemas.board import AllDayIn, BoardIn
+from apps.kitchen.schemas.fields import StationRefIn, TicketRefIn
+from apps.kitchen.schemas.history import LogListIn
+from apps.kitchen.schemas.rounds import TicketSendIn
+from apps.kitchen.schemas.routing import RoutingClearIn, RoutingListIn, RoutingSetIn
+from apps.kitchen.schemas.settings import SettingsPatchIn
+from apps.kitchen.schemas.stations import StationIn, StationListIn, StationPatchIn
+from apps.kitchen.schemas.tickets import (
     ByOrderIn,
     ItemBumpIn,
     ItemRecallIn,
-    LogListIn,
     NoticesIn,
-    RoutingClearIn,
-    RoutingListIn,
-    RoutingSetIn,
-    SettingsPatchIn,
-    StationIn,
-    StationListIn,
-    StationPatchIn,
-    StationRefIn,
     TicketCancelIn,
     TicketCreateIn,
     TicketListIn,
-    TicketRefIn,
     TicketRushIn,
-    TicketSendIn,
 )
 
 router = Router(tags=["kitchen"])

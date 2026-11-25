@@ -10,7 +10,7 @@ from apps.kitchen import events
 from apps.kitchen.models import ACTOR_MAX_LENGTH, Destination, LogAction, Ticket, TicketItem
 from apps.kitchen.queries.reads import business_day
 from apps.kitchen.queries.routing import routing
-from apps.kitchen.schemas import TicketCreateIn, TicketOut
+from apps.kitchen.schemas.tickets import TicketCreateIn, TicketOut
 from apps.kitchen.services.catalog import find_product
 from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out

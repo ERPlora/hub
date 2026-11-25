@@ -11,13 +11,11 @@ from live.operations import get
 
 from apps.schedule.models import ScheduleSettings
 from apps.schedule.queries import day_label, resolve_override, resolve_special_day
-from apps.schedule.schemas import (
-    HoursRangeIn,
-    IsOpenIn,
-    NoParamsIn,
-    OverrideListIn,
-    SpecialDayListIn,
-)
+from apps.schedule.schemas.fields import NoParamsIn
+from apps.schedule.schemas.hours import HoursRangeIn
+from apps.schedule.schemas.is_open import IsOpenIn
+from apps.schedule.schemas.overrides import OverrideListIn
+from apps.schedule.schemas.special_days import SpecialDayListIn
 
 from .conftest import HUB_DB, ctx_for, make_day, make_override, make_special_day
 

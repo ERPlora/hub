@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.kitchen.queries.reads import current_settings, settings_out
-from apps.kitchen.schemas import NoIn, SettingsOut
+from apps.kitchen.schemas.fields import NoIn
+from apps.kitchen.schemas.settings import SettingsOut
 
 
 @operation(

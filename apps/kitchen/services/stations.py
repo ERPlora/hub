@@ -14,7 +14,8 @@ from apps.kitchen.queries.reads import current_settings
 from apps.kitchen.queries.routing import category_routes, product_routes
 from apps.kitchen.queries.scope import STATION_NOT_FOUND, find_station
 from apps.kitchen.queries.stations import in_progress_by_station, station_row
-from apps.kitchen.schemas import DeletedOut, StationIn, StationOut, StationPatchIn, StationRefIn
+from apps.kitchen.schemas.fields import DeletedOut, StationRefIn
+from apps.kitchen.schemas.stations import StationIn, StationOut, StationPatchIn
 from apps.kitchen.services.settling import begin
 from apps.kitchen.services.writes import actor, locked_row
 
