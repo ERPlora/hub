@@ -28,8 +28,9 @@ class HelpScreenOut(Schema):
 
 
 class HelpFlowOut(Schema):
-    """How a task is done: its title, the tabs it happens on, its steps and what happens if it fails, in markdown;
-    ``videos``, the YouTube video ids of its short videos, none when it has no videos."""
+    """How a task is done: its title, the tabs or screens it happens on, its steps and what happens if it fails, in
+    markdown; ``videos``, the YouTube video ids of its short videos, none when it has no videos. Of the Hub's own screens,
+    only what the person may do."""
 
     id: str
     title: str

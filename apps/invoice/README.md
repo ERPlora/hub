@@ -50,7 +50,7 @@ Sirve igual al restaurante y a la peluquería.
 | Inicio | los pasos «Los datos de tu negocio» (`invoice.issuer.get`, `required=True`) y «Tu numeración de facturas» (`invoice.numbering.status`, recomendado) |
 | Operaciones | 19 consultas (`queries/`) y 14 acciones (`services/`), todas con `ai=`; 26 con ruta en `/api/invoice/…` (`invoice.issuer.sync` y las cuatro del hub de plataforma no tienen ruta: solo el sistema; las dos de la página pública del tique, `invoice.public.ticket` e `invoice.public.substitute`, tampoco: se llaman por la puerta pública de `base`, sin sesión) |
 | Eventos | 6, `invoice.invoice.{issued,rectified,paid}`, `invoice.series.{created,updated}` e `invoice.issuer.updated` (`events.py`); reacciona a `sale.sale.completed`, `sale.sale.refunded` y `sale.sale.voided` |
-| Migraciones | `0001_initial` … `0008_due_date` |
+| Migraciones | `0001_initial` … `0009_withholding` |
 | Admin | Django admin en `hubs.erplora.com`: series y emisor editables; facturas y líneas en solo lectura, sin alta ni borrado (solo las notas) |
 
 Las decisiones de diseño (el número se gasta al cobrar, el libro de números es la propia factura, la factura de
@@ -70,7 +70,7 @@ CI=1 pnpm e2e tests/e2e/invoice-sale.spec.ts tests/e2e/invoice-manual.spec.ts te
   `test_integration_printing.py` van contra las apps reales; `test_relay.py`, por el tick real del relay del
   outbox; la numeración y «una por venta», con hilos.
 - Además de las tres de arriba: `invoice-pending`, `invoice-assistant`, `invoice-locale-es`,
-  `invoice-manual-tax-region`, `fix-invoice-setup-hooks` y `sale-invoice-chain`.
+  `invoice-manual-tax-region`, `invoice-withholding`, `fix-invoice-setup-hooks` y `sale-invoice-chain`.
 - Nunca hay red real de la AEAT: VeriFactu solo en el entorno de pruebas (working-rules §15).
 
 ## Qué queda fuera

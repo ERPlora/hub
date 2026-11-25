@@ -74,7 +74,7 @@ def test_the_copy_gives_each_group_hung_from_a_live_product_with_what_its_attach
     # One no product asks for: the copy's groups are every one of them.
     bare = a_group("Bare")
 
-    read = queries.links_in_copy(direct())
+    read = queries.recovery.links_in_copy(direct())
 
     # With each product's SKU there, the article's identity, to find the one made again if the business lost it; and
     # every group of the copy by name, to find the one brought back if the business deleted it.
@@ -92,7 +92,7 @@ def test_a_copy_without_the_apps_table_gives_nothing():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE modifier_modifierlink CASCADE")
 
-    assert queries.links_in_copy(direct()) == []
+    assert queries.recovery.links_in_copy(direct()) == []
 
 
 def a_link_of_the_copy(group, product) -> dict:
@@ -123,7 +123,7 @@ def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_product():
     other_group = a_link_of_the_copy(extras, burger)
     other_product = a_link_of_the_copy(sauces, fries)
 
-    lacking = queries.links_not_in_business([still, hung_again, other_group, other_product])
+    lacking = queries.recovery.links_not_in_business([still, hung_again, other_group, other_product])
 
     # As the group sheet's attach takes each, with its id in the copy: the group and the product.
     assert lacking == [
@@ -145,7 +145,7 @@ def test_a_product_gone_gets_its_groups_on_the_one_a_recovery_made_again_with_it
     make_product("Fries", "FRI")
     by_hand = a_link_of_a_product_gone(sauces, "FRI")
 
-    lacking = queries.links_not_in_business([hung_again, lacking_one, by_hand])
+    lacking = queries.recovery.links_not_in_business([hung_again, lacking_one, by_hand])
 
     assert lacking == [
         {"id": lacking_one["id"], "group_id": extras.id, "product_id": burger.id},
@@ -154,9 +154,9 @@ def test_a_product_gone_gets_its_groups_on_the_one_a_recovery_made_again_with_it
 
 
 def test_with_nothing_read_nothing_is_lacking():
-    assert queries.groups_not_in_business([]) == []
-    assert queries.links_not_in_business([]) == []
-    assert queries.category_links_not_in_business([]) == []
+    assert queries.recovery.groups_not_in_business([]) == []
+    assert queries.recovery.links_not_in_business([]) == []
+    assert queries.recovery.category_links_not_in_business([]) == []
 
 
 @HUB_DB
@@ -173,7 +173,7 @@ def test_the_copy_gives_each_group_hung_from_a_live_category_with_what_its_attac
     hang(sauces, category=old)
     run_here("inventory.category.delete", {"id": str(old.id)})
 
-    read = queries.category_links_in_copy(direct())
+    read = queries.recovery.category_links_in_copy(direct())
 
     # With every live category of the copy by name, one no group hangs from too: the pairing with the business's
     # needs the whole copy, to tell one the copy also holds from the stand-in of another with its name.
@@ -196,11 +196,13 @@ def test_a_copy_without_the_apps_table_gives_no_group_of_a_category():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE modifier_modifierlink CASCADE")
 
-    assert queries.category_links_in_copy(direct()) == []
+    assert queries.recovery.category_links_in_copy(direct()) == []
 
 
 @HUB_DB
-@pytest.mark.parametrize("read", [queries.links_in_copy, queries.category_links_in_copy, queries.options_in_copy])
+@pytest.mark.parametrize(
+    "read", [queries.recovery.links_in_copy, queries.recovery.category_links_in_copy, queries.recovery.options_in_copy]
+)
 def test_a_copy_with_none_of_the_apps_tables_reads_no_group_for_its_links(read):
     with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction. A copy taken before the app was switched on has none of its tables: the
@@ -234,7 +236,7 @@ def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_category():
     other_group = a_category_link_of_the_copy(extras, mains.id, copy)
     other_category = a_category_link_of_the_copy(sauces, drinks.id, copy)
 
-    lacking = queries.category_links_not_in_business([still, hung_again, other_group, other_category])
+    lacking = queries.recovery.category_links_not_in_business([still, hung_again, other_group, other_category])
 
     # As the group sheet's attach takes each, with its id in the copy: the group and the category.
     assert lacking == [
@@ -260,7 +262,7 @@ def test_a_category_gone_gets_its_groups_on_the_one_a_recovery_brought_back_with
     make_category("Drinks")
     by_hand = a_category_link_of_the_copy(sauces, gone, copy)
 
-    lacking = queries.category_links_not_in_business([hung_again, lacking_one, by_hand])
+    lacking = queries.recovery.category_links_not_in_business([hung_again, lacking_one, by_hand])
 
     assert lacking == [
         {"id": lacking_one["id"], "group_id": extras.id, "category_id": back.id},
@@ -278,7 +280,7 @@ def test_a_category_the_copy_also_holds_is_never_the_stand_in_of_another_with_it
     link = a_category_link_of_the_copy(sauces, lost.id, {lost.id: "Specials", kept.id: "Specials"})
 
     # The lost one has no stand-in: its group keeps the copy's category, which the attach refuses as not found.
-    assert queries.category_links_not_in_business([link]) == [
+    assert queries.recovery.category_links_not_in_business([link]) == [
         {"id": link["id"], "group_id": sauces.id, "category_id": lost.id}
     ]
 
@@ -298,7 +300,7 @@ def test_the_copy_gives_each_group_with_its_options_as_its_recover_takes_them():
     extras = a_group("Extras")
     generic = TaxCategory.objects.get(key=GENERIC).pk
 
-    read = queries.groups_in_copy(direct())
+    read = queries.recovery.groups_in_copy(direct())
 
     # Its options by the order they were added in, each with its tax category's id there, the same in the business.
     assert read == [
@@ -324,7 +326,7 @@ def test_a_copy_without_the_groups_table_gives_no_group():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE modifier_modifiergroup CASCADE")
 
-    assert queries.groups_in_copy(direct()) == []
+    assert queries.recovery.groups_in_copy(direct()) == []
 
 
 def a_group_of_the_copy(name: str, *, id=None, options=()) -> dict:
@@ -359,7 +361,7 @@ def test_lacking_is_a_group_the_business_no_longer_holds_nor_made_again_with_its
         an_option_of_the_copy("Large", kitchen_name="L", price_delta=150, tax_category_id=generic, sort_order=1),
     ]) | {"kitchen_name": "SIZE", "min_choices": 1, "max_choices": 1, "allow_repeat": True, "sort_order": 2}
 
-    lacking = queries.groups_not_in_business([still, made_again, sizes])
+    lacking = queries.recovery.groups_not_in_business([still, made_again, sizes])
 
     assert lacking == [
         {
@@ -392,7 +394,7 @@ def test_a_group_gone_stands_for_the_one_a_recovery_brought_back_with_its_name()
     run_here("modifier.group.update", {"id": str(renamed.id), "name": "Rations"})
     a_group_brought_back("Portions")
 
-    standing = queries.groups_standing_for(
+    standing = queries.recovery.groups_standing_for(
         {kept.id: "Sizes", renamed.id: "Portions", lost: "Sauces", gone: "Extras"}
     )
 
@@ -407,7 +409,7 @@ def test_a_group_the_copy_also_holds_is_never_the_stand_in_of_another_with_its_n
     run_here("modifier.group.update", {"id": str(earlier.id), "name": "Sauces"})
     lost = uuid.uuid7()
 
-    assert queries.groups_standing_for({lost: "Sauces", earlier.id: "Dips"}) == {}
+    assert queries.recovery.groups_standing_for({lost: "Sauces", earlier.id: "Dips"}) == {}
 
 
 @HUB_DB
@@ -430,11 +432,11 @@ def test_a_group_gone_hangs_again_as_the_one_a_recovery_brought_back_with_its_na
     on_mains = {"id": uuid.uuid7(), "group_id": lost, "category_id": mains.id, "copy_categories": {mains.id: "Mains"},
                 "copy_groups": copy}
 
-    assert queries.links_not_in_business([on_burger, on_fries, by_hand]) == [
+    assert queries.recovery.links_not_in_business([on_burger, on_fries, by_hand]) == [
         {"id": on_burger["id"], "group_id": back.id, "product_id": burger.id},
         {"id": by_hand["id"], "group_id": gone, "product_id": burger.id},
     ]
-    assert queries.category_links_not_in_business([on_mains]) == [
+    assert queries.recovery.category_links_not_in_business([on_mains]) == [
         {"id": on_mains["id"], "group_id": back.id, "category_id": mains.id}
     ]
 
@@ -451,7 +453,7 @@ def recovered(record: dict, actor: str = "system"):
 @HUB_DB
 def test_a_group_comes_back_with_its_options_by_the_group_sheets_own_creates():
     actor = actor_of(uuid.uuid7())
-    [record] = queries.groups_not_in_business([
+    [record] = queries.recovery.groups_not_in_business([
         a_group_of_the_copy("Doneness", options=[
             an_option_of_the_copy("Rare", sort_order=1),
             an_option_of_the_copy("Medium", is_default=True, sort_order=2),
@@ -483,7 +485,7 @@ def test_a_group_comes_back_with_its_options_by_the_group_sheets_own_creates():
 @HUB_DB
 def test_an_option_its_create_refuses_today_is_left_out_and_said_and_the_group_comes_back():
     generic = TaxCategory.objects.get(key=GENERIC)
-    [record] = queries.groups_not_in_business([
+    [record] = queries.recovery.groups_not_in_business([
         a_group_of_the_copy("Sauces", options=[
             an_option_of_the_copy("Wine sauce", price_delta=200, tax_category_id=generic.pk),
             an_option_of_the_copy("Ketchup", sort_order=1),
@@ -505,7 +507,7 @@ def test_an_option_its_create_refuses_today_is_left_out_and_said_and_the_group_c
 
 @HUB_DB
 def test_an_option_named_as_one_already_back_in_its_group_is_left_out_with_why():
-    [record] = queries.groups_not_in_business([
+    [record] = queries.recovery.groups_not_in_business([
         a_group_of_the_copy("Sauces", options=[an_option_of_the_copy("Alioli"), an_option_of_the_copy("ALIOLI")])
     ])
 
@@ -527,16 +529,16 @@ def test_the_app_declares_its_groups_first_made_again_with_their_options():
     groups, _options, _categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
 
     assert (groups.read, groups.missing, groups.create, groups.deleted, groups.restore) == (
-        queries.groups_in_copy,
-        queries.groups_not_in_business,
+        queries.recovery.groups_in_copy,
+        queries.recovery.groups_not_in_business,
         "modifier.group.recover",
         None,
         "",
     )
     assert (str(groups.label), groups.reads_since) == ("Modifier groups", "0001_initial")
     # A copy that far back holds what the read takes: each column of a group and of an option it reads.
-    assert {"id", *queries.GROUP_COPY_FIELDS} <= fields_held_since("modifier", "modifiergroup", groups.reads_since)
-    assert {"id", "group", "tax_category", *queries.OPTION_COPY_FIELDS} <= fields_held_since(
+    assert {"id", *queries.recovery.GROUP_COPY_FIELDS} <= fields_held_since("modifier", "modifiergroup", groups.reads_since)
+    assert {"id", "group", "tax_category", *queries.recovery.OPTION_COPY_FIELDS} <= fields_held_since(
         "modifier", "modifieroption", groups.reads_since
     )
 
@@ -545,8 +547,8 @@ def test_the_app_declares_its_groups_of_categories_first_hung_again_by_the_same_
     _groups, _options, categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
 
     assert (categories.read, categories.missing, categories.create, categories.deleted, categories.restore) == (
-        queries.category_links_in_copy,
-        queries.category_links_not_in_business,
+        queries.recovery.category_links_in_copy,
+        queries.recovery.category_links_not_in_business,
         "modifier.link.attach",
         None,
         "",
@@ -563,8 +565,8 @@ def test_the_app_declares_its_groups_of_products_hung_again_by_the_group_sheets_
     _groups, _options, _categories, links = apps.get_app_config("modifier").recoverable_from_copy()
 
     assert (links.read, links.missing, links.create, links.deleted, links.restore) == (
-        queries.links_in_copy,
-        queries.links_not_in_business,
+        queries.recovery.links_in_copy,
+        queries.recovery.links_not_in_business,
         "modifier.link.attach",
         None,
         "",

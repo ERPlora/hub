@@ -27,7 +27,7 @@ from apps.modifier.models import (
     ModifierLink,
     ModifierOption,
 )
-from apps.modifier.queries import (
+from apps.modifier.queries.reads import (
     LINK_NOT_FOUND,
     find_group,
     find_option,

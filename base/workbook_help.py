@@ -106,6 +106,8 @@ class Help:
     unknown_screens: tuple[str, ...]
     repeated_screens: tuple[str, ...]
     unpublished: tuple[Draft, ...]
+    #: Who does each flow, published or not, by its id: the names its actor is written with.
+    actors: Mapping[str, tuple[str, ...]]
 
 
 def words() -> Words:
@@ -141,10 +143,12 @@ def parse(markdown: str, tabs: Sequence[Tab], vocabulary: Words) -> Help:
     screen_lines = next((body for title, body in sections if _name(title) == screens_heading), [])
     screens, windows, unknown, repeated = _screens(screen_lines, tabs)
     places = {**windows, **{_place(tab.label): tab.id for tab in tabs}}
-    read = [_flow(*flow, vocabulary, places) for flow in flow_fields(markdown, vocabulary)]
+    written = list(flow_fields(markdown, vocabulary))
+    read = [_flow(*flow, vocabulary, places) for flow in written]
     flows = tuple(flow for flow in read if isinstance(flow, Flow))
     drafts = tuple(flow for flow in read if isinstance(flow, Draft))
-    return Help(purpose, screens, flows, unknown, repeated, drafts)
+    actors = {flow_id: tuple(map(_name, _parts(fields.get("actor", [])))) for flow_id, _title, fields in written}
+    return Help(purpose, screens, flows, unknown, repeated, drafts, actors)
 
 
 def _screens(
@@ -214,13 +218,14 @@ def is_done(status: str, vocabulary: Words) -> bool:
 
 
 def _places(screen: list[str], places: dict[str, str]) -> tuple[str, ...]:
-    """The tabs a flow's screen names: its parts split on «,» and «;», what goes in parentheses left out."""
-    found: list[str] = []
-    for part in re.split(r"[,;]", without_parentheses(" ".join(screen))):
-        tab_id = places.get(_place(part))
-        if tab_id is not None and tab_id not in found:
-            found.append(tab_id)
-    return tuple(found)
+    """The tabs a flow's screen names."""
+    named = (places.get(_place(part)) for part in _parts(screen))
+    return tuple(dict.fromkeys(tab_id for tab_id in named if tab_id is not None))
+
+
+def _parts(lines: list[str]) -> list[str]:
+    """What a flow's key names: its parts split on «,» and «;», what goes in parentheses left out."""
+    return [part for part in re.split(r"[,;]", without_parentheses(" ".join(lines))) if part.strip()]
 
 
 def without_parentheses(text: str) -> str:

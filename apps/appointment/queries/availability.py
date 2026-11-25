@@ -6,7 +6,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.appointment import engine
-from apps.appointment.schemas import CheckIn, CheckOut, SlotsIn, SlotsOut
+from apps.appointment.schemas.availability import CheckIn, CheckOut, SlotsIn, SlotsOut
 from apps.service.models import Service
 from apps.staff.models import Member
 from apps.staff.queries.reads import resolve_member
