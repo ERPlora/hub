@@ -4,8 +4,8 @@ figures and slots, the free tables, the slots, the blocked dates, the waitlist a
 screens name it by, which the assistant's card says instead of the id (schemas/fields.py, ``names``).
 
 Shared with the writes (services/), inside the command's own transaction: the business's clock, the rules, the
-lookups of a reservation, a waitlist entry, a slot or a blocked date as a person says it, and everything the gate (engine.py)
-reads — the slots of a day with what they hold, its blocks, its opening hours (Schedules) and a table's
+lookups of a reservation, a waitlist entry, a slot or a blocked date as a person says it, and everything the gate
+(engine.py) reads — the slots of a day with what they hold, its blocks, its opening hours (Schedules) and a table's
 facts (Tables). The business's zone is the Hub's (``base.business.business_zone``).
 """
 
