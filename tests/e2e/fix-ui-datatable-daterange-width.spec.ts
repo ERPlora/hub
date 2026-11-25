@@ -110,12 +110,12 @@ for (const size of CASES) {
         await shown(page).locator(`[data-testid=${TABLE}-empty], [data-testid=${TABLE}-row]`).first().waitFor({ state: 'visible' });
         if (size.view === 'cards') await shown(page).locator(`[data-testid=${TABLE}-view-cards]`).click();
         const { where, scope } = await filters(page);
+        const end = (name: string) => scope.locator(`[data-testid=${TABLE}-filter-${name}]`);
+        for (const name of DATE_ENDS) await pickDay(page, end(name), day);
+        // Measured once both are picked: a tap scrolls its end into view, and measured one by one each end could
+        // look inside the panel while the other is out of it.
         const dates: Record<string, Fit> = {};
-        for (const name of DATE_ENDS) {
-          const end = scope.locator(`[data-testid=${TABLE}-filter-${name}]`);
-          await pickDay(page, end, day);
-          dates[name] = await fit(end);
-        }
+        for (const name of DATE_ENDS) dates[name] = await fit(end(name));
         const area = (await scope.boundingBox())!;
         const amounts: Record<string, { x: number; box: number }> = {};
         for (const name of AMOUNT_ENDS) {
