@@ -209,6 +209,14 @@ describe('ApiKeysPanel', () => {
     expect(posted(m)).toEqual([['/api/keys', { name: 'Tienda', rate_per_minute: 60, scopes: { cart_checkout: ['read', 'create'] } }]]);
   });
 
+  it('a box ticked with no name, or with a name of only spaces, is not enough for «Create key»', async () => {
+    await newKeyForm();
+    await tick('cart_checkout', 'read');
+    expect(submitOff()).toBe(true);
+    await named('   ');
+    expect(submitOff()).toBe(true);
+  });
+
   it('a box is there only for what who asks may give, and an app they may give nothing on is not listed', async () => {
     await newKeyForm();
     expect(offered('cart_checkout')).toEqual(['read', 'create', 'update']);
