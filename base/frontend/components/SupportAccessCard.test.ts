@@ -92,6 +92,13 @@ describe('SupportAccessCard', () => {
     expect(m.wrapper.find('[data-testid="support-visits-empty"]').exists()).toBe(false);
   });
 
+  it('a single entry is a list of one, without the line for none', async () => {
+    const m = await open();
+    await m.result(m.call, OP, { ...ON, visits: [{ person: 'Sara Soto', entered_at: '2026-11-24T10:00:00Z' }] });
+    expect(m.wrapper.findAll('[data-testid="support-visit"]')).toHaveLength(1);
+    expect(m.wrapper.find('[data-testid="support-visits-empty"]').exists()).toBe(false);
+  });
+
   it('while nobody of support has come in, it says so', async () => {
     const m = await open();
     await m.result(m.call, OP, ON);
@@ -106,12 +113,14 @@ describe('SupportAccessCard', () => {
     expect(m.wrapper.text()).toContain('Only who runs the business can change it.');
   });
 
-  it('a change that cannot be saved says so and keeps the saved value', async () => {
+  it('a change that cannot be saved says so and paints the switch again on the saved value', async () => {
     const m = await open({ onApi: () => Response.json({ error: { code: 'internal_error', message: 'x' } }, { status: 500 }) });
     await m.result(m.call, OP, OFF);
+    const moved = toggle(m);
     switchTo(m, true);
     await flush();
     expect(m.wrapper.get('[data-testid="support-access-save-failed"]').text()).toContain('Could not save the change.');
+    expect(toggle(m)).not.toBe(moved);
     expect(toggle(m).checked).toBe(false);
     expect(toastSuccess).not.toHaveBeenCalled();
   });
