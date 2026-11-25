@@ -1,0 +1,13 @@
+{% load i18n %}{% autoescape off %}{% if invoice.customer_name %}{% blocktranslate with customer=invoice.customer_name %}Hello, {{ customer }}:{% endblocktranslate %}{% else %}{% translate "Hello:" %}{% endif %}
+
+{% translate "Attached you will find this document as a PDF:" %}
+
+{{ document }} {{ invoice.number }}
+{% translate "Date" %}: {{ issue_date }}
+{% if due_date %}{% translate "Due date" context "invoice" %}: {{ due_date }}
+{% endif %}{% if payable %}{% translate "Amount due" context "invoice" %}{% else %}{% translate "Total" context "invoice email" %}{% endif %}: {{ amount }}
+
+{% translate "If you have any questions, just reply to this email." %}
+
+{{ business }}
+{% endautoescape %}

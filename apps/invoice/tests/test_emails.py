@@ -9,12 +9,13 @@ from types import SimpleNamespace
 import pytest
 from django.core import mail
 from django.utils import translation
-from live import live_registry
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.operations import atomic, get
 from pydantic import ValidationError
 
+from apps.customer.models import Customer
 from apps.invoice import events
 from apps.invoice.models import Invoice, InvoiceEmail
 from apps.invoice.queries import pdf as pdf_query
@@ -28,7 +29,7 @@ from apps.invoice.tests.printed import text, words
 from apps.verifactu.models import Record
 from base import outbound, pdf
 from base.models import Hub
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 
 __all__ = ["owner", "send"]
 
@@ -83,7 +84,7 @@ def test_nothing_is_printed_nor_sent_until_the_request_is_committed(monkeypatch)
 
 def test_a_request_that_rolls_back_sends_nothing(django_capture_on_commit_callbacks):
     invoice = manual()
-    with django_capture_on_commit_callbacks(execute=True) as left:
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()) as left:
         with pytest.raises(RuntimeError), atomic():
             asked(invoice, to=ANA)
             raise RuntimeError
@@ -103,7 +104,7 @@ def test_a_typed_address_wins_and_never_changes_the_card(customer, send):
     invoice = manual(customer_id=str(card.id))
     send(invoice, to="facturas@example.com")
     assert only_mail().to == ["facturas@example.com"]
-    assert run("customer.customer.detail", {"id": str(card.id)}).customer.email == ANA
+    assert Customer.objects.get(pk=card.id).email == ANA
 
 
 def test_the_email_of_a_deleted_card_is_not_proposed(customer):
@@ -198,7 +199,7 @@ def test_without_a_due_date_it_says_none(send):
 def test_a_ticket_names_no_customer(charge, product, send):
     product()
     sale = charge("mail-ticket")
-    ticket = run("invoice.invoice.by_source", {"sale_id": str(sale.sale.id)}).invoice
+    ticket = run("invoice.invoice.by_source", {"sale_id": str(sale.id)}).invoice
     send(ticket, to=ANA)
     assert only_mail().body.startswith("Hello:")
     assert only_mail().subject.startswith(f"Simplified invoice {ticket.number}")
@@ -222,7 +223,7 @@ def test_names_are_written_as_they_are_never_as_html(send):
 def test_the_document_of_a_sale_goes_as_a_copy_as_its_download(charge, product, send):
     product()
     sale = charge("mail-copy", document_type="invoice", **RECIPIENT)
-    invoice = run("invoice.invoice.by_source", {"sale_id": str(sale.sale.id)}).invoice
+    invoice = run("invoice.invoice.by_source", {"sale_id": str(sale.id)}).invoice
     send(invoice, to=ANA)
     assert Attached(only_mail()).words()["copy"] == 1
 
@@ -367,13 +368,10 @@ def test_what_nobody_foresaw_is_also_told_as_not_sent(monkeypatch, send):
     assert (kept(out).status, kept(out).error_code) == ("failed", "invoice.email_unavailable")
 
 
-def test_the_owner_left_meanwhile_and_there_is_nowhere_to_reply(send, monkeypatch, django_capture_on_commit_callbacks):
-    invoice = manual()
-    with django_capture_on_commit_callbacks() as left:
-        out = asked(invoice, to=ANA)
-        owned("")
-    for job in left:
-        job()
+def test_the_owner_left_meanwhile_and_there_is_nowhere_to_reply():
+    out = asked(manual(), to=ANA)
+    owned("")
+    service.deliver(A, out.id)
     assert (kept(out).status, kept(out).error_code, mail.outbox) == ("failed", "invoice.email_no_reply", [])
 
 

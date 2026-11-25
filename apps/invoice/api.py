@@ -9,6 +9,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.invoice import queries, services
+from apps.invoice.schemas.emails import EmailListIn, SendEmailIn
 from apps.invoice.schemas.export import InvoiceExportIn
 from apps.invoice.schemas.invoices import (
     BySourceIn,
@@ -65,6 +66,16 @@ async def invoice_pdf(request, params: Query[DocumentIn]):
 @bind(router, "invoice.invoice.print", "/invoice/invoices/print")
 async def invoice_print(request, data: DocumentIn):
     return await run_operation(request, services.paper.print_invoice, data)
+
+
+@bind(router, "invoice.email.list", "/invoice/invoices/emails")
+async def email_list(request, params: Query[EmailListIn]):
+    return await run_operation(request, queries.emails.list_emails, params)
+
+
+@bind(router, "invoice.invoice.send_email", "/invoice/invoices/send_email")
+async def invoice_send_email(request, data: SendEmailIn):
+    return await run_operation(request, services.emails.send_email, data)
 
 
 @bind(router, "invoice.invoice.line_defaults", "/invoice/invoices/line_defaults")

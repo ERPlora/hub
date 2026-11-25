@@ -4,8 +4,8 @@ services.py records them in the outbox, in the command's transaction; live.py na
 each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists. VeriFactu (which
 requires invoice) registers every ``invoice.invoice.issued``.
 
-Reactions: a charged sale is invoiced, a refund and a void are rectified, each through an operation of this app run as
-the system, in its own transaction. The worker's outbox relay hands each delivered event to ``react``; the operations
+Reactions: a charged sale is invoiced, a refund and a void are rectified and the emails of an erased customer's invoices
+lose their address, each through an operation of this app run as the system, in its own transaction. The worker's outbox relay hands each delivered event to ``react``; the operations
 are idempotent (one invoice per sale, one rectification per refund and per void), and a refund or a void that comes
 before its sale's invoice is refused so that the relay retries it (``invoice.sale_not_invoiced``).
 """
@@ -21,6 +21,9 @@ INVOICE_PAID = "invoice.invoice.paid"
 SERIES_CREATED = "invoice.series.created"
 SERIES_UPDATED = "invoice.series.updated"
 ISSUER_UPDATED = "invoice.issuer.updated"
+EMAIL_REQUESTED = "invoice.email.requested"
+EMAIL_SENT = "invoice.email.sent"
+EMAIL_FAILED = "invoice.email.failed"
 
 ALL = [
     INVOICE_ISSUED,
@@ -29,6 +32,9 @@ ALL = [
     SERIES_CREATED,
     SERIES_UPDATED,
     ISSUER_UPDATED,
+    EMAIL_REQUESTED,
+    EMAIL_SENT,
+    EMAIL_FAILED,
 ]
 
 #: The amounts its events bring (an issued invoice's total, what a rectification leaves to rectify), in cents of
@@ -36,6 +42,8 @@ ALL = [
 AMOUNTS = frozenset({"total", "remaining"})
 #: Every event that changes what a document says (lists, detail, the sale's document).
 INVOICE_EVENTS = [INVOICE_ISSUED, INVOICE_RECTIFIED, INVOICE_PAID]
+#: Every event that changes the emails of an invoice.
+EMAIL_EVENTS = [EMAIL_REQUESTED, EMAIL_SENT, EMAIL_FAILED]
 #: Every event that changes a series or its counter.
 SERIES_EVENTS = [SERIES_CREATED, SERIES_UPDATED, INVOICE_ISSUED]
 
@@ -43,12 +51,15 @@ SERIES_EVENTS = [SERIES_CREATED, SERIES_UPDATED, INVOICE_ISSUED]
 SALE_COMPLETED = "sale.sale.completed"
 SALE_REFUNDED = "sale.sale.refunded"
 SALE_VOIDED = "sale.sale.voided"
+# The Customers app's, when the personal data of a card is erased.
+CUSTOMER_ERASED = "customer.customer.erased"
 
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {
     SALE_COMPLETED: "invoice.invoice.create_from_sale",
     SALE_REFUNDED: "invoice.invoice.rectify_from_refund",
     SALE_VOIDED: "invoice.invoice.rectify_from_void",
+    CUSTOMER_ERASED: "invoice.email.forget_customer",
 }
 
 
