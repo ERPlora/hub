@@ -515,6 +515,8 @@
     },
     "void": {
       "title": "Anular la venta {number}",
+      "notAllowed": "Tu rol no permite anular una venta. Pídeselo a un encargado.",
+      "withApproval": "Un encargado tendrá que aprobar esta anulación.",
       "explain": "La venta queda registrada como anulada; caja y stock se revierten una sola vez. El motivo es obligatorio.",
       "reason": "Motivo (obligatorio)",
       "reasonRequired": "Hace falta un motivo para anular una venta",
@@ -525,6 +527,8 @@
     },
     "refund": {
       "title": "Devolver la venta {number}",
+      "notAllowed": "Tu rol no permite devolver una venta. Pídeselo a un encargado.",
+      "withApproval": "Un encargado tendrá que aprobar esta devolución.",
       "loading": "Cargando lo que se puede devolver…",
       "loadError": "No se ha podido cargar la venta, así que todavía no hay nada que devolver. Vuelve a intentarlo.",
       "nothing": "No queda nada por devolver en esta venta.",

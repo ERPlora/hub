@@ -256,7 +256,6 @@
       "title": "Gastar una sesión",
       "message": "Da por entregada una sesión del bono «{package}» de {customer}, fuera del cobro.",
       "service": "Servicio",
-      "servicePlaceholder": "Elige el servicio",
       "member": "Profesional",
       "memberHelp": "Quién la hizo: lo que vale la sesión cuenta en su producción en Ventas. Opcional.",
       "note": "Nota",

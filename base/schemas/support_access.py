@@ -24,3 +24,13 @@ class SupportAccessOut(Schema):
 
 class SupportAccessUpdateIn(Schema):
     enabled: bool
+
+
+class SupportEnterIn(Schema):
+    username: str = Field(max_length=150, description="The local copy of the person of support: saas-support:<id>.")
+    name: str = Field("", max_length=150)
+    email: str = Field("", max_length=254)
+
+
+class SupportEnterOut(Schema):
+    entered: bool = Field(description="Whether the business let the person of support in: its support access is on.")

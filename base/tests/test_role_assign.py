@@ -8,14 +8,16 @@ and never a role that allows more than they may do themselves, of any app of the
 import json
 
 import pytest
+from live.meta import all_live_app_configs
 from live.models import OutboxEvent
+from live.operations import get as get_operation
 
 from base import events
 from base.apps_on import active_apps
 from base.models import Hub, HubUser, Membership
 from base.models.roles import BusinessRole
 from base.permissions import access_for, permissions_of_role
-from base.roles import OFF, ON
+from base.roles import APPROVAL, OFF, ON
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 from base.tests.roles import a_role, held_by
@@ -269,6 +271,50 @@ class TestNeverMoreThanWhoGivesIt:
         client.force_login(mara)
 
         assert refusal(assign(client, "saas:3", copy_of_the_manager)) == (403, "base.role_beyond_editor")
+
+    @pytest.mark.parametrize("sale_on", [True, False])
+    @pytest.mark.parametrize(("mine", "given"), [(OFF, False), (APPROVAL, True), (ON, True)])
+    def test_nor_one_that_does_with_approval_what_their_role_says_no_to(
+        self, client, mara, eva, monkeypatch, sale_on, mine, given
+    ):
+        hers = BusinessRole.objects.get(name="People")
+        hers.states = {**hers.states, "sale.void_sale": mine}
+        hers.save()
+        till = a_role("Till", base__view_home=ON, sale__void_sale=APPROVAL, **all_off("sale.void_sale"))
+        on = active_apps(A) - (set() if sale_on else {"sale"})
+        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: on)
+        client.force_login(mara)
+
+        response = assign(client, "saas:3", till)
+
+        if given:
+            assert response.status_code == 200, response.content
+        else:
+            assert refusal(response) == (403, "base.role_beyond_editor")
+            assert not HubUser.objects.filter(username="saas:3", business_role__isnull=False).exists()
+
+    @pytest.mark.parametrize(("mine", "given"), [(OFF, False), (APPROVAL, True)])
+    def test_nor_return_somebody_to_an_invitation_that_does_with_approval_what_their_role_says_no_to(
+        self, client, mara, eva, mine, given
+    ):
+        """Mara may do all an employee does; an employee voids with approval."""
+        hers = BusinessRole.objects.get(name="People")
+        approvable = {
+            get_operation(name).permission for config in all_live_app_configs() for name in getattr(config, "approvals", {})
+        }
+        hers.states |= dict.fromkeys(approvable, APPROVAL) | {"sale.void_sale": mine}
+        hers.states |= dict.fromkeys(permissions_of_role(EMPLOYEE), ON)
+        hers.save()
+        held_by(eva, a_role("Nothing", base__view_home=ON, **all_off()))
+        client.force_login(mara)
+
+        response = assign(client, "saas:3", "hub_employee")
+
+        if given:
+            assert response.status_code == 200, response.content
+        else:
+            assert refusal(response) == (403, "base.role_beyond_editor")
+            assert role_of("saas:3").name == "Nothing"
 
     def test_nor_return_somebody_to_an_invitation_that_allows_more(self, client, mara, eva):
         held_by(eva, a_role("Nothing", base__view_home=ON, **all_off()))

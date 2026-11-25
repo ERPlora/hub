@@ -536,7 +536,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   (F12) nunca los pide ni guarda los del responsable. La salida mide con el dispositivo que ficha la
   salida, no con el de la entrada. Las coordenadas se guardan solo si el negocio pide la ubicación y el
   dispositivo es personal; si no, solo distancia, dentro/fuera y precisión.
-- **Jornada olvidada** (`queries.is_stale`): abierta y con más horas que las de Ajustes. Se lee como
+- **Jornada olvidada** (`queries.days.is_stale`): abierta y con más horas que las de Ajustes. Se lee como
   «Por revisar» al momento (estado efectivo, sin tiempo trabajado y con su pausa parada), aunque la
   tarea aún no la haya marcado; `clock_out` y las pausas la rechazan con 409
   `attendance.day_needs_review`, y `clock_in` la marca.
@@ -562,7 +562,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   suyo); `tests/test_integration_staff.py` la prueba contra Personal real llamándola directamente.
 - **Panel del Inicio**: `widgets` de `apps.py` (`attendance.clocked_in_now`, KPI, `sm`, de serie, con
   `attendance.view_all`; sin `setup` ni `bell`), sobre `attendance.presence.count` (`map` `value` → `count`). El recuento y la lista de
-  Registros comparten la regla (`queries.present_records`: abierta, dentro de las horas de revisión y de una
+  Registros comparten la regla (`queries.presence.present_records`: abierta, dentro de las horas de revisión y de una
   ficha no dada de baja) y los eventos (`events.WHO_IS_IN`, el `refresh_on` del panel y el `live()` de las dos).
   `tests/test_integration_home.py` lo pasa por `base.widget.list` real, con dos negocios, y la e2e
   `tests/e2e/fix-attendance-setup-hooks.spec.ts`, por el Inicio del dueño en 390, 834 y 1440.

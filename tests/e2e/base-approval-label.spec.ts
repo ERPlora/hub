@@ -9,12 +9,13 @@
 // the write as written (`E2E-ASK`); the SaaS must be seeded with it (README of this folder, «El asistente»). The
 // owner's PIN exists only while this file runs, after the employee has entered (a PIN in hub `a` turns every browser's
 // way in into the PIN pad), and everything this file creates goes with it (`afterAll`).
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { approvalDialog, forgetThePin, forgetThePinAndTheApprovalsSince, ownerChoosesPin } from './approval-helpers';
 import { type Provider } from './assistant-provider';
 import { box, card, openPanelAtTheDesk } from './assistant-panel';
 import { emptyMonth } from './assistant-real';
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shot, shown, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { createItem } from './demo-items';
 import { seededProvider } from './provider-helpers';
 import { toastSaying } from './toast-helpers';
@@ -34,14 +35,6 @@ let employee: { context: BrowserContext; page: Page };
 let started = '';
 let itemId = '';
 
-/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => usernamesOf(email);
-
-/** No PIN of the owner's left behind, in any of their accounts: the business's way in stays erplora.com's. */
-function forgetThePin(): void {
-  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${accountsOf(OWNER.email)})`);
-}
-
 test.beforeAll(async ({ browser }) => {
   provider = await seededProvider();
   emptyMonth();
@@ -58,17 +51,11 @@ test.beforeAll(async ({ browser }) => {
   await device.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   // Only now the owner chooses a PIN («My profile»): who may approve, on the employee's device.
   forgetThePin();
-  const pin = await api<{ set: boolean }>(context, A, 'POST', '/me/pin', { pin: OWNER_PIN });
-  expect(pin.status, JSON.stringify(pin.data)).toBe(200);
+  await ownerChoosesPin(context, OWNER_PIN);
 });
 
 test.afterAll(async () => {
-  forgetThePin();
-  if (started) {
-    psql(
-      `DELETE FROM base_approval WHERE requested_by IN (${accountsOf(EMPLOYEE.email)}) AND operation = 'demo.item.add_line' AND created_at >= '${started}'`,
-    );
-  }
+  forgetThePinAndTheApprovalsSince(started, 'demo.item.add_line');
   if (itemId) await api(owner.context, A, 'POST', '/demo/items/delete', { id: itemId });
   emptyMonth();
   await employee?.context.close();
@@ -76,8 +63,6 @@ test.afterAll(async () => {
   await provider?.close();
 });
 
-/** «An approval is needed», over the screen that asked. */
-const approval = (page: Page): Locator => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('BASE-F84: the dialog says the figures of the very line it approves, and a manager approves it with their PIN', async () => {
@@ -88,7 +73,7 @@ test('BASE-F84: the dialog says the figures of the very line it approves, and a 
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
   await card(page).locator('[data-testid="assistant-confirm-submit"]').click();
 
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(SAID_ES);
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });

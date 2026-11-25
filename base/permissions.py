@@ -5,7 +5,7 @@ business gave the person (in the business's own database) and a fresh copy of th
 cannot go through one. This module only reads.
 """
 
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from typing import Any, NamedTuple
 
 from django.contrib.auth import get_user_model
@@ -43,9 +43,16 @@ class RoleHeld(NamedTuple):
     own: BusinessRole | None
 
 
+def is_a_person(actor: Any) -> bool:
+    """Whether ``actor`` is a signed-in person (a control user), not the platform, an API key or nobody."""
+    return hasattr(actor, "get_username") and bool(getattr(actor, "is_authenticated", False))
+
+
 def role_held(user: Any, scope: Scope) -> RoleHeld | None:
-    """The role of ``user`` on ``scope``, read from the business at work; ``None`` without a ``Membership`` there. The
-    owner keeps the role of their invitation whatever role of the business their row names."""
+    """The role of ``user`` on ``scope``, read from the business at work; ``None`` without a ``Membership`` there, as for
+    whoever is no person. The owner keeps the role of their invitation whatever role of the business their row names."""
+    if not is_a_person(user):
+        return None
     invitation = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
     if invitation is None:
         return None
@@ -76,11 +83,29 @@ def access_for(user: Any, scope: Scope) -> frozenset[str]:
     return permissions_of_role(held.invitation) if held.own is None else permissions_of_business_role(held.own)
 
 
+def states_of_business_role(
+    role: BusinessRole, configs: Iterable[LiveAppConfig], approvable: Collection[str] = frozenset()
+) -> dict[str, str]:
+    """What a role of the business does with each permission of ``configs`` it may hold. An app turned on after it was
+    saved does what it does for the basic role it came from (``base.roles``): what that role lacks of ``approvable`` it
+    leaves to approval."""
+    return roles.effective(role.states, grantable(configs), given=permissions_of_role(role.origin), approvable=approvable)
+
+
 def permissions_of_business_role(role: BusinessRole) -> frozenset[str]:
-    """What a role of the business allows, of every app of this deployment: one turned on later gives what it gives the
-    basic role it came from (``base.roles``)."""
-    allowed = roles.effective(role.states, grantable(all_live_app_configs()), given=permissions_of_role(role.origin))
+    """What a role of the business allows, of every app of this deployment."""
+    allowed = states_of_business_role(role, all_live_app_configs())
     return frozenset(permission for permission, state in allowed.items() if state == roles.ON)
+
+
+def refused_outright(user: Any, scope: Scope, approvable: Collection[str]) -> frozenset[str]:
+    """Which of ``approvable``, the permissions of commands a manager may approve (``base.approvals``), the role the
+    business gave ``user`` on ``scope`` says no to: refused, with no approval to ask for. A basic role says no to none."""
+    held = role_held(user, scope)
+    if held is None or held.own is None:
+        return frozenset()
+    states = states_of_business_role(held.own, all_live_app_configs(), approvable)
+    return frozenset(permission for permission in approvable if states.get(permission, roles.OFF) == roles.OFF)
 
 
 def grantable(configs: Iterable[LiveAppConfig]) -> dict[str, tuple[str, ...]]:
@@ -93,13 +118,13 @@ def grantable(configs: Iterable[LiveAppConfig]) -> dict[str, tuple[str, ...]]:
 
 def permissions_of_role(role: str) -> frozenset[str]:
     """What ``role`` (a ``Membership.Role``) gives on a host: the owner, every permission declared by every app; an
-    administrator, all of them but ``OWNER_ONLY``; manager and employee, what each app's ``role_permissions`` gives
-    them, which never names ``OWNER_ONLY`` (``base/tests/test_permissions.py``)."""
+    administrator and ERPlora's support, all of them but ``OWNER_ONLY``; manager and employee, what each app's
+    ``role_permissions`` gives them, which never names ``OWNER_ONLY`` (``base/tests/test_permissions.py``)."""
     configs = all_live_app_configs()
     declared = frozenset(permission for config in configs for permission in config.permissions)
     if role == Membership.Role.OWNER:
         return declared
-    if role == Membership.Role.ADMIN:
+    if role in (Membership.Role.ADMIN, Membership.SUPPORT):
         return declared - OWNER_ONLY
     return permissions_for_role(configs, role)
 

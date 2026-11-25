@@ -1,6 +1,7 @@
 """The roles a business makes for itself (``base.role.create``, ``update`` and ``delete``, BASE-F127 to BASE-F129) and who
 has each (``base.role.assign``, BASE-F130)."""
 
+from collections.abc import Mapping
 from functools import partial
 
 from django.db import IntegrityError
@@ -8,16 +9,16 @@ from django.utils import translation
 from django.utils.translation import gettext, gettext_lazy as _, ngettext
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, OperationError, PermissionDenied
+from live.meta import all_live_app_configs
 from live.operations import AI, atomic, on_commit, operation
 from live.outbox import record_event
 
 from base import events, queries, roles
 from base import people as people_rules
 from base.models import HubUser
+from base.approvals import approvable_permissions
 from base.models.roles import NAME_UNIQUE, BusinessRole
-from base.permissions import (
-    MANAGE_ROLES, OWNER_ONLY, RoleHeld, grantable, permissions_of_business_role, permissions_of_role,
-)
+from base.permissions import MANAGE_ROLES, OWNER_ONLY, RoleHeld, grantable, permissions_of_role, refused_outright
 from base.schemas.roles import RoleAssignIn, RoleAssignOut, RoleCreateIn, RoleDeleteOut, RoleIn, RoleRowOut, RoleUpdateIn
 from base.services.sessions import _account_id, _wake_open_apps
 
@@ -65,7 +66,7 @@ def role_create(ctx: OperationContext, data: RoleCreateIn) -> dict:
     else:
         origin, states = basic.value, _states_of_basic(ctx, basic.value)
     role = BusinessRole(name=_named(data.name), description=data.description.strip(), origin=origin, states=states)
-    _held_by_who_asks(ctx, permissions_of_business_role(role))
+    _held_by_who_asks(ctx, _does(RoleHeld(origin, role)))
     _save(role)
     record_event(ctx, events.ROLE_CREATED, {"id": str(role.pk)})
     return queries.roles.role_row(ctx.scope, role)
@@ -73,7 +74,7 @@ def role_create(ctx: OperationContext, data: RoleCreateIn) -> dict:
 
 def _states_of_basic(ctx: OperationContext, origin: str) -> dict[str, str]:
     on = queries.roles.configs_on(ctx.scope)
-    approved = queries.roles.approvable_permissions(on)
+    approved = approvable_permissions(on)
     return roles.effective({}, grantable(on), given=permissions_of_role(origin), approvable=approved)
 
 
@@ -136,9 +137,9 @@ def role_update(ctx: OperationContext, data: RoleUpdateIn) -> dict:
     if data.description is not None:
         role.description = data.description.strip()
     if data.states:
-        before = permissions_of_business_role(role)
+        before = _does(RoleHeld(role.origin, role))
         role.states = _changed_states(ctx, role, data.states)
-        _held_by_who_asks(ctx, permissions_of_business_role(role) - before)
+        _held_by_who_asks(ctx, roles.raised(before, _does(RoleHeld(role.origin, role))))
     _save(role)
     record_event(ctx, events.ROLE_UPDATED, {"id": str(role.pk)})
     on_commit(partial(_wake_open_apps, ctx.scope.key))
@@ -152,7 +153,7 @@ def _changed_states(ctx: OperationContext, role: BusinessRole, changes: dict[str
         message = gettext("That is only the owner's of the business: no role gives it.")
         raise PermissionDenied(message, code="base.role_owner_only", fields={"states": message})
     on = queries.roles.configs_on(ctx.scope)
-    apps, approved = grantable(on), queries.roles.approvable_permissions(on)
+    apps, approved = grantable(on), approvable_permissions(on)
     if not changes.keys() <= {permission for permissions in apps.values() for permission in permissions}:
         message = gettext("That permission is not of any app that is on in this business.")
         raise InvalidPayload(message, code="base.role_permission_unknown", fields={"states": message})
@@ -259,8 +260,7 @@ def role_assign(ctx: OperationContext, data: RoleAssignIn) -> dict:
         message = str(people_rules.ROLE_REFUSALS[why])
         raise PermissionDenied(message, code=why, fields={"person": message})
     held = RoleHeld(person["role"], _role_to_give(data.role, person))
-    given = permissions_of_role(held.invitation) if held.own is None else permissions_of_business_role(held.own)
-    _held_by_who_asks(ctx, given, field="role")
+    _held_by_who_asks(ctx, _does(held), field="role")
     HubUser.objects.update_or_create(
         username=person["id"],
         defaults={"business_role": held.own},
@@ -311,9 +311,16 @@ def _named(name: str) -> str:
     return name
 
 
-def _held_by_who_asks(ctx: OperationContext, given: frozenset[str], *, field: str = "states") -> None:
-    """Nobody gives a role what they may not do themselves, nor a person a role that allows it."""
-    if any(not ctx.has(permission) for permission in given):
+def _does(held: RoleHeld) -> dict[str, str]:
+    """What a role does with each permission of every app of this deployment, also one that is off today."""
+    return queries.roles.states_of(held, all_live_app_configs())
+
+
+def _held_by_who_asks(ctx: OperationContext, states: Mapping[str, str], *, field: str = "states") -> None:
+    """Nobody lets a role, or a person by a role, do more than they may do themselves: what it does they do too, and what
+    it leaves to approval their own role does not say no to."""
+    lacking = {permission: state for permission, state in states.items() if state != roles.OFF and not ctx.has(permission)}
+    if roles.ON in lacking.values() or refused_outright(ctx.actor, ctx.scope, lacking):
         message = gettext("A role may not allow more than you may do yourself.")
         raise PermissionDenied(message, code="base.role_beyond_editor", fields={field: message})
 

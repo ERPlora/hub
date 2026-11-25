@@ -80,7 +80,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     to a business. For who runs the business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state, plan, known = _plan_of(hub)
-    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).exclude(role__in=FREE_ROLES).count()
+    people = Membership.objects.team(ctx.scope.key).exclude(role__in=FREE_ROLES).count()
     devices = (
         SessionOwner.objects.filter(host=ctx.scope.key, session__expire_date__gt=timezone.now())
         .exclude(device_id=None)
@@ -91,7 +91,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     demo = hub is not None and hub.is_demo
     last = None if demo else _last_night(hub)
     counted = _counted_during_the_day(hub) if hub is not None and not demo else _NOTHING_COUNTED
-    shown = {config.label for config in home.shown_modules(demo_hub=demo)}
+    shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=demo)}
     return {
         "known": known,
         "demo": demo,
@@ -107,7 +107,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
         "connections": _connections_usage(hub, known, counted),
         "requests": {"this_month": counted.requests_this_month, "since": counted.requests_since},
         "activity": _activity_usage(hub, demo, last, counted),
-        "meters": _apps_meters(ctx, hub, home.home_modules(active_apps(ctx.scope), demo_hub=demo)),
+        "meters": _apps_meters(ctx, hub, home.shown_modules.home_modules(active_apps(ctx.scope), demo_hub=demo)),
     }
 
 
@@ -227,9 +227,9 @@ def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, cou
 
 
 def _apps_meters(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> list[dict]:
-    """What the apps on say their plan includes (``base.home.plan_meters``), read in the business's own database: none in
+    """What the apps on say their plan includes (``base.home.plan_meters.plan_meters``), read in the business's own database: none in
     a demo, which is not measured."""
-    return [] if hub is None or hub.is_demo else home.plan_meters(ctx, modules)
+    return [] if hub is None or hub.is_demo else home.plan_meters.plan_meters(ctx, modules)
 
 
 def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> int:

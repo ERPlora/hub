@@ -1,10 +1,11 @@
 """Charging an appointment at the till (APPOINTMENT-F17)."""
 
+import logging
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import AppInactive, Conflict, NotFound, PermissionDenied
+from live.errors import AppInactive, Conflict, NotFound, OperationError, PermissionDenied
 from live.operations import UnknownOperation, get, operation
 
 from apps.appointment import events
@@ -24,6 +25,8 @@ from apps.service.queries.catalog import needs_tax_setup
 NEEDS_TAX_SETUP = _(
     "“%(name)s” has no tax category: set it in Services before charging."
 )
+logger = logging.getLogger("apps.appointment.services")
+
 SALE_UNAVAILABLE = _(
     "The till (Sales) is not active in this business: the appointment cannot be charged there."
 )
@@ -47,8 +50,8 @@ SALE_UNAVAILABLE = _(
                 "hazle la cuenta a la cita de Paula",
             ),
         },
-        "description": "Charge an appointment at the till: opens a check in Sales linked to it, titled with the customer "
-        "and the appointment's number, with a line per service at the price booked and the professional who did it, "
+        "description": "Charge an appointment at the till: opens a check in Sales linked to it, in the customer's name, "
+        "titled with her and the appointment's number, with a line per service at the price booked and the professional who did it, "
         "so a voucher of the customer can pay one. While that check is open, charging again goes back to it. "
         "Charging the check then marks the appointment charged and completed.",
         "risk": "high",
@@ -79,6 +82,7 @@ def charge(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     if appointment.order_id != order.id:
         appointment.order_id = order.id
         appointment.save(update_fields=["order_id", "updated_at"])
+        _put_customer_on(ctx, appointment, order.id)
         _event(
             ctx, events.APPOINTMENT_CHECK_OPENED, appointment, order_id=str(order.id)
         )
@@ -131,6 +135,18 @@ def _open_check(ctx: OperationContext, appointment: Appointment):
             }
         ),
     )
+
+
+def _put_customer_on(ctx: OperationContext, appointment: Appointment, order_id: UUID) -> None:
+    """Puts the appointment's customer on its check, as the till's «Assign customer» does: the sale is then hers
+    and counts on her card. A card that can no longer go on a check (deleted, merged, erased) or a caller without
+    the right leaves the check without one, as it was: the till still shows «Assign customer»."""
+    link = get("customer.order.link")
+    data = {"order_id": str(order_id), "customer_id": str(appointment.customer_id)}
+    try:
+        link(ctx, link.input.model_validate(data))
+    except OperationError as refusal:
+        logger.info("appointment: check opened without the customer (%s)", refusal.code)
 
 
 def _charge_out(appointment: Appointment, order) -> dict:

@@ -30,8 +30,8 @@
     ]
   },
   {
-    "path": "apps/attendance/queries/__init__.py",
-    "file_name": "__init__.py",
+    "path": "apps/attendance/queries/days.py",
+    "file_name": "days.py",
     "functions": [
       {
         "name": "scoped_records",
@@ -498,20 +498,6 @@
     ]
   },
   {
-    "path": "base/home.py",
-    "file_name": "home.py",
-    "functions": [
-      {
-        "name": "plan_meter_errors",
-        "complexity": 17
-      },
-      {
-        "name": "module_steps",
-        "complexity": 44
-      }
-    ]
-  },
-  {
     "path": "base/management/commands/cut_shared_hubs.py",
     "file_name": "cut_shared_hubs.py",
     "functions": [
@@ -910,6 +896,26 @@
       {
         "name": "words_for",
         "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "base/home/plan_meters.py",
+    "file_name": "plan_meters.py",
+    "functions": [
+      {
+        "name": "plan_meter_errors",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "base/home/setup_steps.py",
+    "file_name": "setup_steps.py",
+    "functions": [
+      {
+        "name": "module_steps",
+        "complexity": 44
       }
     ]
   }

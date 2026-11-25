@@ -11,6 +11,7 @@ import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { saleRow as row } from '../__tests__/sale-row';
 import { business, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, POLISH } from '../__tests__/mount-sale';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import DocumentModal from '../components/document/DocumentModal.vue';
@@ -38,30 +39,6 @@ function words(el: Element): string {
   return out.join(' ');
 }
 const TODAY = { date_from: '2026-10-14', date_to: '2026-10-14' };
-
-const row = (id: string, over: Partial<SaleRow> = {}): SaleRow => ({
-  id,
-  number: `20261014-000${id.slice(1)}`,
-  business_day: '2026-10-14',
-  currency: 'EUR',
-  currency_decimals: 2,
-  created_at: '2026-10-14T10:05:00Z',
-  status: 'completed',
-  document_type: 'ticket',
-  customer_id: null,
-  customer_name: '',
-  payment_method_name: 'Cash',
-  staff_id: null,
-  total: 1250,
-  tax_total: 114,
-  refunded_total: 0,
-  refundable_total: 1250,
-  sessions_to_return: 0,
-  has_refunds: false,
-  invoice_status: 'issued',
-  documents_pending: false,
-  ...over,
-});
 
 const ROWS = [
   row('s1', { customer_name: 'Lucía Pérez' }),

@@ -33,7 +33,7 @@ def list_accounts(ctx: OperationContext, params: AccountListIn) -> dict:
             gettext("Permission “%(permission)s” is required.") % {"permission": ACCOUNT_PERMISSIONS[0]}
         )
     with_access = list(
-        Membership.objects.filter(host=ctx.scope.key, user__is_active=True).values_list("user__username", flat=True)
+        Membership.objects.team(ctx.scope.key).values_list("user__username", flat=True)
     )
     people = HubUser.objects.filter(username__in=with_access, is_active=True)
     if params.user_id:

@@ -259,7 +259,7 @@ def test_the_homes_step_is_your_tables_done_once_one_table_is_in_use():
         False,
     )
     assert "usable_tables" in registry[step.operation].output.model_fields
-    assert home.level_of(f"table.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"table.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():

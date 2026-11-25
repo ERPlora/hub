@@ -130,8 +130,12 @@ pide la página de un hub necesita `django_db`).
 **El negocio propio de ERPlora** (`Hub.is_platform`), el que emite sus facturas, se llama `PLATFORM_HUB_SLUG` (`erp`):
 el único nombre reservado que el Hub sirve como negocio (`base/platform_hub.py`), en su host, en `/admin/hub/erp/` y en el
 salto del personal. Los demás reservados responden 404, también `erplora`, el que tuvo antes. Nadie lo crea ni lo reclama
-(`base.hub.register`: 422 `base.slug_invalid` por su nombre, 409 `base.platform_hub_kept` por su id), lo da de baja ni lo
-vacía (409 `base.platform_hub_kept` en `base.hub.cancel` y `base.hub.reset`). Su fila nace con
+(`base.hub.register`: 422 `base.slug_invalid` por su nombre, 409 `base.platform_hub_kept` por su id), lo da de baja, lo
+restaura ni lo vacía (409 `base.platform_hub_kept` en `base.hub.cancel`, `base.hub.restore` y `base.hub.reset`). De la foto
+de erplora.com solo entran sus personas, con su versión: la fila guarda `members` y nada más, y el resto (estado, plan,
+apps, VeriFactu, WhatsApp, dominio) se ignora sin error (`base.services.platform_hub.people_only`), así que sus límites son
+los de plataforma (`limits.PLATFORM`). Esas personas entran en su dirección con el salto normal y su rol
+(`base/tests/test_platform_hub_people.py`). Su fila nace con
 `create_platform_hub --execute` y solo cambia de nombre con `create_platform_hub --rename --execute` (sin `--execute`, un
 ensayo), como cualquier cambio de dirección («Cambio de dirección web», abajo): su id y su BD siguen, van con él sus
 personas, quién entró y sus apps, y acaban las sesiones abiertas con el nombre anterior. Mientras la fila conserva el nombre anterior
@@ -154,10 +158,10 @@ Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v
 | `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged`, `base.platform_hub_kept` |
 | `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; `maintenance`, la congelación activa de la plataforma (`null` sin ella), y `move_scheduled_for`, cuándo empieza el traslado del negocio pedido para su madrugada (un instante en UTC; `null` sin traslado, una vez arrancado o cancelado); nunca dónde está su BD ni adónde se traslada; 404 |
 | `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged`, `base.platform_hub_kept` |
-| `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged` |
+| `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged`, `base.platform_hub_kept` |
 | `GET /internal/hubs/{id}/dumps` | `base.hub.dump_list` | 200 `{available, dumps: [{id, kind, created_at, bytes, url}]}`: las copias de sus datos de la más nueva a la más vieja (`id` = su clave en el bucket, `url` prefirmada de 15 min, descarga como fichero); `available: false` si nunca tendrá copia (sin BD propia, o dado de baja antes de terminarla); 200 también dado de baja; 404 desconocido o purgado; 503 `base.dumps_unavailable` sin bucket |
 | `GET /internal/usage?day=AAAA-MM-DD[&cursor=]` | `base.usage.list` | 200 `{day, hubs: [{id, s3_bytes, db_bytes, active_users_1d, active_users_30d}], next_cursor}`: lo que usó ese día (UTC) cada negocio con BD propia, medido esa noche (`base/usage.py`), por páginas de 500; 409 `usage_not_ready` antes de medirlo; 422 `internal.payload_invalid` sin `day`, mal escrito o con un cursor ajeno |
-| `PUT /internal/hubs/{id}/state` | `base.hub.state_apply` | 200 `{applied, version}`: guarda la foto si su versión es mayor y aplica el bloque VeriFactu y el estado del negocio y, con la app de WhatsApp activa en ese negocio, su clave `whatsapp` (el estado del número, con la versión de la foto, por `whatsapp_inbox.channel.sync`; apagada, la foto se aplica y la clave espera a la siguiente); 404; 422 si un bloque no cumple el contrato (no se guarda nada) |
+| `PUT /internal/hubs/{id}/state` | `base.hub.state_apply` | 200 `{applied, version}`: guarda la foto si su versión es mayor y aplica el bloque VeriFactu y el estado del negocio y, con la app de WhatsApp activa en ese negocio, su clave `whatsapp` (el estado del número, con la versión de la foto, por `whatsapp_inbox.channel.sync`; apagada, la foto se aplica y la clave espera a la siguiente); del negocio propio de ERPlora, solo sus `members`; 404; 422 si un bloque no cumple el contrato (no se guarda nada) |
 
 Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el de la ruta, 422
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
