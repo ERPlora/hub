@@ -19,7 +19,8 @@ export function mayBegin(access: Access, words: { no: string; approval: string }
     toastError(words.no);
     return false;
   }
-  if (access === 'approval') toastInfo(words.approval);
+  // At the top edge: the window that opens has its button at the bottom one.
+  if (access === 'approval') toastInfo(words.approval, { position: 'top' });
   return true;
 }
 

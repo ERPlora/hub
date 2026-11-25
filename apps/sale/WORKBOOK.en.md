@@ -1233,7 +1233,7 @@ cannot be read, "Its VeriFactu record could not be read, and its paper never pri
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
-<!-- from WORKBOOK.md sha256:dcf1c15629a5 -->
+<!-- from WORKBOOK.md sha256:4b57436eacba -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1246,7 +1246,7 @@ Steps:
 3. If your role voids "With approval", "An approval is needed" opens on top with "Approving: Void
    a sale": a manager taps their face and types their PIN (or swipes their badge) on that same device.
    Whoever has the permission does not see this question, nor does whoever their role says "No" to: no PIN lets them
-   void (BASE-F84).
+   void.
 4. "Sale voided" shows, the window closes, the row changes to Voided and the "Voided" figure goes up.
 In: the chosen sale.
 Out: the sale marked as voided with time, who and reason; it is not deleted (announces: sale voided).
@@ -1267,7 +1267,7 @@ nothing is voided, even if a manager had already approved it.
 Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
 
 ### SALE-F31 Refund a sale (all of it, part of it or through another method)
-<!-- from WORKBOOK.md sha256:817f6bb8b5a4 -->
+<!-- from WORKBOOK.md sha256:cf834b29ea28 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1288,7 +1288,7 @@ Steps:
 5. Write the "Reason" and press "Refund €12.00". If your role refunds "With approval", "An
    approval is needed" opens on top with "Approving: Refund a sale": a manager approves it with their PIN
    (or their badge) on that same device. Whoever has the permission does not see this question, nor does whoever their
-   role says "No" to: no PIN lets them refund (BASE-F84).
+   role says "No" to: no PIN lets them refund.
 6. "Refund recorded." shows; if nothing is left to refund, the sale changes to Refunded; if something is
    left, the row says "€6.00 left to refund".
 In: what was charged and what was already refunded for each payment method; the sale's lines and the ones

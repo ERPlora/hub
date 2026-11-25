@@ -62,7 +62,8 @@ describe('mayBegin', () => {
 
   it('what a manager approves begins, saying so first', () => {
     expect(mayBegin('approval', words)).toBe(true);
-    expect(toastInfo).toHaveBeenCalledExactlyOnceWith('A manager will have to approve it.');
+    // At the top edge: the window that opens has its button at the bottom one.
+    expect(toastInfo).toHaveBeenCalledExactlyOnceWith('A manager will have to approve it.', { position: 'top' });
     expect(toastError).not.toHaveBeenCalled();
   });
 

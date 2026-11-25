@@ -1193,7 +1193,7 @@ Pasos:
 3. Si tu rol anula «Con aprobación», sale encima «Hace falta una aprobación» con «Se aprueba: Anular
    una venta»: un responsable toca su cara y teclea su PIN (o pasa su placa) en ese mismo dispositivo.
    Quien tiene el permiso no ve esta pregunta, y a quien su rol le dice «No» tampoco le sale: no hay PIN que lo
-   deje anular (BASE-F84).
+   deje anular.
 4. Sale «Venta anulada», la ventana se cierra, la fila pasa a Anulada y la cifra «Anuladas» sube.
 Entra: la venta elegida.
 Sale: la venta marcada como anulada con hora, quién y motivo; no se borra (avisa: venta anulada).
@@ -1235,7 +1235,7 @@ Pasos:
 5. Escribe el «Motivo» y pulsa «Devolver 12,00 €». Si tu rol devuelve «Con aprobación», sale encima
    «Hace falta una aprobación» con «Se aprueba: Devolver una venta»: un responsable la aprueba con su PIN
    (o su placa) en ese mismo dispositivo. Quien tiene el permiso no ve esta pregunta, y a quien su rol le dice «No»
-   tampoco le sale: no hay PIN que lo deje devolver (BASE-F84).
+   tampoco le sale: no hay PIN que lo deje devolver.
 6. Sale «Devolución registrada.»; si ya no queda nada por devolver, la venta pasa a Devuelta; si
    queda, la fila dice «Por devolver 6,00 €».
 Entra: lo cobrado y lo ya devuelto por cada forma de pago; las líneas de la venta y las que ya

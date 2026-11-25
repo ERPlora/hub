@@ -4,12 +4,8 @@
 // (employee@example.com, who may neither void nor refund) sees «Void» and «Refund» in Sales; confirming either opens
 // «An approval is needed» over the window, the owner approves it with their PIN on the cashier's own device and it is
 // done once, as the server then says; «Cancel» leaves the refusal inside the window, which stays open, and nothing is
-// voided. Screenshots of the dialog over Sales in the three viewports. The owner's PIN exists only while this file
-// runs, after the cashier has entered (a PIN in hub `a` turns every browser's way in into the PIN pad:
-// base-access.spec.ts), and the approvals it records go with it, as everything else this file creates (`afterAll`).
-// The owner and the cashier are told by their session, not by their email (a hub
-// database kept from a stack whose SaaS was created again holds an older account with each email), and the PIN and
-// the approvals of every account of those emails go before and after, so a run that failed leaves the next one clean.
+// voided. Screenshots of the dialog over Sales in the three viewports. The owner's PIN and the approvals go with the
+// file (sale-approval-helpers.ts), as everything else it creates (`afterAll`).
 // SALE-F30, F32 and BASE-F84: what the approved void asks of other
 // apps goes with it by the platform's rule: a sale paid with Lucía's voucher and a shampoo by card, voided by the
 // cashier with the owner's PIN, gives its session back to the voucher and its rectifying invoice is issued in the void
@@ -22,11 +18,12 @@
 // figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { A, api, login, psql, shot, shown, untilStill } from './helpers';
 import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
+import { approvalDialog, findSale, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, saleRow } from './sale-approval-helpers';
 import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
@@ -36,7 +33,6 @@ const KEY = 'FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL';
 const VOUCHER_KEY = 'FIX-HUB-SALE-OWN-COPY-OF-APPROVED-COMMAND-CONSEQUENCES';
 const FIGURE_KEY = 'FIX-HUB-SALE-APPROVAL-WITHOUT-FIGURE-DECLARATION';
 const SKU = `E2E-APR-${stamp()}`;
-const OWNER_PIN = '2468';
 /** The dialog over Sales at a phone, a tablet and a desk (the SaaS panel's `VIEWPORTS`). */
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -56,18 +52,6 @@ let cashierName = '';
 let article: Product;
 /** The till's discount settings as the run found them (`null`: not read yet), given back after it. */
 let discountsWere: { allow_discounts: boolean; max_discount_percent: number } | null = null;
-
-/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => usernamesOf(email);
-
-/**
- * No PIN of the owner's left behind, in any of their accounts (the business's way in stays erplora.com's), and no
- * approval of a Sales action the cashier asked for, in any of theirs.
- */
-function forgetThePinAndTheApprovals(): void {
-  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${accountsOf(OWNER.email)})`);
-  psql(`DELETE FROM base_approval WHERE requested_by IN (${accountsOf(EMPLOYEE.email)}) AND operation LIKE 'sale.%'`);
-}
 
 test.beforeAll(async ({ browser }) => {
   // What a run that failed left: with the owner's PIN still set, the way in to hub `a` asks for a PIN and the logins
@@ -89,9 +73,8 @@ test.beforeAll(async ({ browser }) => {
   toVoid = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toRefund = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toKeep = await chargeByApi(till, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
-  // Only now the owner chooses a PIN («My profile»): who may approve, on the cashier's device.
-  const pin = await api<{ set: boolean }>(context, A, 'POST', '/me/pin', { pin: OWNER_PIN });
-  expect(pin.status, JSON.stringify(pin.data)).toBe(200);
+  // Only now: a PIN of the business's turns the next way in into the PIN pad.
+  await ownerChoosesPin(context);
 });
 
 test.afterAll(async () => {
@@ -111,27 +94,6 @@ test.afterAll(async () => {
   await owner?.context.close();
 });
 
-const row = (page: Page, sale: SaleOut) => shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
-
-/** Sales, searched for `sale`'s number, with its row painted. */
-async function find(page: Page, sale: SaleOut): Promise<void> {
-  await page.goto(`${A}/sale/sales`);
-  await shown(page).locator('[data-testid=sales-table-row], [data-testid=sales-empty]').first().waitFor({ state: 'visible' });
-  await shown(page).locator('[data-testid=sales-table-search] input').fill(sale.number);
-  await expect(row(page, sale)).toBeVisible();
-}
-
-/** «An approval is needed», over the window that asked. */
-const approval = (page: Page) => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
-
-/** The owner approves on the cashier's device: their face (when there is a choice) and their PIN. */
-async function ownerApproves(page: Page): Promise<void> {
-  const dialog = approval(page);
-  const faces = dialog.getByTestId('pin-face');
-  if (await faces.count()) await faces.first().click();
-  for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
-}
-
 interface Detail {
   status: string;
   voided_by: string;
@@ -145,13 +107,13 @@ async function detail(sale: SaleOut): Promise<Detail> {
 
 /** The cashier asks to void `sale` from Sales with `reason`: «An approval is needed» opens over the window. */
 async function askToVoid(page: Page, sale: SaleOut, reason: string) {
-  await find(page, sale);
+  await findSale(page, sale);
   await rowAction(page, 'sales-table', sale.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill(reason);
   await modal.locator('[data-testid=sale-void-submit]').click();
-  return { modal, dialog: approval(page) };
+  return { modal, dialog: approvalDialog(page) };
 }
 
 /** Lucía's sale: a haircut paid with a session of her voucher and the shampoo by card, charged with its ticket at
@@ -178,14 +140,14 @@ const sessionOf = (sale: SaleOut): string =>
 
 test('SALE-F30: the cashier voids a charged ticket and the owner approves it with their PIN', async () => {
   const { page } = cashier;
-  await find(page, toVoid);
+  await findSale(page, toVoid);
   await rowAction(page, 'sales-table', toVoid.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e wrong ticket');
   await modal.locator('[data-testid=sale-void-submit]').click();
 
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Void a sale|Se aprueba: Anular una venta)$/);
   await expect(dialog.getByTestId('pinpad').or(dialog.getByTestId('pin-face').first())).toBeVisible();
   for (const viewport of VIEWPORTS) {
@@ -199,7 +161,7 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
   await expect(toastSaying(page, /Sale voided|Venta anulada/)).toBeVisible();
-  await expect(row(page, toVoid)).toContainText(/Voided|Anulada/);
+  await expect(saleRow(page, toVoid)).toContainText(/Voided|Anulada/);
   const stored = await detail(toVoid);
   expect([stored.status, stored.void_reason, stored.voided_by]).toEqual(['voided', 'e2e wrong ticket', cashierName]);
   // Once: the approval is spent with the void, and Employees › Approvals keeps who approved it.
@@ -208,7 +170,7 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
 
 test('SALE-F31: the cashier refunds a charged ticket and the owner approves it with their PIN', async () => {
   const { page } = cashier;
-  await find(page, toRefund);
+  await findSale(page, toRefund);
   await rowAction(page, 'sales-table', toRefund.id, 'refund');
   const modal = page.locator('ion-modal[data-testid=sale-refund]');
   await expect(modal).toBeVisible();
@@ -217,26 +179,26 @@ test('SALE-F31: the cashier refunds a charged ticket and the owner approves it w
   await modal.locator('[data-testid=refund-reason] textarea, [data-testid=refund-reason] input').first().fill('e2e returned');
   await modal.locator('[data-testid=refund-confirm]').click();
 
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Refund a sale|Se aprueba: Devolver una venta)$/);
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
   await expect(toastSaying(page, /Refund recorded\.|Devolución registrada\./)).toBeVisible();
   await expect.poll(async () => (await detail(toRefund)).status).toBe('refunded');
-  await expect(row(page, toRefund)).toContainText(/Refunded|Devuelta/);
+  await expect(saleRow(page, toRefund)).toContainText(/Refunded|Devuelta/);
 });
 
 test('SALE-F30: «Cancel» on the approval leaves its refusal inside the window, and nothing is voided', async () => {
   const { page } = cashier;
-  await find(page, toKeep);
+  await findSale(page, toKeep);
   await rowAction(page, 'sales-table', toKeep.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e not approved');
   await modal.locator('[data-testid=sale-void-submit]').click();
 
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toBeVisible();
   await dialog.getByTestId('approval-cancel').click();
   await expect(dialog).toBeHidden();
@@ -265,7 +227,7 @@ test('SALE-F30, SALE-F32: an approved void of a sale paid with a voucher gives t
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
-  await expect(row(page, sale)).toContainText(/Voided|Anulada/);
+  await expect(saleRow(page, sale)).toContainText(/Voided|Anulada/);
   // What the cashier may not do on their own went with the approved void, once.
   const stored = await detail(sale);
   expect([stored.status, stored.voided_by, stored.void_invoice_status]).toEqual(['voided', cashierName, 'issued']);
@@ -332,7 +294,7 @@ test('SALE-F14: a line discount above the maximum says its 50 % in «Hace falta 
   await keys(page, '50');
   await page.locator('[data-testid=pos-discount-apply]:visible').click();
 
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(approving('Descontar una línea un 50 %'));
   await expect(dialog.getByTestId('pinpad').or(dialog.getByTestId('pin-face').first())).toBeVisible();
   for (const viewport of VIEWPORTS) {
@@ -363,7 +325,7 @@ test('SALE-F14: a fixed discount on the check above the maximum says its amount 
   await keys(page, String(off / 10 ** money.decimals));
   await page.locator('[data-testid=pos-discount-apply]:visible').click();
 
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(approving(`Descontar ${money.said(off)} de la cuenta`));
   await ownerApproves(page);
   await expect(dialog).toBeHidden();

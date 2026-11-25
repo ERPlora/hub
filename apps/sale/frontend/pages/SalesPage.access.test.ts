@@ -67,7 +67,7 @@ describe('SalesPage: before a void or a refund begins', () => {
     const s = await setup({ session: EMPLOYEE });
     await s.press(action);
     expect(s.opened()).toEqual(opened);
-    expect(toastInfo).toHaveBeenCalledExactlyOnceWith(said);
+    expect(toastInfo).toHaveBeenCalledExactlyOnceWith(said, { position: 'top' });
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -104,7 +104,7 @@ describe('SalesPage: before a void or a refund begins', () => {
   ])('«%s» with approval is said in the person’s language', async (action, said) => {
     const s = await setup({ session: EMPLOYEE, locale: 'es' });
     await s.press(action);
-    expect(toastInfo).toHaveBeenCalledExactlyOnceWith(said);
+    expect(toastInfo).toHaveBeenCalledExactlyOnceWith(said, { position: 'top' });
   });
 
   it('the actions are the same for everybody', async () => {
