@@ -1,17 +1,47 @@
 """Read operations of Online orders (``READ ONLY``): the tables with the code each one's QR carries, and the row of a
-table and its code that a regeneration answers with too.
+table and its code that a regeneration answers with too; and the table's page, which its QR opens without a session.
 
 The tables are Tables' own, read by its operations' names (``base.operations.call``) with the permission of whoever
 asks: whoever may not see the tables does not see their codes either.
+
+The page's reads (``online_order.public``, the one permission base's public door holds) name the table by its code and
+read the other apps with ``menu_reader(ctx)``: the same context able to read the table and the menu, and nothing that
+changes anything. A code that is no table's (regenerated, of a deleted table) is refused alike, saying nothing of the
+business.
 """
 
+from dataclasses import replace
+from typing import Any
+
+from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.operations import operation
+from live.errors import NotFound
+from live.operations import INTERNAL, operation
 
 from apps.online_order.models import TableCode
-from apps.online_order.schemas import TableCodeListIn, TableCodePage
-from base.operations import call
+from apps.online_order.schemas import (
+    PublicCodeIn,
+    PublicMenuOut,
+    PublicOptionsIn,
+    PublicOptionsOut,
+    TableCodeListIn,
+    TableCodePage,
+)
+from base.apps_on import active_apps
+from base.catalog_groups import every_row, product_groups
+from base.operations import business_name, call
 from base.qr import public_url
+
+PUBLIC = "online_order.public"
+#: What the page's reads add to the visitor's: its table and the menu, each a read.
+MENU_READS = frozenset(
+    {"table.view_table", "inventory.view_product", "inventory.view_category", "modifier.view", "combo.view"}
+)
+QR_NOT_ACTIVE = _("This QR is no longer active; ask the staff for help.")
+QR_NOT_ACTIVE_CODE = "online_order.qr_not_active"
+NOT_ON_MENU = _("This dish is not on the menu.")
+#: The most menus a page of ``combo.combo.for_sale`` gives.
+COMBO_PAGE = 50
 
 
 def page_url(ctx: OperationContext, code: str) -> str:
@@ -64,4 +94,114 @@ def list_qr_codes(ctx: OperationContext, params: TableCodeListIn) -> dict:
         "total": tables.total,
         "limit": params.limit,
         "offset": params.offset,
+    }
+
+
+def menu_reader(ctx: OperationContext) -> OperationContext:
+    """``ctx`` able to read the table and the menu in the other apps (and only that)."""
+    return replace(ctx, permissions=ctx.permissions | MENU_READS)
+
+
+def table_of(reader: OperationContext, code: str):
+    """The table whose QR carries ``code``, as Tables answers it; a code that opens no table's page is not found."""
+    found = TableCode.objects.filter(code=code).first()
+    if found is None:
+        raise NotFound(str(QR_NOT_ACTIVE), code=QR_NOT_ACTIVE_CODE)
+    try:
+        return call(reader, "table.table.get", {"id": found.table_id})
+    except NotFound as gone:
+        # A deleted table's code opens nothing, as an unknown code.
+        raise NotFound(str(QR_NOT_ACTIVE), code=QR_NOT_ACTIVE_CODE) from gone
+
+
+def _dish(row: Any) -> dict:
+    """A row of ``inventory.product.list_for_sale``, as the customer sees it."""
+    fields = ("id", "name", "description", "price", "image_url", "allergens")
+    return {field: getattr(row, field) for field in fields}
+
+
+def _combos(reader: OperationContext, allergens: dict) -> list[dict]:
+    """The menus on sale with their courses, each dish with its allergens; none while Menus and combos is off."""
+    if "combo" not in active_apps(reader.scope):
+        return []
+    return [
+        {
+            "id": combo.id,
+            "name": combo.name,
+            "price": combo.price,
+            "image_url": combo.image_url,
+            "courses": [
+                {
+                    "name": course.name,
+                    "min_choices": course.min_choices,
+                    "max_choices": course.max_choices,
+                    "choices": [
+                        {
+                            "name": choice.product_name,
+                            "price_delta": choice.price_delta,
+                            "allergens": allergens.get(choice.product_id, []),
+                        }
+                        for choice in course.options
+                    ],
+                }
+                for course in combo.groups
+            ],
+        }
+        for combo in every_row(reader, "combo.combo.for_sale", page_size=COMBO_PAGE)
+    ]
+
+
+@operation(
+    "online_order.public.menu",
+    kind="query",
+    permission=PUBLIC,
+    input=PublicCodeIn,
+    output=PublicMenuOut,
+    ai=INTERNAL,
+)
+def public_menu(ctx: OperationContext, data: PublicCodeIn) -> dict:
+    reader = menu_reader(ctx)
+    table = table_of(reader, data.code)
+    on_sale = list(every_row(reader, "inventory.product.list_for_sale"))
+    shown = [row for row in on_sale if row.show_on_website]
+    return {
+        "business_name": business_name(ctx.scope),
+        "table_number": table.number,
+        "zone_name": table.zone_name,
+        "groups": [{"name": name, "items": items} for _id, name, items in product_groups(reader, shown, _dish)],
+        "combos": _combos(reader, {row.id: list(row.allergens) for row in on_sale}),
+    }
+
+
+@operation(
+    "online_order.public.options",
+    kind="query",
+    permission=PUBLIC,
+    input=PublicOptionsIn,
+    output=PublicOptionsOut,
+    ai=INTERNAL,
+)
+def public_options(ctx: OperationContext, data: PublicOptionsIn) -> dict:
+    reader = menu_reader(ctx)
+    table_of(reader, data.code)
+    shown = (row for row in every_row(reader, "inventory.product.list_for_sale") if row.show_on_website)
+    if not any(row.id == data.product_id for row in shown):
+        raise NotFound(str(NOT_ON_MENU), code="online_order.not_on_menu")
+    groups = []
+    if "modifier" in active_apps(reader.scope):
+        groups = call(reader, "modifier.group.for_target", {"product_id": data.product_id}).groups
+    return {
+        "product_id": data.product_id,
+        "groups": [
+            {
+                "name": group.name,
+                "min_choices": group.min_choices,
+                "max_choices": group.max_choices,
+                "options": [
+                    {"name": option.name, "price_delta": option.price_delta, "allergens": option.allergens}
+                    for option in group.options
+                ],
+            }
+            for group in groups
+        ],
     }

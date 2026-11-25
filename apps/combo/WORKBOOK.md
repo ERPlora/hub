@@ -508,7 +508,8 @@ Pasos:
 Entra: el menú y la imagen elegida o la foto subida.
 Sale: el menú con su foto (avisa: menú cambiado); el TPV la enseña en su baldosa sin recargar
 (INVENTORY-F32), y la lista de menús, en su fila. La foto propia se guarda en la carpeta del negocio,
-la ven solo las personas del negocio y cuenta en el espacio de su plan; subir otra, elegir una de la
+la ve cualquiera, porque la carta de una mesa la enseña al cliente que escanea su QR (ONLINE_ORDER-F03), y cuenta en
+el espacio de su plan; subir otra, elegir una de la
 librería, «Quitar foto» o retirar el menú (COMBO-F04) la borra.
 Si falla: junto a «Foto», al elegirla, y no se sube nada: «La
 foto pesa más de 2 MB. Elige una más ligera.» y «Ese archivo no es una foto. Sube una imagen JPG, PNG o

@@ -17,14 +17,18 @@ PAGE = 100
 Group = tuple[str, str, list[dict]]
 
 
-def every_row(ctx: OperationContext, name: str, limit: int = MAX_ITEMS, **params: Any) -> Iterator[Any]:
-    """Every row of the list operation ``name`` (page by page), up to ``limit``; none when no installed app gives it."""
+def every_row(
+    ctx: OperationContext, name: str, limit: int = MAX_ITEMS, page_size: int | None = None, **params: Any
+) -> Iterator[Any]:
+    """Every row of the list operation ``name`` (page by page, ``PAGE`` rows or the list's own ``page_size``), up to
+    ``limit``; none when no installed app gives it."""
     if name not in registry:
         return
     op = get(name)
+    size = page_size or PAGE
     offset = 0
     while offset < limit:
-        page = op(ctx, op.input(limit=min(PAGE, limit - offset), offset=offset, **params))
+        page = op(ctx, op.input(limit=min(size, limit - offset), offset=offset, **params))
         yield from page.rows
         offset += len(page.rows)
         if not page.rows or offset >= page.total:

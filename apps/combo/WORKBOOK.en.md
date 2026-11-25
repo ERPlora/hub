@@ -513,7 +513,7 @@ on its own; meanwhile, they stay marked and nobody sells them.
 Involved: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 The menu's photo
-<!-- from WORKBOOK.md sha256:c04e4e6ef01b -->
+<!-- from WORKBOOK.md sha256:7b8055380345 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -528,7 +528,8 @@ Steps:
 In: the menu and the image chosen or the photo uploaded.
 Out: the menu with its photo (announces: menu changed); the till shows it on its tile without
 reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the
-business's folder, only the business's people see it and it counts against its plan's space; uploading
+business's folder, anyone sees it, because a table's menu shows it to the customer who scans its QR
+(ONLINE_ORDER-F03), and it counts against its plan's space; uploading
 another one, choosing one of the library, "Remove photo" or withdrawing the menu (COMBO-F04) deletes it.
 If it fails: next to "Photo", on choosing it, and nothing is
 uploaded: "The photo weighs more than 2 MB. Choose a lighter one." and "That file is not a photo. Upload
