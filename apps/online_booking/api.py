@@ -35,12 +35,12 @@ router = Router(tags=["online_booking"])
 
 @bind(router, "online_booking.booking.list", "/online_booking/bookings")
 async def booking_list(request, params: Query[BookingListIn]):
-    return await run_operation(request, queries.list_bookings, params)
+    return await run_operation(request, queries.bookings.list_bookings, params)
 
 
 @bind(router, "online_booking.booking.get", "/online_booking/bookings/detail")
 async def booking_get(request, params: Query[BookingRefIn]):
-    return await run_operation(request, queries.get_booking, params)
+    return await run_operation(request, queries.bookings.get_booking, params)
 
 
 @bind(router, "online_booking.booking.confirm", "/online_booking/bookings/confirm")
@@ -73,7 +73,7 @@ async def booking_delete(request, data: BookingRefIn):
 
 @bind(router, "online_booking.settings.get", "/online_booking/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "online_booking.settings.update", "/online_booking/settings")
@@ -93,22 +93,22 @@ async def settings_upload_logo(request, data: ImageUploadIn):
 
 @bind(router, "online_booking.public.page", "/online_booking/public/page")
 async def public_page(request):
-    return await run_operation(request, queries.public_page)
+    return await run_operation(request, queries.page.public_page)
 
 
 @bind(router, "online_booking.public.services", "/online_booking/public/services")
 async def public_services(request, params: Query[PublicServicesIn]):
-    return await run_operation(request, queries.public_services, params)
+    return await run_operation(request, queries.offer.public_services, params)
 
 
 @bind(router, "online_booking.public.slots", "/online_booking/public/slots")
 async def public_slots(request, params: Query[PublicSlotsIn]):
-    return await run_operation(request, queries.public_slots, params)
+    return await run_operation(request, queries.offer.public_slots, params)
 
 
 @bind(router, "online_booking.public.booking", "/online_booking/public/booking")
 async def public_booking(request, params: Query[TokenIn]):
-    return await run_operation(request, queries.public_booking, params)
+    return await run_operation(request, queries.links.public_booking, params)
 
 
 @bind(router, "online_booking.public.book", "/online_booking/public/book")
