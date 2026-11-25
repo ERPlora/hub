@@ -27,7 +27,7 @@ from apps.inventory.schemas.fields import (
     UnitCode,
     _text,
 )
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import ImageInCopyIn
 from base.sensitive import COSTS

@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 
 from apps.appointment.queries.availability import availability_slots
-from apps.appointment.schemas import SlotsIn
+from apps.appointment.schemas.availability import SlotsIn
 from apps.staff.models import Member
 
 from .conftest import (

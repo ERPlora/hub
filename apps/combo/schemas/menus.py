@@ -25,7 +25,7 @@ from apps.combo.schemas.fields import (
     TaxKey,
 )
 from apps.combo.schemas.references import ComboRefIn
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.recovery import ImageInCopyIn
 
 

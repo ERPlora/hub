@@ -1263,10 +1263,12 @@ carta de la página web (WEBSITE-F05) deja fuera los productos ocultos, también
 en sus 200 elementos; la página publicada lo refleja en la siguiente visita, como mucho al minuto. El TPV, Cocina y
 Menús no cambian: un producto oculto se sigue vendiendo, y agotarlo o desactivarlo no le quita la marca. Los productos
 que ya existían salen en la página web, como hasta ahora. Recuperar el negocio desde una copia aparte (BASE-F114)
-devuelve cada producto con su marca.
+devuelve cada producto con su marca. Una copia de seguridad o una plantilla de «Datos y copias» (BASE-F35) dice qué
+productos están ocultos y, al cargarla (BASE-F31), los que entran siguen ocultos; el producto que el negocio ya tenía
+se queda como estaba, y un archivo que no lo dice trae sus productos visibles.
 Si falla: el motivo sale encima de la tabla o dentro del formulario («No se pudo actualizar el producto» o el que dé
 la app). Quien no puede cambiar productos ve la línea de la ficha, pero no las acciones ni el formulario.
-Implicados: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F114
+Implicados: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F31, BASE-F35, BASE-F114
 
 ## Qué comparten los verticales
 
@@ -1585,7 +1587,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   `inventory.product.updated`. `list_for_sale` lo devuelve y admite `show_on_website=true|false`: la Página web pide
   `true`, así que lo oculto no ocupa sitio en su tope de elementos; el TPV no lo pide. Las acciones de la fila, con las
   de agotado, salen de `frontend/composables/useFlagActions.ts`. No entra en el CSV de importación y exportación, que no
-  lleva ninguna otra marca del producto salvo «Activo» en la exportación, ni en el fichero de «Datos y copias».
+  lleva ninguna otra marca del producto salvo «Activo» en la exportación. En el fichero de «Datos y copias», la fila de
+  un producto oculto lleva `show_on_website: false` y la de uno visible no lleva nada (`base/blueprint_products.py`); al
+  cargarla se aplica con `inventory.product.update`, tras la importación.
 - **Referencia de una venta (INVENTORY-F16, 2026-10-21)**: la nota por venta (`SaleStock`) guarda
   `sale_number` (del aviso `sale.sale.completed`) y `document_number` (el `invoice_number` que da
   `sale.sale.get`, leído como sistema al bajar el stock; vacío si Ventas no lo sabe). `inventory.movement.list`

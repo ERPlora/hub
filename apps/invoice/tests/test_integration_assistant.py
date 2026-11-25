@@ -88,6 +88,20 @@ def test_the_card_of_a_manual_invoice_says_its_two_dates(language, named, said):
     assert (labels(card), values(card)) == (named, said)
 
 
+@pytest.mark.parametrize(
+    ("language", "named"), [("es", "Retención de IRPF (%)"), ("en", "IRPF withholding (%)")]
+)
+def test_the_card_of_a_manual_invoice_says_its_withholding(language, named):
+    card = assistant.cards.card(get("invoice.invoice.create"), {"withholding_rate": 15}, language)
+    assert (labels(card), values(card)) == ([named], {"withholding_rate": 15})
+
+
+def test_the_assistant_may_only_ask_for_the_withholdings_of_the_list():
+    schema = get("invoice.invoice.create").input.model_json_schema()["properties"]["withholding_rate"]
+    [rates] = [choice["enum"] for choice in schema["anyOf"] if "enum" in choice]
+    assert rates == [15, 7, 1, 19]
+
+
 def test_the_card_names_a_series_next_number_as_its_form_does():
     for name in ("invoice.series.create", "invoice.series.update"):
         assert labels(assistant.cards.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]

@@ -8,14 +8,10 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.tax import queries, services
-from apps.tax.schemas import (
-    AliasIn,
-    AliasListIn,
-    AliasResolveIn,
-    CalculateIn,
-    CategoryGetIn,
-    CategoryIn,
-    CategoryListIn,
+from apps.tax.schemas.aliases import AliasIn, AliasListIn, AliasResolveIn
+from apps.tax.schemas.calculation import CalculateIn
+from apps.tax.schemas.categories import CategoryGetIn, CategoryIn, CategoryListIn
+from apps.tax.schemas.rules import (
     RuleBulkIn,
     RuleCountriesIn,
     RuleEndIn,
@@ -24,8 +20,8 @@ from apps.tax.schemas import (
     RuleParentIn,
     RuleRefIn,
     RuleStatusIn,
-    TaxSettingsIn,
 )
+from apps.tax.schemas.settings import TaxSettingsIn
 
 router = Router(tags=["tax"])
 

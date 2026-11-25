@@ -13,12 +13,8 @@ from apps.appointment.models import Recurring
 from apps.appointment.queries.access import CHANGE_OWN, may_change
 from apps.appointment.queries.booking import resolve_services
 from apps.appointment.queries.series import RECURRING_NOT_FOUND, find_series, load_series
-from apps.appointment.schemas import (
-    RecurringDeletedOut,
-    RecurringOut,
-    RecurringRefIn,
-    ServiceRefIn,
-)
+from apps.appointment.schemas.references import ServiceRefIn
+from apps.appointment.schemas.series import RecurringDeletedOut, RecurringOut, RecurringRefIn
 from apps.appointment.services.series import RECURRING_NO_STAFF
 from apps.appointment.services.writes import (
     CHANGE_OWN_ONLY,

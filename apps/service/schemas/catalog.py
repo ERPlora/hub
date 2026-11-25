@@ -24,7 +24,7 @@ from apps.service.schemas.fields import (
     Said,
     ServiceRefIn,
 )
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.sensitive import COSTS
 
 #: Services of one bulk create, as the old module (500).

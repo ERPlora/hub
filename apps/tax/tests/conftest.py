@@ -22,7 +22,10 @@ from psycopg.conninfo import make_conninfo
 from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.tax import queries
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
-from apps.tax.schemas import AliasListIn, AliasResolveIn, CalculateIn, CategoryListIn, RuleListIn
+from apps.tax.schemas.aliases import AliasListIn, AliasResolveIn
+from apps.tax.schemas.calculation import CalculateIn
+from apps.tax.schemas.categories import CategoryListIn
+from apps.tax.schemas.rules import RuleListIn
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room

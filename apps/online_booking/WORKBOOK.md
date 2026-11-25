@@ -505,7 +505,7 @@ del equipo con su sesión abierta.
   `apps/flow/events.py`); lo que hace con ellos es de FLOW-F21, que sigue `parcial`.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#673): nombra el registro que una escritura señala
   por su id con las marcas `refers` de Citas (`AN_APPOINTMENT`, `A_SERVICE`, `A_MEMBER` de
-  `apps/appointment/schemas.py`), leídas como quien pregunta: la reserva (el `id` de `BookingRefIn`, en
+  `apps/appointment/schemas/fields.py`), leídas como quien pregunta: la reserva (el `id` de `BookingRefIn`, en
   confirmar, completar, no presentada, cancelar y borrar) por su `label` con `appointment.appointment.get`,
   titulada «Reserva» como la lista; cada servicio de `service_ids` por su nombre con `service.service.get`, y
   el profesional (`staff_id`) por su nombre completo con `staff.member.detail`, en `public.book`. Sin el

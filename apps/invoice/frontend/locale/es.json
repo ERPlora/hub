@@ -47,7 +47,8 @@
       "substitution": "Sustituye a una factura simplificada",
       "rectification": "Rectificación",
       "refund": "Devolución de la venta",
-      "void": "Anulación de la venta"
+      "void": "Anulación de la venta",
+      "platform": "erplora.com"
     },
     "taxes": {
       "vat": "IVA",
@@ -56,6 +57,12 @@
       "exemptCause": "Exento ({cause})",
       "notSubject": "No sujeto",
       "reverseCharge": "Inversión del sujeto pasivo"
+    },
+    "withholding": {
+      "label": "Retención de IRPF",
+      "none": "Sin retención",
+      "of": "Retención IRPF {rate}",
+      "payable": "Total a pagar"
     },
     "taxPct": {
       "vat": "IVA %",

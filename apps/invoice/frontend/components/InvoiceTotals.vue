@@ -1,22 +1,28 @@
 <script setup lang="ts">
 // The breakdown and the totals of an open invoice (INVOICE-F17; the old detail's «Base / Impuestos /
 // Total»): one row per tax of the breakdown with its base and its amount («VAT 21%», «Equivalence surcharge
-// 5.2%», «Exempt (E1)», «Not subject», «Reverse charge»), then «Base», «Taxes» and «Total». The figures are
-// the server's; this only writes them in the page's language.
+// 5.2%», «Exempt (E1)», «Not subject», «Reverse charge»), then «Base», «Taxes» and «Total»; after it, when something is
+// withheld, «IRPF withholding 15%» and «Amount due». The figures are the server's; this only writes them in the page's
+// language.
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, moneyOf } from '../lib/format';
 import { taxRows } from '../lib/invoice';
+import { withholdingOf } from '../lib/withholding';
+import type { WithholdingOut } from '../invoice-withholding';
 import type { InvoiceOut } from '../operations';
 
-const props = defineProps<{ invoice: Pick<InvoiceOut, 'tax_breakdown' | 'base_amount' | 'tax_amount' | 'total_amount' | 'currency' | 'currency_decimals'> }>();
+const props = defineProps<{
+  invoice: Pick<InvoiceOut, 'tax_breakdown' | 'base_amount' | 'tax_amount' | 'total_amount' | 'currency' | 'currency_decimals'> & WithholdingOut;
+}>();
 
 const t = useT();
 const locale = useLocale();
 const money = (cents: number) => formatMoney(cents, locale.value, moneyOf(props.invoice));
 
 const taxes = computed(() => taxRows(props.invoice.tax_breakdown, t, locale.value));
+const withholding = computed(() => withholdingOf(props.invoice, t, locale.value));
 </script>
 
 <template>
@@ -41,6 +47,16 @@ const taxes = computed(() => taxRows(props.invoice.tax_breakdown, t, locale.valu
         class="invoice-totals__total"
         data-testid="invoice-detail-total"
       >{{ $t('invoice.detail.totals.total') }}: {{ money(invoice.total_amount) }}</span>
+      <template v-if="withholding">
+        <span
+          class="invoice-totals__total"
+          data-testid="invoice-detail-withholding"
+        >{{ withholding.label }}: {{ money(withholding.amount) }}</span>
+        <span
+          class="invoice-totals__total"
+          data-testid="invoice-detail-payable"
+        >{{ $t('invoice.withholding.payable') }}: {{ money(invoice.payable_amount) }}</span>
+      </template>
     </div>
   </div>
 </template>

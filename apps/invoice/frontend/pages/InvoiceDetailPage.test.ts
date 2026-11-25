@@ -51,6 +51,9 @@ const INVOICE: InvoiceOut = {
   customer_id_type: '',
   description: '',
   notes: 'Thanks',
+  withholding_rate: null,
+  withholding_amount: 0,
+  payable_amount: 1210,
   tax_breakdown: [{ tax: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate: '21.00', surcharge_rate: '0.00', base: 1000, quota: 210, surcharge_quota: 0 }],
   rectification_kind: '',
   sale_id: null,
@@ -120,6 +123,16 @@ describe('InvoiceDetailPage: what it shows', () => {
     expect([s.field('due-date'), s.field('status')]).toEqual(['11/13/2026', 'Overdue']);
     expect(s.find('invoice-detail-status').attributes('data-tone')).toBe('warning');
     expect(s.find('invoice-detail-due-date').element.previousElementSibling?.textContent).toBe('Due date');
+  });
+
+  it.each([
+    ['en', 'Paid'],
+    ['es', 'Pagada'],
+  ] as const)('one erplora.com issued says it comes from there, already paid, with nothing left to do (%s)', async (locale, paid) => {
+    const s = await setup({ locale });
+    await s.show({ ...INVOICE, source_type: 'platform', status: 'paid', can_mark_paid: false, can_rectify: false });
+    expect([s.field('source'), s.field('status')]).toEqual(['erplora.com', paid]);
+    expect(s.wrapper.find('.invoice-detail__actions').findAll('ion-button')).toHaveLength(0);
   });
 
   it('names the issuer with the tax ID its document prints: the EU VAT number of one in the ROI', async () => {

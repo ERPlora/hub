@@ -8,7 +8,7 @@ from ninja import Field, Schema
 from pydantic import StringConstraints
 
 from apps.inventory.schemas.fields import FILE_ROWS, MAX_BATCH, _text
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.allergens import AllergensCellIn
 from base.sensitive import COSTS
 

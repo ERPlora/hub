@@ -12,7 +12,7 @@ from live.operations import operation
 
 from apps.appointment import engine
 from apps.appointment.models import Appointment, Recurring
-from apps.appointment.schemas import RecurringDetailOut, RecurringGetIn, RecurringListIn, RecurringPage
+from apps.appointment.schemas.series import RecurringDetailOut, RecurringGetIn, RecurringListIn, RecurringPage
 from base.ordering import list_order_for
 from base.weekdays import weekday_name
 
