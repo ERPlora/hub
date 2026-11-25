@@ -26,6 +26,9 @@ const ON: SuggestionOut = {
   ],
 };
 
+/** What the charge reads with tips off: nothing to propose. */
+const OFF: SuggestionOut = { ...ON, enabled: false, suggestions: [] };
+
 const SALE = {
   id: 's1',
   number: '20261125-0001',
@@ -44,6 +47,12 @@ async function setup(read: SuggestionOut | null = ON, props: Record<string, unkn
   const record = (sale: SaleOut = SALE) =>
     (m.wrapper.vm as unknown as { afterCharge: (s: SaleOut, k: string) => Promise<void> }).afterCharge(sale, 'sale-key');
   return { ...m, added, choice, said, pressed, record };
+}
+
+/** The row is not painted and adds nothing to the charge. */
+function expectGone(s: Awaited<ReturnType<typeof setup>>): void {
+  expect(s.find('tip-step').exists()).toBe(false);
+  expect(s.added()).toEqual({ amount: 0, label: 'Tip', issue: '' });
 }
 
 describe('TipStep: what it reads', () => {
@@ -70,9 +79,7 @@ describe('TipStep: what it reads', () => {
   });
 
   it('with tips off: paints nothing and adds nothing', async () => {
-    const s = await setup({ ...ON, enabled: false, suggestions: [] });
-    expect(s.find('tip-step').exists()).toBe(false);
-    expect(s.added()).toEqual({ amount: 0, label: 'Tip', issue: '' });
+    expectGone(await setup(OFF));
   });
 });
 
@@ -131,9 +138,8 @@ describe('TipStep: choosing the tip', () => {
     await click(s.choice('tip-step-custom'));
     await ionValue(s.find('tip-step-amount').element, '2,50', 'ionInput');
     expect(s.added()?.amount).toBe(250);
-    await s.result(OP, { ...ON, enabled: false, suggestions: [] });
-    expect(s.find('tip-step').exists()).toBe(false);
-    expect(s.added()).toEqual({ amount: 0, label: 'Tip', issue: '' });
+    await s.result(OP, OFF);
+    expectGone(s);
   });
 
   it('once the sale is charged nothing changes', async () => {
