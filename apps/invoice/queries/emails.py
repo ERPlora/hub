@@ -114,17 +114,16 @@ def message_of(ctx: OperationContext, invoice_id) -> Message:
     ai={
         "asks": {
             "en": (
-                "did FACT-2025-000317 reach Carpintería Lema by email?",
-                "which address did we email FACT-2025-000317 to?",
+                "has Carpintería Lema been emailed theirs?",
+                "did what we mailed Nuria bounce back?",
             ),
             "es": (
-                "¿le llegó por correo la FACT-2025-000317 a Carpintería Lema?",
-                "¿a qué dirección de correo mandamos la FACT-2025-000317?",
+                "¿a Carpintería Lema ya se la mandamos por correo?",
+                "¿ha fallado el correo de Nuria?",
             ),
         },
         "description": "The emails one invoice was sent in, the newest first: to which address, when, whether each left "
         "and, if not, why; and the email on its customer's card.",
-        "risk": "normal",
     },
 )
 def list_emails(ctx: OperationContext, params: EmailListIn) -> dict:

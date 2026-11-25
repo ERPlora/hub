@@ -83,7 +83,7 @@ def _tell(ctx: OperationContext, name: str, email: InvoiceEmail) -> None:
         "asks": {
             "en": (
                 "email FACT-2025-000317 to Carpintería Lema",
-                "send FACT-2025-000317 by email to nuria@example.com",
+                "drop FACT-2025-000317 into Carpintería Lema's inbox",
             ),
             "es": (
                 "mándale por correo la FACT-2025-000317 a Carpintería Lema",

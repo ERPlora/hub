@@ -1255,9 +1255,8 @@ msgid "emails of invoices"
 msgstr "correos de las facturas"
 
 #: schemas/emails.py
-msgctxt "invoice email"
-msgid "To"
-msgstr "Para"
+msgid "Send to"
+msgstr "Enviar a"
 
 #: queries/emails.py
 #, python-format

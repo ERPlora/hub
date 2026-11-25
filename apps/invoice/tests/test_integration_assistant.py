@@ -488,6 +488,7 @@ NAMED = {
     "invoice.invoice.rectify": ("invoice_id",),
     "invoice.invoice.rectify_from_refund": ("refund_id",),
     "invoice.invoice.rectify_from_void": ("sale_id",),
+    "invoice.invoice.send_email": ("invoice_id",),
     "invoice.invoice.substitute": ("customer_id", "invoice_id"),
     "invoice.series.update": ("series_id",),
 }
@@ -714,9 +715,9 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
-    # Positive control: the employee issues, prints and marks as paid (7 records); the manager, the admin and the owner
-    # run every one of the 11.
-    assert checked == 7 + 11 * 3
+    # Positive control: the employee issues, prints, emails and marks as paid (8 records); the manager, the admin and the
+    # owner run every one of the 12.
+    assert checked == 8 + 12 * 3
     assert unread == []
 
 

@@ -34,8 +34,12 @@ class InvoiceEmail(UUIDModel):
     # Why it was not sent; empty otherwise.
     error_code = models.CharField(pgettext_lazy("invoice email", "error code"), max_length=60, blank=True)
     # The caller's own key of the request: asking again with it sends nothing more.
-    attempt_key = models.UUIDField(
-        pgettext_lazy("invoice email", "request key"), null=True, blank=True, unique=True
+    attempt_key = models.CharField(
+        pgettext_lazy("invoice email", "request key"),
+        max_length=128,
+        null=True,
+        blank=True,
+        unique=True,
     )
     requested_at = models.DateTimeField(pgettext_lazy("invoice email", "requested at"), default=timezone.now)
     requested_by = models.CharField(

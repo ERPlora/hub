@@ -4,11 +4,13 @@ from pathlib import Path
 
 from live.live_registry import live_registry
 
+from apps.customer import events as customer_events
 from apps.invoice import events
 from apps.tax import events as tax_events
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
 TAX_EVENTS_SOURCE = Path(tax_events.__file__).read_text()
+CUSTOMER_EVENTS_SOURCE = Path(customer_events.__file__).read_text()
 INVOICE = [
     "invoice.invoice.issued",
     "invoice.invoice.rectified",
@@ -21,6 +23,17 @@ PREVIEW = [
     "invoice.invoice.rectified",
     "invoice.series.created",
     "invoice.series.updated",
+]
+# The emails of an invoice, and the address proposed: the one on the customer's card.
+EMAILS = [
+    "invoice.email.requested",
+    "invoice.email.sent",
+    "invoice.email.failed",
+    "customer.customer.updated",
+    "customer.customer.merged",
+    "customer.customer.deleted",
+    "customer.customer.erased",
+    "customer.customer.restored",
 ]
 # What a typed line starts with follows the business's territory and Taxes' rules (TAX-F11).
 TAX_RULES = [
@@ -50,6 +63,7 @@ def test_each_query_and_its_events():
         "invoice.invoice.get": INVOICE,
         "invoice.invoice.by_source": INVOICE,
         "invoice.invoice.document": INVOICE,
+        "invoice.email.list": EMAILS,
         "invoice.invoice.rectification_preview": PREVIEW,
         "invoice.invoice.line_defaults": TAX_RULES,
         "invoice.series.list": SERIES,
@@ -62,10 +76,11 @@ def test_each_query_and_its_events():
 
 
 def test_every_event_is_a_literal_of_events_py():
-    # Invoicing's own events, or those of Taxes (a requirement), each a literal of its app's events.py.
+    # Invoicing's own events, or those of Taxes and Customers (requirements), each a literal of its app's events.py.
+    sources = {"invoice": EVENTS_SOURCE, "tax": TAX_EVENTS_SOURCE, "customer": CUSTOMER_EVENTS_SOURCE}
     for on in invoice_queries().values():
         for event in on:
-            assert f'"{event}"' in (TAX_EVENTS_SOURCE if event.startswith("tax.") else EVENTS_SOURCE), event
+            assert f'"{event}"' in sources[event.partition(".")[0]], event
 
 
 def test_a_tax_rule_or_the_territory_re_runs_only_what_a_typed_line_starts_with():
@@ -86,6 +101,7 @@ def test_issuing_re_runs_the_lists_the_series_and_the_book_but_not_the_issuer():
     assert affected == set(invoice_queries()) - {
         "invoice.issuer.get",
         "invoice.invoice.line_defaults",
+        "invoice.email.list",
     }
 
 

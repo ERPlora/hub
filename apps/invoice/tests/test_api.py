@@ -22,6 +22,8 @@ ROUTES = {
     ("GET", "/invoice/invoices/document", "invoice.invoice.document"),
     ("GET", "/invoice/invoices/pdf", "invoice.invoice.pdf"),
     ("POST", "/invoice/invoices/print", "invoice.invoice.print"),
+    ("GET", "/invoice/invoices/emails", "invoice.email.list"),
+    ("POST", "/invoice/invoices/send_email", "invoice.invoice.send_email"),
     ("GET", "/invoice/invoices/line_defaults", "invoice.invoice.line_defaults"),
     ("POST", "/invoice/invoices", "invoice.invoice.create"),
     ("POST", "/invoice/invoices/from_sale", "invoice.invoice.create_from_sale"),

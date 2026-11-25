@@ -26,7 +26,7 @@ def test_an_email_waits_to_leave_until_it_is_sent(issuer):
 
 def test_one_request_is_one_email_and_those_without_a_key_are_never_the_same(issuer):
     invoice = stored(manual())
-    key = uuid.uuid4()
+    key = str(uuid.uuid4())
     logged(invoice, attempt_key=key)
     with pytest.raises(IntegrityError), atomic():
         logged(invoice, attempt_key=key)

@@ -4,13 +4,14 @@ import datetime as dt
 from typing import Annotated, Literal
 from uuid import UUID
 
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import BeforeValidator
 
 from apps.customer.schemas.fields import Email
 from apps.invoice.models import InvoiceEmail
 from apps.invoice.schemas.fields import InvoiceRefIn, _blank_to_none
+from apps.sale.schemas.fields import AttemptKey
 from base.sensitive import CUSTOMER_CONTACT
 
 EmailStatus = Literal[*InvoiceEmail.Status.values]
@@ -19,14 +20,13 @@ EmailStatus = Literal[*InvoiceEmail.Status.values]
 class SendEmailIn(InvoiceRefIn):
     to: Annotated[Email | None, BeforeValidator(_blank_to_none)] = Field(
         None,
-        title=pgettext_lazy("invoice email", "To"),
+        title=gettext_noop("Send to"),
         description="The one email address it goes to; without it, the one on the customer's card.",
     )
-    attempt_key: UUID | None = Field(
+    attempt_key: AttemptKey | None = Field(
         None,
-        description="A key of the caller's own for THIS email (a new UUID per email, the same on a retry): asking again "
+        description="A key of the caller's own for THIS email (a new one per email, the same on a retry): asking again "
         "with it never sends twice.",
-        json_schema_extra={"attempt_key": True},
     )
 
 
@@ -58,7 +58,7 @@ class EmailListOut(Schema):
 
 
 class EmailRefIn(Schema):
-    id: UUID
+    id: UUID = Field(description="Id of the email.")
 
 
 class EmailClaimOut(Schema):

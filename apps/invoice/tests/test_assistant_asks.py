@@ -25,9 +25,9 @@ from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place, offered_to, without_its_asks
 from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
 
-#: Invoicing's assistant tools: its reads (invoices, their A4 page, its PDF and what a sale or a refund has, a manual line's
+#: Invoicing's assistant tools: its reads (invoices, their A4 page, its PDF, its emails and what a sale or a refund has, a manual line's
 #: rate, the rectification it would issue, the issuer, the numbering and its series) and its writes (issue by hand or
-#: from a sale, replace a ticket, mark paid, print, rectify by hand, from a refund or from a void, the issuer and the
+#: from a sale, replace a ticket, mark paid, print, email, rectify by hand, from a refund or from a void, the issuer and the
 #: series). What only the platform does (the hub of ERPlora's own invoices, the issuer from the account) is
 #: ``INTERNAL``.
 TOOLS = {
@@ -52,6 +52,8 @@ TOOLS = {
     "invoice.invoice.substitute",
     "invoice.invoice.mark_paid",
     "invoice.invoice.print",
+    "invoice.invoice.send_email",
+    "invoice.email.list",
     "invoice.invoice.rectify",
     "invoice.invoice.rectify_from_refund",
     "invoice.invoice.rectify_from_void",
@@ -186,6 +188,10 @@ OWN_WORDS = [
     ("en", "invoice.invoice.mark_paid", "Talleres Gómez settled what they owed us yesterday"),
     ("es", "invoice.invoice.print", "saca en papel la FACT-2025-000412"),
     ("en", "invoice.invoice.print", "FACT-2025-000412 on paper for the binder, please"),
+    ("es", "invoice.invoice.send_email", "hazle llegar a Talleres Mercedes la FACT-2025-000412 a su email"),
+    ("en", "invoice.invoice.send_email", "Talleres Mercedes want theirs dropped into their inbox"),
+    ("es", "invoice.email.list", "el correo de Talleres Mercedes, ¿ha fallado o les llegó?"),
+    ("en", "invoice.email.list", "what we mailed Talleres Mercedes yesterday, did it bounce?"),
     ("es", "invoice.invoice.rectify", "la de Talleres Mercedes tiene un error en el importe: hazle su negativo"),
     ("en", "invoice.invoice.rectify", "the Talleres Mercedes one has the wrong amount: fix it with an R1"),
     (
@@ -209,7 +215,7 @@ OWN_WORDS = [
 ]
 
 
-def test_invoice_offers_its_twenty_seven_tools():
+def test_invoice_offers_its_twenty_nine_tools():
     """Invoicing's assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
     tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
