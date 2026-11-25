@@ -204,27 +204,30 @@ def test_the_withholding_has_its_own_columns_only_in_a_file_that_has_one(issuer)
 
 
 def test_the_withholding_of_several_rates_is_shared_out_by_their_base_to_the_cent(issuer):
-    invoice = manual(line(333, "21"), line(333, "10"), line(334, "4"), withholding_rate=15)
+    invoice = manual(line(1000, "21"), line(2001, "10"), line(333, "4"), withholding_rate=15)
 
     rows = values(export())
 
-    # 15 % of 10.00 € is 1.50 €: 0.4995, 0.4995 and 0.5010 € of it.
-    assert [row["Withholding"] for row in rows] == [-0.5, -0.5, -0.5]
-    assert sum(Decimal(str(row["Withholding"])) for row in rows) * 100 == -invoice.withholding_amount == -150
+    # 15 % of 33.34 € is 5.00 €: 1.4997, 3.0010 and 0.4994 € of it, so the cents left go to the first and the last.
+    assert [row["Withholding"] for row in rows] == [-1.5, -3, -0.5]
+    assert sum(Decimal(str(row["Withholding"])) for row in rows) * 100 == -invoice.withholding_amount == -500
     assert sum(Decimal(str(row["Amount due"])) for row in rows) * 100 == invoice.payable_amount
     for row in rows:
         assert Decimal(str(row["Amount due"])) == Decimal(str(row["Total"])) + Decimal(str(row["Withholding"]))
 
 
-def test_the_withholding_of_a_rectifying_invoice_goes_back(issuer):
-    original = manual(line(333, "21"), line(667, "10"), withholding_rate=15)
+def test_the_withholding_of_a_rectifying_invoice_goes_back_row_by_row(issuer):
+    original = manual(line(1000, "21"), line(3000, "10"), withholding_rate=15)
     rectifying = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
 
-    sums = {original.number: Decimal(0), rectifying.number: Decimal(0)}
-    for row in values(export()):
-        sums[row["Number"]] += Decimal(str(row["Withholding"]))
+    rows = [(row["Number"], row["Withholding"], row["Amount due"]) for row in values(export())]
 
-    assert sums == {original.number: Decimal("-1.5"), rectifying.number: Decimal("1.5")}
+    assert rows == [
+        (original.number, -1.5, 10.6),
+        (original.number, -4.5, 28.5),
+        (rectifying.number, 1.5, -10.6),
+        (rectifying.number, 4.5, -28.5),
+    ]
 
 
 def test_the_withholding_goes_with_the_equivalence_surcharge(issuer, equivalence_surcharge):
