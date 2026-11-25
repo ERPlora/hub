@@ -4,7 +4,7 @@ assistant's tools: every input field carries a ``description``).
 Every input refuses a field it does not declare (a filter that does not exist is a 422). A task can be
 named by its id, its number or its title; a project by its id, its code or its name; a person by
 their id or their name: the assistant is used by voice («complete the task clean the store room»,
-«assign it to Ana»). ``queries.resolve_task``, ``queries.resolve_project`` and Staff's
+«assign it to Ana»). ``queries.reads.resolve_task``, ``queries.reads.resolve_project`` and Staff's
 ``resolve_member`` turn the text into the record.
 """
 
