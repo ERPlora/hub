@@ -119,7 +119,8 @@ def test_without_dishes_on_the_menu_the_page_has_no_groups(table_code):
 def test_a_set_menu_comes_with_its_courses_and_each_dish_s_allergens(table_code):
     combo = make_combo("Menu of the day", price=1350, kitchen_name="MENU")
     starters, mains = make_group(combo, "Starters"), make_group(combo, "Mains")
-    make_option(starters, make_product("Lentils", price=700, sku="LEN", show_on_website=False))
+    # A dish the menu offers but the business does not show on its own: its allergens still come with it.
+    make_option(starters, make_product("Lentils", price=700, sku="LEN", show_on_website=False, allergens=["celery"]))
     make_option(starters, make_product("Soup", price=600, sku="SOU", is_sold_out=True))
     make_option(mains, make_product("Hake", price=1400, sku="HAK", allergens=["fish"]), price_delta=200)
     [read] = menu(table_code).combos
@@ -133,7 +134,7 @@ def test_a_set_menu_comes_with_its_courses_and_each_dish_s_allergens(table_code)
                 "name": "Starters",
                 "min_choices": 1,
                 "max_choices": 1,
-                "choices": [{"name": "Lentils", "price_delta": 0, "allergens": []}],
+                "choices": [{"name": "Lentils", "price_delta": 0, "allergens": ["celery"]}],
             },
             {
                 "name": "Mains",
@@ -143,6 +144,21 @@ def test_a_set_menu_comes_with_its_courses_and_each_dish_s_allergens(table_code)
             },
         ],
     }
+
+
+def test_past_two_hundred_products_on_sale_no_dish_shown_on_the_menu_is_lost(table_code):
+    from apps.inventory.models import Product
+
+    # The kitchen's own, on sale but never shown: more of them than a list's cap.
+    Product.objects.bulk_create(
+        Product(name=f"Aaa staff {n:03}", sku=f"STAFF{n:03}", price=100, show_on_website=False) for n in range(200)
+    )
+    zucchini = make_product("Zucchini", price=650, sku="ZUC", allergens=["egg"])
+    make_option(make_group(make_combo("Menu of the day"), "Starters"), zucchini)
+    read = menu(table_code)
+    assert [item.name for group in read.groups for item in group.items] == ["Zucchini"]
+    assert [(choice.name, choice.allergens) for choice in read.combos[0].courses[0].choices] == [("Zucchini", ["egg"])]
+    assert [group.name for group in options(table_code, zucchini)] == []
 
 
 def test_with_menus_off_there_are_no_menus(table_code, hub_a):

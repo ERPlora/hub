@@ -6,6 +6,7 @@ import { IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
+import { ownImageUrl } from '../../../../base/frontend/lib/own-image';
 
 const props = defineProps<{
   name: string;
@@ -19,8 +20,7 @@ const props = defineProps<{
 defineEmits<{ open: [] }>();
 
 const { t, locale } = useBaseI18n();
-// The Hub serves the photos itself: only an address of its own is drawn.
-const photo = computed(() => (props.imageUrl.startsWith('/') && !props.imageUrl.startsWith('//') ? props.imageUrl : ''));
+const photo = computed(() => ownImageUrl(props.imageUrl));
 </script>
 
 <template>

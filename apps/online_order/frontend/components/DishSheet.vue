@@ -7,6 +7,7 @@ import { IonButton, IonImg, IonItem, IonLabel, IonList, IonListHeader, IonNote, 
 import { computed } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
+import { ownImageUrl } from '../../../../base/frontend/lib/own-image';
 import { choiceRule } from '../lib/choice-rule';
 import type { ChoiceOut } from '../operations';
 
@@ -37,10 +38,7 @@ const open = defineModel<boolean>('open', { required: true });
 defineEmits<{ retry: [] }>();
 
 const { t, locale } = useBaseI18n();
-const photo = computed(() => {
-  const url = props.dish.image_url;
-  return url.startsWith('/') && !url.startsWith('//') ? url : '';
-});
+const photo = computed(() => ownImageUrl(props.dish.image_url));
 
 function rule(group: ChoiceGroup): string {
   const [key, named] = choiceRule(group.min_choices, group.max_choices);

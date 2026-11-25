@@ -120,7 +120,7 @@ def _dish(row: Any) -> dict:
     return {field: getattr(row, field) for field in fields}
 
 
-def _combos(reader: OperationContext, allergens: dict) -> list[dict]:
+def _combos(reader: OperationContext) -> list[dict]:
     """The menus on sale with their courses, each dish with its allergens; none while Menus and combos is off."""
     if "combo" not in active_apps(reader.scope):
         return []
@@ -139,7 +139,7 @@ def _combos(reader: OperationContext, allergens: dict) -> list[dict]:
                         {
                             "name": choice.product_name,
                             "price_delta": choice.price_delta,
-                            "allergens": allergens.get(choice.product_id, []),
+                            "allergens": choice.allergens,
                         }
                         for choice in course.options
                     ],
@@ -162,14 +162,13 @@ def _combos(reader: OperationContext, allergens: dict) -> list[dict]:
 def public_menu(ctx: OperationContext, data: PublicCodeIn) -> dict:
     reader = menu_reader(ctx)
     table = table_of(reader, data.code)
-    on_sale = list(every_row(reader, "inventory.product.list_for_sale"))
-    shown = [row for row in on_sale if row.show_on_website]
+    shown = every_row(reader, "inventory.product.list_for_sale", show_on_website=True)
     return {
         "business_name": business_name(ctx.scope),
         "table_number": table.number,
         "zone_name": table.zone_name,
         "groups": [{"name": name, "items": items} for _id, name, items in product_groups(reader, shown, _dish)],
-        "combos": _combos(reader, {row.id: list(row.allergens) for row in on_sale}),
+        "combos": _combos(reader),
     }
 
 
@@ -184,7 +183,7 @@ def public_menu(ctx: OperationContext, data: PublicCodeIn) -> dict:
 def public_options(ctx: OperationContext, data: PublicOptionsIn) -> dict:
     reader = menu_reader(ctx)
     table_of(reader, data.code)
-    shown = (row for row in every_row(reader, "inventory.product.list_for_sale") if row.show_on_website)
+    shown = every_row(reader, "inventory.product.list_for_sale", show_on_website=True)
     if not any(row.id == data.product_id for row in shown):
         raise NotFound(str(NOT_ON_MENU), code="online_order.not_on_menu")
     groups = []

@@ -56,10 +56,12 @@ def test_the_products_go_under_their_categories_in_their_order_and_those_without
         ("Drinks", ["Cola", "Sangria"]),
         ("", ["Loose"]),
     ]
-    assert [category_id for category_id, _name, _items in groups[:3]] == [
+    # The last group is the one without a category, also for a product whose only category is deleted.
+    assert [category_id for category_id, _name, _items in groups] == [
         str(menu["food"].id),
         str(menu["aperitifs"].id),
         str(menu["drinks"].id),
+        "",
     ]
 
 
@@ -88,3 +90,21 @@ def test_a_list_no_installed_app_gives_has_no_rows():
 def test_the_group_without_a_category_goes_after_one_whose_category_is_past_the_list():
     grouped = {"": ("", [{"name": "Loose"}]), "gone": ("Archived", [{"name": "Old"}])}
     assert [name for _id, name, _items in catalog_groups.in_order(grouped, {})] == ["Archived", ""]
+
+
+def test_a_product_whose_only_category_was_not_read_goes_with_those_without_one(menu, monkeypatch):
+    from apps.inventory.models import Product, ProductCategory
+
+    vermouth = Product.objects.create(name="Vermouth", sku="VER", price=300)
+    ProductCategory.objects.create(product=vermouth, category=menu["aperitifs"])
+    ctx = reader()
+    # A category past the most a catalog reads: its products have no category of the ones read.
+    read = catalog_groups.product_categories(ctx)
+    monkeypatch.setattr(catalog_groups, "product_categories", lambda _ctx: [row for row in read if row.name != "aperitifs"])
+    products = [row for row in catalog_groups.every_row(ctx, "inventory.product.list_for_sale") if row.name != "Sangria"]
+    groups = catalog_groups.product_groups(ctx, products, lambda row: {"name": row.name})
+    assert [(category_id, name, [item["name"] for item in items]) for category_id, name, items in groups][-1] == (
+        "",
+        "",
+        ["Loose", "Vermouth"],
+    )

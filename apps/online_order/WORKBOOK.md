@@ -305,10 +305,11 @@ más.
   dan las lecturas del TPV. Un código que no es de ninguna mesa, el viejo de una regenerada o el de una mesa borrada
   dan el mismo 404 `online_order.qr_not_active`, sin nada del negocio.
 - La carta se agrupa por categoría con la misma pieza que la carta de Página web, `base/catalog_groups.py` (cada fila de
-  una lista de otra app, página a página, y los productos bajo sus categorías en su orden). Los alérgenos de los platos
-  de un menú salen de `inventory.product.list_for_sale`, que se lee entero una vez (también los platos que no se
-  muestran sueltos en la carta). Los suplementos de un plato se leen al abrirlo, como hace el TPV, y solo de un plato
-  de la carta (`online_order.not_on_menu` si no lo es).
+  una lista de otra app, página a página, y los productos bajo sus categorías en su orden). Los platos se leen ya
+  filtrados por «Mostrar en la carta» (`show_on_website=True`), como en Página web, con el mismo tope de 200: los que
+  el negocio no muestra no ocupan sitio. Los alérgenos de los platos de un menú los da `combo.combo.for_sale` con cada
+  elección, también los de un plato que no se muestra suelto en la carta. Los suplementos de un plato se leen al
+  abrirlo, como hace el TPV, y solo de un plato de la carta (`online_order.not_on_menu` si no lo es).
 - Las fotos de los productos y las de los menús se sirven sin sesión (`public_media` de Inventario y de Menús), porque
   las enseña esta página.
 - Las mesas borradas en Mesas no salen en la lista; su fila de `TableCode` se queda y no abre nada, porque la página

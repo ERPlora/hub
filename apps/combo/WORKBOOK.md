@@ -680,8 +680,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `kitchen_name`, `price` (céntimos), `supply_kind`, `sort_order`, `image` e `image_url` (su foto, COMBO-F14) y
   `groups[]` (`id`, `name`,
   `min_choices`, `max_choices` —0 sin límite—, `allow_repeat`, `options[]` con `id`, `product_id`,
-  `product_name`, `sku`, `price_delta`). Solo menús a la venta que se pueden completar y elecciones
-  disponibles.
+  `product_name`, `sku`, `price_delta` y `allergens`, los del plato en Inventario). Solo menús a la venta que se
+  pueden completar y elecciones disponibles. La carta de la mesa de Pedidos online lee de aquí los alérgenos de los
+  platos de un menú.
 - **Al pedir y al cobrar**: `combo.combo.resolve` con `{id | combo, choices: [{option_id |
   product (+ group), quantity}], amount?, channel?}`; `channel` (`dine_in`, `takeaway`, `delivery`)
   decide «en el local» o «para llevar», y sin él vale el ajuste del menú. Devuelve `combo_id`, `name`, `kitchen_name`,

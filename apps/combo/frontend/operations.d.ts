@@ -221,6 +221,8 @@ export interface SaleOptionOut {
   product_name: string;
   sku: string;
   price_delta: number;
+  /** Its dish's allergens, by their codes, in the regulation's order. */
+  allergens: string[];
 }
 
 export interface SaleGroupOut {

@@ -62,7 +62,7 @@ const OPTIONS: PublicOptionsOut = {
   ],
 };
 
-type Answer = PublicMenuOut | PublicOptionsOut | ApiError | 'hang';
+type Answer = PublicMenuOut | PublicOptionsOut | ApiError | 'hang' | Promise<PublicOptionsOut>;
 
 async function setup(menu: Answer = MENU, options: Answer = OPTIONS, locale: 'en' | 'es' = 'en') {
   const answers: Record<string, Answer[]> = { 'online_order.public.menu': [menu], 'online_order.public.options': [options] };
@@ -163,6 +163,46 @@ describe('TableMenu', () => {
     expect(s.call).not.toHaveBeenCalledWith('online_order.public.options', expect.anything());
     expect(words(s.inDoc('oo-menu-sheet')!)).toContain('Choose 1');
     expect(words(s.inDoc('oo-menu-choice-0-0')!)).toBe('Hake Allergens: Fish +€2.00');
+  });
+
+  it('draws no photo from another site', async () => {
+    const elsewhere = { ...MENU.groups[0].items[0], image_url: 'https://evil.example/cro.webp' };
+    const s = await setup({ ...MENU, groups: [{ name: 'Starters', items: [elsewhere] }] });
+    expect(s.inDoc('oo-menu-dish-p1')?.querySelector('img')).toBeNull();
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await settle();
+    expect(s.inDoc('oo-menu-sheet')?.querySelector('ion-img')).toBeNull();
+  });
+
+  it('opens a set menu without the error of the dish opened before it', async () => {
+    const s = await setup(MENU, new ApiError(0, 'network_error', 'offline'));
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await settle();
+    expect(s.inDoc('oo-menu-options-error')).not.toBeNull();
+    await click(s.inDoc('oo-menu-combo-m1'));
+    await settle();
+    expect(s.inDoc('oo-menu-options-error')).toBeNull();
+    expect(words(s.inDoc('oo-menu-sheet')!)).toContain('Hake');
+  });
+
+  it('paints the options of the dish open now, not a late answer for the one opened before', async () => {
+    let answerFirst: (read: PublicOptionsOut) => void = () => {};
+    const late = new Promise<PublicOptionsOut>((resolve) => {
+      answerFirst = resolve;
+    });
+    const toppings: PublicOptionsOut = {
+      product_id: 'p2',
+      groups: [{ name: 'Toppings', min_choices: 0, max_choices: 0, options: [{ name: 'Olive oil', price_delta: 0, allergens: [] }] }],
+    };
+    const s = await setup(MENU, OPTIONS);
+    s.answers['online_order.public.options'] = [late, toppings];
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await click(s.inDoc('oo-menu-dish-p2'));
+    await settle();
+    answerFirst(OPTIONS);
+    await settle();
+    const sheet = words(s.inDoc('oo-menu-sheet')!);
+    expect([sheet.includes('Toppings'), sheet.includes('Sauces')]).toEqual([true, false]);
   });
 
   it('says it is loading the menu until it arrives', async () => {

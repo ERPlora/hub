@@ -148,7 +148,7 @@ onMounted(load);
             </header>
             <EmptyState
               v-if="isEmpty"
-              icon="ion:restaurant-outline"
+              icon="ion:storefront-outline"
               :heading="t('online_order.menu.empty')"
               :message="t('online_order.menu.emptyMessage')"
               data-testid="oo-menu-empty"
