@@ -8,7 +8,7 @@ from live.outbox import channel_for
 from apps.flow.tests.test_relay import heard, listen
 from base.tenancy.context import use_hub
 
-from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, run
+from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, run, with_cash
 
 __all__ = ["listen"]
 
@@ -26,6 +26,7 @@ def test_the_registry_is_valid():
 def test_each_query_and_its_events():
     assert tip_queries() == {
         "tip.tip.list": TIPS,
+        "tip.tip.get": TIPS,
         # Its payment methods are Sales': a new one or one switched off changes what can be set.
         "tip.settings.get": ["tip.settings.updated", "sale.payment_method.created", "sale.settings.updated"],
     }
@@ -38,6 +39,10 @@ def test_every_live_query_has_a_permission():
 
 @HUB_DB_COMMITTED
 def test_a_tip_recorded_in_business_b_is_announced_to_b_only(listen, hub_b):
+    # Committed data of another test may have left a business without its cash method: each one is ready on its own.
+    with_cash()
+    with use_hub(hub_b):
+        with_cash(ctx_for(scope=B))
     on_a, on_b = listen(A), listen(B)
     with use_hub(hub_b):
         run("cash_register.settings.update", {"enable_cash_register": False}, ctx_for(scope=B))

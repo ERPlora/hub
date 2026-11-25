@@ -7,7 +7,7 @@ from uuid import UUID
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from ninja import Field, Schema
-from pydantic import ConfigDict, StringConstraints, ValidationInfo, field_validator, model_validator
+from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from apps.sale.schemas.fields import A_METHOD, A_SALE, AttemptKey, Closed, MethodType, Page, PageIn, PositiveCents
 from base.schemas.assistant import names
@@ -21,19 +21,20 @@ POOL_IN_CASH = _("The pool takes cash: leave the payment method out.")
 SAY_WHICH_TIP = _("Say which tip: its id or its sale's number.")
 SAY_REASON = _("Write the reason.")
 SAME_SUGGESTION = _("That suggestion is already there.")
-OVER_100 = _("A percentage goes up to 100.")
+SAY_PERCENT_OR_AMOUNT = _("Give each suggestion a percentage or an amount, not both.")
 NOTHING_TO_CHANGE = _("Say what changes: the amount or the person.")
 
 T_TIP = gettext_noop("Tip")
 T_SALE = gettext_noop("Sale")
 T_FOR = gettext_noop("For")
 A_MEMBER = names("staff.member.detail", name=("full_name",))
+# The card names a tip by its sale's number, as the person does («the tip of 20261114-0007»).
+A_TIP = names("tip.tip.get", name=("sale_number",))
 
 SaleNumber = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=24)]
 Reason = Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]
 Said = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 Status = Literal["active", "voided"]
-Kind = Literal["percent", "amount"]
 
 
 def _a_reason(value: str) -> str:
@@ -46,15 +47,16 @@ def _a_reason(value: str) -> str:
 
 
 class Suggestion(Schema):
-    kind: Kind = Field(description="percent: a share of the check's total before discounts; amount: cents.")
-    value: int = Field(gt=0, description="The percentage (1 to 100) or the amount in cents.")
+    """A percentage of the check's total before discounts, or an amount: one of the two."""
 
-    @field_validator("value")
-    @classmethod
-    def _percent_up_to_100(cls, value: int, info: ValidationInfo) -> int:
-        if info.data.get("kind") == "percent" and value > 100:
-            raise ValueError(str(OVER_100))
-        return value
+    percent: int | None = Field(None, ge=1, le=100, description="A percentage, 1 to 100.")
+    amount: PositiveCents | None = Field(None, description="An amount, in cents.")
+
+    @model_validator(mode="after")
+    def _one_of_the_two(self):
+        if (self.percent is None) == (self.amount is None):
+            raise ValueError(str(SAY_PERCENT_OR_AMOUNT))
+        return self
 
 
 class MethodSuggestionsIn(Closed):
@@ -66,7 +68,7 @@ class MethodSuggestionsIn(Closed):
     @field_validator("suggestions")
     @classmethod
     def _each_once(cls, suggestions: list[Suggestion]) -> list[Suggestion]:
-        if len({(s.kind, s.value) for s in suggestions}) < len(suggestions):
+        if len({(s.percent, s.amount) for s in suggestions}) < len(suggestions):
             raise ValueError(str(SAME_SUGGESTION))
         return suggestions
 
@@ -136,7 +138,7 @@ class TipAddIn(Closed):
 class TipRefIn(Closed):
     """A tip, by its id or by its sale's number (the one tip of that sale); the id wins."""
 
-    id: UUID | None = Field(None, title=T_TIP)
+    id: UUID | None = Field(None, title=T_TIP, json_schema_extra=A_TIP)
     sale: SaleNumber | None = Field(None, title=T_SALE, description="Its sale's number, when its id is not known.")
 
     @model_validator(mode="after")

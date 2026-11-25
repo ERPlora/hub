@@ -23,6 +23,7 @@ from .conftest import (
     ctx_for,
     open_session,
     refund,
+    run,
     void,
 )
 
@@ -108,3 +109,15 @@ def test_not_even_the_owner_s_whole_app_reaches_the_reactions(coffee):
     owner = dataclasses.replace(ctx_for(), permissions=frozenset({"tip.*"}))
     with pytest.raises(PermissionDenied):
         op(owner, op.input.model_validate({"sale_id": str(sale.id)}))
+
+
+def test_a_voided_sale_whose_cash_tip_no_longer_fits_in_the_drawer_still_voids_it(coffee):
+    open_session(0)
+    sale = charge()
+    add_tip(300, "cash", sale_id=str(sale.id))
+    run("cash_register.movement.add", {"type": "out", "amount": 400, "description": "to the bank"})
+    void(sale)
+    assert deliver("sale.sale.voided").changed == 1
+    assert statuses() == ["voided"]
+    # The drawer refuses a cash-out below zero: the tip goes back with its sale and leaves no line of its own.
+    assert not Movement.objects.filter(app="tip", type="out").exists()

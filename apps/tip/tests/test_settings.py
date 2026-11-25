@@ -11,7 +11,7 @@ from .conftest import HUB_DB, ctx_for, run
 
 pytestmark = HUB_DB
 
-FACTORY = [{"kind": "percent", "value": 3}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}]
+FACTORY = [{"percent": 3, "amount": None}, {"percent": 5, "amount": None}, {"percent": 10, "amount": None}]
 
 
 def settings(ctx=None):
@@ -35,7 +35,7 @@ def test_from_the_factory_tips_are_off_with_3_5_and_10_percent_for_every_active_
 
 
 def test_saving_turns_them_on_and_sets_the_suggestions_of_a_method():
-    mine = [{"kind": "amount", "value": 100}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}]
+    mine = [{"percent": None, "amount": 100}, {"percent": 5, "amount": None}, {"percent": 10, "amount": None}]
     saved = run(
         "tip.settings.update",
         {
@@ -59,7 +59,7 @@ def test_saving_the_same_records_nothing():
 
 
 def test_a_method_left_out_keeps_its_suggestions():
-    mine = [{"kind": "amount", "value": 100}, {"kind": "amount", "value": 200}, {"kind": "amount", "value": 500}]
+    mine = [{"percent": None, "amount": 100}, {"percent": None, "amount": 200}, {"percent": None, "amount": 500}]
     run("tip.settings.update", {"methods": [{"method_id": str(card().id), "suggestions": mine}]})
     run("tip.settings.update", {"enabled": True})
     assert by_method(settings())["Card"] == mine

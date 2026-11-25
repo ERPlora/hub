@@ -60,6 +60,7 @@ def test_its_operations_are_the_ones_of_this_layer():
         "tip.settings.get",
         "tip.settings.update",
         "tip.tip.add",
+        "tip.tip.get",
         "tip.tip.list",
         "tip.tip.update",
         "tip.tip.void",

@@ -1419,7 +1419,8 @@
       "tip__tip__list": "Buscar propinas",
       "tip__tip__add": "Anotar una propina",
       "tip__tip__update": "Ajustar una propina",
-      "tip__tip__void": "Anular una propina"
+      "tip__tip__void": "Anular una propina",
+      "tip__tip__get": "Consultar una propina"
     },
     "facts": {
       "created": "alta",

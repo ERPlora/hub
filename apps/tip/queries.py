@@ -13,7 +13,7 @@ from live.operations import operation
 from apps.sale.models import PaymentMethod
 from apps.sale.schemas.fields import EmptyIn
 from apps.tip.models import Settings, Tip
-from apps.tip.schemas import SettingsOut, TipListIn, TipPage, TipRefIn
+from apps.tip.schemas import SettingsOut, TipListIn, TipOut, TipPage, TipRefIn
 from base.business import business_zone
 from base.operations import call
 
@@ -22,7 +22,7 @@ TIP_NOT_FOUND = _("That tip no longer exists.")
 SEVERAL_TIPS = _("The sale %(number)s has several tips: say which one by its id.")
 
 #: A payment method's suggestions from the factory: 3 %, 5 % and 10 % (what is usual in Spain, the WORKBOOK says).
-FACTORY_SUGGESTIONS = [{"kind": "percent", "value": value} for value in (3, 5, 10)]
+FACTORY_SUGGESTIONS = [{"percent": value, "amount": None} for value in (3, 5, 10)]
 #: Staff's answer to «whose record is the caller's?»: what an employee's own tips are.
 CURRENT_MEMBER = "staff.member.current"
 
@@ -100,18 +100,43 @@ def tip_row(tip: Tip) -> dict:
 
 
 def find_tip(ref: TipRefIn, *, lock: bool = False) -> Tip:
-    """The tip ``ref`` names: by its id, else the one tip of its sale (409 ``tip.tip_ambiguous`` with several)."""
+    """The tip ``ref`` names: by its id; else, by its sale's number, the one active tip of that sale (409
+    ``tip.tip_ambiguous`` with several) or, with none active, its newest one, which says it no longer changes."""
     found = Tip.objects.select_for_update(of=("self",)) if lock else Tip.objects.all()
     if ref.id is not None:
-        found = found.filter(pk=ref.id)
+        rows = list(found.filter(pk=ref.id)[:1])
     else:
-        found = found.filter(sale__number=ref.sale)
-    rows = list(found.order_by("-created_at", "id")[:2])
+        of_sale = found.filter(sale__number=ref.sale).order_by("-created_at", "id")
+        rows = list(of_sale.filter(status=Tip.Status.ACTIVE)[:2]) or list(of_sale[:1])
     if not rows:
         raise NotFound(str(TIP_NOT_FOUND), code="tip.tip_not_found")
     if len(rows) > 1:
         raise Conflict(str(SEVERAL_TIPS) % {"number": ref.sale}, code="tip.tip_ambiguous")
     return tips().get(pk=rows[0].pk)
+
+
+@operation(
+    "tip.tip.get",
+    kind="query",
+    permission="tip.view_tip",
+    input=TipRefIn,
+    output=TipOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": ("show me the tip of sale 20261114-0007", "who got the tip of sale 20261114-0009?"),
+            "es": ("enséñame la propina de la venta 20261114-0007", "¿para quién fue la propina de la 20261114-0009?"),
+        },
+        "description": "One tip, by its id or its sale's number (the active one of that sale): who it belongs to, its "
+        "payment method, its amount in cents, whether it is active or voided, and who adjusted or voided it and why. "
+        "An employee reads only their own.",
+    },
+)
+def get_tip(ctx: OperationContext, params: TipRefIn) -> dict:
+    tip = find_tip(params)
+    if not ctx.has("tip.manage") and (tip.member_id is None or tip.member_id != own_member_id(ctx)):
+        raise NotFound(str(TIP_NOT_FOUND), code="tip.tip_not_found")
+    return tip_row(tip)
 
 
 def own_member_id(ctx: OperationContext) -> UUID | None:

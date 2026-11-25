@@ -25,7 +25,7 @@ class Settings(UUIDModel):
     allow_custom = models.BooleanField(_("allow another amount"), default=True)
     # Which of the three suggestions comes chosen (1 to 3); 0: «No tip».
     preselected = models.PositiveSmallIntegerField(_("chosen suggestion"), default=0)
-    # Payment method id → its three suggestions, each {"kind": "percent" | "amount", "value": …}; a method left out
+    # Payment method id → its three suggestions, each {"percent": …, "amount": …} with one of the two; a method left out
     # takes the factory ones.
     suggestions = models.JSONField(_("suggestions by payment method"), default=dict, blank=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)

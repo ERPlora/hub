@@ -136,6 +136,21 @@ def test_a_retry_that_lands_while_the_first_is_being_recorded_is_refused_and_rec
     assert (Tip.objects.count(), len(added_events()), Movement.objects.filter(app="tip").count()) == (1, 1, 1)
 
 
+def test_the_same_attempt_on_another_sale_or_the_pool_is_refused(coffee):
+    open_session()
+    sale, other = charge(payments=CARD), charge(payments=CARD)
+    add_tip(150, sale_id=str(sale.id), attempt_key="charge-0003:1")
+    for elsewhere in ({"sale_id": str(other.id), "method": "card"}, {"sale": other.number, "method": "card"}, {"pool": True}):
+        with pytest.raises(Conflict) as refused:
+            run("tip.tip.add", {"amount": 150, "attempt_key": "charge-0003:1", **elsewhere})
+        assert refused.value.code == "tip.attempt_key_reused", elsewhere
+    run("tip.tip.add", {"amount": 150, "attempt_key": "pool-0004:1", "pool": True})
+    with pytest.raises(Conflict) as refused:
+        add_tip(150, sale=sale.number, attempt_key="pool-0004:1")
+    assert refused.value.code == "tip.attempt_key_reused"
+    assert Tip.objects.count() == 2
+
+
 def test_the_same_attempt_with_another_tip_is_refused(coffee):
     sale = charge(payments=CARD)
     add_tip(150, sale_id=str(sale.id), attempt_key="charge-0001:1")
@@ -240,3 +255,25 @@ def test_only_whoever_manages_tips_adjusts_or_voids_them(coffee, make_user):
         with pytest.raises(PermissionDenied):
             change()
     assert void_tip(tip, ctx=ctx_for("hub_manager")).status == "voided"
+
+
+def test_by_its_sale_s_number_the_active_tip_is_the_one_found(coffee):
+    sale = charge(payments=CARD)
+    first = add_tip(150, sale_id=str(sale.id))
+    void_tip(first)
+    second = add_tip(200, sale_id=str(sale.id))
+    assert run("tip.tip.update", {"sale": sale.number, "amount": 250, "reason": "typo"}).id == second.id
+    assert run("tip.tip.void", {"sale": sale.number, "reason": "wrong sale"}).id == second.id
+    # None active: the newest voided one, which says it no longer changes.
+    with pytest.raises(Conflict) as refused:
+        run("tip.tip.void", {"sale": sale.number, "reason": "again"})
+    assert refused.value.code == "tip.tip_voided"
+
+
+def test_two_active_tips_of_a_sale_are_named_by_their_id(coffee):
+    sale = charge(payments=CARD)
+    add_tip(150, sale_id=str(sale.id))
+    add_tip(200, sale_id=str(sale.id))
+    with pytest.raises(Conflict) as refused:
+        run("tip.tip.void", {"sale": sale.number, "reason": "which one?"})
+    assert refused.value.code == "tip.tip_ambiguous"

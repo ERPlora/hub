@@ -21,7 +21,7 @@ def _void_all(ctx: OperationContext, sale_id: UUID, by: str, reason: str) -> int
         Tip.objects.select_for_update().filter(sale_id=sale_id, status=Tip.Status.ACTIVE).values_list("id", flat=True)
     )
     for tip in tips().filter(pk__in=locked).order_by("created_at", "id"):
-        void_one(ctx, tip, by, reason)
+        void_one(ctx, tip, by, reason, with_its_sale=True)
     return len(locked)
 
 

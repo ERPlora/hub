@@ -21,7 +21,8 @@ la caja la enseña en su propia línea.
   «Activar caja» encendido y la caja cerrada, la de efectivo se rechaza; con la caja apagada se guarda solo aquí.
 - **Ajustar y anular** (F06): con su motivo; la diferencia entra o sale de la sesión abierta y una cerrada no se toca.
   Anular una venta o devolverla entera anula su propina sola.
-- **La lista**: las más nuevas primero, con búsqueda por venta o persona y filtros; un empleado ve solo las suyas.
+- **La lista y una propina**: las más nuevas primero, con búsqueda por venta o persona y filtros; una propina se lee
+  por su id o por el número de su venta (la activa). Un empleado ve solo las suyas.
 
 ## Ficha
 
@@ -30,7 +31,7 @@ la caja la enseña en su propia línea.
 | `LiveAppConfig` | `kind = "app"`, icono `ion:wallet-outline`, categoría `people`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` |
 | `requires` | `sale` (la venta y su forma de pago), `cash_register` (el cajón) y `staff` (de quién es) |
-| Operaciones | 2 consultas (`queries.py`) y 6 acciones (`services/`), todas con `ai=`; 6 rutas en `/api/tip/…` (sin ruta: `tip.sale.void` y `tip.sale.refund`, las reacciones a Ventas) |
+| Operaciones | 3 consultas (`queries.py`) y 6 acciones (`services/`), todas con `ai=`; 7 rutas en `/api/tip/…` (sin ruta: `tip.sale.void` y `tip.sale.refund`, las reacciones a Ventas) |
 | Eventos | 4, `tip.settings.updated` y `tip.tip.{added,adjusted,voided}` (`events.py`); reacciona a `sale.sale.voided` y `sale.sale.refunded` |
 | Tarea programada | ninguna |
 | Migraciones | `0001_initial` |

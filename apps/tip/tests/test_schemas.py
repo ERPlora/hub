@@ -34,21 +34,29 @@ def test_a_change_needs_its_reason_and_something_to_change():
 @pytest.mark.parametrize(
     "suggestions",
     [
-        [{"kind": "percent", "value": 0}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-        [{"kind": "percent", "value": 101}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-        [{"kind": "amount", "value": -100}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-        [{"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
+        [{"percent": 0, "amount": None}, {"percent": 5, "amount": None}, {"percent": 10, "amount": None}],
+        [{"percent": 101, "amount": None}, {"percent": 5, "amount": None}, {"percent": 10, "amount": None}],
+        [{"percent": None, "amount": -100}, {"percent": 5, "amount": None}, {"percent": 10, "amount": None}],
+        [{"percent": 5, "amount": None}, {"percent": 10, "amount": None}],
+        [{"percent": 5, "amount": 100}, {"percent": 10, "amount": None}, {"percent": 15, "amount": None}],
+        [{}, {"percent": 10, "amount": None}, {"percent": 15, "amount": None}],
     ],
 )
-def test_a_suggestion_empty_zero_negative_or_over_100_percent_is_refused(suggestions):
+def test_a_suggestion_empty_both_zero_negative_or_over_100_percent_is_refused(suggestions):
     with pytest.raises(pydantic.ValidationError):
         SettingsPatchIn.model_validate({"methods": [{"method_id": METHOD, "suggestions": suggestions}]})
 
 
 def test_the_same_suggestion_twice_in_a_method_is_said_on_its_field():
-    twice = [{"kind": "percent", "value": 5}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}]
+    twice = [{"percent": 5, "amount": None}, {"percent": 5, "amount": None}, {"percent": 10, "amount": None}]
     with pytest.raises(pydantic.ValidationError) as refused:
         SettingsPatchIn.model_validate({"methods": [{"method_id": METHOD, "suggestions": twice}]})
     assert "That suggestion is already there." in str(refused.value)
 
 
+
+
+def test_a_suggestion_s_amount_is_money_and_its_percentage_is_not():
+    suggestion = SettingsPatchIn.model_json_schema()["$defs"]["Suggestion"]["properties"]
+    assert suggestion["amount"]["anyOf"][0].get("money") is True
+    assert "money" not in suggestion["percent"]["anyOf"][0]

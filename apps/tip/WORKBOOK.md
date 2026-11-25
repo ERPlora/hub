@@ -405,6 +405,7 @@ permisos. Una propina se nombra por su venta («la propina de la 20261114-0007»
 | Los ajustes de propinas | ver propinas | F01, F02 | `tip.settings.get` |
 | Las sugerencias para un cobro: total, forma de pago y su importe | anotar | F02 | `tip.suggestion.get` |
 | Las propinas, con búsqueda, filtros y páginas | ver propinas | F03–F06 | `tip.tip.list` |
+| Una propina, por su id o por el número de su venta (la activa) | ver propinas | F06 | `tip.tip.get` |
 | Las reglas del reparto | gestionar | F08, F09 | `tip.policy.get` |
 | La vista previa del reparto de un día | gestionar | F10 | `tip.policy.preview` |
 | El informe por persona y por turno | gestionar | F13 | `tip.report.by_employee`, `tip.report.by_shift` |

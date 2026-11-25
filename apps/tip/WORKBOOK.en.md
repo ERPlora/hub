@@ -420,13 +420,14 @@ rules and the same permissions. A tip is named by its sale ("the tip of 20261114
 name.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:96af67577a43 -->
+<!-- from WORKBOOK.md sha256:b8a5335b486a -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The tips settings | view tips | F01, F02 | `tip.settings.get` |
 | The suggestions for a charge: total, payment method and its amount | record | F02 | `tip.suggestion.get` |
 | The tips, with search, filters and pages | view tips | F03–F06 | `tip.tip.list` |
+| One tip, by its id or by its sale's number (the active one) | view tips | F06 | `tip.tip.get` |
 | The distribution rules | manage | F08, F09 | `tip.policy.get` |
 | The distribution preview of a day | manage | F10 | `tip.policy.preview` |
 | The report by person and by shift | manage | F13 | `tip.report.by_employee`, `tip.report.by_shift` |

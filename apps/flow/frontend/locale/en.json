@@ -1419,7 +1419,8 @@
       "tip__tip__list": "Look for tips",
       "tip__tip__add": "Record a tip",
       "tip__tip__update": "Adjust a tip",
-      "tip__tip__void": "Void a tip"
+      "tip__tip__void": "Void a tip",
+      "tip__tip__get": "Look at a tip"
     },
     "facts": {
       "created": "created",

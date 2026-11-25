@@ -1,6 +1,7 @@
 """What a tip moves in the drawer (CASH_REGISTER-F18): Cash register's open session, asked by name, takes it as Tips'
 own line, in its payment method. A closed session is never touched: what changes later goes into the open one."""
 
+import logging
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
@@ -18,6 +19,10 @@ CURRENT = "cash_register.session.current"
 MOVEMENT_ADD = "cash_register.movement.add"
 #: The name the drawer shows Tips' lines under (Tips in cash, Tips by card, Tips paid out).
 APP = "tip"
+#: Cash register's refusal of a cash-out that would leave the drawer below zero.
+BELOW_ZERO = "cash_register.negative_balance_not_allowed"
+
+logger = logging.getLogger(__name__)
 
 
 def move(ctx: OperationContext, tip: Tip, kind: str, amount: int, *, strict: bool = False) -> UUID | None:
@@ -42,3 +47,15 @@ def move(ctx: OperationContext, tip: Tip, kind: str, amount: int, *, strict: boo
         },
     )
     return current.session.id
+
+
+def move_with_its_sale(ctx: OperationContext, tip: Tip) -> None:
+    """Takes ``tip`` out of the open drawer as it goes back to the customer with its voided or refunded sale. The money
+    has already left with the sale, so a drawer that refuses to go below zero cannot stop it: the tip is voided all the
+    same and leaves no line of its own."""
+    try:
+        move(ctx, tip, "out", tip.amount)
+    except Conflict as refused:
+        if refused.code != BELOW_ZERO:
+            raise
+        logger.info("tip %s voided with its sale without a drawer line: the drawer would go below zero", tip.id)

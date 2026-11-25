@@ -48,10 +48,17 @@ def _member(named, sale: Sale | None) -> Member | None:
     return member
 
 
+def _same_sale(done: Tip, data: TipAddIn) -> bool:
+    if data.pool:
+        return done.pool
+    if data.sale_id is not None:
+        return done.sale_id == data.sale_id
+    return done.sale is not None and done.sale.number == data.sale
+
+
 def _the_same(done: Tip, data: TipAddIn) -> Tip:
     """A retry of the attempt that recorded ``done`` gets it back; another tip under its key is refused."""
-    same_sale = done.pool if data.pool else (done.sale_id == data.sale_id or done.sale.number == data.sale)
-    if done.amount != data.amount or not same_sale:
+    if done.amount != data.amount or not _same_sale(done, data):
         raise Conflict(str(ATTEMPT_KEY_REUSED), code="tip.attempt_key_reused")
     return done
 
@@ -173,10 +180,14 @@ def update_tip(ctx: OperationContext, data: TipPatchIn) -> dict:
     return tip_row(tip)
 
 
-def void_one(ctx: OperationContext, tip: Tip, by: str, reason: str) -> None:
-    """Voids ``tip``: what it put in a drawer goes out of the open one, and ``tip.tip.voided`` says who and why."""
+def void_one(ctx: OperationContext, tip: Tip, by: str, reason: str, *, with_its_sale: bool = False) -> None:
+    """Voids ``tip``: what it put in a drawer goes out of the open one, and ``tip.tip.voided`` says who and why.
+    ``with_its_sale``: it goes back to the customer with its voided or refunded sale (``drawer.move_with_its_sale``)."""
     if tip.session_id is not None:
-        drawer.move(ctx, tip, "out", tip.amount)
+        if with_its_sale:
+            drawer.move_with_its_sale(ctx, tip)
+        else:
+            drawer.move(ctx, tip, "out", tip.amount)
     tip.status, tip.voided_at = Tip.Status.VOIDED, timezone.now()
     tip.voided_by, tip.void_reason = by[:150], reason[:255]
     tip.save(update_fields=["status", "voided_at", "voided_by", "void_reason"])

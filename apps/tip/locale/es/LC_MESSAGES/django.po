@@ -148,8 +148,8 @@ msgstr "Escribe el motivo."
 msgid "That suggestion is already there."
 msgstr "Esa sugerencia ya está."
 
-msgid "A percentage goes up to 100."
-msgstr "Un porcentaje llega como mucho a 100."
+msgid "Give each suggestion a percentage or an amount, not both."
+msgstr "Da a cada sugerencia un porcentaje o un importe, no los dos."
 
 msgid "Say what changes: the amount or the person."
 msgstr "Di qué cambia: el importe o la persona."

@@ -20,6 +20,7 @@ ROUTES = {
     ("GET", "/tip/settings", "tip.settings.get"),
     ("POST", "/tip/settings", "tip.settings.update"),
     ("GET", "/tip/tips", "tip.tip.list"),
+    ("GET", "/tip/tips/detail", "tip.tip.get"),
     ("POST", "/tip/tips", "tip.tip.add"),
     ("POST", "/tip/tips/update", "tip.tip.update"),
     ("POST", "/tip/tips/void", "tip.tip.void"),

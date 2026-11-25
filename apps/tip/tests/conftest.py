@@ -10,6 +10,8 @@ import dataclasses
 
 from live.context import system_context
 
+from apps.sale.models import PaymentMethod
+
 from apps.cash_register.tests.conftest import (
     HUB_DB,
     HUB_DB_COMMITTED,
@@ -48,3 +50,10 @@ def as_user(user, role: str = "hub_employee"):
 def add_tip(amount: int = 200, method: str = "card", ctx=None, **more):
     """A tip of ``amount`` cents recorded by Tips."""
     return run("tip.tip.add", {"amount": amount, "method": method, **more}, ctx)
+
+
+def with_cash(ctx=None):
+    """The business of ``ctx`` with an active cash payment method, made by Sales when another test left it none: what
+    a tip to the pool is in."""
+    if not PaymentMethod.objects.filter(type=PaymentMethod.Type.CASH, is_active=True).exists():
+        run("sale.payment_method.create", {"name": "Cash", "type": "cash"}, ctx)
