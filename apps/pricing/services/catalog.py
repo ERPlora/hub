@@ -10,7 +10,7 @@ from apps.inventory.models import Product
 from apps.pricing import events
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.queries.other_apps import call_service
-from apps.pricing.schemas import CatalogEventIn, CatalogOut
+from apps.pricing.schemas.catalog import CatalogEventIn, CatalogOut
 from apps.pricing.services.writes import _actor, _group_held
 
 
