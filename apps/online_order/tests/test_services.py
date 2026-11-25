@@ -68,7 +68,7 @@ def test_regenerating_replaces_the_code_and_the_one_before_stops_working(monkeyp
     second = regenerate({"id": str(table.id)})
     assert TOKEN.fullmatch(second.code) and second.code != first.code
     assert second.issued_at == later > first.issued_at
-    assert list(TableCode.objects.values_list("table_id", "code")) == [(table.id, second.code)]
+    assert list(TableCode.objects.values_list("table_id", "code", "issued_at")) == [(table.id, second.code, later)]
     assert not TableCode.objects.filter(code=first.code).exists()
     assert [name for name, _key, _payload in outbox()] == [REGENERATED, REGENERATED]
 
