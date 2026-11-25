@@ -2909,7 +2909,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:986a02e69f6b -->
+<!-- from WORKBOOK.md sha256:060e28bc67bf -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2954,13 +2954,21 @@ Steps:
      Restaurant — food"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
-     it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
-     record and, beside it, only figures — those of a goods receipt (product and quantity) or the services of a voucher
-     (service and sessions) —, by the name of the record followed by its figures, the quantity as it is written in the
-     person's language and an amount as money ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
-     Colour · 3"; when a line cannot be named, the list says how many it carries: it would read as a bare figure); and
-     any other, such as a line with two records (the employee and the product of a sale), one with a text of its own or
-     a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
+     it sends the service and a name as well, it says the service that is booked); a list of what the person wrote,
+     such as the options of a select field, by each one as written ("Options: Terrace, Inside"); a list of lines that
+     carry in words their record, the name the person said, what they wrote or a time or a date and, beside it, only
+     figures — a goods receipt (product and quantity), the services of a voucher (service and sessions), the dishes of
+     a ticket made by hand, the intervals of a day's hours or the lines of an invoice made by hand —, by its words
+     followed by its figures, the quantity as it is written in the person's language, an amount as money and a VAT
+     rate typed by hand as a percentage ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
+     Colour · 3"; "Dishes: Espresso · 2, Latte · 1"; "Opening intervals: 9:00 AM · 2:00 PM"; "Lines: Private birthday
+     menus · 10% · 1 · €681.82"; when a line cannot be named, the list says how many it carries: it would read as a
+     bare figure); the custom fields of a customer's card, each by its name and its value as the card shows it: a yes
+     or no in the person's language, a date as it is written in it and a field that is cleared, with a dash ("Custom
+     fields: Table preference · Terrace, VIP · Yes"; "VIP · —"); the special days loaded at once, by their date and
+     their name and, when that day opens, its hours ("Jan 1, 2027 · New Year's Day; Jan 6, 2027 · Epiphany; Mar 26,
+     2027 · Good Friday and 7 more"); and any other, such as a line with two records (the employee and the product of
+     a sale), one with a yes or no or a list inside or a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
      **Charge** sheet: the total, as the POS works it out for whoever asks ("Total: €12.50"), and each payment method
      with what it pays ("Payments: Cash · €12.50"; the one without an amount pays what the others leave and, when none
      is said, all of it in cash, as the action charges), never "1 item" nor the check's version, which only the

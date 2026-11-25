@@ -2824,12 +2824,21 @@ Pasos:
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
      porque no sabe cuál es («Servicios: Tinte»; si manda el servicio y además un nombre, dice el servicio que se
-     reserva); una lista de líneas que llevan su registro y, al lado, solo cifras —las de una recepción de mercancía
-     (producto y cantidad) o los servicios de un bono (servicio y sesiones)—, por el nombre del registro seguido de sus
-     cifras, la cantidad como se escribe en el idioma de la persona y un importe como dinero («Productos: Vino tinto · 6;
-     Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; si una línea no se puede nombrar, la lista dice
-     cuántas lleva: se leería como una cifra suelta); y cualquier otra, como una línea con dos registros (el empleado y
-     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; un cobro,
+     reserva); una lista de lo que escribió la persona, como las opciones de un campo de selección, por cada una tal
+     cual («Opciones: Terraza, Dentro»); una lista de líneas que llevan en palabras su registro, el nombre que dijo la
+     persona, lo que escribió o una hora o una fecha y, al lado, solo cifras —una recepción de mercancía (producto y
+     cantidad), los servicios de un bono (servicio y sesiones), los platos de una comanda hecha a mano, los tramos de
+     un horario o las líneas de una factura hecha a mano—, por sus palabras seguidas de sus cifras, la cantidad como se
+     escribe en el idioma de la persona, un importe como dinero y el IVA escrito a mano como porcentaje («Productos:
+     Vino tinto · 6; Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; «Platos: Espresso · 2, Café con
+     leche · 1»; «Tramos horarios: 9:00 · 14:00»; «Líneas: Menús de cumpleaños privado · 10 % · 1 · 681,82 €»; si una
+     línea no se puede nombrar, la lista dice cuántas lleva: se leería como una cifra suelta); los campos
+     personalizados de una ficha, cada uno por su nombre y su valor como lo enseña la ficha: un sí o un no en el idioma
+     de la persona, una fecha como se escribe en él y un campo que se vacía, con una raya («Campos personalizados:
+     Preferencia de mesa · Terraza, VIP · Sí»; «VIP · —»); los días especiales que se cargan de golpe, por su fecha y
+     su nombre y, si ese día abre, sus horas («1 ene 2027 · Año Nuevo, 6 ene 2027 · Epifanía del Señor, 26 mar 2027 ·
+     Viernes Santo y 7 más»); y cualquier otra, como una línea con dos registros (el empleado y el producto de una
+     venta), una con un sí o un no o una lista dentro o una lista de códigos, por cuántos elementos lleva; un cobro,
      por su total y cómo se paga, como el botón de la hoja **Cobro**: el total, tal como lo calcula el TPV para quien
      pregunta («Total: 12,50 €»), y cada forma de pago con lo que paga («Pagos: Efectivo · 12,50 €»; la que va sin
      importe paga lo que dejan las otras y, si no se dice ninguna, todo en efectivo, como cobra la acción), nunca

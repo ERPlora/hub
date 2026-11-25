@@ -270,7 +270,9 @@ Pasos:
 4. Marca **Se repite cada año** si cae el mismo día y mes todos los años (Navidad); si quieres, **Notas**.
 5. Pulsa **Añadir día**: el formulario se cierra y el día aparece en la lista.
 Entra: fecha (real: el 31 de febrero no vale), nombre (hasta 200), cerrado o tramos, anual y notas (hasta
-1000).
+1000). Por el asistente, la tarjeta dice en su línea el nombre, la fecha y sus horas, o que cierra («Crear en
+Horarios: Nochebuena · Fecha: 24 dic 2027 · Tramos horarios: 10:00 · 14:00»; cerrado, «Cerrado: Sí»): unos tramos
+de un día que queda cerrado no se guardan, y la tarjeta no los dice.
 Sale: el día especial (`schedule.special_day.created`). Gana a todo lo demás ese día (SCHEDULE-F10,
 F11). Un día anual vale **todos los años**, también los anteriores a su fecha; el del 29 de febrero solo
 existe los años bisiestos.
@@ -290,7 +292,9 @@ Pasos:
    tramos que valen esas fechas (horario de verano).
 4. Pulsa **Añadir cambio temporal**.
 Entra: las dos fechas (ambas incluidas), el motivo (hasta 200) y cerrado o tramos: el cambio vale todos
-los días del rango con las mismas horas.
+los días del rango con las mismas horas. Por el asistente, la tarjeta dice en su línea el motivo, sus fechas
+juntas y sus horas, o que cierra («Crear en Horarios: Horario de verano · Cuándo: 1 jul – 31 ago 2027 · Tramos
+horarios: 8:00 · 15:00»).
 Sale: el cambio temporal (`schedule.override.created`). Gana a la semana, pero pierde contra un día
 especial de esa fecha (no se avisa de que lo pisa: la precedencia lo resuelve).
 Si falla: «La fecha de fin no puede ser anterior a la de inicio.» bajo Hasta; «Esas fechas se solapan con
