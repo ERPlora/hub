@@ -3,7 +3,7 @@
 // and price, and each group of what goes with it (a dish's options, a set menu's courses) with how many to pick.
 // Only to read: ordering is not here.
 import { AllergenRow, FormModal, formatMoney, InlineFeedback, type Money } from '@erplora/ui/components';
-import { IonButton, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonSpinner } from '@ionic/vue';
+import { IonButton, IonImg, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
@@ -62,19 +62,18 @@ function delta(minor: number): string {
     size="md"
     testid="oo-menu-sheet"
   >
-    <div class="dish-sheet">
-      <img
+    <div>
+      <ion-img
         v-if="photo"
-        class="dish-sheet__photo"
         :src="photo"
         :alt="t('online_order.menu.photo', { name: dish.name })"
-      >
+      />
       <p v-if="dish.description">
         {{ dish.description }}
       </p>
       <AllergenRow :codes="dish.allergens" />
-      <p class="dish-sheet__price">
-        {{ formatMoney(dish.price, locale, money) }}
+      <p>
+        <strong>{{ formatMoney(dish.price, locale, money) }}</strong>
       </p>
       <p
         v-if="loading"
@@ -132,16 +131,3 @@ function delta(minor: number): string {
   </FormModal>
 </template>
 
-<style scoped>
-.dish-sheet__photo {
-  display: block;
-  width: 100%;
-  max-height: 240px;
-  object-fit: contain;
-  border-radius: var(--ep-radius-md);
-  background: var(--ep-surface-muted);
-}
-.dish-sheet__price {
-  font-weight: 600;
-}
-</style>

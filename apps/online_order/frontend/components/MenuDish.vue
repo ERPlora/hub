@@ -33,7 +33,6 @@ const photo = computed(() => (props.imageUrl.startsWith('/') && !props.imageUrl.
     <ion-thumbnail
       v-if="photo"
       slot="start"
-      class="menu-dish__photo"
     >
       <img
         :src="photo"
@@ -54,13 +53,3 @@ const photo = computed(() => (props.imageUrl.startsWith('/') && !props.imageUrl.
   </ion-item>
 </template>
 
-<style scoped>
-.menu-dish__photo {
-  --size: 64px;
-  --border-radius: var(--ep-radius-md);
-  background: var(--ep-surface-muted);
-}
-.menu-dish__photo img {
-  object-fit: contain;
-}
-</style>

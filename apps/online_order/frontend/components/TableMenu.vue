@@ -5,7 +5,7 @@
 import { EmptyState, InlineFeedback, type Money } from '@erplora/ui/components';
 import { type ApiClient, ApiError } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
-import { IonButton, IonList, IonListHeader, IonSpinner } from '@ionic/vue';
+import { IonButton, IonCol, IonGrid, IonList, IonListHeader, IonRow, IonSpinner, IonText } from '@ionic/vue';
 import { computed, onMounted, ref } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
@@ -86,122 +86,122 @@ onMounted(load);
     :title="t('online_order.menu.title')"
     content-layout="detail"
   >
-    <div class="table-menu">
-      <p
-        v-if="loading"
-        data-testid="oo-menu-loading"
-        role="status"
-      >
-        <ion-spinner name="crescent" />
-        {{ t('online_order.menu.loading') }}
-      </p>
-      <EmptyState
-        v-else-if="notActive"
-        icon="ion:qr-code-outline"
-        :heading="t('online_order.menu.notActive')"
-        :message="t('online_order.menu.notActiveMessage')"
-        data-testid="oo-menu-not-active"
-      />
-      <InlineFeedback
-        v-else-if="failure"
-        tone="danger"
-        role="alert"
-        data-testid="oo-menu-error"
-      >
-        {{ t('online_order.menu.loadError') }}
-        <template #actions>
-          <ion-button
-            fill="clear"
-            data-testid="oo-menu-retry"
-            @click="load"
+    <ion-grid>
+      <ion-row class="ion-justify-content-center">
+        <ion-col
+          size="12"
+          size-md="10"
+          size-lg="8"
+          size-xl="6"
+        >
+          <p
+            v-if="loading"
+            data-testid="oo-menu-loading"
+            role="status"
           >
-            {{ t('online_order.menu.retry') }}
-          </ion-button>
-        </template>
-      </InlineFeedback>
-      <template v-else-if="menu">
-        <header class="table-menu__header">
-          <h2
-            v-if="menu.business_name"
-            data-testid="oo-menu-business"
-          >
-            {{ menu.business_name }}
-          </h2>
-          <p data-testid="oo-menu-table">
-            {{ t('online_order.sheet.table', { number: menu.table_number }) }}<template v-if="menu.zone_name">
-              · {{ menu.zone_name }}
-            </template>
+            <ion-spinner name="crescent" />
+            {{ t('online_order.menu.loading') }}
           </p>
-        </header>
-        <EmptyState
-          v-if="isEmpty"
-          icon="ion:restaurant-outline"
-          :heading="t('online_order.menu.empty')"
-          :message="t('online_order.menu.emptyMessage')"
-          data-testid="oo-menu-empty"
-        />
-        <ion-list
-          v-if="menu.combos.length"
-          data-testid="oo-menu-group"
-        >
-          <ion-list-header>{{ t('online_order.menu.menus') }}</ion-list-header>
-          <MenuDish
-            v-for="combo in menu.combos"
-            :key="combo.id"
-            :name="combo.name"
-            :detail="courses(combo)"
-            :price="combo.price"
-            :image-url="combo.image_url"
-            :allergens="[]"
-            :money="money"
-            :testid="`oo-menu-combo-${combo.id}`"
-            @open="openCombo(combo)"
+          <EmptyState
+            v-else-if="notActive"
+            icon="ion:qr-code-outline"
+            :heading="t('online_order.menu.notActive')"
+            :message="t('online_order.menu.notActiveMessage')"
+            data-testid="oo-menu-not-active"
           />
-        </ion-list>
-        <ion-list
-          v-for="(group, index) in menu.groups"
-          :key="`${index}-${group.name}`"
-          data-testid="oo-menu-group"
-        >
-          <ion-list-header>{{ group.name || t('online_order.menu.moreDishes') }}</ion-list-header>
-          <MenuDish
-            v-for="dish in group.items"
-            :key="dish.id"
-            :name="dish.name"
-            :detail="dish.description"
-            :price="dish.price"
-            :image-url="dish.image_url"
-            :allergens="dish.allergens"
-            :money="money"
-            :testid="`oo-menu-dish-${dish.id}`"
-            @open="openDish(dish)"
-          />
-        </ion-list>
-        <DishSheet
-          v-model:open="sheetOpen"
-          :dish="opened"
-          :groups="groups"
-          :money="money"
-          :loading="optionsLoading"
-          :error="optionsFailed"
-          @retry="loadOptions"
-        />
-      </template>
-    </div>
+          <InlineFeedback
+            v-else-if="failure"
+            tone="danger"
+            role="alert"
+            data-testid="oo-menu-error"
+          >
+            {{ t('online_order.menu.loadError') }}
+            <template #actions>
+              <ion-button
+                fill="clear"
+                data-testid="oo-menu-retry"
+                @click="load"
+              >
+                {{ t('online_order.menu.retry') }}
+              </ion-button>
+            </template>
+          </InlineFeedback>
+          <template v-else-if="menu">
+            <header>
+              <h2
+                v-if="menu.business_name"
+                class="ion-no-margin"
+                data-testid="oo-menu-business"
+              >
+                {{ menu.business_name }}
+              </h2>
+              <ion-text color="medium">
+                <p
+                  class="ion-no-margin"
+                  data-testid="oo-menu-table"
+                >
+                  {{ t('online_order.sheet.table', { number: menu.table_number }) }}<template v-if="menu.zone_name">
+                    · {{ menu.zone_name }}
+                  </template>
+                </p>
+              </ion-text>
+            </header>
+            <EmptyState
+              v-if="isEmpty"
+              icon="ion:restaurant-outline"
+              :heading="t('online_order.menu.empty')"
+              :message="t('online_order.menu.emptyMessage')"
+              data-testid="oo-menu-empty"
+            />
+            <ion-list
+              v-if="menu.combos.length"
+              data-testid="oo-menu-group"
+            >
+              <ion-list-header>{{ t('online_order.menu.menus') }}</ion-list-header>
+              <MenuDish
+                v-for="combo in menu.combos"
+                :key="combo.id"
+                :name="combo.name"
+                :detail="courses(combo)"
+                :price="combo.price"
+                :image-url="combo.image_url"
+                :allergens="[]"
+                :money="money"
+                :testid="`oo-menu-combo-${combo.id}`"
+                @open="openCombo(combo)"
+              />
+            </ion-list>
+            <ion-list
+              v-for="(group, index) in menu.groups"
+              :key="`${index}-${group.name}`"
+              data-testid="oo-menu-group"
+            >
+              <ion-list-header>{{ group.name || t('online_order.menu.moreDishes') }}</ion-list-header>
+              <MenuDish
+                v-for="dish in group.items"
+                :key="dish.id"
+                :name="dish.name"
+                :detail="dish.description"
+                :price="dish.price"
+                :image-url="dish.image_url"
+                :allergens="dish.allergens"
+                :money="money"
+                :testid="`oo-menu-dish-${dish.id}`"
+                @open="openDish(dish)"
+              />
+            </ion-list>
+            <DishSheet
+              v-model:open="sheetOpen"
+              :dish="opened"
+              :groups="groups"
+              :money="money"
+              :loading="optionsLoading"
+              :error="optionsFailed"
+              @retry="loadOptions"
+            />
+          </template>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
   </AppPage>
 </template>
-
-<style scoped>
-.table-menu {
-  max-width: 720px;
-  margin-inline: auto;
-}
-.table-menu__header h2 {
-  margin: 0 0 4px;
-  overflow-wrap: anywhere;
-}
-.table-menu__header p {
-  margin: 0;
-  color: var(--ep-text-muted);
-}
-</style>
