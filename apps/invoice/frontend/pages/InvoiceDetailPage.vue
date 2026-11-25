@@ -105,11 +105,7 @@ const emailed = computed(() =>
   emails.value.map((email) => ({ id: email.id, text: emailLine(email, t, (moment) => formatDateTime(moment, locale.value)) })),
 );
 /** The last email, when it did not leave: it stays said until another leaves. */
-const unsent = computed(() => {
-  const email = lastFailure(emails.value);
-  if (!email) return null;
-  return { heading: email.to ? t('invoice.email.failedTo', { to: email.to }) : t('invoice.email.failedPlain'), reason: email.reason };
-});
+const unsent = computed(() => lastFailure(emails.value));
 
 const note = computed(() => (invoice.value ? documentNote(invoice.value, t) : ''));
 
@@ -288,7 +284,7 @@ function onSubstituted(full: InvoiceOut): void {
         v-if="unsent"
         tone="danger"
         data-testid="invoice-detail-email-failed"
-        :heading="unsent.heading"
+        :heading="$t('invoice.email.unsent')"
       >
         {{ unsent.reason }}
       </InlineFeedback>

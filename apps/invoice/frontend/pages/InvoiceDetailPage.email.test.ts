@@ -86,7 +86,10 @@ describe('InvoiceDetailPage: «Send by email»', () => {
   it('says why the last one did not leave, until another does', async () => {
     const s = await opened([FAILED, SENT]);
     const notice = s.find('invoice-detail-email-failed');
-    expect(notice.text()).toContain('The invoice was not sent to ana@example.com');
+    expect(notice.text()).toContain('The invoice was not sent by email');
+    // A long address would not fit in the notice of a phone: the row below says it.
+    expect(notice.text()).not.toContain('ana@example.com');
+    expect(s.said()[0]).toBe('Not sent to ana@example.com');
     expect(notice.text()).toContain('That address does not accept the email.');
     expect(redNotices(s)).toBe(1);
     await s.result(LIST, { customer_email: '', emails: [SENT, FAILED] }, {}, 2);
@@ -103,6 +106,6 @@ describe('InvoiceDetailPage: «Send by email»', () => {
     expect(s.find('invoice-detail-email').text()).toBe('Enviar por correo');
     expect(s.said()[0]).toBe('No enviada a ana@example.com');
     expect(s.said()[1]).toMatch(/^Enviada a ana@example\.com el /);
-    expect(s.find('invoice-detail-email-failed').text()).toContain('La factura no se ha enviado a ana@example.com');
+    expect(s.find('invoice-detail-email-failed').text()).toContain('La factura no se ha enviado por correo');
   });
 });

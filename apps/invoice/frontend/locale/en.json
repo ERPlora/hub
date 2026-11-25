@@ -178,8 +178,7 @@
       "sending": "Sending…",
       "notSentTo": "Not sent to {to}",
       "notSent": "Not sent",
-      "failedTo": "The invoice was not sent to {to}",
-      "failedPlain": "The invoice was not sent"
+      "unsent": "The invoice was not sent by email"
     },
     "verifactu": {
       "heading": "VeriFactu receipt",

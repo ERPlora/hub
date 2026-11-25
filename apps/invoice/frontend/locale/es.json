@@ -178,8 +178,7 @@
       "sending": "Enviando…",
       "notSentTo": "No enviada a {to}",
       "notSent": "No enviada",
-      "failedTo": "La factura no se ha enviado a {to}",
-      "failedPlain": "La factura no se ha enviado"
+      "unsent": "La factura no se ha enviado por correo"
     },
     "verifactu": {
       "heading": "Justificante VeriFactu",
