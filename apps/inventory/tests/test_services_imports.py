@@ -297,6 +297,18 @@ def test_an_imported_ean13_of_a_live_product_fails_that_row_only():
     ]
 
 
+def test_an_ean13_written_twice_in_the_file_goes_to_the_first_row_that_goes_in():
+    ean13 = "8412345678905"
+    report = import_products(
+        row("BAD", ean13=ean13, allergens="shellfish"), row("A", ean13=ean13), row("B", ean13=ean13)
+    )
+    assert [(row.key, row.status, row.reason) for row in report.rows] == [
+        ("BAD", "failed", "Allergen not recognized: shellfish"),
+        ("A", "created", ""),
+        ("B", "failed", "Another product of the catalog already has that EAN-13."),
+    ]
+
+
 def test_importing_needs_its_own_permission():
     refused(PermissionDenied, lambda: import_products(row("A"), role="hub_employee"))
     refused(
