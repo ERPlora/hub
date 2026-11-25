@@ -338,7 +338,7 @@ without the tax ID (it stays in the application's log), so that it never stays "
 Involved: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Issue an invoice by hand
-<!-- from WORKBOOK.md sha256:2a6d2cc082a2 -->
+<!-- from WORKBOOK.md sha256:869d0ff8396d -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoices, New manual invoice
@@ -377,7 +377,7 @@ address.", "That tax ID is not valid." (under the field), "Line 2: the price is 
 with a price that comes to 0.00, a series that is inactive, does not issue invoices or belongs to another
 year than the date ("That series numbers another year…"), a date after today ("An invoice cannot be dated after
 today.") or before that of the last invoice of its series ("An invoice cannot be dated before the last one of its
-series, which is of 11/24/2026."), a due date before the date ("The due date cannot be before the invoice's date."), in ERPlora's own business a series of its account, which is not offered either (INVOICE-F23), a ticket above the Sales limit ("Above €3,000.00 a ticket
+series, which is of 11/24/2026."), a due date before the date ("The due date cannot be before the invoice's date."), a ticket above the Sales limit ("Above €3,000.00 a ticket
 cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. A line with a tax category (through the API
 or the assistant) that has no rule in force in the business's territory is refused on that line's field, naming the category as Taxes names
 it in the reader's language (e.g. "Product — generic") and with "Create its

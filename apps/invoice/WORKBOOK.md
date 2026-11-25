@@ -362,8 +362,7 @@ importe…», una línea con precio que sale a 0,00, una serie inactiva, que no 
 («Esa serie numera otro año…»), una fecha posterior a hoy («La fecha de una factura no puede ser posterior a hoy.») o
 anterior a la de la última factura de su serie («La fecha de una factura no puede ser anterior a la de la última de su
 serie, que es del 24/11/2026.»), un vencimiento anterior a la fecha («El vencimiento no puede ser anterior a la fecha
-de la factura.»), en el negocio de ERPlora una serie de su cuenta, que tampoco se ofrece (INVOICE-F23), un tique por
-encima del límite de Ventas («Por encima de 3.000,00 € no se
+de la factura.»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
 puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. Una línea con categoría fiscal (por la API o
 el asistente) sin regla vigente en el territorio del negocio se rechaza en el campo de esa línea, con la
 categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general») y
