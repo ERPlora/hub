@@ -263,7 +263,7 @@ def test_your_business_details_is_done_with_the_issuer_every_document_needs():
     )
     assert "configured" in registry[step.operation].output.model_fields
     # The ⛔ is base's (its LEGAL_STEPS, the old hub's BLOCKING_KEYS), never the module's.
-    assert home.level_of(f"invoice.{step.key}", step.required) == home.LEVEL_LEGAL
+    assert home.setup_steps.level_of(f"invoice.{step.key}", step.required) == home.setup_steps.LEVEL_LEGAL
 
 
 def test_your_invoice_numbering_is_done_once_the_business_has_its_numbering():
@@ -295,7 +295,7 @@ def test_your_invoice_numbering_is_done_once_the_business_has_its_numbering():
     )
     assert "total_series" in registry[step.operation].output.model_fields
     assert registry[step.operation].kind == "query"  # it only reads: it never opens the year's series
-    assert home.level_of(f"invoice.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"invoice.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_steps_speak_the_language_of_whoever_reads_them():

@@ -26,7 +26,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     ``apps`` lists every module the person holds a permission of, since other screens read from it whether a module
     is on (the till sells the modifiers and menus a cashier never opens). ``locked`` names, per module, the entries
     the person may not open: the shell's gate answers them with «No access». Menu and apps list modules only
-    (``home.shown_modules``: the reference app only in development, the tests or a demo's hub): a platform app such
+    (``home.shown_modules.shown_modules``: the reference app only in development, the tests or a demo's hub): a platform app such
     as ``base`` is always on and never shows. A module its business has no right to (``base.entitlement``) or turned
     off (``base.activation``) is ``off`` and has no menu: the shell's gate tells why its screens do not open. ``demo``
     says when the demo ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing
@@ -40,7 +40,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
     creating = activation.creating_apps(ctx.scope) if blocked else frozenset()
     with translation.override(ctx.language):
-        shown = home.shown_modules(demo_hub=demo is not None)
+        shown = home.shown_modules.shown_modules(demo_hub=demo is not None)
         usable = [config for config in shown if _may_use(ctx, config)]
         return {
             "user": _user(ctx.actor, hub_user_of(ctx)),

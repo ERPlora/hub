@@ -3,7 +3,7 @@
 // assistant configured as the Hub boots it (main.ts), for the till's «Speak», which dictates to it.
 import { configureAssistant } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
-import type { Component } from 'vue';
+import type { Component, Ref } from 'vue';
 
 import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import type { StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
@@ -12,6 +12,7 @@ import { business, IN_YEN as JAPANESE } from '../../../../base/frontend/__tests_
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
 import type { Business } from '../../../../base/frontend/operations/business';
+import type { SessionMeOut } from '../../../../frontend/sdk-types';
 import taxEn from '../../../tax/frontend/locale/en.json';
 import taxEs from '../../../tax/frontend/locale/es.json';
 import type { TaxSettingsOut, TerritoryTaxKind } from '../../../tax/frontend/operations';
@@ -49,11 +50,17 @@ export const MANAGER: SessionMe = withMenu('sale', {
   language: 'en',
 });
 
-/** The employee (the old cashier too): builds the check, charges it, reads the sales. */
-export const EMPLOYEE: SessionMe = withMenu('sale', {
-  ...MANAGER,
-  permissions: ['sale.view_sale', 'sale.add_sale', 'sale.take_payment', 'sale.view_paymentmethod', ...READS],
-});
+/** What an app of the till's session also says: what a manager may approve for the person. */
+export type SaleSession = SessionMe & Pick<SessionMeOut, 'approvable'>;
+
+/** The employee (the old cashier too): builds the check, charges it, reads the sales; the rest, with a manager's approval. */
+export const EMPLOYEE: SaleSession = {
+  ...withMenu('sale', {
+    ...MANAGER,
+    permissions: ['sale.view_sale', 'sale.add_sale', 'sale.take_payment', 'sale.view_paymentmethod', ...READS],
+  }),
+  approvable: ['sale.discount_over_limit', 'sale.refund_sale', 'sale.sell_open_price', 'sale.void_sale'],
+};
 
 export interface MountOptions {
   props?: Record<string, unknown>;
@@ -61,7 +68,8 @@ export interface MountOptions {
   business?: Business | null;
   path?: string;
   locale?: 'en' | 'es';
-  session?: SessionMe;
+  /** A ref: a session the test changes while the screen is open. */
+  session?: SessionMe | Ref<SessionMe>;
   stubs?: Record<string, Component | boolean>;
   /** How every API call is answered from the start, the ones made while mounting included. */
   answer?: { status: number; body: unknown };
