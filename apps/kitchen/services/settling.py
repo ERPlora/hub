@@ -25,7 +25,7 @@ from apps.kitchen.queries.scope import station_map
 from apps.kitchen.queries.state import effective
 from apps.kitchen.queries.tickets import TICKET_NOT_FOUND, find_ticket_view
 from apps.kitchen.queries.views import Change, TicketView, saved_views
-from apps.kitchen.schemas import TicketRefIn
+from apps.kitchen.schemas.fields import TicketRefIn
 from apps.kitchen.services.paper import CANCELLED_TICKET, VOIDED_DISH, _pass, _void_slip
 from apps.kitchen.services.writes import (
     _ticket_event,

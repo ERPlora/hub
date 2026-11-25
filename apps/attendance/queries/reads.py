@@ -1,4 +1,4 @@
-"""What every read of the time clock shares, and services.py too: who reads someone else's days, the settings until the
+"""What every read of the time clock shares, and services/ too: who reads someone else's days, the settings until the
 business saves its own, a person's name, the business's calendar day and how a list pages."""
 
 import datetime as dt
