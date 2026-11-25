@@ -64,7 +64,8 @@ def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
             "Reads this business's name, country, time zone, language and currency, as erplora.com registered it. Its "
             "name, time zone and language are changed on erplora.com by the owner or an administrator, never here. Its "
             "country no longer changes once the business is ready, and its currency is always the country's: it "
-            "changes only with the country."
+            "changes only with the country. Without settings_url and not a demo, it is ERPlora's own business: ERPlora "
+            "sets all of this on its server, and none of it is changed on erplora.com."
         ),
         asks={
             "en": (

@@ -111,7 +111,7 @@ export interface InvoiceRowOut extends InvoiceDueOut {
   /** The decimals of its currency as the server counts them (2 in EUR, 0 in JPY): its amounts' minor unit. */
   currency_decimals: number;
   status: InvoiceStatus;
-  source_type: InvoiceSource;
+  source_type: InvoiceSource | 'platform'; // platform: erplora.com issued it (ERPlora's own business)
   rectifies_id: string | null;
   rectifies_number: string;
   substituted: boolean;

@@ -47,7 +47,8 @@
       "substitution": "Replaces a simplified invoice",
       "rectification": "Rectification",
       "refund": "Sale refund",
-      "void": "Sale void"
+      "void": "Sale void",
+      "platform": "erplora.com"
     },
     "taxes": {
       "vat": "VAT",

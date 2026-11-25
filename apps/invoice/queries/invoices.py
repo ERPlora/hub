@@ -10,6 +10,7 @@ from live.operations import operation
 from apps.invoice.queries.documents import render_document
 from apps.invoice.queries.overdue import OVERDUE, overdue
 from apps.invoice.queries.ownership import INVOICES
+from apps.invoice.queries.platform_reading import SHOWN_STATUS, with_source, with_status
 from apps.invoice.queries.rows import _page, document_of_sale, find_invoice, invoice_detail, invoice_row, with_links
 from apps.invoice.schemas.invoices import (
     BySourceIn,
@@ -35,7 +36,7 @@ _SORTS = {
     "number": ["series_code", "year", "sequence"],
     "customer_name": ["customer_name"],
     "total_amount": ["total_amount"],
-    "status": ["status"],
+    "status": ["shown_status"],
     "invoice_type": ["invoice_type"],
     "series_code": ["series_code", "year", "sequence"],
 }
@@ -66,13 +67,15 @@ def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
         )
     if params.status == OVERDUE:
         invoices = invoices.filter(overdue())
+    elif params.status:
+        invoices = invoices.filter(with_status(params.status))
+    if params.source_type:
+        invoices = invoices.filter(with_source(params.source_type))
     exact = {
-        "status": params.status if params.status != OVERDUE else None,
         "invoice_type": params.invoice_type,
         "series_code": params.series_code.strip().upper()
         if params.series_code
         else None,
-        "source_type": params.source_type,
         "customer_id": params.customer_id,
         "issue_date__gte": params.issue_date_from,
         "issue_date__lte": params.issue_date_to,
@@ -111,7 +114,8 @@ def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
 )
 def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
     invoices = filter_invoices(ctx, params)
-    invoices = with_links(invoices).order_by(*_ordering(params.sort, params.dir))
+    invoices = with_links(invoices).alias(shown_status=SHOWN_STATUS)
+    invoices = invoices.order_by(*_ordering(params.sort, params.dir))
     return _page(invoices, params, invoice_row)
 
 
