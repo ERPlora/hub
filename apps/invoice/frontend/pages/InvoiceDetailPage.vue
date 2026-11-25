@@ -6,7 +6,8 @@
 // invoices (each opens), Paid on and Notes (a rectifying invoice's note says what it rectifies and why, in
 // the reader's language); the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full
 // invoice» where they apply and for whoever may, a refusal said right above them. «Download PDF» saves the
-// server's PDF of its A4. «Print / PDF» asks the
+// server's PDF of its A4. «Send by email» mails it, and the page says to whom and when each email went, and why the
+// last one did not (`invoice.email.list`, live). «Print / PDF» asks the
 // printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
 // it; refused (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
 // browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why), and a document of a
@@ -32,13 +33,16 @@ import InvoicePaper from '../components/InvoicePaper.vue';
 import InvoiceTotals from '../components/InvoiceTotals.vue';
 import PageNotices from '../components/PageNotices.vue';
 import RectifyModal from '../components/RectifyModal.vue';
+import SendEmailModal from '../components/SendEmailModal.vue';
 import SubstituteModal from '../components/SubstituteModal.vue';
 import VerifactuReceipt from '../components/VerifactuReceipt.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useLocale, useT } from '../composables/useT';
+import { emailLine, lastFailure } from '../lib/emails';
 import { formatDate, moneyOf } from '../lib/format';
 import { documentNote, missingTaxId, shownStatus, statusTone } from '../lib/invoice';
 import type { InvoiceLinkOut, InvoiceOut } from '../operations';
+import '../operations/emails';
 
 const props = defineProps<{ id: string }>();
 
@@ -95,6 +99,18 @@ const links = computed(() => {
   return out;
 });
 
+const { data: mail } = useLive('invoice.email.list', () => ({ invoice_id: props.id }));
+const emails = computed(() => mail.value?.emails ?? []);
+const emailed = computed(() =>
+  emails.value.map((email) => ({ id: email.id, text: emailLine(email, t, (moment) => formatDateTime(moment, locale.value)) })),
+);
+/** The last email, when it did not leave: it stays said until another leaves. */
+const unsent = computed(() => {
+  const email = lastFailure(emails.value);
+  if (!email) return null;
+  return { heading: email.to ? t('invoice.email.failedTo', { to: email.to }) : t('invoice.email.failedPlain'), reason: email.reason };
+});
+
 const note = computed(() => (invoice.value ? documentNote(invoice.value, t) : ''));
 
 /** VeriFactu on in this business and the right to read its records. */
@@ -121,6 +137,7 @@ function go(link: InvoiceLinkOut): void {
 // ── Actions ──────────────────────────────────────────────────────────────────────────────────────
 const paid = useMarkPaid();
 const rectifyOpen = shallowRef(false);
+const emailOpen = shallowRef(false);
 const substituteOpen = shallowRef(false);
 const paper = shallowRef<{ $el: HTMLElement } | null>(null);
 
@@ -237,6 +254,18 @@ function onSubstituted(full: InvoiceOut): void {
             :load="pdfFile"
           />
           <ion-button
+            v-if="canAdd"
+            fill="outline"
+            data-testid="invoice-detail-email"
+            @click="emailOpen = true"
+          >
+            <HubIcon
+              slot="start"
+              name="ion:mail-outline"
+            />
+            {{ $t('invoice.detail.emailButton') }}
+          </ion-button>
+          <ion-button
             fill="outline"
             color="medium"
             data-testid="invoice-detail-back"
@@ -253,6 +282,15 @@ function onSubstituted(full: InvoiceOut): void {
         data-testid="invoice-missing-tax-id"
       >
         {{ $t('invoice.detail.missingTaxId') }}
+      </InlineFeedback>
+
+      <InlineFeedback
+        v-if="unsent"
+        tone="danger"
+        data-testid="invoice-detail-email-failed"
+        :heading="unsent.heading"
+      >
+        {{ unsent.reason }}
       </InlineFeedback>
 
       <section class="invoice-detail__card">
@@ -286,6 +324,16 @@ function onSubstituted(full: InvoiceOut): void {
             <dt>{{ $t('invoice.detail.fields.paidAt') }}</dt>
             <dd data-testid="invoice-detail-paid-at">
               {{ formatDateTime(invoice.paid_at, locale) }}
+            </dd>
+          </div>
+          <div v-if="emailed.length">
+            <dt>{{ $t('invoice.detail.fields.emailed') }}</dt>
+            <dd
+              v-for="line in emailed"
+              :key="line.id"
+              data-testid="invoice-detail-emailed"
+            >
+              {{ line.text }}
             </dd>
           </div>
           <div v-if="note">
@@ -360,6 +408,12 @@ function onSubstituted(full: InvoiceOut): void {
       v-if="canRectify"
       v-model:open="rectifyOpen"
       :invoice="invoice ?? null"
+    />
+    <SendEmailModal
+      v-if="canAdd"
+      v-model:open="emailOpen"
+      :invoice="invoice ?? null"
+      :proposed="mail?.customer_email ?? ''"
     />
     <SubstituteModal
       v-if="canAdd"

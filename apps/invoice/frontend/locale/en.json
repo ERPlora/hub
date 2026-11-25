@@ -119,6 +119,7 @@
         "pending": "Preparing…",
         "failed": "The PDF could not be downloaded: {reason}"
       },
+      "emailButton": "Send by email",
       "missingTaxId": "This invoice has no customer tax ID: the ticket printer cannot print it as a full invoice.",
       "fields": {
         "type": "Type",
@@ -137,6 +138,7 @@
         "substitutedBy": "Replaced by",
         "rectifications": "Rectifying invoices",
         "paidAt": "Paid on",
+        "emailed": "Email",
         "notes": "Notes"
       },
       "lines": {
@@ -162,6 +164,22 @@
         "rectify": "Rectify",
         "substitute": "Full invoice"
       }
+    },
+    "email": {
+      "title": "Email invoice {number}",
+      "to": "Customer’s email",
+      "help": "The invoice goes attached as a PDF. Replies reach the business owner’s email.",
+      "submit": "Send",
+      "failed": "The invoice could not be sent",
+      "onItsWay": "Sending the invoice to {to}…",
+      "sentTo": "Sent to {to} on {date}",
+      "sent": "Sent on {date}",
+      "sendingTo": "Sending to {to}…",
+      "sending": "Sending…",
+      "notSentTo": "Not sent to {to}",
+      "notSent": "Not sent",
+      "failedTo": "The invoice was not sent to {to}",
+      "failedPlain": "The invoice was not sent"
     },
     "verifactu": {
       "heading": "VeriFactu receipt",
