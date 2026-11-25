@@ -10,7 +10,7 @@
 // read first and put back by API at the end.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { aMonday } from './appointment-helpers';
+import { aMonday, salonCleanUp } from './appointment-helpers';
 import { cardDeletes } from './customer-helpers';
 import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { A, api, psql, shot, shown } from './helpers';
@@ -25,29 +25,7 @@ const DAY = aMonday();
 const NEXT_DAY = new Date(Date.parse(`${DAY}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
 function cleanUp(): void {
-  const customers = `select id from customer_customer where name like '${TAG}%'`;
-  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
-  const series = `select id from appointment_recurring where customer_id in (${customers})`;
-  const services = `select id from service_service where name like '${TAG}%'`;
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  const orders = `select id from sale_order where appointment_id in (${appointments})`;
-  psql(
-    [
-      `delete from sale_orderline where order_id in (${orders})`,
-      `delete from sale_order where id in (${orders})`,
-      `delete from appointment_history where appointment_id in (${appointments})`,
-      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
-      `delete from appointment_appointment where id in (${appointments})`,
-      `delete from appointment_recurringservice where recurring_id in (${series})`,
-      `delete from appointment_recurring where id in (${series})`,
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-      `delete from service_service where name like '${TAG}%'`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      ...cardDeletes(customers),
-    ].join('; '),
-  );
+  psql([...salonCleanUp(TAG), ...cardDeletes(`select id from customer_customer where name like '${TAG}%'`)].join('; '));
 }
 
 /** The business's own settings of Citas, kept before the spec turns overlaps off and put back after. */

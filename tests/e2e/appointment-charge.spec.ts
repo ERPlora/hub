@@ -6,6 +6,7 @@
 // and removed before and after.
 import { expect, test } from '@playwright/test';
 
+import { aMonday, salonCleanUp } from './appointment-helpers';
 import { cardDeletes } from './customer-helpers';
 import { pickDay } from './date-time-fields';
 import { A, psql, shot, shown } from './helpers';
@@ -15,35 +16,10 @@ const TAG = 'E2E Apt Charge';
 const RUN = Date.now().toString(36);
 const named = (label: string): string => `${TAG} ${label} ${RUN}`;
 
-/** A Tuesday five weeks ahead, as `YYYY-MM-DD` of the business. */
-function aTuesday(): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + ((9 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
-const DAY = aTuesday();
+const DAY = aMonday();
 
 function cleanUp(): void {
-  const customers = `select id from customer_customer where name like '${TAG}%'`;
-  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
-  const orders = `select id from sale_order where appointment_id in (${appointments})`;
-  const services = `select id from service_service where name like '${TAG}%'`;
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from sale_orderline where order_id in (${orders})`,
-      `delete from sale_order where id in (${orders})`,
-      `delete from appointment_history where appointment_id in (${appointments})`,
-      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
-      `delete from appointment_appointment where id in (${appointments})`,
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-      `delete from service_service where name like '${TAG}%'`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      ...cardDeletes(customers),
-    ].join('; '),
-  );
+  psql([...salonCleanUp(TAG), ...cardDeletes(`select id from customer_customer where name like '${TAG}%'`)].join('; '));
 }
 
 test.beforeAll(cleanUp);
