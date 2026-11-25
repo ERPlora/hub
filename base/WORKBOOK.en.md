@@ -2742,15 +2742,15 @@ it.".
 Involved: BASE-F90
 
 ### BASE-F92 Open and close the assistant's panel
-<!-- from WORKBOOK.md sha256:7a761cb0f856 -->
+<!-- from WORKBOOK.md sha256:0063a7a68d0c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title stays centred, and
-     the bell stays in sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what
-     they type straight away goes to the chat's box and Enter sends it.
+     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title reads whole, and the
+     bell and the help's "?" stay in sight: there, "Assistant" opens the panel as soon as the menu has finished
+     closing, so what they type straight away goes to the chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the

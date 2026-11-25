@@ -96,19 +96,33 @@ export interface Box {
   height: number;
 }
 
-/** The title's text, centred on its bar (Ionic's ios title), within 4 px; returns both boxes. */
-export async function expectTitleCentred(page: Page, label: string): Promise<{ title: Box; toolbar: Box }> {
-  const text = await topbar(page)
+/** The title's text on the bar of the screen on view, and whether the bar cuts it with «…». */
+function titleText(page: Page): Promise<Box & { cut: boolean }> {
+  return topbar(page)
     .locator('ion-title')
     .evaluate((el) => {
       const inner = el.shadowRoot?.querySelector('.toolbar-title') ?? el;
       const range = document.createRange();
       range.selectNodeContents(inner);
       const box = (range.getClientRects().length ? range : inner).getBoundingClientRect();
-      return { x: box.x, y: box.y, width: box.width, height: box.height };
+      return { x: box.x, y: box.y, width: box.width, height: box.height, cut: inner.scrollWidth > inner.clientWidth };
     });
+}
+
+/** The title's text, centred on its bar (Ionic's ios title), within 4 px; returns both boxes. */
+export async function expectTitleCentred(page: Page, label: string): Promise<{ title: Box; toolbar: Box }> {
+  const text = await titleText(page);
   const toolbar = (await topbar(page).locator('ion-toolbar').boundingBox())!;
   const centre = (box: Box) => box.x + box.width / 2;
   expect(Math.abs(centre(text) - centre(toolbar)), `${label}: the title is centred`).toBeLessThanOrEqual(4);
   return { title: text, toolbar };
+}
+
+/** The title's text, whole and clear of the buttons at the end of its bar: on a phone, with the help beside the bell
+ *  grown into a pill, it has no room to stay centred. */
+export async function expectTitleWhole(page: Page, label: string): Promise<void> {
+  const text = await titleText(page);
+  const end = (await topbar(page).locator('ion-buttons[slot=end]').boundingBox())!;
+  expect(text.cut, `${label}: the title is whole`).toBe(false);
+  expect(text.x + text.width, `${label}: the title ends before the buttons`).toBeLessThanOrEqual(end.x);
 }
