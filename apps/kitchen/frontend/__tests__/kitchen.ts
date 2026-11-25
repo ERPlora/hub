@@ -1,4 +1,4 @@
-// Fixtures of the kitchen app's frontend tests: what the server answers, as schemas.py shapes it.
+// Fixtures of the kitchen app's frontend tests: what the server answers, as schemas/ shapes it.
 import type { Business } from '../../../../base/frontend/operations/business';
 import type { BoardOut, ItemOut, LogOut, RouteOut, SettingsOut, StationOut, TicketOut, TicketRowOut } from '../operations';
 
