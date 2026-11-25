@@ -26,7 +26,7 @@ def menu():
 
     drinks = Category.objects.create(name="Drinks", slug="drinks", order=1)
     food = Category.objects.create(name="Food", slug="food", order=0)
-    wine = Category.objects.create(name="wine", slug="wine", order=1)
+    aperitifs = Category.objects.create(name="aperitifs", slug="aperitifs", order=1)
     gone = Category.objects.create(name="Gone", slug="gone", order=0, is_deleted=True)
     cola = Product.objects.create(name="Cola", sku="COLA", price=250)
     bocata = Product.objects.create(name="Bocata", sku="BOC", price=550)
@@ -35,9 +35,9 @@ def menu():
     ProductCategory.objects.create(product=cola, category=drinks)
     ProductCategory.objects.create(product=bocata, category=food)
     ProductCategory.objects.create(product=sangria, category=drinks)
-    ProductCategory.objects.create(product=sangria, category=wine)
+    ProductCategory.objects.create(product=sangria, category=aperitifs)
     ProductCategory.objects.create(product=loose, category=gone)
-    return {"drinks": drinks, "food": food, "wine": wine}
+    return {"drinks": drinks, "food": food, "aperitifs": aperitifs}
 
 
 def names(groups) -> list[tuple[str, list[str]]]:
@@ -48,18 +48,18 @@ def test_the_products_go_under_their_categories_in_their_order_and_those_without
     ctx = reader()
     products = catalog_groups.every_row(ctx, "inventory.product.list_for_sale")
     groups = catalog_groups.product_groups(ctx, products, lambda row: {"name": row.name})
-    # Food (0) before Drinks and wine (1, by name whatever its case); a product in two categories is in both; one
-    # whose only category is deleted has none.
+    # Food (0) before aperitifs and Drinks (1, by name whatever its case); a product in two categories is in both;
+    # one whose only category is deleted has none.
     assert names(groups) == [
         ("Food", ["Bocata"]),
+        ("aperitifs", ["Sangria"]),
         ("Drinks", ["Cola", "Sangria"]),
-        ("wine", ["Sangria"]),
         ("", ["Loose"]),
     ]
     assert [category_id for category_id, _name, _items in groups[:3]] == [
         str(menu["food"].id),
+        str(menu["aperitifs"].id),
         str(menu["drinks"].id),
-        str(menu["wine"].id),
     ]
 
 
@@ -83,3 +83,8 @@ def test_every_row_reads_the_list_page_by_page_up_to_its_limit(monkeypatch):
 
 def test_a_list_no_installed_app_gives_has_no_rows():
     assert list(catalog_groups.every_row(reader(), "nothing.thing.list")) == []
+
+
+def test_the_group_without_a_category_goes_after_one_whose_category_is_past_the_list():
+    grouped = {"": ("", [{"name": "Loose"}]), "gone": ("Archived", [{"name": "Old"}])}
+    assert [name for _id, name, _items in catalog_groups.in_order(grouped, {})] == ["Archived", ""]
