@@ -57,6 +57,12 @@
       "notSubject": "Not subject",
       "reverseCharge": "Reverse charge"
     },
+    "withholding": {
+      "label": "IRPF withholding",
+      "none": "No withholding",
+      "of": "IRPF withholding {rate}",
+      "payable": "Amount due"
+    },
     "taxPct": {
       "vat": "VAT %",
       "igic": "IGIC %",

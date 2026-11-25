@@ -15,12 +15,14 @@ from apps.invoice import fiscal
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.platform_series import refuse_platform_series
 from apps.invoice.queries.series import FULL, business_series
+from apps.invoice.schemas.fields import HOME_COUNTRY
 from apps.invoice.schemas.invoices import InvoiceCreateIn, InvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import GENERAL_REGIME, _issue, _line_values
 from apps.invoice.services.numbering import SERIES_NOT_FOUND, series_of_year
 from apps.invoice.services.recipient import _chosen_card, _recipient
 from apps.invoice.services.writes import _detail, _today
+from apps.invoice.withholding import columns
 from apps.sale.queries.business import TICKET_LIMIT, business_country, money_text
 from apps.sale.queries.checkout import tax_category_name
 from apps.tax.queries.calculation import round_half_up
@@ -56,6 +58,12 @@ DUE_DATE_BEFORE_ISSUE = _("The due date cannot be before the invoice's date.")
 TICKET_OVER_LIMIT = _(
     "Above %(limit)s a ticket cannot be issued: issue an invoice (F1) with the customer's details."
 )
+
+
+WITHHOLDING_ON_TICKET = _(
+    "A ticket carries no IRPF withholding: issue an invoice (F1) with the customer's details."
+)
+WITHHOLDING_ABROAD = _("IRPF withholding is a Spanish tax: a business outside Spain does not withhold it.")
 
 
 UNKNOWN_CATEGORY = _("There is no tax category «%(category)s».")
@@ -156,16 +164,19 @@ def _rule_key(category_key: str, *, field: str, on: dt.date) -> fiscal.FiscalKey
                 "make an invoice for Carpintería Lema for two hours of work at 50 €",
                 "issue an invoice by hand to Fontanería Ortega",
                 "make an invoice for Carpintería Lema dated yesterday, due in 30 days",
+                "make an invoice for Carpintería Lema with 15% withholding",
             ),
             "es": (
                 "hazle una factura a Carpintería Lema por dos horas de trabajo a 50 €",
                 "emite a mano una factura para Fontanería Ortega",
                 "hazle una factura a Carpintería Lema con fecha de ayer y vencimiento a 30 días",
+                "hazle una factura a Carpintería Lema con retención del 15",
             ),
         },
         "description": "Issue an invoice by hand, numbered in its series (an invoice F1 needs the "
         "customer's name, tax ID and address; a ticket series issues a simplified F2). It is dated today unless "
-        "issue_date says an earlier day, and it has no due date unless due_date says one. Each line: description, "
+        "issue_date says an earlier day, and it has no due date unless due_date says one, nor IRPF withholding unless "
+        "withholding_rate does (15, 7, 1 or 19). Each line: description, "
         "quantity, unit price WITHOUT VAT in cents, and its VAT % or its tax category. The server computes the VAT, "
         "closed once per rate. An issued invoice is never edited: it is corrected with a rectifying invoice.",
         "risk": "high",
@@ -227,6 +238,7 @@ def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
         )
     closed = fiscal.close_manual(lines)
     _within_ticket_limit(series, closed.total)
+    _withholding_allowed(series, data)
     invoice = _issue(
         ctx,
         series=series,
@@ -242,6 +254,7 @@ def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
         issue_date=issue_date,
         operation_date=issue_date,
         due_date=data.due_date,
+        **columns(closed.base, data.withholding_rate),
         source_type=Invoice.Source.MANUAL,
         currency=base_operations.business_currency(ctx.scope),
         notes=data.notes,
@@ -263,3 +276,17 @@ def _within_ticket_limit(series: InvoiceSeries, total: int) -> None:
             str(TICKET_OVER_LIMIT) % {"limit": money_text(limit)},
             code="invoice.ticket_over_limit",
         )
+
+
+def _withholding_allowed(series: InvoiceSeries, data: InvoiceCreateIn) -> None:
+    """IRPF is withheld on a Spanish business's invoice, never on a ticket."""
+    if data.withholding_rate is None:
+        return
+    if series.invoice_type == "F2":
+        refusal, code = WITHHOLDING_ON_TICKET, "invoice.withholding_on_ticket"
+    elif business_country() != HOME_COUNTRY:
+        refusal, code = WITHHOLDING_ABROAD, "invoice.withholding_abroad"
+    else:
+        return
+    message = str(refusal)
+    raise Conflict(message, code=code, fields={"withholding_rate": message})

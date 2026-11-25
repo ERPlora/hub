@@ -9,9 +9,12 @@ import json
 from decimal import Decimal
 
 import pytest
+from django.db import connections
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from live.errors import PermissionDenied
+from live.operations import current_alias
 from openpyxl import load_workbook
 
 from apps.invoice.models import Invoice
@@ -182,6 +185,74 @@ def test_the_equivalence_surcharge_has_its_own_columns_only_in_a_file_that_has_o
     assert totals(export()) == listed()
 
 
+# The IRPF withholding
+
+WITHHELD = [*HEADERS, "Withholding %", "Withholding", "Amount due"]
+
+
+def test_the_withholding_has_its_own_columns_only_in_a_file_that_has_one(issuer):
+    plain = manual(line(10000))
+    assert opened(export())[0] == HEADERS
+    withheld = manual(line(10000), withholding_rate=15)
+
+    assert opened(export())[0] == WITHHELD
+    rows = {row["Number"]: row for row in values(export())}
+    assert [rows[withheld.number][header] for header in WITHHELD[7:]] == [121, 15, -15, 106]
+    # What is collected of an invoice without it is its total: the column adds up to everything that is due.
+    assert [rows[plain.number][header] for header in WITHHELD[7:]] == [121, None, None, 121]
+    assert totals(export()) == listed()
+
+
+def test_the_withholding_of_several_rates_is_shared_out_by_their_base_to_the_cent(issuer):
+    invoice = manual(line(1000, "21"), line(2001, "10"), line(333, "4"), withholding_rate=15)
+
+    rows = values(export())
+
+    # 15 % of 33.34 € is 5.00 €: 1.4997, 3.0010 and 0.4994 € of it, so the cents left go to the first and the last.
+    assert [row["Withholding"] for row in rows] == [-1.5, -3, -0.5]
+    assert sum(Decimal(str(row["Withholding"])) for row in rows) * 100 == -invoice.withholding_amount == -500
+    assert sum(Decimal(str(row["Amount due"])) for row in rows) * 100 == invoice.payable_amount
+    for row in rows:
+        assert Decimal(str(row["Amount due"])) == Decimal(str(row["Total"])) + Decimal(str(row["Withholding"]))
+
+
+def test_the_withholding_of_a_rectifying_invoice_goes_back_row_by_row(issuer):
+    original = manual(line(1000, "21"), line(3000, "10"), withholding_rate=15)
+    rectifying = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
+
+    rows = [(row["Number"], row["Withholding"], row["Amount due"]) for row in values(export())]
+
+    assert rows == [
+        (original.number, -1.5, 10.6),
+        (original.number, -4.5, 28.5),
+        (rectifying.number, 1.5, -10.6),
+        (rectifying.number, 4.5, -28.5),
+    ]
+
+
+def test_the_withholding_goes_with_the_equivalence_surcharge(issuer, equivalence_surcharge):
+    manual(line(10000, None, tax_category_key="product.generic"), withholding_rate=7)
+
+    [row] = values(export())
+
+    assert opened(export())[0] == [*HEADERS[:7], "Surcharge rate %", "Surcharge", *WITHHELD[7:]]
+    assert (row["Total"], row["Withholding %"], row["Withholding"], row["Amount due"]) == (126.2, 7, -7, 119.2)
+
+
+def test_the_withholding_reads_nothing_more_per_invoice(issuer):
+    def queries() -> int:
+        with CaptureQueriesContext(connections[current_alias()]) as captured:
+            export()
+        return len(captured)
+
+    manual(withholding_rate=15)
+    one = queries()
+    for _ in range(3):
+        manual(withholding_rate=15)
+
+    assert queries() == one
+
+
 # What the list counts
 
 
@@ -329,6 +400,9 @@ def test_the_headers_and_the_file_name_are_in_the_person_s_language(issuer):
 
     assert out.filename == "facturas.xlsx"
     assert opened(out)[0] == ["Número", "Fecha", "Cliente", "NIF", "Base imponible", "Tipo %", "Cuota", "Total"]
+
+    manual(withholding_rate=15)
+    assert opened(export(ctx_for(language="es")))[0][-3:] == ["Retención %", "Retención", "Total a pagar"]
 
 
 # The assistant
