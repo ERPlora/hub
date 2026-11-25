@@ -61,7 +61,7 @@ describe('ApprovalsList', () => {
   it.each([
     ['en', 'Their role', 'Done'],
     ['es', 'Su rol', 'Hecha'],
-  ])('what somebody did by their role names who did it and nobody who approved it (%s)', async (locale, way, state) => {
+  ] as const)('what somebody did by their role names who did it and nobody who approved it (%s)', async (locale, way, state) => {
     const m = await open({ locale });
     await m.result(m.call, 'base.approval.list', {
       approvals: [approval({ requested_by: 'Mario', approved_by: '', way: 'role' })],
