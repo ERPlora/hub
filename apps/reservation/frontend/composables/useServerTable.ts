@@ -10,7 +10,7 @@ import { computed, type Ref, ref, watch } from 'vue';
 
 export type SortDir = 'asc' | 'desc';
 
-/** The most rows the server gives at once (`PageIn.limit`, schemas/fields.py). */
+/** The most rows the server gives at once (`PageIn.limit`, schemas.py). */
 export const MAX_LIMIT = 100;
 
 /** One slice of the rows on screen: one live subscription. */
