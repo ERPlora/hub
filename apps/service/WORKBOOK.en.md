@@ -148,7 +148,7 @@ its movements, and from there you spend a session outside the checkout, give ses
 mistake. At the top, **Vouchers with no customer** gathers the vouchers whose customer was deleted.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:4a4caf688564 -->
+<!-- from WORKBOOK.md sha256:64a747432988 -->
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
 box "Search package…", columns **Name, Discount, Closed price, Lines** and **Status** (Active, Archived or
 Deleted). In **Filters**, the Status filter on **Deleted** switches to the view of the vouchers deleted
@@ -179,7 +179,7 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   Empty: "Nobody has bought this voucher yet.".
   - **Spend a session** opens its dialog: "Mark one session of <customer>'s "<voucher>" voucher as delivered,
     outside the till.", the balance "{n} sessions left · {after} after this one" ("1 session left · 0 after this
-    one"; "No session limit" on one without a limit), **Service** ("Choose the service", only those the voucher
+    one"; "No session limit" on one without a limit), **Service** (only those the voucher
     covers; with a single one, already chosen), **Professional** (Staff's team; "Who did it: what the session is
     worth counts in their production in Sales. Optional."), **Note** and the **Cancel** and **Spend session**
     buttons. While it checks the voucher, "Checking the voucher…".
