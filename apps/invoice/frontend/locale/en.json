@@ -166,9 +166,9 @@
       }
     },
     "email": {
-      "title": "Email invoice {number}",
+      "title": "Send by email",
       "to": "Customer’s email",
-      "help": "The invoice goes attached as a PDF. Replies reach the business owner’s email.",
+      "help": "Invoice {number} goes attached as a PDF. Replies reach the business owner’s email.",
       "submit": "Send",
       "failed": "The invoice could not be sent",
       "onItsWay": "Sending the invoice to {to}…",

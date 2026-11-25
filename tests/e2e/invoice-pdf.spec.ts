@@ -7,7 +7,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { A, EMPLOYEE, login, settled, shown } from './helpers';
-import { cleanInvoices, flowShots, issueByHand, readyToInvoice } from './invoice-helpers';
+import { cleanInvoices, flowShots, issueByHand, openInvoice, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 
 const CUSTOMER = `e2e PDF ${stamp()}`;
@@ -48,10 +48,7 @@ async function downloaded(page: Page): Promise<{ name: string; words: string; ti
   };
 }
 
-async function open(page: Page): Promise<void> {
-  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
-  await expect(shown(page).locator('[data-testid=invoice-detail-title]')).toContainText(invoice.number);
-}
+const open = (page: Page): Promise<void> => openInvoice(page, invoice);
 
 test('«Download PDF» saves the invoice as a real PDF under its number, with what the screen shows', async ({ page }) => {
   await login(page, A, '/invoice/invoices');

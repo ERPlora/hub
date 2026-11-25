@@ -4,7 +4,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, settled, shown, signedInSpanish } from './helpers';
 import { cutLabels } from './field-labels';
-import { cleanInvoices, flowShots, issueByHand, openDialog, readyToInvoice } from './invoice-helpers';
+import { cleanInvoices, flowShots, issueByHand, openDialog, openInvoice, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 
 const CUSTOMER = `e2e Correo ${stamp()}`;
@@ -27,10 +27,7 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(() => cleanInvoices());
 
-async function open(page: Page): Promise<void> {
-  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
-  await expect(shown(page).locator('[data-testid=invoice-detail-title]')).toContainText(invoice.number);
-}
+const open = (page: Page): Promise<void> => openInvoice(page, invoice);
 
 async function windowOf(page: Page): Promise<Locator> {
   await shown(page).locator('[data-testid=invoice-detail-email]').click();
@@ -92,7 +89,7 @@ for (const [label, width, height] of [['375', 375, 667], ['820', 820, 1180], ['1
     await open(page);
     const dialog = await windowOf(page);
     await settled(page);
-    await expect(dialog.locator('ion-title')).toHaveText(`Enviar la factura ${invoice.number} por correo`);
+    await expect(dialog.locator('ion-title')).toHaveText('Enviar por correo');
     expect(await cutLabels(dialog)).toEqual([]);
     const submit = (await dialog.locator('[data-testid=invoice-email-submit]').boundingBox())!;
     expect(submit.y + submit.height).toBeLessThanOrEqual(height);

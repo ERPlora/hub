@@ -5,7 +5,7 @@
 // its sales (`E2E-INV-…` products), its names (`e2e …`), its series (`E2E…` codes) or the ids it recorded.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, login, psql } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 
 /** The three sizes of a flow's evidence (the migration's: 390×844, 834×1112, 1440×900). */
 export const FLOW_VIEWPORTS = [
@@ -143,6 +143,12 @@ export async function issueByHand(context: BrowserContext, data: Record<string, 
   expect(issued.status, JSON.stringify(issued.data)).toBe(201);
   issuedIds.add(issued.data.id);
   return issued.data;
+}
+
+/** Opens the page of an issued invoice and waits until it shows. */
+export async function openInvoice(page: Page, invoice: { id: string; number: string }): Promise<void> {
+  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
+  await expect(shown(page).locator('[data-testid=invoice-detail-title]')).toContainText(invoice.number);
 }
 
 interface IssueOut {

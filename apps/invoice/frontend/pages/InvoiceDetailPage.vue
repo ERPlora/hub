@@ -326,7 +326,18 @@ function onSubstituted(full: InvoiceOut): void {
               {{ formatDateTime(invoice.paid_at, locale) }}
             </dd>
           </div>
-          <div v-if="emailed.length">
+          <div v-if="note">
+            <dt>{{ $t('invoice.detail.fields.notes') }}</dt>
+            <dd data-testid="invoice-detail-notes">
+              {{ note }}
+            </dd>
+          </div>
+        </dl>
+        <dl
+          v-if="emailed.length"
+          class="invoice-detail__grid"
+        >
+          <div>
             <dt>{{ $t('invoice.detail.fields.emailed') }}</dt>
             <dd
               v-for="line in emailed"
@@ -334,12 +345,6 @@ function onSubstituted(full: InvoiceOut): void {
               data-testid="invoice-detail-emailed"
             >
               {{ line.text }}
-            </dd>
-          </div>
-          <div v-if="note">
-            <dt>{{ $t('invoice.detail.fields.notes') }}</dt>
-            <dd data-testid="invoice-detail-notes">
-              {{ note }}
             </dd>
           </div>
         </dl>

@@ -23,18 +23,18 @@ async function setup(options: { proposed?: string; locale?: 'en' | 'es' } = {}) 
 }
 
 describe('SendEmailModal', () => {
-  it('names the invoice and proposes the customer’s email', async () => {
+  it('proposes the customer’s email', async () => {
     const s = await setup();
-    expect(s.inDoc('invoice-email')?.getAttribute('aria-label')).toBe('Email invoice FACT-2026-000001');
+    expect(s.inDoc('invoice-email')?.getAttribute('aria-label')).toBe('Send by email');
     expect(s.address().value).toBe('ana@example.com');
     expect(s.address().label).toBe('Customer’s email');
     expect(s.submit()?.textContent?.trim()).toBe('Send');
     expect(s.submit()?.disabled).toBe(false);
   });
 
-  it('says what goes and where the replies arrive', async () => {
+  it('says which invoice goes and where the replies arrive', async () => {
     const s = await setup();
-    expect(s.address().helperText).toBe('The invoice goes attached as a PDF. Replies reach the business owner’s email.');
+    expect(s.address().helperText).toBe('Invoice FACT-2026-000001 goes attached as a PDF. Replies reach the business owner’s email.');
   });
 
   it('without an address to propose it waits for one', async () => {
@@ -120,9 +120,9 @@ describe('SendEmailModal', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
-    expect(s.inDoc('invoice-email')?.getAttribute('aria-label')).toBe('Enviar la factura FACT-2026-000001 por correo');
+    expect(s.inDoc('invoice-email')?.getAttribute('aria-label')).toBe('Enviar por correo');
     expect(s.address().label).toBe('Correo del cliente');
-    expect(s.address().helperText).toBe('La factura va adjunta en PDF. Las respuestas llegan al correo del propietario del negocio.');
+    expect(s.address().helperText).toBe('La factura FACT-2026-000001 va adjunta en PDF. Las respuestas llegan al correo del propietario del negocio.');
     expect(s.submit()?.textContent?.trim()).toBe('Enviar');
   });
 });
