@@ -10,7 +10,7 @@ from live.errors import Conflict
 from apps.customer.models import Customer
 from apps.reservation import engine
 from apps.reservation.models import Reservation
-from apps.reservation.queries import in_service
+from apps.reservation.queries.gate import in_service
 from apps.reservation.services.gate import refuse
 from apps.reservation.services.other_apps import call_app
 from apps.table.models import Hold, Table

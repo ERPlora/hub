@@ -84,15 +84,19 @@ def test_a_section_is_said_by_its_name_and_titled_as_its_screen(language, title)
 
 
 @HUB_DB
-@pytest.mark.parametrize(("language", "vat"), [("en", "Product — generic"), ("es", "Producto — general")])
-def test_a_new_section_says_the_tax_category_it_charges_at_by_its_name(language, vat):
-    """«Varios» at the general rate: its category by the name the Taxes screens give it, never «product.generic»; the
-    yes is for that category (its id among the records the card read)."""
+@pytest.mark.parametrize(
+    ("language", "vat"), [("en", "Product — generic · 21%"), ("es", "Producto — general · 21\xa0%")]
+)
+def test_a_new_section_says_the_tax_category_it_charges_at_and_its_rate_as_its_screen(language, vat):
+    """«Varios» at the general rate: its category by the name the Taxes screens give it, never «product.generic», with
+    the rate the Sections screen gives it; the yes is for that category (its id among the records the card read)."""
     found: list = []
     arguments = {"name": "Varios", "tax_category_key": "product.generic", "sort_order": 0}
     card = assistant.cards.card(get("sale.department.create"), arguments, language, ctx_for(language=language), found=found)
     assert {field["name"]: field["value"] for field in card["fields"]}["tax_category_key"] == vat
     assert str(TaxCategory.objects.get(key="product.generic").id) in {str(one) for one in found}
+    section = run("sale.department.create", arguments, ctx_for(language=language))
+    assert vat.startswith(f"{section.tax_category_name} · {section.tax_rate_pct.normalize()}")
 
 
 @HUB_DB

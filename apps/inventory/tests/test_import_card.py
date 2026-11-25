@@ -1,6 +1,6 @@
 """The card of an import of products or categories from a file through the assistant: its rows by their names and,
-once each and by the names the Taxes screens give them, the tax categories those rows take — the fiscal text of a
-file is what the person most needs to check before the yes."""
+once each and by the names the Taxes screens give them, the tax categories those rows take with the rate each charges
+today — the fiscal text of a file is what the person most needs to check before the yes."""
 
 import pytest
 from live.assistant import NAMED
@@ -11,7 +11,7 @@ from base import assistant
 
 IMPORTS = ("inventory.category.bulk_create", "inventory.product.bulk_create")
 LABELS = {"es": "Categoría fiscal", "en": "Tax category"}
-GENERIC = {"es": "Producto — general", "en": "Product — generic"}
+GENERIC = {"es": "Producto — general · 21\xa0%", "en": "Product — generic · 21%"}
 
 
 def fields(write: str, rows: list, language: str) -> dict:

@@ -48,6 +48,9 @@ dev = [
     "complexipy>=9.0.0",
     # Opens in the tests the Excel files the Hub writes.
     "openpyxl>=3.1.5",
+    # Open in the tests the PDFs the Hub prints and read the QR on them.
+    "pypdfium2>=5.15.2",
+    "zxing-cpp>=3.2.0",
 ]
 
 # ruff checks how big and how branchy each function is, and the common mistakes of the rule families E4, E7, E9, F, B
@@ -160,9 +163,9 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy", "base.tenancy.migrator",
-    "base.services", "base.queries", "base.schemas", "base.ws_print", "control", "control.services", "control.queries",
-    "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
+    "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy",
+    "base.tenancy.migrator", "base.tenancy.move", "base.services", "base.queries", "base.schemas", "base.ws_print",
+    "control", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
 ]
 depth = 0
 ignore_imports = [
@@ -186,7 +189,9 @@ ignore_imports = [
     "base.tenancy.cut -> base.services.photo",
     "base.tenancy.cut -> base.services.provisioning",
     "base.tenancy.dumps -> base.services",
-    "base.tenancy.move -> base.services",
+    "base.tenancy.move.destination -> base.services",
+    "base.tenancy.move.moving -> base.services",
+    "base.tenancy.move.worker_pass -> base.services",
     "base.tenancy.offboarding -> base.services",
     "base.tenancy.offboarding -> base.services.provisioning",
     "base.tenancy.provision -> base.services.demos",
@@ -217,7 +222,7 @@ forbidden_modules = [
     "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo", "apps.flow",
     "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.online_order",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.table", "apps.task",
-    "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -231,8 +236,8 @@ forbidden_modules = [
     "apps.appointment", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website",
-    "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.schedule", "apps.service", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
+    "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -246,7 +251,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cash_register", "apps.combo", "apps.customer", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
     "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -261,7 +266,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.combo", "apps.customer", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule",
-    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website",
+    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website",
     "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -276,8 +281,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.customer", "apps.demo",
     "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.online_order",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
-    "apps.staff", "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
-    "control", "shared",
+    "apps.staff", "apps.table", "apps.task", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -291,7 +296,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
     "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -306,7 +311,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
     "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -321,7 +326,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
     "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -336,8 +341,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.verifactu", "apps.website",
-    "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tip", "apps.verifactu",
+    "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -351,7 +356,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.online_order",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff",
-    "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.table", "apps.task", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control",
+    "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -365,8 +371,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.invoice", "apps.modifier", "apps.online_booking", "apps.online_order",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff",
-    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
-    "control", "shared",
+    "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -380,8 +386,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.invoice", "apps.kitchen", "apps.online_booking", "apps.online_order",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
-    "apps.staff", "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
-    "control", "shared",
+    "apps.staff", "apps.table", "apps.task", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -395,7 +401,7 @@ forbidden_modules = [
     "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo", "apps.flow",
     "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_order", "apps.payment",
     "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.table", "apps.task",
-    "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -409,8 +415,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
-    "apps.staff", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
-    "control", "shared",
+    "apps.staff", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -424,7 +430,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule",
-    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website",
+    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website",
     "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -439,8 +445,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.online_order",
     "apps.payment", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff",
-    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
-    "control", "shared",
+    "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -454,7 +460,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.reservation", "apps.sale", "apps.schedule",
-    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website",
+    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website",
     "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -469,7 +475,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.sale", "apps.service", "apps.staff",
-    "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control",
+    "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -483,8 +490,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule",
-    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
-    "config", "control", "shared",
+    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tip", "apps.verifactu", "apps.website",
+    "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -498,7 +505,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website",
+    "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website",
     "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -513,8 +520,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
-    "control", "shared",
+    "apps.schedule", "apps.table", "apps.task", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -528,8 +535,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website",
-    "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.schedule", "apps.service", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
+    "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -543,8 +550,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule",
-    "apps.service", "apps.staff", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
-    "config", "control", "shared",
+    "apps.service", "apps.staff", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website",
+    "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -558,8 +565,8 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.table", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
-    "config", "control", "shared",
+    "apps.schedule", "apps.service", "apps.table", "apps.tax", "apps.tip", "apps.verifactu", "apps.website",
+    "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -573,8 +580,24 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.verifactu", "apps.website",
-    "apps.whatsapp_inbox", "config", "control", "shared",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tip", "apps.verifactu",
+    "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+
+[[tool.importlinter.contracts]]
+id = "app-tip"
+name = "apps.tip imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.tip"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.combo", "apps.customer", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule",
+    "apps.service", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
 ]
 allow_indirect_imports = true
 ignore_imports = ["**.tests.** -> **"]
@@ -588,7 +611,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.website",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.website",
     "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -603,7 +626,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
     "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
     "apps.whatsapp_inbox", "config", "control", "shared",
 ]
 allow_indirect_imports = true
@@ -618,7 +641,7 @@ forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
     "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.online_order", "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale",
-    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.tip", "apps.verifactu",
     "apps.website", "config", "control", "shared",
 ]
 allow_indirect_imports = true

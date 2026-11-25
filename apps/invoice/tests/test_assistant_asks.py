@@ -25,7 +25,7 @@ from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place, offered_to, without_its_asks
 from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
 
-#: Invoicing's assistant tools: its reads (invoices, their A4 page and what a sale or a refund has, a manual line's
+#: Invoicing's assistant tools: its reads (invoices, their A4 page, its PDF and what a sale or a refund has, a manual line's
 #: rate, the rectification it would issue, the issuer, the numbering and its series) and its writes (issue by hand or
 #: from a sale, replace a ticket, mark paid, print, rectify by hand, from a refund or from a void, the issuer and the
 #: series). What only the platform does (the hub of ERPlora's own invoices, the issuer from the account) is
@@ -35,6 +35,7 @@ TOOLS = {
     "invoice.invoice.export",
     "invoice.invoice.get",
     "invoice.invoice.document",
+    "invoice.invoice.pdf",
     "invoice.invoice.by_source",
     "invoice.invoice.line_defaults",
     "invoice.invoice.rectification_preview",
@@ -135,6 +136,8 @@ OWN_WORDS = [
     ("en", "invoice.invoice.get", "read me FACT-2025-000412 from top to bottom"),
     ("es", "invoice.invoice.document", "¿cómo se ve en hoja lo que le dimos a Talleres Mercedes?"),
     ("en", "invoice.invoice.document", "how does the sheet we handed to Talleres Mercedes look?"),
+    ("es", "invoice.invoice.pdf", "quiero guardar la de Talleres Mercedes"),
+    ("en", "invoice.invoice.pdf", "let me save the Talleres Mercedes one and keep it"),
     ("es", "invoice.invoice.by_source", "lo que vendimos esta mañana en la 20261111-0007, ¿con qué papel quedó?"),
     ("en", "invoice.invoice.by_source", "this morning's 20261111-0007: which paper did it end up with?"),
     ("es", "invoice.invoice.line_defaults", "si meto a mano una línea de unas gafas, ¿qué porcentaje le sale?"),
@@ -206,7 +209,7 @@ OWN_WORDS = [
 ]
 
 
-def test_invoice_offers_its_twenty_five_tools():
+def test_invoice_offers_its_twenty_seven_tools():
     """Invoicing's assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
     tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)

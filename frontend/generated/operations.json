@@ -1275,6 +1275,10 @@
     "method": "get",
     "path": "/api/invoice/invoices/document"
   },
+  "invoice.invoice.pdf": {
+    "method": "get",
+    "path": "/api/invoice/invoices/pdf"
+  },
   "invoice.invoice.print": {
     "method": "post",
     "path": "/api/invoice/invoices/print"
@@ -2766,6 +2770,34 @@
   "cart_checkout.customer.erase": {
     "method": "post",
     "path": "/api/cart_checkout/customers/erase"
+  },
+  "tip.settings.get": {
+    "method": "get",
+    "path": "/api/tip/settings"
+  },
+  "tip.settings.update": {
+    "method": "post",
+    "path": "/api/tip/settings"
+  },
+  "tip.tip.list": {
+    "method": "get",
+    "path": "/api/tip/tips"
+  },
+  "tip.tip.get": {
+    "method": "get",
+    "path": "/api/tip/tips/detail"
+  },
+  "tip.tip.add": {
+    "method": "post",
+    "path": "/api/tip/tips"
+  },
+  "tip.tip.update": {
+    "method": "post",
+    "path": "/api/tip/tips/update"
+  },
+  "tip.tip.void": {
+    "method": "post",
+    "path": "/api/tip/tips/void"
   },
   "verifactu.config.get": {
     "method": "get",

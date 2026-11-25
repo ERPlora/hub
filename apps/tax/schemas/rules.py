@@ -37,7 +37,7 @@ from apps.tax.schemas.jurisdiction import (
     OptionalRegion,
     _RegionOfTheCountry,
 )
-from apps.tax.schemas.references import A_RULE, A_TAX_CATEGORY, CATEGORY, CATEGORY_REF, T_RULE, CategoryRef
+from apps.tax.schemas.references import A_RULE, A_RULE_CATEGORY, CATEGORY, CATEGORY_REF, T_RULE, CategoryRef
 
 #: The countries the factory catalogue brings rules for (TAX-F16, migration 0002): Spain, and no other. A business of
 #: another country has them in its database too, but they never apply to it: it creates its own in Rules (hub#996);
@@ -143,7 +143,7 @@ class RuleFields(_RegionOfTheCountry, Schema):
 
     country_code: CountryCode = Field(description=COUNTRY)
     region_code: OptionalRegion = Field(None, description=REGION)
-    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF, json_schema_extra=A_TAX_CATEGORY)
+    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF, json_schema_extra=A_RULE_CATEGORY)
     operation_class: OperationClass = Field("subject", description=OPERATION_CLASS)
     rate_pct: Rate = Field(
         description="The rate in %, 0 to 100, two decimals; 0 for a class that charges no tax."
@@ -227,7 +227,7 @@ class RuleRefIn(_RegionOfTheCountry, Schema):
     )
     region_code: OptionalRegion = Field(None, description=REGION)
     tax_category_key: CategoryRef | None = Field(
-        None, title=CATEGORY, description=CATEGORY_REF + " With the country, instead of the id.", json_schema_extra=A_TAX_CATEGORY
+        None, title=CATEGORY, description=CATEGORY_REF + " With the country, instead of the id.", json_schema_extra=A_RULE_CATEGORY
     )
 
     @model_validator(mode="after")

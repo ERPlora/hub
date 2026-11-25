@@ -3,7 +3,7 @@
 import pytest
 
 from apps.tax.schemas.aliases import AliasOut
-from apps.tax.schemas.categories import CategoryIn, CategoryListIn, CategoryOut, CategoryRowOut
+from apps.tax.schemas.categories import CategoryIn, CategoryListIn, CategoryNamedOut, CategoryOut, CategoryRowOut
 
 from .schema_checks import invalid_fields
 
@@ -46,6 +46,7 @@ def test_the_rows_carry_the_columns_of_the_screens():
         "id", "key", "name", "description", "display_name", "display_description", "is_system", "is_active",
     ]  # fmt: skip
     assert list(CategoryRowOut.model_fields)[-2:] == ["rate_pct", "operation_class"]
+    assert list(CategoryNamedOut.model_fields) == [*CategoryOut.model_fields, "label"]
     assert list(AliasOut.model_fields) == [
         "id", "alias", "tax_category_key", "tax_category_name", "source", "is_active",
     ]  # fmt: skip

@@ -889,7 +889,7 @@ def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
         seen.append((context.current().kind, cancelled()))
         return 1
 
-    monkeypatch.setattr(move, "run_due", run_due)
+    monkeypatch.setattr(move.worker_pass, "run_due", run_due)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append(("restores", cancelled())) or 0)
 
     worker_data._moves(ten(0), stop)
@@ -903,7 +903,7 @@ def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
 
     monkeypatch.undo()
     seen: list[tuple[str, dt.datetime]] = []
-    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(move.worker_pass, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now)) or 1)
 
     worker_data._moves(ten(0), threading.Event())
@@ -917,7 +917,7 @@ def test_the_moves_pass_brings_back_what_a_business_lost_from_its_copy_too_on_co
 
     monkeypatch.undo()
     seen: list[tuple] = []
-    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(move.worker_pass, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_aside_due", lambda now, *, cancelled: seen.append("asides") or 0)
     monkeypatch.setattr(
@@ -938,7 +938,7 @@ def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeyp
     def run_due(now, *, cancelled):
         raise failure
 
-    monkeypatch.setattr(move, "run_due", run_due)
+    monkeypatch.setattr(move.worker_pass, "run_due", run_due)
 
     with caplog.at_level(logging.ERROR, logger="base.worker"):
         worker_data._moves(ten(0), threading.Event())

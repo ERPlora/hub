@@ -290,7 +290,7 @@ export interface TaxSettingsOut {
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'tax.category.list': { input: CategoryListIn; output: Page<CategoryRowOut> };
-    'tax.category.get': { input: CategoryGetIn; output: CategoryOut };
+    'tax.category.get': { input: CategoryGetIn; output: CategoryOut & { label: string } };
     'tax.category.create': { input: CategoryIn; output: CategoryOut };
     'tax.rule.list': { input: RuleListIn; output: Page<RuleOut> };
     'tax.rule.status': { input: RuleStatusIn; output: RuleStatusOut };

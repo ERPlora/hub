@@ -1,5 +1,5 @@
-"""The tax categories: their list with today's rate (TAX-F01), one category by its key, name or alias, and the
-categories a write of another app holds while it names them."""
+"""The tax categories: their list with today's rate (TAX-F01), one category by its key, name or alias with how a
+person names it, and the categories a write of another app holds while it names them."""
 
 from collections.abc import Iterable
 
@@ -11,10 +11,11 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxCategory
-from apps.tax.queries.jurisdiction import asked_jurisdiction, business_today
+from apps.tax.queries.jurisdiction import asked_jurisdiction, business_jurisdiction, business_today
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.resolution import current_rates
-from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn, CategoryOut, CategoryPage
+from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn, CategoryNamedOut, CategoryPage
+from base.business import percent_text
 from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
@@ -43,6 +44,15 @@ def category_row(category: TaxCategory) -> dict:
         "is_system": category.is_system,
         "is_active": category.is_active,
     }
+
+
+def category_label(category: TaxCategory) -> str:
+    """How a person names ``category`` with what it charges today in the business's country and region, in the active
+    language, as the Sections screen tells it («Producto — general · 21 %»); without a rule in force, its name alone."""
+    resolution = current_rates([category], *business_jurisdiction(), business_today())[category.id]
+    if resolution is None:
+        return category.display_name
+    return f"{category.display_name} · {percent_text(resolution.rate_pct)}"
 
 
 @operation(
@@ -115,7 +125,7 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     kind="query",
     permission="tax.view",
     input=CategoryGetIn,
-    output=CategoryOut,
+    output=CategoryNamedOut,
     expose_api=True,
     ai={
         "asks": {
@@ -139,7 +149,7 @@ def get_category(ctx: OperationContext, params: CategoryGetIn) -> dict:
     if category is None:
         raise NotFound(CATEGORY_NOT_FOUND)
     with translation.override(ctx.language):
-        return category_row(category)
+        return {**category_row(category), "label": category_label(category)}
 
 
 # ── A tax category another app's write names ───────────────────────────────────────────────────

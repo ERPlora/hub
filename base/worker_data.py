@@ -94,7 +94,8 @@ def _usage(now: dt.datetime) -> None:
 
 def _moves(now: dt.datetime, stop: threading.Event | None = None) -> bool:
     """Move the hub asked longest ago to its new cluster and drop the copies past their days
-    (``base.tenancy.move.run_due``), then restore the hub asked longest ago from its copy (``base.tenancy.restore.run_due``),
+    (``base.tenancy.move.worker_pass.run_due``), then restore the hub asked longest ago from its copy
+    (``base.tenancy.restore.run_due``),
     make the separate copy asked longest ago (``base.tenancy.restore.run_aside_due``) and bring back into its business
     what a made copy was asked to give back (``base.tenancy.recovery.run_due``), on control, in the worker's move thread
     (:class:`Background`); a failure is logged and the next pass tries again. ``stop`` set stops the copy in course and
@@ -102,7 +103,7 @@ def _moves(now: dt.datetime, stop: threading.Event | None = None) -> bool:
     cancelled = stop.is_set if stop is not None else None
     try:
         with use_control():
-            moved = move.run_due(now, cancelled=cancelled)
+            moved = move.worker_pass.run_due(now, cancelled=cancelled)
             moved += restore.run_due(now, cancelled=cancelled)
             moved += restore.run_aside_due(now, cancelled=cancelled)
             moved += recovery.run_due(now, cancelled=cancelled)

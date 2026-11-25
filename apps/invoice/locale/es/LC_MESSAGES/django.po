@@ -829,13 +829,17 @@ msgstr ""
 "Ninguna impresora del sistema recibe esta factura: ábrela para imprimirla o "
 "guardarla en PDF."
 
-#: services/paper.py:26
+#: queries/documents.py
 msgid ""
 "Its VeriFactu record could not be read, and an invoice never prints without "
 "its QR."
 msgstr ""
 "No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin "
 "su QR."
+
+#: queries/pdf.py
+msgid "The PDF cannot be made right now. Try again later."
+msgstr "El PDF no se puede hacer ahora mismo. Inténtalo más tarde."
 
 #: services/rectifying.py:40
 #, python-format

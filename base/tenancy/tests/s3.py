@@ -229,13 +229,14 @@ def stopping_as(monkeypatch, where, step: str) -> Callable[[], bool]:
 
 
 def lose_each_copy(monkeypatch, endpoint: str, bucket: str) -> None:
-    """Each copy is gone from ``bucket`` by the time ``pg_restore`` reads it back (``move._restore_from_bucket``)."""
+    """Each copy is gone from ``bucket`` by the time ``pg_restore`` reads it back
+    (``move.bucket._restore_from_bucket``)."""
     from base.tenancy import move
 
-    real = move._restore_from_bucket
+    real = move.bucket._restore_from_bucket
 
     def lost(key, name, cluster, heartbeat, cancelled=None):
         client(endpoint).delete_object(Bucket=bucket, Key=key)
         return real(key, name, cluster, heartbeat, cancelled)
 
-    monkeypatch.setattr(move, "_restore_from_bucket", lost)
+    monkeypatch.setattr(move.bucket, "_restore_from_bucket", lost)

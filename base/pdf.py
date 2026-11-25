@@ -1,4 +1,6 @@
-"""A whole HTML page as PDF: WeasyPrint prints it offline, and its callers do so outside any transaction.
+"""A whole HTML page as PDF: WeasyPrint prints it offline. It holds the transaction its caller has open, if any, while it
+prints (a moment for a short invoice, a second or more for a very long one): what prints many, or before a wait, reads
+first and prints outside it.
 
 Nothing outside the page is fetched: a page carries its styles inline and its images as ``data:`` URIs, so the
 fetcher allows ``data:`` alone and a URL among the texts it prints never makes the server call anywhere (it is left
