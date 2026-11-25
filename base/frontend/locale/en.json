@@ -914,18 +914,34 @@
       "intro": "These are the roles of this business. Each person gets one when invited on erplora.com, and it is changed there.",
       "columns": {
         "role": "Role",
-        "origin": "Comes from",
-        "available": "Available",
-        "members": "Members",
+        "origin": "Type",
+        "members": "People",
         "permissions": "Permissions"
       },
       "basic": "Basic",
       "own": "Custom",
-      "always": "Always available",
       "search": "Search role…",
       "empty": "This business has no roles.",
       "error": "The roles could not be loaded.",
-      "change": "Change roles on erplora.com"
+      "change": "Change roles on erplora.com",
+      "toReview": "To review",
+      "new": "New role",
+      "duplicate": "Duplicate",
+      "edit": "Edit",
+      "delete": "Delete",
+      "add": {
+        "title": "New role",
+        "name": "Name",
+        "basedOn": "Based on",
+        "help": "It will allow the same as that role. Then adjust what it allows.",
+        "create": "Create role",
+        "created": "Role {name} created"
+      },
+      "remove": {
+        "title": "Delete role",
+        "message": "Delete the role {name}? This cannot be undone.",
+        "done": "Role {name} deleted"
+      }
     },
     "role": {
       "title": "What it allows",
@@ -940,7 +956,17 @@
         "on": "Allowed",
         "approval": "With approval",
         "off": "No"
-      }
+      },
+      "introEdit": "What this role lets a person do in this business, app by app. Whoever has it notices as soon as it is saved.",
+      "name": "Name",
+      "description": "Description",
+      "review": {
+        "title": "New permissions to review",
+        "text": "They are marked “To review”. Choose what the role does with each one and save."
+      },
+      "save": "Save",
+      "saved": "Role saved.",
+      "saveError": "The role could not be saved"
     },
     "person": {
       "title": "Person",
