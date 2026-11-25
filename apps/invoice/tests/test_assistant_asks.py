@@ -136,6 +136,8 @@ OWN_WORDS = [
     ("en", "invoice.invoice.get", "read me FACT-2025-000412 from top to bottom"),
     ("es", "invoice.invoice.document", "¿cómo se ve en hoja lo que le dimos a Talleres Mercedes?"),
     ("en", "invoice.invoice.document", "how does the sheet we handed to Talleres Mercedes look?"),
+    ("es", "invoice.invoice.pdf", "quiero guardar la de Talleres Mercedes"),
+    ("en", "invoice.invoice.pdf", "let me save the Talleres Mercedes one and keep it"),
     ("es", "invoice.invoice.by_source", "lo que vendimos esta mañana en la 20261111-0007, ¿con qué papel quedó?"),
     ("en", "invoice.invoice.by_source", "this morning's 20261111-0007: which paper did it end up with?"),
     ("es", "invoice.invoice.line_defaults", "si meto a mano una línea de unas gafas, ¿qué porcentaje le sale?"),
@@ -207,7 +209,7 @@ OWN_WORDS = [
 ]
 
 
-def test_invoice_offers_its_twenty_five_tools():
+def test_invoice_offers_its_twenty_seven_tools():
     """Invoicing's assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
     tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)

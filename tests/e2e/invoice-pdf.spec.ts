@@ -1,0 +1,88 @@
+// «Download PDF» of an invoice (INVOICE-F25) in Chrome: an invoice with a withholding and a due date downloads as a real
+// PDF under its number, opened here by a PDF reader of its own: it says what the screen shows, with the record's QR
+// legend. The accountancy firm's and the employee's button is the same one.
+import { readFileSync } from 'node:fs';
+
+import { expect, type Page, test } from '@playwright/test';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+import { A, api, EMPLOYEE, login, shown } from './helpers';
+import { cleanInvoices, flowShots, issuedIds, readyToInvoice } from './invoice-helpers';
+import { stamp } from './sale-helpers';
+
+const CUSTOMER = `e2e PDF ${stamp()}`;
+const RECIPIENT = { customer_name: CUSTOMER, customer_tax_id: 'B12345674', customer_address: 'Calle Luna 3' };
+let invoice: { id: string; number: string };
+
+test.beforeAll(async ({ browser }) => {
+  const context = await readyToInvoice(browser);
+  const issued = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', {
+    ...RECIPIENT,
+    lines: [{ description: 'Consultoría', quantity: '1', unit_price: 10000, tax_rate: '21' }],
+    withholding_rate: 15,
+  });
+  expect(issued.status, JSON.stringify(issued.data)).toBe(201);
+  invoice = issued.data;
+  issuedIds.add(invoice.id);
+  await context.close();
+});
+
+test.afterAll(() => cleanInvoices());
+
+/** The words of the PDF the button saves, and its title and language, as a reader of its own opens it. */
+async function downloaded(page: Page): Promise<{ name: string; words: string; title: string; language: string; pages: number }> {
+  const download = page.waitForEvent('download');
+  await shown(page).locator('[data-testid=invoice-detail-pdf]').click();
+  const file = await download;
+  const document = await getDocument({ data: new Uint8Array(readFileSync((await file.path()) as string)) }).promise;
+  const metadata = await document.getMetadata();
+  const texts: string[] = [];
+  for (let n = 1; n <= document.numPages; n += 1) {
+    const { items } = await (await document.getPage(n)).getTextContent();
+    texts.push(...items.map((item) => ('str' in item ? item.str : '')));
+  }
+  const info = metadata.info as { Title?: string; Language?: string };
+  return {
+    name: file.suggestedFilename(),
+    words: texts.join(' ').replace(/\s+/g, ' '),
+    title: info.Title ?? '',
+    language: info.Language ?? '',
+    pages: document.numPages,
+  };
+}
+
+async function open(page: Page): Promise<void> {
+  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
+  await expect(shown(page).locator('[data-testid=invoice-detail-title]')).toContainText(invoice.number);
+}
+
+test('«Download PDF» saves the invoice as a real PDF under its number, with what the screen shows', async ({ page }) => {
+  await login(page, A, '/invoice/invoices');
+  await open(page);
+  await expect(shown(page).locator('[data-testid=invoice-verifactu]')).toBeVisible();
+
+  const pdf = await downloaded(page);
+
+  expect(pdf.name).toBe(`${invoice.number}.pdf`);
+  expect(pdf.pages).toBe(1);
+  expect([pdf.title, pdf.language]).toEqual([`Invoice ${invoice.number}`, 'en']);
+  for (const said of [invoice.number, CUSTOMER, 'B12345674', 'Consultoría', '€121.00', '-€15.00', '€106.00', 'QR tributario:', 'VERI*FACTU']) {
+    expect(pdf.words).toContain(said);
+  }
+  await flowShots(page, 'F25', async (shot) => {
+    await expect(shown(shot).locator('[data-testid=invoice-detail-pdf]')).toBeVisible();
+  });
+});
+
+test('an employee downloads their own invoices', async ({ browser }) => {
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/invoice/invoices', EMPLOYEE);
+  const mine = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', { ...RECIPIENT, lines: [{ description: 'Curso', quantity: '1', unit_price: 5000, tax_rate: '21' }] });
+  expect(mine.status, JSON.stringify(mine.data)).toBe(201);
+  issuedIds.add(mine.data.id);
+  await page.goto(`${A}/invoice/invoices/${mine.data.id}`);
+
+  expect((await downloaded(page)).name).toBe(`${mine.data.number}.pdf`);
+  await context.close();
+});
