@@ -77,7 +77,7 @@ def _withholding(invoice: Invoice, language: str) -> dict | None:
     if invoice.withholding_rate is None:
         return None
     return {
-        "label": WITHHOLDING % {"rate": _percent(invoice.withholding_rate, language)},
+        "label": WITHHOLDING % {"rate": percent(invoice.withholding_rate, language)},
         "amount": _money(-invoice.withholding_amount, invoice.currency, language),
         "payable": _money(invoice.payable_amount, invoice.currency, language),
     }
