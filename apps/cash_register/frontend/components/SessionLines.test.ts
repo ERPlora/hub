@@ -1,6 +1,7 @@
 // The lines of a session (CASH_REGISTER-F11) — or those that fell in none (F17) — in a server-side
 // DataTable, newest first, 50 a page, table or cards: When, Type, Amount with its sign, Method, Concept (a
-// sale named by its document, a void «Void of …», a refund «Refund of …», a line by hand its concept).
+// sale named by its document, a void «Void of …», a refund «Refund of …», a line by hand its concept). A line
+// another app recorded (Tips, CASH_REGISTER-F18) says that app as its type.
 // They re-run by themselves on a sale, a movement or a close: nothing here refetches.
 import { DataTable } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
@@ -22,6 +23,8 @@ const line = (key: string, over: Partial<MovementRow> = {}): MovementRow => ({
   method_type: 'cash',
   method_name: 'Cash',
   description: '',
+  app: '',
+  app_name: '',
   sale_id: 'v1',
   sale_number: '20261014-0007',
   document_type: 'ticket',
@@ -64,6 +67,15 @@ describe('SessionLines', () => {
     expect(s.cells(1).slice(1)).toEqual(['Void', '-€3.00', 'Card', 'Void of Ticket 20261014-0007']);
     expect(s.cells(2).slice(1)).toEqual(['Refund', '-€1.50', 'Bizum', 'Refund of Invoice 20261014-0007']);
     expect(s.cells(3).slice(1)).toEqual(['Cash out', '-€5.00', 'Cash', 'Bread supplier']);
+  });
+
+  it('a line another app recorded says that app as its type, in English and in Spanish', async () => {
+    const tip = { type: 'in', amount: 500, signed_amount: 500, method_name: '', description: 'Tip · 20261014-0007', sale_id: null, sale_number: '' } as const;
+    for (const [locale, name, said] of [['en', 'Tips', ['Tips', '+€5.00', 'Cash', 'Tip · 20261014-0007']], ['es', 'Propinas', ['Propinas', '+5,00 €', 'Efectivo', 'Tip · 20261014-0007']]] as const) {
+      const s = await setup({ session_id: 's1' }, locale);
+      await s.result(OP, { rows: [line('m2', { ...tip, app: 'tip', app_name: name })], total: 1, limit: 50, offset: 0 });
+      expect(s.cells(0).slice(1)).toEqual(said);
+    }
   });
 
   it('no column a narrow box gives up hides the document a line is: a narrow table turns to cards (F11, F17)', async () => {

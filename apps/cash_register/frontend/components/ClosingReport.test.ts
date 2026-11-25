@@ -28,4 +28,11 @@ describe('ClosingReport', () => {
     await m.live();
     expect(m.find('cash-register-report-title').text()).toBe('Informe parcial (X)');
   });
+
+  it("prints another app's lines just before the expected, as the screen shows them", async () => {
+    const tips = { ...SESSION, summary: { ...SESSION.summary, app_lines: [{ app: 'tip', label: 'Tips in cash', amount: 500 }] } };
+    const m = await mountCash(ClosingReport, { props: { session: tips } });
+    await m.live();
+    expect(words(m.find('cash-register-report').element)).toContain('Comps €0.40 Tips in cash €5.00 Expected €100.00');
+  });
 });

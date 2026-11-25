@@ -1,10 +1,11 @@
-// How a line of a shift reads: its type and payment method in the reader's language and its concept —
+// How a line of a shift reads: its type (the app that recorded it, for another app's line: Tips, CASH_REGISTER-F18)
+// and payment method in the reader's language and its concept —
 // a sale is named by its document («Ticket 20261014-0007», «Invoice …»), a void «Void of …» and a refund
 // «Refund of …»; a line written by hand shows what was typed. A factory payment method (Sales keeps
 // «Cash» and «Card» in English) is translated; one the owner named is shown as she named it.
 import { describe, expect, it } from 'vitest';
 
-import { conceptOf, methodOf } from './lines';
+import { conceptOf, methodOf, typeOf } from './lines';
 
 const t = (key: string, named?: Record<string, unknown>) => (named ? `${key}(${Object.values(named).join(',')})` : key);
 
@@ -26,5 +27,14 @@ describe('methodOf', () => {
     expect(methodOf({ method_type: 'card', method_name: 'Card' }, t)).toBe('cash_register.methods.card');
     expect(methodOf({ method_type: 'cash', method_name: '' }, t)).toBe('cash_register.methods.cash');
     expect(methodOf({ method_type: 'other', method_name: 'Bizum' }, t)).toBe('Bizum');
+  });
+});
+
+describe('typeOf', () => {
+  it('names a line another app recorded by that app, and every other line by its type', () => {
+    expect(typeOf({ type: 'in', app_name: 'Tips' }, t)).toBe('Tips');
+    expect(typeOf({ type: 'out', app_name: 'Tips' }, t)).toBe('Tips');
+    expect(typeOf({ type: 'in', app_name: '' }, t)).toBe('cash_register.types.in');
+    expect(typeOf({ type: 'sale', app_name: '' }, t)).toBe('cash_register.types.sale');
   });
 });
