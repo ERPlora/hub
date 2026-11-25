@@ -592,21 +592,21 @@ original is rectified.
 Involved: SALE-F31
 
 ### INVOICE-F11 Number each document in its series and its year
-<!-- from WORKBOOK.md sha256:e1f2a935e35b -->
+<!-- from WORKBOOK.md sha256:b103e410cfbc -->
 Status: done
 Actor: system
 Screen: none
 Steps:
 1. Every time a document is issued (ticket, invoice, replacing or rectifying invoice), Invoicing takes the
-   series of its code and of the year of the business day; if it does not exist, it creates it at that
-   moment with the counter at 0, inheriting name, prefix and format from the previous year's one with
+   series of its code and of the year of its date (the business day or, in a manual invoice, the one chosen); if it
+   does not exist, it creates it at that moment with the counter at 0, inheriting name, prefix and format from the previous year's one with
    that code (or, the first time, with the code as prefix).
 2. It raises that series' counter by one and writes the number with the series' format (without format,
    `TICKET-2026-000001`) in the same operation that saves the document.
 3. On 1 January, at the business's time, the next document opens the new year's series and goes back to
    1 (or to the "Next number" set for it).
 In: the series code that applies (TICKET for tickets, FACT for full and replacing invoices, RECT for
-rectifying invoices; in the manual entry, the chosen series) and the business day.
+rectifying invoices; in the manual entry, the chosen series) and the document's date.
 Out: the document's number. The number goes into VeriFactu's chained fingerprint.
 If it fails: if the issue is refused or fails, nothing is saved and the counter does not go up: no gap is
 left. Two charges at once in the same series wait for each other and get consecutive numbers; two

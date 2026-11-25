@@ -572,15 +572,15 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada vez que se emite un documento (tique, factura, sustitutiva o rectificativa), Facturación toma
-   la serie de su código y del año del día del negocio; si no existe, la crea en ese momento con el
-   contador a 0, heredando nombre, prefijo y formato de la del año anterior con ese código (o, la
+   la serie de su código y del año de su fecha (el día del negocio o, en una factura manual, el que se haya elegido);
+   si no existe, la crea en ese momento con el contador a 0, heredando nombre, prefijo y formato de la del año anterior con ese código (o, la
    primera vez, con el código como prefijo).
 2. Sube el contador de esa serie en uno y escribe el número con el formato de la serie (sin formato,
    `TICKET-2026-000001`) en la misma operación que guarda el documento.
 3. El 1 de enero, a la hora del negocio, el siguiente documento abre la serie del año nuevo y vuelve a 1
    (o al «Siguiente número» que se le haya fijado).
 Entra: el código de serie que toca (TICKET para los tiques, FACT para las facturas completas y las
-sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida) y el día del negocio.
+sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida) y la fecha del documento.
 Sale: el número del documento. El número entra en la huella encadenada de VeriFactu.
 Si falla: si la emisión se rechaza o falla, no se guarda nada y el contador no sube: no queda hueco.
 Dos cobros a la vez en la misma serie esperan uno al otro y reciben números seguidos; dos documentos de
