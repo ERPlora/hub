@@ -172,16 +172,11 @@ def _handed_over(ctx: OperationContext, email_id: UUID, claimed: EmailClaimOut) 
 )
 def claim_email(ctx: OperationContext, data: EmailRefIn) -> dict:
     email = (
-        InvoiceEmail.objects.select_for_update(of=("self",), skip_locked=True)
-        .select_related("invoice")
+        InvoiceEmail.objects.select_for_update(skip_locked=True)
         .filter(pk=data.id, status=InvoiceEmail.Status.QUEUED)
         .first()
     )
     if email is None:
-        return {"claimed": False}
-    if not email.to_address:
-        # The customer's personal data was erased meanwhile.
-        _end(ctx, email, UNAVAILABLE)
         return {"claimed": False}
     email.status, email.status_at = InvoiceEmail.Status.SENDING, _now()
     email.save(update_fields=["status", "status_at"])
