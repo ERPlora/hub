@@ -58,7 +58,7 @@ def presence(monkeypatch):
 async def test_a_device_that_prints_tells_its_presence_at_hello_and_at_every_beat(sockets, session, presence, monkeypatch):
     """The old hub's heartbeat (``print_hosts::heartbeat``): connecting and every beat are news that the device is
     there, told to the command its app declares, with the device's id and as the device's user."""
-    monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
+    monkeypatch.setattr(ws_print.presence, "PRESENCE_SECONDS", 0)
     told = presence()
     cookie = await db(session)
     till = await db(printer)
@@ -67,14 +67,14 @@ async def test_a_device_that_prints_tells_its_presence_at_hello_and_at_every_bea
     assert told == [("till-1", "ana")]
 
     await socket.send({"type": "beat"})
-    assert await socket.receive() == {"type": "beat", "refreshed": 1, "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS}
+    assert await socket.receive() == {"type": "beat", "refreshed": 1, "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS}
     await socket.send({"type": "beat"})
     await socket.receive()
     assert told == [("till-1", "ana")] * 3
 
 
 async def test_without_a_declared_presence_the_socket_tells_nobody(sockets, session, presence, monkeypatch):
-    monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
+    monkeypatch.setattr(ws_print.presence, "PRESENCE_SECONDS", 0)
     told = presence(declared=False)
     cookie = await db(session)
     till = await db(printer)
@@ -82,14 +82,14 @@ async def test_without_a_declared_presence_the_socket_tells_nobody(sockets, sess
     socket = await ready_socket(sockets, cookie, [till])
     await socket.send({"type": "beat"})
 
-    assert await socket.receive() == {"type": "beat", "refreshed": 1, "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS}
+    assert await socket.receive() == {"type": "beat", "refreshed": 1, "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS}
     assert told == []
 
 
 async def test_the_presence_is_told_once_per_interval_however_fast_the_device_beats(sockets, session, presence):
     """``HEARTBEAT_SECONDS`` × devices writes at the rate a device is told to beat; one that beats faster writes no
     more than once every ``PRESENCE_SECONDS``."""
-    assert 0 < ws_print.PRESENCE_SECONDS < ws_print.HEARTBEAT_SECONDS
+    assert 0 < ws_print.presence.PRESENCE_SECONDS < ws_print.presence.HEARTBEAT_SECONDS
     told = presence()
     cookie = await db(session)
     till = await db(printer)
@@ -103,7 +103,7 @@ async def test_the_presence_is_told_once_per_interval_however_fast_the_device_be
 
 
 async def test_a_device_that_prints_for_nothing_tells_no_presence(sockets, session, presence, monkeypatch):
-    monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
+    monkeypatch.setattr(ws_print.presence, "PRESENCE_SECONDS", 0)
     told = presence()
     cookie = await db(session)
     till = await db(printer)
@@ -118,7 +118,7 @@ async def test_a_device_that_prints_for_nothing_tells_no_presence(sockets, sessi
 
 @pytest.mark.parametrize("failure", [RuntimeError("the disk is full"), AppInactive("Printing is off.")])
 async def test_a_failed_presence_is_logged_and_the_socket_goes_on(sockets, session, presence, monkeypatch, caplog, failure):
-    monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
+    monkeypatch.setattr(ws_print.presence, "PRESENCE_SECONDS", 0)
     presence(fails=failure)
     cookie = await db(session)
     till = await db(printer)
@@ -126,7 +126,7 @@ async def test_a_failed_presence_is_logged_and_the_socket_goes_on(sockets, sessi
     with caplog.at_level(logging.WARNING, logger="base.ws_print"):
         socket = await ready_socket(sockets, cookie, [till])
         await socket.send({"type": "beat"})
-        assert await socket.receive() == {"type": "beat", "refreshed": 1, "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS}
+        assert await socket.receive() == {"type": "beat", "refreshed": 1, "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS}
 
     await db(enqueue, till)
     assert (await socket.receive())["type"] == "wake", "the socket still drains"
@@ -160,3 +160,7 @@ def test_one_app_at_most_declares_the_presence(monkeypatch, presence):
     errors = presence_errors(monkeypatch, {"printing": SEEN, "sale": "sale.device.seen"})
 
     assert len(errors) == 1 and "printing" in errors[0] and "sale" in errors[0]
+
+
+def test_a_failed_presence_logs_under_the_channels_name():
+    assert ws_print.presence.logger.name == "base.ws_print"

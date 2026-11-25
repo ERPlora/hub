@@ -303,6 +303,22 @@ class TestTheRecord:
         assert response.status_code == 403
 
 
+def done_by_role(who="Mario", operation=APPROVABLE, *, at=None, figures=None) -> Approval:
+    """An approvable action on the record done by ``who``, who may do it themselves (`at`: when)."""
+    row = Approval.objects.create(
+        operation=operation,
+        permission="base.manage",
+        requested_by="saas:4",
+        requested_by_name=who,
+        way="role",
+        used_at=timezone.now(),
+        figures=figures,
+    )
+    if at is not None:
+        Approval.objects.filter(pk=row.pk).update(created_at=at)
+    return row
+
+
 def recorded(
     operation=APPROVABLE, *, way="pin", used=True, at=None, asked="Eva", approver="Adam", figures=None
 ) -> Approval:
@@ -351,9 +367,9 @@ class TestTheExport:
         file = exported(client, "es")
         assert (file["filename"], file["content_type"], file["rows"]) == ("approvals.csv", "text/csv", 2)
         assert lines(file) == [
-            ["Cuándo", "Acción", "Autorizado por", "Lo pidió", "Con", "Estado"],
-            ["2026-10-24 11:30", "Change how the till asks who is there", "Adam", "Eva", "PIN", "Usada"],
-            ["2026-10-23 20:05", "Change how the till asks who is there", "Mario", "Ana", "Placa", "Sin usar"],
+            ["Cuándo", "Acción", "Autorizado por", "Quién", "Con", "Estado"],
+            ["2026-10-24 11:30", "Change how the till asks who is there", "Adam", "Eva", "PIN", "Hecha"],
+            ["2026-10-23 20:05", "Change how the till asks who is there", "Mario", "Ana", "Placa", "Sin hacer"],
         ]
         assert "base.access" not in file["csv"]
 
@@ -368,14 +384,14 @@ class TestTheExport:
         recorded(way="badge", used=False)
         client.force_login(adam)
         [header, row] = lines(exported(client, "en"))
-        assert header == ["When", "Action", "Approved by", "Asked by", "With", "State"]
-        assert row[4:] == ["Badge", "Not used"]
+        assert header == ["When", "Action", "Approved by", "Who", "With", "State"]
+        assert row[4:] == ["Badge", "Not done"]
 
     def test_nothing_yet_is_only_the_header(self, client, adam, eva):
         client.force_login(adam)
         file = exported(client)
         assert file["rows"] == 0
-        assert lines(file) == [["When", "Action", "Approved by", "Asked by", "With", "State"]]
+        assert lines(file) == [["When", "Action", "Approved by", "Who", "With", "State"]]
 
     def test_the_filters_and_the_search_of_the_list(self, client, adam, eva):
         recorded(at=dt.datetime(2026, 10, 20, 12, tzinfo=dt.UTC), asked="Eva")
@@ -407,14 +423,64 @@ class TestTheExport:
         assert row[3] == "'=HYPERLINK(1)"
 
 
+class TestDoneByWhoMayDoIt:
+    """BASE-F85: what somebody did by themselves, because their role lets them, with what needed an approval."""
+
+    def test_the_list_says_who_did_it_and_that_nobody_approved_it(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, PERCENT)
+        row = done_by_role(figures={"pin_inactivity_minutes": 30})
+        client.force_login(adam)
+        [shown] = client.get("/api/approvals", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es").json()["approvals"]
+        assert (shown["id"], shown["action"]) == (str(row.pk), "Lock the till at 30\xa0%")
+        assert (shown["requested_by"], shown["approved_by"], shown["way"], shown["used"]) == ("Mario", "", "role", True)
+
+    def test_the_newest_first_whatever_the_way(self, client, adam, eva):
+        recorded(at=dt.datetime(2026, 10, 24, 9, 30, tzinfo=dt.UTC))
+        done_by_role(at=dt.datetime(2026, 10, 25, 9, 30, tzinfo=dt.UTC))
+        recorded(way="badge", at=dt.datetime(2026, 10, 26, 9, 30, tzinfo=dt.UTC))
+        client.force_login(adam)
+        assert [row["way"] for row in get(client, "/approvals").json()["approvals"]] == ["badge", "role", "pin"]
+
+    def test_an_employee_reads_none_of_it(self, client, adam, eva):
+        done_by_role()
+        assert get(client, "/approvals").status_code == 403
+        assert get(client, "/approvals/export").status_code == 403
+
+    def test_the_file_says_it_in_words_in_the_person_s_language(self, client, adam, eva):
+        done_by_role(at=dt.datetime(2026, 10, 24, 9, 30, tzinfo=dt.UTC))
+        client.force_login(adam)
+        assert lines(exported(client, "es"))[1:] == [
+            ["2026-10-24 11:30", "Change how the till asks who is there", "", "Mario", "Su rol", "Hecha"],
+        ]
+        assert lines(exported(client, "en"))[1][4:] == ["Their role", "Done"]
+
+    def test_the_file_is_filtered_and_searched_with_it(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, PERCENT)
+        recorded(asked="Eva", used=False)
+        done_by_role("Ana", figures={"pin_inactivity_minutes": 5})
+        done_by_role("Mario", "ghost.thing.do")
+        client.force_login(adam)
+
+        def who(**filters) -> set[str]:
+            return {row[3] for row in lines(exported(client, **filters))[1:]}
+
+        assert who(way="role") == {"Ana", "Mario"}
+        assert who(way="pin") == {"Eva"}
+        assert who(used="true") == {"Ana", "Mario"}
+        assert who(used="false") == {"Eva"}
+        assert who(way="role", operation=APPROVABLE) == {"Ana"}
+        assert who(search="mario") == {"Mario"}
+        assert who(search="5%") == {"Ana"}
+
+
 class TestFollowedLive:
-    def test_the_record_follows_each_approval_and_each_pass_spent_and_who_approves_the_people(self):
+    def test_the_record_follows_what_is_approved_and_done_and_who_approves_the_people(self):
         from live.live_registry import live_registry
 
         from base import events
 
         on = live_registry.subscribable
-        assert on["base.approval.list"] == sorted({events.APPROVAL_GRANTED, events.APPROVAL_USED})
+        assert on["base.approval.list"] == sorted({events.APPROVAL_GRANTED, events.APPROVAL_USED, events.APPROVAL_NOTED})
         assert on["base.approval.approvers"] == sorted(
             {events.PIN_SET, events.PROFILE_UPDATED, events.HUB_STATE_APPLIED, *events.PERSON_EVENTS, *events.ROLE_EVENTS}
         )

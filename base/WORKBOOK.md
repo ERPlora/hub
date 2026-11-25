@@ -284,7 +284,8 @@ Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key�
 enlace a la documentación de la API.
 
 ### Empleados · Aprobaciones
-El registro de lo que se aprobó con el PIN de un responsable, solo de lectura.
+El registro, solo de lectura, de las acciones que pueden necesitar la aprobación de un responsable: quién la hizo y
+quién se la aprobó, o que la hizo por su cuenta alguien a quien su rol se lo permite.
 
 ### Ficha de una persona
 Desde una fila de **Empleados › Personal**, para quien administra, con el botón de volver: «Sus datos» (con «Abrir
@@ -2475,10 +2476,13 @@ Pasos:
      la sesión (BASE-F13). Una app que se encendió después de guardar el rol pregunta como el rol básico del que salió;
      un permiso que una app añadió después está en «No» hasta que se revisa (BASE-F131). Al propietario no se le pregunta
      nunca.
+  6. Quien puede hacerla por su rol no ve la pregunta: la hace y queda anotada como hecha por él, sin que nadie la
+     apruebe (BASE-F85).
   También desde el asistente: el «sí» de su tarjeta abre el mismo diálogo, con las cifras de lo que se le pidió.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
-**Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`. Se gasta junto con la acción:
+**Empleados › Aprobaciones** (BASE-F85). Eventos `base.approval.granted` y `base.approval.used`; el de una acción hecha
+por quien puede, `base.approval.noted`. La aprobación se gasta junto con la acción:
 si la acción falla por un motivo del negocio, la aprobación sigue sin usar y la misma acción, repetida en esos dos
 minutos, pasa con ella; si salió bien, no se repite; dos a la vez con la misma, solo pasa una. Lo que la acción
 aprobada hace por el camino en otras apps (la factura rectificativa de una anulación, las sesiones de bono que
@@ -2497,23 +2501,31 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Aprobaciones
 Pasos:
-  1. En **Empleados › Aprobaciones** (la pestaña solo existe para quien administra): «Cada acción que necesitó el PIN
-     de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo
-     ni borrarlo.».
-  2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras y en su idioma; con las cifras de
-     lo que se hizo con ella, cuando la app las da: una aprobación sin usar no hizo nada y no lleva cifras),
-     «Autorizado por», «Lo pidió», «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
-  3. Busca con «Buscar por persona o acción…» (también por sus cifras) y, en «Filtros» (el embudo), filtra por
+  1. En **Empleados › Aprobaciones** (la pestaña solo existe para quien administra): «Cada acción que puede necesitar la
+     autorización de un encargado: quién la hizo, quién la autorizó y con qué. Nadie, tampoco un administrador, puede
+     editarlo ni borrarlo.».
+  2. Una fila por acción, la última primero: «Cuándo», «Acción» (en palabras y en su idioma; con las cifras de lo que
+     se hizo, cuando la app las da: una aprobación que nadie usó no hizo nada y no lleva cifras), «Autorizado por»,
+     «Quién» (quien la hizo, o la pidió), «Con» («PIN», «Placa» o «Su rol») y «Estado» («Hecha», o «Sin hacer» si la
+     aprobación no se usó).
+  3. Las que hizo por su cuenta alguien a quien su rol se lo permite salen también: el encargado que anula una venta o da
+     un descuento por encima del máximo, el propietario, quien lo tiene «Permitido» en su rol propio (BASE-F128) y lo
+     mismo pedido al asistente, con quien dijo que sí (BASE-F100). Dicen «Su rol» en «Con» y dejan vacío «Autorizado
+     por». Una fila por acción: no sale la que se rechazó o falló, ni el reintento de una que ya se hizo, ni la que no
+     cambió nada, ni lo que hace el sistema o una automatización.
+  4. Busca con «Buscar por persona o acción…» (también por sus cifras) y, en «Filtros» (el embudo), filtra por
      «Cuándo» (un día o unos días seguidos), «Acción» (las que hay en el registro, cada una una vez y sin cifras),
      «Con» y «Estado».
-  4. «Exportar CSV» descarga un archivo con las aprobaciones que dejan la búsqueda y los filtros, también las más
-     antiguas que la lista ya no enseña, con las mismas columnas en su idioma; mientras tanto dice «Exportando…».
+  5. «Exportar CSV» descarga un archivo con las acciones que dejan la búsqueda y los filtros, también las más antiguas
+     que la lista ya no enseña (las 500 últimas), con las mismas columnas en su idioma; mientras tanto dice
+     «Exportando…».
 Entra: el registro de aprobaciones.
-Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al día sola con cada aprobación.
-Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
-que autorizar nada en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso
-lo dice con su motivo y no se descarga nada.
-Implicados: BASE-F84, BASE-F112 (dentro de la app)
+Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al día sola con cada aprobación y con cada
+acción.
+Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía no hay ninguna acción
+de este tipo en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso lo dice
+con su motivo y no se descarga nada.
+Implicados: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (dentro de la app)
 
 ### BASE-F86 Crear una llave de API y copiar su token
 Estado: hecho
@@ -2627,7 +2639,7 @@ En las pantallas de Empleados y en la Documentación de la API:
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; «Cargando lo que permite este rol…» en «Qué permite»; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
-| Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía nadie ha tenido que autorizar nada en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
+| Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía no hay ninguna acción de este tipo en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
 | Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar lo que permite este rol.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
 | Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
 
@@ -2978,11 +2990,12 @@ Pasos:
   5. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer.
 Entra: la sesión de quien pregunta, que firma cada acción; para lo que aprueba un responsable, su PIN o su placa.
 Sale: la acción hecha con esa persona como autora. La aprobación vale para esa acción de esa conversación, una sola
-vez y durante dos minutos, y se gasta junto con la acción (BASE-F84).
+vez y durante dos minutos, y se gasta junto con la acción (BASE-F84). La que un responsable podría aprobar y la persona
+puede hacer por su rol queda también anotada, a su nombre (BASE-F85).
 Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Una
 aprobación ya usada o caducada no deja pasar la acción: el recibo dice «No se hizo, falló: …» y el asistente lo
 cuenta.
-Implicados: BASE-F13, BASE-F84, BASE-F97, BASE-F130
+Implicados: BASE-F13, BASE-F84, BASE-F85, BASE-F97, BASE-F130
 
 ### BASE-F101 Pedirle varias cosas seguidas
 Estado: hecho
@@ -3947,7 +3960,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `test_unpaid_plan.py` y `action-notices.test.ts`.
 - Presencia del dispositivo que imprime (misma tarea): la app que
   lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
-  `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
+  `device`; `/ws/print` (`base/ws_print/`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
   mientras imprime para alguna impresora, como mucho una vez cada `PRESENCE_SECONDS` (15 s, medio latido). Si falla,
   se anota en el log y el socket sigue (contesta el latido y sigue sacando trabajos). `base.E006` comprueba al arrancar
   que es una orden de la propia app, con `device`, y que solo una app la declara. Sin declarar, el socket no avisa a
@@ -4926,6 +4939,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `frontend/main.ts`). Para decirlo antes de empezar, `useAccess(permiso)` de `base/frontend/lib/use-access.ts` da
   `allowed`, `approval` o `no` desde `permissions` y `approvable` de `base.session.me`, que se vuelve a leer al cambiar el
   rol; lo usa Ventas (SALE-F30, SALE-F31). El registro es `base.models.approvals.Approval` (`base.approval.list`).
+  Lo que hizo quien ya podía lo anota `base.approval_note.note`, que live llama dentro de la transacción de cada orden
+  cuando su cuerpo ha contestado (`LIVE["after_command"]`): una fila con `way = "role"`, sin pase, sin límite de tiempo y
+  sin quien la apruebe, y el evento `base.approval.noted`. No anota lo que dejó pasar un pase ni lo que la orden
+  aprobada llama por el camino, una orden que no registró ningún evento (la respuesta repetida de una clave de
+  reintento), ni a quien no es una persona o una API key (la plataforma, una automatización). Ninguna orden aprobable
+  se publica hoy en la API; si una app publica una, la llave queda con su nombre («API · …»).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
   en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento

@@ -143,7 +143,7 @@ def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
 @_cache
 def _code_leaves() -> dict[str, str]:
     """This code's last migration of each app (its migrations never change while the process runs)."""
-    return dict(migrator.code_migrations().leaves)
+    return dict(migrator.app_sets.code_migrations().leaves)
 
 
 def _code_leaf(label: str) -> str:

@@ -37,9 +37,9 @@ def built_template(django_db_blocker, hub_databases, vertical: str, apps) -> Ite
             conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(name, control=control)))
         ddl = tenancy_connections.register_ddl_alias(name)
         try:
-            migrator.migrate_apps(ddl, apps)
+            migrator.schema.migrate_apps(ddl, apps)
         finally:
-            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
+            migrator.servers._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
     yield name
     with hubs._maintenance() as conn:
         hubs._drop(conn, name, control)
@@ -224,19 +224,19 @@ def test_a_seeding_that_writes_its_apps_keeps_them_as_it_wrote_them(registry, to
 
 @pytest.fixture
 def full_template(django_db_blocker, hub_databases):
-    """``<control>_template_full``: built as ``migrate_hubs`` builds the platform's (``migrator.templates()[0].apps``)."""
-    yield from built_template(django_db_blocker, hub_databases, "full", migrator.templates()[0].apps)
+    """``<control>_template_full``: built as ``migrate_hubs`` builds the platform's (``migrator.hub_templates.templates()[0].apps``)."""
+    yield from built_template(django_db_blocker, hub_databases, "full", migrator.hub_templates.templates()[0].apps)
 
 
 def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_template, monkeypatch, told):
-    """The templates carry every portable app (``migrator.templates``), so a hub made from one migrates nothing: its
+    """The templates carry every portable app (``migrator.hub_templates.templates``), so a hub made from one migrates nothing: its
     sign-up is the clone, never a minute of migrations on Fargate."""
     hub = registry.hub(vertical="full")
     applied = []
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda row, **kwargs: applied.append(real(row, **kwargs)) or applied[-1])
+    real = migrator.schema.ensure_schema
+    monkeypatch.setattr(migrator.schema, "ensure_schema", lambda row, **kwargs: applied.append(real(row, **kwargs)) or applied[-1])
 
     assert provision.provision(hub) is True
 
     assert applied == [[]]
-    assert set(migrator.portable_apps()) <= set(fresh(hub).schema_apps)
+    assert set(migrator.app_sets.portable_apps()) <= set(fresh(hub).schema_apps)

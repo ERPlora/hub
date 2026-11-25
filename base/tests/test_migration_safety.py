@@ -154,6 +154,9 @@ ACCEPTED = {
     # The name of a role of the business: base/0028 made the table and no code before this one writes a row in it, so
     # none can break the constraint.
     ("base", "0030_business_role_name_unique", "AddConstraint", "businessrole.base_businessrole_name_unique"),
+    # The ways an action of the record of approvals may say are widened, dropped and added again in one migration with
+    # ``role``; ``pin`` and ``badge``, all the code of before writes, still pass it.
+    ("base", "0032_approval_by_role", "AddConstraint", "approval.base_approval_way"),
     # The contract of the move to base.HubUser, a later deploy's, once no code from before the move runs (written here,
     # not applied): the old columns to control's users, which the move took out of the state and nobody writes any
     # more, leave the database through

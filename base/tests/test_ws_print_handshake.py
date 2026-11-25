@@ -36,7 +36,7 @@ async def test_the_handshake_is_accepted_and_hello_answers_ready(sockets, sessio
         "type": "ready",
         "deviceId": "till-1",
         "roles": ["kitchen", "receipt"],
-        "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS,
+        "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS,
     }
 
 

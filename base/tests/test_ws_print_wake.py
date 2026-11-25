@@ -36,17 +36,17 @@ def handled(monkeypatch):
     test waits for the result that follows a change and then reads what the socket sent, instead of waiting for a
     silence a loaded runner may not keep (the live re-run is grouped 150 ms, hub#135)."""
     results: defaultdict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
-    handle = ws_print.PrintSocket._on_stream
+    handle = ws_print.protocol.PrintSocket._on_stream
 
     async def recorded(self, item):
         try:
             return await handle(self, item)
         finally:
-            event, data = ws_print._decode_frame(item)
+            event, data = ws_print.wake._decode_frame(item)
             if event == "result":
                 results[self.device.device_id].put_nowait({row["id"] for row in data["data"]["rows"]})
 
-    monkeypatch.setattr(ws_print.PrintSocket, "_on_stream", recorded)
+    monkeypatch.setattr(ws_print.protocol.PrintSocket, "_on_stream", recorded)
     return results
 
 
@@ -125,7 +125,7 @@ async def test_a_job_queued_behind_a_backlog_of_its_function_still_wakes_the_dev
     cookie = await db(session)
     till = await db(printer, "Till")
     unattended = await db(printer, "Front desk")
-    for _ in range(ws_print.WAKE_WINDOW):
+    for _ in range(ws_print.wake.WAKE_WINDOW):
         await db(enqueue, unattended)
     socket = await ready_socket(sockets, cookie, [till])
 

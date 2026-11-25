@@ -808,7 +808,7 @@ la que solo se le autorizó reservar.
   bloqueados y lista de espera van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
   descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
   por lista.
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `engine.py` (la puerta del
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `engine.py` (la puerta del
   alta sin base de datos), `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_table.py`, `tests/test_integration_customer.py`,
@@ -901,7 +901,7 @@ la que solo se le autorizó reservar.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cancelar, no presentado y
   todo borrado; y `asks`, las frases en `en` y `es` con que una persona pide cada herramienta: Reservas está
   en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada una traiga su
-  herramienta entre las diez primeras, rol por rol) y cada campo de `schemas.py` su `description`. Ninguna
+  herramienta entre las diez primeras, rol por rol) y cada campo de `schemas/` su `description`. Ninguna
   descripción le dice al modelo que pregunte antes: la tarjeta es la confirmación (BASE-F97), y un «Ask
   first.» hacía que contestara en el chat sin sacarla (hub#1105; lo vigila
   `tests/test_assistant_asks.py`). Cada id que nombra un registro en una

@@ -85,7 +85,7 @@ def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeyp
     def broken(*args, **kwargs):
         raise RuntimeError("the migrator broke")
 
-    monkeypatch.setattr(provision.migrator, "migrate_apps", broken)
+    monkeypatch.setattr(provision.migrator.schema, "migrate_apps", broken)
 
     assert provision.provision(hub) is False
 

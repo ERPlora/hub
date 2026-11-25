@@ -439,7 +439,7 @@ class MovedCopy(UUIDModel):
     db_name = models.CharField(_("database"), max_length=63)
     moved_at = models.DateTimeField(_("moved at"), null=True, blank=True)
     # While the move goes on: the origin's schema record as control had it (the destination's is written when it is
-    # migrated, ``migrator.ensure_schema``), given back if the move is undone. Only the worker writes a note, right
+    # migrated, ``migrator.schema.ensure_schema``), given back if the move is undone. Only the worker writes a note, right
     # before it renames: a note is always the truth of where the data is (a cancel never makes nor takes one).
     schema_state = models.CharField(_("schema"), max_length=16, blank=True, default="", db_default="")
     schema_apps = models.JSONField(_("created apps"), null=True, blank=True)

@@ -195,7 +195,7 @@ def test_a_live_rerun_of_a_hub_that_ended_closes_the_stream():
 def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
     # Committed (no test case holding hub_b's one place of its plan, base.tenancy.limits): the socket's own thread
     # opens its transaction there.
-    from base.ws_print import PrintSocket
+    from base.ws_print.protocol import PrintSocket
 
     socket = PrintSocket({"path": "/ws/print"}, None, None)
     socket.request = type("Admitted", (), {"hub": hub_b})()
