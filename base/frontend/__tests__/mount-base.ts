@@ -6,7 +6,7 @@ import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { type BaseWrapper } from '@vue/test-utils';
 import { vi } from 'vitest';
 import { type Component, type Ref } from 'vue';
-import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
+import { createMemoryHistory, createRouter, type RouteLocationRaw, type RouteMeta, type Router, type RouteRecordRaw } from 'vue-router';
 
 import { type ApiCall, type ApiHandler, flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import type { AppHelp } from '../operations-help';
@@ -168,6 +168,8 @@ export interface MountOptions {
   routes?: string[];
   /** The app id the shell puts in those routes' metadata. */
   app?: string;
+  /** The metadata those routes declare themselves. */
+  meta?: RouteMeta;
   stubs?: Record<string, Component | boolean>;
   sidebar?: ShellSidebar;
   /** What the fake API answers, set before mounting (a component may ask on mount). */
@@ -191,7 +193,7 @@ export async function mountBase(component: Component, options: MountOptions = {}
   const known: RouteRecordRaw[] = (options.routes ?? []).map((path) => ({
     path,
     component: BLANK,
-    meta: options.app ? { app: options.app } : {},
+    meta: { ...(options.app ? { app: options.app } : {}), ...options.meta },
   }));
   const router = createRouter({
     history: createMemoryHistory(),
