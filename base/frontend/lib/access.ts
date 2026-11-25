@@ -152,10 +152,10 @@ export function createIdleLock(minutes: number, onIdle: () => void, target: Even
 
 // ── The session's way in, from the HTML ──────────────────────────────────────────────────────────────────────────
 
-/** `hub-home.access` (`base.queries.shell_access`): how this session was opened, whether «Switch user» is offered
- *  and after how many idle minutes the till locks (null: it does not). */
+/** `hub-home.access` (`base.queries.shell_access`): how this session was opened (`support`: a person of ERPlora's
+ *  support), whether «Switch user» is offered and after how many idle minutes the till locks (null: it does not). */
 export interface ShellAccess {
-  credential: 'account' | 'pin' | 'badge';
+  credential: 'account' | 'pin' | 'badge' | 'support';
   switch_user: boolean;
   idle_minutes: number | null;
 }
