@@ -1,4 +1,5 @@
-"""The printable document: the A4 page of an invoice (``templates/invoice/invoice.html``) in the reader's language."""
+"""The printable document: the A4 page of an invoice (``templates/invoice/invoice.html``) in the reader's language, and
+the VeriFactu QR it carries."""
 
 from decimal import Decimal
 
@@ -8,11 +9,19 @@ from django.utils import translation
 from django.utils.formats import date_format
 from django.utils.translation import gettext, pgettext_lazy
 from django.utils.translation import gettext_lazy as _
+from live.context import OperationContext
+from live.errors import AppInactive, Conflict, OperationError
+from live.operations import UnknownOperation
+from live.operations import get as get_operation
 
 from apps.invoice.document_issuer import document_issuer
 from apps.invoice.models import Invoice
 from apps.invoice.queries.rows import _loaded
 from base.business import money_text
+
+#: VeriFactu's record of an invoice, asked by name: Invoicing never imports it.
+VERIFACTU_BY_INVOICE = "verifactu.record.by_invoice"
+RECORD_UNREADABLE = _("Its VeriFactu record could not be read, and an invoice never prints without its QR.")
 
 # Texts of the printed document (and its titles), in the reader's language.
 DOC_INVOICE = _("Invoice")
@@ -93,6 +102,23 @@ def document_note(invoice: Invoice) -> str:
             return gettext(RECTIFIES_NOTE) % {"number": number, "reason": reason}
         return gettext(RECTIFIES_NOTE_NO_REASON) % {"number": number}
     return invoice.notes
+
+
+def qr_of(ctx: OperationContext, invoice: Invoice) -> dict | None:
+    """VeriFactu's QR of ``invoice`` (``{"url", "svg"}``): none without VeriFactu or without a record (the page goes
+    without it, as on screen). A record that cannot be read refuses the page: never one without its QR (VERIFACTU-F19)."""
+    try:
+        op = get_operation(VERIFACTU_BY_INVOICE)
+    except UnknownOperation:
+        return None
+    try:
+        record = op(ctx, op.input.model_validate({"invoice_id": str(invoice.id)})).record
+    except AppInactive:
+        return None
+    except OperationError as refused:
+        with translation.override(ctx.language):
+            raise Conflict(str(RECORD_UNREADABLE), code="invoice.record_unreadable") from refused
+    return {"url": record.qr_url, "svg": record.qr_svg} if record is not None else None
 
 
 def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | None = None) -> str:

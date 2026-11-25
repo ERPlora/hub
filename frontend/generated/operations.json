@@ -1275,6 +1275,10 @@
     "method": "get",
     "path": "/api/invoice/invoices/document"
   },
+  "invoice.invoice.pdf": {
+    "method": "get",
+    "path": "/api/invoice/invoices/pdf"
+  },
   "invoice.invoice.print": {
     "method": "post",
     "path": "/api/invoice/invoices/print"

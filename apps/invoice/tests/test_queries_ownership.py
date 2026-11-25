@@ -116,9 +116,11 @@ class TestAnEmployeeReachesOnlyTheirOwnInvoices:
     def test_nor_its_document_nor_its_paper(self, people, invoices):
         ana, theirs = people["ana"][1], invoices["bea"]["ticket"]
         assert missing(get(ana, "/invoice/invoices/document", invoice_id=theirs["id"]))
+        assert missing(get(ana, "/invoice/invoices/pdf", invoice_id=theirs["id"]))
         assert missing(post(ana, "/invoice/invoices/print", {"invoice_id": theirs["id"]}))
         own = invoices["ana"]["ticket"]
         assert get(ana, "/invoice/invoices/document", invoice_id=own["id"]).json()["number"] == own["number"]
+        assert get(ana, "/invoice/invoices/pdf", invoice_id=own["id"]).json()["filename"] == f"{own['number']}.pdf"
         assert reaches_the_printer(post(ana, "/invoice/invoices/print", {"invoice_id": own["id"]}))
 
     def test_nor_the_invoice_of_someone_elses_sale(self, people, invoices):
