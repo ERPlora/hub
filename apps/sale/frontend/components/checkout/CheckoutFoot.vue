@@ -62,6 +62,7 @@ const money = (cents: number): string => formatMoney(cents, locale.value, busine
 const short = computed(() => {
   const block = props.block;
   if (!block || block.kind === 'tenderedMissing') return '';
+  if (block.kind === 'step') return block.message;
   if (block.kind === 'remaining') return t('sale.checkout.block.remaining', { amount: money(block.amount) });
   return t(`sale.checkout.block.${block.kind}`);
 });
@@ -69,8 +70,9 @@ const short = computed(() => {
 /** The whole reason, what a tap on the blocked button answers; the recipient's is the details box itself. */
 const reason = computed(() => {
   const block = props.block;
-  // The recipient's box itself says what is missing or wrong.
+  // The recipient's box itself says what is missing or wrong, and a step's own field what is wrong with it.
   if (!block || block.kind === 'recipient' || block.kind === 'taxIdInvalid' || block.kind === 'idTypeRequired') return '';
+  if (block.kind === 'step') return '';
   if (block.kind === 'cashLimit') return t('sale.checkout.cashLimitReason', { amount: money(block.limit) });
   if (block.kind === 'remaining') return t('sale.checkout.reason.remaining', { amount: money(block.amount) });
   return t(`sale.checkout.reason.${block.kind}`);

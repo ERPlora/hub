@@ -12,7 +12,7 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
@@ -22,12 +22,14 @@ import { useLocale, useT } from '../../composables/useT';
 import { type ChargeBlock, chargeBlock } from '../../lib/checkout/blocks';
 import { chargeableMethods } from '../../lib/checkout/methods';
 import { recipientComplete, recipientFrom, recipientPayload } from '../../lib/checkout/recipient';
+import { type Added, NOTHING_ADDED, stepBlock, withAdded } from '../../lib/checkout/steps';
 import { recipientIssue } from '../../lib/checkout/taxId';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import type { DocumentType, PaymentMethodOut, PreviewIn, SaleOut } from '../../operations';
 import CashSessionWindow from './CashSessionWindow.vue';
 import CheckoutFoot from './CheckoutFoot.vue';
 import CheckoutSide from './CheckoutSide.vue';
+import CheckoutSteps from './CheckoutSteps.vue';
 import CheckoutTender from './CheckoutTender.vue';
 import VoucherLines from './VoucherLines.vue';
 
@@ -111,8 +113,20 @@ const partialText = computed(() => {
   return n === 1 ? t('sale.checkout.payingPartOne', { total: money(wholeTotal) }) : t('sale.checkout.payingPart', { n, total: money(wholeTotal) });
 });
 
+// ── What the steps of other apps add (SALE-F39) ───────────────────────────────────────────────
+/** What they add to this charge, charged with the sale on its one payment; a split charges the sale alone. */
+const added = shallowRef<Added>(NOTHING_ADDED);
+/** What the one payment charges: the sale and what the steps add. */
+const due = computed(() => (total.value === undefined ? undefined : total.value + added.value.amount));
+const discount = computed(() => preview.data.value?.discount_amount ?? 0);
+const addedText = computed(() =>
+  added.value.amount > 0 ? t('sale.checkout.added', { amount: money(added.value.amount), label: added.value.label.toLocaleLowerCase(locale.value) }) : '',
+);
+
 // ── What the person chooses and types ─────────────────────────────────────────────────────────
-const tender = useTender({ total, methods, cashLimit, operationTotal, money: business });
+const tender = useTender({ total: due, methods, cashLimit, operationTotal, money: business });
+// The steps go away while splitting, and what they added with them.
+watch(tender.splitting, (splitting) => splitting && (added.value = NOTHING_ADDED));
 
 const recipient = ref(recipientFrom(props.customer));
 const complete = computed(() => recipientComplete(recipient.value));
@@ -134,29 +148,47 @@ const needsRecipient = computed(() => documentType.value === 'invoice' && !compl
 watch(needsRecipient, (needed) => needed && (sideOpen.value = true), { immediate: true });
 
 const block = computed<ChargeBlock | null>(() =>
-  total.value === undefined
+  due.value === undefined
     ? null
-    : chargeBlock({
+    : (chargeBlock({
         requireCustomer: !!settings.data.value?.require_customer,
         hasCustomer: !!props.customer,
         documentType: documentType.value,
         recipientComplete: complete.value,
         recipientIssue: recipientIssue(recipient.value),
-        total: total.value,
+        total: due.value,
         operationTotal: operationTotal.value,
         cashLimit: cashLimit.value,
         method: tender.method.value,
         typed: tender.typed.value,
         splitting: tender.splitting.value,
         legs: tender.legs.value,
-      }),
+      }) ?? stepBlock(added.value)),
 );
 const ready = computed(
   () => total.value !== undefined && !readError.value && methodsLoaded.value && (methods.value.length > 0 || total.value === 0),
 );
 
 // ── Charging ──────────────────────────────────────────────────────────────────────────────────
-const checkout = useCheckout({ onCharged: (sale) => emit('charged', sale, lineIds.value) });
+const steps = useTemplateRef<InstanceType<typeof CheckoutSteps>>('steps');
+/** The sale is charged: the steps record their part of it before the till gets it. */
+const charged = shallowRef<SaleOut | null>(null);
+const handed = shallowRef(false);
+const checkout = useCheckout({ onCharged: afterCharge });
+const busy = computed(() => checkout.busy.value || (charged.value !== null && !handed.value));
+/** The steps sit over the methods once they are there, for one payment of a sale that charges something. */
+const showSteps = computed(() => methodsLoaded.value && !tender.splitting.value);
+
+function afterCharge(sale: SaleOut): void {
+  if (!steps.value) return hand(sale);
+  charged.value = sale;
+  steps.value.afterCharge(sale, checkout.key.value);
+}
+
+function hand(sale: SaleOut): void {
+  handed.value = true;
+  emit('charged', sale, lineIds.value);
+}
 
 // ── Lines paid with a voucher (SALE-F27) ──────────────────────────────────────────────────────
 /** Services is on in this business and the person may spend its sessions. */
@@ -168,7 +200,7 @@ const previewLines = computed(() => preview.data.value?.lines ?? []);
 function onSplit(newLines: readonly string[]): void {
   if (partial.value) lineIds.value = [...lineIds.value, ...newLines];
 }
-watch(checkout.busy, (busy) => emit('busy', busy));
+watch(busy, (now) => emit('busy', now));
 
 function pick(method: PaymentMethodOut): void {
   if (!tender.pick(method)) toastWarning(t('sale.checkout.cashLimitReason', { amount: money(cashLimit.value) }));
@@ -201,7 +233,7 @@ function confirm(): void {
     order_id: props.orderId,
     ...(partial.value ? { line_ids: [...lineIds.value] } : {}),
     order_version: preview.data.value?.order_version ?? openedVersion,
-    payments,
+    payments: withAdded(payments, added.value),
     document_type: documentType.value,
     ...(props.customer ? { customer_id: props.customer.customer_id } : {}),
     ...recipientPayload(recipient.value),
@@ -247,7 +279,7 @@ function goToDrawer(): void {
         class="sheet-h__close"
         data-testid="sale-checkout-close"
         :aria-label="$t('sale.checkout.close')"
-        :disabled="checkout.busy.value"
+        :disabled="busy"
         @click="emit('close')"
       >
         <HubIcon
@@ -303,6 +335,13 @@ function goToDrawer(): void {
         </span>
       </div>
       <div
+        v-if="addedText"
+        class="pay-part"
+        data-testid="sale-checkout-added"
+      >
+        {{ addedText }}
+      </div>
+      <div
         v-if="partialText"
         class="pay-part"
         data-testid="sale-checkout-partial"
@@ -339,6 +378,16 @@ function goToDrawer(): void {
         />
       </CheckoutSide>
       <div class="pay-tender">
+        <CheckoutSteps
+          v-if="showSteps && tender.method.value && total"
+          ref="steps"
+          :total="total"
+          :discount="discount"
+          :method="tender.method.value"
+          :locked="busy"
+          @update:added="added = $event"
+          @done="charged && hand(charged)"
+        />
         <p
           v-if="!methodsLoaded && !failed"
           class="pay-note"
@@ -358,7 +407,7 @@ function goToDrawer(): void {
           {{ $t('sale.checkout.noMethods') }}
         </p>
         <CheckoutTender
-          v-else-if="methodsLoaded && total !== undefined"
+          v-else-if="methodsLoaded && due !== undefined && !charged"
           :methods="methods"
           :method="tender.method.value"
           :cash-off="tender.cashOff.value"
@@ -366,7 +415,7 @@ function goToDrawer(): void {
           :legs="tender.legs.value"
           :typed="tender.typed.value"
           :change="tender.change.value"
-          :total="total"
+          :total="due"
           :remaining="tender.remaining.value"
           :block="block"
           @pick="pick"
@@ -379,8 +428,9 @@ function goToDrawer(): void {
       </div>
     </div>
     <CheckoutFoot
+      v-if="!charged"
       class="sheet-foot"
-      :total="total"
+      :total="due"
       :method="tender.method.value"
       :split="tender.splitting.value || tender.legs.value.length > 0"
       :block="block"

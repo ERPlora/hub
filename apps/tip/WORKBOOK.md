@@ -1,8 +1,10 @@
 # Workbook — Propinas (app)
 Prefijo: TIP
 Alcance MVP: etapa TPV (restaurante y peluquería)
-Estado de la app: parcial, fuera de la tienda — una propina se anota, se ajusta y se anula por la API y el asistente, y sale
-aparte en la caja; faltan sus pantallas, su paso en el Cobro, el informe y «Mis propinas» (hub#1498, hub#1500) y el reparto (hub#1501)
+Estado de la app: parcial, fuera de la tienda — la hoja Cobro propone la propina y la anota con su venta en un cobro de una
+sola forma de pago; una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la caja; faltan sus
+pantallas, el informe y «Mis propinas» (hub#1498), la propina de cada cobro al repartir y «Quédese el cambio» (hub#1500) y el
+reparto (hub#1501)
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y
@@ -101,7 +103,7 @@ Dentro de la hoja **Cobro** de Ventas (SALE-F39), solo con las propinas encendid
 las tres sugerencias de la forma de pago elegida («3 %», «5 %», «10 %», cada una con su importe debajo),
 «Otra cantidad» y «Sin propina»; la marcada de fábrica es «Sin propina». Debajo, «Para <nombre>» (quien
 atiende). En efectivo, cuando lo entregado pasa del total, el botón «Quédese el cambio». Con una propina
-puesta, el importe grande dice «<total> + <propina> de propina».
+puesta, bajo el importe grande sale «+ <propina> de propina».
 
 ### Propinas
 Título «Propinas», periodo («Hoy», «7 días», «30 días»), tabla (Fecha, Venta, Para, Forma de pago, Importe,
@@ -142,9 +144,9 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 | ID | Flujo | Vertical | Estado |
 |---|---|---|---|
 | TIP-F01 | Configurar las propinas | común | parcial — falta la pantalla Ajustes |
-| TIP-F02 | Proponer la propina al cobrar | común | no hecho |
-| TIP-F03 | Anotar una propina con tarjeta | común | parcial — faltan el Cobro y la pantalla Propinas |
-| TIP-F04 | Anotar una propina en efectivo | común | parcial — faltan el Cobro y la pantalla Propinas |
+| TIP-F02 | Proponer la propina al cobrar | común | parcial — faltan «Para <nombre>» y la propina de cada cobro al repartir |
+| TIP-F03 | Anotar una propina con tarjeta | común | parcial — falta la pantalla Propinas |
+| TIP-F04 | Anotar una propina en efectivo | común | parcial — faltan «Quédese el cambio» en el Cobro y la pantalla Propinas |
 | TIP-F05 | Echar al bote una propina sin tique | restaurante | parcial — falta la pantalla Propinas |
 | TIP-F06 | Ajustar o anular una propina | común | parcial — falta la pantalla Propinas |
 | TIP-F07 | Declarar las propinas en efectivo al cerrar el turno | restaurante | no hecho |
@@ -176,7 +178,9 @@ bloqueada con «No tienes permiso para cambiar estos ajustes.».
 Implicados: SALE-F37
 
 ### TIP-F02 Proponer la propina al cobrar
-Estado: no hecho — Propinas aún no declara su paso en la hoja Cobro (hub#1498, hub#1500)
+Estado: parcial — la hoja Cobro enseña la fila «Propina» con las sugerencias de la forma de pago, cobra la propina con la
+venta en un cobro de una sola forma de pago y la anota con su venta, una sola vez aunque se reintente; faltan «Para <nombre>»
+y la propina de cada cobro al repartir el cobro, que hoy se cobra sin propina (hub#1500)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro
@@ -199,8 +203,8 @@ al ajustarla (TIP-F06).
 Implicados: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Anotar una propina con tarjeta
-Estado: parcial — la propina con tarjeta se anota sobre su venta por la API y el asistente y sale aparte en la caja;
-faltan anotarla en el Cobro y en la pantalla Propinas (hub#1498, hub#1500)
+Estado: parcial — la propina con tarjeta se anota en el Cobro y, sobre su venta, por la API y el asistente, y sale aparte
+en la caja; falta anotarla en la pantalla Propinas (hub#1498)
 Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Cobro, Propinas
@@ -217,8 +221,9 @@ una venta de un día ya repartido, «Ese día ya está repartido: reábrelo para
 Implicados: CASH_REGISTER-F18
 
 ### TIP-F04 Anotar una propina en efectivo
-Estado: parcial — la propina en efectivo se anota sobre su venta por la API y el asistente y entra en el cajón; faltan
-«Quédese el cambio» en el Cobro y la pantalla Propinas (hub#1498, hub#1500)
+Estado: parcial — la propina en efectivo se anota en el Cobro (lo entregado cubre la cuenta y la propina, y el cambio
+descuenta las dos) y, sobre su venta, por la API y el asistente, y entra en el cajón; faltan en el Cobro «Quédese el cambio» y
+el aviso propio cuando lo entregado no cubre el total y la propina (hub#1500), y la pantalla Propinas (hub#1498)
 Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Cobro, Propinas

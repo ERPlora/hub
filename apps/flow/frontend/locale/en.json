@@ -1425,7 +1425,8 @@
       "tip__tip__add": "Record a tip",
       "tip__tip__update": "Adjust a tip",
       "tip__tip__void": "Void a tip",
-      "tip__tip__get": "Look at a tip"
+      "tip__tip__get": "Look at a tip",
+      "tip__suggestion__get": "Read the tips a charge suggests"
     },
     "facts": {
       "created": "created",

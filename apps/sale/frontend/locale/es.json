@@ -297,6 +297,7 @@
       "noMethods": "Este negocio no tiene ninguna forma de pago con la que cobrar.",
       "payingPartOne": "Cobrando 1 línea de {total}",
       "payingPart": "Cobrando {n} líneas de {total}",
+      "added": "+ {amount} de {label}",
       "remaining": "Restante",
       "documentFormat": "Documento",
       "docTicket": "Tique",
