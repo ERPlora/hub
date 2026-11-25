@@ -104,7 +104,7 @@ def test_spanish_texts():
         assert str(TaxRule.TaxType.IGIC.label) == "IGIC (Canarias)"
         assert str(TaxAlias.Source.SHIPPED.label) == "De fábrica"
         assert str(queries.calculation.NO_RATE) == "Ninguna regla fiscal se aplica a esta categoría en este país."
-        assert str(services.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
+        assert str(services.rule_lifecycle.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
         assert str(apps.get_app_config("tax").verbose_name) == "Impuestos"
 
 

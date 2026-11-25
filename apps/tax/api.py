@@ -41,7 +41,7 @@ async def category_get(request, params: Query[CategoryGetIn]):
 
 @bind(router, "tax.category.create", "/tax/categories", status=201)
 async def category_create(request, data: CategoryIn):
-    return await run_operation(request, services.create_category, data)
+    return await run_operation(request, services.categories.create_category, data)
 
 
 # Rules
@@ -69,27 +69,27 @@ async def rule_countries(request, params: Query[RuleCountriesIn]):
 
 @bind(router, "tax.rule.create", "/tax/rules", status=201)
 async def rule_create(request, data: RuleIn):
-    return await run_operation(request, services.create_rule, data)
+    return await run_operation(request, services.rules.create_rule, data)
 
 
 @bind(router, "tax.rule.bulk_create", "/tax/rules/bulk_create", status=201)
 async def rule_bulk_create(request, data: RuleBulkIn):
-    return await run_operation(request, services.bulk_create_rules, data)
+    return await run_operation(request, services.rules.bulk_create_rules, data)
 
 
 @bind(router, "tax.rule.end", "/tax/rules/end")
 async def rule_end(request, data: RuleEndIn):
-    return await run_operation(request, services.end_rule, data)
+    return await run_operation(request, services.rule_lifecycle.end_rule, data)
 
 
 @bind(router, "tax.rule.deactivate", "/tax/rules/deactivate")
 async def rule_deactivate(request, data: RuleRefIn):
-    return await run_operation(request, services.deactivate_rule, data)
+    return await run_operation(request, services.rule_lifecycle.deactivate_rule, data)
 
 
 @bind(router, "tax.rule.activate", "/tax/rules/activate")
 async def rule_activate(request, data: RuleRefIn):
-    return await run_operation(request, services.activate_rule, data)
+    return await run_operation(request, services.rule_lifecycle.activate_rule, data)
 
 
 # Aliases
@@ -107,7 +107,7 @@ async def alias_resolve(request, params: Query[AliasResolveIn]):
 
 @bind(router, "tax.alias.create", "/tax/aliases", status=201)
 async def alias_create(request, data: AliasIn):
-    return await run_operation(request, services.create_alias, data)
+    return await run_operation(request, services.aliases.create_alias, data)
 
 
 # The calculation
@@ -128,4 +128,4 @@ async def settings_get(request):
 
 @bind(router, "tax.settings.update", "/tax/settings")
 async def settings_update(request, data: TaxSettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
