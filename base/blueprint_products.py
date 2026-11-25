@@ -1,13 +1,17 @@
-"""What a product's row of a backup or a template carries only when the product has it: its image, its allergens and
-being hidden from the website.
+"""What a product's row of a backup or a template carries only when the product has it: its image, its allergens,
+being hidden from the website, being a service and a price that is not for one of its unit.
 
 ``base.blueprint`` reads each product with ``inventory.product.list`` and loads it with
 ``inventory.product.bulk_create``. The allergens travel by their codes, which that import reads as it reads their
-names; a file made before products had allergens has no such key and loads its products without any. The categories
-and the marks, which that import does not take, load with ``inventory.product.update``.
+names; a file made before products had allergens has no such key and loads its products without any. The type and what
+the price refers to enter with that import too, so a product is never there at another price. The categories and the
+marks, which that import does not take, load with ``inventory.product.update``.
 """
 
 from typing import Any
+
+#: The type a product is imported with when its row says none.
+PHYSICAL = "physical"
 
 
 def optional_fields(product: Any) -> dict:
@@ -19,6 +23,12 @@ def optional_fields(product: Any) -> dict:
         fields["allergens"] = list(product.allergens)
     if not product.show_on_website:
         fields["show_on_website"] = False
+    if product.product_type != PHYSICAL:
+        fields["product_type"] = product.product_type
+    if product.price_quantity != 1:
+        fields["price_quantity"] = f"{product.price_quantity.normalize():f}"
+    if product.pricing_unit != product.unit:
+        fields["pricing_unit"] = product.pricing_unit
     return fields
 
 
