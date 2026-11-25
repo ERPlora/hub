@@ -16,7 +16,6 @@ from apps.verifactu.models import Record
 pytestmark = [HUB_DB, pytest.mark.usefixtures("issuer", "nothing_leaves")]
 
 
-
 def record_of(answer) -> dict:
     """Everything VeriFactu keeps and prints of a document: its record's columns, its XML, its fingerprint and its QR.
     Only the ids of the rows are left out, new in each one; the chain is in the previous record's number and fingerprint."""
