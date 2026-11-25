@@ -2,7 +2,7 @@
 
 The Hub's admin lives only on hubs.erplora.com and has full CRUD over every table. The database still refuses an amount
 of 0 or less, an unknown status, a repeated reference and a repeated method name; the ladder of a payment and its events
-are the operations' (services.py), which the screens, the API and the assistant use.
+are the operations' (services/), which the screens, the API and the assistant use.
 """
 
 from django.contrib import admin
