@@ -110,9 +110,15 @@ describe('QrCodesPage: the list', () => {
     s.net.lastStream().push(errorFrame(s.subId(OP), 'base.unavailable'));
     await flush();
     expect(s.prop('error')).toBe('msg base.unavailable');
+    const streams = s.net.streams.length;
     s.table().vm.$emit('retry');
     await flush();
+    await s.reopen();
+    expect(s.net.streams.length).toBeGreaterThan(streams);
     expect(s.params(OP)).toEqual([{ limit: 100, offset: 0 }]);
+    await s.show([FOUR]);
+    expect(s.prop('error')).toBeUndefined();
+    expect(s.cells(0)[0]).toBe('4');
   });
 });
 
@@ -125,6 +131,32 @@ describe('QrCodesPage: printing', () => {
     await s.printButton().trigger('click');
     await flush();
     expect(s.printed()).toEqual({ title: 'QR codes of the tables', tables: ['Table 4', 'Table 10'] });
+  });
+
+  it('«Print sheet» stays off until every window of a long list has come', async () => {
+    const s = await setup();
+    await s.result(OP, page([FOUR], 150, 100, 0));
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([
+      { limit: 100, offset: 0 },
+      { limit: 100, offset: 100 },
+    ]);
+    await s.result(OP, page([FOUR], 150, 100, 0), { offset: 0 });
+    expect(s.printable()).toBe(false);
+    await s.result(OP, page([TEN], 150, 100, 100), { offset: 100 });
+    expect(s.printable()).toBe(true);
+  });
+
+  it('«Print sheet» can print again once a print has finished', async () => {
+    const s = await setup();
+    await s.show([FOUR]);
+    await s.printButton().trigger('click');
+    await flush();
+    expect(s.printable()).toBe(true);
+    await s.printButton().trigger('click');
+    await flush();
+    expect(mocks.print).toHaveBeenCalledTimes(2);
   });
 
   it('«Print QR» of a row prints only that table', async () => {

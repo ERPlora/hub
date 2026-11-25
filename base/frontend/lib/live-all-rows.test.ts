@@ -26,6 +26,15 @@ async function setup() {
   return { ...m, status, all: exposed.all! };
 }
 
+/** Mounted with a first window that says there are `total` rows, and the windows that total asks for opened. */
+async function withTotal(total: number) {
+  const s = await setup();
+  await s.result(OP, page([row('1')], total, 100, 0));
+  await flush();
+  await s.reopen();
+  return s;
+}
+
 describe('useLiveAllRows', () => {
   it('asks the first hundred rows and, when they are all, stays on one window and is complete', async () => {
     const s = await setup();
@@ -43,10 +52,7 @@ describe('useLiveAllRows', () => {
   });
 
   it('opens as many windows as the total asks, joins them in order and is complete only when all came', async () => {
-    const s = await setup();
-    await s.result(OP, page([row('1')], 250, 100, 0));
-    await flush();
-    await s.reopen();
+    const s = await withTotal(250);
     expect(s.params(OP)).toEqual([
       { status: 'open', limit: 100, offset: 0 },
       { status: 'open', limit: 100, offset: 100 },
@@ -63,10 +69,7 @@ describe('useLiveAllRows', () => {
   });
 
   it('drops the windows the total no longer asks for', async () => {
-    const s = await setup();
-    await s.result(OP, page([row('1')], 150, 100, 0));
-    await flush();
-    await s.reopen();
+    const s = await withTotal(150);
     expect(s.params(OP)).toHaveLength(2);
     await s.result(OP, page([row('1')], 50, 100, 0), { offset: 0 });
     await flush();
@@ -75,6 +78,16 @@ describe('useLiveAllRows', () => {
     await s.reopen();
     expect(s.params(OP)).toEqual([{ status: 'open', limit: 100, offset: 0 }]);
     expect(s.wrapper.text()).toBe('1');
+  });
+
+  it('lets go of every window when the screen goes away', async () => {
+    const s = await withTotal(250);
+    expect(s.params(OP)).toHaveLength(3);
+    s.wrapper.unmount();
+    await flush();
+    await s.clock.advance(RELEASE_GRACE_MS);
+    await s.reopen();
+    expect(s.params(OP)).toEqual([]);
   });
 
   it('follows its query in every window', async () => {
