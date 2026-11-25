@@ -1,6 +1,6 @@
 // Types of the reservation app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/reservation/schemas.py. Written by hand, as the other apps' are: nothing generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per
+// apps/reservation/schemas/. Written by hand, as the other apps' are: nothing generates them from
+// `/api/openapi.json`. Keep it in step with schemas/ and `frontend/generated/operations.json`. One input per
 // operation (ninja's parity): no path parameters, an id travels in the input. On the wire: a reservation's day
 // `YYYY-MM-DD` and time `HH:MM:SS` on the business's wall clock; moments ISO 8601 with their zone.
 import type { Page } from '../../../frontend/sdk-types';
