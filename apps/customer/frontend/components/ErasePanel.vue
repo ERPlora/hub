@@ -38,6 +38,7 @@ async function confirm(): Promise<void> {
     <p>{{ $t('customer.erase.message', { name: customer.name }) }}</p>
     <InlineFeedback
       v-if="error"
+      class="ion-margin-vertical"
       tone="danger"
       data-testid="customer-erase-error"
     >
