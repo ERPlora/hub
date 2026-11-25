@@ -25,7 +25,6 @@
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
-678 apps/modifier/services/__init__.py ERPlora/erplora-next#74
 515 apps/online_booking/schemas.py ERPlora/erplora-next#74
 553 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
 597 apps/payment/services.py ERPlora/erplora-next#74
