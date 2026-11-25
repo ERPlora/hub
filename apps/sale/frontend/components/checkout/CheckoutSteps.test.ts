@@ -65,7 +65,7 @@ describe('CheckoutSteps: the steps of the apps on', () => {
     expect(s.added()).toEqual({ amount: 0, label: '', issue: '' });
   });
 
-  it('a step whose code does not arrive paints nothing and is logged, and the others stay', async () => {
+  it('a step whose code does not arrive is left out and logged, and the others stay', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const s = await setup([{ key: 'x.broken', app: 'x', component: 'Broken' }, TIP]);
     expect(s.added()).toEqual({ amount: 50, label: 'Tip', issue: '' });
