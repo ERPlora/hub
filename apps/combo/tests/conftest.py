@@ -15,6 +15,7 @@ from django.utils import translation
 from live.context import OperationContext, Scope
 from live.errors import Conflict
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
@@ -61,6 +62,13 @@ def run(name: str, data: dict, ctx: OperationContext | None = None):
     """Runs the operation ``name`` as its route does: the input validated, then the operation."""
     op = get(name)
     return op(ctx or ctx_for("hub_admin"), op.input.model_validate(data))
+
+
+def events(name: str) -> list[dict]:
+    return [
+        event.payload
+        for event in OutboxEvent.objects.filter(name=name).order_by("created_at", "id")
+    ]
 
 
 @pytest.fixture(autouse=True)
