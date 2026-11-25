@@ -1064,7 +1064,7 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 - **Administrador de Django con CRUD completo**, solo en `hubs.erplora.com`; ids y
   fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` con sus `asks` (frases en `en` y `es`, `live.E020`: Impresión está en
-  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1086) y cada campo de `schemas.py` su `description`; la
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1086) y cada campo de `schemas/` su `description`; la
   impresora se nombra por su nombre y el trabajo por su número de documento. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Trabajo» para `job_id`, «Dispositivo», «Intento», «Error de impresión», «Referencia») o, si no lo tiene,
