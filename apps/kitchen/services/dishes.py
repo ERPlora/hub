@@ -11,7 +11,7 @@ from apps.kitchen import events
 from apps.kitchen.models import ItemStatus, LogAction, Ticket, TicketItem, TicketStatus
 from apps.kitchen.queries.reads import IN_FLIGHT, STRUCK, TO_DO
 from apps.kitchen.queries.scope import find_scope, in_scope
-from apps.kitchen.schemas import ItemBumpIn, ItemRecallIn, TicketOut
+from apps.kitchen.schemas.tickets import ItemBumpIn, ItemRecallIn, TicketOut
 from apps.kitchen.services.paper import _pass
 from apps.kitchen.services.settling import INVALID_TRANSITION, begin, locked_ticket, out
 from apps.kitchen.services.writes import _ticket_event, actor, write_log

@@ -523,7 +523,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 ## Para quien lo mantiene
 
 - Anatomía completa de una app: `apps.py`, `models.py`, `engine.py` (las reglas, sin base de datos),
-  `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `schemas/`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero; las páginas en `frontend/`. `UI-REQUESTS.md` lista lo que se pide
   a `@erplora/ui`.
 - Modelos (UUIDv7, sin `hub_id`): `WeekDay` (un día de la semana, lunes = 0, cerrado o no; un día sin
@@ -591,7 +591,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   delante de todo `appointment.blocked_time.*`, y una frase propia por herramienta solo llega entre las 10 primeras con
   sus `asks` (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
-  con las marcas `refers` de `schemas.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
+  con las marcas `refers` de `schemas/fields.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
   `OverrideRefIn`), leídas como quien pregunta: el día especial por su `name` con `schedule.special_day.get` y el
   cambio temporal por su `reason` con `schedule.override.get`, como el diálogo «Eliminar» de las pantallas. Ese `id`
   lleva su título («Día especial», «Cambio temporal»), nunca «Registro». Sin persona detrás, sin `schedule.view`, con

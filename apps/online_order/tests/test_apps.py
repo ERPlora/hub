@@ -22,12 +22,14 @@ def test_online_order_is_a_restaurant_module_that_requires_tables():
     # Never turned on by a template (a vertical lists only what every hub of it turns on).
     assert config.verticals == []
     assert config.premium is False
-    # Out of the store while it has no screen: a business that turned it on would get nothing to use.
+    # Out of the store until the customer can order: a printed QR must not open a page that does not exist yet.
     assert config.listed is False
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
-    # No screen yet: the QR sheet is the next step.
-    assert config.navigation == []
+    # One screen, the tables' QR codes, for whoever may see them.
+    assert [(nav.id, str(nav.label), nav.icon, nav.path, nav.permission) for nav in config.navigation] == [
+        ("qr_codes", "QR codes", "ion:qr-code-outline", "/online_order/qr-codes", "online_order.view_qr_code"),
+    ]
 
 
 def test_permissions_and_roles():

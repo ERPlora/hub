@@ -13,7 +13,7 @@ from apps.kitchen.queries.reads import COOKING, IN_FLIGHT, current_settings
 from apps.kitchen.queries.scope import ALL, find_scope, scoped, station_map
 from apps.kitchen.queries.state import in_flight_views
 from apps.kitchen.queries.views import ItemView, TicketView
-from apps.kitchen.schemas import AllDayIn, AllDayOut, BoardIn, BoardOut
+from apps.kitchen.schemas.board import AllDayIn, AllDayOut, BoardIn, BoardOut
 
 PRIORITY_RANK = {"rush": 0, "vip": 1, "normal": 2}
 #: The most tickets each list of the board shows (a result stays under 256 KB).

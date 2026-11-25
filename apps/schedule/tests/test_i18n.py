@@ -106,14 +106,14 @@ def test_spanish_texts_are_the_old_modules():
             "Domingo",
         ]
         assert (
-            str(schemas.MISSING_HOURS)
+            str(schemas.intervals.MISSING_HOURS)
             == "Un día abierto necesita al menos un tramo horario."
         )
-        assert str(schemas.OVERLAPPING) == (
+        assert str(schemas.intervals.OVERLAPPING) == (
             "Dos tramos se solapan (o uno cruza la medianoche sobre otro); ajusta las horas para que no se pisen."
         )
         assert (
-            str(schemas.RANGE_BACKWARDS)
+            str(schemas.fields.RANGE_BACKWARDS)
             == "La fecha de fin no puede ser anterior a la de inicio."
         )
         assert (
