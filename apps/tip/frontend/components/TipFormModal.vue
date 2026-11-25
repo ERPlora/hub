@@ -144,6 +144,7 @@ const canDismiss = useUnsavedFormOnOpen('tip-form', () => `${form.value.sale}${f
         <MoneyInput
           :model-value="form.amount"
           testid="tip-form-amount"
+          name="amount"
           :label="$t('tip.form.amount')"
           :money="money"
           :error-text="amountError ? $t(amountError) : fieldErrors.amount"

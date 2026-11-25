@@ -89,6 +89,7 @@ const canDismiss = useUnsavedFormOnOpen('tip-adjust', () => reason.value, open);
       <MoneyInput
         v-model="amount"
         testid="tip-adjust-amount"
+        name="amount"
         :label="$t('tip.adjust.amount')"
         :money="money"
         :error-text="amountError ? $t(amountError) : fieldErrors.amount"
