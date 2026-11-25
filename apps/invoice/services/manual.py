@@ -15,6 +15,7 @@ from apps.invoice import fiscal
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.platform_series import refuse_platform_series
 from apps.invoice.queries.series import FULL, business_series
+from apps.invoice.schemas.fields import HOME_COUNTRY
 from apps.invoice.schemas.invoices import InvoiceCreateIn, InvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import GENERAL_REGIME, _issue, _line_values
@@ -62,6 +63,7 @@ TICKET_OVER_LIMIT = _(
 WITHHOLDING_ON_TICKET = _(
     "A ticket carries no IRPF withholding: issue an invoice (F1) with the customer's details."
 )
+WITHHOLDING_ABROAD = _("IRPF withholding is a Spanish tax: a business outside Spain does not withhold it.")
 
 
 UNKNOWN_CATEGORY = _("There is no tax category «%(category)s».")
@@ -277,6 +279,14 @@ def _within_ticket_limit(series: InvoiceSeries, total: int) -> None:
 
 
 def _withholding_allowed(series: InvoiceSeries, data: InvoiceCreateIn) -> None:
-    if series.invoice_type == "F2" and data.withholding_rate is not None:
-        message = str(WITHHOLDING_ON_TICKET)
-        raise Conflict(message, code="invoice.withholding_on_ticket", fields={"withholding_rate": message})
+    """IRPF is withheld on a Spanish business's invoice, never on a ticket."""
+    if data.withholding_rate is None:
+        return
+    if series.invoice_type == "F2":
+        refusal, code = WITHHOLDING_ON_TICKET, "invoice.withholding_on_ticket"
+    elif business_country() != HOME_COUNTRY:
+        refusal, code = WITHHOLDING_ABROAD, "invoice.withholding_abroad"
+    else:
+        return
+    message = str(refusal)
+    raise Conflict(message, code=code, fields={"withholding_rate": message})

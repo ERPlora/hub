@@ -726,6 +726,14 @@ msgstr "El vencimiento no puede ser anterior a la fecha de la factura."
 
 #: services/manual.py
 msgid ""
+"IRPF withholding is a Spanish tax: a business outside Spain does not "
+"withhold it."
+msgstr ""
+"La retención de IRPF es un impuesto español: un negocio de fuera de España no "
+"la practica."
+
+#: services/manual.py
+msgid ""
 "A ticket carries no IRPF withholding: issue an invoice (F1) with the "
 "customer's details."
 msgstr ""
@@ -933,7 +941,7 @@ msgstr "Retención IRPF %(rate)s"
 #: templates/invoice/invoice.html
 msgctxt "invoice"
 msgid "Amount due"
-msgstr "A cobrar"
+msgstr "Total a pagar"
 
 #: templates/invoice/invoice.html:79
 msgid "Bill to"
@@ -1172,4 +1180,4 @@ msgstr "Retención"
 #: queries/export.py
 msgctxt "invoice export"
 msgid "Amount due"
-msgstr "A cobrar"
+msgstr "Total a pagar"

@@ -402,7 +402,7 @@ def test_the_headers_and_the_file_name_are_in_the_person_s_language(issuer):
     assert opened(out)[0] == ["Número", "Fecha", "Cliente", "NIF", "Base imponible", "Tipo %", "Cuota", "Total"]
 
     manual(withholding_rate=15)
-    assert opened(export(ctx_for(language="es")))[0][-3:] == ["Retención %", "Retención", "A cobrar"]
+    assert opened(export(ctx_for(language="es")))[0][-3:] == ["Retención %", "Retención", "Total a pagar"]
 
 
 # The assistant

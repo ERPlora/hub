@@ -8,7 +8,8 @@ import pytest
 from pydantic import ValidationError
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.conftest import HUB_DB, fields, run
+from base.models import Hub
+from apps.invoice.tests.conftest import A, HUB_DB, fields, run
 from apps.invoice.tests.manual import HUNDRED, LINE, RECIPIENT, line, manual, page, refused, stored, withheld
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("issuer", "nothing_leaves")]
@@ -79,6 +80,12 @@ def test_a_ticket_issued_by_hand_is_refused_under_its_field_and_spends_no_number
     assert (error.code, set(error.fields)) == ("invoice.withholding_on_ticket", {"withholding_rate"})
 
 
+def test_a_business_outside_spain_is_refused_under_its_field_and_spends_no_number():
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    error = refused(withholding_rate=15)
+    assert (error.code, set(error.fields)) == ("invoice.withholding_abroad", {"withholding_rate"})
+
+
 def test_a_ticket_without_it_is_issued_as_ever():
     ticket = run("invoice.invoice.create", {"series_code": "TICKET", "lines": [LINE]})
     assert to_collect(ticket) == (None, 0, 1210)
@@ -128,7 +135,7 @@ def test_the_preview_of_the_rectification_says_what_it_gives_back():
     ("language", "label", "amount", "due", "payable"),
     [
         ("en", "IRPF withholding 15%", "-€15.00", "Amount due", "€106.00"),
-        ("es", "Retención IRPF 15\xa0%", "-15,00\xa0€", "A cobrar", "106,00\xa0€"),
+        ("es", "Retención IRPF 15\xa0%", "-15,00\xa0€", "Total a pagar", "106,00\xa0€"),
     ],
 )
 def test_the_printed_document_says_it_after_its_total(language, label, amount, due, payable):

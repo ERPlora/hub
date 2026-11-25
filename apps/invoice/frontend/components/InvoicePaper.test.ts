@@ -109,7 +109,7 @@ describe('InvoicePaper', () => {
     ]);
     expect(rows(await setup({ invoice: withheld }, 'es')).slice(-2)).toEqual([
       ['Retención IRPF 15 %', '-3,00 €'],
-      ['A cobrar', '21,20 €'],
+      ['Total a pagar', '21,20 €'],
     ]);
     expect(rows(await setup()).at(-1)).toEqual(['TOTAL', '€24.20']);
   });

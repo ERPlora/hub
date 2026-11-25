@@ -59,7 +59,7 @@ describe('InvoiceTotals', () => {
     expect(plain(s.find('invoice-detail-payable').text())).toBe('Amount due: €56.24');
     const es = await setup('es', withheld);
     expect(plain(es.find('invoice-detail-withholding').text())).toBe('Retención IRPF 15 %: -9,00 €');
-    expect(plain(es.find('invoice-detail-payable').text())).toBe('A cobrar: 56,24 €');
+    expect(plain(es.find('invoice-detail-payable').text())).toBe('Total a pagar: 56,24 €');
     const none = await setup();
     expect([none.find('invoice-detail-withholding').exists(), none.find('invoice-detail-payable').exists()]).toEqual([false, false]);
   });

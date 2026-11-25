@@ -127,7 +127,7 @@ Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry
 action shows as a notice above the table.
 
 #### Invoice detail
-<!-- from WORKBOOK.md sha256:26f1a49ea9f6 -->
+<!-- from WORKBOOK.md sha256:1bf2c3450237 -->
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
 tag and the buttons "Print / PDF" and "← Back". If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
@@ -340,7 +340,7 @@ without the tax ID (it stays in the application's log), so that it never stays "
 Involved: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Issue an invoice by hand
-<!-- from WORKBOOK.md sha256:caec2591053d -->
+<!-- from WORKBOOK.md sha256:8eca069000b3 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoices, New manual invoice
@@ -389,7 +389,8 @@ year than the date ("That series numbers another year…"), a date after today (
 today.") or before that of the last invoice of its series ("An invoice cannot be dated before the last one of its
 series, which is of 11/24/2026."), a due date before the date ("The due date cannot be before the invoice's date."), a
 withholding on a ticket, asked for through the API or the assistant ("A ticket carries no IRPF withholding: issue an
-invoice (F1) with the customer's details."), a ticket above the Sales limit ("Above €3,000.00 a ticket
+invoice (F1) with the customer's details.") or in a business outside Spain ("IRPF withholding is a Spanish tax: a
+business outside Spain does not withhold it."), a ticket above the Sales limit ("Above €3,000.00 a ticket
 cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. A line with a tax category (through the API
 or the assistant) that has no rule in force in the business's territory is refused on that line's field, naming the category as Taxes names
 it in the reader's language (e.g. "Product — generic") and with "Create its
@@ -511,7 +512,7 @@ cannot, the void goes ahead and both stay "pending", in sight, until "Issue now"
 Involved: SALE-F30
 
 ### INVOICE-F08 Rectify an invoice by hand
-<!-- from WORKBOOK.md sha256:bd0cbda88258 -->
+<!-- from WORKBOOK.md sha256:bf91ff98284c -->
 Status: done
 Actor: manager, administrator, assistant
 Screen: Rectify
@@ -807,7 +808,7 @@ and an invoice never prints without its QR.".
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21
 
 ### INVOICE-F19 Mark an invoice as paid
-<!-- from WORKBOOK.md sha256:4b1d840faff9 -->
+<!-- from WORKBOOK.md sha256:d3f2db5041b0 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's), assistant
 Screen: Invoices, Invoice detail
@@ -921,7 +922,7 @@ written and no number is used.
 Involved: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14
 
 ### INVOICE-F24 Download the issued invoices in Excel
-<!-- from WORKBOOK.md sha256:6008cbe604fb -->
+<!-- from WORKBOOK.md sha256:09578b93d648 -->
 Status: done
 Actor: owner, administrator, manager, accountancy firm, assistant
 Screen: Invoices

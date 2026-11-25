@@ -232,6 +232,7 @@ async function issue(): Promise<void> {
         <WithholdingSelect
           v-if="full"
           v-model="withholding"
+          name="withholding_rate"
           :error-text="fieldErrors.withholding_rate"
         />
       </div>

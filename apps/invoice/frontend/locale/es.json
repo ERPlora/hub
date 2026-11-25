@@ -61,7 +61,7 @@
       "label": "Retención de IRPF",
       "none": "Sin retención",
       "of": "Retención IRPF {rate}",
-      "payable": "A cobrar"
+      "payable": "Total a pagar"
     },
     "taxPct": {
       "vat": "IVA %",
