@@ -26,6 +26,9 @@ const INVOICE = {
   base_amount: 6000,
   tax_amount: 524,
   total_amount: 6524,
+  withholding_rate: null as string | null,
+  withholding_amount: 0,
+  payable_amount: 6524,
   currency: 'EUR',
   currency_decimals: 2,
 };
@@ -46,6 +49,19 @@ describe('InvoiceTotals', () => {
     expect(plain(s.find('invoice-detail-base').text())).toBe('Base: €60.00');
     expect(plain(s.find('invoice-detail-taxes').text())).toBe('Taxes: €5.24');
     expect(plain(s.find('invoice-detail-total').text())).toBe('Total: €65.24');
+  });
+
+  it('says what is withheld and what is left to collect after the total, only if something is', async () => {
+    const withheld = { ...INVOICE, withholding_rate: '15.00', withholding_amount: 900, payable_amount: 5624 };
+    const s = await setup('en', withheld);
+    expect(plain(s.find('invoice-detail-total').text())).toBe('Total: €65.24');
+    expect(plain(s.find('invoice-detail-withholding').text())).toBe('IRPF withholding 15%: -€9.00');
+    expect(plain(s.find('invoice-detail-payable').text())).toBe('Amount due: €56.24');
+    const es = await setup('es', withheld);
+    expect(plain(es.find('invoice-detail-withholding').text())).toBe('Retención IRPF 15 %: -9,00 €');
+    expect(plain(es.find('invoice-detail-payable').text())).toBe('A cobrar: 56,24 €');
+    const none = await setup();
+    expect([none.find('invoice-detail-withholding').exists(), none.find('invoice-detail-payable').exists()]).toEqual([false, false]);
   });
 
   it('speaks Spanish', async () => {
