@@ -13,7 +13,8 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.queries.series import FULL
+from apps.invoice.platform_series import refuse_platform_series
+from apps.invoice.queries.series import FULL, business_series
 from apps.invoice.schemas.invoices import InvoiceCreateIn, InvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import GENERAL_REGIME, _issue, _line_values
@@ -80,6 +81,7 @@ def _manual_series(
         series = InvoiceSeries.objects.filter(pk=data.series_id).first()
         if series is None:
             raise NotFound(str(SERIES_NOT_FOUND), code="invoice.series_not_found")
+        refuse_platform_series(ctx.scope, series.code)
         if series.year != year:
             raise Conflict(
                 str(SERIES_OTHER_YEAR),
@@ -87,11 +89,12 @@ def _manual_series(
                 fields={"series_id": str(SERIES_OTHER_YEAR)},
             )
     elif data.series_code:
-        series = series_of_year(data.series_code.strip().upper(), year, ctx)
+        code = data.series_code.strip().upper()
+        refuse_platform_series(ctx.scope, code)
+        series = series_of_year(code, year, ctx)
     else:
-        series = InvoiceSeries.objects.filter(
-            year=year, is_default=True
-        ).first() or series_of_year(FULL, year, ctx)
+        default = business_series(ctx).filter(year=year, is_default=True).first()
+        series = default or series_of_year(FULL, year, ctx)
     if not series.is_active:
         raise Conflict(str(SERIES_INACTIVE), code="invoice.series_inactive")
     if series.invoice_type not in ("F1", "F2"):
