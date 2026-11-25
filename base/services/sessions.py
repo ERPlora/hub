@@ -34,6 +34,7 @@ from base.models import Hub, HubUser, Membership
 from base.models.api_keys import ApiKey
 from base.models.sessions import SessionOwner
 from base.models.access import TrustedDevice
+from base.permissions import is_a_person
 from base.registry import internal_only
 from base.schemas.sessions import HubUserSyncIn, HubUserSyncOut, SessionRevokeIn, SessionRevokeOut
 from control.models import HubVisit
@@ -294,7 +295,7 @@ def ensure_hub_user(user) -> HubUser:
 def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     """The ``HubUser`` of the person behind ``ctx``, made if missing, for what a write signs; ``None`` for the
     platform, an API key or nobody (no person)."""
-    if not queries.people.is_a_person(ctx.actor):
+    if not is_a_person(ctx.actor):
         return None
     return ensure_hub_user(ctx.actor)
 

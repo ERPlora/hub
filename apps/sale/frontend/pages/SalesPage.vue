@@ -7,8 +7,8 @@
 // date range replaces the period; an amount it cannot read, or a «to» day before its «from», is said
 // under its field and does not filter), table or
 // cards and 50 a page. A row opens its document; «Document» and «Reprint» for everyone; «Void» and
-// «Refund» for everyone too, only where they apply (whoever may not, with a manager's approval on this very
-// device: BASE-F84, the windows ask it); a sale whose fiscal documents wait says «Document
+// «Refund» for everyone too, only where they apply: whoever does them with a manager's approval hears so as they begin
+// (the windows ask for it on this very device: BASE-F84), whoever their role says no to is told and no window opens; a sale whose fiscal documents wait says «Document
 // pending» under its status and offers «Issue now» (`sale.sale.issue_documents`) to whoever charges. Charges, voids and refunds come back through the
 // stream by themselves: nothing here refetches. Everything the screen shows is the server's.
 import {
@@ -36,11 +36,13 @@ import { useBusinessDay } from '../components/sales/useBusinessDay';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
+import { mayBegin } from '../lib/approval';
 import { amountFilterErrors, formatMoney, type Money, moneyOf, useBusinessMoney } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES, TOTAL_ENDS } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+import { useAccess } from '../../../../base/frontend/lib/use-access';
 
 const tabs = useAppTabs('sale');
 
@@ -53,6 +55,8 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 const session = useSession();
 const canIssue = computed(() => session.can('sale.take_payment'));
+const voidAccess = useAccess('sale.void_sale');
+const refundAccess = useAccess('sale.refund_sale');
 const t = useT();
 const locale = useLocale();
 /** «Total» is typed in the business's currency; each row is painted in its own sale's (flow business-currency). */
@@ -220,13 +224,20 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
   if (actionId === 'document') openDocument(row);
   else if (actionId === 'reprint' && !reprinting.value) reprinting.value = row.id;
   else if (actionId === 'issue' && canIssue.value && row.documents_pending && !issuingId.value) void issue(row);
-  else if (actionId === 'void' && voidable(row)) {
-    voiding.value = row;
-    voidOpen.value = true;
-  } else if (actionId === 'refund' && refundable(row)) {
-    refunding.value = row;
-    refundOpen.value = true;
-  }
+  else if (actionId === 'void' && voidable(row)) beginVoid(row);
+  else if (actionId === 'refund' && refundable(row)) beginRefund(row);
+}
+
+function beginVoid(row: SaleRow): void {
+  if (!mayBegin(voidAccess.value, { no: t('sale.void.notAllowed'), approval: t('sale.void.withApproval') })) return;
+  voiding.value = row;
+  voidOpen.value = true;
+}
+
+function beginRefund(row: SaleRow): void {
+  if (!mayBegin(refundAccess.value, { no: t('sale.refund.notAllowed'), approval: t('sale.refund.withApproval') })) return;
+  refunding.value = row;
+  refundOpen.value = true;
 }
 </script>
 

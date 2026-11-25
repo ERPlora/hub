@@ -3,12 +3,25 @@
 // «An approval is needed» lets a manager approve it with their PIN on this very device, and the command is repeated
 // once. Where an ordinary door comes first (a discount within the maximum, an empty check), `throughManager` tries it
 // and, refused with the code of the manager's action, takes the manager's door: directly for whoever holds the
-// permission, through the approval for anybody else.
+// permission, through the approval for anybody else. `mayBegin` tells it before an action begins.
 import { ApiError } from '@erplora/ui/sdk';
+import { toastError, toastInfo } from '@erplora/ui/shell';
 
 import { withApproval } from '../../../../base/frontend/lib/approval';
+import type { Access } from '../../../../base/frontend/lib/use-access';
 
 export { withApproval };
+
+/** Whether an action begins for whoever asks for it, said first: what their role says no to does not, and what it
+ *  leaves to a manager begins knowing that one will have to approve it. */
+export function mayBegin(access: Access, words: { no: string; approval: string }): boolean {
+  if (access === 'no') {
+    toastError(words.no);
+    return false;
+  }
+  if (access === 'approval') toastInfo(words.approval);
+  return true;
+}
 
 export async function throughManager<T>(
   ordinary: () => Promise<T>,

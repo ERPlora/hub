@@ -58,6 +58,19 @@ def saved(
     return kept | dict(changes)
 
 
+#: What a role does with a permission, from nothing to all of it.
+_MORE = (OFF, APPROVAL, ON)
+
+
+def raised(before: Mapping[str, str], after: Mapping[str, str]) -> dict[str, str]:
+    """What ``after`` does more of than ``before``, each permission with its state in ``after``."""
+    return {
+        permission: state
+        for permission, state in after.items()
+        if _MORE.index(state) > _MORE.index(before.get(permission, OFF))
+    }
+
+
 def to_review(states: Mapping[str, str], apps: Mapping[str, Collection[str]]) -> frozenset[str]:
     """The permissions of ``apps`` a role saved with ``states`` has not seen: every one of an app turned on after it
     was saved, and each one an app added since."""
