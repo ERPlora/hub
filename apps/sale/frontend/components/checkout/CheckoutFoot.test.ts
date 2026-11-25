@@ -108,6 +108,15 @@ describe('CheckoutFoot: why it cannot charge', () => {
     await click(s.confirm());
     expect(s.wrapper.emitted('blocked')).toEqual([[{ kind: 'recipient' }, "Enter the customer's details"]]);
   });
+
+  it('a step of another app that cannot be charged says its own words on the button and answers with them', async () => {
+    const step: ChargeBlock = { kind: 'step', message: 'Write a valid tip.' };
+    const s = await setup(block(step));
+    expect(s.label()).toBe('Write a valid tip.');
+    expect(s.reason().exists()).toBe(false);
+    await click(s.confirm());
+    expect(s.wrapper.emitted('blocked')).toEqual([[step, 'Write a valid tip.']]);
+  });
 });
 
 describe('CheckoutFoot: what a screen reader hears', () => {
