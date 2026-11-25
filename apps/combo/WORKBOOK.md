@@ -665,10 +665,10 @@ producto recuperado no reacciona: sus elecciones vuelven desde la copia (F15).
 
 | De | Para qué | Flujos | Servicio |
 |---|---|---|---|
-| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
-| Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
+| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo Product de Inventario; el buscador de la pantalla usa `inventory.product.list` (los activos, agotados o no) |
+| Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo TaxCategory de Impuestos; el selector usa `tax.category.list` |
 | Plataforma | La librería de imágenes: buscarla y nombrar por su título la imagen que se pone a un menú | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
-| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | `recoverable_from_copy` de `apps.py` |
+| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | lo que declara su módulo de app (recoverable_from_copy) |
 
 ### Contrato con Ventas
 
