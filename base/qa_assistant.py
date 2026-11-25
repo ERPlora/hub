@@ -64,10 +64,12 @@ class Asked:
 class Report:
     flows: tuple[Asked, ...]
     uncited_tools: tuple[str, ...]
+    broken_citations: tuple[str, ...]
 
 
 def report(root: Path, flows: Mapping[str, WorkbookFlow], operations: Mapping[str, Operation]) -> Report:
-    """Each of ``flows`` done on a screen, as asked for by talking, and the tools of ``operations`` no flow cites."""
+    """Each of ``flows`` done on a screen, as asked for by talking, the tools of ``operations`` no flow cites, and what is
+    cited and does not exist."""
     cited = cited_operations(root)
     answers = tuple(
         asked(flow, [operations[name] for name in cited.get(flow.id, ()) if name in operations])
@@ -76,7 +78,19 @@ def report(root: Path, flows: Mapping[str, WorkbookFlow], operations: Mapping[st
     )
     used = {name for flow_id in flows for name in cited.get(flow_id, ())}
     uncited = sorted(name for name, op in operations.items() if is_tool(op) and name not in used)
-    return Report(answers, tuple(uncited))
+    return Report(answers, tuple(uncited), tuple(_broken_citations(cited, flows, operations)))
+
+
+def _broken_citations(
+    cited: Mapping[str, tuple[str, ...]], flows: Mapping[str, WorkbookFlow], operations: Mapping[str, Operation]
+) -> Iterator[str]:
+    """The flows cited that no manual has, and the operations a done flow cites that the registry does not have: the
+    manual of an app that is not done yet names the ones it will have."""
+    for flow_id, names in cited.items():
+        if flow_id not in flows:
+            yield f"{flow_id} is in no WORKBOOK"
+        elif flows[flow_id].done:
+            yield from (f"{flow_id} cites {name}, which is no operation" for name in names if name not in operations)
 
 
 def asked(flow: WorkbookFlow, operations: Sequence[Operation]) -> Asked:
