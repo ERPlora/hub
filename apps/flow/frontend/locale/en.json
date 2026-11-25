@@ -1099,6 +1099,7 @@
       "online_booking__settings__get": "Read the online booking settings",
       "online_booking__settings__update": "Change the online booking settings",
       "online_booking__settings__upload_logo": "Upload the booking page's logo",
+      "online_order__qr_code__list": "Look for the tables' QR codes",
       "payment__method__activate": "Turn on a payment method",
       "payment__method__create": "Create a payment method",
       "payment__method__deactivate": "Turn off a payment method",

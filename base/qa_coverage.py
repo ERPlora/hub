@@ -89,7 +89,7 @@ def workbook_flows(root: Path) -> dict[str, WorkbookFlow]:
         vocabulary = workbook_help.words()
     flows: dict[str, WorkbookFlow] = {}
     for path in workbooks(root):
-        markdown = catalog.user_part(path.read_text(encoding="utf-8"))
+        markdown = catalog.workbooks.user_part(path.read_text(encoding="utf-8"))
         for flow_id, _title, fields in workbook_help.flow_fields(markdown, vocabulary):
             done = workbook_help.is_done(_text(fields, "status"), vocabulary)
             actor, screen = _text(fields, "actor"), _text(fields, "screen")

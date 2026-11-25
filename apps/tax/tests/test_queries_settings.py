@@ -3,7 +3,7 @@ sales are declared with."""
 
 import pytest
 
-from apps.tax.schemas import SettingsGetIn
+from apps.tax.schemas.settings import SettingsGetIn
 
 from .conftest import HUB_DB, keep_region, run
 

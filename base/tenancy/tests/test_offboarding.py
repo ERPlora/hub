@@ -263,8 +263,9 @@ def test_a_business_with_fiscal_documents_stays_cancelled_with_its_database_and_
 #: The apps with nothing a tax inspector asks for, each one looked at: a new app has to say which side it is on, or the
 #: drop of a business would take its documents away without anyone noticing. ``kitchen.Ticket`` comes from a sale, which
 #: is the document; a price in ``service``, ``pricing`` or ``combo`` is a list price, no money that moved;
-#: ``inventory.StockMovement`` counts goods, not what was paid for them; a ``tip.Tip`` is no sale and carries no fiscal record
-#: (the cash it brings into the drawer is Cash register's movement, which is kept).
+#: ``inventory.StockMovement`` counts goods, not what was paid for them; a table's code in ``online_order`` opens a
+#: page; a ``tip.Tip`` is no sale and carries no fiscal record (the cash it brings into the drawer is Cash register's
+#: movement, which is kept).
 NO_FISCAL_DOCUMENTS = {
     "appointment",
     "attendance",
@@ -275,6 +276,7 @@ NO_FISCAL_DOCUMENTS = {
     "kitchen",
     "modifier",
     "online_booking",
+    "online_order",
     "pricing",
     "printing",
     "reservation",

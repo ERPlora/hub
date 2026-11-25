@@ -27,7 +27,7 @@ from apps.modifier.schemas.fields import (
     TaxKey,
     _Input,
 )
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import RecoveredOut
 from base.schemas.assistant import unless_given

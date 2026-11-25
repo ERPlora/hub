@@ -1229,7 +1229,7 @@ damaged, a newer version of ERPlora made it or it is larger than 20 MB) and it s
 Involved: BASE-F31
 
 ### BASE-F31 Review and load what the file brings
-<!-- from WORKBOOK.md sha256:60f3af32eacc -->
+<!-- from WORKBOOK.md sha256:8b483c56f07d -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Import)
@@ -1261,7 +1261,7 @@ load in your business: none of its apps can be turned on here.". An app that cou
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
 the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
 this business. Upload the file again in a minute to bring its data.".
-Involved: BASE-F22, INVENTORY-F12, VERIFACTU-F01, BASE-F32
+Involved: BASE-F22, INVENTORY-F12, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Read the import report
 <!-- from WORKBOOK.md sha256:65b9b3c18b17 -->
@@ -1337,7 +1337,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:3a0e7c0bb5b4 -->
+<!-- from WORKBOOK.md sha256:c817f412c322 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1360,7 +1360,7 @@ business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
 administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset.
-Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F33, BASE-F36
+Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F33, INVENTORY-F36, BASE-F36
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
 <!-- from WORKBOOK.md sha256:da5ff03469f9 -->

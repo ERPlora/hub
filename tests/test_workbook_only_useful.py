@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from base.catalog import WORKBOOK, workbook_configs
+from base.catalog.workbooks import WORKBOOK, workbook_configs
 
 REPO = Path(__file__).resolve().parent.parent
 SKIPPED_FOLDERS = {"node_modules", "packages"}

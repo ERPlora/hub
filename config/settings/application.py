@@ -8,7 +8,7 @@ INSTALLED_APPS = [
     "control",
     # Before the admin: base/templates/admin/ overrides its templates (the chosen hub's banner).
     "base",
-    # The mirror of the SaaS's `shared` schema: only base/catalog.py writes it.
+    # The mirror of the SaaS's `shared` schema: only base/catalog/register_apps.py writes it.
     "shared",
     # Django's admin, its site the Hub's own: a hub's model only once a business is chosen (base/admin_site.py).
     "base.admin_site.AdminConfig",
@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.cart_checkout",
     "apps.modifier",
     "apps.website",
+    "apps.online_order",
     "apps.tip",
 ]
 

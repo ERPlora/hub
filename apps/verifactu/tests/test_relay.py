@@ -16,7 +16,7 @@ from live.models import OutboxEvent
 from apps.verifactu.models import Chain, Record
 from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, manual
 from base import catalog, worker
-from base.catalog import RegisterResult
+from base.catalog.register_apps import RegisterResult
 from base.models.relay import EventDelivery
 
 pytestmark = HUB_DB_COMMITTED
@@ -29,7 +29,7 @@ def tick(monkeypatch, settings):
     """One tick of the worker's real loop, without the SaaS (``register_apps``) nor a gateway (nothing is presented),
     as a process that has served no hub yet."""
     settings.VERIFACTU_GATEWAY_URL = ""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: REGISTERED)
 
     def one_tick() -> None:
         stop = threading.Event()

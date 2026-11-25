@@ -30,7 +30,7 @@ from apps.sale.schemas.fields import (
     Said,
     _text,
 )
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 
 
 class LineFields(Closed):

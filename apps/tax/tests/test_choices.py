@@ -8,7 +8,7 @@ from django.apps import apps
 from django.utils import translation
 
 from apps.tax.choices import CHOICES, COUNTRY_LABELS
-from apps.tax.schemas import COUNTRY_CODES
+from apps.tax.schemas.jurisdiction import COUNTRY_CODES
 from base.business import country_name
 
 

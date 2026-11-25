@@ -470,16 +470,12 @@
       {
         "name": "_customer_load",
         "complexity": 17
-      },
-      {
-        "name": "_inventory_product_load",
-        "complexity": 39
       }
     ]
   },
   {
-    "path": "base/catalog.py",
-    "file_name": "catalog.py",
+    "path": "base/catalog/workbooks.py",
+    "file_name": "workbooks.py",
     "functions": [
       {
         "name": "_uncommented_lines",
