@@ -30,7 +30,7 @@ class TaxConfig(LiveAppConfig):
     # Both sectors' templates carry it (base.catalog.template_apps); every business is born with it on anyway (below).
     verticals = ["hair_salon", "restaurant"]
     # Mandatory wherever the business is: no sale is priced without it. The Home asks whoever runs a business to turn it
-    # on while it is off (base.home.mandatory_steps), and the platform turns it on by itself at sign-up
+    # on while it is off (base.home.mandatory_apps.mandatory_steps), and the platform turns it on by itself at sign-up
     # (base.activation.born_on, base.services.hub_registry.turn_on_born_apps): it binds the business to no authority.
     mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"

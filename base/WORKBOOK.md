@@ -3855,12 +3855,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Las tres consultas vivas del Inicio son de `base/queries/`, con permiso `base.view_home` y ruta ninja en
   `base/api/home.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
-  `base/home.py` (sin ORM).
+  `base/home/` (sin ORM).
 - Punto de extensión: cada módulo declara en su `LiveAppConfig` `setup` (`SetupStep`), `widgets`
   (`Widget`) y `bell` (`BellCounter`), dataclasses de `live.meta` comprobadas por `live.checks`
   (E009–E016). Cada consulta que nombran es un `kind="query"` de la propia app; base la ejecuta como la
   persona (`run_hook`).
-- País: un paso con `countries` solo sale en un hub de esos países (`home.applies_to_country`); el país del hub
+- País: un paso con `countries` solo sale en un hub de esos países (`home.setup_steps.applies_to_country`); el país del hub
   se lee con `base.business.country_or_market`, la única lectura de la plataforma: sin país (una demo, el hub de
   ERPlora sin fila) es `MARKET_COUNTRY`, España, el mercado de ERPlora, como lo cuenta VeriFactu
   (`queries.outside_spain` la usa), hub#682.
@@ -3879,13 +3879,13 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Campana por reloj: un contador cuya cifra cambia porque pasa el
   tiempo, sin evento (un trabajo que lleva un minuto en cola sin dispositivo vivo), lo dice su módulo en
   `bell_refresh_every` de su `LiveAppConfig` (clave del contador → segundos; la forma de `scheduled_tasks` y
-  `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home.py`) exige claves de su propio `bell` y
+  `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home/bell_counters.py`) exige claves de su propio `bell` y
   segundos enteros desde `MIN_BELL_REFRESH_SECONDS` (30). `base.bell.counters` devuelve
   `refresh_every`, el menor de los contadores que la persona puede ver de las apps encendidas (también a cero: es el
   tiempo el que los sube), y `base/frontend/lib/bell-counters.ts` vuelve a leer `GET /api/home/bell` cada tantos
   segundos mientras la página está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se
   descarta, y una que falla deja lo último. Sin `refresh_every`, la campana solo se mueve por eventos. Tests:
-  `test_home.py`, `test_queries_home_bell.py` y `bell-counters.test.ts`.
+  `test_bell_counters.py`, `test_queries_home_bell.py` y `bell-counters.test.ts`.
 - El centro de avisos: la campana, la tarjeta de llegada y el panel son de `@erplora/ui` y los monta el shell; el Hub
   solo le da su fuente, `useHubActionNotices` (`base/frontend/lib/action-notices.ts`), en `actionNotices` de
   `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso con lo que dice el servidor
@@ -3931,14 +3931,14 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   (`live` en `WidgetOut`). Un panel con `component` monta `apps/<app>/frontend/components/<Nombre>.vue`, que carga
   `frontend/lib/app-components.ts`, la única puerta de `base/frontend` hacia `apps/` (`platform-boundary.test.ts`).
 - Tarjetas de Sistema (hub#683, BASE-F39): una app declara en su `LiveAppConfig` `system_cards`, una lista de
-  `{"key", "component"}` y, si no la ve todo el mundo, `"permission"`. `base.E015` (`base/home.py`) comprueba al arrancar
+  `{"key", "component"}` y, si no la ve todo el mundo, `"permission"`. `base.E015` (`base/home/system_cards.py`) comprueba al arrancar
   que cada clave es única, que el componente es un nombre (nunca una ruta) con su fichero en
   `apps/<app>/frontend/components/` y que el permiso es de la app. `base.system.cards` (viva: la foto y
   encender o apagar una app la re-ejecutan; `GET /api/system/cards`) lista las de las apps encendidas que la persona
   puede ver, y `SystemAppCards.vue` las monta al final de «Uso y plan».
   Lo que dice una tarjeta es de su app. Las puertas de erplora.com a la app de ERPlora de cada sistema
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
-  `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
+  `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_system_cards.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
 - La fila de salud del Inicio (hub#573, BASE-F02): una app declara en su `LiveAppConfig` `health`, un diccionario con
   `operation` (una consulta suya cuya primera fila dice `state`: `ok`, `no_signal` o `not_configured`), `params`, el
@@ -3964,15 +3964,15 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
-  con la AEAT). `base.E016` (`base/home.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
+  con la AEAT). `base.E016` (`base/home/mandatory_apps.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
   mayúsculas sin repetir (nunca una lista vacía, que leería «en ninguno» o «en todos») y `platform_turns_on`
-  booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_steps` da un paso `base.mandatory.<app>`
+  booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_apps.mandatory_steps` da un paso `base.mandatory.<app>`
   (nivel `functional`, orden 15, ruta `/apps#all`, el icono con que el shell pinta la app: el de su primera entrada de
-  menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
+  menú, `home.shown_modules.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
   (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
   `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
   (`creating`) el paso sigue: todavía no está encendida. Tests:
-  `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
+  `test_mandatory_apps.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
   hubs reales) y `apps/tax/tests/test_apps.py`.
   Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
   da las obligatorias del país que están `on` (no `creating` ni `failed`, que aún no atan y se pueden dejar), que
@@ -4021,7 +4021,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   (`tests/e2e/fix-hub-home-timeline-raw-utc-time.spec.ts`).
 - `demo` (módulo no listado) sale en el menú, en «Mis apps» y con su ejemplo en el Inicio solo con
   `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
-  Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.
+  Una sola regla, `base.home.shown_modules.shown_modules`, para `base.session.me` y los ganchos del Inicio.
 - Cada entrada del menú de un módulo (`Nav` de su `apps.py`) declara el permiso que la abre (`permission`, uno de los
   del propio módulo; `live.E025` lo exige). `base.session.me` lleva en `menu` solo las entradas abiertas a la persona y
   solo los módulos con alguna (`_can_see` de `base/queries/apps.py`), y «Mis apps» (`useMyApps` de `@erplora/ui`) sale
@@ -4090,7 +4090,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Frontend en `base/frontend/` (rutas, catálogos `en`/`es` bajo `base`, componentes y su `lib/home.ts`);
   los destellos y «Mejorar plan» se enchufan en `frontend/main.ts` por `chrome` de `createShell`, y los avisos de la
   campana por `actionNotices`. La ruta `/` de base (`base-home`) gana a la rejilla del shell (`home`).
-- Tests: `base/tests/test_home.py`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
+- Tests: los `base/tests/test_<módulo>.py` de cada módulo de `base/home/`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
   Vitest en `base/frontend/**`; e2e `tests/e2e/base-home.spec.ts` y `base-home-activity.spec.ts`.
 - BASE-F13: cada login anota de quién y dónde es su sesión (`base.SessionOwner`, en control junto a las
   sesiones de Django; `CASCADE` con la sesión). `POST /internal/sessions/revoke {user_id, hub_id?}`
@@ -4156,7 +4156,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `base.apps_on.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
   despliegue (hoy) no se lee nada. Tests: `base/tests/test_entitlement.py` (dos hubs, demo, fin del derecho, 402).
 - `base.app.list` (`GET /api/apps`, `base.view_home`, viva con `base.hub.state_applied`): los módulos de
-  `home.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
+  `home.shown_modules.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
   entrada del menú si la persona ve la app), `icon` (el de la primera entrada del menú, el que pinta el shell, como el
   lanzador y «Mis apps»: el `icon` del módulo es el de la Tienda, horneado aparte, y `HubIcon` rechaza un nombre no
   registrado, que dejaba la pantalla en blanco), `requires` (cierre) y `required_by`, y `store_url` =
@@ -4180,7 +4180,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
 - Las apps no activadas en el asistente (BASE-F24 paso 6, hub#2178; `base/assistant/apps_not_on.py`): el catálogo de
-  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules` cuando las
+  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules.shown_modules` cuando las
   palabras de la petición abierta o las búsquedas del modelo dicen su nombre en el idioma de la persona (`_names`: las
   raíces de su `verbose_name`, comparadas con las palabras tal como se dicen, sin el vocabulario de `live`, que haría
   de «precio» una palabra de Tarifas) y tiene una herramienta en los `PLACES` puestos de ese turno contra el catálogo
@@ -4197,7 +4197,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
-  `LiveAppConfig` (`home.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
+  `LiveAppConfig` (`home.plan_meters.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
   cuenta en la memoria de cada proceso que atiende peticiones y lo vuelca cada 60 s y al salir
   (`services.usage.activity_recorded`, `services.usage.people_seen`): peticiones en `HubDatabaseMiddleware`, personas en
   `HubContextBuilder.from_request`, pico en `Limiter.take`, fuera de su lock. «Sin hueco» solo cuando llega a un cliente
@@ -4358,7 +4358,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - **La hora del negocio** (hub#687): la zona la lee un solo sitio, `base.business.business_zone()`: la del hub en el que se
   trabaja (`control.Hub.timezone`, la manda el SaaS), la del despliegue en la plataforma o si no tiene una que Python
   conozca (`zone_of`); sin contexto, `HubContextMissing`, como un modelo de hub. La usan la tarjeta del asistente, los
-  avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
+  avisos del Inicio y los textos de las automatizaciones (`base.home.device_notices.moment`), el CSV de autorizaciones y las apps; una
   lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. En pantalla, `useBusinessZone`
   (`base/frontend/lib/zone.ts`), que también siguen Fichajes, Tareas y la bandeja de WhatsApp (hub#779). Las fechas de
   la factura, el día y el número de una venta, el «hoy» de Impuestos y las horas de VeriFactu (la de generación de cada

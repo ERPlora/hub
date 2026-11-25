@@ -154,7 +154,7 @@ def test_every_granted_permission_is_declared():
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
     # The tab bar, the help window and the menu's highlight follow these entries, each with the permission that opens
     # it. The first one is the app's entry and its people icon the launcher's
-    # (base.home.shell_icon).
+    # (base.home.shown_modules.shell_icon).
     entries = staff().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.path, entry.icon, entry.permission) for entry in entries] == [
@@ -165,7 +165,7 @@ def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
         ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline", "staff.view"),
         ("settings", "Settings", "/staff/settings", "ion:settings-outline", "staff.manage_settings"),
     ]
-    assert home.shell_icon(staff()) == "ion:people-outline"
+    assert home.shown_modules.shell_icon(staff()) == "ion:people-outline"
     shell = shell_icon_registry()
     for entry in entries:
         assert f"'{entry.icon.removeprefix('ion:')}':" in shell, entry.icon

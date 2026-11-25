@@ -207,7 +207,7 @@ def test_the_homes_step_is_your_cash_drawer_done_once_the_settings_are_saved():
     )
     assert "updated_at" in registry[step.operation].output.model_fields
     # Not required, so «Recommended»: a drawer on its factory values stops no sale nor invoice.
-    assert home.level_of(f"cash_register.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"cash_register.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():

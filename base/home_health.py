@@ -64,9 +64,9 @@ def health_items(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> lis
 def read_state(ctx: OperationContext, label: str, declared: Mapping[str, Any]) -> str:
     """The state the app's query answers, or :data:`UNKNOWN` (logged) when it fails or answers one it may not."""
     try:
-        row = home.run_hook(ctx, declared["operation"], declared.get("params") or {}) or {}
+        row = home.module_hooks.run_hook(ctx, declared["operation"], declared.get("params") or {}) or {}
     except Exception:
-        home.hook_failed(f"{label}.health", declared["operation"])
+        home.module_hooks.hook_failed(f"{label}.health", declared["operation"])
         return UNKNOWN
     state = row.get("state")
     if state not in APP_STATES:

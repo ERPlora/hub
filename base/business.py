@@ -76,7 +76,7 @@ def zone_name(zone: dt.tzinfo | None = None) -> str:
 def country_or_market(country: str) -> str:
     """The country (ISO 3166-1 alpha-2, upper-case) a business with ``country`` is in for every rule by country: its
     own, or ERPlora's market (:data:`MARKET_COUNTRY`, Spain) without one, as a demo is (hub#682). The one reading of
-    it: the Home's national steps (``base.home.applies_to_country``) and VeriFactu's «only in Spain» ask it here."""
+    it: the Home's national steps (``base.home.setup_steps.applies_to_country``) and VeriFactu's «only in Spain» ask it here."""
     return country.strip().upper() or MARKET_COUNTRY
 
 
