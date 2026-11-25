@@ -99,14 +99,14 @@ def test_spanish_texts_are_the_old_modules():
             str(queries.reads.MEMBER_NOT_FOUND)
             == "Ese miembro del personal no existe en este negocio."
         )
-        assert str(services.ACTIVE_TIME_OFF) == (
+        assert str(services.members.ACTIVE_TIME_OFF) == (
             "Ese miembro tiene ausencias pendientes o aprobadas que aún no han terminado. Resuélvelas primero."
         )
         assert (
-            str(services.INVALID_TRANSITION)
+            str(services.time_off.INVALID_TRANSITION)
             == "Esa solicitud de ausencia no puede pasar a ese estado desde el actual."
         )
-        assert str(services.DEFAULT_SCHEDULE_NAME) == "Horario habitual"
+        assert str(services.schedules.DEFAULT_SCHEDULE_NAME) == "Horario habitual"
         assert (
             str(schemas.fields.END_BEFORE_START)
             == "La fecha de fin no puede ser anterior a la de inicio."
