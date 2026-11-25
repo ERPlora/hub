@@ -25,8 +25,7 @@ from base.schemas.bell import BellCountersIn
 from base.tenancy.context import use_hub
 
 from .conftest import A, B, HUB_DB, HUB_DB_COMMITTED, MONDAY, at, ctx_for, make_appointment, make_salon, make_settings
-from .conftest import run, wall, without_hours
-from .test_queries import employee_linked_to
+from .conftest import employee_linked_to, run, wall, without_hours
 
 pytestmark = pytest.mark.usefixtures("anytime")
 

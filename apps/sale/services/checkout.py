@@ -31,7 +31,7 @@ from apps.sale.queries.service_lines import Booking
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.checkout import CompleteIn
 from apps.sale.schemas.sales import SaleOut
-from apps.sale.services import charge_card
+from apps.sale.services import charge_card, charge_kitchen
 from apps.sale.services.charge_validation import (
     _check_discounts,
     _check_drawer,
@@ -207,7 +207,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         )
     counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
     operation = operation_total(None if counter_sale else order, closes, valuation, on=day)
-    legs = _legs(data, valuation.total, settings, operation)
+    legs = _legs(ctx, data, valuation.total, settings, operation)
     _check_drawer(ctx, legs)
 
     if counter_sale:
@@ -351,8 +351,10 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     # A dict, not AI(...): AI has no ``summary``, the card's own words (base.assistant.cards.card).
     ai={
         "description": "Charge a sale: an open check (all its lines, or some for a partial charge) or loose lines (products by "
-        "SKU or name, services by name, open prices by department). The sessions of the lines paid with a voucher are "
-        "spent with it (the sale must be charged to the voucher's owner). Payments: cash with what was handed over (change), card or other "
+        "SKU or name, services by name, open prices by department). What an open check has not sent to the kitchen "
+        "yet goes to it first, as a new round, as the till's Charge does. The sessions of the lines paid with a "
+        "voucher are spent with it (the sale must be charged to the voucher's owner). Payments: cash with what was "
+        "handed over (change), card or other "
         "methods for the exact amount, or split. The server prices, taxes and numbers it; a ticket up to 3,000 €, above "
         "or on request an invoice with the customer's name, tax ID and address (ask for them). Send the same "
         "idempotency_key on a retry: it never charges twice.",
@@ -375,7 +377,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     },
 )
 def complete(ctx: OperationContext, data: CompleteIn) -> dict:
-    return _complete(ctx, data, over_limit=False)
+    return _complete(ctx, charge_kitchen.send_pending(ctx, data), over_limit=False)
 
 
 @operation(
@@ -404,4 +406,4 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
     },
 )
 def complete_over_limit(ctx: OperationContext, data: CompleteIn) -> dict:
-    return _complete(ctx, data, over_limit=True)
+    return _complete(ctx, charge_kitchen.send_pending(ctx, data), over_limit=True)

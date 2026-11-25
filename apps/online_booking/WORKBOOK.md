@@ -176,9 +176,10 @@ Pasos:
    Servicios los enseña («Mostrar precios», «Mostrar duración»).
 3. Si el negocio lo permite, elige profesional entre los que hacen todos esos servicios, o «Sin
    preferencia».
-4. Elige el día: salen las **horas libres** que la agenda daría a la clienta (horario del negocio, turno y
-   ausencias del profesional, bloqueos y otras citas; nunca dentro de la antelación mínima, más allá de la
-   máxima, en el pasado ni encima de otra cita).
+4. Toca el día en el calendario, que se abre entero en el centro de la pantalla, y queda elegido sin pulsar más:
+   salen las **horas libres** que la agenda daría a la clienta (horario del negocio, turno y ausencias del
+   profesional, bloqueos y otras citas; nunca dentro de la antelación mínima, más allá de la máxima, en el
+   pasado ni encima de otra cita).
 5. Escribe su nombre, su **móvil** (obligatorio), su email (si el negocio lo pide) y, si se permite, una nota.
 6. Pulsa **Reservar**: la cita entra en la agenda con el origen «Reserva online», **Confirmada** o
    **Pendiente** según «Confirmar automáticamente las reservas de la clienta» (y siempre Pendiente si un
@@ -455,7 +456,7 @@ del equipo con su sesión abierta.
   numeración, horas libres, antelaciones, confirmación automática y política de cancelación son de Citas;
   qué servicio se reserva online, de Servicios (`Service.allow_online_booking`); la ficha, de Clientes.
 - **`requires = ["appointment", "customer", "service", "staff"]`**: lee las citas, busca y crea fichas, lee
-  el catálogo y los profesionales de un servicio (`appointment.queries.bookable_members`, que devuelve
+  el catálogo y los profesionales de un servicio (`appointment.queries.booking.bookable_members`, que devuelve
   fichas de Personal). Escribe en ellas solo por sus operaciones: `appointment.appointment.create`,
   `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (solo el email que tecleó la
   clienta como contacto de la cita, si su ficha no tiene), `appointment.settings.update`,
@@ -475,7 +476,7 @@ del equipo con su sesión abierta.
   de la base en un despliegue posterior.
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
   apps usan `delegated(ctx)`: el mismo contexto con los permisos justos de Citas, Clientes, Servicios,
-  Horarios y Personal (como `appointment.queries.reader`), y como actor «online booking» cuando no hay
+  Horarios y Personal (como `appointment.queries.agenda.reader`), y como actor «online booking» cuando no hay
   persona. La reserva va con `source = "online"`: Citas aplica la antelación, la ventana y que la clienta
   nunca solapa, y decide Pendiente o Confirmada.
 - **Ficha por teléfono**: el móvil se normaliza a E.164 (`apps.customer.phones`); entre las fichas vivas con
@@ -498,14 +499,14 @@ del equipo con su sesión abierta.
 - **Límites**: 5 por visitante y hora y 100 por negocio y hora (429; constantes de `services.py`), y las
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
-- **Reloj**: el de Citas (`apps.appointment.queries.now`, `business_zone`); los tests lo fijan.
+- **Reloj**: el de Citas (`apps.appointment.queries.business.now`, `base.business.business_zone`); los tests lo fijan.
 - Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`);
   `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
   Sus dos avisos no los escucha ninguna app salvo Automatizaciones, que se apunta a todos (`"*"` en
   `apps/flow/events.py`); lo que hace con ellos es de FLOW-F21, que sigue `parcial`.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#673): nombra el registro que una escritura señala
   por su id con las marcas `refers` de Citas (`AN_APPOINTMENT`, `A_SERVICE`, `A_MEMBER` de
-  `apps/appointment/schemas.py`), leídas como quien pregunta: la reserva (el `id` de `BookingRefIn`, en
+  `apps/appointment/schemas/fields.py`), leídas como quien pregunta: la reserva (el `id` de `BookingRefIn`, en
   confirmar, completar, no presentada, cancelar y borrar) por su `label` con `appointment.appointment.get`,
   titulada «Reserva» como la lista; cada servicio de `service_ids` por su nombre con `service.service.get`, y
   el profesional (`staff_id`) por su nombre completo con `staff.member.detail`, en `public.book`. Sin el
@@ -581,7 +582,9 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
   clienta), la página de reservas. `PersonalBooking.vue` carga y anula la reserva del enlace personal;
   `PublicBookingHeader.vue` pinta la identidad del negocio, `PublicBookingSubmit.vue` el aviso de privacidad, el campo
   trampa y el envío, `BookingResult.vue` la confirmación y los datos de la reserva, y `CancelDialog.vue` la
-  confirmación de anular, tanto en la bandeja como en el enlace.
+  confirmación de anular, tanto en la bandeja como en el enlace. La de la clienta la abre `BookingResult.vue`, la
+  misma justo después de reservar y desde su enlace, y la anulación por el enlace es `composables/useCancelByLink.ts`
+  en las dos páginas.
 - Los estados permitidos y el reloj se leen de `apps/appointment/frontend/lib/states.ts` y `clock.ts`: las
   mismas reglas que la agenda, sin copiarlas.
 - Datos solo por `useLive`/`useCommand` (el recorrido de la clienta, por el cliente de la API o el de la puerta: lo

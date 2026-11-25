@@ -185,7 +185,7 @@ class Hub(models.Model):
     # on its origin on its next pass, never taking it forward. Its restore's too (below): its own database back.
     move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
     # A move asked for the business's night (``control.hub.move`` with ``when="at_night"``): nothing closes until the
-    # worker starts it at ``move_scheduled_for`` (``base.tenancy.move.launch_due``), when ``moving_to`` takes its place.
+    # worker starts it at ``move_scheduled_for`` (``move.worker_pass.launch_due``), when ``moving_to`` takes its place.
     move_scheduled_to = models.ForeignKey(
         Cluster,
         on_delete=models.PROTECT,
@@ -439,7 +439,7 @@ class MovedCopy(UUIDModel):
     db_name = models.CharField(_("database"), max_length=63)
     moved_at = models.DateTimeField(_("moved at"), null=True, blank=True)
     # While the move goes on: the origin's schema record as control had it (the destination's is written when it is
-    # migrated, ``migrator.ensure_schema``), given back if the move is undone. Only the worker writes a note, right
+    # migrated, ``migrator.schema.ensure_schema``), given back if the move is undone. Only the worker writes a note, right
     # before it renames: a note is always the truth of where the data is (a cancel never makes nor takes one).
     schema_state = models.CharField(_("schema"), max_length=16, blank=True, default="", db_default="")
     schema_apps = models.JSONField(_("created apps"), null=True, blank=True)
@@ -477,9 +477,9 @@ class RestoredCopy(AskedOfTheWorker):
     """A hub's database as it was at a moment, made aside on the hub's own cluster while the business goes on
     (BASE-F114): asked in the Hub admin (``control.hub.restore_aside``), made by the worker from the hub's copy
     on a temporary cluster (``base.tenancy.restore``, «restore aside»), then dropped with its row after
-    ``move.MOVED_COPY_DAYS``. Its database, ``<control>_copy_<its hex>`` (``base.tenancy.names``), is no business: no
-    hub's row names it, it is granted to none of the app's roles and no process registers an alias of it, so nothing in
-    it ever reaches the tax authority. The business itself is never closed nor changed by it.
+    ``move.worker_pass.MOVED_COPY_DAYS``. Its database, ``<control>_copy_<its hex>`` (``base.tenancy.names``), is no
+    business: no hub's row names it, it is granted to none of the app's roles and no process registers an alias of it,
+    so nothing in it ever reaches the tax authority. The business itself is never closed nor changed by it.
 
     ``source`` is the temporary cluster while the copy is to make (it cannot be deleted then), emptied once made or
     failed. ``cluster`` is where the copy is (empty: the settings' own server), which cannot be deleted while it is

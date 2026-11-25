@@ -4,15 +4,16 @@
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
 from apps.invoice import events, fiscal
 from apps.invoice.models import InvoiceSeries
+from apps.invoice.platform_series import refuse_platform_number, refuse_platform_series
 from apps.invoice.queries.series import series_row, series_started
-from apps.invoice.schemas import SeriesCreateIn, SeriesOut, SeriesUpdateIn
+from apps.invoice.schemas.series import SeriesCreateIn, SeriesOut, SeriesUpdateIn
 from apps.invoice.services.numbering import SERIES_NOT_FOUND
 from apps.invoice.services.writes import actor
 
@@ -31,11 +32,29 @@ NUMBER_TOO_LONG = _(
 )
 
 
-def _check_number(*, prefix: str, format: str, code: str, year: int, blame: str) -> None:
+def _check_number(scope: Scope, series: InvoiceSeries, *, blame: str) -> None:
     """Every number of the series must be a VeriFactu ``NumSerieFactura`` (60 printable ASCII
-    characters at most, with its widest sequence); a 422 under the field the request changed."""
-    if not fiscal.number_fits(format, prefix=prefix, code=code, year=year):
+    characters at most, with its widest sequence) and none of erplora.com's; refused under the field the request changed."""
+    shape = {"code": series.code, "year": series.year}
+    if not fiscal.number_fits(series.format, prefix=series.prefix or series.code, **shape):
         raise InvalidPayload(str(NUMBER_TOO_LONG), fields={blame: str(NUMBER_TOO_LONG)})
+    first = fiscal.render_number(series.format, prefix=series.prefix, seq=1, **shape)
+    refuse_platform_number(scope, first, field=blame)
+
+
+def _asked_as(field: str) -> str:
+    return "next_number" if field == "current_number" else field
+
+
+def _refuse_locked(series: InvoiceSeries, changes: dict) -> None:
+    """Once the series has issued, the shape of its numbers and its counter change no more."""
+    frozen = sorted(set(changes) & {"prefix", "format", "current_number"})
+    if frozen and series_started(series):
+        raise Conflict(
+            str(SERIES_LOCKED),
+            code="invoice.series_locked",
+            fields={_asked_as(field): str(SERIES_LOCKED) for field in frozen},
+        )
 
 
 def _demote_defaults(year: int, keep: UUID | None = None) -> None:
@@ -70,22 +89,14 @@ def _demote_defaults(year: int, keep: UUID | None = None) -> None:
     },
 )
 def create_series(ctx: OperationContext, data: SeriesCreateIn) -> dict:
+    refuse_platform_series(ctx.scope, data.code, field="code")
     if InvoiceSeries.objects.filter(code=data.code, year=data.year).exists():
         raise Conflict(
             str(SERIES_EXISTS),
             code="invoice.series_exists",
             fields={"code": str(SERIES_EXISTS)},
         )
-    _check_number(
-        prefix=data.prefix or data.code,
-        format=data.format,
-        code=data.code,
-        year=data.year,
-        blame="format" if data.format else "prefix",
-    )
-    if data.is_default:
-        _demote_defaults(data.year)
-    series = InvoiceSeries.objects.create(
+    series = InvoiceSeries(
         code=data.code,
         name=data.name,
         invoice_type=data.invoice_type,
@@ -98,6 +109,10 @@ def create_series(ctx: OperationContext, data: SeriesCreateIn) -> dict:
         created_by=actor(ctx),
         updated_by=actor(ctx),
     )
+    _check_number(ctx.scope, series, blame="format" if data.format else "prefix")
+    if data.is_default:
+        _demote_defaults(data.year)
+    series.save(force_insert=True)
     record_event(
         ctx,
         events.SERIES_CREATED,
@@ -133,6 +148,7 @@ def update_series(ctx: OperationContext, data: SeriesUpdateIn) -> dict:
     series = InvoiceSeries.objects.select_for_update().filter(pk=data.series_id).first()
     if series is None:
         raise NotFound(str(SERIES_NOT_FOUND), code="invoice.series_not_found")
+    refuse_platform_series(ctx.scope, series.code)
     wanted = {
         "name": data.name,
         "prefix": data.prefix,
@@ -147,28 +163,13 @@ def update_series(ctx: OperationContext, data: SeriesUpdateIn) -> dict:
         for field, value in wanted.items()
         if value is not None and getattr(series, field) != value
     }
-    frozen = sorted(set(changes) & {"prefix", "format", "current_number"})
-    if frozen and series_started(series):
-        field_names = [
-            "next_number" if field == "current_number" else field for field in frozen
-        ]
-        raise Conflict(
-            str(SERIES_LOCKED),
-            code="invoice.series_locked",
-            fields={f: str(SERIES_LOCKED) for f in field_names},
-        )
-    if "prefix" in changes or "format" in changes:
-        _check_number(
-            prefix=changes.get("prefix", series.prefix) or series.code,
-            format=changes.get("format", series.format),
-            code=series.code,
-            year=series.year,
-            blame="prefix" if "prefix" in changes else "format",
-        )
-    if changes.get("is_default"):
-        _demote_defaults(series.year, keep=series.id)
+    _refuse_locked(series, changes)
     for field, value in changes.items():
         setattr(series, field, value)
+    if "prefix" in changes or "format" in changes:
+        _check_number(ctx.scope, series, blame="prefix" if "prefix" in changes else "format")
+    if changes.get("is_default"):
+        _demote_defaults(series.year, keep=series.id)
     series.updated_by = actor(ctx)
     series.save()
     if changes:
@@ -179,10 +180,7 @@ def update_series(ctx: OperationContext, data: SeriesUpdateIn) -> dict:
                 "id": str(series.id),
                 "code": series.code,
                 "year": series.year,
-                "fields": sorted(
-                    "next_number" if field == "current_number" else field
-                    for field in changes
-                ),
+                "fields": sorted(_asked_as(field) for field in changes),
             },
         )
     return series_row(series)

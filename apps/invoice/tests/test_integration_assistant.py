@@ -76,6 +76,32 @@ def test_the_card_names_the_lines_of_a_manual_invoice():
     assert labels(assistant.cards.card(create, {"lines": lines}, "en")) == ["Lines"]
 
 
+@pytest.mark.parametrize(
+    ("language", "named", "said"),
+    [
+        ("es", ["Fecha de emisión", "Vencimiento"], {"issue_date": "23 nov 2026", "due_date": "23 dic 2026"}),
+        ("en", ["Issue date", "Due date"], {"issue_date": "Nov 23, 2026", "due_date": "Dec 23, 2026"}),
+    ],
+)
+def test_the_card_of_a_manual_invoice_says_its_two_dates(language, named, said):
+    card = assistant.cards.card(get("invoice.invoice.create"), {"issue_date": "2026-11-23", "due_date": "2026-12-23"}, language)
+    assert (labels(card), values(card)) == (named, said)
+
+
+@pytest.mark.parametrize(
+    ("language", "named"), [("es", "Retención de IRPF (%)"), ("en", "IRPF withholding (%)")]
+)
+def test_the_card_of_a_manual_invoice_says_its_withholding(language, named):
+    card = assistant.cards.card(get("invoice.invoice.create"), {"withholding_rate": 15}, language)
+    assert (labels(card), values(card)) == ([named], {"withholding_rate": 15})
+
+
+def test_the_assistant_may_only_ask_for_the_withholdings_of_the_list():
+    schema = get("invoice.invoice.create").input.model_json_schema()["properties"]["withholding_rate"]
+    [rates] = [choice["enum"] for choice in schema["anyOf"] if "enum" in choice]
+    assert rates == [15, 7, 1, 19]
+
+
 def test_the_card_names_a_series_next_number_as_its_form_does():
     for name in ("invoice.series.create", "invoice.series.update"):
         assert labels(assistant.cards.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]
@@ -462,6 +488,7 @@ NAMED = {
     "invoice.invoice.rectify": ("invoice_id",),
     "invoice.invoice.rectify_from_refund": ("refund_id",),
     "invoice.invoice.rectify_from_void": ("sale_id",),
+    "invoice.email.send": ("invoice_id",),
     "invoice.invoice.substitute": ("customer_id", "invoice_id"),
     "invoice.series.update": ("series_id",),
 }
@@ -688,9 +715,9 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
-    # Positive control: the employee issues, prints and marks as paid (7 records); the manager, the admin and the owner
-    # run every one of the 11.
-    assert checked == 7 + 11 * 3
+    # Positive control: the employee issues, prints, emails and marks as paid (8 records); the manager, the admin and the
+    # owner run every one of the 12.
+    assert checked == 8 + 12 * 3
     assert unread == []
 
 
@@ -705,7 +732,7 @@ def test_a_series_with_a_code_of_another_shape_gets_no_card_and_the_model_hears_
     wrong = {"code": "E2E-?", "name": "Online", "invoice_type": "F1", "year": 2026}
     with translation.override("es"):
         plan = turn(call("invoice.series.create", wrong))
-        why = str(schemas.SERIES_CODE_INVALID)
+        why = str(schemas.series.SERIES_CODE_INVALID)
     assert plan["confirm"] is None
     assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
         ("invoice.series.create", "error", "invalid_payload")

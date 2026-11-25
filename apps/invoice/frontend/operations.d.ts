@@ -1,10 +1,10 @@
-// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas.py. Written by
-// hand, as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
-// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
-// parameters, an invoice's id or number travels in the input. Money is whole cents with a sign (a rectifying invoice is
-// negative); decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO
-// `YYYY-MM-DD`.
+// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas. Written by
+// hand, as `frontend/sdk-types.ts` is: keep it in step with them and with `frontend/generated/operations.json`. One input
+// per operation (ninja's parity): an invoice's id or number travels in it. Money is whole cents with a sign (a rectifying
+// invoice is negative); decimals are JSON strings on the way out («2.000», «21.00»); dates are ISO `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
+import type { InvoiceDatesIn, InvoiceDueOut, InvoiceStatusFilter } from './invoice-dates';
+import type { WithholdingIn, WithholdingOut } from './invoice-withholding';
 import type { DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut } from './document-issuer';
 
 export type SortDir = 'asc' | 'desc';
@@ -42,7 +42,7 @@ export interface RecipientIn {
 
 export interface InvoiceListIn extends PageIn {
   search?: string;
-  status?: InvoiceStatus;
+  status?: InvoiceStatusFilter;
   invoice_type?: InvoiceType;
   series_code?: string;
   source_type?: InvoiceSource;
@@ -94,7 +94,7 @@ export interface InvoiceLinkOut {
   total_amount: number;
 }
 
-export interface InvoiceRowOut {
+export interface InvoiceRowOut extends InvoiceDueOut {
   id: string;
   number: string;
   invoice_type: InvoiceType;
@@ -111,7 +111,7 @@ export interface InvoiceRowOut {
   /** The decimals of its currency as the server counts them (2 in EUR, 0 in JPY): its amounts' minor unit. */
   currency_decimals: number;
   status: InvoiceStatus;
-  source_type: InvoiceSource;
+  source_type: InvoiceSource | 'platform'; // platform: erplora.com issued it (ERPlora's own business)
   rectifies_id: string | null;
   rectifies_number: string;
   substituted: boolean;
@@ -120,7 +120,7 @@ export interface InvoiceRowOut {
   can_substitute: boolean;
 }
 
-export interface InvoiceOut extends InvoiceRowOut, DocumentIssuerOut {
+export interface InvoiceOut extends InvoiceRowOut, DocumentIssuerOut, WithholdingOut {
   series_id: string;
   sequence: number;
   operation_date: string;
@@ -159,11 +159,10 @@ export interface DocumentOut {
   html: string;
 }
 
-/** The A4 page asked of Printing: queued for the system printer, or not (the device prints the screen's paper). */
+/** The A4 page Printing queued for the system printer; one no printer takes fails (`invoice.no_printer`). */
 export interface PaperOut {
-  queued: boolean;
-  job_id: string | null;
-  printer: string | null;
+  job_id: string;
+  printer: string;
 }
 
 /** What a line of a manual invoice starts with when its rate is typed (INVOICE-F03, TAX-F11). */
@@ -197,7 +196,7 @@ export interface ManualLineIn {
   product_id?: string;
 }
 
-export interface InvoiceCreateIn extends RecipientIn {
+export interface InvoiceCreateIn extends RecipientIn, InvoiceDatesIn, WithholdingIn {
   series_id?: string;
   series_code?: string;
   notes?: string;
@@ -225,7 +224,7 @@ export interface RectifyIn extends RectificationPreviewIn {
 
 /** The rectifying invoice a rectification would issue now, before it is issued (INVOICE-F08): its number is the
  *  series' next one, not reserved. */
-export interface RectificationPreviewOut {
+export interface RectificationPreviewOut extends WithholdingOut {
   original: {
     invoice_id: string;
     number: string;

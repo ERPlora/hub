@@ -2,7 +2,7 @@
 with on its first use.
 """
 
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import Exists, F, OuterRef, Q, QuerySet
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -11,9 +11,10 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import FACTORY_SERIES_NAMES, Invoice, InvoiceSeries
+from apps.invoice.platform_series import platform_codes, refuse_platform_series
 from apps.invoice.queries.rows import _page
-from apps.invoice.schemas import SeriesDetailOut, SeriesListIn, SeriesPage, SeriesPeekIn, SeriesPeekOut
-from apps.tax.queries import business_today
+from apps.invoice.schemas.series import SeriesDetailOut, SeriesListIn, SeriesPage, SeriesPeekIn, SeriesPeekOut
+from apps.tax.queries.jurisdiction import business_today
 
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
 
@@ -21,6 +22,11 @@ SERIES_NOT_FOUND = _("This numbering series does not exist.")
 #: The code each kind of document is numbered in, and the type a series born for it takes.
 TICKET, FULL, RECTIFYING = "TICKET", "FACT", "RECT"
 FACTORY_TYPES = {TICKET: "F2", FULL: "F1", RECTIFYING: "R1"}
+
+
+def business_series(ctx: OperationContext) -> QuerySet[InvoiceSeries]:
+    """The series the business keeps: all of them but the ones erplora.com numbers."""
+    return InvoiceSeries.objects.exclude(code__in=platform_codes(ctx.scope))
 
 
 def series_started(series: InvoiceSeries) -> bool:
@@ -81,7 +87,7 @@ def series_row(series: InvoiceSeries) -> dict:
     },
 )
 def list_series(ctx: OperationContext, params: SeriesListIn) -> dict:
-    series = InvoiceSeries.objects.annotate(
+    series = business_series(ctx).annotate(
         started=Exists(Invoice.objects.filter(series=OuterRef("pk")))
     )
     if params.search:
@@ -102,7 +108,7 @@ def list_series(ctx: OperationContext, params: SeriesListIn) -> dict:
     return _page(series, params, series_row)
 
 
-def find_series(series_id, code: str | None, year: int | None) -> InvoiceSeries:
+def find_series(ctx: OperationContext, series_id, code: str | None, year: int | None) -> InvoiceSeries:
     if series_id is not None:
         series = InvoiceSeries.objects.filter(pk=series_id).first()
     else:
@@ -111,6 +117,8 @@ def find_series(series_id, code: str | None, year: int | None) -> InvoiceSeries:
         ).first()
     if series is None:
         raise NotFound(str(SERIES_NOT_FOUND), code="invoice.series_not_found")
+    # Its counter in the Hub stays at 0: the number it would say is one erplora.com gave long ago.
+    refuse_platform_series(ctx.scope, series.code)
     return series
 
 
@@ -137,7 +145,7 @@ def find_series(series_id, code: str | None, year: int | None) -> InvoiceSeries:
     },
 )
 def peek_next(ctx: OperationContext, params: SeriesPeekIn) -> dict:
-    series = find_series(params.series_id, params.code, params.year)
+    series = find_series(ctx, params.series_id, params.code, params.year)
     row = series_row(series)
     return {
         "series_id": series.id,
@@ -174,7 +182,7 @@ def peek_next(ctx: OperationContext, params: SeriesPeekIn) -> dict:
 )
 def get_series(ctx: OperationContext, params: SeriesPeekIn) -> dict:
     """Named as the Series screen's card titles it, with its name in the reader's language: «FACT · 2026 · Invoices»."""
-    series = find_series(params.series_id, params.code, params.year)
+    series = find_series(ctx, params.series_id, params.code, params.year)
     with translation.override(ctx.language):
         row = series_row(series)
     return {**row, "label": " · ".join(part for part in (row["code"], str(row["year"]), row["display_name"]) if part)}

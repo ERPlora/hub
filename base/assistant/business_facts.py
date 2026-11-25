@@ -97,13 +97,13 @@ def _settings(ctx: OperationContext, apps: Mapping[str, LiveAppConfig]) -> list[
 def _names_on(ctx: OperationContext, apps: Mapping[str, LiveAppConfig], *, demo: bool) -> list[str]:
     """The apps of the store on in the business, by the names its menu gives them in the chat's language."""
     with translation.override(ctx.language):
-        return sorted((str(config.verbose_name) for config in home.home_modules(apps, demo_hub=demo)), key=str.casefold)
+        return sorted((str(config.verbose_name) for config in home.shown_modules.home_modules(apps, demo_hub=demo)), key=str.casefold)
 
 
 def _apps_counted(ctx: OperationContext, hub) -> str:
     """How many apps the plan counts against its limit, as Apps says it («14 of 40 of your plan»): the ones the
     business chose, never one that came with another app or was on from the start."""
-    shown = {config.label for config in home.shown_modules(demo_hub=hub.is_demo)}
+    shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=hub.is_demo)}
     used = activation.chosen_on(activation.states_of(ctx.scope), among=shown)
     limit = activation.plan_limit(hub.state)
     counted = f"{used} of {limit}" if limit else f"{used}, with no limit"

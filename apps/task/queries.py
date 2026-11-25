@@ -1,4 +1,4 @@
-"""Read operations of the task app (``READ ONLY``), and the loaders services.py reuses.
+"""Read operations of the task app (``READ ONLY``), and the loaders services/ reuses.
 
 Who sees what: a caller with ``task.view_all`` sees every task; anyone else, their own — the ones
 assigned to their staff record (the one linked to their account) and the ones they created. A task the
@@ -30,7 +30,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
-from apps.staff.queries import actor_user_id, own_member
+from apps.staff.queries.reads import actor_user_id, own_member
 from base.business import business_zone
 from base.models import HubUser
 from base.ordering import list_order_for

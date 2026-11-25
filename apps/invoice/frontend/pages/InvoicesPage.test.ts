@@ -3,10 +3,9 @@
 // issued first, 50 a page, search «Search invoices…» and the filters behind the table's funnel. A row opens its invoice; «Mark
 // as paid» only where it applies and for whoever may issue; «Rectify» only where it applies and for
 // whoever may rectify; «+» opens «New manual invoice». Every state of the screen and the tabbar.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+import { EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Component } from 'vue';
 
 import {
   answerIssuer,
@@ -17,8 +16,6 @@ import {
   flush,
   itPaintsTheTabsItsSessionOpens,
   MANAGER,
-  mountInvoice,
-  type MountOptions,
   POLISH,
 } from '../__tests__/mount-invoice';
 import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
@@ -27,8 +24,9 @@ import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
 import type { InvoiceRowOut } from '../operations';
-import InvoicesPage from './InvoicesPage.vue';
 import source from './InvoicesPage.vue?raw';
+import { row } from '../__tests__/invoice-row';
+import { EMPTY, OP, PAGE, setup } from '../__tests__/invoices-page';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
@@ -37,63 +35,6 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   useConfirm: () => ({ confirm: mocks.confirm }),
 }));
 beforeEach(() => mocks.confirm.mockReset());
-
-const OP = 'invoice.invoice.list';
-
-const row = (number: string, over: Partial<InvoiceRowOut> = {}): InvoiceRowOut => ({
-  id: number,
-  number,
-  invoice_type: 'F1',
-  series_code: 'FACT',
-  year: 2026,
-  issue_date: '2026-10-14',
-  issued_at: '2026-10-14T10:00:00Z',
-  customer_name: 'Talleres Pérez SL',
-  customer_tax_id: 'B12345674',
-  base_amount: 1000,
-  tax_amount: 210,
-  total_amount: 1210,
-  currency: 'EUR',
-  currency_decimals: 2,
-  status: 'issued',
-  source_type: 'manual',
-  rectifies_id: null,
-  rectifies_number: '',
-  substituted: false,
-  can_mark_paid: true,
-  can_rectify: true,
-  can_substitute: false,
-  ...over,
-});
-
-const PAGE = {
-  rows: [
-    row('FACT-2026-000002'),
-    row('TICKET-2026-000001', { invoice_type: 'F2', customer_name: '', status: 'paid', can_mark_paid: false, can_substitute: true, source_type: 'sale' }),
-    row('RECT-2026-000001', { invoice_type: 'R1', total_amount: -1210, status: 'issued', can_mark_paid: false, can_rectify: false, rectifies_number: 'FACT-2026-000001' }),
-  ],
-  total: 3,
-  limit: 50,
-  offset: 0,
-};
-const EMPTY = { rows: [], total: 0, limit: 50, offset: 0 };
-
-async function setup(options: MountOptions = {}) {
-  const m = await mountInvoice(InvoicesPage, options);
-  const call = await m.live();
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="invoice-list-row"]');
-  const params = () => m.params(OP);
-  const show = (page: unknown) => m.result(OP, page);
-  async function emit(name: string, ...args: unknown[]) {
-    table().vm.$emit(name, ...args);
-    await flush();
-  }
-  /** What the table's funnel applies (`v-model:filters`): the filters by name, as typed. */
-  const filter = (values: Record<string, string>) => emit('update:filters', values);
-  return { ...m, call, table, prop, rows, params, show, emit, filter };
-}
 
 describe('InvoicesPage: the live list', () => {
   it('follows invoice.invoice.list, the last issued first, 50 from the first, until the first result loading', async () => {
@@ -128,6 +69,20 @@ describe('InvoicesPage: the live list', () => {
     expect(text(0).slice(0, 6)).toEqual(['FACT-2026-000002', 'Talleres Pérez SL', '€12.10', 'Issued', '10/14/2026', 'Invoice']);
     expect(text(1).slice(0, 6)).toEqual(['TICKET-2026-000001', '—', '€12.10', 'Paid', '10/14/2026', 'Ticket']);
     expect(text(2).slice(2, 3)).toEqual(['-€12.10']);
+  });
+
+  it('an overdue invoice says «Overdue» instead of «Issued», and can still be marked as paid', async () => {
+    const s = await setup();
+    await s.show({ ...PAGE, rows: [row('FACT-2026-000003', { due_date: '2026-11-13', overdue: true }), row('FACT-2026-000002', { due_date: '2026-12-13' })] });
+    const pills = s.wrapper.findAll('[data-testid="invoice-list-status"]');
+    expect(pills.map((pill) => [pill.text(), pill.attributes('data-tone')])).toEqual([
+      ['Overdue', 'warning'],
+      ['Issued', 'info'],
+    ]);
+    const paid = s.prop<Array<{ id: string; hidden?: (row: InvoiceRowOut) => boolean }>>('actions').find((action) => action.id === 'paid');
+    expect(paid?.hidden?.(row('FACT-2026-000003', { overdue: true }))).toBe(false);
+    await s.filter({ status: 'overdue' });
+    expect(s.params()).toEqual([{ status: 'overdue', sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
   });
 
   it('sorts, searches and pages on the server; an empty answer says «No results»', async () => {
@@ -171,6 +126,7 @@ describe('InvoicesPage: the live list', () => {
     ]);
     expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
       { value: 'issued', label: 'Issued' },
+      { value: 'overdue', label: 'Overdue' },
       { value: 'paid', label: 'Paid' },
       { value: 'cancelled', label: 'Cancelled' },
     ]);

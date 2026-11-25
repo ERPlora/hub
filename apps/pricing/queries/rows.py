@@ -16,7 +16,7 @@ from live.errors import OperationError
 from apps.customer.models import CustomerGroup
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.queries import resolution
-from apps.pricing.schemas import ResolveIn
+from apps.pricing.schemas.resolution import ResolveIn
 from base import operations as platform
 from base.business import babel_locale
 
@@ -169,7 +169,7 @@ def _status(rows: QuerySet, status: str) -> QuerySet:
 
 
 def snapshot_values(rule: DiscountRule) -> dict[str, Any]:
-    """The fields of a stored rule that ``schemas.rule_problems`` reads (targets as ids)."""
+    """The fields of a stored rule that ``schemas.rules.rule_problems`` reads (targets as ids)."""
     return {
         "rule_type": rule.rule_type,
         "percent": rule.percent,

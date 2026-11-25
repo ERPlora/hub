@@ -17,6 +17,7 @@ from live.meta import Help
 from base import catalog
 from base.queries import app_help
 from base.workbook_help import Tab, Words
+from base.workbook_sections import marked
 
 ES = """\
 # Mesas
@@ -271,6 +272,7 @@ ES_WORDS = Words(
         "vertical": "Vertical",
         "actor": "Actor",
         "screen": "Pantalla",
+        "operations": "Operaciones",
         "steps": "Pasos",
         "in": "Entra",
         "out": "Sale",
@@ -287,6 +289,7 @@ EN_WORDS = Words(
         "vertical": "Vertical",
         "actor": "Actor",
         "screen": "Screen",
+        "operations": "Operations",
         "steps": "Steps",
         "in": "In",
         "out": "Out",
@@ -303,6 +306,7 @@ EO_WORDS = Words(
         "vertical": "Vertikalo",
         "actor": "Aktoro",
         "screen": "Ekrano",
+        "operations": "Operacioj",
         "steps": "Paŝoj",
         "in": "Eniras",
         "out": "Eliras",
@@ -311,6 +315,191 @@ EO_WORDS = Words(
         "involved": "Implikitaj",
     },
 )
+
+
+#: The made-up WORKBOOK of the Hub's own screens: three of its screens, a section that is no screen (the bell) and the
+#: tasks done on them: anyone's, those of some roles, the system's, one on a screen for everyone and on one that is not,
+#: and one that is not done.
+PLATFORM_ES = """\
+# Base
+Prefijo: BASE
+
+## Para qué sirve y para quién
+
+Lo que el Hub trae **siempre**,
+sin activar nada.
+
+### De un vistazo
+
+El `Inicio` (hub#1).
+
+## Pantallas
+
+### Inicio · Resumen
+El negocio de un vistazo.
+
+#### De arriba abajo
+Los paneles (BASE-F02).
+
+### La campana
+Los avisos, en cualquier pantalla.
+
+### Archivos
+Los documentos del negocio.
+
+### Sistema · Registros
+Lo que ha pasado.
+
+## Flujos
+
+### BASE-F01 Ver el negocio de un vistazo
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Inicio · Resumen
+Pasos:
+1. Entra en el Inicio.
+Implicados: BASE-F02
+
+### BASE-F02 Configurar lo que falta
+Estado: hecho
+Actor: propietario, administrador, responsable (el de guardia)
+Pantalla: Inicio · Resumen
+Pasos:
+1. Pulsa «Configurar».
+
+### BASE-F03 Empezar con una plantilla
+Estado: hecho
+Actor: propietario, administrador, personal de soporte
+Pantalla: Inicio · Resumen
+Pasos:
+1. Elige la plantilla.
+
+### BASE-F04 Vaciar el negocio
+Estado: hecho
+Actor: propietario
+Pantalla: Inicio · Resumen
+Pasos:
+1. Escribe el nombre del negocio.
+
+### BASE-F05 Mantener los paneles al día
+Estado: hecho
+Actor: sistema
+Pantalla: Inicio · Resumen
+Pasos:
+1. El panel cambia solo.
+
+### BASE-F06 Descargar un archivo
+Estado: hecho
+Actor: cualquier persona del negocio
+Pantalla: Sistema · Registros, Archivos
+Pasos:
+1. Pulsa «Descargar».
+Si falla: lo dice un aviso.
+
+### BASE-F07 Ver las cuentas de la gestoría
+Estado: parcial — falta la pantalla
+Actor: gestoría
+Pantalla: Archivos
+Pasos:
+1. Aún no se puede.
+
+### BASE-F08 Ver los archivos
+Estado: hecho
+Actor: empleado, gestoría
+Pantalla: Archivos
+Pasos:
+1. Abre la carpeta.
+
+## Para quien lo mantiene
+
+Nada.
+"""
+PLATFORM_EN = """\
+## What it is for and who it is for
+
+What the Hub **always** brings, with nothing to turn on.
+
+### At a glance
+
+The `Home` (hub#1).
+
+## Screens
+
+### Home · Summary
+The business at a glance.
+
+#### From top to bottom
+The panels (BASE-F02).
+
+### The bell
+The notices, on any screen.
+
+### Files
+The business's documents.
+
+### System · Logs
+What has happened.
+
+## Flows
+
+### BASE-F01 See the business at a glance
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Home · Summary
+Steps:
+1. Go to the Home.
+Involved: BASE-F02
+
+### BASE-F02 Set up what is missing
+Status: done
+Actor: owner, administrator, manager (the one on duty)
+Screen: Home · Summary
+Steps:
+1. Tap "Set up".
+
+### BASE-F03 Start with a template
+Status: done
+Actor: owner, administrator, support staff
+Screen: Home · Summary
+Steps:
+1. Choose the template.
+
+### BASE-F04 Empty the business
+Status: done
+Actor: owner
+Screen: Home · Summary
+Steps:
+1. Write the business's name.
+
+### BASE-F05 Keep the panels up to date
+Status: done
+Actor: system
+Screen: Home · Summary
+Steps:
+1. The panel changes by itself.
+
+### BASE-F06 Download a file
+Status: done
+Actor: anyone of the business
+Screen: System · Logs, Files
+Steps:
+1. Tap "Download".
+If it fails: a notice says so.
+
+### BASE-F07 See the accountancy firm's accounts
+Status: partial — the screen is missing
+Actor: accountancy firm
+Screen: Files
+Steps:
+1. Not possible yet.
+
+### BASE-F08 See the files
+Status: done
+Actor: employee, accountancy firm
+Screen: Files
+Steps:
+1. Open the folder.
+"""
 
 
 def tabs(*labels: str) -> tuple[Tab, ...]:
@@ -325,16 +514,30 @@ EN_TABS = tabs("Floor plan", "Zones", "Tables", "Settings")
 EO_TABS = tabs("Salonplano", "Zonoj", "Tabloj", "Agordoj")
 
 
-def header_of(source: str = ES) -> str:
-    """The first line that makes a translation current with the customer's part of ``source``."""
-    return catalog.en_header(catalog.source_hash(catalog.user_part(source)))
+def ready_platform(monkeypatch, root: Path) -> SimpleNamespace:
+    """The only app with its help ready: the Hub's own screens, its WORKBOOKs the made-up ones written in ``root``."""
+    write_workbooks(root, {"en": PLATFORM_EN}, source=PLATFORM_ES)
+    base = apps.get_app_config("base")
+    platform = SimpleNamespace(
+        label=base.label, kind=base.kind, verbose_name=base.verbose_name, path=str(root), help=Help()
+    )
+    _only_ready(monkeypatch, platform)
+    return platform
+
+
+def _only_ready(monkeypatch, app: SimpleNamespace) -> None:
+    monkeypatch.setattr(app_help, "all_live_app_configs", lambda: [app])
+    # A cache of its own, so that no help read by another test (of another folder) answers for this one.
+    monkeypatch.setattr(app_help, "_READ", {})
 
 
 def write_workbooks(root: Path, translations: dict[str, str], source: str = ES) -> Path:
     """``WORKBOOK.md`` in ``root`` and, for each language, its ``WORKBOOK.<language>.md`` current with it."""
     (root / "WORKBOOK.md").write_text(source, encoding="utf-8")
     for language, body in translations.items():
-        (root / f"WORKBOOK.{language}.md").write_text(f"{header_of(source)}\n\n{body}", encoding="utf-8")
+        text = marked(catalog.workbooks.user_part(source), body)
+        assert text is not None, f"the made-up {language} has other headings than its source"
+        (root / f"WORKBOOK.{language}.md").write_text(text, encoding="utf-8")
     return root
 
 
@@ -351,7 +554,5 @@ def ready_tables(monkeypatch, root: Path, ready: Help | None = None) -> SimpleNa
         path=str(write_workbooks(root, {"en": EN})),
         help=ready or Help(),
     )
-    monkeypatch.setattr(app_help, "module_configs", lambda: [module])
-    # A cache of its own, so that no help read by another test (of another folder) answers for this one.
-    monkeypatch.setattr(app_help, "_READ", {})
+    _only_ready(monkeypatch, module)
     return module

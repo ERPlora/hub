@@ -12,7 +12,7 @@ from django.utils import timezone
 from live.errors import Conflict
 from live.operations import get
 
-from apps.tax.schemas import RuleCountriesIn, RuleParentIn, RuleStatusIn
+from apps.tax.schemas.rules import RuleCountriesIn, RuleParentIn, RuleStatusIn
 
 from .conftest import HUB_DB, category, ctx_for, rule, rules, run
 
@@ -228,7 +228,7 @@ def test_a_root_without_tax_only_takes_a_component_at_zero(no_seed):
 
 def test_the_server_accepts_as_a_parent_exactly_what_the_picker_offers(no_seed):
     """One predicate: every root offered takes the component, every root left out is refused (409)."""
-    from apps.tax.schemas import RuleIn
+    from apps.tax.schemas.rules import RuleIn
 
     food = category("restaurant.food")
     offered = [rule(food, "10", valid_from=date(2012, 9, 1)), rule(food, "12", valid_from=date(2027, 1, 1))]

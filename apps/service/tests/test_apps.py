@@ -1,15 +1,17 @@
 """The service app declares its module metadata, its menu, its permissions, what each role gets and its hook of the
 Home."""
 
-
+import pytest
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.service import events as E
 from base import home
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.roles import grants_by_role
 from base.tests.shell_icons import shell_icon_registry
 
@@ -164,6 +166,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
             expected |= {"asks"}
             said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
             assert min(said.values()) >= MIN_ASKS, (op.name, said)
+        if op.name == "service.grant.create":  # its card puts first the voucher, whose it is and its sale (hub#2347)
+            expected |= {"summary"}
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
@@ -229,7 +233,7 @@ def test_the_homes_step_is_your_service_catalogue_done_once_one_service_can_be_c
         True,
     )
     assert "sellable_services" in registry[step.operation].output.model_fields
-    assert home.level_of(f"service.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(f"service.{step.key}", step.required) == home.setup_steps.LEVEL_FUNCTIONAL
 
 
 def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
@@ -268,5 +272,21 @@ def test_services_brings_no_panels_and_no_bell_rows_to_the_home():
     assert (service().widgets, service().bell) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert service().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert service().help.videos == {"es": "toNEQIwtQDY", "en": "vxEm9WTDpi0"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("SERVICE-F01", "SERVICE-F02", "SERVICE-F04"), "LbOhuQ82bpw", "RncbXpYLq-I"),
+    (("SERVICE-F03",), "Vr7GaLsXYy0", "Ul5ANHNCxTo"),
+    (("SERVICE-F31", "SERVICE-F32"), "zX1YGJDGZgs", "P2zoniTyTbU"),
+    (("SERVICE-F07", "SERVICE-F08"), "lSNrQpprRDU", "VXDOqc0EWU8"),
+    (("SERVICE-F12", "SERVICE-F13"), "oD_kZLu2xYQ", "3XPQhS5SNrc"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("service", language) == help_videos.by_task(TASK_VIDEOS, language)

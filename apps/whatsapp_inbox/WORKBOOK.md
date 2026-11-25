@@ -1086,7 +1086,7 @@ diría de quién es. Contesta eligiendo la conversación. Ordenar por el teléfo
 | `whatsapp_inbox.conversation.summary` | Abiertas, sin leer y esperando respuesta, y si el tope del mes está gastado | F09, F13 |
 | `whatsapp_inbox.conversation.count_awaiting_reply` | Cuántos clientes esperan respuesta (abiertas con el último mensaje del cliente o marcadas «Necesita atención»): lo cuenta la campana | F09 |
 | `whatsapp_inbox.conversation.notices` | Los clientes que esperan respuesta, del más reciente al más antiguo, con quién, lo último que escribió y cuándo: los avisos del dispositivo | F09 |
-| `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo | F05, F06 |
+| `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo | F05, F06, F34 |
 | `whatsapp_inbox.message.get` | Un mensaje por su id (el que puso en marcha una automatización): qué dice, quién y cuándo, el número internacional exacto de su conversación, cómo llamar al cliente, si ahora se le puede escribir y lo último que el negocio le escribió desde el Hub en las 24 horas anteriores (la lista que puede estar contestando, F19) | F19–F22, F24, F25 |
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación | F36 |
 | `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta | F27, F28, F33 |
@@ -1125,8 +1125,8 @@ Del sistema (sin ruta pública):
 | Operación | Quién la llama | Flujos |
 |---|---|---|
 | `whatsapp_inbox.message.receive` | erplora.com, por `/internal` | F03, F04, F08, F38 |
-| `whatsapp_inbox.message.update_status` | erplora.com, por `/internal` | F34 |
-| `whatsapp_inbox.channel.sync` | erplora.com, por `/internal` | F01, F02, F13, F27, F28 |
+| `whatsapp_inbox.message.update_status` | erplora.com, por `/internal` | — |
+| `whatsapp_inbox.channel.sync` | erplora.com, por `/internal` | F01, F02, F28 |
 | `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | las entregas | F32, F33 |
 | `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | las entregas | F10, F11 |
 | `whatsapp_inbox.template.claim_submit`, `whatsapp_inbox.template.record_submit` | las entregas | F29, F30 |
@@ -1155,6 +1155,15 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
   `customer.customer.restored` (la ficha eliminada que vuelve desde la copia aparte, CUSTOMER-F33) las une otra
   vez, como una ficha nueva (F04); `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
   marketing por WhatsApp; crea fichas solo con `customer.customer.create`.
+
+| De | Para qué | Flujos | Servicio |
+|---|---|---|---|
+| Automatizaciones | Si una respuesta automática está encendida y si trae una versión mejor | F14, F15, F17, F18 | `flow.recipe.list` |
+| Automatizaciones | Encender una respuesta automática | F14, F15 | `flow.recipe.enable` |
+| Automatizaciones | Ponerla en pausa, también al encender la otra | F14, F15, F17 | `flow.recipe.disable` |
+| Automatizaciones | Volverla a la versión que trae la app | F18 | `flow.recipe.restore` |
+| Citas | Si las citas se confirman solas | F16 | `appointment.settings.get`, `.update` |
+| Reservas | Si las reservas se confirman solas | F16 | `reservation.settings.get`, `.update` |
 
 ### Quién la usa
 
@@ -1248,10 +1257,10 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   carpeta), de donde la hoja y «Enviar una plantilla» pintan su miniatura (`HeaderFilePreview.vue`: `<img>`, o
   `<video preload="metadata">` con el primer fotograma; `'self'` en la CSP); una plantilla lo referencia con
   `PROTECT`.
-  Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.MAX_FILE_BYTES`,
+  Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.create.MAX_FILE_BYTES`,
   25 MB; Meta admite 100). Un archivo nuevo cabe en el espacio del plan: lo comprueba el ayudante único de
   `base` (`base.queries.files.refuse_past_the_plans_space`, el mismo de Archivos y de la web), sin copia en la app ni
-  en su catálogo: el `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.used_bytes`, que ya
+  en su catálogo: el `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.space.used_bytes`, que ya
   cuenta `whatsapp_inbox/`; fuera de él, 409 `base.file_no_space` con el texto de Archivos (catálogo de `base`)
   en el idioma de quien llama. El mismo archivo otra vez no ocupa más y no se mide. Si el almacén no contesta al
   medir, el 503 de Archivos (`base.file_store_unavailable`) y no se guarda nada.
@@ -1404,7 +1413,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - **Las 32 herramientas del asistente dicen sus `asks`** en `en` y `es` (hub#1108): `whatsapp_inbox` está en
   `LIVE_ASSISTANT_ASKS_REQUIRED`, y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta entre
   las diez primeras, rol a rol. `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
-  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las 19
+  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las 15
   que ofrece un turno antes de la búsqueda. Además, cada herramienta tiene una frase propia (`OWN_WORDS`, ni ask ni sonda) que
   solo entra entre las diez primeras con sus `asks`: neutralizarlos en una sola herramienta hace caer su caso, y los
   asks que esta app obligó a reescribir (las plantillas de negocio de `base` y la carga de Personal) guardan dos puestos
@@ -1750,7 +1759,7 @@ aplica F16 a un origen de clienta), `on_behalf_of_customer` y `customer_id` al m
 existe a una cita de otra: `appointment.appointment_not_found`) y `for_customer` en los huecos (los de una clienta). El
 asistente no los ve y lo que mande por ellos se pisa; `customer` por nombre sigue en su esquema, pero Citas toma la ficha
 por el id antes que cualquier nombre. La tarjeta de **Esperan tu respuesta** nombra la clienta y la profesional porque
-`customer_id` y `staff_id` llevan su marca `refers` (`apps/appointment/schemas.py`); el resto de Citas sigue en hub#635.
+`customer_id` y `staff_id` llevan su marca `refers` (`apps/appointment/schemas/fields.py`); el resto de Citas sigue en hub#635.
 Los servicios salen por su nombre: cada uno es una línea que solo lleva su registro (`service_id`, con su marca), y la
 tarjeta dice una lista así por el nombre de cada línea (hub#835, BASE-F97). La
 tarjeta de Ajustes restaura el mutuo excluyente de cuando había dos (`rival`): al encender una, se apaga la otra con su

@@ -259,9 +259,9 @@ def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a,
 
 def run_the_loop_once(monkeypatch) -> None:
     from base import catalog
-    from base.catalog import RegisterResult
+    from base.catalog.register_apps import RegisterResult
 
-    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
     monkeypatch.setattr(worker_data, "_measured", None)
     stop = threading.Event()
     assert worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set()) == 0
@@ -425,11 +425,11 @@ def test_an_unsigned_call_is_refused(db):
 def admin_of(slug: str) -> OperationContext:
     from django.contrib.auth import get_user_model
 
-    from base.permissions import permissions_for
+    from base.permissions import access_for
 
     user = get_user_model().objects.create_user(username=f"olga-{slug}", password="pw")
     Membership.objects.create(user=user, host=slug, role=Membership.Role.OWNER)
-    return OperationContext(scope=Scope("host", slug), actor=user, permissions=permissions_for(user, Scope("host", slug)), language="en")
+    return OperationContext(scope=Scope("host", slug), actor=user, permissions=access_for(user, Scope("host", slug)), language="en")
 
 
 def plan_usage(hub: Hub):

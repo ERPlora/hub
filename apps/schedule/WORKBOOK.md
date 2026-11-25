@@ -270,7 +270,9 @@ Pasos:
 4. Marca **Se repite cada año** si cae el mismo día y mes todos los años (Navidad); si quieres, **Notas**.
 5. Pulsa **Añadir día**: el formulario se cierra y el día aparece en la lista.
 Entra: fecha (real: el 31 de febrero no vale), nombre (hasta 200), cerrado o tramos, anual y notas (hasta
-1000).
+1000). Por el asistente, la tarjeta dice en su línea el nombre, la fecha y sus horas, o que cierra («Crear en
+Horarios: Nochebuena · Fecha: 24 dic 2027 · Tramos horarios: 10:00 · 14:00»; cerrado, «Cerrado: Sí»): unos tramos
+de un día que queda cerrado no se guardan, y la tarjeta no los dice.
 Sale: el día especial (`schedule.special_day.created`). Gana a todo lo demás ese día (SCHEDULE-F10,
 F11). Un día anual vale **todos los años**, también los anteriores a su fecha; el del 29 de febrero solo
 existe los años bisiestos.
@@ -290,7 +292,9 @@ Pasos:
    tramos que valen esas fechas (horario de verano).
 4. Pulsa **Añadir cambio temporal**.
 Entra: las dos fechas (ambas incluidas), el motivo (hasta 200) y cerrado o tramos: el cambio vale todos
-los días del rango con las mismas horas.
+los días del rango con las mismas horas. Por el asistente, la tarjeta dice en su línea el motivo, sus fechas
+juntas y sus horas, o que cierra («Crear en Horarios: Horario de verano · Cuándo: 1 jul – 31 ago 2027 · Tramos
+horarios: 8:00 · 15:00»).
 Sale: el cambio temporal (`schedule.override.created`). Gana a la semana, pero pierde contra un día
 especial de esa fecha (no se avisa de que lo pisa: la precedencia lo resuelve).
 Si falla: «La fecha de fin no puede ser anterior a la de inicio.» bajo Hasta; «Esas fechas se solapan con
@@ -519,7 +523,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 ## Para quien lo mantiene
 
 - Anatomía completa de una app: `apps.py`, `models.py`, `engine.py` (las reglas, sin base de datos),
-  `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `schemas/`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero; las páginas en `frontend/`. `UI-REQUESTS.md` lista lo que se pide
   a `@erplora/ui`.
 - Modelos (UUIDv7, sin `hub_id`): `WeekDay` (un día de la semana, lunes = 0, cerrado o no; un día sin
@@ -583,11 +587,11 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   app («día», «hora», «semana» solo donde son la cosa pedida), para no quitar puesto a las herramientas de otras apps.
   Así cerrar por obras, cargar festivos de una vez o corregir un cambio temporal o un día especial desde el chat
   (SCHEDULE-F05, F07 y F13) llegan a su operación y no a los bloqueos de Citas: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno y por
+  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno y por
   delante de todo `appointment.blocked_time.*`, y una frase propia por herramienta solo llega entre las 10 primeras con
   sus `asks` (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
-  con las marcas `refers` de `schemas.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
+  con las marcas `refers` de `schemas/fields.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
   `OverrideRefIn`), leídas como quien pregunta: el día especial por su `name` con `schedule.special_day.get` y el
   cambio temporal por su `reason` con `schedule.override.get`, como el diálogo «Eliminar» de las pantallas. Ese `id`
   lleva su título («Día especial», «Cambio temporal»), nunca «Registro». Sin persona detrás, sin `schedule.view`, con

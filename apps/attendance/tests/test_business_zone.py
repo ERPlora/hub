@@ -9,7 +9,7 @@ import io
 import pytest
 
 from apps.attendance.models import Record
-from apps.attendance.queries import business_date
+from apps.attendance.queries.reads import business_date
 from apps.attendance.schemas import CorrectIn
 
 from .conftest import HUB_DB, make_member, run, utc

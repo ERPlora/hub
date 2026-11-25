@@ -1,5 +1,5 @@
 """Sale and Taxes together, no mocks: every line is charged and declared with tax's own rule and
-calculation (``apps.tax.queries.calculate_tax``), on the business day, in the business's country.
+calculation (``apps.tax.queries.calculation.calculate_tax``), on the business day, in the business's country.
 """
 
 import datetime as dt

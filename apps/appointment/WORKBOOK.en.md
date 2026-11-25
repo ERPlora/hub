@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:640b9ee7377450c313bea49984b51a242bf325614c24dd1ec1ea2f264dae671a -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:329392f0b388 -->
 
 Appointments is the agenda of a business that works by appointment, such as a hair salon, a beauty salon or a barber
 shop. Each appointment joins a customer, the services they have done and the professional who attends them at a time,
@@ -8,6 +7,7 @@ without stepping over the business's opening hours or the team's time off, and k
 attended and charged.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:10879edc3c90 -->
 
 Appointments is **the agenda of a business that works by appointment** (hair salon, beauty salon, barber
 shop). Each appointment joins a customer from **Customers**, one or more services from **Services** (cut +
@@ -16,6 +16,7 @@ colour) and a professional from **Staff** at a time, without stepping over the b
 everything that happens to it from the moment it is booked until it is attended, charged or called off.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:20332441333f -->
 
 - The **employee** sees **their own agenda**: books appointments for themselves, confirms them, starts
   them, finishes them, moves them, cancels them and charges them. They do not see their colleagues'
@@ -43,6 +44,7 @@ everything that happens to it from the moment it is booked until it is attended,
   series by its customer ("Lucía's standing appointment", "Lucía's weekly series").
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:2f5b18a00eab -->
 
 - **Fresha, Vagaro, Mangomint, Square Appointments, Booksy and Phorest**: the day's agenda by
   professional, dragging the appointment to another time or another professional, week view, several
@@ -57,6 +59,7 @@ everything that happens to it from the moment it is booked until it is attended,
   always the business's and series are edited with a cut.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:ba4f3322845d -->
 
 1. Appointments turns on with it **Customers**, **Services**, **Staff** and **Schedules**, and they cannot
    be turned off while Appointments is on.
@@ -75,6 +78,7 @@ everything that happens to it from the moment it is booked until it is attended,
 7. To charge from the agenda, **Sales** has to be on and you have to be able to sell in it.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:a25595f75cd9 -->
 
 Appointments opens from the **Appointments** menu and has two tabs: **Agenda** and **Settings** (the latter
 only for whoever can change them). What a person cannot do is greyed out or does not appear, and the app
@@ -84,6 +88,7 @@ Besides, Appointments puts the **Visit history** block at the end of a customer'
 10 appointments, the most recent first, with services, professional, state and notes (the internal one first).
 
 ### Agenda
+<!-- from WORKBOOK.md sha256:9436bad1c4b3 -->
 Here is the business's agenda, always on its clock. Change the day with the arrows or with **Today** and choose how
 to see it: as a **List**, **By professional** (one row per professional, by day or by week) or the **Repeating**
 appointments. With **Add appointment** you pick the customer, the services, the professional and one of the free
@@ -93,6 +98,7 @@ it to another time or another professional. The **N to confirm** notice takes yo
 booked that are waiting for your confirmation.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:e9ea0160aecc -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -134,6 +140,7 @@ professional**, also **Day · Week**.
   appointment** (optional reason) and **Delete the appointment** (confirmation).
 
 #### Repeating
+<!-- from WORKBOOK.md sha256:f6358f62594b -->
 Third segment of the Agenda. Table: Customer, Service, Professional, Repeats (for example "Every
 week · Monday · 11:00"), Starts, Ends ("No end", "After {n} appointments" or the date) and **Active**
 (switch). On each row: **Edit series**, **Book appointments** and **Delete** (asks for confirmation). The
@@ -147,11 +154,13 @@ are left, "The dates from {date} on are not booked yet: tap «Book appointments�
 them.".
 
 #### Appointment card
+<!-- from WORKBOOK.md sha256:69e336501e5c -->
 When you tap an appointment: number, state, customer, services with their price, professional, time,
 notes, whether it is charged and its **History**: each change with its time on the business clock, who
 made it ("Requested by the customer" when it was them) and what changed.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:02ddcefedc3a -->
 Here you decide the agenda's rules for the whole business: the default length of an appointment, how far ahead
 customers can book and how many days ahead at most, whether overlapping appointments are allowed, whether the
 customer can cancel on their own and with how many hours' notice, what time the calendar starts and ends, how many
@@ -159,6 +168,7 @@ minutes apart the slots are and whether the appointments customers book are conf
 need and tap **Save**.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:a529086f739e -->
 **Settings** tab (only for whoever can change them): "Default duration (minutes)", "Minimum booking notice
 (minutes)" (only for the bookings made by the customer), "Book at most this far ahead (days; 0 = no
 limit)", "Allow overlapping appointments (the front desk is warned first)",
@@ -167,6 +177,7 @@ limit)", "Allow overlapping appointments (the front desk is warned first)",
 automatically"; **Save** button.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:9b7f72d53474 -->
 
 | State | What the person sees |
 |---|---|
@@ -182,12 +193,14 @@ Dates, times and amounts show in the format of the language of whoever is lookin
 clock.
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:360a4015177b -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -230,6 +243,7 @@ for those of any professional, just as the customer books with whoever she likes
 they do not do (APPOINTMENT-F01 and F04).
 
 ### APPOINTMENT-F01 Book an appointment from the agenda
+<!-- from WORKBOOK.md sha256:efd52a8dace5 -->
 Status: done
 Actor: employee (for themselves), manager, assistant
 Screen: Agenda
@@ -244,6 +258,8 @@ Steps:
 4. Tap **Add appointment**. If the business allows overlaps and that time clashes with another appointment
    of the professional, answer "Overlapping appointment".
 5. The appointment shows as **Confirmed** with its number (for example, APT-20261116-0001).
+6. Through the assistant, the confirmation card puts first the customer, the day and the time and the service; then
+   the professional.
 In: the customer's card (Customers), the services with their price and duration (Services), the
 professional and who does what (Staff and Services), the business's opening hours (Schedules) and the
 professional's shift and time off (Staff).
@@ -264,6 +280,7 @@ BASE-F114 (ERPlora's staff recovers from a separate copy the appointments the bu
 booking; a deleted one comes back the same, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 See which times are still free
+<!-- from WORKBOOK.md sha256:feb760542985 -->
 Status: done
 Actor: employee, assistant, customer
 Screen: Agenda (new appointment and editing)
@@ -290,6 +307,7 @@ professional. You can still pick a time.".
 Involved: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirm a pending appointment
+<!-- from WORKBOOK.md sha256:25b3b1b7df07 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
@@ -308,6 +326,7 @@ written.
 Involved: none
 
 ### APPOINTMENT-F04 Move an appointment or change its professional or services
+<!-- from WORKBOOK.md sha256:e2e4fc352ef5 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
@@ -332,6 +351,7 @@ rules.
 Involved: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancel an appointment from the agenda
+<!-- from WORKBOOK.md sha256:7946011d011d -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
@@ -349,6 +369,7 @@ charge it or void it there first.".
 Involved: none
 
 ### APPOINTMENT-F06 The customer cancels or moves their own appointment
+<!-- from WORKBOOK.md sha256:44bfc237a800 -->
 Status: done
 Actor: customer (through WhatsApp or online booking)
 Screen: none
@@ -374,6 +395,7 @@ If it fails: `appointment.customer_cancellation_disabled`, `appointment.cancella
 Involved: FLOW-F28, FLOW-F38
 
 ### APPOINTMENT-F07 Start the service
+<!-- from WORKBOOK.md sha256:4ef2c4db09df -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
@@ -386,6 +408,7 @@ If it fails: "This appointment cannot be started in its current state."
 Involved: none
 
 ### APPOINTMENT-F08 Complete the appointment
+<!-- from WORKBOOK.md sha256:20345296acaf -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
@@ -398,6 +421,7 @@ If it fails: "This appointment cannot be completed in its current state."
 Involved: none
 
 ### APPOINTMENT-F09 Mark that the customer did not show up
+<!-- from WORKBOOK.md sha256:05b8279d3068 -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
@@ -412,6 +436,7 @@ with its check open at the till, "This appointment has a check open in the till:
 Involved: none
 
 ### APPOINTMENT-F10 See an appointment's history
+<!-- from WORKBOOK.md sha256:ac1dd82e7eea -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
@@ -430,6 +455,7 @@ If it fails: "The appointment history could not be loaded."
 Involved: APPOINTMENT-F11, BASE-F114, BASE-F119
 
 ### APPOINTMENT-F11 Delete an appointment
+<!-- from WORKBOOK.md sha256:da3d20d7f39c -->
 Status: done
 Actor: owner, administrator
 Screen: Agenda
@@ -454,6 +480,7 @@ under the same conditions.
 Involved: APPOINTMENT-F10, BASE-F114
 
 ### APPOINTMENT-F12 Create a repeating appointment
+<!-- from WORKBOOK.md sha256:3a7e7592a075 -->
 Status: done
 Actor: employee (for themselves), manager, assistant
 Screen: Repeating
@@ -464,6 +491,8 @@ Steps:
    time, the minutes and, if you want, "Ends on (optional)" or "Number of appointments (optional)".
 3. Tap **Create repeating appointment**: the series is created and its appointments are booked up to the
    maximum booking notice of the settings.
+4. Through the assistant, the confirmation card puts first the customer, when it repeats (the first day, the time
+   and how often) and the service; then the professional.
 In: the customer, the services and the professional (Customers, Services and Staff) and the Appointments
 settings.
 Out: the active series, its appointments and the `appointment.recurring.created` event.
@@ -474,6 +503,7 @@ with this same creation, after its appointments: it books no date that already h
 back the same, APPOINTMENT-F15)
 
 ### APPOINTMENT-F13 Book the appointments of a series
+<!-- from WORKBOOK.md sha256:8068e78da959 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Repeating
@@ -497,6 +527,7 @@ its appointments."); one without dates, "This repeating appointment has no dates
 Involved: SCHEDULE-F11, STAFF-F16
 
 ### APPOINTMENT-F14 Edit a series from this appointment on
+<!-- from WORKBOOK.md sha256:be94bf4859db -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Repeating, Agenda
@@ -517,6 +548,8 @@ Steps:
 5. The notice says only what happened: how many appointments move, with whom and with which services they
    go now, how many new dates are booked, how many are cancelled and which stay at their time, with their
    date; if no appointment had to change, "Saved: no appointment had to change.".
+6. Through the assistant, the confirmation card puts first the series, from when and what changes of when it
+   repeats, and then the new professional and services.
 In: a series and the date from which it changes.
 Out: the series split in two (the old one ends the day before) or, if the change starts on its first date,
 the same series edited; the `appointment.recurring.updated` event.
@@ -525,6 +558,7 @@ If it fails: "Ends on (optional)" before the date of the change or the start of 
 Involved: none
 
 ### APPOINTMENT-F15 Pause, reactivate or delete a series
+<!-- from WORKBOOK.md sha256:4d58ea30fc3e -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Repeating
@@ -546,6 +580,7 @@ is created again as a new series.
 Involved: BASE-F114
 
 ### APPOINTMENT-F16 Block time in the agenda
+<!-- from WORKBOOK.md sha256:57c5de32867a -->
 Status: done
 Actor: manager, assistant
 Screen: Agenda (it paints it)
@@ -555,6 +590,8 @@ Steps:
 2. From that moment nobody can book in that slot; without a professional, it blocks the whole business. An
    all-day block covers those whole days, in the booking and in the free times.
 3. The "By professional" grid paints it striped on its row (or on all of them, if it is the business's).
+4. Through the assistant, the confirmation card puts first whose the block is (if it is a person's), its start and
+   its end as one period ("Nov 26, 2026, 2:00 – 3:00 PM") and what it is.
 In: the professional (Staff), if the block is theirs.
 Out: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
 If it fails: "The end cannot be before the start."; removing one that is no longer there, "That blocked period
@@ -562,6 +599,7 @@ does not exist in this business.".
 Involved: none
 
 ### APPOINTMENT-F17 Charge the appointment at the till
+<!-- from WORKBOOK.md sha256:7f41050ab344 -->
 Status: done
 Actor: manager, employee (their own appointments), with the right to sell in Sales
 Screen: Agenda
@@ -571,9 +609,12 @@ Steps:
    appointment's number ("Lucía · APT-20261116-0001"), with a **service** line for each service of the appointment (as if it were tapped in "Services"
    of the till), with the professional who performed it and **at the price it was booked at**
    (the professional's own included), even if the catalogue has changed since then, and takes you to
-   **Sales** with that check on screen.
+   **Sales** with that check on screen. The check already has **the appointment's customer assigned**,
+   as if she had been chosen in "Assign customer".
 3. At the till products or discounts are added, a service
-   can be paid with a **voucher** of the customer and it is charged like any sale.
+   can be paid with a **voucher** of the customer and it is charged like any sale: the sale is the
+   customer's and the purchase counts on her card. If the customer is taken off or changed
+   at the till, going back with **Go to the check** leaves it as the till left it.
 4. An appointment has **a single check**: while it is still open, the button is called **Go to the check**
    and goes back to it (it never opens another one, even if it is tapped at the same time on two devices);
    if the check is voided at the till, **Charge** opens a new one. With the check open, the appointment is
@@ -589,10 +630,14 @@ If it fails: "A cancelled or no-show appointment is not charged."; already charg
 charged it and the event has not arrived yet, "This appointment is already charged."; a service without a tax
 category, the notice that it needs one in Services before charging; with Sales turned off, "The till (Sales) is not
 active in this business: the appointment cannot be charged there."; a service that is no longer offered or a price
-that is not the appointment's, the Sales sentence; without the right to sell, the Sales notice.
-Involved: SALE-F26, SALE-F27, SALE-F30, SALE-F38
+that is not the appointment's, the Sales sentence; without the right to sell, the Sales notice. If the
+customer's card is no longer available (deleted, merged into another or with its data erased) or whoever
+charges has no right to assign customers, the check opens all the same, without a customer, and the till still
+offers "Assign customer".
+Involved: SALE-F26, SALE-F27, SALE-F30, SALE-F38, CUSTOMER-F19, CUSTOMER-F20
 
 ### APPOINTMENT-F18 Appointment booked by the customer
+<!-- from WORKBOOK.md sha256:63571113fd8c -->
 Status: done
 Actor: customer (WhatsApp, online booking)
 Screen: none
@@ -616,6 +661,7 @@ taken (`appointment.slot_taken`); the automation offers another time.
 Involved: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Adjust the booking rules
+<!-- from WORKBOOK.md sha256:87aa339390c4 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Settings
@@ -633,6 +679,7 @@ try.
 Involved: none
 
 ### APPOINTMENT-F20 See a customer's appointments on their card
+<!-- from WORKBOOK.md sha256:6d7d1097b46f -->
 Status: done
 Actor: whoever sees the agenda
 Screen: Visit history (Customers card)
@@ -641,13 +688,15 @@ Steps:
 2. At the end, the **Visit history** block shows their last 10 appointments, the most recent first, with
    the day and the time, the services, the professional, the state and the notes (the internal one first).
 In: the customer's appointments that whoever is looking can see. Through the API or the assistant the customer is
-named by her name, her phone or her email; by phone or email, only by whoever sees the customers' contact details
-(BASE-F119).
+named by her name (whole or a part of it, with or without accents, as the Customers list finds her: "Lucía", "Lucia
+Fernandez"), her phone or her email; by phone or email, only by whoever sees the customers' contact details
+(BASE-F119). If several customers fit, the answer says which, to choose one.
 Out: nothing (it only reads). An automation reads it without notes or reasons.
 If it fails: "The visit history could not be loaded." · empty: "No appointments yet for this customer."
 Involved: CUSTOMER-F24, BASE-F119
 
 ### APPOINTMENT-F21 Book several appointments at once (voucher or course)
+<!-- from WORKBOOK.md sha256:7451bfceb21f -->
 Status: done
 Actor: manager, assistant
 Screen: none
@@ -661,6 +710,7 @@ If it fails: "{time}: {reason}" of the first one that does not fit; none is book
 Involved: none
 
 ### APPOINTMENT-F22 Change the notes or the contact details of an appointment
+<!-- from WORKBOOK.md sha256:bf04e155e27f -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda (Edit), assistant
@@ -680,6 +730,7 @@ does not exist, "That appointment does not exist in this business.".
 Involved: CUSTOMER-F11, BASE-F119
 
 ### APPOINTMENT-F23 Merge the appointments when two customer cards are merged
+<!-- from WORKBOOK.md sha256:25d0c3843999 -->
 Status: done
 Actor: system
 Screen: none
@@ -693,6 +744,7 @@ If it fails: it is never left half done (all or nothing) and it retries by itsel
 Involved: CUSTOMER-F13, ONLINE_BOOKING-F09
 
 ### APPOINTMENT-F24 Empty a customer's data when the card is erased
+<!-- from WORKBOOK.md sha256:6968c7389b01 -->
 Status: done
 Actor: system
 Screen: none
@@ -708,6 +760,7 @@ If it fails: it is never left half done (all or nothing) and it retries by itsel
 Involved: CUSTOMER-F16, ONLINE_BOOKING-F12
 
 ### APPOINTMENT-F25 A professional leaves with upcoming appointments
+<!-- from WORKBOOK.md sha256:abf1d3d42fbb -->
 Status: done
 Actor: system
 Screen: none
@@ -724,6 +777,7 @@ If it fails: it is never left half done (all or nothing) and it retries by itsel
 Involved: STAFF-F06
 
 ### APPOINTMENT-F26 A service is archived with appointments or series that use it
+<!-- from WORKBOOK.md sha256:2545ec39575c -->
 Status: done
 Actor: system
 Screen: none
@@ -741,6 +795,7 @@ If it fails: a new booking with that service is refused (`appointment.service_no
 Involved: SERVICE-F04
 
 ### APPOINTMENT-F27 See the week's agenda
+<!-- from WORKBOOK.md sha256:4754133f3cdc -->
 Status: done
 Actor: employee (theirs), manager
 Screen: Agenda (By professional · Week)
@@ -755,6 +810,7 @@ If it fails: "The professionals could not be loaded." with **Retry**, instead of
 Involved: none
 
 ### APPOINTMENT-F28 Get the system notice of a new or cancelled appointment
+<!-- from WORKBOOK.md sha256:1a1b3b5d599b -->
 Status: done
 Actor: employee (those of their agenda), manager
 Screen: System notice, Agenda
@@ -779,6 +835,7 @@ whose data were erased shows without a name ("New appointment").
 Involved: none
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:9ae791c6630b -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever is speaking) and the API, with the same rules and the same permissions. An appointment is named by
@@ -788,6 +845,7 @@ name; a time, as the business's wall-clock date and time ("2026-10-15 10:00"). I
 which ones and asks to choose.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:856d9410d08b -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -807,6 +865,7 @@ which ones and asks to choose.
 | The settings | see appointments | F19 | `appointment.settings.get` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:ff9dab8d4a90 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -831,6 +890,7 @@ Cancelling, marking as no-show, charging and deleting are **high risk** for the 
 confirmation before doing them.
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:61be2d931f6f -->
 
 | Event | When | What it carries |
 |---|---|---|
@@ -851,6 +911,7 @@ confirmation before doing them.
 The events carry identifiers, never notes or reasons (they may carry health data).
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:c0cc9aaf36c5 -->
 
 | Event of another app | What Appointments does | Flows |
 |---|---|---|
@@ -862,6 +923,7 @@ The events carry identifiers, never notes or reasons (they may carry health data
 | `sale.order.voided` (Sales) | Releases the voided check: **Charge** opens a new one | F17 |
 
 ### Contract with Sales
+<!-- from WORKBOOK.md sha256:1bccb48b38c5 -->
 
 Sales is not a requirement of Appointments: Appointments uses its operation `sale.order.open` by name, with
 the session of whoever charges (their right to sell), and reacts to its events. The check carries
@@ -876,6 +938,7 @@ The appointment keeps its check (`order_id`) while it is open: charging again lo
 returns the open check of an appointment with `already = true`).
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:3bea7a7c248c -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

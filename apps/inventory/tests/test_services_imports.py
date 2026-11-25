@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 
+import pytest
 from live.errors import PermissionDenied
 from live.operations import get
 
@@ -182,6 +183,54 @@ def test_an_imported_product_is_active_physical_follows_the_business_and_has_no_
     assert event_names() == [events.PRODUCT_CREATED, events.STOCK_CHANGED]
 
 
+def test_a_row_says_its_type_and_what_its_price_refers_to():
+    report = import_products(
+        row("CUT", product_type=" Service "),
+        row("HAM", price="2,50", unit="g", price_quantity="100", stock="500"),
+        row("SAF", price="9", unit="g", pricing_unit="KG"),
+        row("OIL", unit="ml", price_quantity="0,5", pricing_unit="l", product_type="physical"),
+    )
+
+    assert [row.reason for row in report.rows] == [""] * 4
+    assert {
+        product.sku: (product.product_type, product.unit, product.price_quantity, product.pricing_unit)
+        for product in Product.objects.all()
+    } == {
+        "CUT": ("service", "ud", 1, "ud"),
+        "HAM": ("physical", "g", 100, "g"),
+        "SAF": ("physical", "g", 1, "kg"),
+        "OIL": ("physical", "ml", Decimal("0.5"), "l"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("cells", "reason"),
+    [
+        ({"product_type": "combo"}, "Product type not recognized: combo"),
+        ({"product_type": "service", "stock": "2"}, "A service has no stock."),
+        ({"price_quantity": "many"}, "Quantity is not a number"),
+        ({"price_quantity": "0"}, "Quantity is not a number"),
+        ({"price_quantity": "-100"}, "Quantity is not a number"),
+        ({"price_quantity": "1000000000000"}, "Quantity too large"),
+        ({"price_quantity": "0.5"}, "The quantity does not respect the step allowed for this unit"),
+        (
+            {"unit": "kg", "pricing_unit": "g", "price_quantity": "0.5"},
+            "The quantity does not respect the step allowed for this unit",
+        ),
+        ({"pricing_unit": "lb"}, "Unit of measure not recognized: lb"),
+        ({"unit": "g", "pricing_unit": "l"}, "The price must refer to a unit of the same kind as the product's unit."),
+    ],
+)
+def test_a_row_whose_type_or_price_quantity_cannot_be_fails_alone_and_the_rehearsal_says_the_same(cells, reason):
+    rows = (row("BAD", **cells), row("GOOD"))
+
+    rehearsal, real = import_products(*rows, dry_run=True), import_products(*rows)
+
+    assert [(row.key, row.status, row.reason) for row in rehearsal.rows] == [("BAD", "failed", reason), ("GOOD", "ready", "")]
+    assert [(row.key, row.status, row.reason) for row in real.rows] == [("BAD", "failed", reason), ("GOOD", "created", "")]
+    assert Product.objects.get().sku == "GOOD"
+
+
 def test_the_import_report_says_why_each_row_did_not_go_in():
     create("Coffee", "CAF")
     deleted = create("Old", "OLD")
@@ -245,6 +294,18 @@ def test_an_imported_ean13_of_a_live_product_fails_that_row_only():
     assert [(row.status, row.reason) for row in report.rows] == [
         ("failed", "Another product of the catalog already has that EAN-13."),
         ("created", ""),
+    ]
+
+
+def test_an_ean13_written_twice_in_the_file_goes_to_the_first_row_that_goes_in():
+    ean13 = "8412345678905"
+    report = import_products(
+        row("BAD", ean13=ean13, allergens="shellfish"), row("A", ean13=ean13), row("B", ean13=ean13)
+    )
+    assert [(row.key, row.status, row.reason) for row in report.rows] == [
+        ("BAD", "failed", "Allergen not recognized: shellfish"),
+        ("A", "created", ""),
+        ("B", "failed", "Another product of the catalog already has that EAN-13."),
     ]
 
 
@@ -356,3 +417,38 @@ def test_an_exported_catalog_imports_into_an_empty_one_as_it_was():
         "kg",
         "8412345678905",
     )
+
+
+def test_a_stock_sold_below_zero_imports_into_an_empty_catalog_as_it_was():
+    configure(allow_sell_without_stock=True)
+    wine = create("Wine", "WIN", initial_stock="5")
+    write_off(wine.id, "8")
+    rows = exported_rows()
+    run("inventory.product.delete", ProductRefIn(product="WIN"))
+
+    report = import_products(*rows)
+
+    assert (report.created, report.failed) == (1, 0)
+    again = Product.objects.get(is_deleted=False)
+    assert (again.stock, movements(again.id)) == (Decimal("-3"), [("initial", Decimal("-3"), Decimal("-3"))])
+
+
+@pytest.mark.parametrize(
+    ("cells", "reason"),
+    [
+        ({"stock": "-2,5", "unit": "kg"}, ""),
+        ({"stock": "many"}, "Quantity is not a number"),
+        ({"stock": "-"}, "Quantity is not a number"),
+        ({"stock": "--3"}, "Quantity is not a number"),
+        ({"stock": "3-"}, "Quantity is not a number"),
+        ({"stock": "-1,5,0"}, "Quantity is not a number"),
+        ({"stock": "-0.0001", "unit": "kg"}, "Quantity is not a number"),
+        ({"stock": "-9999999999999"}, "Quantity too large"),
+        ({"stock": "-2.5"}, "The quantity does not respect the step allowed for this unit"),
+        ({"low_stock_threshold": "-3"}, "Quantity is not a number"),
+    ],
+)
+def test_only_the_stock_may_be_below_zero_and_what_is_not_a_number_still_fails(cells, reason):
+    [outcome] = import_products(row("NEG", **cells), dry_run=True).rows
+
+    assert (outcome.status, outcome.reason) == ("ready" if not reason else "failed", reason)

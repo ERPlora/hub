@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:e0b2588ffd05f74d0eb6a8b13824c8156b4e2fc38f3755c8b24474780c0cd50b -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:52c5c00036d6 -->
 
 Staff is your team: who works, with which role, on which schedule each week, when they are away and how much they earn
 per hour and in commission. The manager adds the records, approves time off and sees in Commissions what each
@@ -9,6 +8,7 @@ time off. Appointments, Services, Time
 clock, Tasks and the till read from here who works and who serves.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:e001308578e1 -->
 
 Staff is the **business's team as a working resource**: who works, which catalogue role they have
 ("stylist", "waiter"), which schedule they work each week, when they are away, how much they earn per hour
@@ -38,6 +38,7 @@ each task is assigned to; and the till reads the directory to name who serves (a
 ticket). At the end of the day, **Commissions** gives what each professional has sold and earned.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:cc9f63767917 -->
 
 - **Salon (Fresha, Vagaro, Mangomint, Square Appointments)**: the professional as a resource of the agenda
   with their weekly schedule and their time off, bookable or not, and their commission.
@@ -52,6 +53,7 @@ ticket). At the end of the day, **Commissions** gives what each professional has
   usual one, and a one-day schedule is the way to give an exception.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:dc5a8400f706 -->
 
 1. The accounts of whoever will get into the till are created in the SaaS (members of the business); they
    are only needed if you want to link their record.
@@ -69,6 +71,7 @@ ticket). At the end of the day, **Commissions** gives what each professional has
    proposes (STAFF-F22 and STAFF-F13); untouched, from 09:00 to 18:00 with a one-hour break.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:6813f534c038 -->
 
 Staff has five tabs: **Staff**, **Roles**, **Time Off**, **Schedules** and **Commissions** (this one,
 only for whoever sees the pay), plus **Settings**; **Roles** and **Settings**, only for whoever can save the
@@ -76,6 +79,7 @@ settings. What a person cannot do does not show, and the app refuses it even if 
 the assistant.
 
 ### Staff
+<!-- from WORKBOOK.md sha256:07c5b1795255 -->
 Here is your team: one row per person with their name, their role, their email (for whoever sees the team's contact
 details) and their status (**Active**, **Inactive** or **On leave**) and, for whoever sees the pay, their hourly rate. Above it, three figures: **Active
 staff**, **On leave today** and **Pending time off**. **+** adds a person and a row opens their record to edit it; the
@@ -83,6 +87,7 @@ owner and the administrator also deactivate or terminate them from the row. Whoe
 record sees it in **My record**.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:42ee105f94b3 -->
 Above the table, three figures: **Active staff**, **On leave today** and **Pending time off**
 (STAFF-F23). Below, the table with the search "Search member…" (first name, last name, employee ID or role, and
 email and phone for whoever sees the team's contact details), columns **Name, Role, Email, Status** and, only for
@@ -94,7 +99,7 @@ Last name, Email and Phone (whoever sees the team's contact details), Role, Stat
 
 The **+** button opens **New**; a row opens **Edit · {name}**. Form: **First name, Last name, Email,
 Phone, Employee ID, Role** ("No role"), **Hub user** ("No Hub access"), **Status** (only when editing:
-Active, Inactive, On leave), **Bookable**, **Buffer between appointments (min)**, **Hire date**,
+Active, Inactive, On leave), **Bookable**, **Booking buffer (min)**, **Hire date**,
 **Color**, **Specialties**, **Bio** and, for whoever can see the pay, **Hourly rate** and **Commission
 (%)**. Row actions for the owner and the administrator: **Deactivate** and **Terminate**, both with a
 confirmation. The rate (in the column, in the form and in "My record") is in the business's currency, its
@@ -103,6 +108,7 @@ its symbol at the end of the field; while the business has not answered, an amou
 decimals.
 
 #### Home panels
+<!-- from WORKBOOK.md sha256:24d5a8acdba3 -->
 The Hub's **Home** shows the five panels of Staff, grouped as "Staff" in **Customize panel**. By default
 "Active staff" (how many people are **Active**), "On leave today" (different people with approved time off
 that covers today) and "Today’s time off" (who is away today, full days first and then by name, with the
@@ -115,11 +121,13 @@ without reloading. The same figures stay inside Staff: the three above the Staff
 above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F23).
 
 ### Roles
+<!-- from WORKBOOK.md sha256:304aab01fb91 -->
 Table with the search "Search role…" and columns **Role, Description, Members** (how many **Active**
 people hold it). **+** opens **New** (**Role name, Description, Color**); a row opens **Edit**, where the
 role is also **retired** (it stops being offered) or turned active again.
 
 ### Time Off
+<!-- from WORKBOOK.md sha256:d6cfe7b14c36 -->
 Above the table, **Today’s time off**: who is away today, with the type and, if it is only part of the
 day, its hours. Below, the table with a search by name and columns **Member, Type, From, To,
 Status**, with filters by member, type, status and dates. Row actions: **Approve**, **Reject** and
@@ -129,6 +137,7 @@ employee asks for it for themselves), **Type** (Vacation, Sick leave, Personal, 
 and the notes are only seen by whoever has the permission and by the person themselves.
 
 ### Schedules
+<!-- from WORKBOOK.md sha256:2a68d9950069 -->
 **Member** selector and the table of their schedules: **Schedule, Default, From, To, Active, Hours** (the
 week summed up). Row actions: **Edit**, **Activate / deactivate** and **Delete** (with a confirmation).
 **+** opens **New**: **Schedule** (name; empty, "Regular schedule"), **Effective from, Effective until,
@@ -136,6 +145,7 @@ Default** and one row per weekday with **Start, End, Break start, Break end** (o
 working day of **Settings** already in place.
 
 ### Commissions
+<!-- from WORKBOOK.md sha256:5e65cbd410a2 -->
 Here you see what each professional has sold in a period and what is due to them in commission: "Today" on entering,
 or "Yesterday", "This week", "This month" or "Custom", with its "From" and "To" dates. At the top, the total of
 **Production** and of **Commissions**; below, one row per person with their role, what they have sold, their
@@ -144,6 +154,7 @@ one row per person on the team; an employee sees only their own, with everything
 sale is charged, voided or refunded.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:c7a5ec353712 -->
 At the top, the period: "Today" (on entering), "Yesterday", "This week" (since Monday), "This month"
 (since the 1st) or "Custom", which opens "From" and "To" with the days that were on screen; next to it,
 the days it counts. On a phone, the period is chosen in the "Period" drop-down, with the same options.
@@ -156,11 +167,13 @@ name, role, production or commission. On a phone, one card per person. It update
 charged, voided or refunded and when a record changes.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:59f2453475ad -->
 "Default working day", with "A new schedule proposes this working day from Monday to Friday, with the
 break in the middle of the day.": "Working day starts (HH:MM)", "Working day ends (HH:MM)", "Break
 duration (minutes)" and **Save**. While the business has never saved, the proposed values show.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:6af320578005 -->
 
 | State | What the person sees |
 |---|---|
@@ -172,12 +185,14 @@ duration (minutes)" and **Save**. While the business has never saved, the propos
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:d6c6af115722 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -206,14 +221,15 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 The services each professional performs are in the Services app (SERVICE-F31, F32 and F33).
 
 ### STAFF-F01 Add a professional
+<!-- from WORKBOOK.md sha256:641e2339816b -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Staff
 Steps:
 1. In **Staff**, tap **+**: **New** opens (without Status: the person is born **Active**).
 2. Write First name and Last name (required, up to 100 characters). If you want, Email, Phone, Employee
-   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
-   appointments and, with the pay permission, Hourly rate and Commission (%). **Bookable** comes on.
+   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Booking buffer and, with the pay
+   permission, Hourly rate and Commission (%). **Bookable** comes on.
 3. Tap Save: the person shows in the table as **Active**, with their email and phone for whoever sees the team's
    contact details.
 In: the form; the active roles (STAFF-F04), by id or by their name. The rate is typed in the business's
@@ -234,6 +250,7 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, Save
 Involved: BASE-F97, BASE-F119
 
 ### STAFF-F02 Edit a professional's record
+<!-- from WORKBOOK.md sha256:11d2b90a469c -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Staff
@@ -257,6 +274,7 @@ first.".
 Involved: BASE-F119
 
 ### STAFF-F03 Link the record to an account of the business
+<!-- from WORKBOOK.md sha256:cc6a704c4d8b -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Staff
@@ -274,6 +292,7 @@ at the same time; "That Hub user has no access to this business.".
 Involved: ATTENDANCE-F01, TASK-F03
 
 ### STAFF-F04 Create, edit and retire a role
+<!-- from WORKBOOK.md sha256:98ba31251444 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Roles
@@ -291,6 +310,7 @@ role does not exist in this business.".
 Involved: none
 
 ### STAFF-F05 Deactivate a professional
+<!-- from WORKBOOK.md sha256:094392549505 -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Staff
@@ -307,6 +327,7 @@ member is already inactive."; "That staff member does not exist in this business
 Involved: none
 
 ### STAFF-F06 Terminate a professional
+<!-- from WORKBOOK.md sha256:982571aabf24 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Staff
@@ -326,6 +347,7 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
+<!-- from WORKBOOK.md sha256:34b070c0893f -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
@@ -343,6 +365,7 @@ refused whole.
 Involved: none
 
 ### STAFF-F08 See my own record and my time off
+<!-- from WORKBOOK.md sha256:81805f096696 -->
 Status: done (server and screen)
 Actor: employee (and any person with a linked record), assistant
 Screen: Staff (own view), Time Off
@@ -358,6 +381,7 @@ If it fails: without a record or without time off, empty.
 Involved: none
 
 ### STAFF-F09 Give the team to other apps
+<!-- from WORKBOOK.md sha256:9e06efb5b422 -->
 Status: done (the other apps read it)
 Actor: system
 Screen: none
@@ -373,6 +397,7 @@ If it fails: each app handles it its own way.
 Involved: SALE-F16, APPOINTMENT-F01, SERVICE-F33, TASK-F07
 
 ### STAFF-F13 Create a professional's weekly schedule
+<!-- from WORKBOOK.md sha256:cef9e38cdac3 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Schedules
@@ -400,6 +425,7 @@ picked), without saving again; the other days' reasons stay until those days cha
 Involved: none
 
 ### STAFF-F14 Edit a schedule
+<!-- from WORKBOOK.md sha256:aff27bb3664e -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Schedules
@@ -415,6 +441,7 @@ changes, or "That schedule does not exist in this business.".
 Involved: none
 
 ### STAFF-F15 Activate, deactivate or delete a schedule
+<!-- from WORKBOOK.md sha256:72aa25ddf1c9 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Schedules
@@ -429,6 +456,7 @@ If it fails: "That schedule does not exist in this business.".
 Involved: none
 
 ### STAFF-F16 Know when a professional can work
+<!-- from WORKBOOK.md sha256:759249ec6db0 -->
 Status: done (Appointments reads it)
 Actor: system (Appointments), assistant
 Screen: none
@@ -446,6 +474,7 @@ backwards or of more than 731 days is refused in the field.
 Involved: APPOINTMENT-F01, APPOINTMENT-F02, APPOINTMENT-F04, APPOINTMENT-F13
 
 ### STAFF-F17 Register time off
+<!-- from WORKBOOK.md sha256:bf0bc72c8790 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Time Off
@@ -453,6 +482,8 @@ Steps:
 1. In **Time Off**, tap **+**, choose the Member, the Type (Vacation comes), From and To, "Full day" (or
    its hours) and, if you want, the Reason.
 2. Tap Save: the time off shows as **Pending**.
+3. Through the assistant, the confirmation card puts first whose it is, the kind and its days as one period ("Dec
+   21 – 31, 2026"; with its hours if it is part of the day).
 In: the person (any record that is not terminated, an Inactive one too; by id or by name) and the time
 off, with optional reason and notes. With hours, the same ones apply each day of the range.
 Out: the Pending time off (`staff.time_off.created`; the notice does not carry the reason). It does not
@@ -466,6 +497,7 @@ business.".
 Involved: none
 
 ### STAFF-F18 Approve or reject time off
+<!-- from WORKBOOK.md sha256:7915f2306130 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Time Off
@@ -483,6 +515,7 @@ time-off request does not exist in this business.".
 Involved: none
 
 ### STAFF-F19 Cancel time off
+<!-- from WORKBOOK.md sha256:f22dfea997a0 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager; the employee, only their own pending one
 Screen: Time Off
@@ -497,6 +530,7 @@ while they cancel it): "You can only cancel your own pending requests.".
 Involved: none
 
 ### STAFF-F20 See who is away today
+<!-- from WORKBOOK.md sha256:3ca068cd8e6d -->
 Status: done (server and screen)
 Actor: everyone
 Screen: Time Off, Staff, Home
@@ -515,6 +549,7 @@ is away today could not be loaded" in its place (on the **Home**, "Unavailable")
 Involved: none
 
 ### STAFF-F21 Give each professional's rate and commission
+<!-- from WORKBOOK.md sha256:bf44b7507bac -->
 Status: done (server and screen)
 Actor: owner, administrator, manager (the whole team); employee (their own row of Commissions)
 Screen: Staff (Rate/h column and form), Commissions
@@ -549,6 +584,7 @@ with only one day, "A period of your own needs its first and its last day."; wit
 Involved: SALE-F16, SALE-F27, SALE-F28
 
 ### STAFF-F22 Change the Staff settings
+<!-- from WORKBOOK.md sha256:2496eb28df18 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Settings
@@ -574,6 +610,7 @@ form: values that are not the business's are never offered to be saved.
 Involved: none
 
 ### STAFF-F23 See the figures of the staff and by role
+<!-- from WORKBOOK.md sha256:40b9fc328dd0 -->
 Status: done (server and screen)
 Actor: everyone
 Screen: Staff, Roles, Home
@@ -596,6 +633,7 @@ and the table keeps working. While they arrive, each figure shows "…".
 Involved: none
 
 ### STAFF-F24 Ask for my own time off
+<!-- from WORKBOOK.md sha256:7869dfa45891 -->
 Status: done (server and screen)
 Actor: employee (and any person with a linked record), assistant
 Screen: Time Off
@@ -611,6 +649,7 @@ any staff member: ask a manager to link it.".
 Involved: none
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:399b20f641b0 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and the same permissions. A person is named by their id or
@@ -621,6 +660,7 @@ whose it is and what it is called ("Ana López · Regular schedule") and a time-
 its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all but the accounts and the session's record can be followed live)
+<!-- from WORKBOOK.md sha256:ccc5c3cbea76 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -646,6 +686,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | The active accounts with access to the business, for "Hub user" (id and name, with search or by user: the account of a record that no longer has access does not show and the screen says "No access to this business") | add or edit | F03 | `staff.account.list` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:d63e8740eb72 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -668,6 +709,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | Saves the settings (only what was sent) | settings | F22 | `staff.settings.update` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:805577874c98 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -687,6 +729,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | Settings changed | Saving with some change (or the first save) | Nothing | `staff.settings.updated` |
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:c8931d92aa73 -->
 It reacts to no notice and requires no app. For **Commissions** it asks **Sales**, if the business has it,
 for what each professional sold in the period, with refunds already taken off (`sale.sale.by_staff`, read as
 the platform: which rows each person sees is Staff's to say), and it updates with its notices of a sale charged,
@@ -702,6 +745,7 @@ the directory for "Who is serving this check" without needing Staff, and Automat
 "The checklist of someone new in the team" on the adding of a record (`staff.member.created`).
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:b1fa6877083d -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

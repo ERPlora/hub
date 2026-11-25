@@ -549,6 +549,7 @@ Estado: hecho — el encabezado y el pie del tique viven en los ajustes de Venta
 allí
 Actor: administrador
 Pantalla: Ajustes
+Operaciones: ninguna
 Pasos:
 1. Abre **Impresión → Ajustes**.
 2. La nota del encabezado y el pie lleva, con «Abrir los ajustes del tique», a los ajustes de Ventas,
@@ -770,7 +771,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
 | Un trabajo de la cola por id o por el número de su documento (el más reciente), con su título como lo pone la cola | ver | F14, F16 | `printing.job.get` |
-| El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01 | `printing.job.summary` |
+| El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01, F22 | `printing.job.summary` |
 | Si una función tiene un dispositivo dado de alta que la imprime, encendido o no (el paso del Inicio), y cuántos de sus trabajos llevan un minuto o más en cola sin un dispositivo encendido que los saque (la campana) | ver | F01 | `printing.device.coverage` |
 | Si la estación de una función responde ahora: lista (un dispositivo dado de alta que la imprime ha dado señales en los últimos 90 s), sin conectar (dado de alta, pero callado) o sin configurar (ninguno); para la fila de salud del Inicio y la tarjeta «Tu impresora» | ver | F21 | `printing.device.health` |
 
@@ -782,11 +783,11 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Da de alta una impresora | ajustes | F03 | `printing.printer.create` |
 | Cambia una impresora, o la desactiva y activa | ajustes | F04 | `printing.printer.update` |
 | Encola la hoja de prueba de una impresora | imprimir | F05 | `printing.printer.test` |
-| Encola un documento (idempotente por su clave) | imprimir | F07–F13, F16, F17 | `printing.job.create` |
+| Encola un documento (idempotente por su clave) | imprimir | F07–F13, F16, F17, F22 | `printing.job.create` |
 | Da de alta el dispositivo desde el que se pide, con su nombre y sus impresoras | ajustes | F18 | `printing.device.register` |
 | Cambia el nombre o las impresoras de un dispositivo | ajustes | F18 | `printing.device.update` |
 | Retira un dispositivo: ya no imprime | ajustes | F18 | `printing.device.retire` |
-| Apunta que el dispositivo dado de alta con un identificador está ahí (para el canal del dispositivo, al conectarse y en cada latido; sin ruta, sin asistente y sin aviso) | imprimir | F01, F18 | `printing.device.seen` |
+| Apunta que el dispositivo dado de alta con un identificador está ahí (para el canal del dispositivo, al conectarse y en cada latido; sin ruta, sin asistente y sin aviso) | imprimir | F18 | `printing.device.seen` |
 | Da al dispositivo dado de alta el siguiente trabajo de sus impresoras | imprimir | F18 | `printing.job.claim` |
 | Confirma un trabajo impreso | imprimir | F18 | `printing.job.complete` |
 | Avisa de que un trabajo no salió | imprimir | F18 | `printing.job.fail` |
@@ -949,8 +950,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `UNDRAINED_ALERT_SECONDS`) o más que ningún dispositivo con `last_seen_at` en los últimos `SEEN_WITHIN` (90 s,
    `HOST_TTL_SECONDS`) puede sacar; `configured` (el paso del Inicio) y `unattended` del resumen siguen mirando solo
    el alta. Como esa cifra cambia sin evento, `bell_refresh_every = {"stalled_<función>": 30}` (`base.E007`): la
-   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
-   `tests/test_services.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
+   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries_waiting.py`,
+   `tests/test_services_devices.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
    `tests/test_integration_home.py`.
 7. **El cliente del canal en el dispositivo**.
    `frontend/components/PrintHost.vue` es la pieza de fondo de Impresión: una ruta de
@@ -981,7 +982,7 @@ fila del Inicio; si la lectura falla, `unknown`. Tests: `tests/test_apps.py`,
 llega a una impresora activa suya en papel de tique ha dado señales en los últimos `SEEN_WITHIN` (90 s), `no_signal`
 si lo hay pero ninguno ha dado señales y `not_configured` si no hay ninguno. «Dado de alta» es el `configured` de
 `printing.device.coverage` y «ha dado señales», lo que la campana llama un dispositivo que está: las tres lecturas usan
-las mismas reglas. `SEEN_WITHIN` vive en `queries/health.py`. `PrintingConfig.health` la declara con los tiques, para
+las mismas reglas. `SEEN_WITHIN` vive en `queries/device_reads.py`. `PrintingConfig.health` la declara con los tiques, para
 quien ve Impresión (`printing.view_settings`), con «Configurar la impresión» hacia `/printing/printers` (`base.E021`).
 Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 
@@ -1002,8 +1003,8 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
   `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
   de su transacción (KITCHEN-F08, F09).
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
-  vocabulario y las comprobaciones del documento), `queries.py`, `services.py`, `events.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `documents.py` (el
+  vocabulario y las comprobaciones del documento), `queries/`, `services/`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `templates/printing/`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (una venta real de Ventas
   encolada por nombre) y `tests/test_integration_kitchen.py` (la comanda y la reimpresión reales de

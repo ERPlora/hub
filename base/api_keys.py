@@ -8,8 +8,8 @@ was looked at), else the session goes on as always. A route no app publishes nev
 
 The door (:class:`KeyDoor`) asks ``base.services.api_keys.authenticate_api_key`` (the ORM's side) for the key of the token in
 the request's hub — the hub's own database: a key of another business does not exist there — and then this module's
-rules: what the key may do (read reaches the published queries of an app, write its published commands), its pace
-(requests a minute) and the brake on an address that tries tokens nobody issued (``AttemptLimit``, as the PIN's).
+rules: what the key may do (read, create, update or delete on each app, ``base.api_actions``), its pace (requests a
+minute) and the brake on an address that tries tokens nobody issued (``AttemptLimit``, as the PIN's).
 A caller that passes gets, of the operation's own permission, base's data permissions and the «see everyone's» ones,
 those whoever made the key holds today (:class:`KeyCaller`): a key never does more than its maker. The operation then
 checks, as for anyone, the hub, the app's right and that permission.
@@ -38,10 +38,6 @@ KEY_ADDRESS_LIMIT = AttemptLimit("api-key-address", attempts=30, window=300)
 #: The cache's key of a key's requests in one minute.
 PACE_KEY = "api-key-pace:{key}:{minute}"
 
-READ, WRITE = "read", "write"
-FULL, PER_APP = "full", "per_app"
-MODES = (FULL, READ, WRITE, PER_APP)
-
 
 def new_token() -> str:
     """A new token: the prefix and 256 bits from the system's randomness (``secrets``), URL-safe."""
@@ -51,21 +47,6 @@ def new_token() -> str:
 def digest(token: str) -> str:
     """What the hub keeps of a token: its SHA-256, hexadecimal."""
     return hashlib.sha256(token.encode()).hexdigest()
-
-
-def kind_of(op: Operation) -> str:
-    """What an operation asks of a key: ``read`` for a query, ``write`` for a command."""
-    return READ if op.kind == "query" else WRITE
-
-
-def allows(mode: str, scopes: dict, app: str, kind: str) -> bool:
-    """Whether a key of ``mode`` (and ``scopes``, per app) may ``kind`` on ``app``."""
-    if mode == FULL:
-        return True
-    if mode in (READ, WRITE):
-        return mode == kind
-    granted = scopes.get(app) if isinstance(scopes, dict) else None
-    return isinstance(granted, list) and kind in granted
 
 
 def over_pace(key_id: object, rate_per_minute: int, *, now: float | None = None) -> bool:

@@ -11,23 +11,27 @@ by hand: the integration with ``tax``, ``inventory``, ``customer`` and ``service
 """
 
 import datetime as dt
+import json
 from decimal import Decimal
 
 import pytest
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.test import Client
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
-from live.meta import all_live_app_configs, permissions_for_role
+from live.meta import CheckoutStep, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import get, registry
 from psycopg.conninfo import make_conninfo
 
+from base import activation, assistant
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+from base.tests.test_services_assistant import answered, asked, call
 
 
 def ctx_for(
@@ -57,6 +61,35 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
 
 
+def charged_by_the_assistant(order):
+    """The assistant's charge of the open check ``order`` in cash, said in Spanish, once its card was confirmed: what
+    the model hears back from ``sale.sale.complete``, which is ``ok``."""
+    outcome = assistant.tools.run(
+        ctx_for(language="es"),
+        get("sale.sale.complete"),
+        json.dumps({"order_id": str(order.id), "idempotency_key": "assistant-0001", "payments": [{"method": "cash"}]}),
+    )
+    assert outcome.outcome == "ok", outcome.content
+    return outcome
+
+
+def answered_yes_to_the_assistant(name: str, arguments: dict, ctx: OperationContext) -> dict:
+    """The turn after ``ctx``'s person said yes to what the assistant asked for: the call ``name`` with ``arguments``."""
+
+    def turn_of(*calls, decision=None):
+        data = {"messages": [{"role": "user", "content": "imprímelo"}, asked(*calls)], "pending": list(calls)}
+        return run("base.assistant.turn", {**data, "decision": decision}, ctx).model_dump(mode="json")
+
+    return answered(call(name, arguments), decision={"call_id": "c1", "accepted": True}, turn_of=turn_of)
+
+
+def confirmed_by_the_assistant(name: str, arguments: dict, ctx: OperationContext) -> dict:
+    """The receipt's row of the write ``name`` the assistant asked for with ``arguments``, once ``ctx``'s person said
+    yes to its card: its outcome, its code and why it was not done, in the person's language."""
+    [row] = answered_yes_to_the_assistant(name, arguments, ctx)["executed"]
+    return row
+
+
 #: Bogotá at 23:30 of 2 November 2026, already the 3rd in Madrid, the deployment's clock (hub#771).
 ELSEWHERE = "America/Bogota"
 NIGHT_THERE = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
@@ -81,11 +114,16 @@ def without_cash_register(monkeypatch):
     )
 
 
+#: The step the reference app declares at the charge in ``a_step_at_the_charge``, as ``sale.checkout.steps`` gives it.
+DECLARED_STEP = {"key": "demo.tip", "app": "demo", "component": "TipStep"}
+
+
 @pytest.fixture
 def a_step_at_the_charge(monkeypatch):
-    """An active app adds a step to the charge (the tip of Tips), so what it adds to a tender is taken (SALE-F39). No
-    app can declare such a step yet, so without this fixture the charge refuses any added amount."""
-    monkeypatch.setattr("apps.sale.services.charge_validation._refuse_added_amounts", lambda payments: None)
+    """An app on adds a step to the charge, as Tips does with its tip, so what it adds to a tender is taken (SALE-F39):
+    the reference app declares one, seen by everyone who charges. Without it no app on declares one, and the charge
+    refuses any added amount."""
+    monkeypatch.setattr(django_apps.get_app_config("demo"), "checkout", [CheckoutStep(key="tip", component="TipStep")])
 
 
 @pytest.fixture(autouse=True)
@@ -299,6 +337,12 @@ def refund(sale, *, lines=(), allocations=(), key=None, ctx=None):
         },
         ctx,
     )
+
+
+@pytest.fixture
+def without_kitchen(monkeypatch):
+    """A business without Kitchen, as a shop or a salon sells: a charge sends nothing to it first."""
+    monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"kitchen"}))
 
 
 @pytest.fixture

@@ -195,7 +195,7 @@ def test_a_live_rerun_of_a_hub_that_ended_closes_the_stream():
 def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
     # Committed (no test case holding hub_b's one place of its plan, base.tenancy.limits): the socket's own thread
     # opens its transaction there.
-    from base.ws_print import PrintSocket
+    from base.ws_print.protocol import PrintSocket
 
     socket = PrintSocket({"path": "/ws/print"}, None, None)
     socket.request = type("Admitted", (), {"hub": hub_b})()
@@ -275,7 +275,9 @@ def test_internal_calls_for_a_business_without_its_own_database_answer_503_and_e
 @HUB_DB
 def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch, settings, hub_a):
     from base import internal, internal_platform
+    from control.models import Hub
 
+    Hub.objects.filter(pk=hub_a.pk).update(is_platform=True)
     settings.PLATFORM_HUB_SLUG = hub_a.slug
     seen = []
 

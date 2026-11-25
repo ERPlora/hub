@@ -14,6 +14,7 @@ from base.schemas.sessions import SessionAccessIn, SessionAccessOut, SessionMeIn
 
 from .apps import _can_see, _may_use, open_entries
 from .people import hub_user_of, person_label
+from .roles import approvable_of, role_label, signed_in_role_held
 
 
 # Not an assistant tool: the SPA's own session, read at start.
@@ -25,7 +26,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     ``apps`` lists every module the person holds a permission of, since other screens read from it whether a module
     is on (the till sells the modifiers and menus a cashier never opens). ``locked`` names, per module, the entries
     the person may not open: the shell's gate answers them with «No access». Menu and apps list modules only
-    (``home.shown_modules``: the reference app only in development, the tests or a demo's hub): a platform app such
+    (``home.shown_modules.shown_modules``: the reference app only in development, the tests or a demo's hub): a platform app such
     as ``base`` is always on and never shows. A module its business has no right to (``base.entitlement``) or turned
     off (``base.activation``) is ``off`` and has no menu: the shell's gate tells why its screens do not open. ``demo``
     says when the demo ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing
@@ -39,7 +40,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
     creating = activation.creating_apps(ctx.scope) if blocked else frozenset()
     with translation.override(ctx.language):
-        shown = home.shown_modules(demo_hub=demo is not None)
+        shown = home.shown_modules.shown_modules(demo_hub=demo is not None)
         usable = [config for config in shown if _may_use(ctx, config)]
         return {
             "user": _user(ctx.actor, hub_user_of(ctx)),
@@ -59,9 +60,19 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
             ],
             "apps": [{"label": config.label, "state": _session_state(config.label, blocked, creating)} for config in usable],
             "locked": _locked(ctx, shown),
+            **_role(ctx),
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
+
+
+def _role(ctx: OperationContext) -> dict[str, Any]:
+    """The role that rules what who asks may do, by its name, and what a manager may approve for them; nothing for an
+    anonymous visitor or somebody without a role here."""
+    held = signed_in_role_held(ctx)
+    if held is None:
+        return {"role": None, "approvable": []}
+    return {"role": role_label(held), "approvable": approvable_of(ctx, held)}
 
 
 def _locked(ctx: OperationContext, configs: list[Any]) -> dict[str, list[str]]:
@@ -84,17 +95,18 @@ def _locked(ctx: OperationContext, configs: list[Any]) -> dict[str, list[str]]:
     permission=VIEW_HOME,
     input=SessionAccessIn,
     output=SessionAccessOut,
-    database=False,
     ai=INTERNAL,
 )
 def session_access(ctx: OperationContext, data: SessionAccessIn) -> dict[str, str]:
-    """A fingerprint of the session's permissions on this scope, which every live re-run reads again from the person's
-    role: when erplora.com changes it, the device's open app sees the key change and reads ``base.session.me`` again,
-    so its menu and the screen in front follow the new role without signing in again. A hash, so the stream carries a
-    few bytes and only when it changes. The Home's permission, which every role of the business holds: a live query
-    needs one."""
-    digest = hashlib.sha256("\n".join(sorted(ctx.permissions)).encode()).hexdigest()
-    return {"key": digest}
+    """A fingerprint of what the session may do on this scope (its permissions, which every live re-run reads again from
+    the person's role, the name of that role and what a manager may approve for them): when erplora.com or the business
+    changes it, the device's open app sees the key change and reads ``base.session.me`` again, so its menu and the
+    screen in front follow the new role without signing in again. A hash, so the stream carries a few bytes and only
+    when it changes. The Home's permission, which every role of the business holds: a live query needs one."""
+    with translation.override(ctx.language):
+        role = _role(ctx)
+    said = [*sorted(ctx.permissions), "", str(role["role"]), *role["approvable"]]
+    return {"key": hashlib.sha256("\n".join(said).encode()).hexdigest()}
 
 
 def _session_state(label: str, blocked: frozenset[str], creating: frozenset[str]) -> str:

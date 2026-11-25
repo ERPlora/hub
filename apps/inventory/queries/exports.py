@@ -21,6 +21,7 @@ from apps.inventory.schemas.exports import ExportOut, ProductRow
 from apps.inventory.schemas.products import ProductFiltersIn
 from base import allergens
 from base import operations as platform
+from base.blueprint.export import TO_ANOTHER_BUSINESS
 from base.business import money_text
 from base.exports import visible_columns
 
@@ -59,7 +60,10 @@ FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
     output=ExportOut,
     expose_api=True,
     ai={
-        "description": "Export to CSV every product that matches the search and the filters, with the headers the import reads.",
+        "description": (
+            "Export to CSV every product that matches the search and the filters, with the headers the import reads. "
+            f"A CSV takes no photos. {TO_ANOTHER_BUSINESS}"
+        ),
         "asks": {
             "en": (
                 "export my products to a spreadsheet",

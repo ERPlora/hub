@@ -67,7 +67,7 @@ msgstr ""
 "%(app)s necesita una suscripción que este negocio no tiene. Se contrata en "
 "erplora.com, en la Tienda."
 
-#: middleware.py:107 registry.py:85 ws_print.py:244 ws_print.py:246
+#: middleware.py:107 registry.py:85 ws_print/handshake.py:35 ws_print/handshake.py:37
 msgid "Not found"
 msgstr "No encontrado."
 
@@ -308,12 +308,12 @@ msgstr "Tus apps"
 msgid "Turn on at least one business app so your till has something to sell."
 msgstr "Activa al menos una app de negocio para que el TPV tenga algo que vender."
 
-#: home.py
+#: home/mandatory_apps.py
 #, python-format
 msgid "Turn on %(app)s"
 msgstr "Activa %(app)s"
 
-#: home.py
+#: home/mandatory_apps.py
 #, python-format
 msgid "It is mandatory for businesses in %(country)s."
 msgstr "Es obligatoria para los negocios de %(country)s."
@@ -371,6 +371,10 @@ msgstr "La petición puede pesar %(mb)s MB como máximo."
 #: services.py:413
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
+
+#: services/platform_hub.py:31
+msgid "ERPlora's own business is never changed, closed or emptied here."
+msgstr "El negocio propio de ERPlora no se cambia, no se cierra ni se vacía aquí."
 
 #: services.py:417
 msgid "Another hub has this address."
@@ -492,43 +496,43 @@ msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
 msgid "January"
 msgstr ""
 
-#: ws_print.py:274
+#: ws_print/protocol.py:101
 #, python-format
 msgid "No hello within %(seconds)s seconds."
 msgstr "No ha llegado el hello en %(seconds)s segundos."
 
-#: ws_print.py:300
+#: ws_print/protocol.py:127
 msgid "Say hello with a deviceId before draining."
 msgstr "Envía hello con un deviceId antes de recoger trabajos."
 
-#: ws_print.py:364
+#: ws_print/protocol.py:191
 msgid ""
 "This channel speaks JSON text frames: hello, claim, done, failed and beat."
 msgstr ""
 "Este canal habla con mensajes de texto JSON: hello, claim, done, failed y "
 "beat."
 
-#: ws_print.py:369
+#: ws_print/protocol.py:196
 #, python-format
 msgid "A frame of %(size)s bytes is over this channel's cap of %(cap)s bytes."
 msgstr ""
 "Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
 
-#: ws_print.py:378
+#: ws_print/protocol.py:205
 msgid "This channel speaks hello, claim, done, failed and beat."
 msgstr "Este canal habla hello, claim, done, failed y beat."
 
-#: ws_print.py:393
+#: ws_print/protocol.py:222
 msgid "This channel drains for one device: send its deviceId."
 msgstr "Este canal recoge trabajos para un dispositivo: envía su deviceId."
 
-#: ws_print.py:397
+#: ws_print/protocol.py:226
 msgid "printers is the list of the ids of the printers this device reaches."
 msgstr ""
 "printers es la lista de los id de las impresoras a las que llega este "
 "dispositivo."
 
-#: ws_print.py:408
+#: ws_print/protocol.py:237
 msgid ""
 "This device is not set up to print in this hub: someone who manages the "
 "printers sets it up in Printing → Devices."
@@ -536,7 +540,7 @@ msgstr ""
 "Este dispositivo no está dado de alta para imprimir en este hub: quien "
 "gestiona las impresoras lo da de alta en Impresión → Dispositivos."
 
-#: ws_print.py:416
+#: ws_print/protocol.py:245
 msgid ""
 "This device reaches no active printer of this hub: choose its printers "
 "before printing."
@@ -544,34 +548,34 @@ msgstr ""
 "Este dispositivo no llega a ninguna impresora activa de este hub: elige sus "
 "impresoras antes de imprimir."
 
-#: ws_print.py:427
+#: ws_print/protocol.py:256
 #, python-format
 msgid "This device does not print «%(role)s» for this hub."
 msgstr "Este dispositivo no imprime «%(role)s» para este hub."
 
-#: ws_print.py:497
+#: ws_print/access.py:32
 msgid "Sign in to this hub to print: this connection has no session."
 msgstr ""
 "Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
 
-#: ws_print.py:504
+#: ws_print/access.py:41
 msgid "This connection's session is not valid on this hub: sign in again."
 msgstr ""
 "La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
 
-#: ws_print.py:625
+#: ws_print/protocol.py:366
 msgid "jobId is the id of a job this hub handed out."
 msgstr "jobId es el id de un trabajo que entregó este hub."
 
-#: ws_print.py:653
+#: ws_print/printing.py:29
 msgid "Printing is not on in this hub."
 msgstr "Impresión no está activada en este hub."
 
-#: ws_print.py:664
+#: ws_print/printing.py:40
 msgid "Invalid frame."
 msgstr "Mensaje no válido."
 
-#: ws_print.py:690
+#: ws_print/protocol.py:372
 #, python-format
 msgid "%(field)s is text."
 msgstr "%(field)s es un texto."
@@ -611,7 +615,7 @@ msgstr[0] "Vuelve a intentarlo en %(minutes)s minuto."
 msgstr[1] "Vuelve a intentarlo en %(minutes)s minutos."
 msgstr[2] "Vuelve a intentarlo en %(minutes)s minutos."
 
-#: ws_print.py
+#: ws_print/access.py
 #, python-format
 msgid "Too many failed sign-ins from this connection. Try again in %(minutes)s minute."
 msgid_plural "Too many failed sign-ins from this connection. Try again in %(minutes)s minutes."
@@ -1010,11 +1014,11 @@ msgstr "No se puede leer el informe."
 msgid "Too many reports for now."
 msgstr "Demasiados informes por ahora."
 
-#: base/files.py
+#: base/files/relocate.py
 msgid "A folder can't be moved inside itself."
 msgstr "Una carpeta no se puede mover dentro de sí misma."
 
-#: base/files.py
+#: base/files/relocate.py
 msgid "It is already in that folder."
 msgstr "Ya está en esa carpeta."
 
@@ -1022,49 +1026,53 @@ msgstr "Ya está en esa carpeta."
 msgid "Only who runs the business can change the files."
 msgstr "Solo quien administra el negocio puede modificar los archivos."
 
-#: base/files.py
+#: base/files/names.py
 #, python-format
 msgid "Programs (.%(extension)s) can't be kept in Files: they could harm whoever opens them."
 msgstr "Los programas (.%(extension)s) no se pueden guardar en Archivos: podrían dañar a quien los abra."
 
-#: base/files.py
+#: base/files/names.py base/files/store.py
 msgid "That file or folder is not in this business's files."
 msgstr "Ese archivo o carpeta no está en los archivos de este negocio."
 
-#: base/files.py
+#: base/files/read.py base/files/store.py
 msgid "That file or folder no longer exists. Refresh the list."
 msgstr "Ese archivo o carpeta ya no existe. Actualiza la lista."
 
-#: base/files.py
+#: base/files/create.py
 #, python-format
 msgid "That file weighs more than %(mb)s MB, the most Files takes."
 msgstr "Ese archivo pesa más de %(mb)s MB, lo máximo que admite Archivos."
 
-#: base/files.py
+#: base/files/listing.py base/files/store.py
 msgid "That folder no longer exists. Refresh the list."
 msgstr "Esa carpeta ya no existe. Actualiza la lista."
 
-#: base/files.py
+#: base/files/names.py
 msgid "That name is not valid. Use a name without slashes or lone dots."
 msgstr "Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos."
 
-#: base/files.py
+#: base/files/names.py
 msgid "That name is too long for this folder."
 msgstr "Ese nombre es demasiado largo para esta carpeta."
 
-#: base/files.py
+#: base/services/files.py
 msgid "The file did not arrive whole. Upload it again."
 msgstr "El archivo no llegó entero. Vuelve a subirlo."
 
-#: base/files.py
+#: base/files/store.py
 msgid "The file store did not answer. Try again in a moment."
 msgstr "El almacén de archivos no ha respondido. Inténtalo de nuevo en un momento."
 
-#: base/files.py
+#: base/files/create.py base/files/store.py
 msgid "There is already a file or folder with that name here."
 msgstr "Ya hay un archivo o una carpeta con ese nombre aquí."
 
-#: base/files.py
+#: base/assistant/attachments.py
+msgid "There is no file «{name}» attached to this conversation: attach it again."
+msgstr "No hay ningún archivo «{name}» adjunto en esta conversación: vuelve a adjuntarlo."
+
+#: base/files/space.py
 #, python-format
 msgid "There is no space left for that file: your plan includes %(space)s."
 msgstr "No queda espacio para ese archivo: tu plan incluye %(space)s."
@@ -1591,6 +1599,10 @@ msgctxt "approval"
 msgid "figures"
 msgstr "cifras"
 
+msgctxt "approval"
+msgid "Their role"
+msgstr "Su rol"
+
 #: models.py:499
 msgctxt "approval"
 msgid "approval"
@@ -1639,8 +1651,8 @@ msgstr "Autorizado por"
 
 #: queries.py
 msgctxt "approvals export"
-msgid "Asked by"
-msgstr "Lo pidió"
+msgid "Who"
+msgstr "Quién"
 
 #: queries.py
 msgctxt "approvals export"
@@ -1654,13 +1666,13 @@ msgstr "Estado"
 
 #: queries.py
 msgctxt "approvals export"
-msgid "Used"
-msgstr "Usada"
+msgid "Done"
+msgstr "Hecha"
 
 #: queries.py
 msgctxt "approvals export"
-msgid "Not used"
-msgstr "Sin usar"
+msgid "Not done"
+msgstr "Sin hacer"
 
 #: queries.py:1408
 msgid "The API documentation is hidden in this business."
@@ -1693,6 +1705,10 @@ msgstr "Elige al menos una app y qué puede hacer la key en ella."
 #: services.py:2022
 msgid "That app does not publish what the key would do on it."
 msgstr "Esa app no publica lo que la key haría en ella."
+
+#: services/api_keys.py
+msgid "A key may not do more than you may do yourself."
+msgstr "Una key no puede hacer más de lo que puedes hacer tú."
 
 #: services.py:2052
 msgid "Give the key a name."
@@ -1796,6 +1812,10 @@ msgstr "Entra con tu cuenta de erplora.com para ir directamente."
 #: base/services.py
 msgid "You don't have permission to manage this business on erplora.com."
 msgstr "No tienes permiso para gestionar este negocio en erplora.com."
+
+#: base/services/support.py
+msgid "This business has no plan."
+msgstr "Este negocio no tiene plan."
 
 #: base/services.py
 msgid "We could not open erplora.com directly."
@@ -1976,11 +1996,6 @@ msgstr "Ninguna app tiene ese nombre o identificador."
 #, python-format
 msgid "“%(said)s” matches several apps: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias apps: %(names)s. Di cuál."
-
-#: base/services.py
-#, python-format
-msgid "%(first)s and %(last)s"
-msgstr "%(first)s y %(last)s"
 
 #: base/services.py
 #, python-format
@@ -2352,6 +2367,11 @@ msgstr "Pantalla"
 
 #: workbook_help.py
 msgctxt "workbook"
+msgid "Operations"
+msgstr "Operaciones"
+
+#: workbook_help.py
+msgctxt "workbook"
 msgid "Steps"
 msgstr "Pasos"
 
@@ -2379,6 +2399,126 @@ msgstr "Por el asistente"
 msgctxt "workbook"
 msgid "Involved"
 msgstr "Implicados"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Home · Summary"
+msgstr "Inicio · Resumen"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Home · Activity"
+msgstr "Inicio · Actividad"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Staff"
+msgstr "Empleados · Personal"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Roles"
+msgstr "Empleados · Roles"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Roles · What it allows"
+msgstr "Empleados · Roles · Qué permite"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · API keys"
+msgstr "Empleados · API keys"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Employees · Approvals"
+msgstr "Empleados · Aprobaciones"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "A person's page"
+msgstr "Ficha de una persona"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Files"
+msgstr "Archivos"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Apps"
+msgstr "Apps"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Usage and plan"
+msgstr "Sistema · Uso y plan"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Updates"
+msgstr "Sistema · Actualizaciones"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Failed events"
+msgstr "Sistema · Eventos caídos"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "System · Logs"
+msgstr "Sistema · Registros"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · General"
+msgstr "Ajustes · General"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Business"
+msgstr "Ajustes · Negocio"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Printing"
+msgstr "Ajustes · Impresión"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "Settings · Data and backups"
+msgstr "Ajustes · Datos y copias"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "My profile"
+msgstr "Mi perfil"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "accountancy firm"
+msgstr "gestoría"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "employee"
+msgstr "empleado"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "manager"
+msgstr "responsable"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "administrator"
+msgstr "administrador"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "owner"
+msgstr "propietario"
 
 #: queries/app_help.py
 msgctxt "workbook"
@@ -2486,6 +2626,9 @@ msgstr "Borrar archivos"
 msgid "Open this business on erplora.com"
 msgstr "Abrir este negocio en erplora.com"
 
+msgid "Manage roles"
+msgstr "Gestionar roles"
+
 msgid "View costs"
 msgstr "Ver costes"
 
@@ -2509,6 +2652,78 @@ msgstr "Datos sensibles"
 
 msgid "This role does not exist in this business."
 msgstr "Este rol no existe en este negocio."
+
+#: schemas/roles.py
+msgid "Name"
+msgstr "Nombre"
+
+#: schemas/roles.py
+msgid "Description"
+msgstr "Descripción"
+
+#: schemas/roles.py
+msgid "Role"
+msgstr "Rol"
+
+#: schemas/roles.py
+msgid "Based on"
+msgstr "A partir de"
+
+#: schemas/roles.py
+msgid "What it allows"
+msgstr "Qué permite"
+
+#: schemas/roles.py
+msgid "People with this role"
+msgstr "Personas con este rol"
+
+#: services/roles.py
+msgid "Allowed"
+msgstr "Permitido"
+
+#: services/roles.py
+msgid "With approval"
+msgstr "Con aprobación"
+
+#: services/roles.py
+msgid "No"
+msgstr "No"
+
+#: services/roles.py
+msgid "Give the role a name."
+msgstr "Ponle nombre al rol."
+
+#: services/roles.py
+msgid "There is already a role with that name. Choose another."
+msgstr "Ya hay un rol con ese nombre. Elige otro."
+
+#: services/roles.py
+msgid "This is one of erplora.com's roles. Duplicate it and change the copy."
+msgstr "Este rol es de erplora.com. Duplícalo y cambia la copia."
+
+#: services/roles.py
+msgid "A role may not allow more than you may do yourself."
+msgstr "Un rol no puede permitir más de lo que puedes hacer tú."
+
+#: services/roles.py
+msgid "That is only the owner's of the business: no role gives it."
+msgstr "Eso es solo del propietario del negocio: ningún rol lo da."
+
+#: services/roles.py
+msgid "That permission is not of any app that is on in this business."
+msgstr "Ese permiso no es de ninguna app encendida de este negocio."
+
+#: services/roles.py
+msgid "That cannot be approved with a PIN: choose allowed or no."
+msgstr "Eso no se puede aprobar con un PIN: elige permitido o no."
+
+#: services/roles.py
+#, python-format
+msgid "%(n)s person has this role. Give them another before deleting it."
+msgid_plural "%(n)s people have this role. Give them another before deleting it."
+msgstr[0] "%(n)s persona tiene este rol. Dale otro antes de borrarlo."
+msgstr[1] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
+msgstr[2] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
 
 msgid "Last used"
 msgstr "Último uso"
@@ -2555,8 +2770,150 @@ msgctxt "base"
 msgid "Once on"
 msgstr "Una vez activada"
 
+msgctxt "base"
+msgid "Other apps"
+msgstr "Otras apps"
+
+#, python-format
+msgid "%(app)s needs %(apps)s: it turns on with it."
+msgid_plural "%(app)s needs %(apps)s: they turn on with it."
+msgstr[0] "%(app)s necesita %(apps)s: se activa con ella."
+msgstr[1] "%(app)s necesita %(apps)s: se activan con ella."
+msgstr[2] "%(app)s necesita %(apps)s: se activan con ella."
+
+#, python-format
+msgid "%(apps)s turns off with it: only %(app)s needed it."
+msgid_plural "%(apps)s turn off with it: only %(app)s needed them."
+msgstr[0] "%(apps)s se desactiva con ella: solo la necesitaba %(app)s."
+msgstr[1] "%(apps)s se desactivan con ella: solo las necesitaba %(app)s."
+msgstr[2] "%(apps)s se desactivan con ella: solo las necesitaba %(app)s."
+
 msgid "The assistant sent data that does not fit."
 msgstr "El asistente envió datos que no valen."
 
 msgid "The assistant sent data that does not fit: {names}."
 msgstr "El asistente envió datos que no valen: {names}."
+
+msgid "The assistant did not say what to change."
+msgstr "El asistente no dijo qué cambiar."
+
+#: models/roles.py
+msgid "description"
+msgstr "descripción"
+
+#: models/roles.py
+msgid "based on"
+msgstr "a partir de"
+
+#: models/roles.py
+msgid "what it allows"
+msgstr "qué permite"
+
+#: models/roles.py
+msgid "role of the business"
+msgstr "rol propio"
+
+#: models/roles.py
+msgid "roles of the business"
+msgstr "roles propios"
+
+#: models/__init__.py
+msgid "role in this business"
+msgstr "rol en este negocio"
+
+msgctxt "support access"
+msgid "support may come in"
+msgstr "soporte puede entrar"
+
+msgctxt "support access"
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "support access"
+msgid "updated by"
+msgstr "actualizado por"
+
+msgctxt "support access"
+msgid "support access"
+msgstr "acceso de soporte"
+
+msgctxt "support visit"
+msgid "person"
+msgstr "persona"
+
+msgctxt "support visit"
+msgid "name"
+msgstr "nombre"
+
+msgctxt "support visit"
+msgid "email"
+msgstr "email"
+
+msgctxt "support visit"
+msgid "entered at"
+msgstr "entró el"
+
+msgctxt "support visit"
+msgid "support entry"
+msgstr "entrada de soporte"
+
+msgctxt "support visit"
+msgid "support entries"
+msgstr "entradas de soporte"
+
+msgid "ERPlora support"
+msgstr "Soporte de ERPlora"
+
+msgctxt "way in"
+msgid "ERPlora support"
+msgstr "Soporte de ERPlora"
+
+msgid "This business does not let support in"
+msgstr "Este negocio no deja entrar a soporte"
+
+msgid ""
+"The owner or an administrator of this business has to turn on ERPlora's "
+"support access before you can come in. Ask them to, then try again."
+msgstr ""
+"El propietario o un administrador de este negocio tiene que encender el "
+"acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a "
+"intentarlo."
+
+msgid "Try again"
+msgstr "Volver a intentarlo"
+
+#: people.py
+msgid "The owner is always the owner: nobody gives them another role."
+msgstr "El propietario siempre es el propietario: nadie le da otro rol."
+
+#: people.py
+msgid "Nobody changes their own role: ask somebody above you."
+msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
+
+#: people.py
+msgid "You may only give a role to people below you in the business."
+msgstr "Solo puedes dar un rol a quien está por debajo de ti en el negocio."
+
+#: services/roles.py
+msgid "That role is given on erplora.com. Here you give one of the business's own."
+msgstr "Ese rol se da en erplora.com. Aquí se da uno propio del negocio."
+
+#: bell.py
+msgid "Roles to review"
+msgstr "Roles por revisar"
+
+#: bell.py
+#, python-format
+msgid "%(count)d role to review"
+msgid_plural "%(count)d roles to review"
+msgstr[0] "%(count)d rol por revisar"
+msgstr[1] "%(count)d roles por revisar"
+msgstr[2] "%(count)d roles por revisar"
+
+#: bell.py
+msgid "An app turned on or a new permission is not in them yet: look at what each role allows."
+msgstr "Hay una app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol."
+
+#: bell.py
+msgid "Review the roles"
+msgstr "Revisar los roles"

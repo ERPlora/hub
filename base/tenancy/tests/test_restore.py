@@ -18,7 +18,7 @@ a time, with the move's own steps (``base.tenancy.move``) and its origin and des
 
 Any failure before the end puts the hub's own database back, nothing lost: the new database dropped, the kept copy
 renamed back and opened to the app again, the hub ready with the reason in ``last_error``. A lease that went to another
-worker is left to it. The kept copies are dropped after ``move.MOVED_COPY_DAYS`` with the moves' copies.
+worker is left to it. The kept copies are dropped after ``move.worker_pass.MOVED_COPY_DAYS`` with the moves' copies.
 
 Real databases on the session's server: the temporary cluster's row points at the same server (CI has one), so the
 copy there has a name of its own (``run_due(source=…)``); in AWS it has the hub's, as a restore of the whole cluster
@@ -194,14 +194,14 @@ def kept_copy(hub: Hub) -> MovedCopy:
 
 def taken_after_the_schema(monkeypatch, hub: Hub) -> None:
     """Another worker takes ``hub``'s lease once its schema is at the code's leaf: right before the end."""
-    real = move._ensure_schema
+    real = move.destination._ensure_schema
 
     def then_taken(restored, cluster, heartbeat=None):
         real(restored, cluster, heartbeat)
         with use_control():
             HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
 
-    monkeypatch.setattr(move, "_ensure_schema", then_taken)
+    monkeypatch.setattr(move.destination, "_ensure_schema", then_taken)
 
 
 class TestARestore:
@@ -302,14 +302,14 @@ class TestClosedToTheApp:
         hub = restores.hub(source=restores.cluster())
         hubs.grant_connect(app_role, hub.db_name)
         seen: list[tuple[bool, bool]] = []
-        real = move._restore_from_bucket
+        real = move.bucket._restore_from_bucket
 
         def restoring(key, name, cluster, heartbeat, cancelled=None):
-            kept = control_services.pending_copy(hub.id).db_name
+            kept = control_services.worker_move.pending_copy(hub.id).db_name
             seen.append((hubs.reaches(app_role, name), hubs.reaches(app_role, kept)))
             return real(key, name, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_restore_from_bucket", restoring)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", restoring)
 
         run(restores, roles=hubs.app_roles(app_role))
 
@@ -322,9 +322,9 @@ class TestClosedToTheApp:
         hubs.grant_connect(app_role, hub.db_name)
 
         def broken(*args, **kwargs):
-            raise move.MoveFailed("move_restore_failed", "the restore broke on purpose")
+            raise move.exceptions.MoveFailed("move_restore_failed", "the restore broke on purpose")
 
-        monkeypatch.setattr(move, "_restore_from_bucket", broken)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", broken)
 
         run(restores, roles=hubs.app_roles(app_role))
 
@@ -352,10 +352,10 @@ class TestAFailurePutsItsOwnBack:
     @pytest.mark.parametrize(
         ("where", "step"),
         [
-            (move, "_dump_to_bucket"),
-            (move, "_restore_from_bucket"),
-            (move, "_verify_identity"),
-            (move, "_ensure_schema"),
+            (move.bucket, "_dump_to_bucket"),
+            (move.bucket, "_restore_from_bucket"),
+            (move.destination, "_verify_identity"),
+            (move.destination, "_ensure_schema"),
             (restore, "_finish"),
         ],
     )
@@ -421,7 +421,7 @@ class TestAFailurePutsItsOwnBack:
     def test_the_new_database_is_never_made_while_its_own_is_not_kept_aside(self, restores, monkeypatch):
         # A rename that did not happen: the hub's name still holds its data, which nothing drops for a new one.
         hub = restores.hub(source=restores.cluster())
-        monkeypatch.setattr(move, "_rename", lambda conn, old, new: None)
+        monkeypatch.setattr(move.databases, "_rename", lambda conn, old, new: None)
 
         run(restores)
 
@@ -449,8 +449,10 @@ class TestTheFiscalGuard:
         hub = restores.hub(source=restores.cluster())
         a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
         closed: list[str] = []
-        real = move._close
-        monkeypatch.setattr(move, "_close", lambda conn, name, roles: closed.append(name) or real(conn, name, roles))
+        real = move.databases._close
+        monkeypatch.setattr(
+            move.databases, "_close", lambda conn, name, roles: closed.append(name) or real(conn, name, roles)
+        )
 
         run(restores)
 
@@ -497,7 +499,7 @@ class TestTheFiscalGuard:
     def test_it_looks_again_once_the_business_is_closed(self, restores, monkeypatch):
         # The business could invoice until it was closed: a record made right before is seen.
         hub = restores.hub(source=restores.cluster())
-        real = move._close
+        real = move.databases._close
         made: list[uuid.UUID] = []
 
         def close(conn, name, roles):
@@ -505,7 +507,7 @@ class TestTheFiscalGuard:
                 made.append(a_record(hub.db_name, created_at=AFTER, updated_at=AFTER))
             real(conn, name, roles)
 
-        monkeypatch.setattr(move, "_close", close)
+        monkeypatch.setattr(move.databases, "_close", close)
 
         run(restores)
 
@@ -564,7 +566,7 @@ class TestTwoWorkers:
         def stolen(*args, **kwargs):
             raise provisioning.ProvisioningStopped("another worker holds it now")
 
-        monkeypatch.setattr(move, "_restore_from_bucket", stolen)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", stolen)
 
         run(restores)
 
@@ -588,14 +590,14 @@ class TestTwoWorkers:
     def test_a_lease_taken_right_before_the_end_is_checked_again_on_the_locked_row(self, restores, monkeypatch, caplog):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        real = control_services.restore_finished
+        real = control_services.worker_move.restore_finished
 
         def taken_then_ended(*args, **kwargs):
             with use_control():
                 HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
             return real(*args, **kwargs)
 
-        monkeypatch.setattr(control_services, "restore_finished", taken_then_ended)
+        monkeypatch.setattr(control_services.worker_move, "restore_finished", taken_then_ended)
 
         run(restores)
 
@@ -607,14 +609,14 @@ class TestTwoWorkers:
     def test_a_restore_another_worker_ended_meanwhile_is_never_touched_again(self, restores, monkeypatch, caplog):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        real = move._dump_to_bucket
+        real = move.bucket._dump_to_bucket
 
         def dump(*args, **kwargs):
             real(*args, **kwargs)
             with use_control():
                 Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
 
-        monkeypatch.setattr(move, "_dump_to_bucket", dump)
+        monkeypatch.setattr(move.bucket, "_dump_to_bucket", dump)
 
         run(restores)
 
@@ -691,7 +693,7 @@ class TestResuming:
             raise RuntimeError("broke on purpose")
 
         with monkeypatch.context() as patched:
-            patched.setattr(move, "_ensure_schema", broken)
+            patched.setattr(move.destination, "_ensure_schema", broken)
             patched.setattr(restore, "_put_back", broken)
             run(restores)
 
@@ -765,7 +767,7 @@ class TestTheCopyGoesThroughTheBucket:
     ):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move, "_restore_command")
+        where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move.bucket, "_restore_command")
 
         run(restores, cancelled=s3.stopping_as(monkeypatch, where, step))
 
@@ -830,11 +832,11 @@ class TestTheKeptCopiesGoAfterTheirDays:
         kept = kept_copy(fresh(hub)).db_name
 
         with use_control():
-            move.run_due(AT + dt.timedelta(days=move.MOVED_COPY_DAYS) - dt.timedelta(minutes=1))
+            move.worker_pass.run_due(AT + dt.timedelta(days=move.worker_pass.MOVED_COPY_DAYS) - dt.timedelta(minutes=1))
         assert kept in databases()
 
         with use_control():
-            move.run_due(AT + dt.timedelta(days=move.MOVED_COPY_DAYS))
+            move.worker_pass.run_due(AT + dt.timedelta(days=move.worker_pass.MOVED_COPY_DAYS))
         assert kept not in databases() and not MovedCopy.objects.filter(hub=hub).exists()
         assert marker(fresh(hub).db_name) == [AS_THEN]
 

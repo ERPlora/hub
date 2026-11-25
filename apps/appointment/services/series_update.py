@@ -9,27 +9,17 @@ from live.errors import Conflict, InvalidPayload, PermissionDenied
 from live.operations import operation
 from live.outbox import record_event
 
+from apps.appointment import assistant_cards
 from apps.appointment import engine, events
 from apps.appointment.models import Appointment, Recurring, RecurringService
-from apps.appointment.queries import (
-    CHANGE_OWN,
-    MOVABLE,
-    business_zone,
-    check_member,
-    find_series,
-    lines_for,
-    load_series,
-    may_change,
-    now,
-    pattern_of,
-    resolve_services,
-    verdict_message,
-)
-from apps.appointment.schemas import (
-    END_BEFORE_START,
-    RecurringUpdatedOut,
-    RecurringUpdateIn,
-)
+from apps.appointment.queries.access import CHANGE_OWN, may_change
+from apps.appointment.queries.agenda import verdict_message
+from apps.appointment.queries.booking import check_member, lines_for, resolve_services
+from apps.appointment.queries.business import now
+from apps.appointment.queries.reads import MOVABLE
+from apps.appointment.queries.series import find_series, load_series, pattern_of
+from apps.appointment.schemas.fields import END_BEFORE_START
+from apps.appointment.schemas.series import RecurringUpdatedOut, RecurringUpdateIn
 from apps.appointment.services.moving import _move
 from apps.appointment.services.series import (
     RECURRING_NO_STAFF,
@@ -45,7 +35,8 @@ from apps.appointment.services.writes import (
     _history,
     lock_appointments,
 )
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
+from base.business import business_zone
 
 PATTERN_CHANGED = _("The repeating appointment changed its pattern")
 
@@ -73,6 +64,7 @@ PATTERN_CHANGED = _("The repeating appointment changed its pattern")
         "is split); appointments already charged, in progress or completed are left alone; the booked ones that still "
         "fall on the pattern move, the others are cancelled, and the ones that do not fit stay and are listed.",
         "risk": "normal",
+        "summary": assistant_cards.series_change,
     },
 )
 def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:  # noqa: C901, PLR0912, PLR0915

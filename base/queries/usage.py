@@ -49,7 +49,9 @@ BUSY_WINDOW_DAYS = 7
             "plan includes; its capacity (what it does at once against what it really has, and the times it fell short "
             "in the last 7 days); the requests served this month, the people active now and in 30 days, and the size of "
             "its database. A figure that is null has not been measured yet: say so, never read it as a zero. The "
-            "assistant's own messages are not here. Files and the database are measured every night."
+            "assistant's own messages of the month are read with base.assistant.usage. Files and the database are "
+            "measured every night. With platform true it is ERPlora's own business, which has no plan: never say one is "
+            "coming nor that it should upgrade."
         ),
         asks={
             "en": (
@@ -79,7 +81,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     to a business. For who runs the business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state, plan, known = _plan_of(hub)
-    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).exclude(role__in=FREE_ROLES).count()
+    people = Membership.objects.team(ctx.scope.key).exclude(role__in=FREE_ROLES).count()
     devices = (
         SessionOwner.objects.filter(host=ctx.scope.key, session__expire_date__gt=timezone.now())
         .exclude(device_id=None)
@@ -90,10 +92,11 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     demo = hub is not None and hub.is_demo
     last = None if demo else _last_night(hub)
     counted = _counted_during_the_day(hub) if hub is not None and not demo else _NOTHING_COUNTED
-    shown = {config.label for config in home.shown_modules(demo_hub=demo)}
+    shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=demo)}
     return {
         "known": known,
         "demo": demo,
+        "platform": _is_platform(hub),
         "plan_slug": _plan_slug(plan) if known else None,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
         "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
@@ -106,7 +109,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
         "connections": _connections_usage(hub, known, counted),
         "requests": {"this_month": counted.requests_this_month, "since": counted.requests_since},
         "activity": _activity_usage(hub, demo, last, counted),
-        "meters": _apps_meters(ctx, hub, home.home_modules(active_apps(ctx.scope), demo_hub=demo)),
+        "meters": _apps_meters(ctx, hub, home.shown_modules.home_modules(active_apps(ctx.scope), demo_hub=demo)),
     }
 
 
@@ -115,6 +118,10 @@ def _plan_of(hub: Hub | None) -> tuple[dict, dict | None, bool]:
     state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
     plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
     return state, plan, plan is not None and all(_is_count(plan.get(field)) for field in ("max_users", "max_devices"))
+
+
+def _is_platform(hub: Hub | None) -> bool:
+    return hub is not None and hub.is_platform
 
 
 def _plan_slug(plan: dict) -> str | None:
@@ -140,7 +147,7 @@ def _is_near(used: int, limit: int) -> bool:
 
 def _files_usage(state: dict, known: bool, last: HubUsageDaily | None) -> dict:
     """What the files take up (``s3_bytes``) against the plan's space (BASE-F40, step 3); nothing to compare, no status."""
-    limit = files.space_limit(state) if known else None
+    limit = files.space.space_limit(state) if known else None
     used = last.s3_bytes if last else None
     percent = status = None
     if limit is not None and used is not None:
@@ -194,8 +201,7 @@ def _connections_usage(hub: Hub | None, known: bool, counted: _Counted) -> dict:
     plan whose photo lacks its limits gets Free's, so the screen says that, never «no limit», and ERPlora's own hub, with no
     plan to know, what its row gives it. And the times it fell short: with limits of 1, 3 or 6 a percentage says nothing, a
     Free plan's first operation of the day is its 100 %."""
-    platform = hub is not None and hub.is_platform
-    limits = (tenancy_limits.hub_limits(hub) or tenancy_limits.FREE) if known or platform else None
+    limits = (tenancy_limits.hub_limits(hub) or tenancy_limits.FREE) if known or _is_platform(hub) else None
     return {
         "peak_today": counted.peak_today,
         "limit": limits.max_transactions if limits else None,
@@ -226,9 +232,9 @@ def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, cou
 
 
 def _apps_meters(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> list[dict]:
-    """What the apps on say their plan includes (``base.home.plan_meters``), read in the business's own database: none in
+    """What the apps on say their plan includes (``base.home.plan_meters.plan_meters``), read in the business's own database: none in
     a demo, which is not measured."""
-    return [] if hub is None or hub.is_demo else home.plan_meters(ctx, modules)
+    return [] if hub is None or hub.is_demo else home.plan_meters.plan_meters(ctx, modules)
 
 
 def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> int:

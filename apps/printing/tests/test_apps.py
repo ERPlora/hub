@@ -3,6 +3,7 @@ Home."""
 
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.core import checks
@@ -11,7 +12,6 @@ from live.live_registry import live_registry
 from live.meta import (
     BellCounter,
     Category,
-    Help,
     LiveAppConfig,
     SetupCheck,
     SetupStep,
@@ -22,7 +22,9 @@ from live.operations import registry
 
 from apps.printing import events as E
 from base import home
-from base.ws_print import presence_operation
+from base.ws_print.presence import presence_operation
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
@@ -140,7 +142,7 @@ def test_the_homes_step_is_set_up_your_printer_done_once_a_device_prints_the_rec
         False,
     )
     assert "configured" in registry[step.operation].output.model_fields
-    assert home.level_of(f"printing.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"printing.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
@@ -239,9 +241,23 @@ def test_its_card_of_system_is_your_printer_for_everybody_with_printing_and_base
         "printing.view_settings" in permissions_for_role([config()], role)
         for role in ("hub_owner", "hub_admin", "hub_manager", "hub_employee")
     )
-    assert home.system_card_errors([config()]) == []
+    assert home.system_cards.system_card_errors([config()]) == []
     assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == []
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert config().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert config().help.videos == {"es": "uW6aQbBMWZY", "en": "L7PsjxqO-x0"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("PRINTING-F03",), "dyI_PmIvzTI", "ULjehZ6kAd4"),
+    (("PRINTING-F04",), "9W6PHb_rz_w", "2B56aOPDrs0"),
+    (("PRINTING-F06",), "RpcOHsdMT0M", "7ljnN72MdDE"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("printing", language) == help_videos.by_task(TASK_VIDEOS, language)

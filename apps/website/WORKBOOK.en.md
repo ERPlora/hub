@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:a19fa841c007927a9f9fda74108dce188688df2350b8ac8898833edd27425fe1 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:3282cc39e9e1 -->
 
 Website gives your business a simple page of its own at its ERPlora address (your-business.erplora.com). You pick one
 of four designs and its colours, fill in the sections you want (cover, about us, catalog, gallery, Google reviews,
@@ -8,6 +7,7 @@ contact and location) and publish it. Your customers see it when they open that 
 its **Log in** button.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:d586ca077929 -->
 
 Website gives each business a simple page of its own at its ERPlora address (your-business on erplora.com).
 The owner picks one of four designs, fills in its sections (name and logo, title and cover photo, a few words about
@@ -21,6 +21,7 @@ fixed sections, no dragging blocks around, no HTML or code of the user's. Changi
 content and the design are kept apart.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:653bb3c0596e -->
 
 - **Square Online, Wix and Squarespace**: templates that swap without losing the content, sections shown or hidden, a
   real preview beside the editor on a computer and in its own tab on a phone, a draft apart from what is published,
@@ -36,6 +37,7 @@ content and the design are kept apart.
 - **Square's and Toast's QR**: a PNG to print and an SVG to enlarge without losing quality, and the link to copy.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:45feeefa66b0 -->
 
 - The app is in the **Organization** category and needs no other app. If the business has **Inventory** or
   **Services**, the Catalog section can show its products on sale or its offered services.
@@ -45,8 +47,10 @@ content and the design are kept apart.
   that listing is pasted and ERPlora reads its rating and reviews from Google.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Website
+<!-- from WORKBOOK.md sha256:d7dd8fb349c5 -->
 Here you prepare and publish the business's website. At the top you see whether it is online and at what address,
 with **Save**, **Publish**, **Take offline** and **Share and QR**. Below, the editor (design, colours, background and
 each section) and the preview as your customers will see it; on a tablet or a phone, the **Edit / Preview** tab
@@ -54,6 +58,7 @@ switches between the two. What you change is kept in a draft, and your customers
 **Publish**.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:3a05247ae6bd -->
 At the top, the status: «Your website is not online yet…» (never published), «Your website is offline…» (taken
 offline) or «Your website is online at …» (with the address), and «You have changes that are not published yet.»
 when the draft has changed since the last publication. Next to it, **Save**, **Publish**, **Take offline** (only when
@@ -106,20 +111,26 @@ switches between the two.
   width, and **Reload**. It reloads by itself after each save.
 
 #### Share and QR
+<!-- from WORKBOOK.md sha256:9cd4fb66fb51 -->
 The website's address with **Copy link**, its QR code and **Download PNG** (to print) and **Download SVG** (to scale up
 without losing quality). It warns that, on the device where you signed in, the address opens the app (to see the
 page: your phone or a private window) and, if the page is not online, that the address still leads to the team's
-sign-in.
+sign-in. If the draft shows the catalog, below it, after a line, «Your catalog's address»: the same address, which
+opens the page right at the catalog, with its **Copy link**, its QR and its **Download PNG** and **Download SVG**, and
+the note «Opens your website right at the catalog: print its QR for your tables or your counter.».
 
 #### The public page
+<!-- from WORKBOOK.md sha256:d6dcb90786ec -->
 The chosen template with what is published, at the business's address: a sticky see-through top bar with the
 logo, the name, the sections' menu (folded on a phone) and **Log in** (an outline pill); a header with the cover photo
 (or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
 **Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
 without contact or address, one to the first section. Each section has a small line over its heading («Who we are»,
 «What we offer», «Take a look», «Google reviews», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
-the text; the catalog as a grid of cards (a gradient with the initial, since items have no photo; the price in a pill;
-pills to jump between categories when there are two or more); the gallery as a grid of square, rounded photos (two
+the text; the catalog as a grid of cards (the product's photo or, without a photo, and for services, a gradient with the
+initial; under the name, a service's duration, the product's description and its allergens, «Allergens: Gluten, Milk»;
+the price in a pill; pills to jump between categories when there are two or more; the photos load as they come into
+view, so a long menu is not downloaded whole on opening); the gallery as a grid of square, rounded photos (two
 a row on a phone, three on a tablet, four on a computer) that grow a little under the pointer and open whole apart;
 the Google reviews with the rating in large type, its stars (rounded to the half star) and «128 reviews on Google»,
 the **See on Google** and **Write a review** buttons (they open on Google) and up to five cards with the author's
@@ -141,6 +152,7 @@ the page's texts (Log in, the days, the default headings) come out in the browse
 what the owner writes, as written.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:a2a0aca722dc -->
 
 | State | What the person sees |
 |---|---|
@@ -155,6 +167,7 @@ what the owner writes, as written.
 | No permission | Without the permission to see it: «Only the owner or an admin can change the website.» With the one to see it (manager): the status, **Share and QR** and that same notice, without the editor. |
 
 ## Flows
+<!-- from WORKBOOK.md sha256:af3fecbe2dcf -->
 
 | ID | Flow | State |
 |---|---|---|
@@ -172,6 +185,7 @@ what the owner writes, as written.
 | WEBSITE-F12 | Show the Google reviews | done |
 
 ### WEBSITE-F01 Fill in and save the draft
+<!-- from WORKBOOK.md sha256:281d13b37d73 -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -192,6 +206,7 @@ business's website: upload it again.».
 Involved: WEBSITE-F02, WEBSITE-F03, WEBSITE-F04, WEBSITE-F11, WEBSITE-F12
 
 ### WEBSITE-F02 Choose the design, the palette and the background
+<!-- from WORKBOOK.md sha256:87a87367e681 -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -209,6 +224,7 @@ If it fails: a colour written wrong is not saved and the field says so:
 Involved: WEBSITE-F01, WEBSITE-F06
 
 ### WEBSITE-F03 Show or hide a section
+<!-- from WORKBOOK.md sha256:9de66cc3aa20 -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -224,6 +240,7 @@ If it fails: the same as when saving the draft; hiding never deletes what was wr
 Involved: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Upload an image
+<!-- from WORKBOOK.md sha256:954d2a6261bd -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, API
 Screen: Website
@@ -244,18 +261,22 @@ anyway.
 Involved: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Show the catalog
+<!-- from WORKBOOK.md sha256:f69bcbafce2d -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
 Steps:
 1. Unfold **Catalog** and turn **Show** on.
-2. In **What to show**, choose **Products** (Inventory's on sale: active and not sold out) or **Services** (those
+2. In **What to show**, choose **Products** (Inventory's on sale: active, not sold out and not hidden from the
+   website) or **Services** (those
    offered); only those of the apps on in the business are offered.
 3. If you want, choose the **Categories** (none = **All categories**) and whether prices show with **Show prices**.
    It saves by itself, like the rest of the draft.
 In: the source, the chosen categories and whether prices show.
 Out: on the preview and, once published, on the page: the catalog grouped by category in their order (what has no
-category, last), up to 200 items, with pills to jump between categories when there are two or more. Prices, in the
+category, last), up to 200 items, with pills to jump between categories when there are two or more. Each product
+carries its photo (its own or the image library's; without a photo, a gradient with its initial), its description and
+its allergens by name, in the visitor's language («Allergens: Gluten, Milk»); each service, its duration. Prices, in the
 business's currency (its country's) with its decimals; for a business in Spain: «€15.00», «From €40.00», «€20.00 /
 hour» or «Free»; a variable price is not shown. Publishing keeps a copy, and the page refreshes it on opening with the
 products or services of that moment; if the business's country changes, the page and the preview come out in the new
@@ -264,9 +285,10 @@ If it fails: without Inventory or Services on, the note «Turn on Inventory or S
 services here.»; if the saved source is an app that was turned off, «Inventory is not on in this business: your page
 shows no catalog until you turn it on or choose another source.» (or Services) and the page has no catalog, never an
 error; if the categories cannot be read, «The categories could not be loaded» under the selector.
-Involved: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
+Involved: INVENTORY-F27, INVENTORY-F36, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 See the preview
+<!-- from WORKBOOK.md sha256:d7153d07ee3b -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator
 Screen: Website
@@ -283,6 +305,7 @@ preview**.
 Involved: WEBSITE-F01, WEBSITE-F02, WEBSITE-F05, WEBSITE-F12
 
 ### WEBSITE-F07 Publish
+<!-- from WORKBOOK.md sha256:1ca6e7023242 -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -299,6 +322,7 @@ If it fails: «The website could not be published» and what is published stays 
 Involved: WEBSITE-F05, WEBSITE-F10, WEBSITE-F12
 
 ### WEBSITE-F08 Take the page offline
+<!-- from WORKBOOK.md sha256:3084c9f65fc2 -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -314,6 +338,7 @@ If it fails: «The website could not be taken offline» and the page stays onlin
 Involved: WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F09 Share the address and the QR
+<!-- from WORKBOOK.md sha256:a632520a45ce -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, manager, API
 Screen: Share and QR
@@ -321,21 +346,28 @@ Steps:
 1. In **Website**, tap **Share and QR**.
 2. **Copy link** copies the address («Link copied»); **Download PNG** gets the QR to print it and **Download SVG** to
    enlarge it without losing quality.
-3. **Close** goes back to the editor.
+3. If the draft shows the catalog, below is «Your catalog's address», with its own **Copy link**,
+   **Download PNG** and **Download SVG**: it is the QR to print and leave on the tables.
+4. **Close** goes back to the editor.
 In: nothing: the address is the business's.
-Out: the business's public address, its own on erplora.com as the browser sees it, and its QR. It warns that on that
-device the address opens the app (to see the page: the phone or a private window) and, if the page is not online,
-that it still leads to the team's sign-in.
+Out: the business's public address, its own on erplora.com as the browser sees it, and its QR; with the catalog on
+show, the catalog's too, the same address ending in `#catalog`, which opens the page right at it (on the business's own
+domain too, with its address), and its QR. With the catalog hidden, without a source or with its app off, that block
+does not show. It warns that on that device the address opens the app (to see the page: the phone or a private window)
+and, if the page is not online, that it still leads to the team's sign-in.
 If it fails: if it cannot be copied, «The link could not be copied: select it and copy it by hand.».
-Involved: WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
+Involved: WEBSITE-F05, WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
 
 ### WEBSITE-F10 Visit the public page
+<!-- from WORKBOOK.md sha256:c96f116d0410 -->
 Status: done (server, public page and e2e)
 Actor: anyone, without an account
 Screen: The public page
 Steps:
-1. Open the business's address (your-business on erplora.com) on a phone, a tablet or a computer.
-2. The published page shows in the browser's language (English or Spanish), with what the owner wrote as written.
+1. Open the business's address (your-business on erplora.com) on a phone, a tablet or a computer, or scan the
+   catalog's QR on the table, which opens the page right at the catalog.
+2. The published page shows in the browser's language (English or Spanish), with what the owner wrote as written; in
+   the catalog, each product with its photo, its description and its allergens in that language.
 3. **Log in** leads to ERPlora's sign-in and, once signed in, to the app; with a session open, the address opens the
    app as always.
 In: the business's address.
@@ -351,6 +383,7 @@ same page: **Log in** leads to its address on erplora.com and, with no page to s
 Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Show a photo gallery
+<!-- from WORKBOOK.md sha256:b58c66403d0a -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant (ordering or removing photos already uploaded), API
 Screen: Website
@@ -368,6 +401,7 @@ uploaded to this business's website: upload it again.» under the gallery.
 Involved: WEBSITE-F04, WEBSITE-F10
 
 ### WEBSITE-F12 Show the Google reviews
+<!-- from WORKBOOK.md sha256:368d36d01921 -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant (the link), API
 Screen: Website
@@ -393,37 +427,41 @@ kept and they will show as soon as they are.».
 Involved: WEBSITE-F01, WEBSITE-F07, WEBSITE-F10
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:6a3f8d6826bc -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of whoever
 speaks) and the API, with the same rules and the same permissions.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:1275433dd314 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The draft, its publication status and the public address (can be followed live) | view | F01–F03, F07, F08 | `website.site.get` |
+| The draft, its publication status and the public address (can be followed live) | view | F01–F03, F07, F08, F11, F12 | `website.site.get` |
 | The draft painted as the public page (HTML, for the preview) | manage | F06 | `website.site.preview` |
 | The categories of Inventory or Services to choose from | manage | F05 | `website.catalog.categories` |
 | An uploaded image by the name of its file: what the assistant's card reads to name it (BASE-F97) | view | F04, F11 | `website.image.get` |
 | A category of Inventory or Services by its name: what the assistant's card reads to name it (BASE-F97) | manage | F05 | `website.category.get` |
-| The QR of the public address, in PNG or SVG | view | F09 | `website.qr.get` |
+| The QR of the public address or of the catalog (`target`: `page` or `catalog`, the same address with `#catalog`), in PNG or SVG | view | F09 | `website.qr.get` |
 | What is published, without the hidden sections (no session) | anyone | F10 | `website.public.site` |
-| The published catalog, read at that moment and with the prices in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
+| The published catalog, read at that moment: each product with its photo, its description and its allergens, and the prices and the allergens' names in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
 | The Google reviews kept for the published site, with their texts in the asker's language (no session; never asks Google) | anyone | F10, F12 | `website.public.reviews` |
 
 The three public ones answer only with the page online (otherwise, 404 `website.not_published`) and count each visitor:
 60 reads a minute per address, then 429 `base.rate_limited`. The public catalog is kept for a minute.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:fd5b82001640 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
-| Saves the draft (template, palette and background, content) | manage | F01–F03, F05 | `website.site.save` |
+| Saves the draft (template, palette and background, content) | manage | F01–F03, F05, F11, F12 | `website.site.save` |
 | Publishes the draft with the catalog's copy | manage | F07 | `website.site.publish` |
 | Takes the page offline | manage | F08 | `website.site.unpublish` |
 | Uploads an image (base64, up to 5 MB) | manage | F04 | `website.image.upload` |
 
 ### Assistant
+<!-- from WORKBOOK.md sha256:69673197851c -->
 The assistant (by voice or by text) uses, with the session and permissions of whoever speaks, `website.site.get`,
 `website.site.save`, `website.site.publish`, `website.site.unpublish` and `website.catalog.categories`. Every field of
 the draft carries its description (name, tagline, about text, gallery, Google reviews link, contact, opening hours,
@@ -443,6 +481,7 @@ names, the other sections whose content changes («Content: Header, Contact»). 
 «No changes».
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:13f8bc9a7443 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -452,12 +491,18 @@ names, the other sections whose content changes («Content: Header, Contact»). 
 | Image uploaded | Uploading an image | `id` | `website.image.uploaded` |
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:a8d202255df0 -->
 - It reacts to no notice of other apps and requires none (`requires = []`).
 - **Inventory** and **Services**, only if they are on in the business: the catalog reads them by the name of their
-  queries (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`,
+  queries (`inventory.product.list_for_sale` with `show_on_website=true`, `inventory.category.list`,
+  `inventory.product_category.list`,
   `service.service.list_for_sale`, `service.category.list`; INVENTORY-F27 and SERVICE-F10), with a context that can
   only read them; with the app off or without it, the catalog comes out empty, never an error, and the editor says
-  so.
+  so. Each item is put together by `catalog_items` (`product_item`, `service_item`): of the product, its `description`,
+  its `image_url` and the codes of its `allergens`, which the published copy keeps as they are; `render.catalog_view`
+  writes `allergens_label` when painting («Allergens: Gluten, Milk», with the names of `base.allergens` in the visitor's
+  language). A copy published before the photos is painted without them until the next live read. A product's own photo
+  is served to anyone by `/p/media/` (Inventory's `public_media`).
 - From the platform: the hub's registry (its id, for the file store; `base.operations.hub_id`), the store
   `storages["hub_files"]` and the `/p/media/…` view (`base.storage`, `base.media`), the per-visitor limit
   (`base.throttle`) and the `/` entry (`base.public_home`, which calls the app's provider).
@@ -467,6 +512,7 @@ names, the other sections whose content changes («Content: Header, Contact»). 
   month per business with reviews).
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:17640f8bbb2d -->
 
 | Permission | Owner | Admin | Manager | Employee | Service |
 |---|---|---|---|---|---|

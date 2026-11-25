@@ -156,10 +156,11 @@ describe('refusals', () => {
     expect(refusalKey(undefined)).toBe('base.files.refusal.generic');
   });
 
-  it('every code base/files.py and the modules of base/services/ write has its sentence, in English and in Spanish', () => {
+  it('every code the modules of base/files/ and base/services/ write has its sentence, in English and in Spanish', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const own = readdirSync(join(root, 'files')).filter((file) => file.endsWith('.py'));
     const services = readdirSync(join(root, 'services')).filter((file) => file.endsWith('.py'));
-    const files = ['files.py', ...services.map((file) => join('services', file))];
+    const files = [...own.map((file) => join('files', file)), ...services.map((file) => join('services', file))];
     const sources = files.map((file) => readFileSync(join(root, file), 'utf8')).join('\n');
     const written = new Set([...sources.matchAll(/code="(base\.file_[a-z_]+)"/g)].map((match) => match[1]));
     expect(written.size).toBeGreaterThan(8);
@@ -214,7 +215,7 @@ describe('joinSentences', () => {
 });
 
 // hub#578 (BASE-F74): a spreadsheet and a Word document are read here too. The server serves them as bytes, with no
-// preview of its own (`base/files.py`, `SERVED`); the screen knows them by the type the server gives them.
+// preview of its own (`base/files/names.py`, `SERVED`); the screen knows them by the type the server gives them.
 describe('the viewer of a file', () => {
   const file = (preview: FileItem['preview'], content_type: string) => ({ preview, content_type });
 

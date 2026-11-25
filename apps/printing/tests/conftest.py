@@ -5,10 +5,12 @@ Every test with the database runs as production does: inside business A's own da
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
 """
 
+import datetime as dt
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from django.utils import translation
+from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
@@ -16,6 +18,7 @@ from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of
+from apps.printing.models import PrintJob
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
@@ -78,6 +81,32 @@ def enqueue(document_type: str = "receipt", document: dict | None = None, **more
     """Queues a document through ``printing.job.create`` (a receipt by default)."""
     data = {"document_type": document_type, "document": document if document is not None else RECEIPT, **more}
     return run("printing.job.create", data)
+
+
+def age(job_id, minutes: int) -> None:
+    PrintJob.objects.filter(pk=job_id).update(created_at=timezone.now() - dt.timedelta(minutes=minutes))
+
+
+def queued_ago(seconds: int, **more):
+    """A receipt queued ``seconds`` ago."""
+    job = enqueue(**more).job
+    PrintJob.objects.filter(pk=job.id).update(created_at=timezone.now() - dt.timedelta(seconds=seconds))
+    return job
+
+
+def reaches(*printers, name: str = "Counter", retired: bool = False, seen: dt.timedelta | None = dt.timedelta(0)):
+    """A device set up with ``printers``; ``seen``: how long ago it last gave news (``None``: never)."""
+    from apps.printing.models import PrintDevice
+
+    now = timezone.now()
+    device = PrintDevice.objects.create(
+        name=name,
+        key=PrintDevice.key_of(name),
+        retired_at=now if retired else None,
+        last_seen_at=None if seen is None else now - seen,
+    )
+    device.printers.add(*(p.id for p in printers))
+    return device
 
 
 @pytest.fixture(autouse=True)

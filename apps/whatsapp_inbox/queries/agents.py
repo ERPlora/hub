@@ -10,11 +10,9 @@ from base.models import HubUser, Membership
 
 
 def team_roles(ctx: OperationContext) -> dict[str, str]:
-    """``{username: role}`` of whoever has access to this business: control's memberships of the scope's host, read
-    first (a query never joins two databases)."""
-    return dict(
-        Membership.objects.filter(host=ctx.scope.key, user__is_active=True).values_list("user__username", "role")
-    )
+    """``{username: role}`` of the team of this business: control's memberships of the scope's host, read first (a
+    query never joins two databases)."""
+    return dict(Membership.objects.team(ctx.scope.key).values_list("user__username", "role"))
 
 
 def team(ctx: OperationContext, roles: dict[str, str] | None = None) -> QuerySet[HubUser]:

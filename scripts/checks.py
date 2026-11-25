@@ -1,12 +1,12 @@
 """What ``scripts/checks.sh fast [<since>]`` runs before a change is pushed; .githooks/pre-push runs it on every pushed
 commit, in a temporary worktree.
 
-1. The guardrail tests of file size, ruff, the import contracts and cognitive complexity, the lists that only shrink
-   included: seconds, without the network or a database.
+1. The guardrail tests of file size, ruff, the import contracts, cognitive complexity and a test named after each module
+   the branch adds, the lists that only shrink included: seconds, without the network or a database.
 2. What the change touches: what differs from <since>, uncommitted and untracked files included; by default, where HEAD
    left origin/main, or HEAD's parent on origin/main itself (the point the guardrails' exception lists compare with).
    - ESLint on its TypeScript, JavaScript and Vue files, the typecheck when it touches any, and the Vitest tests related
-     to them.
+     to them and to its .json files (``frontend_data``).
    - pytest on its test files and on each touched module's ``test_<module>.py``, on the Postgres of compose.yaml, in a
      test database of this checkout's own unless TEST_DB_NAME names one. A touched WORKBOOK runs its module's
      ``test_workbook.py`` and the tests that read every WORKBOOK.
@@ -36,6 +36,7 @@ GUARDRAILS = (
     "tests/test_guardrails_ruff.py",
     "tests/test_guardrails_complexity.py",
     "tests/test_guardrails_imports.py",
+    "tests/test_guardrails_module_tests.py",
 )
 WORKBOOK = re.compile(r"WORKBOOK(?:\.[a-z]{2})?\.md")
 #: The tests that read every WORKBOOK of the repository, run when any of them changes.
@@ -77,18 +78,22 @@ def touched(point: str) -> list[str]:
     return sorted({path for path in listed.split("\0") if Path(path).is_file()})
 
 
+def named_tests(path: Path) -> list[Path]:
+    """Where the module's own tests go, whether they exist yet or not: ``test_<module>.py``, and then
+    ``test_<package>_<module>.py`` for a module of a package such as services/, in the tests folder of the nearest
+    package that has one. A WORKBOOK in either language is the module's ``test_workbook.py``."""
+    stem = "workbook" if WORKBOOK.fullmatch(path.name) else path.stem
+    home = next((parent for parent in path.parents if (parent / "tests").is_dir()), Path())
+    return list(dict.fromkeys(home / "tests" / name for name in (f"test_{stem}.py", f"test_{path.parent.name}_{stem}.py")))
+
+
 def tests_of(path: Path) -> list[Path]:
-    """The test file itself, or the module's ``test_<module>.py`` (``test_<package>_<module>.py`` too, for a module of a
-    package such as services/) in the tests folder of the nearest package that has one. A WORKBOOK in either language
-    is the module's ``test_workbook.py`` and the tests that read every WORKBOOK."""
+    """The test file itself, or the module's own tests that exist (``named_tests``). A WORKBOOK also runs the tests that
+    read every WORKBOOK."""
     if path.name.startswith("test_") and path.suffix == ".py":
         return [path]
-    workbook = WORKBOOK.fullmatch(path.name) is not None
-    stem = "workbook" if workbook else path.stem
-    home = next((parent for parent in path.parents if (parent / "tests").is_dir()), Path())
-    names = {f"test_{stem}.py", f"test_{path.parent.name}_{stem}.py"}
-    own = [home / "tests" / name for name in names if (home / "tests" / name).is_file()]
-    return sorted([*own, *map(Path, EVERY_WORKBOOK_TESTS)] if workbook else own)
+    own = [test for test in named_tests(path) if test.is_file()]
+    return sorted([*own, *map(Path, EVERY_WORKBOOK_TESTS)] if WORKBOOK.fullmatch(path.name) else own)
 
 
 def unpack(clone: Path, into: Path) -> None:
@@ -132,19 +137,22 @@ def run(command: list[str], **env: str) -> bool:
     return subprocess.run(command, env={**os.environ, **env}, check=False).returncode != 0
 
 
-def frontend_failed(files: list[str]) -> bool:
+def frontend_data(path: str) -> bool:
+    """A .json a frontend module may import: no linter reads it, but the tests related to it pin what it says. Those of
+    the root configure the tools, and Vitest would run its whole suite for package.json."""
+    return path.endswith(".json") and "/" in path
+
+
+def frontend_failed(code: list[str], data: list[str]) -> bool:
     if lender := os.environ.get(LENDER):
         borrow(Path(lender))
     missing = [f"{name}: run {fix}" for name, (shown_by, fix) in NEEDED.items() if not shown_by.exists()]
     if missing:
         print(f"checks: ESLint, the typecheck and Vitest need {'; '.join(missing)}", flush=True)
         return True
-    steps = (
-        ["pnpm", "exec", "eslint", "--no-warn-ignored", *files],
-        ["pnpm", "typecheck"],
-        ["pnpm", "exec", "vitest", "related", "--run", "--passWithNoTests", *files],
-    )
-    return any([run(step) for step in steps])
+    linted = [["pnpm", "exec", "eslint", "--no-warn-ignored", *code], ["pnpm", "typecheck"]] if code else []
+    related = ["pnpm", "exec", "vitest", "related", "--run", "--passWithNoTests", *code, *data]
+    return any([run(step) for step in (*linted, related)])
 
 
 def tests_failed(tests: list[Path]) -> bool:
@@ -161,10 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     files = touched(comparison_point(args.since))
     frontend = [path for path in files if path.endswith(FRONTEND)]
+    data = [path for path in files if frontend_data(path)]
     tests = sorted({test for path in files for test in tests_of(Path(path))})
     failed = run([sys.executable, "-m", "pytest", "-q", "--tb=short", *GUARDRAILS])
-    if frontend:
-        failed = frontend_failed(frontend) or failed
+    if frontend or data:
+        failed = frontend_failed(frontend, data) or failed
     if tests:
         failed = tests_failed(tests) or failed
     return 1 if failed else 0

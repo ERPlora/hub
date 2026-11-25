@@ -30,8 +30,8 @@
     ]
   },
   {
-    "path": "apps/attendance/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/attendance/queries/days.py",
+    "file_name": "days.py",
     "functions": [
       {
         "name": "scoped_records",
@@ -128,20 +128,6 @@
     ]
   },
   {
-    "path": "apps/inventory/services/imports.py",
-    "file_name": "imports.py",
-    "functions": [
-      {
-        "name": "_check_product_row",
-        "complexity": 17
-      },
-      {
-        "name": "bulk_create_products",
-        "complexity": 19
-      }
-    ]
-  },
-  {
     "path": "apps/inventory/tests/test_workbook.py",
     "file_name": "test_workbook.py",
     "functions": [
@@ -158,16 +144,6 @@
       {
         "name": "_recipient",
         "complexity": 26
-      }
-    ]
-  },
-  {
-    "path": "apps/invoice/services/series.py",
-    "file_name": "series.py",
-    "functions": [
-      {
-        "name": "update_series",
-        "complexity": 17
       }
     ]
   },
@@ -192,8 +168,8 @@
     ]
   },
   {
-    "path": "apps/pricing/schemas/__init__.py",
-    "file_name": "__init__.py",
+    "path": "apps/pricing/schemas/rules.py",
+    "file_name": "rules.py",
     "functions": [
       {
         "name": "rule_problems",
@@ -202,13 +178,19 @@
     ]
   },
   {
-    "path": "apps/pricing/services.py",
-    "file_name": "services.py",
+    "path": "apps/pricing/services/price_lists.py",
+    "file_name": "price_lists.py",
     "functions": [
       {
         "name": "update_price_list",
         "complexity": 21
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/pricing/services/rules.py",
+    "file_name": "rules.py",
+    "functions": [
       {
         "name": "update_rule",
         "complexity": 22
@@ -236,8 +218,8 @@
     ]
   },
   {
-    "path": "apps/printing/services.py",
-    "file_name": "services.py",
+    "path": "apps/printing/services/printers.py",
+    "file_name": "printers.py",
     "functions": [
       {
         "name": "_connection",
@@ -246,7 +228,13 @@
       {
         "name": "update_printer",
         "complexity": 19
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/printing/services/queueing.py",
+    "file_name": "queueing.py",
+    "functions": [
       {
         "name": "create_job",
         "complexity": 24
@@ -468,34 +456,16 @@
       {
         "name": "_customer_load",
         "complexity": 17
-      },
-      {
-        "name": "_inventory_product_load",
-        "complexity": 39
       }
     ]
   },
   {
-    "path": "base/catalog.py",
-    "file_name": "catalog.py",
+    "path": "base/catalog/workbooks.py",
+    "file_name": "workbooks.py",
     "functions": [
       {
         "name": "_uncommented_lines",
         "complexity": 20
-      }
-    ]
-  },
-  {
-    "path": "base/home.py",
-    "file_name": "home.py",
-    "functions": [
-      {
-        "name": "plan_meter_errors",
-        "complexity": 17
-      },
-      {
-        "name": "module_steps",
-        "complexity": 44
       }
     ]
   },
@@ -534,8 +504,8 @@
     ]
   },
   {
-    "path": "base/tenancy/move.py",
-    "file_name": "move.py",
+    "path": "base/tenancy/move/bucket.py",
+    "file_name": "bucket.py",
     "functions": [
       {
         "name": "_run",
@@ -632,8 +602,8 @@
     ]
   },
   {
-    "path": "base/ws_print.py",
-    "file_name": "ws_print.py",
+    "path": "base/ws_print/protocol.py",
+    "file_name": "protocol.py",
     "functions": [
       {
         "name": "PrintSocket::_on_stream",
@@ -708,22 +678,8 @@
     "file_name": "hub_registry.py",
     "functions": [
       {
-        "name": "hub_register",
-        "complexity": 22
-      },
-      {
         "name": "hub_seed_local",
         "complexity": 23
-      }
-    ]
-  },
-  {
-    "path": "base/assistant/gateway.py",
-    "file_name": "gateway.py",
-    "functions": [
-      {
-        "name": "stream_turn",
-        "complexity": 33
       }
     ]
   },
@@ -912,6 +868,26 @@
       {
         "name": "words_for",
         "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "base/home/plan_meters.py",
+    "file_name": "plan_meters.py",
+    "functions": [
+      {
+        "name": "plan_meter_errors",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "base/home/setup_steps.py",
+    "file_name": "setup_steps.py",
+    "functions": [
+      {
+        "name": "module_steps",
+        "complexity": 44
       }
     ]
   }

@@ -137,9 +137,9 @@ def test_the_switch_read_says_whether_control_is_frozen(monkeypatch):
     platform = system_context(REGISTRY_SCOPE)
 
     assert worker._frozen() is False
-    control_services.freeze_set(platform, FreezeIn(frozen=True, reason="upgrade"))
+    control_services.freeze.freeze_set(platform, FreezeIn(frozen=True, reason="upgrade"))
     assert worker._frozen() is True
-    control_services.freeze_set(platform, FreezeIn(frozen=False))
+    control_services.freeze.freeze_set(platform, FreezeIn(frozen=False))
     assert worker._frozen() is False
 
 

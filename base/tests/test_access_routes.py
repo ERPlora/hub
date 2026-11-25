@@ -24,6 +24,8 @@ ROUTES = {
     ("POST", "/me/preferences", "base.profile.preferences_set"),
     ("POST", "/me/avatar", "base.profile.avatar_set"),
     ("POST", "/me/avatar/remove", "base.profile.avatar_remove"),
+    ("GET", "/support-access", "base.support_access.get"),
+    ("POST", "/support-access/update", "base.support_access.update"),
 }
 
 

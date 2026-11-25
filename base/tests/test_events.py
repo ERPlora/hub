@@ -44,15 +44,23 @@ def test_every_event_is_named_as_the_convention_says():
         "base.person.pin_removed",
         "base.person.badge_set",
         "base.person.badge_removed",
+        "base.role.created",
+        "base.role.updated",
+        "base.role.deleted",
+        "base.role.assigned",
         # The business's API keys.
         "base.api_key.created",
         "base.api_key.rotated",
         "base.api_key.revoked",
-        # A manager's approval given, and spent.
+        # A manager's approval given, and spent; and what was done without needing one.
         "base.approval.granted",
         "base.approval.used",
+        "base.approval.noted",
         # The API's documentation shown or hidden.
         "base.api_doc.settings_changed",
+        # ERPlora's support access turned on or off, and each entry of support.
+        "base.support_access.changed",
+        "base.support_access.entered",
         # An app turned on or off by the business.
         "base.app.enabled",
         "base.app.disabled",

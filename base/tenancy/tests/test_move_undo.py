@@ -78,7 +78,7 @@ class TestTheOriginFirst:
         left_on(target, hub)
 
         with use_control():
-            move.drop_leftovers(AT)
+            move.worker_pass.drop_leftovers(AT)
 
         assert marker(hub.db_name) == [MARKER]
         assert not LeftoverDatabase.objects.filter(hub=hub).exists()
@@ -108,7 +108,7 @@ class TestTheOriginFirst:
         def broken(*args, **kwargs):
             raise RuntimeError("control blinked")
 
-        monkeypatch.setattr(move, "_switch", broken)
+        monkeypatch.setattr(move.moving, "_switch", broken)
 
         run()
 
@@ -120,10 +120,10 @@ class TestTheOriginFirst:
         hub = moves.hub(to=target)
 
         def stopped(*args, **kwargs):
-            raise move.MoveStopped("the worker is stopping")
+            raise move.exceptions.MoveStopped("the worker is stopping")
 
         with monkeypatch.context() as patched:
-            patched.setattr(move, "_restore_from_bucket", stopped)
+            patched.setattr(move.bucket, "_restore_from_bucket", stopped)
             run()
         assert fresh(hub).moving_to_id == target.pk
         with use_control():
@@ -158,7 +158,7 @@ def cancel(hub) -> None:
     from control.schemas import HubIdIn
 
     with use_control():
-        move.control_services.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=hub.pk))
+        move.moving.control_services.move.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=hub.pk))
 
 
 class TestACancelBeforeTheWorkerStarted:
@@ -226,20 +226,20 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
         # stays moving (503) with its data in the copy, never ready on the destination's half-made database.
         target = moves.cluster()  # the origin's own server
         hub = moves.hub(to=target)
-        real_drop = move.ops.drop_database
+        real_drop = move.undo.ops.drop_database
         calls = {"n": 0}
 
         def drop(name, **kwargs):
             calls["n"] += 1
             if calls["n"] >= 2:  # the undo's drop of the destination (the first is _make_destination's)
-                raise move.ops.DatabaseOpsError("statement timeout while dropping")
+                raise move.undo.ops.DatabaseOpsError("statement timeout while dropping")
             return real_drop(name, **kwargs)
 
         def broken_restore(*args, **kwargs):
-            raise move.MoveFailed("move_restore_failed", "broke on purpose")
+            raise move.exceptions.MoveFailed("move_restore_failed", "broke on purpose")
 
-        monkeypatch.setattr(move.ops, "drop_database", drop)
-        monkeypatch.setattr(move, "_restore_from_bucket", broken_restore)
+        monkeypatch.setattr(move.undo.ops, "drop_database", drop)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", broken_restore)
 
         run()
 
@@ -263,8 +263,8 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
         other = moves.hub(to=None, cluster=target)
         Hub.objects.filter(pk=other.pk).update(db_name=hub.db_name)
 
-        with pytest.raises(move.MoveStopped):
-            move._drop_destination(fresh(hub), target)
+        with pytest.raises(move.exceptions.MoveStopped):
+            move.undo._drop_destination(fresh(hub), target)
 
         assert marker(hub.db_name) == [MARKER]
 
@@ -276,8 +276,8 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
         hub = moves.hub(to=target)
         copy = names.moved_db_name(tenancy_connections.control_name(), hub.id)
 
-        with pytest.raises(move.MoveStopped):
-            move._drop_destination(fresh(hub), target, origin=None, copy_name=copy)
+        with pytest.raises(move.exceptions.MoveStopped):
+            move.undo._drop_destination(fresh(hub), target, origin=None, copy_name=copy)
 
         assert marker(hub.db_name) == [MARKER]
 
@@ -290,10 +290,15 @@ class TestTheMinorPoints:
         target = moves.cluster()
         hub = moves.hub(to=target)
         with use_control():
-            move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
+            move.moving.services.provisioning.claim_hub(hub.id, AT, move.moving.LEASE)
             with CaptureQueriesContext(connections["default"]) as queries:
-                move.control_services.move_finished(
-                    hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.provisioning.LEASE_OWNER
+                move.moving.control_services.worker_move.move_finished(
+                    hub.id,
+                    target.pk,
+                    None,
+                    f"x_move_{hub.id.hex}",
+                    AT,
+                    owner=move.moving.services.provisioning.LEASE_OWNER,
                 )
 
         leases = [q["sql"] for q in queries.captured_queries if '"control_hubdue"' in q["sql"]]
@@ -305,7 +310,7 @@ class TestTheMinorPoints:
         hub = moves.hub(to=None, cluster=elsewhere)
         left_on(target, hub)
         claimed: list[dt.datetime] = []
-        real = move.services.provisioning.claim_hub
+        real = move.moving.services.provisioning.claim_hub
 
         def claim(hub_id, now, lease, **kwargs):
             claimed.append(now)
@@ -313,7 +318,7 @@ class TestTheMinorPoints:
             Hub.objects.filter(pk=hub_id).update(cluster=target)
             return real(hub_id, now, lease, **kwargs)
 
-        monkeypatch.setattr(move.services.provisioning, "claim_hub", claim)
+        monkeypatch.setattr(move.moving.services.provisioning, "claim_hub", claim)
 
         run()
 
@@ -328,22 +333,22 @@ class TestTheMinorPoints:
         left_on(target, hub)
 
         with use_control():
-            move.drop_leftovers(AT)
+            move.worker_pass.drop_leftovers(AT)
 
         assert marker(hub.db_name) == [MARKER]
-        assert move._same_server(None, target)
+        assert move.databases._same_server(None, target)
 
     def test_a_cancel_is_heard_while_the_copy_is_restored(self, moves, monkeypatch, caplog):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        monkeypatch.setattr(move.dumps, "POLL_SECONDS", 0.0)
-        real = move._kept_entries
+        monkeypatch.setattr(move.bucket.dumps, "POLL_SECONDS", 0.0)
+        real = move.bucket._kept_entries
 
         def asked_meanwhile(listing):
             Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
             return real(listing)
 
-        monkeypatch.setattr(move, "_kept_entries", asked_meanwhile)
+        monkeypatch.setattr(move.bucket, "_kept_entries", asked_meanwhile)
 
         run()
 

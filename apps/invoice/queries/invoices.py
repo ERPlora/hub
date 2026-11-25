@@ -8,13 +8,16 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.invoice.queries.documents import render_document
+from apps.invoice.queries.overdue import OVERDUE, overdue
 from apps.invoice.queries.ownership import INVOICES
+from apps.invoice.queries.platform_reading import SHOWN_STATUS, with_source, with_status
 from apps.invoice.queries.rows import _page, document_of_sale, find_invoice, invoice_detail, invoice_row, with_links
-from apps.invoice.schemas import (
+from apps.invoice.schemas.invoices import (
     BySourceIn,
     BySourceOut,
     DocumentIn,
     DocumentOut,
+    InvoiceFiltersIn,
     InvoiceGetIn,
     InvoiceListIn,
     InvoiceOut,
@@ -23,7 +26,8 @@ from apps.invoice.schemas import (
     LineDefaultsOut,
 )
 from apps.sale.queries.sales import visible_sale
-from apps.tax.queries import business_tax_kind, resolve_tax
+from apps.tax.queries.jurisdiction import business_tax_kind
+from apps.tax.queries.resolution import resolve_tax
 
 #: A sort column → its ordering; every one ends with the newest first, then the id.
 _SORTS = {
@@ -32,7 +36,7 @@ _SORTS = {
     "number": ["series_code", "year", "sequence"],
     "customer_name": ["customer_name"],
     "total_amount": ["total_amount"],
-    "status": ["status"],
+    "status": ["shown_status"],
     "invoice_type": ["invoice_type"],
     "series_code": ["series_code", "year", "sequence"],
 }
@@ -51,6 +55,38 @@ def _ordering(sort: str, direction: str) -> list:
     return [*columns, *tie]
 
 
+def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
+    """The invoices the caller sees that match the list's search and filters."""
+    invoices = INVOICES.visible(ctx)
+    if params.search:
+        text = params.search.strip()
+        invoices = invoices.filter(
+            Q(number__icontains=text)
+            | Q(customer_name__icontains=text)
+            | Q(customer_tax_id__icontains=text)
+        )
+    if params.status == OVERDUE:
+        invoices = invoices.filter(overdue())
+    elif params.status:
+        invoices = invoices.filter(with_status(params.status))
+    if params.source_type:
+        invoices = invoices.filter(with_source(params.source_type))
+    exact = {
+        "invoice_type": params.invoice_type,
+        "series_code": params.series_code.strip().upper()
+        if params.series_code
+        else None,
+        "customer_id": params.customer_id,
+        "issue_date__gte": params.issue_date_from,
+        "issue_date__lte": params.issue_date_to,
+        "total_amount__gte": params.total_amount_from,
+        "total_amount__lte": params.total_amount_to,
+    }
+    return invoices.filter(
+        **{lookup: value for lookup, value in exact.items() if value is not None}
+    )
+
+
 @operation(
     "invoice.invoice.list",
     kind="query",
@@ -63,43 +99,23 @@ def _ordering(sort: str, direction: str) -> list:
             "en": (
                 "which invoices have we issued this month?",
                 "show me the invoices of Carpintería Lema that are still pending",
+                "which invoices are overdue?",
             ),
             "es": (
                 "¿qué facturas hemos emitido este mes?",
                 "busca las facturas de Carpintería Lema que siguen pendientes",
+                "¿qué facturas están vencidas sin cobrar?",
             ),
         },
         "description": "List the invoices, the last issued first: search by number, customer's name or tax ID; filter "
-        "by status (issued, paid, cancelled), type (F1, F2 ticket, F3, R1–R5), series, source, issue dates and total "
-        "(cents). Pages of up to 100."
+        "by status (issued, paid, cancelled; overdue: not paid and past its due date), type (F1, F2 ticket, F3, R1–R5), "
+        "series, source, issue dates and total (cents). Pages of up to 100."
     },
 )
 def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
-    invoices = INVOICES.visible(ctx)
-    if params.search:
-        text = params.search.strip()
-        invoices = invoices.filter(
-            Q(number__icontains=text)
-            | Q(customer_name__icontains=text)
-            | Q(customer_tax_id__icontains=text)
-        )
-    exact = {
-        "status": params.status,
-        "invoice_type": params.invoice_type,
-        "series_code": params.series_code.strip().upper()
-        if params.series_code
-        else None,
-        "source_type": params.source_type,
-        "customer_id": params.customer_id,
-        "issue_date__gte": params.issue_date_from,
-        "issue_date__lte": params.issue_date_to,
-        "total_amount__gte": params.total_amount_from,
-        "total_amount__lte": params.total_amount_to,
-    }
-    invoices = invoices.filter(
-        **{lookup: value for lookup, value in exact.items() if value is not None}
-    )
-    invoices = with_links(invoices).order_by(*_ordering(params.sort, params.dir))
+    invoices = filter_invoices(ctx, params)
+    invoices = with_links(invoices).alias(shown_status=SHOWN_STATUS)
+    invoices = invoices.order_by(*_ordering(params.sort, params.dir))
     return _page(invoices, params, invoice_row)
 
 

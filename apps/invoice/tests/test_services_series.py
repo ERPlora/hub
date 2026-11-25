@@ -265,7 +265,8 @@ def test_prefix_format_and_next_number_freeze_with_the_first_number(issuer, toda
     for change in ({"prefix": "G"}, {"format": "{year}{seq}"}, {"next_number": 99}):
         with pytest.raises(Conflict) as refused:
             run("invoice.series.update", {"series_id": str(series.id), **change})
-        assert refused.value.code == "invoice.series_locked"
+        # Under the field as it was asked: the counter is «next_number» to whoever changes it.
+        assert (refused.value.code, set(refused.value.fields)) == ("invoice.series_locked", set(change))
     renamed = run(
         "invoice.series.update",
         {
@@ -276,6 +277,7 @@ def test_prefix_format_and_next_number_freeze_with_the_first_number(issuer, toda
         },
     )
     assert (renamed.name, renamed.is_active) == ("Main", False)
+    assert events("invoice.series.updated")[0].payload["fields"] == ["format", "next_number", "prefix"]
     assert events("invoice.series.updated")[-1].payload["fields"] == [
         "is_active",
         "name",

@@ -33,27 +33,27 @@ router = Router(tags=["customer"])
 
 @bind(router, "customer.customer.list", "/customer/customers")
 async def customer_list(request, params: Query[CustomerListIn]):
-    return await run_operation(request, queries.list_customers, params)
+    return await run_operation(request, queries.cards.list_customers, params)
 
 
 @bind(router, "customer.customer.detail", "/customer/customers/detail")
 async def customer_detail(request, params: Query[CustomerRefIn]):
-    return await run_operation(request, queries.customer_detail, params)
+    return await run_operation(request, queries.cards.customer_detail, params)
 
 
 @bind(router, "customer.customer.stats", "/customer/customers/stats")
 async def customer_stats(request):
-    return await run_operation(request, queries.customer_stats)
+    return await run_operation(request, queries.cards.customer_stats)
 
 
 @bind(router, "customer.customer.by_phone", "/customer/customers/by_phone")
 async def customer_by_phone(request, params: Query[ByPhoneIn]):
-    return await run_operation(request, queries.customers_by_phone, params)
+    return await run_operation(request, queries.cards.customers_by_phone, params)
 
 
 @bind(router, "customer.customer.export", "/customer/customers/export")
 async def customer_export(request, params: Query[CustomerExportIn]):
-    return await run_operation(request, queries.export_customers, params)
+    return await run_operation(request, queries.exports.export_customers, params)
 
 
 @bind(router, "customer.customer.create", "/customer/customers", status=201)
@@ -101,7 +101,7 @@ async def customer_erase(request, data: EraseIn):
 
 @bind(router, "customer.group.list", "/customer/groups")
 async def group_list(request, params: Query[GroupListIn]):
-    return await run_operation(request, queries.list_groups, params)
+    return await run_operation(request, queries.groups.list_groups, params)
 
 
 @bind(router, "customer.group.create", "/customer/groups", status=201)
@@ -121,7 +121,7 @@ async def group_delete(request, data: GroupRefIn):
 
 @bind(router, "customer.tag.list", "/customer/tags")
 async def tag_list(request, params: Query[TagListIn]):
-    return await run_operation(request, queries.list_tags, params)
+    return await run_operation(request, queries.tags.list_tags, params)
 
 
 @bind(router, "customer.tag.create", "/customer/tags", status=201)
@@ -141,7 +141,7 @@ async def tag_delete(request, data: TagRefIn):
 
 @bind(router, "customer.field.list", "/customer/fields")
 async def field_list(request, params: Query[FieldListIn]):
-    return await run_operation(request, queries.list_fields, params)
+    return await run_operation(request, queries.custom_fields.list_fields, params)
 
 
 @bind(router, "customer.field.create", "/customer/fields", status=201)
@@ -164,7 +164,7 @@ async def field_delete(request, data: FieldRefIn):
 
 @bind(router, "customer.activity.list", "/customer/activity")
 async def activity_list(request, params: Query[ActivityListIn]):
-    return await run_operation(request, queries.list_activity, params)
+    return await run_operation(request, queries.activity.list_activity, params)
 
 
 @bind(router, "customer.activity.add", "/customer/activity", status=201)
@@ -179,22 +179,22 @@ async def note_add(request, data: NoteIn):
 
 @bind(router, "customer.purchase.list", "/customer/purchases")
 async def purchase_list(request, params: Query[PurchaseListIn]):
-    return await run_operation(request, queries.list_purchases, params)
+    return await run_operation(request, queries.purchases.list_purchases, params)
 
 
 @bind(router, "customer.purchase.divergences", "/customer/purchases/divergences")
 async def purchase_divergences(request, params: Query[DivergencesIn]):
-    return await run_operation(request, queries.purchase_divergences, params)
+    return await run_operation(request, queries.purchases.purchase_divergences, params)
 
 
 @bind(router, "customer.consent.history", "/customer/consents")
 async def consent_history(request, params: Query[ConsentHistoryIn]):
-    return await run_operation(request, queries.consent_history, params)
+    return await run_operation(request, queries.consent.consent_history, params)
 
 
 @bind(router, "customer.consent.state", "/customer/consents/state")
 async def consent_state(request, params: Query[ConsentStateIn]):
-    return await run_operation(request, queries.consent_state, params)
+    return await run_operation(request, queries.consent.consent_state, params)
 
 
 @bind(router, "customer.consent.grant", "/customer/consents/grant", status=201)
@@ -212,7 +212,7 @@ async def consent_withdraw(request, data: ConsentWithdrawIn):
 
 @bind(router, "customer.health.detail", "/customer/health")
 async def health_detail(request, params: Query[HealthDetailIn]):
-    return await run_operation(request, queries.health_detail, params)
+    return await run_operation(request, queries.health.health_detail, params)
 
 
 @bind(router, "customer.health.grant", "/customer/health/grant")
@@ -232,12 +232,12 @@ async def health_update(request, data: HealthIn):
 
 @bind(router, "customer.order.list", "/customer/orders")
 async def order_list(request, params: Query[OrderListIn]):
-    return await run_operation(request, queries.list_orders, params)
+    return await run_operation(request, queries.orders.list_orders, params)
 
 
 @bind(router, "customer.order.customer", "/customer/orders/customer")
 async def order_customer(request, params: Query[OrderIn]):
-    return await run_operation(request, queries.order_customer, params)
+    return await run_operation(request, queries.orders.order_customer, params)
 
 
 @bind(router, "customer.order.link", "/customer/orders/link")

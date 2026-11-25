@@ -17,21 +17,17 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
+from live.errors import Conflict, NotFound
 from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.payment import events
-from apps.payment.models import (
-    ACTOR_MAX_LENGTH,
-    Payment,
-    PaymentCounter,
-    PaymentMethod,
-)
+from apps.payment.models import ACTOR_MAX_LENGTH, Payment, PaymentCounter, PaymentMethod
 from apps.payment.queries import (
     find_method,
     find_payment,
     method_row,
+    method_to_pay_from,
     payment_row,
 )
 from apps.payment.schemas import (
@@ -45,13 +41,13 @@ from apps.payment.schemas import (
     PaymentRefIn,
 )
 from base import operations as platform
+from base.assistant import card_order
 from base.business import business_zone
 from base.queries.people import actor_name
 
 METHOD_NAME_TAKEN = _(
     "There is already a payment method with that name. Pick another name."
 )
-METHOD_INACTIVE = _("That payment method is deactivated: pick an active one.")
 METHOD_ALREADY_INACTIVE = _("That payment method is already deactivated.")
 METHOD_ALREADY_ACTIVE = _("That payment method is already active.")
 APPROVE_REFUSED = _("Only a draft payment can be approved; this one is %(status)s.")
@@ -170,6 +166,7 @@ def create_method(ctx: OperationContext, data: MethodIn) -> dict:
         "description": "Change a payment method (named by its id or its name): only the fields sent change. "
         "The payments that used it keep it.",
         "risk": "normal",
+        "check": "payment.method.get",
     },
 )
 def update_method(ctx: OperationContext, data: MethodPatchIn) -> dict:
@@ -239,6 +236,7 @@ def _set_active(ctx: OperationContext, data: MethodRefIn, active: bool) -> dict:
         "description": "Deactivate a payment method (named by its id or its name): a new payment can no "
         "longer use it; the payments that used it keep it. It is never deleted.",
         "risk": "normal",
+        "check": "payment.method.get",
     },
 )
 def deactivate_method(ctx: OperationContext, data: MethodRefIn) -> dict:
@@ -267,6 +265,7 @@ def deactivate_method(ctx: OperationContext, data: MethodRefIn) -> dict:
         "description": "Activate a deactivated payment method again (named by its id or its name), so new "
         "payments can use it.",
         "risk": "normal",
+        "check": "payment.method.get",
     },
 )
 def activate_method(ctx: OperationContext, data: MethodRefIn) -> dict:
@@ -274,25 +273,6 @@ def activate_method(ctx: OperationContext, data: MethodRefIn) -> dict:
 
 
 # ── Payments ──────────────────────────────────────────────────────────────────────────────────
-
-
-def _method_to_pay_from(data: PaymentIn) -> PaymentMethod:
-    """The active method the payment leaves from; a missing or deactivated one is refused under the
-    field the caller used (the screen sends ``method_id``, the assistant may say ``method``)."""
-    field = "method_id" if data.method_id is not None else "method"
-    try:
-        method = find_method(data.method_id, data.method, lock=True)
-    except NotFound as missing:
-        raise InvalidPayload(
-            missing.message, code=missing.code, fields={field: missing.message}
-        ) from None
-    if not method.is_active:
-        raise InvalidPayload(
-            str(METHOD_INACTIVE),
-            code="payment.method_inactive",
-            fields={field: str(METHOD_INACTIVE)},
-        )
-    return method
 
 
 def _number(day) -> int:
@@ -368,6 +348,8 @@ def _recorded(data: PaymentIn, currency: str) -> dict | None:
         "day, the amount in minor units (12,50 € = 1250), the beneficiary and optionally the concept, IBAN, "
         "supplier's invoice and currency. It moves no money. Never use it to charge a customer.",
         "risk": "normal",
+        "check": "payment.payment.check",
+        "summary": card_order.said_first("beneficiary_name", "supplier_invoice_ref", "amount"),
     },
 )
 def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
@@ -376,7 +358,7 @@ def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
     recorded = _recorded(data, currency)
     if recorded is not None:
         return recorded
-    method = _method_to_pay_from(data)
+    method = method_to_pay_from(data, lock=True)
     day = timezone.localdate(timezone=business_zone())
     actor = _actor(ctx)
     try:

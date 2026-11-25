@@ -263,7 +263,7 @@ def meter(ctx=None) -> dict:
     from base import home
 
     config = apps.get_app_config("whatsapp_inbox")
-    (found,) = home.plan_meters(ctx or ctx_for("hub_owner"), [config])
+    (found,) = home.plan_meters.plan_meters(ctx or ctx_for("hub_owner"), [config])
     return found
 
 

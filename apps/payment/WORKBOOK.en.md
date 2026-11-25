@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:3c202f103fe4d7fa0a6525234a0bc8f2a2d372561e96d7b2c02ae0d0a49d4c35 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:1c3861a0769b -->
 
 Payments keeps the money that goes out of the business: what is paid to a supplier, a transfer or a refund that is
 not a sale's. Each payment carries its reference and moves from draft to approved, sent and completed, or is
@@ -8,6 +7,7 @@ cancelled with its reason, and keeps who recorded it, who approved it and when e
 and talks to no bank: you mark each step once it has happened.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:0430e0040776 -->
 
 Payments records the **money that goes out** of the business: what is paid to a supplier, a transfer,
 a refund that is not a sale's. Each payment carries its own reference (`PAY-YYYYMMDD-NNNN`) and goes
@@ -33,6 +33,7 @@ Who uses it:
   left out.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:a446d930770e -->
 
 - **The till's tenders are settings of the till; paying suppliers is another piece** (accounts
   payable): Odoo separates the Point of Sale payment methods (Point of Sale → Configuration) from the
@@ -56,6 +57,7 @@ Who uses it:
 Research and links in the Spanish WORKBOOK, "Para quien lo mantiene · Decisión: Pagos no es Ventas".
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:f312d8690d34 -->
 
 1. Payments is not turned on with any type of business: it is turned on from the app store. It turns on
    no other app and needs none: it can be turned on and off on its own.
@@ -65,11 +67,13 @@ Research and links in the Spanish WORKBOOK, "Para quien lo mantiene · Decisión
    Spain, euros; in Poland, złoty). A payment already recorded keeps its own.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:849b8d9f57bb -->
 
 Payments opens from the **Payments** menu and has two tabs: **Payments** and **Methods**. What a person
 cannot do does not show, and the app refuses it even if they try through the API or the assistant.
 
 ### Payments
+<!-- from WORKBOOK.md sha256:89adca9b7420 -->
 
 Title "Outgoing payments". The table of the payments, with their reference, date, beneficiary, amount and status,
 the most recent on top; you search by the reference, the beneficiary or the supplier invoice, and the toolbar's
@@ -78,6 +82,7 @@ funnel filters by date, amount and status. Each row offers the step that is due:
 one.
 
 #### Payments table
+<!-- from WORKBOOK.md sha256:e9d9679e6f7a -->
 
 A table with the columns **Reference**, **Date**, **Beneficiary**,
 **Amount** and **Status** (and **Method**, which can be shown with the column picker). Search box
@@ -94,18 +99,21 @@ status; an approved one (and later sent or completed), who approved it ("Approve
 action is working, its button spins and a second tap does nothing.
 
 #### New payment
+<!-- from WORKBOOK.md sha256:0a6515da3c35 -->
 
 The **New payment** button opens the "New payment" form: **Method**, **Date** (today's comes filled
 in), **Amount** (it says the business's currency: "Amount (EUR)", "Amount (PLN)"), **Beneficiary**,
 **Concept** and, if wanted, **Beneficiary IBAN** and **Supplier invoice** (its number).
 
 ### Methods
+<!-- from WORKBOOK.md sha256:1d94bb2295db -->
 
 The methods are where the business pays from: its bank account, its company card or the cash in the drawer. A table
 with their name, their type, the account (covered except for its last four characters) and whether it is active.
 **New method** creates one, a row opens it to change it and each row offers **Deactivate** or **Activate**.
 
 #### Methods table
+<!-- from WORKBOOK.md sha256:dc421fce2e3c -->
 
 A table with **Name**, **Type** (Cash, Bank transfer, Card, SEPA, Cheque or Other), **Account** (the
 reference of the bank account, covered except for its last four characters: an IBAN shows as
@@ -115,6 +123,7 @@ opens the form; a row (or its **Edit**) opens "Editing method — {name}"; each 
 or **Activate**.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:9429fafe9700 -->
 
 | State | What the person sees |
 |---|---|
@@ -129,12 +138,14 @@ Amounts and dates show in the format of the language of whoever looks; the amoun
 currency.
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:cfb1ff9cfaf5 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); the whole account read when editing a method is no change.
 
 ## Flows
+<!-- from WORKBOOK.md sha256:02fcf64378c5 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -148,6 +159,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the whol
 | PAYMENT-F08 | Edit, deactivate and reactivate a payment method | done |
 
 ### PAYMENT-F01 Create a payment method
+<!-- from WORKBOOK.md sha256:e6a031a0943a -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
@@ -166,6 +178,7 @@ methods yet. Create one in Methods before recording a payment.".
 Involved: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F02 Record a payment
+<!-- from WORKBOOK.md sha256:8801dc029ca0 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Payments
@@ -188,7 +201,12 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, "Rec
 Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
-recorded instead of recording another.
+recorded instead of recording another. The assistant's card says on its line who is paid, the supplier
+invoice and the amount, these two with their names ("Create in Payments: Pescados QA · Supplier invoice: F-2611 ·
+Amount: €180.00"); without an invoice, the method it leaves from goes after the amount ("Pescados QA · Amount:
+€180.00 · Method: Cuenta BBVA"), and the other data
+follow, each one once. The method shows as the payment finds it, even when it was said in other words
+("Cuenta BBVA" when "the BBVA one" was said).
 Out: a draft payment with reference `PAY-YYYYMMDD-NNNN` — the date is that of the business day on which
 it is recorded, not the payment's; the number counts per day and never repeats — and the notice
 `payment.payment.created` (it carries the reference, the beneficiary, the amount and the currency).
@@ -200,12 +218,14 @@ not an amount. Type a figure, for example 12.50."; also an amount with another c
 IBAN is not valid: check the country, the check digits and the length."); a method that does not exist
 ("That payment method does not exist in this business.") or is deactivated ("That payment method is
 deactivated: pick an active one."). Through the assistant, a method name that matches several says
-which ones ("“Till” matches several payment methods: …"). An attempt key that already recorded another
+which ones ("“Till” matches several payment methods: …"); that one, one that does not exist or one that is
+deactivated draw no card: the assistant hears it and asks. An attempt key that already recorded another
 payment is refused ("That attempt key already recorded another payment. Make a new key for each
 payment.") and nothing is saved.
 Involved: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F03 Approve a payment
+<!-- from WORKBOOK.md sha256:83714b991020 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Payments
@@ -221,6 +241,7 @@ why ("Only a draft payment can be approved; this one is Approved."), above the t
 Involved: FLOW-F21
 
 ### PAYMENT-F04 Mark a payment as sent and as completed
+<!-- from WORKBOOK.md sha256:358ca239f900 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Payments
@@ -236,6 +257,7 @@ be marked as completed; …"). A completed or cancelled payment offers no more a
 Involved: FLOW-F21
 
 ### PAYMENT-F05 Cancel a payment
+<!-- from WORKBOOK.md sha256:28073fcd61e0 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Payments
@@ -254,6 +276,7 @@ is cancelled and another is recorded.
 Involved: FLOW-F21
 
 ### PAYMENT-F06 Search and review the payments
+<!-- from WORKBOOK.md sha256:0430845da71b -->
 Status: done
 Actor: manager, administrator, owner, assistant (an employee does not open Payments: by its address, "No access" (BASE-F118))
 Screen: Payments
@@ -275,6 +298,7 @@ If it fails: if the list does not load, the table says so ("The payments could n
 Involved: FLOW-F11, BASE-F119
 
 ### PAYMENT-F07 Announce a completed payment
+<!-- from WORKBOOK.md sha256:ea621bbb02e8 -->
 Status: done
 Actor: system
 Screen: none (the automation is created in **Automations**)
@@ -294,6 +318,7 @@ starts anything in another. This app listens to no other.
 Involved: FLOW-F21
 
 ### PAYMENT-F08 Edit, deactivate and reactivate a payment method
+<!-- from WORKBOOK.md sha256:d2a335812177 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
@@ -306,16 +331,22 @@ Steps:
    what has not been touched.
 3. To stop using it, tap **Deactivate** in its row: it moves to **Deactivated** and no longer shows in
    "New payment". **Activate** brings it back.
-In: the method (through the assistant, by its name) and what changes.
+In: the method (through the assistant, by its name) and what changes. The assistant's card says the
+method it is going to change as it finds it, even when it was said in other words ("Change in Payments:
+Cuenta BBVA 4821 · Name: BBVA QA proveedores" when "the BBVA one" was said).
 Out: the changed method (`payment.method.updated`, `.deactivated`, `.activated`). The payments that
 already used it keep it and show its new name.
 If it fails: a name that another method already has is refused under Name. Deactivating a deactivated
-one or activating an active one changes nothing and says why. A method is never deleted.
+one or activating an active one changes nothing and says why. A method is never deleted. Through the
+assistant, a name that matches several methods or none draws no card: the assistant says which ones fit
+and asks which one.
 Involved: FLOW-F11, FLOW-F21
 
 ## Payments: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:f11d80912911 -->
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:ee0811f25d12 -->
 
 | Operation | What it gives | Permission | Flows |
 |---|---|---|---|
@@ -323,8 +354,10 @@ Involved: FLOW-F11, FLOW-F21
 | `payment.payment.get` | A whole payment, by its id or its reference, with its full IBAN | `payment.view_payment` | F06 |
 | `payment.method.list` | The methods, paginated, with search (name or account), type, status and sorting | `payment.view_payment` | F01, F02, F08 |
 | `payment.method.get` | A method, by its id or its name, with its full account | `payment.view_payment` | F08 |
+| `payment.payment.check` | The active method a new payment leaves from, as recording it finds it: what the assistant checks before its card; not a tool of the assistant and with no route in the API | `payment.add_payment` | F02 |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:f9ffa3c46821 -->
 
 | Operation | What it does | Permission | Flows |
 |---|---|---|---|
@@ -338,12 +371,14 @@ Involved: FLOW-F11, FLOW-F21
 | `payment.payment.cancel` | Any unfinished one → Cancelled, with a reason | `payment.approve_payment` | F05 |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:bae59e6c8605 -->
 
 `payment.payment.created`, `.approved`, `.sent`, `.completed`, `.cancelled` and
 `payment.method.created`, `.updated`, `.deactivated`, `.activated`; each one in the same transaction as
 its change and only if the change happened.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:1b9134f16f7c -->
 
 Nothing and from nobody: `requires = []`. No other app reads Payments except **Automations**, which
 listens to all its notices and offers them as triggers (PAYMENT-F07, FLOW-F21). Its steps can also look
@@ -352,6 +387,7 @@ payment and create, change, deactivate or activate a method. Approving, marking 
 cancelling need a person: an automation does not do them.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:8d0f6a7f4727 -->
 
 | Role | View | Record, send, complete and manage methods | Approve and cancel |
 |---|---|---|---|

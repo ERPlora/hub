@@ -8,8 +8,8 @@ Home), where its plan is changed on the SaaS (``/dashboard/store/plans?business=
 plan»), the SaaS's account page (the user menu's «My account»; its «Report a problem» is the hub's own dialog) and this
 business on the SaaS's panel (``manage_url``, the bar's «erplora.com»; only with ``base.open_management``), those only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock;
-``base.queries.access.shell_access``), the person's own appearance (``preferences``) and the modules whose help window
-is ready (``help_apps``, ``base.help.get``). The addresses on erplora.com
+``base.queries.access.shell_access``), the person's own appearance (``preferences``) and the apps whose help is ready
+(``help_apps``, ``base.help.get``). The addresses on erplora.com
 are the usual ones, which ask to sign in: their click goes with the pass ``base.saas_pass.create`` signs, never
 embedded here, where it would expire in a minute and any script could read it. ``widget-list`` carries
 ``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
@@ -36,7 +36,7 @@ from live.errors import OperationError
 from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
 
-from base import public_home, queries
+from base import public_home, queries, saas_store
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models.sessions import SessionOwner
@@ -96,7 +96,7 @@ def shell(request: HttpRequest, *, blocks: dict | None = None) -> HttpResponse:
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,
-            "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if account else "",
+            "plan_url": saas_store.plans_url(hub.slug, hub.id) if account else "",
             "account_url": saas_url(f"{SAAS_PANEL_PATH}/account") if account else "",
             # «Members» of the business on erplora.com, where people are invited.
             "members_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/members") if account else "",
@@ -109,7 +109,7 @@ def shell(request: HttpRequest, *, blocks: dict | None = None) -> HttpResponse:
             # The ERPlora app of each system erplora.com publishes, always its latest build. Public pages, so they go
             # to anyone, whatever the way in.
             "app_downloads": {platform: saas_url(f"/app/download/{platform}/") for platform in APP_PLATFORMS},
-            # The modules whose screens show the help button (base.help.get).
+            # The apps whose help is ready (base.help.get).
             "help_apps": queries.app_help.ready_apps(),
         }
         widgets = _widgets(request)

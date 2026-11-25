@@ -19,8 +19,8 @@ from apps.sale.models import Refund, RefundLine, Sale, SaleLine
 from apps.sale.queries.ownership import SALES, VOUCHER_SESSIONS
 from apps.sale.schemas.fields import EmptyIn
 from apps.sale.schemas.figures import ByStaffOut, LastDaysOut, PeriodIn, StatsOut, TodayOut
-from apps.tax.queries import business_tax_kind, business_today
-from apps.tax.schemas import TAX_KIND_NAMES
+from apps.tax.queries.jurisdiction import business_tax_kind, business_today
+from apps.tax.schemas.jurisdiction import TAX_KIND_NAMES
 
 #: A voided sale is no revenue; one refunded (in part or in full) is, minus what went back.
 COUNTED = [Sale.Status.COMPLETED, Sale.Status.REFUNDED]

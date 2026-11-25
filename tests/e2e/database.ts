@@ -73,7 +73,7 @@ export function prepareDatabase(name: string, { sql, manage }: { sql: AdminSql; 
 
 /** Makes `<name>_template`, the platform's template every vertical's one is cloned from, when missing: in production
  * db-bootstrap makes it (with its roles and grants), and `migrate_hubs` refuses to run without it
- * (base/tenancy/migrator.py, `TemplateMissing`). Here one role does everything: it only closes it to PUBLIC. */
+ * (base/tenancy/migrator/hub_templates.py, `TemplateMissing`). Here one role does everything: it only closes it to PUBLIC. */
 function ensurePlatformTemplate(name: string, sql: AdminSql): void {
   const template = `${name}_template`;
   const found = sql(`select 1 from pg_database where datname = '${template}'`);

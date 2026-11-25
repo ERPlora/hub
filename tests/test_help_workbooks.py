@@ -1,4 +1,4 @@
-"""Every module whose help window is ready publishes only what a customer reads, and all of it, in every language.
+"""Every app whose help is ready publishes only what a customer reads, and all of it, in every language.
 
 For each module that declares ``help`` and each language of the deployment, the help ``base.help.get`` serves: every
 entry of the module's menu has its ``###`` under the screens heading, once, and every ``###`` there is one of its tabs;
@@ -9,11 +9,13 @@ screen's summary, and each flow's title, steps and what happens if it fails) hol
 reference, no size in pixels, no flow id (also a short one, «F09»), no placeholder of a message («{n}», «<total>»), no
 Markdown the window's reader does not read («***», a backslash escape), no operation or event name and no quoted title
 of a part of the WORKBOOK the window does not show («Pantallas»), while the detail under a ``###`` of the first section
-or a ``####`` of a screen may hold any of them; every published flow has its steps; and no flow that reads as done on a
+or a ``####`` of a screen may hold any of them; every published flow has its steps, numbered in order; and no flow that reads as done on a
 tab is left out, also when its screen names the tab with an arrow or «y» instead of a comma. A translation
 publishes the same tabs and flows as its source, each with its steps and what happens if it fails when the source has
-them, so a word of the vocabulary that is missing or wrong in it cannot empty the help in that language. While no module declares its help, the real cases are
-an empty set; the made-up WORKBOOKs below, clean and then broken once per rule, show the check catching what it guards.
+them, so a word of the vocabulary that is missing or wrong in it cannot empty the help in that language. The platform (base)
+follows the same rules with the screens it declares, each with its ``###``, once; only a ``###`` that is no screen (the
+bell, the side menu) stays in the file. The made-up WORKBOOKs below, clean and then broken once per rule, show the check
+catching what it guards.
 """
 
 import itertools
@@ -27,10 +29,10 @@ from django.conf import settings
 from django.utils import translation
 from live.meta import all_live_app_configs
 
-from base import workbook_help
-from base.catalog import user_part
+from base import platform_screens, workbook_help
+from base.catalog.workbooks import user_part
 from base.queries import app_help
-from base.tests.help_workbooks import EN, EN_TABS, EN_WORDS, ES, ES_TABS, ES_WORDS
+from base.tests.help_workbooks import EN, EN_TABS, EN_WORDS, ES, ES_TABS, ES_WORDS, PLATFORM_ES
 
 FORBIDDEN = {
     "code": re.compile(r"`"),
@@ -48,6 +50,7 @@ JOINING_WORD = re.compile(r"\s+(?:y|e|o|u|and|or)\s+")
 #: The title of a section (``##``) or a part of one (``###``) of the WORKBOOK, and that of a flow.
 HEADING = re.compile(r"^#{2,3} +(.+?) *$", re.MULTILINE)
 FLOW_HEADING = re.compile(r"^[A-Z][A-Z0-9_]*-F\d+\s")
+STEP = re.compile(r"^\s*(\d+)[.)]\s", re.MULTILINE)
 QUOTES = ("«{}»", '"{}"', "“{}”")
 #: ``<app>.<entity>.<action>`` (or ``<fact>``): an operation's or an event's name, when its first part is an app.
 DOTTED = re.compile(r"(?<![\w.])([a-z][a-z0-9_]*)\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*(?!\w|\.\w)")
@@ -57,6 +60,8 @@ SUMMARY_MAX = 900
 PURPOSE_MAX = 500
 LANGUAGES = [code for code, _name in settings.LANGUAGES]
 READY = app_help.ready_apps()
+MODULES = [label for label in READY if apps.get_app_config(label).kind == "app"]
+PLATFORM = apps.get_app_config("base")
 
 
 def published(read: workbook_help.Help) -> Iterator[tuple[str, str]]:
@@ -155,25 +160,59 @@ def reference_problems(read: workbook_help.Help, markdown: str, tabs) -> list[st
     ]
 
 
-def problems(markdown: str, tabs, menu: set[str], vocabulary: workbook_help.Words, module: str) -> list[str]:
-    """What breaks the rules in the help read from ``markdown`` with ``vocabulary``, for the module named ``module``,
-    whose tabs are ``tabs`` and whose menu has the ids ``menu`` (its implicit settings tab is a tab only when the
-    WORKBOOK writes it)."""
-    read = workbook_help.parse(markdown, tabs, vocabulary)
-    documented = {screen.id for screen in read.screens}
-    found = [f"the tab «{tab.label}» has no ### under the screens heading" for tab in tabs if tab.id in menu - documented]
-    found += [f"«### {title}» under the screens heading is no tab" for title in read.unknown_screens]
-    found += [f"«### {title}» is written twice under the screens heading" for title in read.repeated_screens]
-    found += purpose_problems(read) + summary_problems(read)
+def screen_problems(read: workbook_help.Help, tabs, required: set[str]) -> list[str]:
+    """The tabs of ``required`` with no section under the screens heading, and those with two."""
+    missing = required - {screen.id for screen in read.screens}
+    found = [f"the tab «{tab.label}» has no ### under the screens heading" for tab in tabs if tab.id in missing]
+    return found + [f"«### {title}» is written twice under the screens heading" for title in read.repeated_screens]
+
+
+def published_problems(read: workbook_help.Help, markdown: str, tabs) -> list[str]:
+    """What breaks the rules in the text that is published."""
     names = {config.label for config in all_live_app_configs()}
+    found = purpose_problems(read) + summary_problems(read)
     found += [problem for where, text in published(read) for problem in text_problems(where, text, names)]
-    found += reference_problems(read, markdown, tabs) + placement_problems(read, markdown, tabs, vocabulary, module)
+    return found + reference_problems(read, markdown, tabs)
+
+
+def numbered(flow: workbook_help.Flow) -> list[int]:
+    """The numbers its steps start with, as the window lists them: a line the file wraps at «3. …» starts one too."""
+    return [int(number) for number in STEP.findall(flow.steps)]
+
+
+def in_order(numbers: list[int]) -> list[int]:
+    return list(range(1, len(numbers) + 1))
+
+
+def task_problems(read: workbook_help.Help, markdown: str, tabs, vocabulary: workbook_help.Words, app: str) -> list[str]:
+    """The tasks done on a tab of ``app`` that are left out of it, and those published without steps or with steps
+    numbered out of order."""
+    found = placement_problems(read, markdown, tabs, vocabulary, app)
     found += [f"{flow.id} is published without steps" for flow in read.flows if not flow.steps.strip()]
+    found += [f"the steps of {flow.id} are numbered {seen}" for flow in read.flows if (seen := numbered(flow)) != in_order(seen)]
     return found + [
         f"{draft.id} is done on a tab, but its status «{draft.status}» is not read as done: it is left out"
         for draft in read.unpublished
         if draft.screens and reads_as_done(draft.status, vocabulary.done)
     ]
+
+
+def platform_problems(markdown: str, tabs, vocabulary: workbook_help.Words) -> list[str]:
+    """What breaks the rules in the platform's help read from ``markdown`` with ``vocabulary``: every one of ``tabs`` is
+    written, and what is no tab stays in the file."""
+    read = workbook_help.parse(markdown, tabs, vocabulary)
+    found = screen_problems(read, tabs, {tab.id for tab in tabs}) + published_problems(read, markdown, tabs)
+    return found + task_problems(read, markdown, tabs, vocabulary, platform_screens.NAME)
+
+
+def problems(markdown: str, tabs, menu: set[str], vocabulary: workbook_help.Words, module: str) -> list[str]:
+    """What breaks the rules in the help read from ``markdown`` with ``vocabulary``, for the module named ``module``,
+    whose tabs are ``tabs`` and whose menu has the ids ``menu`` (its implicit settings tab is a tab only when the
+    WORKBOOK writes it)."""
+    read = workbook_help.parse(markdown, tabs, vocabulary)
+    found = screen_problems(read, tabs, menu) + published_problems(read, markdown, tabs)
+    found += [f"«### {title}» under the screens heading is no tab" for title in read.unknown_screens]
+    return found + task_problems(read, markdown, tabs, vocabulary, module)
 
 
 def shape(read: workbook_help.Help) -> tuple[list[str], list[tuple[str, bool, bool]]]:
@@ -190,13 +229,14 @@ def served(config, language: str) -> tuple[str, str, list, workbook_help.Words, 
         return language_served, markdown, tabs, vocabulary, str(config.verbose_name)
 
 
-def read_served(config, language: str) -> tuple[str, workbook_help.Help]:
-    language_served, markdown, tabs, vocabulary, _module = served(config, language)
-    return language_served, workbook_help.parse(markdown, tabs, vocabulary)
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_platform_publishes_only_what_a_customer_reads_and_all_of_it(language):
+    _language_served, markdown, tabs, vocabulary, _name = served(PLATFORM, language)
+    assert platform_problems(markdown, tabs, vocabulary) == []
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
-@pytest.mark.parametrize("label", READY)
+@pytest.mark.parametrize("label", MODULES)
 def test_a_ready_module_publishes_only_what_a_customer_reads_and_all_of_it(label, language):
     config = apps.get_app_config(label)
     _language_served, markdown, tabs, vocabulary, module = served(config, language)
@@ -205,12 +245,12 @@ def test_a_ready_module_publishes_only_what_a_customer_reads_and_all_of_it(label
 
 @pytest.mark.parametrize("language", [code for code in LANGUAGES if code != workbook_help.SOURCE_LANGUAGE])
 @pytest.mark.parametrize("label", READY)
-def test_a_ready_module_s_translation_publishes_what_its_source_does(label, language):
+def test_the_translation_of_a_ready_app_publishes_what_its_source_does(label, language):
     config = apps.get_app_config(label)
-    language_served, translated = read_served(config, language)
+    language_served, translated = app_help.help_of(config, language)
     # Not current: its translation fell behind the source (translate_workbooks --check says how to bring it up to date).
     assert language_served == language
-    assert shape(translated) == shape(read_served(config, workbook_help.SOURCE_LANGUAGE)[1])
+    assert shape(translated) == shape(app_help.help_of(config, workbook_help.SOURCE_LANGUAGE)[1])
 
 
 # ── The made-up module: clean, then broken once per rule ───────────────────────────────────────────────────────────
@@ -276,6 +316,7 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         ("Una tabla de zonas.", "Sale «{n} zonas».", "the screen «Zonas» has a placeholder"),
         ("Una tabla de mesas.", "Una tabla de mesas que lee table.table.list.", "names 'table.table.list'"),
         ("Pasos:\n1. Pulsa «+».\n", "", "TABLE-F01 is published without steps"),
+        ("1. Pulsa «+».\n", "1. Pulsa «+», como en los pasos 2 y\n   3. Guarda.\n", "the steps of TABLE-F01 are numbered [1, 3]"),
         ("Estado: hecho\n", "Estado: hecho, también por la API\n", "TABLE-F01 is done on a tab, but its status"),
         ("Tocar una mesa abre su ventana.\n", "", "the screen «Plano de sala» has no summary"),
         ("Una tabla de zonas.", "Z" * (SUMMARY_MAX + 1), f"the summary of «Zonas» has {SUMMARY_MAX + 1} characters"),
@@ -301,6 +342,7 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         "placeholder",
         "operation",
         "no-steps",
+        "wrapped-into-a-step",
         "dropped",
         "no-summary",
         "long-summary",
@@ -436,3 +478,57 @@ def test_a_translation_with_one_word_wrong_publishes_less_and_is_caught(before, 
 
 def test_a_translation_read_with_the_source_s_words_is_caught():
     assert shape(workbook_help.parse(EN, EN_TABS, ES_WORDS)) != SOURCE
+
+
+# ── The made-up platform ───────────────────────────────────────────────────────────────────────────────────────────
+
+PLATFORM_TABS = (
+    workbook_help.Tab("home", "Inicio · Resumen", "/"),
+    workbook_help.Tab("files", "Archivos", "/files"),
+    workbook_help.Tab("system_logs", "Sistema · Registros", "/system#logs"),
+)
+
+
+def made_up_platform(workbook: str) -> list[str]:
+    return platform_problems(user_part(workbook), PLATFORM_TABS, ES_WORDS)
+
+
+def test_the_clean_platform_passes_with_a_section_that_is_no_screen():
+    assert made_up_platform(PLATFORM_ES) == []
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "caught"),
+    [
+        ("### Archivos\nLos documentos del negocio.\n", "", "the tab «Archivos» has no ###"),
+        ("### La campana\n", "### Archivos\nOtros.\n\n### La campana\n", "«### Archivos» is written twice"),
+        ("Los documentos", "Los `documentos`", "the screen «Archivos» has code"),
+        ("Los documentos del negocio.", "«La campana» avisa.", "«Archivos» refers to «La campana»"),
+        ("sin activar nada.", "P" * PURPOSE_MAX, "what it is for has"),
+        ("1. Entra en el Inicio.", "1. Entra en el Inicio (BASE-F02).", "the steps of BASE-F01 has a flow id"),
+        ("1. Elige la plantilla.", "1. Elige «{name}».", "the steps of BASE-F03 has a placeholder"),
+        ("lo dice un aviso.", "lo dice un aviso (hub#12).", "what happens if BASE-F06 fails has an issue reference"),
+        ("1. Abre la carpeta.", "1. Abre la carpeta, como «La campana».", "the steps of BASE-F08 refers to «La campana»"),
+        ("Pasos:\n1. Abre la carpeta.\n", "", "BASE-F08 is published without steps"),
+        ("Pantalla: Archivos\nPasos:\n1. Abre", "Pantalla: Archivos › Carpeta\nPasos:\n1. Abre", "BASE-F08 is left out of"),
+        ("Estado: hecho\nActor: propietario\n", "Estado: hecho, con copia\nActor: propietario\n", "BASE-F04 is done on a tab"),
+    ],
+    ids=[
+        "missing",
+        "twice",
+        "code",
+        "reference",
+        "long-purpose",
+        "task-flow-id",
+        "task-placeholder",
+        "task-issue",
+        "task-reference",
+        "task-no-steps",
+        "task-arrow",
+        "task-dropped",
+    ],
+)
+def test_each_rule_catches_the_platform_that_breaks_it(before, after, caught):
+    assert before in PLATFORM_ES
+    [problem] = made_up_platform(PLATFORM_ES.replace(before, after, 1))
+    assert caught in problem

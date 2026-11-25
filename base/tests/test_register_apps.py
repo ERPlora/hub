@@ -21,20 +21,15 @@ from django.core.management import CommandError, call_command
 from django.db import connections
 
 from base import catalog
-from base.catalog import (
-    CatalogError,
-    RegistryError,
-    SharedSchemaNotReady,
-    build_registry,
-    register_apps,
-    source_hash,
-)
-from base.tests.test_catalog import ICONS, USER_PART, WORKBOOK, module, translated
+from base.catalog.app_registry import build_registry
+from base.catalog.errors import CatalogError, RegistryError, SharedSchemaNotReady
+from base.catalog.register_apps import register_apps
+from base.catalog.workbooks import source_hash
+from base.tests.apps_on_disk import ENGLISH, ICONS, USER_PART, WORKBOOK, module, translated
 from shared.models import App, AppDoc
 
 RELEASE = {"APP_VERSION": "4da2a10", "APP_RELEASED_AT": "2026-10-13T20:50:00+02:00"}
 RELEASED_AT = datetime.fromisoformat(RELEASE["APP_RELEASED_AT"])
-EN_BODY = "## What it is for\n\nKeeps **things**.\n"
 SHARED_DB = [pytest.mark.django_db(databases=["default", "shared"]), pytest.mark.usefixtures("shared_schema")]
 
 
@@ -51,7 +46,7 @@ def release(settings):
 def modules(tmp_path):
     """Two modules on disk: ``things`` translated, ``stock`` premium and only in Spanish."""
     return [
-        module(tmp_path, "things", en=translated(USER_PART, EN_BODY), verticals=["restaurant"]),
+        module(tmp_path, "things", en=translated(USER_PART, ENGLISH), verticals=["restaurant"]),
         module(tmp_path, "stock", premium=True, requires=["things"]),
     ]
 
@@ -93,7 +88,7 @@ class TestWrite:
         docs = {(doc.app_id, doc.lang): doc for doc in AppDoc.objects.all()}
         assert set(docs) == {("things", "es"), ("things", "en"), ("stock", "es")}
         assert docs["things", "es"].markdown == USER_PART
-        assert (docs["things", "en"].markdown, docs["things", "en"].source_hash) == (EN_BODY, source_hash(EN_BODY))
+        assert (docs["things", "en"].markdown, docs["things", "en"].source_hash) == (ENGLISH, source_hash(ENGLISH))
         assert docs["things", "es"].id.version == 7
 
     def test_the_same_release_twice_changes_nothing(self, modules):
@@ -108,7 +103,7 @@ class TestWrite:
     def test_a_changed_document_changes_its_hash_and_its_time_and_nothing_else(self, tmp_path, modules):
         register_apps(registry(modules))
         before = {(doc.app_id, doc.lang): doc for doc in AppDoc.objects.all()}
-        changed = rewritten(tmp_path, "Guarda **objetos**.", en=translated(USER_PART.replace("**cosas**", "**objetos**"), EN_BODY))
+        changed = rewritten(tmp_path, "Guarda **objetos**.", en=translated(USER_PART.replace("**cosas**", "**objetos**"), ENGLISH))
 
         result = register_apps(registry([changed, modules[1]]))
 
@@ -134,7 +129,7 @@ class TestWrite:
     def test_the_command_exits_zero_when_a_newer_release_registered(self, modules, monkeypatch):
         register_apps(registry(modules))
         App.objects.filter(id="things").update(registered_at=RELEASED_AT + timedelta(hours=1))
-        monkeypatch.setattr(catalog, "build_registry", lambda *args, **kwargs: registry(modules))
+        monkeypatch.setattr(catalog.register_apps, "build_registry", lambda *args, **kwargs: registry(modules))
 
         call_command("register_apps")  # no CommandError: exit code 0
 
@@ -177,7 +172,7 @@ class TestWrite:
         def broken(*args, **kwargs):
             raise CatalogError("the documents could not be written")
 
-        monkeypatch.setattr(catalog, "_write_documents", broken)
+        monkeypatch.setattr(catalog.register_apps, "_write_documents", broken)
 
         with caplog.at_level(logging.ERROR, logger="base.catalog"), pytest.raises(CatalogError):
             register_apps(registry(modules))
@@ -295,13 +290,13 @@ def test_check_validates_the_real_modules_without_opening_any_connection(capsys)
 
 
 def test_check_fails_with_every_problem(monkeypatch):
-    monkeypatch.setattr(catalog, "build_registry", broken_registry)
+    monkeypatch.setattr(catalog.app_registry, "build_registry", broken_registry)
     with pytest.raises(CommandError, match="lucide:box"):
         call_command("register_apps", "--check")
 
 
 def test_an_invalid_registry_fails_before_any_connection(monkeypatch, caplog):
-    monkeypatch.setattr(catalog, "build_registry", broken_registry)
+    monkeypatch.setattr(catalog.register_apps, "build_registry", broken_registry)
     with caplog.at_level(logging.ERROR, logger="base.catalog"), pytest.raises(RegistryError):
         register_apps()
     assert "lucide:box" in caplog.text
@@ -338,9 +333,9 @@ def test_the_command_forces_only_when_asked(monkeypatch):
 
     def recorded(**kwargs):
         calls.append(kwargs)
-        return catalog.RegisterResult(written=0, retired=0, docs_changed=0, skipped=False)
+        return catalog.register_apps.RegisterResult(written=0, retired=0, docs_changed=0, skipped=False)
 
-    monkeypatch.setattr(catalog, "register_apps", recorded)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", recorded)
     call_command("register_apps")
     call_command("register_apps", "--force")
     assert calls == [{"force": False}, {"force": True}]

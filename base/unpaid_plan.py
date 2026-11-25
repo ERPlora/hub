@@ -19,7 +19,7 @@ from live.meta import BellCounter
 from base import bell
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.business import zone_of
-from base.home import MIN_BELL_REFRESH_SECONDS
+from base.home.bell_counters import MIN_BELL_REFRESH_SECONDS
 from control.models import Hub
 
 logger = logging.getLogger(__name__)

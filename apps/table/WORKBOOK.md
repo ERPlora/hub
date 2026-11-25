@@ -315,7 +315,7 @@ Pasos:
    crea desde el «+» del plano en «Editar plano» (campo Zona y «Añadir zona»): se pone la última y
    queda elegida.
 5. Con el asistente: «quiero otra zona, Barra, para los que comen en la barra, y que vaya la primera». La
-   tarjeta lleva solo lo que se ha pedido, el nombre y el orden («Crear en Mesas: Barra · 0»): para qué es la
+   tarjeta lleva solo lo que se ha pedido, el nombre y el orden («Crear en Mesas: Barra · Orden: 0»): para qué es la
    zona no se guarda como su descripción. La descripción solo va si se pide («con la descripción…»).
 Entra: el nombre, la descripción, el color y el orden.
 Sale: la zona (avisa: `table.zone.created`).
@@ -923,7 +923,8 @@ Pantalla: Plano de sala (Servicio); asistente
 Pasos:
 1. En Ventas, con la cuenta de una mesa en pantalla, el camarero imprime la cuenta para llevarla a la mesa
    («Imprimir cuenta»), por la impresora de tiques o por el diálogo de impresión del dispositivo, o se la pide
-   al asistente («imprime la cuenta de la mesa 4»).
+   al asistente («imprime la cuenta de la mesa 4»), que solo la imprime por la impresora de tiques: si ninguna la
+   recibe, no se imprime ni se marca, y su recibo lo dice.
 2. En **Mesas → Plano de sala**, esa mesa pasa a **Cuenta pedida**: su estado escrito, con su icono, dice
    «Cuenta pedida» en lugar de «Ocupada», y la mesa se pinta de un color propio que no se confunde con los de
    los otros estados ni con el ámbar y el rojo del aviso de tiempo. Sigue enseñando el tiempo, los comensales
@@ -960,9 +961,9 @@ por su nombre. Lo que la persona no puede ver (la cuenta de Ventas, sin permiso 
 |---|---|---|---|
 | Las zonas con sus mesas y las libres, búsqueda, filtros, orden y páginas (hasta 100) | ver zonas | F01, F06 | `table.zone.list` |
 | Una zona | ver zonas | F06 | `table.zone.get` |
-| Las mesas con su estado vivo (comensales, desde cuándo, camarero, cliente, reserva), en orden natural, con búsqueda, filtros y páginas | ver mesas | F02, F09 | `table.table.list` |
+| Las mesas con su estado vivo (comensales, desde cuándo, camarero, cliente, reserva), en orden natural, con búsqueda, filtros y páginas | ver mesas | F02, F09, F18, F20, F33, F34 | `table.table.list` |
 | Una mesa con sus cuentas abiertas y su nombre con la zona, como 5 (Terraza) | ver mesas | F09–F17 | `table.table.get` |
-| Las cuentas de la sala (abiertas, cerradas, todas), con cobrado, filtros y páginas | ver cuentas | F22 | `table.session.list` |
+| Las cuentas de la sala (abiertas, cerradas, todas), con cobrado, filtros y páginas | ver cuentas | F18–F20, F22 | `table.session.list` |
 | Una cuenta de mesa y dónde está: su mesa con la zona, o «Aparcada» | ver cuentas | F21, F22 | `table.session.get` |
 | Las cuentas de mesa de una cuenta de Ventas (para el TPV: la mesa de la cuenta en pantalla) | ver cuentas | F12, F13, F24 | `table.session.by_order` |
 | Una línea de la cuenta de Ventas de una mesa, con su nombre y su cantidad, como las lista «Dividir cuenta» | ver cuentas | F17 | `table.session.line` |
@@ -1018,11 +1019,11 @@ Ningún aviso lleva nombres ni notas libres: solo ids y números.
 
 ### A qué reacciona
 
-| Aviso | De | Qué hace | Servicio |
-|---|---|---|---|
-| `sale.order.completed` | Ventas | Cierra las cuentas de mesa de esa cuenta (F18) | `table.session.close_by_order` |
-| `sale.order.voided` | Ventas | Cierra las cuentas de mesa de esa cuenta (F20) | `table.session.close_by_order` |
-| `customer.customer.erased` | Clientes | Borra el nombre de sus retenciones (F31) | `table.hold.forget_customer` |
+| Aviso | De | Qué hace | Flujos | Servicio |
+|---|---|---|---|---|
+| `sale.order.completed` | Ventas | Cierra las cuentas de mesa de esa cuenta | F18 | `table.session.close_by_order` |
+| `sale.order.voided` | Ventas | Cierra las cuentas de mesa de esa cuenta (F20) | — | `table.session.close_by_order` |
+| `customer.customer.erased` | Clientes | Borra el nombre de sus retenciones | F31 | `table.hold.forget_customer` |
 
 Las reacciones llegan en segundo plano, poco después, y repetirlas no cambia nada. Lo que dice Ventas se lee
 además en cada lectura y en cada escritura: una cuenta de mesa cuya cuenta de Ventas está cobrada o anulada

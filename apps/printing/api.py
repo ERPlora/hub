@@ -39,12 +39,12 @@ router = Router(tags=["printing"])
 
 @bind(router, "printing.settings.get", "/printing/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "printing.settings.update", "/printing/settings")
 async def settings_update(request, data: SettingsPatchIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 # Printers
@@ -52,32 +52,32 @@ async def settings_update(request, data: SettingsPatchIn):
 
 @bind(router, "printing.printer.list", "/printing/printers")
 async def printer_list(request, params: Query[PrinterListIn]):
-    return await run_operation(request, queries.list_printers, params)
+    return await run_operation(request, queries.printers.list_printers, params)
 
 
 @bind(router, "printing.printer.get", "/printing/printers/detail")
 async def printer_get(request, params: Query[PrinterRefIn]):
-    return await run_operation(request, queries.get_printer, params)
+    return await run_operation(request, queries.printers.get_printer, params)
 
 
 @bind(router, "printing.printer.status", "/printing/printers/status")
 async def printer_status(request, params: Query[PrinterRefIn]):
-    return await run_operation(request, queries.printer_status, params)
+    return await run_operation(request, queries.printers.printer_status, params)
 
 
 @bind(router, "printing.printer.create", "/printing/printers", status=201)
 async def printer_create(request, data: PrinterIn):
-    return await run_operation(request, services.create_printer, data)
+    return await run_operation(request, services.printers.create_printer, data)
 
 
 @bind(router, "printing.printer.update", "/printing/printers/update")
 async def printer_update(request, data: PrinterUpdateIn):
-    return await run_operation(request, services.update_printer, data)
+    return await run_operation(request, services.printers.update_printer, data)
 
 
 @bind(router, "printing.printer.test", "/printing/printers/test", status=201)
 async def printer_test(request, data: PrinterRefIn):
-    return await run_operation(request, services.test_printer, data)
+    return await run_operation(request, services.queueing.test_printer, data)
 
 
 # Jobs
@@ -85,47 +85,47 @@ async def printer_test(request, data: PrinterRefIn):
 
 @bind(router, "printing.job.list", "/printing/jobs")
 async def job_list(request, params: Query[JobListIn]):
-    return await run_operation(request, queries.list_jobs, params)
+    return await run_operation(request, queries.jobs.list_jobs, params)
 
 
 @bind(router, "printing.job.summary", "/printing/jobs/summary")
 async def job_summary(request):
-    return await run_operation(request, queries.job_summary)
+    return await run_operation(request, queries.summary.job_summary)
 
 
 @bind(router, "printing.job.get", "/printing/jobs/detail")
 async def job_get(request, params: Query[JobRefIn]):
-    return await run_operation(request, queries.get_job, params)
+    return await run_operation(request, queries.jobs.get_job, params)
 
 
 @bind(router, "printing.job.create", "/printing/jobs", status=201)
 async def job_create(request, data: JobCreateIn):
-    return await run_operation(request, services.create_job, data)
+    return await run_operation(request, services.queueing.create_job, data)
 
 
 @bind(router, "printing.job.claim", "/printing/jobs/claim")
 async def job_claim(request, data: JobClaimIn):
-    return await run_operation(request, services.claim_job, data)
+    return await run_operation(request, services.claims.claim_job, data)
 
 
 @bind(router, "printing.job.complete", "/printing/jobs/complete")
 async def job_complete(request, data: JobCompleteIn):
-    return await run_operation(request, services.complete_job, data)
+    return await run_operation(request, services.claims.complete_job, data)
 
 
 @bind(router, "printing.job.fail", "/printing/jobs/fail")
 async def job_fail(request, data: JobFailIn):
-    return await run_operation(request, services.fail_job, data)
+    return await run_operation(request, services.claims.fail_job, data)
 
 
 @bind(router, "printing.job.retry", "/printing/jobs/retry")
 async def job_retry(request, data: JobRefIn):
-    return await run_operation(request, services.retry_job, data)
+    return await run_operation(request, services.job_actions.retry_job, data)
 
 
 @bind(router, "printing.job.cancel", "/printing/jobs/cancel")
 async def job_cancel(request, data: JobCancelIn):
-    return await run_operation(request, services.cancel_job, data)
+    return await run_operation(request, services.job_actions.cancel_job, data)
 
 
 # The devices that print
@@ -133,32 +133,32 @@ async def job_cancel(request, data: JobCancelIn):
 
 @bind(router, "printing.device.list", "/printing/devices")
 async def device_list(request, params: Query[DeviceListIn]):
-    return await run_operation(request, queries.list_devices, params)
+    return await run_operation(request, queries.devices.list_devices, params)
 
 
 @bind(router, "printing.device.detail", "/printing/devices/detail")
 async def device_detail(request, params: Query[DeviceRefIn]):
-    return await run_operation(request, queries.get_device_detail, params)
+    return await run_operation(request, queries.devices.get_device_detail, params)
 
 
 @bind(router, "printing.device.register", "/printing/devices", status=201)
 async def device_register(request, data: DeviceRegisterIn):
-    return await run_operation(request, services.register_device, data)
+    return await run_operation(request, services.devices.register_device, data)
 
 
 @bind(router, "printing.device.update", "/printing/devices/update")
 async def device_update(request, data: DeviceUpdateIn):
-    return await run_operation(request, services.update_device, data)
+    return await run_operation(request, services.devices.update_device, data)
 
 
 @bind(router, "printing.device.retire", "/printing/devices/retire")
 async def device_retire(request, data: DeviceRefIn):
-    return await run_operation(request, services.retire_device, data)
+    return await run_operation(request, services.devices.retire_device, data)
 
 
 @bind(router, "printing.device.coverage", "/printing/devices/coverage")
 async def device_coverage(request, params: Query[CoverageIn]):
-    return await run_operation(request, queries.device_coverage, params)
+    return await run_operation(request, queries.devices.device_coverage, params)
 
 
 @bind(router, "printing.device.health", "/printing/devices/health")

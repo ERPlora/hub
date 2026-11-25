@@ -11,10 +11,12 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
+from apps.invoice.platform_series import refuse_platform_invoice
 from apps.invoice.queries.rows import find_invoice, remaining_of
 from apps.invoice.queries.series import RECTIFYING, next_number_of
-from apps.invoice.schemas import RectificationPreviewIn, RectificationPreviewOut
-from apps.tax.queries import business_today
+from apps.invoice.schemas.rectifying import RectificationPreviewIn, RectificationPreviewOut
+from apps.invoice.withholding import columns
+from apps.tax.queries.jurisdiction import business_today
 
 CANNOT_RECTIFY_RECTIFICATION = _("A rectifying invoice cannot be rectified.")
 ALREADY_CANCELLED = _("The invoice is already cancelled.")
@@ -36,7 +38,8 @@ def rectifiable(
 ) -> int:
     """What is left of ``original`` to rectify by hand, dated ``today`` (``issue_date``: the date asked, if any); a
     ``Conflict`` saying why when it cannot be: a rectifying invoice, a cancelled one, a ticket replaced by a full
-    invoice, another day than today, nothing left."""
+    invoice, another day than today, nothing left, or erplora.com's own."""
+    refuse_platform_invoice(original)
     if original.is_rectification:
         raise Conflict(
             str(CANNOT_RECTIFY_RECTIFICATION),
@@ -164,6 +167,7 @@ def rectification_preview(
     )
     base = sum(item["base"] for item in entries)
     tax = sum(item["quota"] + item["surcharge_quota"] for item in entries)
+    withholding = columns(base, original.withholding_rate)
     return {
         "original": {
             "invoice_id": original.id,
@@ -183,6 +187,8 @@ def rectification_preview(
         "base_amount": base,
         "tax_amount": tax,
         "total_amount": base + tax,
+        **withholding,
+        "payable_amount": base + tax - withholding["withholding_amount"],
         "currency": original.currency,
         "currency_decimals": get_currency_precision(original.currency),
         "lines": [

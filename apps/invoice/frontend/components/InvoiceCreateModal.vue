@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // «New manual invoice» (INVOICE-F03; the old create panel of the table, now a dialog): the «Series» (the
-// active invoice and ticket series), the recipient (a card of Customers or typed: name, country, tax ID,
-// address), «Notes» and the lines (description, quantity, price WITHOUT the tax, rate %). The rate is named by
+// active invoice and ticket series), the «Date» (today on the business's clock, or an earlier day: left as it is,
+// the server dates it), the «Due date», if any, the recipient (a card of Customers or typed: name, country, tax ID,
+// address), «Notes», the lines (description, quantity, price WITHOUT the tax, rate %) and, except on a ticket, the «IRPF
+// withholding», none to begin with. The rate is named by
 // the tax of the business's territory, as Taxes publishes it (`useTaxKind`, `tax.settings.get`), and starts at
 // its general rate (`invoice.invoice.line_defaults`); both followed live (TAX-F11): «VAT %» and 21 on the
 // peninsula, «IGIC %» in the Canary Islands, «IPSI %» in Ceuta and Melilla, blank when the territory has no
@@ -14,7 +16,7 @@
 // says «Invoice <number> issued» and closes; the list paints the new row by itself, live. A refusal stays in
 // the window, under its field when it is one (recipient, notes or line) until that field is corrected
 // (FormModal's `fieldErrors`, hub#461), and what was written is kept.
-import { FormModal, type FormModalError } from '@erplora/ui/components';
+import { DateField, FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
@@ -22,9 +24,11 @@ import { computed, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+import { todayIn, useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useTaxKind } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { typedRate, useBusinessMoney } from '../lib/format';
+import type { WithholdingRate } from '../invoice-withholding';
 import { type Recipient, recipientComplete, recipientFrom, recipientPayload } from '../lib/recipient';
 import { refusal } from '../lib/refusal';
 import type { InvoiceOut, InvoiceType } from '../operations';
@@ -32,6 +36,7 @@ import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
 import { blankLine, type DraftLine, linePayload, linesReady, unreadablePrice } from './lines';
 import RecipientFields from './RecipientFields.vue';
 import SeriesSelect from './SeriesSelect.vue';
+import WithholdingSelect from './WithholdingSelect.vue';
 
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ created: [invoice: InvoiceOut] }>();
@@ -48,8 +53,15 @@ const money = useBusinessMoney();
 const seriesCode = shallowRef('');
 const invoiceType = shallowRef<InvoiceType | undefined>(undefined);
 const recipient = shallowRef<Recipient>(recipientFrom(null));
+const zone = useBusinessZone();
+const openedAt = shallowRef(new Date());
+const today = computed(() => todayIn(zone.value, openedAt.value));
+/** The day chosen; none is today. */
+const issueDate = shallowRef('');
+const dueDate = shallowRef('');
 const notes = shallowRef('');
 const lines = shallowRef<DraftLine[]>([blankLine(1)]);
+const withholding = shallowRef<WithholdingRate | null>(null);
 /** The form's own refusal (a price that is not an amount), before anything is sent. */
 const local = shallowRef<string | null>(null);
 
@@ -58,8 +70,12 @@ watch(
   (now) => {
     if (!now) return;
     recipient.value = recipientFrom(null);
+    openedAt.value = new Date();
+    issueDate.value = '';
+    dueDate.value = '';
     notes.value = '';
     lines.value = [blankLine(1, defaultRate.value)];
+    withholding.value = null;
     local.value = null;
     command.error.value = null;
   },
@@ -85,19 +101,36 @@ watch(seriesCode, (code) => {
   if (!openedSeries.value) openedSeries.value = code;
 });
 /** The window always opens blank, its line at the territory's rate (which may arrive after it opened). */
-const opened = () => ({ series: openedSeries.value, recipient: recipientFrom(null), notes: '', lines: [blankLine(1, defaultRate.value)] });
+const opened = () => ({
+  series: openedSeries.value,
+  issueDate: '',
+  dueDate: '',
+  recipient: recipientFrom(null),
+  notes: '',
+  lines: [blankLine(1, defaultRate.value)],
+  withholding: null,
+});
+const written = () => ({
+  series: seriesCode.value,
+  issueDate: issueDate.value,
+  dueDate: dueDate.value,
+  recipient: recipient.value,
+  notes: notes.value,
+  lines: lines.value,
+  withholding: withholding.value,
+});
 const canDismiss = useUnsavedForm(
   'invoice-create',
-  () => (open.value ? { series: seriesCode.value, recipient: recipient.value, notes: notes.value, lines: lines.value } : opened()),
+  () => (open.value ? written() : opened()),
   opened,
 );
 
-/** An invoice (F1) names its recipient whole; a ticket (F2) may name nobody. */
-const needsRecipient = computed(() => invoiceType.value !== 'F2');
+/** An invoice (F1) names its recipient whole and may be withheld; a ticket (F2) may name nobody and never is. */
+const full = computed(() => invoiceType.value !== 'F2');
 // No price is read before the business answers its money: until then «12,50 zł» is not an amount and «1234»
 // would be read with two decimals, whatever its currency counts (hub#907).
 const ready = computed(
-  () => !!money.value && linesReady(lines.value) && (!needsRecipient.value || recipientComplete(recipient.value)),
+  () => !!money.value && linesReady(lines.value) && (!full.value || recipientComplete(recipient.value)),
 );
 const error = computed<FormModalError | null>(() => {
   if (local.value) return { message: local.value };
@@ -117,7 +150,10 @@ async function issue(): Promise<void> {
   try {
     invoice = await command.run({
       ...(seriesCode.value ? { series_code: seriesCode.value } : {}),
+      ...(issueDate.value ? { issue_date: issueDate.value } : {}),
+      ...(dueDate.value ? { due_date: dueDate.value } : {}),
       ...recipientPayload(recipient.value),
+      ...(full.value && withholding.value ? { withholding_rate: withholding.value } : {}),
       notes: notes.value.trim(),
       lines: lines.value.map((line) => linePayload(line, business)),
     });
@@ -150,6 +186,26 @@ async function issue(): Promise<void> {
           v-model="seriesCode"
           v-model:invoice-type="invoiceType"
         />
+        <div class="invoice-create__dates">
+          <DateField
+            testid="invoice-create-issue-date"
+            name="issue_date"
+            required
+            :label="$t('invoice.create.issueDate')"
+            :model-value="issueDate || today"
+            :max="today"
+            :error-text="fieldErrors.issue_date"
+            @update:model-value="issueDate = $event === today ? '' : $event"
+          />
+          <DateField
+            v-model="dueDate"
+            testid="invoice-create-due-date"
+            name="due_date"
+            :label="$t('invoice.create.dueDate')"
+            :min="issueDate || today"
+            :error-text="fieldErrors.due_date"
+          />
+        </div>
         <RecipientFields
           v-model="recipient"
           :field-errors="fieldErrors"
@@ -173,6 +229,12 @@ async function issue(): Promise<void> {
           :tax="tax"
           :default-rate="defaultRate"
         />
+        <WithholdingSelect
+          v-if="full"
+          v-model="withholding"
+          name="withholding_rate"
+          :error-text="fieldErrors.withholding_rate"
+        />
       </div>
     </template>
   </FormModal>
@@ -181,6 +243,11 @@ async function issue(): Promise<void> {
 <style scoped>
 .invoice-create__fields {
   display: grid;
+  gap: 14px;
+}
+.invoice-create__dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 14px;
 }
 </style>

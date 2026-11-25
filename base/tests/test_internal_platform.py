@@ -7,7 +7,7 @@
   200 with the same; a body out of contract → 422 with the error envelope.
 - ``GET …/{id}``: its status, 404 ``invoice.platform_unknown`` when it never arrived; ``GET …/{id}/pdf``: its PDF.
 
-Every view runs its operation as the system on ``PLATFORM_HUB_SLUG``.
+Every view runs its operation as the system on the platform hub's row, under the name it has.
 """
 
 import copy
@@ -123,6 +123,35 @@ def test_the_platform_hub_issues_in_its_own_database_and_nowhere_else(client, hu
     assert answer.status_code == 201
     with use_hub(hub_a):
         assert Invoice.objects.count() == 1
+
+
+@pytest.mark.parametrize("slug", ["erp", "erplora"], ids=["renamed", "not-renamed-yet"])
+def test_an_invoice_reaches_its_hub_under_its_name_and_the_one_it_had_before(client, hub_a, hub_b, settings, slug):
+    """While its row is renamed, the SaaS's invoices reach the same hub, and no other business holds one."""
+    settings.ERPLORA_ENVIRONMENT = "pre"
+    Hub.objects.filter(pk=hub_a.pk).update(slug=slug, is_platform=True)
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        run("invoice.issuer.update", PLATFORM_ISSUER, system_context(Scope("host", slug)))
+
+    health = get(client, f"{ROOT}/health")
+    issued = post(client, BODY)
+    again = post(client, BODY)
+
+    assert (health.status_code, issued.status_code, again.status_code) == (200, 201, 200)
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        assert (Invoice.objects.count(), Record.objects.count()) == (1, 1)
+    with use_hub(hub_b):
+        assert (Invoice.objects.count(), Record.objects.count()) == (0, 0)
+
+
+def test_a_business_under_its_name_never_takes_erploras_invoices(client, hub_a):
+    Hub.objects.filter(pk=hub_a.pk).update(slug="erp")
+
+    issued = post(client, BODY)
+
+    assert (issued.status_code, code(issued)) == (503, "base.platform_hub_missing")
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        assert not Invoice.objects.exists()
 
 
 @pytest.mark.parametrize(

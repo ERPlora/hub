@@ -315,7 +315,7 @@ def purge_demo_data(hub: Hub) -> None:
     """Delete what the demo ``hub`` wrote: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its cluster
     (``base.tenancy.ops``), outside any transaction, and only its own ``<control>_demo_<hex>`` (a row that names another
     database, or no demo, is refused and loses nothing); it is never emptied nor reused. Then its files, its prefix in
-    the store and no other (:func:`base.files.delete_hub_files`).
+    the store and no other (:func:`base.files.delete_hub.delete_hub_files`).
 
     A demo made before demos got their own database (``db_name`` empty) kept its rows in a database every hub shared,
     where nothing tells them from anyone else's: only its files are deleted. A database already
@@ -331,7 +331,7 @@ def purge_demo_data(hub: Hub) -> None:
         )
     if hub.db_name:
         ops.drop_database(hub.db_name, cluster=hub.cluster)
-    files.delete_hub_files(storages["hub_files"], hub.id)
+    files.delete_hub.delete_hub_files(storages["hub_files"], hub.id)
 
 
 def reap_demos(now: dt.datetime | None = None) -> int:

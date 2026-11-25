@@ -194,8 +194,11 @@ def test_a_session_that_noted_no_host_ends_too_when_the_photo_takes_that_person_
 
 
 def access_of(role: str, hub: Hub) -> bytes:
-    """What ``base.session.access`` answers to a session of ``role`` in ``hub``, as a stream frame carries it."""
-    ctx = OperationContext(scope=A, actor=None, permissions=permissions_of_role(role), language="en")
+    """What ``base.session.access`` answers to a session of somebody else with ``role`` in ``hub``, as a stream frame
+    carries it."""
+    peer = get_user_model().objects.create_user(username=f"peer-{role}")
+    Membership.objects.create(user=peer, host=hub.slug, role=role)
+    ctx = OperationContext(scope=A, actor=peer, permissions=permissions_of_role(role), language="en")
     with use_hub(hub):
         return get("base.session.access")(ctx, get("base.session.access").input()).model_dump_json().encode()
 

@@ -16,7 +16,7 @@ from live.operations import get as get_operation
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
 from apps.invoice.queries.series import FULL, TICKET
-from apps.invoice.schemas import FromSaleIn, IssueOut
+from apps.invoice.schemas.invoices import FromSaleIn, IssueOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
 from apps.invoice.services.issuing import AUDIT_MESSAGES, GENERAL_REGIME, _issue, _issued_notice, _line_values
 from apps.invoice.services.numbering import series_of_year
@@ -26,7 +26,8 @@ from apps.sale import pricing
 from apps.sale.models import OrderLine, Sale, Settings
 from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
-from apps.tax.queries import business_tax_kind, round_half_up, tax_kind_of
+from apps.tax.queries.calculation import round_half_up
+from apps.tax.queries.jurisdiction import business_tax_kind, tax_kind_of
 
 #: VeriFactu's DescripcionOperacion of a document born of a sale, in the tax agency's language.
 SALE_OPERATION = _("Sale %(number)s")

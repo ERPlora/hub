@@ -19,20 +19,13 @@ from apps.schedule.models import (
     SpecialDayInterval,
     WeekDay,
 )
-from apps.schedule.schemas import (
-    BulkSpecialDayIn,
-    NoParamsIn,
-    OverrideIn,
-    OverridePatchIn,
-    OverrideRefIn,
-    SetDayIn,
-    SettingsIn,
-    SpecialDayIn,
-    SpecialDayPatchIn,
-    SpecialDayRefIn,
-)
+from apps.schedule.schemas.fields import NoParamsIn
+from apps.schedule.schemas.overrides import OverrideIn, OverridePatchIn, OverrideRefIn
+from apps.schedule.schemas.settings import SettingsIn
+from apps.schedule.schemas.special_days import BulkSpecialDayIn, SpecialDayIn, SpecialDayPatchIn, SpecialDayRefIn
+from apps.schedule.schemas.week import SetDayIn
 
-from apps.staff.tests.test_services import _race
+from apps.staff.tests.conftest import _race
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_override, make_special_day

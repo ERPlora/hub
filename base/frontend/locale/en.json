@@ -189,14 +189,12 @@
       "alsoOff": "Also turned off: {apps}.",
       "confirmOn": {
         "title": "Turn on {app}?",
-        "message": "{app} needs {apps}: it turns on with it. | {app} needs {apps}: they turn on with it.",
         "confirm": "Turn on",
         "cancel": "Cancel"
       },
       "confirmOff": {
         "title": "Turn off {app}?",
         "message": "It leaves the menu for everyone in this business. Nothing is deleted: turned on again, it has its data.",
-        "along": "{apps} turns off with it: only {app} needed it. | {apps} turn off with it: only {app} needed them.",
         "confirm": "Turn off",
         "cancel": "Cancel"
       },
@@ -319,7 +317,7 @@
         "versionValue": "Version {version}",
         "brings": "It brings",
         "readError": "The file could not be read: {reason}",
-        "tooBig": "the file is larger than 20 MB."
+        "fileTooBig": "The file could not be read: the file is larger than 20 MB."
       },
       "review": {
         "title": "Review what it brings",
@@ -630,6 +628,7 @@
         },
         "demo": "Use is not measured in a demo: its data is deleted when it ends.",
         "unknown": "We do not know this business's plan yet: it shows up as soon as erplora.com sends it.",
+        "platform": "This is ERPlora's own business: it has no plan.",
         "managed": "Plans are managed from your ERPlora account, on erplora.com."
       }
     },
@@ -653,6 +652,7 @@
       "whereAdmin": "The name, the time zone and the language are changed on erplora.com. The country does not change once the business is ready.",
       "whereOthers": "Only the owner or an administrator changes them, on erplora.com.",
       "whereDemo": "This demo has no business on erplora.com: its data does not change.",
+      "wherePlatform": "This is ERPlora’s business: ERPlora sets these details on its server, and they are changed neither here nor on erplora.com.",
       "change": "Change on erplora.com",
       "fiscal": "Fiscal data",
       "fiscalHint": "Legal name, tax ID and address: the ones the invoices use",
@@ -914,21 +914,39 @@
       "intro": "These are the roles of this business. Each person gets one when invited on erplora.com, and it is changed there.",
       "columns": {
         "role": "Role",
-        "origin": "Comes from",
-        "available": "Available",
-        "members": "Members",
+        "origin": "Type",
+        "members": "People",
         "permissions": "Permissions"
       },
       "basic": "Basic",
-      "always": "Always available",
+      "own": "Custom",
       "search": "Search role…",
       "empty": "This business has no roles.",
       "error": "The roles could not be loaded.",
-      "change": "Change roles on erplora.com"
+      "change": "Change roles on erplora.com",
+      "toReview": "To review",
+      "new": "New role",
+      "duplicate": "Duplicate",
+      "edit": "Edit",
+      "delete": "Delete",
+      "add": {
+        "title": "New role",
+        "name": "Name",
+        "basedOn": "Based on",
+        "help": "It will allow the same as that role. Then adjust what it allows.",
+        "create": "Create role",
+        "created": "Role {name} created"
+      },
+      "remove": {
+        "title": "Delete role",
+        "message": "Delete the role {name}? This cannot be undone.",
+        "done": "Role {name} deleted"
+      }
     },
     "role": {
       "title": "What it allows",
       "intro": "What this role lets a person do in this business, app by app. It is given on erplora.com and is not changed here.",
+      "introOwn": "What this role lets a person do in this business, app by app.",
       "members": "People with this role: {n}",
       "loading": "Loading what this role allows…",
       "error": "Could not load what this role allows.",
@@ -938,7 +956,17 @@
         "on": "Allowed",
         "approval": "With approval",
         "off": "No"
-      }
+      },
+      "introEdit": "What this role lets a person do in this business, app by app. Whoever has it notices as soon as it is saved.",
+      "name": "Name",
+      "description": "Description",
+      "review": {
+        "title": "New permissions to review",
+        "text": "They are marked “To review”. Choose what the role does with each one and save."
+      },
+      "save": "Save",
+      "saved": "Role saved.",
+      "saveError": "The role could not be saved"
     },
     "person": {
       "title": "Person",
@@ -999,6 +1027,7 @@
         "token": "Token",
         "permissions": "Permissions",
         "state": "State",
+        "createdBy": "Created by",
         "created": "Created",
         "lastUsed": "Last use",
         "limit": "Limit"
@@ -1006,17 +1035,21 @@
       "modes": {
         "full": "Full access",
         "read": "Read only",
-        "write": "Write only",
-        "per_app": "Per app"
+        "write": "Write only"
       },
-      "kinds": {
+      "actions": {
         "read": "Read",
-        "write": "Write"
+        "create": "Create",
+        "update": "Update",
+        "delete": "Delete"
       },
       "short": {
         "read": "R",
-        "write": "W"
+        "create": "C",
+        "update": "U",
+        "delete": "D"
       },
+      "allApps": "All apps",
       "states": {
         "active": "Active",
         "revoked": "Revoked"
@@ -1033,10 +1066,11 @@
         "rate": "Requests per minute",
         "rateHint": "From 1 to 10,000.",
         "mode": "What this key may do",
-        "generalHint": "The general modes cover every app of your business, also the ones you add later.",
+        "chooseApps": "Choose apps",
+        "allAppsHint": "Every app of your business, also the ones you add later.",
         "perAppHint": "Tick what the key may do on each app.",
         "app": "App",
-        "noApps": "No app publishes its API yet."
+        "noApps": "There is no app you may give access to."
       },
       "token": {
         "title": "API key created",
@@ -1065,6 +1099,7 @@
         "gone": "That key no longer exists. Refresh the list and try again.",
         "scopesRequired": "Choose at least one app and what the key may do on it.",
         "scopeUnknown": "That app does not publish what the key would do on it.",
+        "beyondMaker": "A key may not do more than you may do yourself.",
         "denied": "Only whoever runs the business manages the API keys."
       },
       "docs": "API documentation"
@@ -1091,12 +1126,12 @@
       }
     },
     "approvals": {
-      "intro": "Each action that needed a manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or delete it.",
+      "intro": "Each action that can need a manager's approval: who did it, who approved it and with what. Nobody, not even an administrator, can edit or delete it.",
       "search": "Search by person or action…",
-      "empty": "Nobody has had to approve anything in this business yet.",
+      "empty": "There is no action of this kind in this business yet.",
       "error": "Could not load the record of approvals.",
-      "used": "Used",
-      "unused": "Not used",
+      "used": "Done",
+      "unused": "Not done",
       "export": {
         "button": "Export CSV",
         "pending": "Exporting…",
@@ -1104,13 +1139,14 @@
       },
       "way": {
         "pin": "PIN",
-        "badge": "Badge"
+        "badge": "Badge",
+        "role": "Their role"
       },
       "columns": {
         "at": "When",
         "action": "Action",
         "approvedBy": "Approved by",
-        "requestedBy": "Asked by",
+        "requestedBy": "Who",
         "way": "With",
         "used": "State"
       }
@@ -1138,6 +1174,21 @@
         "loadFailed": "Could not load the setting.",
         "retry": "Retry"
       }
+    },
+    "supportAccess": {
+      "title": "Support access",
+      "toggle": "Let ERPlora support in",
+      "note": "On, ERPlora's support staff can come into the business with their own accounts to help you set it up, as an administrator would. It stays on until you turn it off, and they leave as soon as you do.",
+      "changed": "Last changed by {who}, {when}.",
+      "adminOnly": "Only who runs the business can change it.",
+      "visits": "Latest support visits",
+      "noVisits": "Nobody from ERPlora support has come in yet.",
+      "loading": "Loading the support access…",
+      "loadFailed": "Could not load the support access.",
+      "retry": "Retry",
+      "saveFailed": "Could not save the change.",
+      "turnedOn": "Support access is on: ERPlora support can come in.",
+      "turnedOff": "Support access is off: ERPlora support can no longer come in."
     },
     "files": {
       "title": "Files",
@@ -1277,7 +1328,7 @@
       "current": "On this screen",
       "here": "You are here",
       "how": "How to",
-      "others": "Other screens of this module",
+      "others": "Other screens",
       "failure": "If something goes wrong",
       "search": "Search tasks…",
       "empty": "Nothing matches your search",
@@ -1313,8 +1364,8 @@
           "archive": "Archive",
           "assign": "Assign",
           "attach": "Apply",
-          "auto_close": "Close",
-          "avatar_remove": "Remove",
+          "auto_close": "Close the sessions due to close by themselves",
+          "avatar_remove": "Remove the profile photo",
           "back_to_testing": "Go back to testing",
           "badge_remove": "Remove",
           "book": "Book",
@@ -1326,7 +1377,7 @@
           "charge": "Charge",
           "claim": "Take",
           "claim_call": "Take the call",
-          "cleanup_expired": "Clean up the expired",
+          "cleanup_expired": "Clean up the expired carts",
           "clear": "Clear",
           "clock_in": "Clock in",
           "clock_out": "Clock out",
@@ -1395,13 +1446,13 @@
           "pin_remove": "Remove",
           "place": "Set aside",
           "preferences_set": "Change",
-          "prepare": "Prepare",
+          "prepare": "Prepare the connection",
           "print": "Print",
           "print_bill": "Print the bill",
           "print_label": "Print the label",
-          "process": "Process",
+          "process": "Process the queue now",
           "propose": "Propose",
-          "prune": "Clean up",
+          "prune": "Remove the unused devices",
           "publish": "Publish",
           "query": "Ask the AEAT",
           "react": "Start",
@@ -1419,12 +1470,13 @@
           "redeem": "Redeem",
           "refresh_service": "Update",
           "refund": "Refund",
+          "regenerate": "Regenerate",
           "register": "Register",
           "reject": "Reject",
           "release": "Release",
           "release_check": "Release",
           "release_member": "Release",
-          "release_unconfirmed": "Release",
+          "release_unconfirmed": "Release the unconfirmed reservations",
           "remove": "Remove",
           "remove_line": "Remove",
           "remove_voucher": "Remove",
@@ -1441,9 +1493,9 @@
           "resume_due": "Resume",
           "retire": "Retire",
           "retry": "Retry",
-          "retry_all": "Retry all",
+          "retry_all": "Retry all failed events",
           "return": "Give back",
-          "review_stale": "Flag for review",
+          "review_stale": "Flag forgotten days for review",
           "revoke": "Revoke",
           "run": "Run",
           "save": "Save",
@@ -1499,6 +1551,12 @@
           "other": "Do this"
         },
         "operations": {
+          "attendance": {
+            "break": {
+              "end": "End the break",
+              "start": "Start a break"
+            }
+          },
           "cart_checkout": {
             "cart": {
               "clear": "Clear"
@@ -1512,7 +1570,15 @@
               "add": "Register movement"
             }
           },
+          "schedule": {
+            "week": {
+              "confirm": "Confirm the weekly hours"
+            }
+          },
           "verifactu": {
+            "certificate": {
+              "remove": "Remove the certificate"
+            },
             "diagnostic": {
               "run": "Test the connection"
             },

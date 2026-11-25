@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
 from typing import Any
+from uuid import UUID
 
 import pydantic
 from django.apps import apps as django_apps
@@ -118,69 +119,76 @@ def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
     ]
 
 
-def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:  # noqa: C901, PLR0912
-    by_sku: dict[str, dict] = {}
+def _product_cells(row: dict, line: int) -> dict:
+    """A product's row as the cells ``inventory.product.bulk_create`` reads."""
+    return {
+        "line": line,
+        "name": _text(row, "name"),
+        "sku": _text(row, "sku"),
+        "price": _money(row.get("price", 0)),
+        "cost": _money(row.get("cost", 0)),
+        "stock": _text(row, "stock"),
+        "low_stock_threshold": _text(row, "low_stock_threshold"),
+        "ean13": _text(row, "ean13"),
+        "description": _text(row, "description"),
+        "unit": _text(row, "unit"),
+        "product_type": _text(row, "product_type"),
+        "price_quantity": _text(row, "price_quantity"),
+        "pricing_unit": _text(row, "pricing_unit"),
+        "tax_category_key": _text(row, "tax_category_key"),
+    } | blueprint_products.allergens_cell(row)
+
+
+def _create_products(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> list[tuple[str, dict]]:
+    """Import ``rows``, a page at most; the ones created, each with its new id."""
+    cells = [_product_cells(row, line) for line, row in enumerate(rows, start=1)]
+    try:
+        report = _call(ctx, "inventory.product.bulk_create", rows=cells)
+    except (OperationError, pydantic.ValidationError) as exc:
+        for row in rows:
+            loaded.refuse(_text(row, "name") or _text(row, "sku"), _reason(exc))
+        return []
+    made = []
+    for outcome in report.rows:
+        row = rows[outcome.line - 1]
+        if outcome.status == "created":
+            made.append((_created(loaded, outcome), row))
+        elif outcome.status == "skipped":
+            loaded.already += 1
+        else:
+            # Named as the person knows it: its name, its code only without one.
+            loaded.refuse(_text(row, "name") or outcome.key or _text(row, "sku"), outcome.reason)
+    return made
+
+
+def _product_change(row: dict, categories: dict[str, UUID], loaded: Loaded) -> dict:
+    """What the import does not take of a product's row: its categories, by their ids, and its marks."""
+    ids = []
+    for name in blueprint_products.category_names(row):
+        if _key(name) in categories:
+            ids.append(categories[_key(name)])
+        else:
+            loaded.warn(str(CATEGORY_MISSING) % {"row": _text(row, "sku"), "category": name})
+    return ({"category_ids": ids} if ids else {}) | blueprint_products.marks(row)
+
+
+def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
+    made: list[tuple[str, dict]] = []
     for start in range(0, len(rows), PAGE):
-        chunk = rows[start : start + PAGE]
-        cells = [
-            {
-                "line": start + index + 1,
-                "name": _text(row, "name"),
-                "sku": _text(row, "sku"),
-                "price": _money(row.get("price", 0)),
-                "cost": _money(row.get("cost", 0)),
-                "stock": _text(row, "stock"),
-                "low_stock_threshold": _text(row, "low_stock_threshold"),
-                "ean13": _text(row, "ean13"),
-                "description": _text(row, "description"),
-                "unit": _text(row, "unit"),
-                "tax_category_key": _text(row, "tax_category_key"),
-            } | blueprint_products.allergens_cell(row)
-            for index, row in enumerate(chunk)
-        ]
-        try:
-            report = _call(ctx, "inventory.product.bulk_create", rows=cells)
-        except (OperationError, pydantic.ValidationError) as exc:
-            for row in chunk:
-                loaded.refuse(_text(row, "name") or _text(row, "sku"), _reason(exc))
-            continue
-        for outcome in report.rows:
-            row = chunk[outcome.line - start - 1]
-            if outcome.status == "created":
-                by_sku[_text(row, "sku")] = {"id": _created(loaded, outcome), "row": row}
-            elif outcome.status == "skipped":
-                loaded.already += 1
-            else:
-                # Named as the person knows it: its name, its code only without one.
-                loaded.refuse(_text(row, "name") or outcome.key or _text(row, "sku"), outcome.reason)
-    if not by_sku:
+        made += _create_products(ctx, rows[start : start + PAGE], loaded)
+    if not made:
         return
     categories = {_key(row.name): row.id for row in _pages(ctx, "inventory.category.list")}
-    for sku, made in by_sku.items():
-        row, patch = made["row"], {}
-        names = row.get("categories") or []
-        names = [name for name in names if isinstance(name, str) and name.strip()] if isinstance(names, list) else []
-        ids = []
-        for name in names:
-            if _key(name) in categories:
-                ids.append(categories[_key(name)])
-            else:
-                loaded.warn(str(CATEGORY_MISSING) % {"row": sku, "category": name})
-        if ids:
-            patch["category_ids"] = ids
-        if isinstance(row.get("track_stock"), bool):
-            patch["track_stock"] = row["track_stock"]
-        if row.get("is_active") is False:
-            patch["is_active"] = False
-        if not patch:
+    for pk, row in made:
+        change = _product_change(row, categories, loaded)
+        if not change:
             continue
         try:
-            _call(ctx, "inventory.product.update", id=made["id"], **patch)
+            _call(ctx, "inventory.product.update", id=pk, **change)
         except (OperationError, pydantic.ValidationError) as exc:
-            loaded.warn(str(ROW_REFUSED) % {"row": sku, "reason": _reason(exc)})
-    for made in by_sku.values():
-        row = made["row"]
-        _load_image(ctx, loaded, "inventory.product", made["id"], row, _text(row, "name") or _text(row, "sku"))
+            loaded.warn(str(ROW_REFUSED) % {"row": _text(row, "sku"), "reason": _reason(exc)})
+    for pk, row in made:
+        _load_image(ctx, loaded, "inventory.product", pk, row, _text(row, "name") or _text(row, "sku"))
 
 
 # service: categories and services

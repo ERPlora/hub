@@ -9,28 +9,23 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.invoice import queries, services
-from apps.invoice.schemas import (
-    AllocationsIn,
+from apps.invoice.schemas.emails import EmailListIn, SendEmailIn
+from apps.invoice.schemas.export import InvoiceExportIn
+from apps.invoice.schemas.invoices import (
     BySourceIn,
     DocumentIn,
-    FromRefundIn,
     FromSaleIn,
-    FromVoidIn,
-    GapsIn,
     InvoiceCreateIn,
     InvoiceGetIn,
     InvoiceListIn,
-    IssuerIn,
     MarkPaidIn,
-    RectificationPreviewIn,
-    RectifyIn,
-    RefundGetIn,
-    SeriesCreateIn,
-    SeriesListIn,
-    SeriesPeekIn,
-    SeriesUpdateIn,
     SubstituteIn,
 )
+from apps.invoice.schemas.issuer import IssuerIn
+from apps.invoice.schemas.numbering import AllocationsIn, GapsIn
+from apps.invoice.schemas.rectifying import FromRefundIn, FromVoidIn, RectificationPreviewIn, RectifyIn
+from apps.invoice.schemas.refunds import RefundGetIn
+from apps.invoice.schemas.series import SeriesCreateIn, SeriesListIn, SeriesPeekIn, SeriesUpdateIn
 
 router = Router(tags=["invoice"])
 
@@ -41,6 +36,11 @@ router = Router(tags=["invoice"])
 @bind(router, "invoice.invoice.list", "/invoice/invoices")
 async def invoice_list(request, params: Query[InvoiceListIn]):
     return await run_operation(request, queries.invoices.list_invoices, params)
+
+
+@bind(router, "invoice.invoice.export", "/invoice/invoices/export")
+async def invoice_export(request, params: Query[InvoiceExportIn]):
+    return await run_operation(request, queries.export.export_invoices, params)
 
 
 @bind(router, "invoice.invoice.get", "/invoice/invoices/detail")
@@ -58,9 +58,24 @@ async def invoice_document(request, params: Query[DocumentIn]):
     return await run_operation(request, queries.invoices.document, params)
 
 
+@bind(router, "invoice.invoice.pdf", "/invoice/invoices/pdf")
+async def invoice_pdf(request, params: Query[DocumentIn]):
+    return await run_operation(request, queries.pdf.invoice_pdf, params)
+
+
 @bind(router, "invoice.invoice.print", "/invoice/invoices/print")
 async def invoice_print(request, data: DocumentIn):
     return await run_operation(request, services.paper.print_invoice, data)
+
+
+@bind(router, "invoice.email.list", "/invoice/emails")
+async def email_list(request, params: Query[EmailListIn]):
+    return await run_operation(request, queries.emails.list_emails, params)
+
+
+@bind(router, "invoice.email.send", "/invoice/emails/send")
+async def email_send(request, data: SendEmailIn):
+    return await run_operation(request, services.emails.send_email, data)
 
 
 @bind(router, "invoice.invoice.line_defaults", "/invoice/invoices/line_defaults")

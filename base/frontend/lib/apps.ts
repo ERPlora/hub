@@ -1,8 +1,8 @@
 // The rules of the Apps screen the browser
 // applies to `base.app.list`, which already says each app's right, state and first screen: the server decides, this
 // only chooses what each tab lists and how an app's company is named. Turning an app on or off is the
-// server's too (`base.app.enable`, `base.app.disable`): here only when each is offered and what the dialog names —
-// what comes along, what goes with it, and what has to go off first.
+// server's too (`base.app.enable`, `base.app.disable`), and so is what else its switch changes (each row's
+// `along_said`): here only when each is offered and what has to go off first.
 import type { AppRow } from '../operations/apps';
 
 /** «My apps», «Add apps» (the whole catalogue) and «Paid» (what is bought apart, on erplora.com). */
@@ -81,42 +81,6 @@ export function canTurnOff(app: AppRow): boolean {
 /** «Retry»: an app whose tables could not be made in the business's own database (`base.app.retry`). */
 export function canRetry(app: AppRow): boolean {
   return app.state === 'failed';
-}
-
-/** The names of what turning `app` on also turns on: what it needs that is off. */
-export function turnsOnWith(app: AppRow, apps: readonly AppRow[]): string[] {
-  const off = new Set(apps.filter((row) => row.state === 'off').map((row) => row.id));
-  return namesOf(
-    app.requires.filter((id) => off.has(id)),
-    apps,
-  );
-}
-
-/** Kept on whatever goes off: one on that the business's country requires (`mandatory`, hub#997); one being set up, or
- *  that could not be, binds nothing yet — the server's `base.activation.mandatory_on`. */
-function keptOn(row: AppRow): boolean {
-  return row.mandatory && row.state === 'on';
-}
-
-/** The names of what turning `app` off also turns off: what came along with it (on, not chosen) that no app left on
- *  needs any more, never one kept on (`keptOn`) — the server's rule (`base.activation.disabling`), for the dialog. */
-export function goesOffWith(app: AppRow, apps: readonly AppRow[]): string[] {
-  const byId = new Map(apps.map((row) => [row.id, row]));
-  const off = new Set([app.id]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const id of app.requires) {
-      const row = byId.get(id);
-      if (!row || off.has(id) || !isWanted(row) || row.chosen || keptOn(row)) continue;
-      if (row.required_by.every((other) => off.has(other))) {
-        off.add(id);
-        changed = true;
-      }
-    }
-  }
-  off.delete(app.id);
-  return namesOf([...off], apps);
 }
 
 /** The names of the apps to turn off before `app`: the chosen ones on (or on their way) that need it (what came along

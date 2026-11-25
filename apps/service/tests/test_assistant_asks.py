@@ -207,12 +207,21 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-test_the_reported_service_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
+#: The task the model searches for when a request brings its tool past the places of a turn.
+SEARCHED = {
+    "service.assignment.remove": "quitar una asignación de servicio",
+    "service.catalog.status": "estado del catálogo de servicios",
+}
+
+test_the_reported_service_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED, SEARCHED))
 
 
 #: The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new ask
-#: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
-test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "service"))
+#: elsewhere pushes out of the ones a turn offers, or past them out of what the search of its task finds, fails here
+#: before the real-model QA sees it.
+test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = in_hubs(
+    probes_test(PROBES, "service", SEARCHED)
+)
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)

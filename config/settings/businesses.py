@@ -9,7 +9,7 @@ MAX_CONCURRENT_DEMOS = config("MAX_CONCURRENT_DEMOS", default=50, cast=int)
 DEMO_TTL_MINUTES = config("DEMO_TTL_MINUTES", default=60, cast=int)
 DEMO_TOMBSTONE_DAYS = config("DEMO_TOMBSTONE_DAYS", default=7, cast=int)
 # Whether a module kept out of the store (``listed = False``: today only apps/demo, the platform's reference) shows:
-# in the menu, in «My apps» and with its example steps, panels and counters on the Home (base.home.shown_modules).
+# in the menu, in «My apps» and with its example steps, panels and counters on the Home (base.home.shown_modules.shown_modules).
 # On with DEBUG (development, the tests and the e2e), off in prod and pre: a customer never sees the reference app;
 # a demo's hub shows it whatever this says.
 SHOW_UNLISTED_MODULES = config("SHOW_UNLISTED_MODULES", default=DEBUG, cast=bool)

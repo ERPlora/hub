@@ -178,8 +178,9 @@ def test_declarations(name, permission, input, output, risk):
     op = get(name)
     # Every action is reachable by API (WORKBOOK, change 12) and by the assistant, with its risk.
     assert (op.kind, op.permission, op.input, op.output, op.expose_api) == ("command", permission, input, output, True)
-    # An import's card says its rows by their names and the tax categories they take (import_card).
-    summary = {"summary"} if input in (ProductImportIn, CategoryImportIn) else set()
+    # An import's card says its rows by their names and the tax categories they take (import_card); a new product's
+    # puts first its name, its price and the VAT it charges (card_order).
+    summary = {"summary"} if input in (ProductImportIn, CategoryImportIn, ProductIn) else set()
     # A write that names a product or a category checks it before its card (hub#2295).
     check = {"check"} if name in CHECKS else set()
     assert set(op.ai) == {"description", "risk", "asks", *summary, *check} and op.ai["description"]

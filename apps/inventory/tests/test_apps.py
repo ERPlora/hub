@@ -102,7 +102,7 @@ FRONTEND = Path(apps.get_app_config("inventory").path) / "frontend"
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
     # The tab bar shows the entries the person may open, the help window names the screen in view by them and the
     # assistant links each one, each with the permission that opens it. The first one keeps the cube: it is the icon of
-    # the launcher and of «My apps» (base.home.shell_icon).
+    # the launcher and of «My apps» (base.home.shown_modules.shell_icon).
     entries = inventory().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.path, entry.icon, entry.permission) for entry in entries] == [
@@ -112,7 +112,7 @@ def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
         ("categories", "Categories", "/inventory/categories", "ion:list-outline", "inventory.view_category"),
         ("settings", "Settings", "/inventory/settings", "ion:settings-outline", "inventory.manage_settings"),
     ]
-    assert home.shell_icon(inventory()) == "ion:cube-outline"
+    assert home.shown_modules.shell_icon(inventory()) == "ion:cube-outline"
     shell = shell_icon_registry()
     for entry in entries:
         assert f"'{entry.icon.removeprefix('ion:')}':" in shell, entry.icon
@@ -200,8 +200,9 @@ CHECKS = {
     ),
     **dict.fromkeys(("inventory.category.update", "inventory.category.delete"), "inventory.category.get"),
 }
-#: The writes whose card says their data by a summary of their own: the rows of a file by their names.
-CARD_SUMMARY = {"inventory.product.bulk_create", "inventory.category.bulk_create"}
+#: The writes whose card says their data by a summary of their own: the rows of a file by their names, and a new
+#: product by its name, its price and the VAT it charges before the rest.
+CARD_SUMMARY = {"inventory.product.bulk_create", "inventory.category.bulk_create", "inventory.product.create"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -266,7 +267,7 @@ def test_the_homes_step_is_your_catalog_done_with_one_active_product():
     )
     assert "active_products" in registry[step.operation].output.model_fields
     # Required, so «Important»; base alone gives the legal level, and an empty catalog stops no invoice.
-    assert home.level_of(f"inventory.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(f"inventory.{step.key}", step.required) == home.setup_steps.LEVEL_FUNCTIONAL
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():

@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:c4b157bf8a163956de373475bd8460fa664abe453dc933dfa6e8a9b97a33f96d -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:0f9b6fb598e5 -->
 
 Sales is the business's cash register: you tap the articles or the services to build the check and
 charge it in cash, by card or across several payment methods. In a restaurant, the check stays open
@@ -8,6 +7,7 @@ while the table eats. Each charge becomes a sale with its ticket or its invoice,
 look up, reprint or refund.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:2e04a75bda08 -->
 
 Sales & POS is the business's **cash register**: the check is built by tapping articles, it is charged
 in cash, by card or split across several payment methods, and what remains is a **sale that can no longer
@@ -20,6 +20,7 @@ businesses:
   charged at the end, with the client set.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:d7e3107eae0d -->
 
 - The **employee** (waiter, receptionist, cashier): builds the check, adds notes, comps a line, applies
   discounts up to the business's maximum, parks and retrieves checks, charges and looks up their sales
@@ -31,6 +32,7 @@ businesses:
 - The **owner** and the **administrator**: everything.
 
 ### What it does not do
+<!-- from WORKBOOK.md sha256:4327edd821ac -->
 
 Sales does not keep tables or customers in the check (they belong to Tables and Customers), does not
 number invoices or talk to the AEAT (it asks Invoicing for them in the same charge; the AEAT belongs to
@@ -39,6 +41,7 @@ cash register (Cash register reads the sales; Sales only asks it whether the cas
 charging in cash).
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:c51fc38b9fae -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
@@ -69,6 +72,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   country rules (in Poland, for example, there is no cash cap for someone buying as a private person).
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:e3b3fa5865e4 -->
 
 - **Taxes** and **Customers** are turned on with Sales and cannot be turned off while Sales is on:
   without the VAT rules no sale is closed, and the sale keeps its customer's record.
@@ -107,6 +111,7 @@ Initial setup, step by step:
 4. Make a test sale with each method and check the ticket and its fiscal QR (SALE-F01, SALE-F02, SALE-F29).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:f48f162180be -->
 
 Sales & POS opens from the **Sales & POS** menu and has five entries: **Sell**, **Sales**,
 **Quick notes**, **Sections** and **Settings**; the last three, only for whoever can change the Sales
@@ -114,6 +119,7 @@ settings. "Sections" are the till's departments: the short
 word fits in a phone's tab bar with all five in sight.
 
 ### Sell
+<!-- from WORKBOOK.md sha256:6f0590348f30 -->
 This is the till: here you build the customer's check and take the payment. Tap the articles or the
 services in the catalogue to add them to the check, change the quantity or give them a note or a discount
 if needed, and press **Charge** to choose how they pay. If the customer is not leaving yet, park the
@@ -121,6 +127,7 @@ check and pick it up later from **Open checks**; in a restaurant, this is also w
 to a table and send the order to the kitchen.
 
 #### Details
+<!-- from WORKBOOK.md sha256:36113985af20 -->
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
 "Exit full screen" (the browser's, when the device allows it) and it closes by tapping outside, with Esc
 or with the phone's back button. Two areas:
@@ -168,6 +175,7 @@ Notices above the grid: articles without VAT ("N items cannot be sold…" with "
 for whoever can fix it). Load error: "Error loading the till" with "Retry".
 
 #### Charge
+<!-- from WORKBOOK.md sha256:350843592364 -->
 Sheet opened by "Charge". At the top, the big amount, "Paying N lines of <total>" if there are marked
 lines and "Remaining" when splitting. On one side, the summary ("Receipt" / "Invoice", customer), with
 "Invoice" the customer's details and, with Services, "Lines paid another way": each service line of the
@@ -181,16 +189,19 @@ Footer: the reason if it cannot be charged (those of the amount tendered go abov
 "Open a cash session".
 
 #### Open checks
+<!-- from WORKBOOK.md sha256:c8b86b18ea91 -->
 Drop-down of the check's ticket icon: "Park this check" with its explanation, "Open checks" and "Tap a
 check to resume it.", and a row per open check of the business (title or amount, time and amount) with
 its bin. Empty: "No open checks". A failure is painted above the rows. It closes by tapping outside, with
 Esc or with the phone's back button.
 
 #### Bill (pre-bill)
+<!-- from WORKBOOK.md sha256:a4ed89147faf -->
 "Bill" window opened by the footer's printer ("Print bill"): the paper taken to the table, with the notice "Bill — this
 is not an invoice. The fiscal receipt is issued on payment.", and the print and close buttons.
 
 ### Sales
+<!-- from WORKBOOK.md sha256:7e1e8640d127 -->
 Here are the sales already charged, with the figures for today or for the period you choose. Look a sale
 up by its number or by the customer to see its ticket, reprint it, void it or refund it. If you are not
 allowed to void or refund, a manager approves it for you with their PIN. An employee sees only their own
@@ -198,6 +209,7 @@ sales, the ones they charged and the ones attributed to them; the manager, the o
 administrator see everyone's.
 
 #### Details
+<!-- from WORKBOOK.md sha256:b4d330fa54ef -->
 Title "Sales", period ("Today", "7 days", "30 days", "All"), six figures ("Tickets", "Revenue", "Avg.
 ticket", "VAT", "Discounts", "Voided") and the table (Date, Number, Customer, Payment, Status, Total) with
 the search "Search number or customer…", filters, table or card view, 50 per page. Per row: "Document",
@@ -206,6 +218,7 @@ also sees them, and a manager approves it for them with their PIN. Empty: "No sa
 "Loading…"; error: the notice with "Retry".
 
 #### Sale document
+<!-- from WORKBOOK.md sha256:c864478bf40c -->
 Window with a sale's ticket, which opens on tapping its row or "Document" and, by itself, on charging in
 **Sell**: the paper as it prints (title "Receipt" or "Invoice", the business with its tax ID, the number
 Invoicing gave it —"Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"— or, without it, the sale's,
@@ -213,6 +226,7 @@ date, lines, one VAT row per tax key, total, payment method, tendered and change
 printer. Every print from **Sales** comes out with "DUPLICATE". Error: "Error loading the document".
 
 #### Refund
+<!-- from WORKBOOK.md sha256:f750d9288b7c -->
 Window "Refund sale <number>", opened by "Refund": explanation, one card per payment method ("Charged", "Already refunded",
 "Refundable", "Refund amount" and, if needed, "Give it back through"), "Refund everything", "What goes
 back" (the sale's lines with a checkbox each and, on a line of several units, "Units that go back"; the
@@ -221,40 +235,48 @@ one paid with a voucher says "Already paid · <voucher>" and, once marked, "The 
 refund: "There is nothing left to refund on this sale.".
 
 #### Void sale
+<!-- from WORKBOOK.md sha256:26ecc0973f24 -->
 Window "Void sale <number>", opened by "Void": the explanation, the "Reason (required)" and "Void" /
 "Cancel". A refusal is read inside the window, which stays open. Without the permission to void, "Void"
 opens "An approval is needed" on top, where a manager approves it with their PIN.
 
 ### Quick notes
+<!-- from WORKBOOK.md sha256:167dc93b52ca -->
 Here you set up the notes that come up most often on the lines of a check, such as "no salt". Then, when
 you put a note on a line in **Sell**, they show as buttons and you just tap them instead of typing them.
 
 #### Details
+<!-- from WORKBOOK.md sha256:7706c765ef37 -->
 Explanation, table (Note, Position) with search, **+** to add and, per row, "Edit" and "Delete". Empty:
 "No quick notes yet…"; loading: "Loading quick notes…". Whoever lacks the settings permission does not
 open it: by its address, "No access" (BASE-F118).
 
 ### Sections
+<!-- from WORKBOOK.md sha256:a6504a3624b5 -->
 Sections are the till's departments for charging something that is not in the catalogue, at an open
 price, such as fruit and vegetables. Here you create them, each with the VAT it charges and in the order
 they show. When you tap **Open price** in **Sell**, you pick the section and type the amount.
 
 #### Details
+<!-- from WORKBOOK.md sha256:e477660c85ac -->
 Explanation, table (Name, VAT charged, Position), **+** and, per row, "Edit" and "Delete". Empty: "No
 sections yet…"; loading: "Loading sections…". Whoever lacks the settings permission does not open
 it: by its address, "No access" (BASE-F118).
 
 ### Settings
+<!-- from WORKBOOK.md sha256:5308120b74d9 -->
 Here you decide how the till charges: which payment methods it takes, whether every sale needs a
 customer, whether discounts are allowed and whether it gives a ticket or an invoice by default. You also
 write what goes at the top and the bottom of the receipt. Press **Save** for the changes to take effect.
 
 #### Details
+<!-- from WORKBOOK.md sha256:614997f0148b -->
 Header "Point of sale": a switch or field per setting and "Save". Loading: "Loading
 settings…"; error: "Could not load settings." with "Retry"; without permission,
 by its address, "No access" (BASE-F118).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:74842b18b608 -->
 
 | State | What the person sees |
 |---|---|
@@ -267,12 +289,14 @@ by its address, "No access" (BASE-F118).
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". What a manager can approve with their PIN (voiding and refunding a sale, voiding a sent line, deleting a check with something ordered, the open price and discounts above the maximum) does show and, when pressed, asks "An approval is needed". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:9804405bb7c3 -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -320,6 +344,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | done |
 
 ### SALE-F01 Sell and charge in cash
+<!-- from WORKBOOK.md sha256:c8fb17dbd758 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -368,6 +393,7 @@ which charges what is there.
 Involved: INVENTORY-F21, CUSTOMER-F19, CUSTOMER-F20, TAX-F18
 
 ### SALE-F02 Charge by card or another method with no change
+<!-- from WORKBOOK.md sha256:d4c1079935ac -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -389,6 +415,7 @@ payment method is not available in this business.".
 Involved: none
 
 ### SALE-F03 Split the payment across several payment methods
+<!-- from WORKBOOK.md sha256:e00404c181a7 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -412,6 +439,7 @@ into: on a check of €1,000 or more no partial payment can carry cash.
 Involved: none
 
 ### SALE-F04 Choose ticket or invoice and the customer's details
+<!-- from WORKBOOK.md sha256:da588f275c55 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -445,6 +473,7 @@ is charged: they are corrected and the sale is charged again.
 Involved: CUSTOMER-F17, INVOICE-F02
 
 ### SALE-F05 Charge when the business requires a customer
+<!-- from WORKBOOK.md sha256:dfa7590efca7 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -462,6 +491,7 @@ requires a customer on every sale.".
 Involved: CUSTOMER-F17, CUSTOMER-F18
 
 ### SALE-F06 Recover a charge left without an answer
+<!-- from WORKBOOK.md sha256:27338cb1d165 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -486,6 +516,7 @@ If it fails: see steps 3 and 4; it never says "not charged" without knowing it.
 Involved: none
 
 ### SALE-F07 The POS warns of what cannot be sold today
+<!-- from WORKBOOK.md sha256:39c6e14950bc -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -515,6 +546,7 @@ it, it does not go into the check and the same "«…» is sold out." shows.
 Involved: INVENTORY-F04, INVENTORY-F29, VERIFACTU-F08
 
 ### SALE-F08 Charge without the cash register open
+<!-- from WORKBOOK.md sha256:f089ed9cb87b -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -541,6 +573,7 @@ check stays in **Sell**.
 Involved: CASH_REGISTER-F03, CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Sell at an open price by section
+<!-- from WORKBOOK.md sha256:d43469de6be8 -->
 Status: done
 Vertical: common
 Actor: manager (employee with the open-price permission); cashier, with a manager's approval
@@ -567,6 +600,7 @@ and the sheet says "This needs a manager's approval.".
 Involved: TAX-F18, BASE-F84
 
 ### SALE-F10 Sell by weight, typing the quantity
+<!-- from WORKBOOK.md sha256:326c66dabc25 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -583,6 +617,7 @@ the step of the product (…)." and the line stays as it was. There is no scale 
 Involved: INVENTORY-F26
 
 ### SALE-F11 Choose an article's modifiers
+<!-- from WORKBOOK.md sha256:059162f5c4fa -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -616,6 +651,7 @@ again." and nothing goes in.
 Involved: MODIFIER-F06, MODIFIER-F07, MODIFIER-F08
 
 ### SALE-F12 Put together a menu
+<!-- from WORKBOOK.md sha256:e1016f7429f5 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -653,6 +689,7 @@ product (1 ud).". If the menus cannot be read, above the grid "The menus could n
 Involved: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22, SALE-F42
 
 ### SALE-F13 Put a note on a line
+<!-- from WORKBOOK.md sha256:169ff0f5ddb3 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -671,6 +708,7 @@ A line already sent to the kitchen has no note button.
 Involved: none
 
 ### SALE-F14 Apply a discount to a line or to the check
+<!-- from WORKBOOK.md sha256:d71ed1a11dec -->
 Status: done
 Vertical: common
 Actor: employee, manager; above the maximum, the cashier with a manager's approval
@@ -691,7 +729,8 @@ Steps:
    with their PIN (or their badge) on that same device. The check keeps who authorized it and it is not
    asked again when charging; if, when charging, the discount goes over the maximum without
    authorization, it asks just the same, with "Approving: Charge with a discount above the maximum".
-   Employees › Approvals keeps what was approved with its figure.
+   Employees › Approvals keeps what was approved with its figure, and also what is given by whoever may give
+   it by themselves.
 In: "Allow discounts" and the maximum discount of the settings. The assistant only sets one on a check it is
 told about (its table or its name): the discount a product or a category gets on every sale is a rule of Price
 Lists (PRICING-F11).
@@ -708,6 +747,7 @@ any charge.
 Involved: BASE-F84, BASE-F85
 
 ### SALE-F15 Comp a line
+<!-- from WORKBOOK.md sha256:76404231c9d1 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -726,6 +766,7 @@ If it fails: "That change to the line could not be saved. The line is back as it
 Involved: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Attribute the check or a line to whoever serves
+<!-- from WORKBOOK.md sha256:ca9d61689e0a -->
 Status: done
 Vertical: common
 Actor: employee, manager, assistant
@@ -765,6 +806,7 @@ business.".
 Involved: STAFF-F21, KITCHEN-F18, TABLE-F09
 
 ### SALE-F17 Park a check and retrieve it
+<!-- from WORKBOOK.md sha256:abb956f749c2 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -786,6 +828,7 @@ there is no park button anywhere.
 Involved: CUSTOMER-F19, TABLE-F33
 
 ### SALE-F18 Delete an open check
+<!-- from WORKBOOK.md sha256:0ec519758a80 -->
 Status: done
 Vertical: common
 Actor: manager; an empty check, also the employee; one with something ordered, the cashier with a manager's approval
@@ -810,6 +853,7 @@ the list and "This needs a manager's approval." is read on top.
 Involved: TABLE-F20, TABLE-F21, BASE-F84
 
 ### SALE-F19 Open a table's check and leave it on the table
+<!-- from WORKBOOK.md sha256:a6d82c6f1f1a -->
 Status: done (without asking for the number of guests in the POS: see "What stays out")
 Vertical: restaurant
 Actor: employee, manager
@@ -839,6 +883,7 @@ its tables and seat, there is no button and Tables is not asked anything.
 Involved: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24, TABLE-F33
 
 ### SALE-F20 Send the order to the kitchen and void a sent line
+<!-- from WORKBOOK.md sha256:38a11388c5a4 -->
 Status: done
 Vertical: restaurant
 Actor: employee (send), manager (void; the cashier, with a manager's approval)
@@ -857,7 +902,9 @@ Steps:
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad can be tapped from the first moment. If the send fails, the
-   charge does not open and it says why.
+   charge does not open and it says why. A charge through the assistant or the API does the same: what
+   the check has not sent yet goes to the kitchen as a new round before the charge, and if Kitchen
+   refuses it, nothing is charged and it says why.
 4. A sent line is locked: no quantity, no note, no discount. It can still be comped with its gift: it
    stays on the check at 0 and the kitchen gets nothing new.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «Croquettes»" opens with
@@ -886,10 +933,11 @@ longer be removed: it was sent to the kitchen (void it with a reason), it is cha
 an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Through the assistant: its confirmation card says the check (a table's, by its table as Tables says it and in the reader's language, "4 (Dining room)"; any other, or without access to Tables, by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97). A product asked for in words shows as the one that will be added: "two coffees" with "Espresso" and "White coffee" on the menu says "2 · White coffee · 4 (Dining room)"; if the words fit several products or none, they show as they were said and confirming adds nothing: the assistant asks which one.
+Through the assistant: its confirmation card says the check (a table's, by its table as Tables says it and in the reader's language, "4 (Dining room)"; any other, or without access to Tables, by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97). A product asked for in words shows as the one that will be added: "two coffees" with "Espresso" and "White coffee" on the menu says "2 · White coffee · 4 (Dining room)"; if the words fit several products or none ("two cafés con leche" with "White coffee" on the menu), no card shows: the assistant hears which products fit or that none has those words, and looks it up on the menu or asks which one. Should the refusal come on confirming (the menu changed between the card and the yes, or through the API), nothing is added and it says "There is no product “café con leche”. Say which one.".
 Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
+<!-- from WORKBOOK.md sha256:c1de49a32c77 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -911,15 +959,19 @@ In: the open check and its total worked out by the server.
 Out: a paper with no fiscal number; it uses up no numbering and creates no sale. Each press, one bill. Printing it
 leaves the check marked as requested, whether it comes out on the receipt printer or through the device's dialog,
 until it is charged in full or deleted; printing it again, adding lines or charging part of it does not remove it.
+Asked of the assistant ("print the bill for table 4"), it only comes out on the receipt printer: if none takes it,
+it is neither printed nor marked, and its receipt says it was not done, with the reason: "No receipt printer takes
+this bill: open it in Sales to print it on this device.".
 If it fails: while the business has not yet said its currency, "Bill" keeps loading and the printer stays grey:
 the paper never goes out with a supposed figure; if the currency cannot be read, it says so with "Retry", as
 when the bill cannot be worked out. If it does not print, "Bill could not be printed"; if the installed app does
 not open its print screen, the notice says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
 another business".
-Involved: PRINTING-F09, TABLE-F34, INVOICE-F21
+Involved: PRINTING-F09, TABLE-F34, INVOICE-F21, BASE-F97
 
 ### SALE-F22 Charge only part of the check
+<!-- from WORKBOOK.md sha256:a77753750562 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -947,6 +999,7 @@ no longer exists does not stay on screen.
 Involved: TABLE-F33
 
 ### SALE-F23 Split a table's check
+<!-- from WORKBOOK.md sha256:1b8ef0701770 -->
 Status: done — the "Split check" button belongs to Tables' table control (TABLE-F17)
 Vertical: restaurant
 Actor: employee, manager
@@ -962,6 +1015,7 @@ If it fails: if another device is charging that check, the split waits and, if i
 Involved: TABLE-F17
 
 ### SALE-F24 Merge the checks of two tables
+<!-- from WORKBOOK.md sha256:f465ee7cdca5 -->
 Status: done — the "Merge" button belongs to Tables' table control (TABLE-F16)
 Vertical: restaurant
 Actor: employee, manager
@@ -980,6 +1034,7 @@ If it fails: if one of the two is no longer open, it is refused without moving a
 Involved: TABLE-F16, KITCHEN-F28
 
 ### SALE-F25 Move the check to another table
+<!-- from WORKBOOK.md sha256:dc080a720767 -->
 Status: done — in Tables (TABLE-F15): the check does not change
 Vertical: restaurant
 Actor: employee, manager
@@ -993,24 +1048,28 @@ If it fails: Tables will say.
 Involved: TABLE-F15
 
 ### SALE-F26 Charge an appointment from the calendar
+<!-- from WORKBOOK.md sha256:668681fa4a91 -->
 Status: done (the calendar's "Charge" button belongs to Appointments: APPOINTMENT-F17)
 Vertical: hair salon
 Actor: employee, manager
 Screen: Sell
 Steps:
 1. In the Appointments calendar, "Charge" opens the appointment's check (with one line per service, at
-   its booked price and with the professional) and goes to **Sell** with that check on screen.
+   its booked price and with the professional), already in the name of the appointment's customer, and
+   goes to **Sell** with that check on screen.
 2. It is charged as always; if it is parked and retrieved, the check stays tied to the appointment.
 3. Pressing "Charge" again (or on another device at the same time) goes back to the same open check: an
    appointment has a single open check, never two.
 In: the appointment, from Appointments.
-Out: the sale with the appointment and the professional (announces: sale charged and sale born from an
-appointment, with the appointment, who served and the total).
+Out: the sale with the appointment, the customer and the professional, and the purchase on the customer's
+card (announces: sale charged and sale born from an appointment, with the appointment, who served and the
+total).
 If it fails: if the appointment's check is no longer open (it was charged or voided), the POS says so
 ("That check is not open any more…") and carries on as it was.
-Involved: APPOINTMENT-F17
+Involved: APPOINTMENT-F17, CUSTOMER-F19
 
 ### SALE-F27 Pay a line with a voucher
+<!-- from WORKBOOK.md sha256:010309d0e04f -->
 Status: done
 Vertical: hair salon
 Actor: employee, manager
@@ -1050,6 +1109,7 @@ charging them is refused ("Services is not active in this business…").
 Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Look up the sales history and figures
+<!-- from WORKBOOK.md sha256:1ae7f8809d87 -->
 Status: done
 Vertical: common
 Actor: employee (the history and the figures of their sales), manager (everyone's)
@@ -1117,6 +1177,7 @@ be read, "Unavailable".
 Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
+<!-- from WORKBOOK.md sha256:a66effd35f44 -->
 Status: done
 Vertical: common
 Actor: employee (of their sales), manager (of all of them)
@@ -1167,20 +1228,28 @@ not open its print screen, with the reason after a colon, as when printing the b
 refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes nothing; with no reason,
 "The documents could not be issued. Try again.". A sale the person does not see (someone else's, for an
 employee) is not opened, reprinted or issued: the window says "Error loading the document" and the API or
-the assistant, "That sale does not exist.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+the assistant, "That sale does not exist.". If the assistant is asked ("reprint the last ticket"), it is only done
+if a receipt printer takes the paper; if not, nothing is printed and its receipt says it was not done, with the
+reason: "No receipt printer takes this sale's paper: open the sale to print it on this device."; with its fiscal
+document pending, "Its fiscal document is still pending: open the sale to issue it.", and if its VeriFactu record
+cannot be read, "Its VeriFactu record could not be read, and its paper never prints without its QR.".
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
+<!-- from WORKBOOK.md sha256:f0831c2c8ad4 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
 Screen: Sales, Void sale, An approval is needed
 Steps:
-1. In **Sales**, on a Completed sale with no refunds, press "Void".
+1. In **Sales**, on a Completed sale with no refunds, press "Void". Before starting one knows whether it will be
+   possible: if your role does it "With approval", "A manager will have to approve this void." shows; if your own role
+   says "No", "Your role does not let you void a sale. Ask a manager to do it." shows and nothing opens.
 2. "Void sale 20261121-0007" opens. Write the "Reason (required)" and press "Void", or "Cancel".
-3. If you do not have the permission to void, "An approval is needed" opens on top with "Approving: Void
+3. If your role voids "With approval", "An approval is needed" opens on top with "Approving: Void
    a sale": a manager taps their face and types their PIN (or swipes their badge) on that same device.
-   Whoever has the permission does not see this question.
+   Whoever has the permission does not see this question, nor does whoever their role says "No" to: no PIN lets them
+   void.
 4. "Sale voided" shows, the window closes, the row changes to Voided and the "Voided" figure goes up.
 In: the chosen sale.
 Out: the sale marked as voided with time, who and reason; it is not deleted (announces: sale voided).
@@ -1196,16 +1265,20 @@ at the same time, "This sale is already voided.". A refusal is read inside the w
 If "Cancel" is pressed in "An approval is needed", nothing is voided and the window says "This needs a
 manager's approval.". The approved void does the same as the manager's, only once: the corrective
 invoice in the same void, the voucher sessions that go back, the stock and the customer's record; who
-approved it stays in **Employees › Approvals**.
-Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
+approved it, or that whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role
+becomes "No" with the window open, the void is refused and nothing is voided, even if a manager had already approved it.
+Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Refund a sale (all of it, part of it or through another method)
+<!-- from WORKBOOK.md sha256:a78b311b17a5 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
 Screen: Refund, An approval is needed
 Steps:
-1. In **Sales**, on a Completed sale (also with an invoice), press "Refund".
+1. In **Sales**, on a Completed sale (also with an invoice), press "Refund". Before starting one knows whether it will be
+   possible: if your role does it "With approval", "A manager will have to approve this refund." shows; if your own role
+   says "No", "Your role does not let you refund a sale. Ask a manager to do it." shows and nothing opens.
 2. "Refund sale 20261121-0007" shows one card for each way it was paid: "Charged", "Already refunded" and
    "Refundable", with a proposal for a full refund already shared out ("Refund everything" puts it back).
 3. If the customer returns articles, mark them in "What goes back": the amount is proposed by itself (the
@@ -1215,9 +1288,10 @@ Steps:
    money is refunded.
 4. Change the "Refund amount" of each method if only part goes back. If the original method is no longer
    available, choose another in "Give it back through".
-5. Write the "Reason" and press "Refund €12.00". If you do not have the permission to refund, "An
+5. Write the "Reason" and press "Refund €12.00". If your role refunds "With approval", "An
    approval is needed" opens on top with "Approving: Refund a sale": a manager approves it with their PIN
-   (or their badge) on that same device. Whoever has the permission does not see this question.
+   (or their badge) on that same device. Whoever has the permission does not see this question, nor does whoever their
+   role says "No" to: no PIN lets them refund.
 6. "Refund recorded." shows; if nothing is left to refund, the sale changes to Refunded; if something is
    left, the row says "€6.00 left to refund".
 In: what was charged and what was already refunded for each payment method; the sale's lines and the ones
@@ -1233,13 +1307,15 @@ another refund takes the last of a marked line at the same time: "One of the lin
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
 pressing again does not refund twice. If "Cancel" is pressed in "An approval is needed",
 nothing is refunded and the window says "This needs a manager's approval.". The approved refund is the
-same, only once, with its corrective invoice and the voucher sessions that go back; who approved it stays
-in **Employees › Approvals**.
-Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
+same, only once, with its corrective invoice and the voucher sessions that go back; who approved it, or that
+whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role becomes "No" with the
+window open, the refund is refused and nothing is refunded, even if a manager had already approved it.
+Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Customers takes what was refunded off the record's spending on hearing "sale refunded" (CUSTOMER-F22)
 and Inventory puts back the units that go back (INVENTORY-F24), once per refund.
 
 ### SALE-F32 Give back a voucher's session
+<!-- from WORKBOOK.md sha256:21d924c17995 -->
 Status: done
 Vertical: hair salon
 Actor: manager
@@ -1262,6 +1338,7 @@ refund or the void of a sale with sessions is refused ("Services is not active i
 Involved: SERVICE-F26, SERVICE-F27
 
 ### SALE-F33 Merge the sales of two customer records
+<!-- from WORKBOOK.md sha256:1552010f8c23 -->
 Status: done
 Vertical: common
 Actor: system
@@ -1275,6 +1352,7 @@ If it fails: there is no screen; repeating it changes nothing.
 Involved: CUSTOMER-F13
 
 ### SALE-F34 Set up the POS
+<!-- from WORKBOOK.md sha256:85864b490a9e -->
 Status: done
 Vertical: common
 Actor: manager, administrator
@@ -1302,6 +1380,7 @@ turned off, the POS goes back to accepting every active method.
 Involved: none
 
 ### SALE-F35 Add and order the open-price sections
+<!-- from WORKBOOK.md sha256:6d1c451fbcf9 -->
 Status: done
 Vertical: common
 Actor: manager
@@ -1318,10 +1397,12 @@ charged with.
 If it fails: a VAT category that does not exist is refused next to its field. A field's reason goes away
 as soon as that field is corrected ("VAT charged", by choosing another category). A section someone else
 already deleted: "That section is no longer in this business. Reload the list and try again.".
-Through the assistant: its confirmation card says the section by its name, never by an id; one that is no longer there stays off the card (BASE-F97).
+Through the assistant: its confirmation card says the section by its name, never by an id (one that is no longer there
+stays off the card), and the VAT it charges with today's rate, as the list does ("Product — generic · 21%") (BASE-F97).
 Involved: TAX-F01, BASE-F97
 
 ### SALE-F36 Prepare the quick notes
+<!-- from WORKBOOK.md sha256:45e837feb484 -->
 Status: done
 Vertical: common
 Actor: manager
@@ -1339,6 +1420,7 @@ away as soon as that field is corrected.
 Involved: none
 
 ### SALE-F37 Add a payment method (Bizum, bank transfer…)
+<!-- from WORKBOOK.md sha256:905543d23e9e -->
 Status: done
 Vertical: common
 Actor: manager, assistant
@@ -1354,6 +1436,7 @@ If it fails: a repeated name is refused: "There is already a payment method with
 Involved: none
 
 ### SALE-F38 Sell a service from Services
+<!-- from WORKBOOK.md sha256:ca62f433f92b -->
 Status: done
 Vertical: hair salon
 Actor: employee, manager
@@ -1393,9 +1476,10 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-Status: not done — the sale knows how to keep apart, in each payment, what another app adds, but today it always
-refuses it: no app can declare its step at the charge yet, the Charge sheet does not paint those steps and the Sale
-document does not show what was added (hub#1497, hub#1500, hub#1502)
+<!-- from WORKBOOK.md sha256:9a6ccd9de0bb -->
+Status: not done — the sale knows how to keep apart, in each payment, what another app adds, and Sales already says
+which steps the apps turned on add to the charge and takes what is added only when whoever charges has one, but the
+Charge sheet does not paint them yet and the Sale document does not show what was added (hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager
 Screen: Charge, Sale document
@@ -1416,9 +1500,10 @@ VAT (see "Why the tip is not on the ticket" in the Tips manual). The sale keeps 
 charged on top and its name, to square the amount tendered and the change and for the paper, and the sale
 charged notice carries it apart; the **Sales** figures (SALE-F28) do not add it. The step's app keeps its own
 (TIP-F02).
-If it fails: with no app turned on that adds a step to the charge, a charge that brings an added amount (through
-the API or the assistant) does not charge: "This business has no app that adds anything to a charge, such as a tip:
-charge the sale alone.". If the step's app is turned off with the sheet open, the row goes away and it charges without
+If it fails: with no app turned on that adds a step to the charge of whoever charges, a charge that brings an added
+amount (through the API or the assistant) does not charge: "This business has no app that adds anything to a charge, such as a tip:
+charge the sale alone."; if the app is turned on but whoever charges has no permission for its step, "You have no
+permission to add anything to a charge, such as a tip: charge the sale alone.". If the step's app is turned off with the sheet open, the row goes away and it charges without
 it.
 If the sale is charged and the step cannot save its own, the sale stays charged and the sheet says the step's
 notice with "Retry" (TIP-F02); the retry uses the same attempt key and never charges twice (SALE-F06), and that
@@ -1429,6 +1514,7 @@ total, as always: the tip is no price.
 Involved: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 See a dish's allergens when ordering it
+<!-- from WORKBOOK.md sha256:a1dd433981f3 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -1459,6 +1545,7 @@ no row is not taken for a dish without allergens.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32, MODIFIER-F12
 
 ### SALE-F41 Mark the customer's allergy on a line
+<!-- from WORKBOOK.md sha256:3470420bb0e1 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -1490,6 +1577,7 @@ the confirmation card, which says the check, the dish and the allergens by their
 Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
 ### SALE-F42 Choose the modifiers of a dish in a menu
+<!-- from WORKBOOK.md sha256:aa1c4f5d73c2 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -1530,6 +1618,7 @@ Involved: SALE-F11, SALE-F12, SALE-F40, COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F
 MODIFIER-F07, MODIFIER-F08
 
 ## What the verticals share
+<!-- from WORKBOOK.md sha256:a9b0896d68e4 -->
 
 | Shared piece | Flows that use it |
 |---|---|
@@ -1542,6 +1631,7 @@ MODIFIER-F07, MODIFIER-F08
 | The POS settings: the same for both businesses | F34 and every charge flow |
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:ec70e79bef89 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a product is
@@ -1557,6 +1647,7 @@ and refunding) only reaches the sales the person sees: without "See all sales", 
 the ones attributed to them. One they do not see does not exist for them (404 `sale.sale_not_found`).
 
 ### What it offers: queries (they read and change nothing)
+<!-- from WORKBOOK.md sha256:a82dbcf5d08c -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -1569,8 +1660,9 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | What was sold on each of the last 7 days | see sales | F28 | `sale.sale.last_7_days` |
 | What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | see sales | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
+| The steps the apps turned on add to the charge, those whoever charges sees and in their order: which app each one is of and which part of it paints it; with none, the charge takes nothing added | charge | F39 | `sale.checkout.steps` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
-| A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
+| A check with its uncharged lines | see sales | F17, F19, F40 | `sale.order.get` |
 | The active payment methods, with the ones the business allows today | see payment methods | F02, F03 | `sale.payment_method.list` |
 | The POS settings (to edit them) | settings | F34 | `sale.settings.get` |
 | The settings the POS needs to sell | see sales | F01–F05 | `sale.pos_settings.get` |
@@ -1580,12 +1672,14 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
+| The product of a new line as the write that adds it finds it, to check it before the assistant's card; words that are no product, or fit several, draw no card | build the check | F20 | `sale.order_line.check` |
 | The name of a record a write of Sales touches, by its id, and that of a refund, by its sale ("Refund of sale 20261014-0007"), by which Services names the one that gives sessions back (SERVICE-F26): only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F32, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
 the quick notes and what is refundable can be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:521328cbfe57 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -1593,12 +1687,12 @@ the quick notes and what is refundable can be followed live.
 | The same charge, with a discount above the maximum | uncapped discount | F14 | `sale.sale.complete_over_limit` |
 | Voids a charged sale with a reason (and gives back its voucher sessions); with its corrective invoice in the same void (and its ticket first, if it was pending) | void | F30, F32 | `sale.sale.void` |
 | Issues now a sale's fiscal documents that are waiting ("Issue now"): its ticket or invoice and the corrective invoices of its void and its refunds | charge (and Invoicing's permission for each document) | F29 | `sale.sale.issue_documents` |
-| Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if it cannot be queued, it says so and the device prints it | see sales | F29 | `sale.sale.print` |
+| Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if none takes it (or its fiscal document is pending, or its QR cannot be read), it fails and says why, and the screen prints it on the device | see sales | F29 | `sale.sale.print` |
 | Refunds money from a sale per payment, and the lines that go back (the ones paid with a voucher give back their session); with its corrective invoice in the same refund | refund | F31, F32 | `sale.sale.refund` |
 | Opens a check, with or without lines (articles, services —at their booked price or at the professional's— or open price); that of an appointment that already has an open one returns that one (`already`) | build the check | F01, F17, F26, F38 | `sale.order.open` |
-| Adds a catalog article to a check | build the check | F01, F10 | `sale.order.add_line` |
+| Adds a catalog article to a check | build the check | F01, F10, F11, F40 | `sale.order.add_line` |
 | Adds a service from Services to a check | build the check | F38 | `sale.order.add_service_line` |
-| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12 | `sale.order.add_combo_line` |
+| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12, F40, F42 | `sale.order.add_combo_line` |
 | Pays a service line with one of the client's vouchers (holds the session) | build the check and spend sessions | F27 | `sale.order.apply_voucher` |
 | Undoes a line's voucher (releases the session) | build the check and spend sessions | F27 | `sale.order.remove_voucher` |
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
@@ -1608,23 +1702,25 @@ the quick notes and what is refundable can be followed live.
 | Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |
-| Voids a line already sent to the kitchen, with a reason | void | F20 | `sale.order.void_line` |
+| Voids a line already sent to the kitchen, with a reason | void | F20, KITCHEN-F29 | `sale.order.void_line` |
 | Sends the pending lines to the kitchen | build the check | F20 | `sale.order.fire` |
 | Splits a check | build the check | F23 | `sale.order.split` |
 | Merges two checks | build the check | F24 | `sale.order.merge` |
-| Voids an open check (an empty one, with no live lines or payments, with just building the check) | void; empty: build the check | F18 | `sale.order.void` |
-| The same void of a check with something ordered or charged, the one a manager approves with their PIN | void | F18 | `sale.order.void_ordered` |
+| Voids an open check (an empty one, with no live lines or payments, with just building the check) | void; empty: build the check | F18, TABLE-F20 | `sale.order.void` |
+| The same void of a check with something ordered or charged, the one a manager approves with their PIN | void | F18, TABLE-F20 | `sale.order.void_ordered` |
 | Sets the check's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_discount`, `sale.order.set_discount_over_limit` |
 | Sets a line's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Sets a check's title (parking) | build the check | F17 | `sale.order.set_label` |
 | Links a check to its appointment | build the check | F26 | `sale.order.set_appointment` |
-| Prints the bill of a table (not an invoice: no number, no payment) on the receipt printer, or says it was not queued and the device prints it; the table shows "Bill requested" until it is charged in full | see sales | F21 | `sale.order.print_bill` |
+| Prints the bill of a table (not an invoice: no number, no payment) on the receipt printer; if none takes it, it fails and says why, and the screen prints it on the device; the table shows "Bill requested" until it is charged in full | see sales | F21 | `sale.order.print_bill` |
+| Notes that the device printed a table's bill because no receipt printer took it: the table shows "Bill requested"; the screen only (the assistant does not print on the device) | see sales | F21 | `sale.order.note_bill` |
 | Creates a payment method | create payment methods | F37 | `sale.payment_method.create` |
 | Saves the POS settings | settings | F34 | `sale.settings.update` |
 | Creates, changes and deletes sections | settings | F35 | `sale.department.create`, `.update`, `.delete` |
 | Creates, changes and deletes quick notes | settings | F36 | `sale.quick_note.create`, `.update`, `.delete` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:d898ff863395 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -1648,6 +1744,7 @@ the quick notes and what is refundable can be followed live.
 | Payment method, settings, section, quick note | Creating or changing them | Which one | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:38cf6ee5d06b -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
@@ -1655,6 +1752,7 @@ the quick notes and what is refundable can be followed live.
 | Document issued (`invoice.invoice.issued`) | Invoicing | Links by its source (`source = {type, sale_id, refund_id, void}`) a document that was left pending: a refund's corrective invoice goes back to that refund, a void's to the sale, the charge's ticket or invoice to the sale; the rest (manual invoice, F3 that replaces, corrective invoice of an invoice) belongs to Invoicing (F29) | `sale.sale.record_invoice` |
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:272d015e0c61 -->
 
 - **Taxes** (required): the rule and the VAT calculation of each line when charging.
 - **Customers** (required): the sale's customer record and its search by name or, for whoever sees the
@@ -1687,7 +1785,16 @@ the quick notes and what is refundable can be followed live.
 - **Appointments** (optional): a check's appointment and what it booked, to charge its booked price
   (`appointment.appointment.get`).
 
+| From | What for | Flows | Service |
+|---|---|---|---|
+| Inventory | The articles that are tapped or searched for, with what is sold out, those with no VAT and their allergens | F07, F40 | `inventory.product.list` |
+| Inventory | The allergens of a menu's dishes | F40 | `inventory.product.get` |
+| Modifiers | The groups and options of an article, or of a dish in a menu | F11, F42 | `modifier.group.for_target` |
+| Menus and combos | The menus that can be sold, with their courses and choices | F12, F42 | `combo.combo.for_sale` |
+| VeriFactu | Whether tickets and invoices can be issued now, and if not, why | F07 | `verifactu.config.get` |
+
 ### Who uses it
+<!-- from WORKBOOK.md sha256:4722b9a4a381 -->
 
 | App | What for | Service |
 |---|---|---|
@@ -1701,6 +1808,7 @@ the quick notes and what is refundable can be followed live.
 | Kitchen | Opens the kitchen order of each round sent and brings it up to date when the check is charged in full, voided or one of its lines is voided (KITCHEN-F05, KITCHEN-F27 to KITCHEN-F29) | `sale.order.fired`, `sale.order.completed`, `sale.order.voided`, `sale.order.line_voided` |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:bbb3ec1467dc -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
@@ -1729,8 +1837,8 @@ their PIN or their badge ("An approval is needed", BASE-F84), once and for that 
 refunding a sale, voiding a line sent to the kitchen, deleting a check with something ordered, selling at
 an open price and discounts above the maximum. The approved action does everything the manager's does
 (also what Invoicing and Services move: the corrective invoice and the voucher sessions that go back) and
-stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the whole business's figures, the
-settings and creating payment methods are not approved.
+stays in **Employees › Approvals**, like the one the manager does by themselves (BASE-F85). Seeing everyone's
+sales, the whole business's figures, the settings and creating payment methods are not approved.
 
 The accountancy firm (`hub_accountant`) only reads: "See sales, checks, POS settings, sections and quick notes",
 "See the payment methods" and "See everyone's sales". It does not build checks, charge, void or refund, nobody

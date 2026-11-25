@@ -221,8 +221,8 @@ solo el elemento del id (hub#1272).
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Los elementos, con búsqueda por nombre, filtro de estado y páginas (hasta 100 por página) | ver | F01–F05 | `demo.item.list` |
-| La ficha de un elemento con sus líneas | ver | F02–F05 | `demo.item.detail` |
+| Los elementos, con búsqueda por nombre, filtro de estado y páginas (hasta 100 por página) | ver | F01–F06 | `demo.item.list` |
+| La ficha de un elemento con sus líneas | ver | F02–F06 | `demo.item.detail` |
 | Las cifras: total, abiertos, hechos y líneas | gestionar | F05 | `demo.item.stats` |
 | Cuántos elementos siguen abiertos (el contador de la campana) | ver | F05 | `demo.item.open_count` |
 
@@ -233,7 +233,7 @@ solo el elemento del id (hub#1272).
 | Crea un elemento | gestionar | F01 | `demo.item.create` |
 | Cambia un elemento (solo lo enviado) | gestionar | F02 | `demo.item.update` |
 | Borra un elemento y sus líneas | gestionar | F03 | `demo.item.delete` |
-| Añade una línea; repetir con el mismo identificador no la duplica | gestionar | F04 | `demo.item.add_line` |
+| Añade una línea; repetir con el mismo identificador no la duplica | gestionar | F04, F06 | `demo.item.add_line` |
 
 ### Lo que avisa
 
@@ -290,7 +290,7 @@ papel en ningún negocio.
   acciones, su `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace). Los
   `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
   tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
+  (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno
   (`tests/test_assistant_asks.py`), y las que nombran el elemento solo por su nombre («elimina Ejemplo QA…») llegan a
   una herramienta que lo toma por ese nombre (hub#1162).
 - Un elemento por su id o por su nombre (hub#1162): `ItemRefIn` (`id` o `called`; el id gana), del que heredan

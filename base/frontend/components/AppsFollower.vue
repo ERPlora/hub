@@ -7,11 +7,11 @@
 // nothing.
 import { useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
-import { computed, watch } from 'vue';
+import { watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { sessionChanged } from '../lib/access';
 import { gateAgain } from '../lib/app-gate';
+import { readSessionAgainOnChange } from '../lib/session-follow';
 
 const route = useRoute();
 const router = useRouter();
@@ -19,11 +19,7 @@ const session = useSession();
 const { data } = useLive('base.app.list', {});
 
 /** Each app's state, the only part of the list that changes the menu. */
-const states = computed(() => data.value?.apps.map((app) => `${app.id}:${app.state}`).join(','));
-
-watch(states, (next, previous) => {
-  if (next !== undefined && previous !== undefined && next !== previous) sessionChanged();
-});
+readSessionAgainOnChange(() => data.value?.apps.map((app) => `${app.id}:${app.state}`).join(','));
 
 /** The app of the screen in front, off in the session just read: the gate runs again in the same address. */
 watch(

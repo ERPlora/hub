@@ -8,6 +8,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
+from live.operations import INTERNAL
 from live.meta import (
     Category,
     Help,
@@ -129,6 +130,8 @@ def test_the_worker_sends_the_queue_every_minute():
 
 OPERATIONS = {
     "verifactu.config.get",
+    # What going live refuses, read before the assistant's card of going live (hub#2200).
+    "verifactu.config.check_go_live",
     "verifactu.record.list",
     "verifactu.record.get",
     "verifactu.record.by_invoice",
@@ -164,6 +167,8 @@ OPERATIONS = {
     "verifactu.representation.model",
 }
 #: High risk: sending to the AEAT, the queue, correcting and cancelling, the chain's recovery and the configuration.
+#: The reads that are no assistant tool.
+INTERNAL_READS = {"verifactu.config.check_go_live"}
 HIGH = {
     "verifactu.record.correct",
     "verifactu.record.cancel",
@@ -190,7 +195,10 @@ def test_every_operation_is_described_for_the_assistant():
 
     ops = {name: op for name, op in registry.items() if name.startswith("verifactu.")}
     assert set(ops) == OPERATIONS
+    assert {name for name, op in ops.items() if op.ai is INTERNAL} == INTERNAL_READS
     for name, op in ops.items():
+        if name in INTERNAL_READS:
+            continue
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name
         )
@@ -263,8 +271,8 @@ def test_the_step_is_important_in_testing_and_its_text_never_says_it_stops_the_s
     (step,) = verifactu().setup
     key = f"verifactu.{step.key}"
     assert step.required is True
-    assert home.level_of(key, step.required, {"environment": "testing"}) == home.LEVEL_FUNCTIONAL
-    assert home.level_of(key, step.required, {"environment": "production"}) == home.LEVEL_LEGAL
+    assert home.setup_steps.level_of(key, step.required, {"environment": "testing"}) == home.setup_steps.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(key, step.required, {"environment": "production"}) == home.setup_steps.LEVEL_LEGAL
     for language, description in product(("en", "es"), DESCRIPTIONS):
         with translation.override(language):
             text = f"{step.title} {description}".lower()

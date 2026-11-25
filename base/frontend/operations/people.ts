@@ -1,4 +1,4 @@
-// Types of base/schemas/people.py for the SDK (`useLive`, `useCommand`, `client.api.call`), written by
+// Types of base/schemas/people.py and roles.py for the SDK (`useLive`, `useCommand`, `client.api.call`), written by
 // hand: keep them in step with it and with `frontend/generated/operations.json`.
 
 type NoInput = Record<string, never>;
@@ -42,21 +42,35 @@ export interface PersonDetail extends Person {
   may: { remove_pin: boolean; set_badge: boolean };
 }
 
-/** `base.RoleOut`: one of erplora.com's roles. */
-export interface HubRoleRow {
-  key: HubRole;
+/** `base.RoleOut`: one of erplora.com's roles (`basic`, its `HubRole`) or one the business made (`own`, its id). */
+export interface HubRoleInfo {
+  key: string;
   label: string;
-  origin: 'basic';
+  description: string;
+  origin: 'basic' | 'own';
   members: number;
+  /** An own one: an app turned on or a permission added after it was saved is still to look at. */
+  to_review: boolean;
+}
+
+/** `base.RoleRowOut`: a role as the list shows it. */
+export interface HubRoleRow extends HubRoleInfo {
   permissions: number;
 }
+
+/** What a role does with a permission: on, it holds it; approval, a manager approves it there and then with their
+ *  PIN; off, not at all. */
+export type RoleState = 'on' | 'approval' | 'off';
 
 /** `base.RolePermissionOut`: a permission in business words, and what the role does with it. */
 export interface RolePermission {
   permission: string;
   phrase: string;
-  /** on: the role holds it; approval: a manager approves it there and then with their PIN; off: not at all. */
-  state: 'on' | 'approval' | 'off';
+  state: RoleState;
+  /** A manager can approve it there and then, so a role may leave it to approval. */
+  approvable: boolean;
+  /** An own one: the role was saved before this permission was there to look at. */
+  to_review: boolean;
 }
 
 /** `base.RoleAppOut`: one panel of «What it allows»: the business, an app that is on, or the sensitive data. */
@@ -66,13 +80,25 @@ export interface RoleApp {
   permissions: RolePermission[];
 }
 
-/** `base.RoleDetailOut`: «What it allows» of a basic role. */
-export interface RoleDetail {
-  key: HubRole;
-  label: string;
-  origin: 'basic';
-  members: number;
+/** `base.RoleDetailOut`: «What it allows» of a role. */
+export interface RoleDetail extends HubRoleInfo {
   apps: RoleApp[];
+}
+
+/** `base.RoleUpdateIn`: only what is sent changes. */
+export interface RoleChange {
+  role: string;
+  name?: string;
+  description?: string;
+  states?: Record<string, RoleState>;
+}
+
+/** `base.RoleAssignOut`: the role the person has now, the business's own or the one of their invitation. */
+export interface RoleGiven {
+  person: string;
+  name: string;
+  role: string;
+  label: string;
 }
 
 declare module '@erplora/ui/sdk' {
@@ -84,5 +110,9 @@ declare module '@erplora/ui/sdk' {
     'base.person.badge_remove': { input: { person: string }; output: PersonDetail };
     'base.role.list': { input: NoInput; output: { roles: HubRoleRow[] } };
     'base.role.detail': { input: { role: string }; output: RoleDetail };
+    'base.role.create': { input: { based_on: string; name: string; description?: string }; output: HubRoleRow };
+    'base.role.update': { input: RoleChange; output: HubRoleRow };
+    'base.role.delete': { input: { role: string }; output: { key: string } };
+    'base.role.assign': { input: { person: string; role: string }; output: RoleGiven };
   }
 }

@@ -582,9 +582,11 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py` (`ModifierGroup`, `ModifierOption`, `ModifierLink`),
-  `migrations/`, `schemas/`, `queries/` (con `selection.py`, la valoración, y `copy_columns.py`), `services/`,
-  `events.py`, `live.py`, `api.py`,
-  `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
+  `migrations/`, `schemas/`, `queries/` (con `selection.py`, la valoración, y `copy_columns.py`), `services/`
+  (un módulo por entidad, `recovery.py`, lo que vuelve de una copia aparte, `defaults.py`, las opciones por defecto, y
+  `writes.py`, lo que comparten), `events.py`, `live.py`, `api.py`,
+  `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero (`tests/test_services_<módulo>.py` en
+  `services/`; lo de `recovery.py`, en `tests/test_recovery*.py`), más
   `tests/test_integration_inventory.py`, `tests/test_integration_tax.py`, `tests/test_integration_sale.py`
   (F06 y F07 contra Ventas: descuento, repetido, a peso e IVA al céntimo) y
   `tests/test_integration_kitchen.py` (F08, Ventas → relay → Cocina) con las apps reales,
@@ -622,7 +624,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   nombre y por `id` en la dirección de la lista: en descendente es la ascendente leída al revés, empates
   incluidos (`base.ordering`). El catálogo entero de opciones por
   `sort_order` va antes por el orden y el nombre de sus grupos, en los dos sentidos. Lo fijan los
-  `test_tied_*` de `tests/test_queries.py`, con las filas creadas fuera de orden.
+  `test_tied_*` de `tests/test_queries_groups.py` y `tests/test_queries_options.py`, con las filas creadas fuera de orden.
 - **Dinero**: céntimos enteros con signo, entre −99.999.999 y 99.999.999. Una opción con categoría
   fiscal propia tiene que valer más de cero (422 en `price_delta`): su línea propia no puede valer cero
   ni menos. Lo comprueba la operación antes y la base de datos después
@@ -646,26 +648,26 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
 - **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara tres cosas, «Modifier
   groups», «Modifier groups of categories» y después «Modifier groups of products», cada una contada aparte.
-  `queries.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y los alérgenos de cada
+  `queries.recovery.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y los alérgenos de cada
   opción solo si la copia tiene la columna (`queries/copy_columns.py`, `LATER_OPTION_FIELDS`, igual que
-  `queries.options_in_copy`): una copia anterior devuelve sus opciones sin ellos y `reads_since` no sube; y
-  `queries.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
+  `queries.recovery.options_in_copy`): una copia anterior devuelve sus opciones sin ellos y `reads_since` no sube; y
+  `queries.recovery.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
   nombre es único, `modifier_group_name_unique`), cada opción con la clave de su categoría fiscal propia (Impuestos nunca
   borra una). Los crea `modifier.group.recover` (permiso `modifier.system`, sin ruta ni herramienta del asistente):
   `create_group` y después `create_option` por cada opción, en una sola transacción; la opción que su alta rechaza
   (`InvalidPayload` o `Conflict`) se devuelve en `left_out` con su código y `OPTION_LEFT`, y el grupo vuelve sin ella.
-  Las dos lecturas de enganches llevan además los grupos de la copia por su nombre (`queries.group_names_in_copy`,
+  Las dos lecturas de enganches llevan además los grupos de la copia por su nombre (`queries.recovery.group_names_in_copy`,
   `copy_groups`), y `_not_hung` pone cada enganche en el grupo que hace del de la copia
-  (`queries.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
+  (`queries.recovery.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
   recuperación, `base.recovery.brought_back`, y que no es ninguno de la copia; uno hecho a mano no hace de ninguno).
-  `queries.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
+  `queries.recovery.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
   las categorías vivas de la copia por su nombre (`apps.inventory.queries.recovery.category_names_in_copy`), y
-  `queries.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
+  `queries.recovery.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
   (`apps.inventory.queries.recovery.categories_standing_for`, la misma pareja que los enlaces de productos a categorías de
   Inventario: la misma mientras vive; si no, la viva con su nombre que trajo una recuperación; una hecha a mano no
-  recibe nada). `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
+  recibe nada). `queries.recovery.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
   producto no borrado allí, con el SKU del producto allí, y
-  `queries.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
+  `queries.recovery.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
   (`apps.inventory.queries.recovery.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
   con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe nada) y deja
   los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; grupo y
@@ -688,11 +690,12 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   que también es el de un turno o un umbral). Así consultar los grupos, las opciones y los enganches, engancharlos y
   soltarlos, y cambiar o borrar grupos y opciones desde el chat (MODIFIER-F03 a F07) llegan a su operación: las frases
   reales de la QA del asistente (`tests/e2e/qa/probes/*-es-modifier-2026-11-08.json`, del dueño y del empleado) quedan
-  entre las 20 primeras herramientas del turno, y una frase propia por herramienta solo llega con sus `asks`
+  entre las 15 herramientas que ofrece el turno o, las de ver una asignación y ver un grupo, las encuentra la
+  búsqueda de su tarea; una frase propia por herramienta solo llega con sus `asks`
   (`tests/test_assistant_asks.py`), también la de borrar un grupo «sin cambiar los pedidos antiguos», desde que live
   deja de leer «sin cambiar» como una orden de cambiar (ERPlora/live#60).
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
-  las marcas `refers` de `schemas/__init__.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
+  las marcas `refers` de `schemas/fields.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
   pueden tener una opción con el mismo nombre, y el enganche por su grupo y lo que engancha. El id lleva su título
   («Grupo», «Opción», «Se aplica a»), nunca «Registro». Sin persona detrás, sin permiso, con un id de otro negocio o
@@ -717,7 +720,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
   `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El `product` y la `category` de
-  `_Target` se leen por sus palabras como los busca `services._target`, con `as_said`: `A_PRODUCT_BY_NAME` con
+  `_Target` se leen por sus palabras como los busca `services.links._target`, con `as_said`: `A_PRODUCT_BY_NAME` con
   `inventory.product.get`, que busca entre los mismos productos vivos que `find_product` (sus `rows` solo dan la fila
   final por su id), y `A_CATEGORY_BY_NAME` con `modifier.category.get`, el mismo `find_category`. Se dejan sin leer
   junto a `product_id` o `category_id` y, al soltar, también junto al `id` del enganche (hub#1291;

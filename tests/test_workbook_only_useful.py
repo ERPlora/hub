@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from base.catalog import WORKBOOK, workbook_configs
+from base.catalog.workbooks import WORKBOOK, workbook_configs
 
 REPO = Path(__file__).resolve().parent.parent
 SKIPPED_FOLDERS = {"node_modules", "packages"}
@@ -96,7 +96,7 @@ def test_each_kind_of_history_is_caught(text, rule):
 
 
 def test_what_describes_the_product_of_today_is_left_alone():
-    text = f"""<!-- generated from WORKBOOK.md sha256:0000 -->
+    text = f"""<!-- from WORKBOOK.md sha256:000000000000 -->
 | SALE-F12 | Llegar a una dirección retirada | hecho |
 | INVOICE-F03 | Descartado: vaciar la papelera | hecho |
 Estado: hecho

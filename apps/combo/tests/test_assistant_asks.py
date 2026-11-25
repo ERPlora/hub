@@ -20,7 +20,7 @@ from live.operations import AI, registry
 from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, comparable
 from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 
@@ -135,19 +135,24 @@ def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_
     assert ahead == [], ahead
 
 
+#: The task the model searches for when a probe brings its tool past the places of a turn.
+SEARCHED = {"combo.option.bulk_create": "añadir varias opciones a un menú"}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The phrases of layer 2 of Menus and combos, the ones the model answered right too: a tool of Menus that a new ask
-    elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it. What
-    the employee asks of a change of the menus is a refusal: the tool is not theirs to be offered."""
+    elsewhere pushes out of the ones a turn offers, or past them out of what the search of its task finds
+    (``SEARCHED``), fails here before the real-model QA sees it. What the employee asks of a change of the menus is a
+    refusal: the tool is not theirs to be offered."""
     role = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}[probe["role"]]
     tools = catalog_of(role, probe["language"])
     if probe["expect"] == "refused":
         assert (probe["role"], probe["tool"] in WRITES) == ("employee", True)
         assert probe["tool"] not in tools
         return
-    assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
+    assert_offered_or_found(tools, probe["tool"], probe["phrase"], SEARCHED.get(probe["tool"]), probe["language"])
 
 
 test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))

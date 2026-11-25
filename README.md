@@ -4,8 +4,6 @@
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
-git config merge.workbook-translation.driver \
-  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
@@ -33,12 +31,16 @@ scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, so
 
 `scripts/checks.sh fast` pasa primero, en unos segundos y sin red ni base de datos, los tests de guardarraíles del
 tamaño de cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de
-excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Después
+excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`), y el que
+exige que cada módulo de Python que añade la rama traiga su test con su nombre, el mismo que se corre cuando el módulo
+cambia (abajo); no cuentan los ficheros solo movidos ni un `__init__.py` que solo importa. Después
 comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `origin/main` (en `origin/main`, del commit
 anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
 
 - ESLint sobre sus ficheros TypeScript, JavaScript y Vue y, si toca alguno, la comprobación de tipos (`pnpm typecheck`)
-  y las pruebas de Vitest relacionadas (`vitest related`).
+  y las pruebas de Vitest relacionadas (`vitest related`). Un `.json` que no esté en la raíz (los textos, el mapa de
+  rutas de `frontend/generated/`) pasa solo a `vitest related`: ESLint no lo lee, y los de la raíz configuran las
+  herramientas (con `package.json`, Vitest correría su suite entera).
 - pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
   `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
   contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia). Un
@@ -125,22 +127,53 @@ ERPlora/knowledge): `HubHostRequiredMiddleware` busca la fila del slug del `Host
 en los tests, la fixture autouse `local_hubs` de `conftest.py` hace lo mismo en todo test con BD (un test sin BD que
 pide la página de un hub necesita `django_db`).
 
+**El negocio propio de ERPlora** (`Hub.is_platform`), el que emite sus facturas, se llama `PLATFORM_HUB_SLUG` (`erp`):
+el único nombre reservado que el Hub sirve como negocio (`base/platform_hub.py`), en su host, en `/admin/hub/erp/` y en el
+salto del personal. Los demás reservados responden 404, también `erplora`, el que tuvo antes. Nadie lo crea ni lo reclama
+(`base.hub.register`: 422 `base.slug_invalid` por su nombre, 409 `base.platform_hub_kept` por su id), lo da de baja, lo
+restaura ni lo vacía (409 `base.platform_hub_kept` en `base.hub.cancel`, `base.hub.restore` y `base.hub.reset`). De la foto
+de erplora.com solo entran sus personas, con su versión: la fila guarda `members` y nada más, y el resto (estado, plan,
+apps, VeriFactu, WhatsApp, dominio) se ignora sin error (`base.services.platform_hub.people_only`), así que sus límites son
+los de plataforma (`limits.PLATFORM`). Esas personas entran en su dirección con el salto normal y su rol
+(`base/tests/test_platform_hub_people.py`). Su fila nace con
+`create_platform_hub --execute` y solo cambia de nombre con `create_platform_hub --rename --execute` (sin `--execute`, un
+ensayo), como cualquier cambio de dirección («Cambio de dirección web», abajo): su id y su BD siguen, van con él sus
+personas, quién entró y sus apps, y acaban las sesiones abiertas con el nombre anterior. Mientras la fila conserva el nombre anterior
+(`PLATFORM_HUB_FORMER_SLUG`), el Hub la trata como el mismo negocio y sus facturas siguen entrando, pero ningún host lo
+abre. El renombrado, en este orden:
+
+1. Todas las tareas del entorno corren una release que conoce los dos nombres.
+2. La pasarela fiscal de erplora.com acepta los dos a la vez: el Hub se presenta en ella con su nombre, y lo que la
+   pasarela rechaza (`hub_unknown`) no se reenvía solo.
+3. `python manage.py create_platform_hub --rename --execute`, como tarea puntual de la familia `worker`.
+
+Para deshacerlo, la misma orden con `PLATFORM_HUB_SLUG=erplora`, siempre **antes** de volver a una release que solo
+conoce `erplora`.
+
 Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v2 y dos secretos
 (`base/signing.py`, el mismo esquema que `accounts/signing.py` del SaaS); cada ruta es una operación de `base`:
 
 | Ruta | Operación | Respuesta |
 |---|---|---|
-| `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged` |
-| `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; nunca dónde está su BD; 404 |
-| `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged` |
-| `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged` |
+| `PUT /internal/hubs/{id}` | `base.hub.register` | 202 `requested` si lo crea, con su BD propia por hacer (el worker la hace, «Alta» abajo, y el SaaS recibe `POST /internal/hubs/{id}/ready` cuando está lista); 202 también si lo actualiza mientras se prepara (uno `failed` se reintenta al momento), 200 si lo actualiza ya listo; 422 `base.slug_invalid`, 409 `base.slug_taken`, `base.hub_cancelled`, `hub_purged`, `base.platform_hub_kept` |
+| `GET /internal/hubs/{id}` | `base.hub.get` | la fila: `status` `requested`, `creating`, `migrating`, `seeding` o `failed` mientras se prepara, `ready` (lo que espera el SaaS), `cancelled`…; `maintenance`, la congelación activa de la plataforma (`null` sin ella), y `move_scheduled_for`, cuándo empieza el traslado del negocio pedido para su madrugada (un instante en UTC; `null` sin traslado, una vez arrancado o cancelado); nunca dónde está su BD ni adónde se traslada; 404 |
+| `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled` (con su BD propia terminada, el worker la copia: `offboarding`, «Copias de los datos» abajo); 404; 409 `hub_purged`, `base.platform_hub_kept` |
+| `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready` (`requested` otra vez si su BD no llegó a terminarse); 404; 409 `hub_purged`, `base.platform_hub_kept` |
 | `GET /internal/hubs/{id}/dumps` | `base.hub.dump_list` | 200 `{available, dumps: [{id, kind, created_at, bytes, url}]}`: las copias de sus datos de la más nueva a la más vieja (`id` = su clave en el bucket, `url` prefirmada de 15 min, descarga como fichero); `available: false` si nunca tendrá copia (sin BD propia, o dado de baja antes de terminarla); 200 también dado de baja; 404 desconocido o purgado; 503 `base.dumps_unavailable` sin bucket |
 | `GET /internal/usage?day=AAAA-MM-DD[&cursor=]` | `base.usage.list` | 200 `{day, hubs: [{id, s3_bytes, db_bytes, active_users_1d, active_users_30d}], next_cursor}`: lo que usó ese día (UTC) cada negocio con BD propia, medido esa noche (`base/usage.py`), por páginas de 500; 409 `usage_not_ready` antes de medirlo; 422 `internal.payload_invalid` sin `day`, mal escrito o con un cursor ajeno |
-| `PUT /internal/hubs/{id}/state` | `base.hub.state_apply` | 200 `{applied, version}`: guarda la foto si su versión es mayor y aplica el bloque VeriFactu y el estado del negocio y, con la app de WhatsApp activa en ese negocio, su clave `whatsapp` (el estado del número, con la versión de la foto, por `whatsapp_inbox.channel.sync`; apagada, la foto se aplica y la clave espera a la siguiente); 404; 422 si un bloque no cumple el contrato (no se guarda nada) |
+| `PUT /internal/hubs/{id}/state` | `base.hub.state_apply` | 200 `{applied, version}`: guarda la foto si su versión es mayor y aplica el bloque VeriFactu y el estado del negocio y, con la app de WhatsApp activa en ese negocio, su clave `whatsapp` (el estado del número, con la versión de la foto, por `whatsapp_inbox.channel.sync`; apagada, la foto se aplica y la clave espera a la siguiente); del negocio propio de ERPlora, solo sus `members`; 404; 422 si un bloque no cumple el contrato (no se guarda nada) |
 
 Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el de la ruta, 422
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
 no lo publica).
+
+**Cambio de dirección web** (`PUT /internal/hubs/{id}` con otro `slug`, HUBS-F16 de erplora.com): el negocio se abre en la
+nueva como estaba (`base/services/address_change.py`). En la misma transacción se mudan sus personas (`Membership`) y quién
+entró (`HubVisit`), acaban las sesiones abiertas en la dirección que deja, porque el navegador guarda cada una para su
+dirección, y en la que coge no queda nada de quien la tuvo antes. Sus apps (`AppActivation`) se copian a la dirección nueva en
+su propia base, que confirma antes que control: las de la anterior se quedan, así que un cambio que no llega a confirmarse
+deja el negocio abierto donde estaba y erplora.com lo reintenta. Los eventos y los caídos no se leen por la dirección: la base
+solo guarda los suyos. Tests: `base/tests/test_address_change.py`.
 
 Las puertas de WhatsApp (contrato en `apps/whatsapp_inbox/WORKBOOK.md`, «Contrato con el SaaS», puertas 1–4) llevan
 en el cuerpo el negocio, `hub` (su slug en la fase 1), y ejecutan la operación de la bandeja como el sistema en ese
@@ -204,7 +237,7 @@ del Hub» de erplora-next.
   (`base/tenancy/tests/test_provision_own_database.py`) impide crear un hub en `base/services/` sin ella, también
   `a`/`b`: `seed_local_hubs` les da su BD (clonada de
   `<control>_template`, con las tablas de todas las apps y todas encendidas) y se niega si alguna app no puede vivir en
-  una (`migrator.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
+  una (`migrator.app_sets.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
   `base.hub_maintenance` y el worker lo nombra al arrancar (`ERROR base.worker.hub_without_database`) sin tocarlo, hasta
   que **`manage.py cut_shared_hubs`** le da su BD (`base/tenancy/cut.py`; ya se corrió en prod, PLAN-DB ronda
   2026-11-01c): `--copy-all <slug>` (una vez, un negocio:
@@ -249,7 +282,7 @@ del Hub» de erplora-next.
   transacción: sin pool, `CONN_MAX_AGE` 0, sin cursores de servidor ni sentencias preparadas) sin mutar
   `connections.settings`; su `base_hub_identity` se comprueba una vez por proceso (otra identidad → 503
   `base.hub_unavailable`, no se sirve nada). `migrate` solo acepta `default` (y `shared`); el esquema de un hub lo
-  cambia solo el migrador (`base/tenancy/migrator.py`, abajo).
+  cambia solo el migrador (`base/tenancy/migrator/`, abajo).
 - **El migrador.** `ensure_schema(hub, add=())` es la única función que cambia el esquema de un hub: abre su alias
   directo `<db_name>__ddl` (sin PgBouncer, como el migrador del servidor del hub: el del settings o el de su
   `Cluster`), con `lock_timeout` 5 s y `statement_timeout`/`idle_in_transaction_session_timeout` 5 min, toma en esa BD
@@ -263,8 +296,8 @@ del Hub» de erplora-next.
   personas del negocio son suyas, `base.HubUser`); si una volviera a enlazar un modelo de control, `add=` la rechazaría
   (`AppNotPortable`) y las plantillas la dejarían fuera, y el lint «(h)» de `tests/test_guardrails.py` lo impide antes.
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):
-  `<control>_template`, con la plataforma y todas las apps portables (`migrator.templates`, PLAN-DB ronda 2026-11-01),
-  y una `<control>_template_<vertical>` por vertical de `base/catalog.py`, clonada de la anterior (las apps de su
+  `<control>_template`, con la plataforma y todas las apps portables (`migrator.hub_templates.templates`, PLAN-DB ronda 2026-11-01),
+  y una `<control>_template_<vertical>` por vertical de `base/catalog/verticals.py`, clonada de la anterior (las apps de su
   vertical, `template_apps`, ya están en ella) y todo apagado (ninguna `AppActivation`). La de la plataforma la crea
   **solo** `bootstrap_databases` (roles, `vector`, privilegios por defecto, sin acceso para PUBLIC); si falta en un servidor, `migrate_hubs` para con `TemplateMissing` («run
   db-bootstrap there»). La de una vertical que falta se clona (reintenta mientras otro tenga abierta la de la
@@ -273,7 +306,7 @@ del Hub» de erplora-next.
   `node tests/e2e/database.ts` crea la `<BD>_template` de cada BD de e2e (y `--drop` borra sus plantillas); para la
   `hub` de desarrollo, `createdb hub_template` en el Postgres de compose (o `bootstrap_databases`).
 - **`manage.py migrate_hubs`** (la tarea `hub-migrate` de cada despliegue): 1) control, bajo su lock; 2) las
-  plantillas de cada servidor (con todas las apps portables, también en S3, `migrator.templates`; nunca se reconstruyen:
+  plantillas de cada servidor (con todas las apps portables, también en S3, `migrator.hub_templates.templates`; nunca se reconstruyen:
   el primer despliegue que les añade las portables migra cada una en caliente, cerca de un minuto, y un alta en ese rato
   cae en `clone_failed` y se reintenta a los 60 s; `clusters_to_migrate`: sin
   filas de `Cluster`, el del settings; con ellas, los abiertos
@@ -290,14 +323,14 @@ del Hub» de erplora-next.
   credenciales del migrador son `DB_MIGRATOR_USER`/`DB_MIGRATOR_PASSWORD`; sin ellas falla
   (`MigratorCredentialsMissing`), nunca usa las de `default` (`hub_app` en el web y el worker), salvo en local con
   `DEBUG` (un solo rol); los tests las fijan en `config/settings_pytest.py`. Las de cada cluster se enchufan en
-  `migrator.migrator_credentials`.
+  `migrator.servers.migrator_credentials`.
 - **Quién abre el contexto**: `HubDatabaseMiddleware` (cada petición: el hub del host; en `hubs.localhost`, el hub
   elegido en el admin o control, donde el admin solo enseña los modelos de control, `base/admin_site.py`), `HubContextBuilder.enter` (cada re-ejecución viva, en el hilo del ejecutor),
   `/ws/print`, las puertas de `/internal`, el worker y los comandos. Una sesión vale solo en el host donde se abrió
   (`SessionHostMiddleware`): la de B en el host de A es anónima (401).
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
-  La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
+  La plantilla de test lleva todas las apps del hub (`migrator.app_sets.portable_apps()`, `base/tests/test_hub_user_links.py`).
   Todos los tests corren como producción: la BD de control de test tiene solo las tablas de control (los mismos routers
   que producción) y un modelo de hub sin contexto falla (`HubContextMissing`). Las pruebas del corte y de
   `control/0007`, que leen las tablas de las apps en control como estaban antes del corte, las crean ellas mismas
@@ -318,7 +351,7 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
   migración de la app en el código que la pidió (`AppActivation.target`).
 - **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados (`hub_due` vencido y
   libre); en cada uno, lo debido (`creating`, o `failed` cuyo próximo intento llegó) se crea con
-  `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
+  `migrator.schema.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
   (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos cambian sin recargar) o lo deja `failed` con
   `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada hora; `base.app.activation_failed`), y mueve
   la llamada del hub a lo siguiente que espera (o la quita). Esquema ocupado por otra ejecución: +30 s. Una petición de un
@@ -446,8 +479,8 @@ demos que acaban): es el worker del e2e, cuyas specs juegan ellas mismas el repa
 `REACTIONS` de su `events.py`; `"*"` = todo evento de las demás): la venta cobrada baja el stock y cuenta en la ficha
 del cliente, la ronda enviada abre su comanda en cocina, etc. Un evento que no es de un hub (los del registro y las
 demos, en el outbox de control) no lo oye ninguna app: no hay hub en el que correr su reacción. Cada app lo recibe **una vez** (`base.EventDelivery`, en
-la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó (su aviso vivo sale por el
-canal de ese hub). Una reacción que falla se deshace y reintenta a los 2, 4, 8… s (una hora como mucho); al octavo
+la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó, con la dirección que tiene al
+entregarlo aunque la haya cambiado desde entonces (su aviso vivo sale por el canal de ese hub). Una reacción que falla se deshace y reintenta a los 2, 4, 8… s (una hora como mucho); al octavo
 intento queda `dead` con su error, en el log y en la fila. Los eventos que una reacción anota se reparten un nivel
 más abajo, y pasado el 16 no se entregan. Lo que una reacción o una tarea deja para después del COMMIT y espera a la
 red (la llamada a otro sistema o el paso del asistente de Automatizaciones, y lo que la Bandeja de WhatsApp entrega a
@@ -460,7 +493,7 @@ el primer despliegue) se da por repartido sin aplicarse.
 ## `/ws/print`: el canal del dispositivo que imprime
 
 El único WebSocket del Hub (PLAN-HUB §5). `config/asgi.py` manda el HTTP a Django, como siempre, y el WebSocket de
-`/ws/print` a `base/ws_print.py`, una aplicación ASGI propia, **sin Channels** (ronda 11: sin capa de canales); otra
+`/ws/print` a `base/ws_print/`, una aplicación ASGI propia, **sin Channels** (ronda 11: sin capa de canales); otra
 ruta WebSocket se rechaza en el saludo (Daphne contesta 403). Lo sirve el mismo `daphne` del servicio `hub`, y el ALB
 ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su `idle_timeout` de 120 s).
 
@@ -469,7 +502,7 @@ ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su 
   saludo, comprobada en `hello` y en cada mensaje (un cierre de sesión corta el socket en el siguiente latido).
 - **Protocolo**: el del Hub viejo (`print_ws.rs`), mismos mensajes y campos: `hello` (con `deviceId` y las
   `printers` a las que llega el dispositivo) → `ready`; `claim` → `job` o `idle`; `done`/`failed` → `ack`; `beat`;
-  y del Hub, `wake` y `error` con su código. La tabla de códigos está en el docstring de `base/ws_print.py`.
+  y del Hub, `wake` y `error` con su código. La tabla de códigos está en el docstring de `base/ws_print/`.
 - **Quién imprime lo decide Impresión** (PRINTING-F18): en `hello` el canal lee el alta del dispositivo por su
   `deviceId` (`printing.device.get`) y sus impresoras son las activas de esa alta, como en el Hub viejo. Un
   dispositivo sin alta (o retirado) se rechaza ya en `hello` con `print.host_not_registered` (4403). Con la sesión de
@@ -536,6 +569,12 @@ sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/k
 4. Probado en pre, PR `pre` → `main` con «Create a merge commit»: despliega prod como siempre
    (release `hub-v…`).
 5. Después, `git push origin main:pre` (fast-forward) para que `pre` no se separe de `main`.
+
+Los push de una rama se despliegan de uno en uno: si entran varios seguidos, corre uno y espera solo el más nuevo,
+que ya lleva a los demás. Los intermedios salen cancelados en Actions y la release siguiente incluye sus commits. Una
+vuelta atrás o un relanzamiento a mano solo esperan a que acabe el paso de desplegar, nunca a las pruebas de un push.
+Para volver a desplegar una rama se lanza a mano (abajo): relanzar una ejecución vieja de un push entra en esa fila y
+descarta la que estuviera esperando.
 
 La rama decide el entorno (`.github/scripts/deploy-env.sh`): `main` → prod, `pre` → pre; cualquier
 otra no despliega. Relanzar o volver atrás, siempre desde la rama del entorno:

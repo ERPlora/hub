@@ -1,12 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:82fd1c01d679ccb6deca825f540ad49d3c73ce69107df365306873db61469998 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:16eab9012c93 -->
 
 Online booking is the page where your customers book an appointment on their own, without calling: they pick the
 service, the professional, the day and a free time, and the appointment goes into the Appointments diary. Here you
 see and handle those bookings and set up the page and its rules.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:f21eec578b69 -->
 
 Online booking is **the door through which a customer asks for an appointment on her own, from outside,
 without calling**: she picks the service, the professional (or "No preference"), the day and a free time,
@@ -17,6 +17,7 @@ appointment number and a personal link with which she sees her booking and cance
 business's policy.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:ae2f3fc2d5b3 -->
 
 - The **customer**, on the business's booking page (no account and no password).
 - The **employee** sees in the inbox the online bookings of **their own diary**.
@@ -35,6 +36,7 @@ business's policy.
   asking cannot see, or what no longer exists, is left out.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:632f1c64f5ac -->
 
 **Fresha, Treatwell, Booksy, Square Appointments, Vagaro, Mindbody, Odoo Appointments and SimplyBook.me**
 (table and links in "Market decisions"): the online booking **is an appointment of the diary** from the
@@ -43,6 +45,7 @@ for name and mobile; the customer manages her booking with the link of the confi
 from there respects the business's notice.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:c92212a500ce -->
 
 1. Online booking switches on with it **Appointments**, **Customers**, **Services** and **Staff** (and,
    through Appointments, **Schedules**), and they cannot be switched off while it is on.
@@ -56,18 +59,21 @@ from there respects the business's notice.
 5. Every time is on the **business's clock**, in its time zone.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:088993aecfc3 -->
 
 Online booking opens from the **Online booking** menu and has two tabs: **Bookings** and **Settings** (the
 latter only for whoever can change them). What a person cannot do shows greyed out or does not appear, and
 the app refuses it even if they try through the API or the assistant.
 
 ### Bookings
+<!-- from WORKBOOK.md sha256:cb4c1939af82 -->
 Here are the appointments your customers have booked from the page, most recent first: the number, the customer with
 her phone, the service, the professional, the day, the time and the status. Search or filter to find one and, from
 its row, confirm it, complete it, mark it as a no-show, cancel it or delete it. If you are an employee, you only see
 the ones in your diary.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:229789c07e23 -->
 A table of 50 rows per page with a search box ("Search no., customer, phone, service…"; to whoever does not see
 the customers' contact details, "Search no., customer, service…", which does not look at the phone or the email)
 and filters by column behind the filter button of the bar: No., Customer, Service,
@@ -82,6 +88,7 @@ confirmation with an optional reason; **Delete** asks for confirmation. Empty: "
 in the diary.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:dd49a81a9236 -->
 Here you set up the booking page your customers open: whether it is on, its title, its welcome message, its colour,
 its logo and which details it asks for, and the booking rules it shares with Appointments (notice, slot interval,
 whether bookings confirm themselves and whether the customer can cancel). Below, you choose which services are booked
@@ -89,6 +96,7 @@ online. Your customers open it at your business's address ending in /book, for e
 aurora.erplora.com/p/aurora/book.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:ea441313c2cc -->
 Title "Booking page settings". Three blocks and a **Save** button:
 
 - **Public page**: "Public page on", "Page title", "Welcome message", "Primary colour"
@@ -107,6 +115,7 @@ Title "Booking page settings". Three blocks and a **Save** button:
 On saving: "Settings saved."; a refusal shows under its field ("Could not save").
 
 #### Booking page (the customer, no session)
+<!-- from WORKBOOK.md sha256:d3bd6dee3ac6 -->
 Page `/p/<business>/book` at the business's address: anyone opens it, without signing in or seeing anything of the
 team's (no menu of theirs). At the top, the business's name, its logo (the one uploaded in Settings, served from the
 business's own address; without a logo, only the name) and its colour. Also "Book online" and "Choose your
@@ -121,6 +130,7 @@ professional and status, and she can cancel it with confirmation if the policy s
 or past its notice does not offer that action. An unknown link gives a clear notice, with no details or form.
 
 #### Booking preview (development only)
+<!-- from WORKBOOK.md sha256:4e5174848451 -->
 Page `/online_booking/preview`, only on the development server: the same flow as the booking page
 (service → professional → day and time → details → book → see and cancel with the link), with the same
 operations, through the team's session. It is not part of the production version. As in the form windows, the
@@ -129,6 +139,7 @@ both come back if the next try is refused too. A refusal that names no field sta
 cancellation policy of Appointments applies the same when the team tries a booking's link here.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:e76b7952ff4d -->
 
 | State | What the person sees |
 |---|---|
@@ -142,6 +153,7 @@ cancellation policy of Appointments applies the same when the team tries a booki
 Dates and times show on the business's clock and in the format of the language of whoever looks.
 
 ## Flows
+<!-- from WORKBOOK.md sha256:a5b6c62592e6 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -159,6 +171,7 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
+<!-- from WORKBOOK.md sha256:f1cb172614fc -->
 Status: done
 Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: Booking page (`/p/<business>/book`; in development, the preview too)
@@ -170,9 +183,10 @@ Steps:
    and their duration if Services shows them ("Show prices", "Show duration").
 3. If the business allows it, she picks a professional among those who do all those services, or "No
    preference".
-4. She picks the day: the **free times** the diary would give the customer show (business hours, the
-   professional's shift and absences, blocks and other appointments; never inside the minimum notice,
-   beyond the maximum, in the past or on top of another appointment).
+4. She taps the day in the calendar, which opens whole in the middle of the screen, and it is chosen with nothing
+   more to press: the **free times** the diary would give the customer show (business hours, the professional's
+   shift and absences, blocks and other appointments; never inside the minimum notice, beyond the maximum, in
+   the past or on top of another appointment).
 5. She writes her name, her **mobile** (required), her email (if the business asks for it) and, if allowed,
    a note.
 6. She presses **Book**: the appointment goes into the diary with the origin "Online booking", **Confirmed**
@@ -202,6 +216,7 @@ professional at once: one gets in and the other gets "That time is no longer fre
 Involved: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirm a booking
+<!-- from WORKBOOK.md sha256:d67d290a106c -->
 Status: done
 Actor: manager, owner, administrator, assistant
 Screen: Bookings
@@ -216,6 +231,7 @@ bookings, they are listed and the number is asked for.
 Involved: APPOINTMENT-F03
 
 ### ONLINE_BOOKING-F03 Complete a booking
+<!-- from WORKBOOK.md sha256:0ec41daadd5d -->
 Status: done
 Actor: manager, owner, administrator, assistant
 Screen: Bookings
@@ -228,6 +244,7 @@ If it fails: "This appointment cannot be completed in its current state."
 Involved: APPOINTMENT-F08, APPOINTMENT-F17
 
 ### ONLINE_BOOKING-F04 Mark that she did not show up
+<!-- from WORKBOOK.md sha256:7fc83718f03d -->
 Status: done
 Actor: manager, owner, administrator, assistant
 Screen: Bookings
@@ -241,6 +258,7 @@ marked as a no-show in its current state."
 Involved: APPOINTMENT-F09
 
 ### ONLINE_BOOKING-F05 Cancel a booking
+<!-- from WORKBOOK.md sha256:3c46c434f5ef -->
 Status: done
 Actor: manager, owner, administrator, assistant
 Screen: Bookings
@@ -255,6 +273,7 @@ If it fails: "This appointment can no longer be cancelled in its current state."
 Involved: APPOINTMENT-F05
 
 ### ONLINE_BOOKING-F06 Delete a booking
+<!-- from WORKBOOK.md sha256:ef7ede15e076 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Bookings
@@ -268,6 +287,7 @@ If it fails: an appointment in progress, completed or charged is not deleted ("T
 Involved: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Set up the booking page
+<!-- from WORKBOOK.md sha256:be31aaaf61a8 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Settings
@@ -294,6 +314,7 @@ too. A refusal that names no field stays until the next try.
 Involved: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 See and search the bookings
+<!-- from WORKBOOK.md sha256:391a267e4eff -->
 Status: done
 Actor: employee (those of their diary), manager, owner, administrator, assistant
 Screen: Bookings
@@ -310,6 +331,7 @@ If it fails: "The bookings could not be loaded" with **Retry**.
 Involved: APPOINTMENT-F27, BASE-F119
 
 ### ONLINE_BOOKING-F09 Follow the customer when two cards are merged
+<!-- from WORKBOOK.md sha256:45034b9aa59d -->
 Status: done (Appointments does it; the inbox reflects it)
 Actor: system
 Screen: none (it shows in Bookings)
@@ -324,6 +346,7 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
+<!-- from WORKBOOK.md sha256:674c2c23cbb2 -->
 Status: done
 Actor: customer (no session)
 Screen: Booking page (her link's, `/p/<business>/book/<link>`, at the business's address; once booked, the page
@@ -342,6 +365,7 @@ name, or at another business's address, opens no page.
 Involved: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 The customer cancels her booking with her link
+<!-- from WORKBOOK.md sha256:a47bd8223f11 -->
 Status: done
 Actor: customer (no session)
 Screen: Booking page (her link's, `/p/<business>/book/<link>`, at the business's address; once booked, the page
@@ -358,6 +382,7 @@ be cancelled online 24 hours ahead…"; one already cancelled or completed, the 
 Involved: APPOINTMENT-F06, APPOINTMENT-F19
 
 ### ONLINE_BOOKING-F12 Erase a customer's data (GDPR)
+<!-- from WORKBOOK.md sha256:e130a745b1b0 -->
 Status: done
 Actor: system
 Screen: none (it shows in Bookings)
@@ -371,6 +396,7 @@ If it fails: the relay retries the reaction on its own; it is never left halfway
 Involved: APPOINTMENT-F24, CUSTOMER-F16
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:9f2e7d520451 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of the person speaking) and the
 API, with the same rules and permissions. A booking is named by its id, its number (`APT-…`) or **the way a
@@ -380,6 +406,7 @@ online booking. If it fits several, they are listed and the number is asked for.
 asked for as "Olga's internet booking" or "what I have in the inbox".
 
 ### What it offers: queries
+<!-- from WORKBOOK.md sha256:18baad5f8736 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -389,6 +416,7 @@ asked for as "Olga's internet booking" or "what I have in the inbox".
 | Page, services, free times and booking by link (public) | `online_booking.public` | F01, F10 | `online_booking.public.page`, `.services`, `.slots`, `.booking` |
 
 ### What it offers: actions
+<!-- from WORKBOOK.md sha256:dfb0da0f5446 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -406,6 +434,7 @@ it, without asking first in the chat (BASE-F97). The actions of
 the inbox are done by Appointments with the permission of whoever acts: it takes this app's **and** Appointments'.
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:374385a29496 -->
 
 | Notice | When | What it carries |
 |---|---|---|
@@ -415,12 +444,14 @@ the inbox are done by Appointments with the permission of whoever acts: it takes
 The rest of the facts (confirmed, cancelled, completed, no-show, deleted) are the notices of Appointments.
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:9993e16d68e5 -->
 
 | Notice of another app | What it does | Flows |
 |---|---|---|
 | `customer.customer.erased` (Customers) | Revokes the links of that card's bookings and forgets the device's fingerprint | F12 |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:f8455f28d2a8 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

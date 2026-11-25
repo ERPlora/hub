@@ -176,7 +176,7 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
   Vacía: «Nadie ha comprado este bono todavía.».
   - **Gastar una sesión** abre su ventana: «Da por entregada una sesión del bono «<bono>» de <clienta>, fuera
     del cobro.», el saldo «Quedan {n} sesiones · {after} después de esta» («Queda 1 sesión · 0 después de
-    esta»; «Sin límite de sesiones» en uno sin límite), **Servicio** («Elige el servicio», solo los que cubre
+    esta»; «Sin límite de sesiones» en uno sin límite), **Servicio** (solo los que cubre
     el bono; con uno solo, ya elegido), **Profesional** (el equipo de Personal; «Quién la hizo: lo que vale la
     sesión cuenta en su producción en Ventas. Opcional.»), **Nota** y los botones **Cancelar** y **Gastar
     sesión**. Mientras comprueba el bono, «Comprobando el bono…».
@@ -523,8 +523,8 @@ Pantalla: asistente
 Pasos:
 1. Pide al asistente que conceda el bono a la clienta (por su nombre o su teléfono), con el importe
    cobrado y la venta que lo cobró. Si esa venta cobró varias líneas, también cuál de ellas.
-2. La tarjeta de confirmación del asistente nombra el bono, la clienta, la venta por su número
-   («20261014-0007») y la línea por lo que cobra; confírmala.
+2. La tarjeta de confirmación del asistente pone delante el bono, la clienta y la venta por su número
+   («20261014-0007»), y después la línea por lo que cobra y los importes; confírmala.
 3. El bono sale en **Bonos vendidos** de ese bono (SERVICE-F16).
 Entra: el bono del catálogo, vivo y activo, y la clienta (Clientes).
 Sale: un bono vendido con la titular, la fecha, el importe y los «Usos» y la «Vigencia» del catálogo
@@ -563,9 +563,12 @@ Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Bonos vendidos** (de uno eliminado, con Estado en **Eliminado**).
 2. Sale una fila por compra, la más reciente primero.
-3. **Cargar más** trae la siguiente página; **Cerrar** vuelve a la tabla.
+3. Una compra cobrada con su venta la dice por el número con que la nombra Ventas, «Venta:
+   20261124-0001». Quien no puede ver esa venta (Ventas apagada, o una venta que no es suya) ve la fila
+   sin venta.
+4. **Cargar más** trae la siguiente página; **Cerrar** vuelve a la tabla.
 Entra: las compras de ese bono y el nombre de cada clienta (Clientes); de una ficha eliminada, su
-identificador.
+identificador; el número de la venta de cada compra, de la lectura de la venta de Ventas.
 Sale: nada; solo lectura. **Gastar una sesión** (SERVICE-F21), **Ajustar** y **Anular** salen donde proceden
 y para quien puede.
 Si falla: vacía, «Nadie ha comprado este bono todavía.»; si no se puede leer, «No se han podido
@@ -623,7 +626,12 @@ Pasos:
    más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
 3. Una sesión gastada diciendo quién la hizo la nombra junto a la clienta, «Profesional: Ana
    López»; si cambia su nombre en Personal, la fila lo dice al momento.
-Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal).
+4. Una sesión cobrada en el TPV dice su venta por el número con que la nombra Ventas, «Venta:
+   20261123-0003», también la devuelta, y la profesional de su línea (o la de la cuenta, si la línea no
+   dice ninguna), como cuenta Ventas lo que hizo cada una. Quien no puede ver esa venta (Ventas apagada,
+   o una venta que no es suya) ve la fila sin venta.
+Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal); el
+número y la profesional de la venta de cada sesión del TPV, de la lectura de la venta de Ventas.
 Sale: nada; solo lectura.
 Si falla: vacía, «Este bono aún no se ha usado.»; si no se puede leer, «No se han podido cargar los
 movimientos» con el motivo.
@@ -1060,7 +1068,7 @@ la línea que vende, aunque quien cobra no lo vea.
 | Si se puede gastar una sesión y por qué no | gastar sesiones | F21 | `service.grant.redeem_check` |
 | Los bonos de una clienta que pueden pagar un servicio, el que se gasta primero y por qué | gastar sesiones | F22 | `service.grant.tender_options` |
 | Los movimientos de un bono | ver saldos de bonos | F19 | `service.movement.list` |
-| Hasta cinco imágenes de la librería para la foto de un servicio, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver servicios | F34 | `service.service.suggest_image` |
+| Hasta cinco imágenes de la librería para la foto de un servicio, por su nombre y tituladas en el idioma de quien pregunta; no pone ninguna | ver servicios | F34 | `service.service.suggest_image` |
 
 Todas, menos las comprobaciones, las imágenes propuestas y las lecturas de una asignación, un bono vendido o una
 sesión, se pueden seguir en vivo.
@@ -1173,6 +1181,12 @@ con la sesión de quien vende, como hace con Inventario.
   sesión de quien pregunta, a `sale.sale.get` (el número de la venta), a `sale.record.get` (una línea de la venta con
   `sale_line_id`, una de la cuenta con `line_id` y una devolución con `refund_id`, «Devolución de la venta …») y a
   `appointment.appointment.get` (la `label` de la cita). Una `reference` que no es una devolución es la venta anulada.
+- **Lo que los bonos vendidos y sus movimientos dicen de Ventas** (F16, F19): `service.grant.list` y
+  `service.movement.list` llaman por su nombre, con la sesión de quien mira, a `sale.sale.get`, una vez por cada venta
+  de la página (`queries/sale_numbers.py`): su `number`; los movimientos, además, quién sirvió la línea de la sesión,
+  la de su `order_line_id` (su `staff_id` o, vacío, el de la venta, como cuenta Ventas la producción). Nada se copia
+  en Servicios. Sin Ventas, sin permiso de ver ventas o con una venta que no es suya, `sale_number` va nulo y la
+  lista sale igual. Las escrituras del bono responden `GrantOut`, sin `sale_number`: solo lo pide la lista.
 
 ### Quién puede qué
 
@@ -1217,7 +1231,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `ServiceSettings.default_tax_category` son claves ajenas a `tax.TaxCategory`;
   `Assignment.member` y `Redemption.member` (la profesional que hizo una sesión gastada fuera del cobro, F21;
   `PROTECT`: una ficha no se borra, se da de baja), a `staff.Member`; `Grant.customer`, a `customer.Customer`. Los nombres se
-  resuelven con `apps.staff.queries.resolve_member` y `apps.customer.queries.find_customer`. La venta
+  resuelven con `apps.staff.queries.reads.resolve_member` y `apps.customer.queries.reads.find_customer`. La venta
   y la cita de una sesión o de una compra son identificadores opacos (`sale_id`, `appointment_id`),
   sin clave ajena: Ventas y Citas no son requisito (como `sale` guarda `staff_id`).
 - Modelos: `ServiceSettings` (una fila, restricción `service_settings_singleton`), `Category`,
@@ -1276,7 +1290,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `base.images.from_copy` la deja: la de la librería, salvo una que la librería dice que ya no tiene; nunca una foto
   propia; con la librería sin leer, tal como estaba, para no dejar el servicio fuera (hub#1429); y cada profesional
   que lo hacía en la copia y el
-  negocio sigue teniendo (no dado de baja, por su id: `staff.queries.live_members`), por `service.assignment.assign`
+  negocio sigue teniendo (no dado de baja, por su id: `staff.queries.reads.live_members`), por `service.assignment.assign`
   con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
   entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
   más, para que solo se asigne en los servicios que vuelven: en uno que el negocio conserva o rehízo a mano no se toca
@@ -1359,8 +1373,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`service.assignment`). Así ver, vender, gastar, anular y ajustar bonos, retener y soltar sesiones,
   restaurar un servicio y asignar, cambiar o quitar un profesional desde el chat (SERVICE-F04, F05, F14 a
   F20, F31 y F32) llegan a su operación: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-service-2026-11-08.json`) quedan entre las 20 primeras herramientas del
-  turno, cada herramienta tiene una frase propia que solo llega a ella por sus `asks`, y ni las `asks` ni
+  (`tests/e2e/qa/probes/owner-es-service-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el
+  turno o, las de quitar un profesional y ver el estado del catálogo, las encuentra la búsqueda de su tarea, cada herramienta tiene una frase propia que solo llega a ella por sus `asks`, y ni las `asks` ni
   los grupos de Servicios adelantan sus bonos, sesiones o asignaciones a una petición de Citas o de las
   cuentas de Ventas (`tests/test_assistant_asks.py`). Lo que solo se toma por su
   id (un bono vendido, una sesión, una asignación) dice en su descripción qué lectura lo encuentra

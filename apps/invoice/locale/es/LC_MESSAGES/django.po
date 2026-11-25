@@ -327,6 +327,21 @@ msgstr "fecha de emisión"
 msgid "operation date"
 msgstr "fecha de operación"
 
+#: models.py
+msgctxt "invoice"
+msgid "due date"
+msgstr "vencimiento"
+
+#: models.py
+msgctxt "invoice"
+msgid "IRPF withholding (%)"
+msgstr "retención de IRPF (%)"
+
+#: models.py
+msgctxt "invoice"
+msgid "IRPF withholding"
+msgstr "retención de IRPF"
+
 #: models.py:236
 msgid "issued at"
 msgstr "emitida el"
@@ -641,6 +656,18 @@ msgstr ""
 "El registro de VeriFactu admite como mucho %(max)s caracteres aquí: acórtalo"
 " (en la ficha del cliente)."
 
+#: platform_series.py:20
+msgid "erplora.com numbers the ERP and ERPR series: use another series."
+msgstr "Las series ERP y ERPR las numera erplora.com: usa otra serie."
+
+#: platform_series.py:24
+msgid ""
+"erplora.com issued this invoice and corrects it, in its ERPR series: it "
+"cannot be corrected by hand here."
+msgstr ""
+"Esta factura la emitió erplora.com y allí se corrige, en su serie ERPR: aquí "
+"no se puede corregir a mano."
+
 #: services/manual.py:27
 msgid "This series is not active: activate it or choose another one."
 msgstr "Esta serie no está activa: actívala o elige otra."
@@ -675,10 +702,43 @@ msgstr ""
 #: services/manual.py:35
 msgid ""
 "That series numbers another year: a manual invoice is numbered in a series "
-"of this year."
+"of the year of its date."
 msgstr ""
-"Esa serie numera otro año: una factura manual se numera en una serie de este"
-" año."
+"Esa serie numera otro año: una factura manual se numera en una serie del año "
+"de su fecha."
+
+#: services/manual.py
+msgid "An invoice cannot be dated after today."
+msgstr "La fecha de una factura no puede ser posterior a hoy."
+
+#: services/manual.py
+#, python-format
+msgid ""
+"An invoice cannot be dated before the last one of its series, which is of "
+"%(date)s."
+msgstr ""
+"La fecha de una factura no puede ser anterior a la de la última de su serie, "
+"que es del %(date)s."
+
+#: services/manual.py
+msgid "The due date cannot be before the invoice's date."
+msgstr "El vencimiento no puede ser anterior a la fecha de la factura."
+
+#: services/manual.py
+msgid ""
+"IRPF withholding is a Spanish tax: a business outside Spain does not "
+"withhold it."
+msgstr ""
+"La retención de IRPF es un impuesto español: un negocio de fuera de España no "
+"la practica."
+
+#: services/manual.py
+msgid ""
+"A ticket carries no IRPF withholding: issue an invoice (F1) with the "
+"customer's details."
+msgstr ""
+"Un tique no lleva retención de IRPF: emite una factura (F1) con los datos del "
+"cliente."
 
 #: services/manual.py:40
 #, python-format
@@ -762,6 +822,25 @@ msgstr ""
 "Este tique ya tiene rectificativas: ya no se puede sustituir por una factura"
 " completa."
 
+#: services/paper.py:25
+msgid ""
+"No system printer takes this invoice: open it to print it or save it as PDF."
+msgstr ""
+"Ninguna impresora del sistema recibe esta factura: ábrela para imprimirla o "
+"guardarla en PDF."
+
+#: queries/documents.py
+msgid ""
+"Its VeriFactu record could not be read, and an invoice never prints without "
+"its QR."
+msgstr ""
+"No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin "
+"su QR."
+
+#: queries/pdf.py
+msgid "The PDF cannot be made right now. Try again later."
+msgstr "El PDF no se puede hacer ahora mismo. Inténtalo más tarde."
+
 #: services/rectifying.py:40
 #, python-format
 msgid ""
@@ -787,10 +866,10 @@ msgstr "No hay ninguna categoría fiscal «%(category)s»."
 #: services/manual.py:48
 #, python-format
 msgid ""
-"No tax rule applies today to the tax category «%(category)s». Create its "
+"No tax rule applies that day to the tax category «%(category)s». Create its "
 "rule in Taxes › Rules."
 msgstr ""
-"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s». "
+"Ninguna regla fiscal se aplica ese día a la categoría fiscal «%(category)s». "
 "Crea su regla en Impuestos › Reglas."
 
 #: services/manual.py:53
@@ -851,6 +930,22 @@ msgstr "Fecha"
 #: templates/invoice/invoice.html:73
 msgid "Operation date"
 msgstr "Fecha de operación"
+
+#: templates/invoice/invoice.html
+msgctxt "invoice"
+msgid "Due date"
+msgstr "Vencimiento"
+
+#: queries/documents.py
+#, python-format
+msgctxt "invoice"
+msgid "IRPF withholding %(rate)s"
+msgstr "Retención IRPF %(rate)s"
+
+#: templates/invoice/invoice.html
+msgctxt "invoice"
+msgid "Amount due"
+msgstr "Total a pagar"
 
 #: templates/invoice/invoice.html:79
 msgid "Bill to"
@@ -1001,8 +1096,8 @@ msgstr "Ver e imprimir las facturas, las series, la numeración y el emisor"
 msgid "View everyone's invoices"
 msgstr "Ver las facturas de todos"
 
-msgid "Issue invoices, invoice a sale, replace a receipt and mark invoices paid"
-msgstr "Emitir facturas, facturar una venta, sustituir un tique y marcar facturas como pagadas"
+msgid "Issue and email invoices, invoice a sale, replace a receipt and mark invoices paid"
+msgstr "Emitir facturas y enviarlas por correo, facturar una venta, sustituir un tique y marcar facturas como pagadas"
 
 msgid "Issue corrective invoices"
 msgstr "Rectificar facturas"
@@ -1015,3 +1110,211 @@ msgstr "Configurar el emisor"
 
 msgid "Request the full invoice of a receipt on the public page"
 msgstr "Pedir la factura completa de un tique en la página pública"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "invoices"
+msgstr "facturas"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Invoices"
+msgstr "Facturas"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Number"
+msgstr "Número"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Date"
+msgstr "Fecha"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Customer"
+msgstr "Cliente"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Tax ID"
+msgstr "NIF"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Taxable base"
+msgstr "Base imponible"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Rate %"
+msgstr "Tipo %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Tax"
+msgstr "Cuota"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Surcharge rate %"
+msgstr "Tipo de recargo %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Surcharge"
+msgstr "Cuota de recargo"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Total"
+msgstr "Total"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Withholding %"
+msgstr "Retención %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Withholding"
+msgstr "Retención"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Amount due"
+msgstr "Total a pagar"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "Waiting to be sent"
+msgstr "Pendiente de enviar"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "Sending"
+msgstr "Enviando"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "Sent"
+msgstr "Enviada"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "Not sent"
+msgstr "No enviada"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "to"
+msgstr "para"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "status"
+msgstr "estado"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "status since"
+msgstr "en ese estado desde"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "sent at"
+msgstr "enviada el"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "error code"
+msgstr "código del error"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "request key"
+msgstr "clave de la petición"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "requested at"
+msgstr "pedida el"
+
+#: models_email.py
+msgctxt "invoice email"
+msgid "requested by"
+msgstr "pedida por"
+
+#: models_email.py
+msgid "email of an invoice"
+msgstr "correo de una factura"
+
+#: models_email.py
+msgid "emails of invoices"
+msgstr "correos de las facturas"
+
+#: schemas/emails.py
+msgid "Send to"
+msgstr "Enviar a"
+
+#: queries/emails.py
+#, python-format
+msgid "%(document)s %(number)s from %(business)s"
+msgstr "%(document)s %(number)s de %(business)s"
+
+#: queries/emails.py
+msgid "The email could not be sent right now. Try again in a few minutes."
+msgstr "El correo no se ha podido enviar ahora mismo. Vuelve a intentarlo en unos minutos."
+
+#: queries/emails.py
+msgid "That address does not accept the email. Check it and send it again."
+msgstr "Esa dirección no acepta el correo. Revísala y vuelve a enviarlo."
+
+#: queries/emails.py
+msgid "We could not confirm that the email was sent. Ask the customer before sending it again."
+msgstr "No hemos podido confirmar que el correo se haya enviado. Pregunta al cliente antes de volver a enviarlo."
+
+#: queries/emails.py
+msgid "The owner's account has no email to receive the customer's replies. Add one on erplora.com to send invoices."
+msgstr "La cuenta del propietario no tiene un correo que reciba las respuestas del cliente. Añádelo en erplora.com para enviar facturas."
+
+#: services/emails.py
+msgid "Enter the email to send it to."
+msgstr "Escribe el correo al que enviarla."
+
+#: services/emails.py
+msgid "A demo does not send emails."
+msgstr "Una demo no envía correos."
+
+#: services/emails.py
+msgid "That request key already belongs to another email."
+msgstr "Esa clave de petición ya es de otro correo."
+
+#: services/emails.py
+msgid "This business has sent all the emails it can send in an hour. Try again later."
+msgstr ""
+"Este negocio ya ha enviado todos los correos que puede enviar en una hora. "
+"Vuelve a intentarlo más tarde."
+
+#: templates/invoice/email.txt
+#, python-format
+msgid "Hello, %(customer)s:"
+msgstr "Hola, %(customer)s:"
+
+#: templates/invoice/email.txt
+msgid "Hello:"
+msgstr "Hola:"
+
+#: templates/invoice/email.txt
+msgid "Attached you will find this document as a PDF:"
+msgstr "Adjuntamos en PDF este documento:"
+
+#: templates/invoice/email.txt
+msgctxt "invoice email"
+msgid "Total"
+msgstr "Total"
+
+#: templates/invoice/email.txt
+msgid "If you have any questions, just reply to this email."
+msgstr "Para cualquier duda, basta con responder a este correo."

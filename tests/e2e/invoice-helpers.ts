@@ -5,7 +5,7 @@
 // its sales (`E2E-INV-…` products), its names (`e2e …`), its series (`E2E…` codes) or the ids it recorded.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, login, psql } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 
 /** The three sizes of a flow's evidence (the migration's: 390×844, 834×1112, 1440×900). */
 export const FLOW_VIEWPORTS = [
@@ -46,6 +46,16 @@ export function snapshotSeries(): void {
   seriesBefore = psql(`select string_agg(id::text || ':' || current_number::text, ',') from invoice_invoiceseries`)
     .split(',')
     .filter(Boolean);
+}
+
+/** A context signed in at Invoicing, with the numbering noted for `cleanInvoices()` and an issuer set up: what a spec
+ *  that issues invoices does first, in `beforeAll`. */
+export async function readyToInvoice(browser: Browser): Promise<BrowserContext> {
+  const context = await browser.newContext({ baseURL: A });
+  await login(await context.newPage(), A, '/invoice/invoices');
+  snapshotSeries();
+  await ensureIssuer(context);
+  return context;
 }
 
 export interface IssuerOut {
@@ -125,6 +135,20 @@ export interface InvoiceOut extends InvoiceLink {
   substitutes: InvoiceLink | null;
   substituted_by: InvoiceLink | null;
   rectifications: InvoiceLink[];
+}
+
+/** An invoice issued by hand through the app's API, as the window would, and noted for `cleanInvoices()`. */
+export async function issueByHand(context: BrowserContext, data: Record<string, unknown>): Promise<{ id: string; number: string }> {
+  const issued = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', data);
+  expect(issued.status, JSON.stringify(issued.data)).toBe(201);
+  issuedIds.add(issued.data.id);
+  return issued.data;
+}
+
+/** Opens the page of an issued invoice and waits until it shows. */
+export async function openInvoice(page: Page, invoice: { id: string; number: string }): Promise<void> {
+  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
+  await expect(shown(page).locator('[data-testid=invoice-detail-title]')).toContainText(invoice.number);
 }
 
 interface IssueOut {
@@ -212,6 +236,7 @@ export function cleanInvoices(): void {
         where r.issuer_nif = c.issuer_nif and r.environment = c.environment and c.last_record_id is null`,
       ...(hadVerifactuConfig ? [] : ['delete from verifactu_config where not exists (select 1 from verifactu_record)']),
       'delete from invoice_invoiceline where invoice_id in (select id from e2e_inv)',
+      'delete from invoice_invoiceemail where invoice_id in (select id from e2e_inv)',
       // A document goes once nothing points at it (a rectifying one is always linked): from the last link back.
       ...Array.from({ length: 4 }, () => UNREFERENCED),
       `delete from invoice_invoiceseries where code like 'E2E%'`,

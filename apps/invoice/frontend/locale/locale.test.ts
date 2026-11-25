@@ -20,10 +20,23 @@ describe('invoice catalogues (en source + es)', () => {
       expect(EN.has(`invoice.typeNames.${type}`), type).toBe(true);
     }
     for (const status of ['issued', 'paid', 'cancelled']) expect(EN.has(`invoice.status.${status}`), status).toBe(true);
-    for (const source of ['sale', 'manual', 'substitution', 'rectification', 'refund', 'void']) {
+    for (const source of ['sale', 'manual', 'substitution', 'rectification', 'refund', 'void', 'platform']) {
       expect(EN.has(`invoice.sources.${source}`), source).toBe(true);
     }
     for (const idType of ['02', '03', '04', '05', '06', '07']) expect(EN.has(`invoice.recipient.idTypes.${idType}`), idType).toBe(true);
+  });
+
+  it('write the default number format the same way in the series intro, its column and its field help', () => {
+    for (const [lang, catalogue] of [['en', EN], ['es', ES]] as const) {
+      const format = catalogue.get('invoice.series.defaultFormat') ?? '';
+      expect(format, lang).toMatch(/^[^-\s]+-[^-\s]+-N+$/);
+      expect(catalogue.get('invoice.series.intro'), lang).toContain(`(${format})`);
+      expect(catalogue.get('invoice.series.form.formatHint'), lang).toContain(` ${format}.`);
+    }
+    const [enPrefix, enYear] = (EN.get('invoice.series.defaultFormat') ?? '').split('-');
+    const [esPrefix, esYear] = (ES.get('invoice.series.defaultFormat') ?? '').split('-');
+    expect(esPrefix).not.toBe(enPrefix);
+    expect(esYear).not.toBe(enYear);
   });
 
   it('keep the old screens’ words (WORKBOOK «Pantallas»)', () => {

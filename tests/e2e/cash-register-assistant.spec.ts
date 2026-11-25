@@ -388,7 +388,7 @@ test('cash-register-assistant-card — in Spanish renaming a drawer by its id na
   const renamed = `E2E Terraza ${RUN}`;
   await askForACard(page, `E2E-ASK cash_register__register__update ${JSON.stringify({ register_id: drawerId, name: renamed })}`, { timeout: 30_000 });
   // Renaming is not dangerous: its card says the action with its data, the drawer it renames first.
-  await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · ${renamed}`);
+  await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · Nombre: ${renamed}`);
   await expect(card(page)).not.toContainText(drawerId);
   await capture(page, `${RECORDS_KEY}-drawer-1440`);
   await cancelInSpanish(page);

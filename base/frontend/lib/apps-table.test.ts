@@ -1,27 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { app as appRow } from '../__tests__/app-row';
 import type { AppRow } from '../operations/apps';
 import { appActions, appSwitch, type AppsTableState } from './apps-table';
 
 function app(fields: Partial<AppRow> = {}): AppRow {
-  return {
-    id: 'flow',
-    name: 'Flows',
-    icon: 'ion:cube-outline',
-    category: 'sales',
-    category_label: 'Sales',
-    summary: '',
-    premium: false,
-    right: 'free',
-    state: 'on',
-    chosen: true,
-    path: '/flow/home',
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
-    ...fields,
-  };
+  return appRow('flow', { name: 'Flows', ...fields });
 }
 /** The keys a test reads back instead of the words. */
 const t = (key: string, values?: Record<string, unknown>) => (values ? `${key}(${Object.values(values).join(',')})` : key);

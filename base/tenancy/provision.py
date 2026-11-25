@@ -11,10 +11,10 @@ of its own (``base.services.provisioning``):
    (``<control>_template[_<vertical>]``, ``base.tenancy.ops``), private to the environment's roles, with its identity
    (``base_hub_identity``);
 2. ``migrating``: the apps the clone has (its ``django_migrations``: its template's), its vertical's and ``base`` are
-   brought to the code's leaf (``base.tenancy.migrator.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
+   brought to the code's leaf (``base.tenancy.migrator.schema.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
    template current, so the sign-up is the clone; the lease renewed between apps) and noted in ``Hub.schema_apps``
    (``{app: its leaf migration}``) with ``schema_state`` current. Every template carries every portable app's tables
-   (``migrator.templates``), so the clone has them; an app it lacks (one ported after its template was made) gets its
+   (``migrator.hub_templates.templates``), so the clone has them; an app it lacks (one ported after its template was made) gets its
    tables the first time the business turns it on (``base.app.enable`` → ``creating`` → the worker's
    ``ensure_schema``);
 3. ``seeding``: inside ``use_hub``, its apps written down: every one off but those its country requires that the
@@ -48,7 +48,7 @@ from live.context import system_context
 
 from base import activation, registry
 from base.services import demos, hub_registry, photo, provisioning
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 from base.schemas.demos import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops
@@ -75,7 +75,7 @@ Seed = Callable[[Hub], None]
 
 
 def vertical_apps(vertical: str) -> list[str]:
-    """The apps a hub of ``vertical`` is born with (``base.catalog.template_apps``); none for no vertical, or for one no
+    """The apps a hub of ``vertical`` is born with (``base.catalog.verticals.template_apps``); none for no vertical, or for one no
     module lists (its template's own apps are brought to the leaf all the same)."""
     if not vertical:
         return []
@@ -230,7 +230,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
         try:
             # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs). The
             # lease is renewed between apps: a long migration never lets another worker take the hub meanwhile.
-            migrator.ensure_schema(
+            migrator.schema.ensure_schema(
                 hub,
                 add=["base", *vertical_apps(hub.vertical), *sorted(activation.born_apps(hub.country)), *apps],
                 heartbeat=lambda: provisioning.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE),

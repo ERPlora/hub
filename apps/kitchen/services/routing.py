@@ -11,7 +11,7 @@ from apps.inventory.queries.reads import held
 from apps.kitchen import events
 from apps.kitchen.models import CategoryRoute, ProductRoute, Station
 from apps.kitchen.queries.scope import find_station
-from apps.kitchen.schemas import RouteOut, RoutingClearIn, RoutingSetIn
+from apps.kitchen.schemas.routing import RouteOut, RoutingClearIn, RoutingSetIn
 from apps.kitchen.services.catalog import CATEGORY_NOT_FOUND, PRODUCT_NOT_FOUND, find_category, find_product
 from apps.kitchen.services.settling import begin
 from apps.kitchen.services.writes import actor

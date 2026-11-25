@@ -1,7 +1,7 @@
 """Django admin of the staff app: full CRUD on every model, for the platform's staff.
 
 The Hub admin has full CRUD over all of a hub's tables, unlike the read-only admin apps/demo carries. A raw admin write
-records no event: the actions that need one call the operations of services.py. A record's «Delete» locks it first
+records no event: the actions that need one call the operations of services. A record's «Delete» locks it first
 (``lock_members``), as every write on that person does: it waits for the one under way and only then checks what
 protects the record.
 """
@@ -17,7 +17,7 @@ from apps.staff.models import (
     StaffSettings,
     TimeOff,
 )
-from apps.staff.services import lock_members
+from apps.staff.services.locks import lock_members
 
 
 @admin.register(Role)

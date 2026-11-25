@@ -23,7 +23,8 @@ import pytest
 from django.db import DatabaseError
 
 from base import catalog, outbound, relay, scheduler, worker, worker_data
-from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
+from base.catalog.errors import CatalogError, SharedSchemaNotReady
+from base.catalog.register_apps import RegisterResult
 from base.tenancy import context, provision
 
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
@@ -248,7 +249,7 @@ def calls(monkeypatch):
         done.append("register_apps")
         return WRITTEN
 
-    monkeypatch.setattr(catalog, "register_apps", register_apps)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", register_apps)
     monkeypatch.setattr(
         worker, "close_old_connections", lambda: done.append("close_old_connections")
     )
@@ -279,7 +280,7 @@ def test_releases_the_connections_register_apps_opened_before_idling(calls):
     ids=["written", "skipped"],
 )
 def test_says_what_it_registered_once_it_waits_for_work(monkeypatch, caplog, result, said):
-    monkeypatch.setattr(catalog, "register_apps", lambda: result)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: result)
 
     with caplog.at_level(logging.INFO, logger="base.worker"):
         worker.run(stopped())
@@ -307,7 +308,7 @@ def registrations(monkeypatch, *outcomes):
             raise outcome
         return outcome
 
-    monkeypatch.setattr(catalog, "register_apps", register_apps)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", register_apps)
     return attempts
 
 
@@ -888,7 +889,7 @@ def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
         seen.append((context.current().kind, cancelled()))
         return 1
 
-    monkeypatch.setattr(move, "run_due", run_due)
+    monkeypatch.setattr(move.worker_pass, "run_due", run_due)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append(("restores", cancelled())) or 0)
 
     worker_data._moves(ten(0), stop)
@@ -902,7 +903,7 @@ def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
 
     monkeypatch.undo()
     seen: list[tuple[str, dt.datetime]] = []
-    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(move.worker_pass, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now)) or 1)
 
     worker_data._moves(ten(0), threading.Event())
@@ -916,7 +917,7 @@ def test_the_moves_pass_brings_back_what_a_business_lost_from_its_copy_too_on_co
 
     monkeypatch.undo()
     seen: list[tuple] = []
-    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(move.worker_pass, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_aside_due", lambda now, *, cancelled: seen.append("asides") or 0)
     monkeypatch.setattr(
@@ -937,7 +938,7 @@ def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeyp
     def run_due(now, *, cancelled):
         raise failure
 
-    monkeypatch.setattr(move, "run_due", run_due)
+    monkeypatch.setattr(move.worker_pass, "run_due", run_due)
 
     with caplog.at_level(logging.ERROR, logger="base.worker"):
         worker_data._moves(ten(0), threading.Event())

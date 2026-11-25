@@ -8,7 +8,7 @@ from pathlib import Path
 from django.apps import apps
 from django.utils import translation
 
-from apps.staff import queries, schemas, services
+from apps.staff import queries, schemas, services, time_off_card
 from apps.staff.models import (
     Member,
     Role,
@@ -41,7 +41,7 @@ def visible_texts() -> set[str]:
     lazies = [
         *config_texts(config),
         *(widget.title for widget in config.widgets),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, services, schemas, time_off_card),
     ]
     lazies += model_texts(MODELS)
     for choices in (Member.Status, TimeOff.LeaveType, TimeOff.Status):
@@ -96,17 +96,17 @@ def test_spanish_texts_are_the_old_modules():
             "Cancelada",
         ]
         assert (
-            str(queries.MEMBER_NOT_FOUND)
+            str(queries.reads.MEMBER_NOT_FOUND)
             == "Ese miembro del personal no existe en este negocio."
         )
-        assert str(services.ACTIVE_TIME_OFF) == (
+        assert str(services.members.ACTIVE_TIME_OFF) == (
             "Ese miembro tiene ausencias pendientes o aprobadas que aún no han terminado. Resuélvelas primero."
         )
         assert (
-            str(services.INVALID_TRANSITION)
+            str(services.time_off.INVALID_TRANSITION)
             == "Esa solicitud de ausencia no puede pasar a ese estado desde el actual."
         )
-        assert str(services.DEFAULT_SCHEDULE_NAME) == "Horario habitual"
+        assert str(services.schedules.DEFAULT_SCHEDULE_NAME) == "Horario habitual"
         assert (
             str(schemas.fields.END_BEFORE_START)
             == "La fecha de fin no puede ser anterior a la de inicio."

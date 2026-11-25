@@ -1,6 +1,6 @@
 """The lines of a session as its movements, and whether this database holds any."""
 
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import OperationContext
 from live.operations import operation
 
@@ -11,6 +11,7 @@ from apps.cash_register.queries.sessions import find_session, hides_expected, li
 from apps.cash_register.queries.settings import current_settings
 from apps.cash_register.queries.unassigned import unassigned_lines
 from apps.cash_register.schemas import MovementListIn, MovementPage
+from base.system import app_name
 
 
 def line_row(line: Line) -> dict:
@@ -23,6 +24,8 @@ def line_row(line: Line) -> dict:
         "method_type": line.method_type,
         "method_name": line.method_name,
         "description": line.description,
+        "app": line.app,
+        "app_name": app_name(line.app),
         "sale_id": line.sale_id,
         "sale_number": line.sale_number,
         "document_type": line.document_type,
@@ -85,8 +88,10 @@ def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
         reverse=params.dir == "desc",
     )
     page = lines[params.offset : params.offset + params.limit]
+    with translation.override(ctx.language):  # Each line names its app in the reader's language.
+        rows = [line_row(line) for line in page]
     return {
-        "rows": [line_row(line) for line in page],
+        "rows": rows,
         "total": len(lines),
         "limit": params.limit,
         "offset": params.offset,

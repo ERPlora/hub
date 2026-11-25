@@ -18,13 +18,12 @@ from apps.inventory.tests.test_allergens import NOT_ONE_OF_THE_FOURTEEN
 from apps.inventory.tests.test_assistant_card_records import fields_of
 from apps.modifier import events
 from apps.modifier.models import ModifierOption
-from apps.modifier.schemas import OptionIn, OptionPatchIn
+from apps.modifier.schemas.options import OptionIn, OptionPatchIn
 from base.models import Membership
 from base.tenancy.context import current_alias, use_hub
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, probe_phrases
 
-from .conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, catalog_of, ctx_for, make_product, run
-from .test_services import received
+from .conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, catalog_of, ctx_for, make_product, received, run
 
 pytestmark = HUB_DB
 #: The fixture taken from the conftest: the assistant's catalogue of a person of business A.

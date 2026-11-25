@@ -1,11 +1,12 @@
 """The assistant's catalogue did not move when ``ai=`` became typed and mandatory (``live.E017``).
 
 Before, the Hub decided a tool by the words of an ``ai=`` dictionary and by its permission: no description, «Not an
-assistant tool…»/«System only…», no permission or one no app declares (the platform's reactions and scheduled tasks),
-what is never done from the chat (``NOT_FROM_CHAT``) and the assistant's own were no tool. Now ``live.assistant``
-decides by ``Operation.ai_spec()`` (``AI`` or ``INTERNAL``) and the operations that declared nothing say ``INTERNAL``.
-``legacy_catalog`` is that old rule, as ``base/assistant.py`` had it on ``origin/main`` (``ae5f473e``): an owner, a
-manager, an employee and a superuser are offered exactly the tools it gives them, in the same order.
+assistant tool…»/«System only…», no permission or one no app declares (the platform's reactions and scheduled tasks)
+and what is never done from the chat (``NOT_FROM_CHAT``) were no tool. Now ``live.assistant`` decides by
+``Operation.ai_spec()`` (``AI`` or ``INTERNAL``) and the operations that declared nothing say ``INTERNAL``.
+``legacy_catalog`` is that rule by the words: an owner, a manager, an employee and a superuser are offered exactly the
+tools it gives them, in the same order. Of the assistant's own operations only the search of the tools is left out by
+its name, as every turn offers it apart; the rest say by their words whether they are a tool.
 """
 
 import pytest
@@ -15,7 +16,7 @@ from live.operations import AI, Operation, registry
 
 from base import approvals, assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 #: Business A, entered for every test with its own database (``in_business_a``).
@@ -43,7 +44,7 @@ def legacy_is_tool(op: Operation, declared_permissions: frozenset[str]) -> bool:
         and op.permission in declared_permissions
         and not text.startswith(LEGACY_NOT_A_TOOL)
         and op.name not in LEGACY_NOT_FROM_CHAT
-        and not op.name.startswith("base.assistant.")
+        and op.name != "base.assistant.find_tools"
     )
 
 
@@ -60,7 +61,7 @@ def legacy_catalog(ctx: OperationContext) -> list[str]:
 
 
 def person(user) -> OperationContext:
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language="es")
 
 
 @HUB_DB

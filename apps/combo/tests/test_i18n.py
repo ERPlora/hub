@@ -72,13 +72,13 @@ def test_spanish_texts_are_the_old_modules():
         assert str(config.verbose_name) == "Menús y combos"
         assert [str(nav.label) for nav in config.navigation] == ["Menús"]
         assert [str(label) for label in Combo.SupplyKind.labels] == ["En el local", "Para llevar"]
-        assert str(services.TAX_REQUIRED) == (
+        assert str(services.menus.TAX_REQUIRED) == (
             "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar."
         )
-        assert str(schemas.CEILING_BELOW_FLOOR) % {"max": 1, "min": 2} == (
+        assert str(schemas.fields.CEILING_BELOW_FLOOR) % {"max": 1, "min": 2} == (
             "El máximo (1) queda por debajo del mínimo (2): nadie podría satisfacer nunca este plato."
         )
-        assert str(queries.COMBO_NOT_FOUND) == "Ese menú no existe en este negocio."
+        assert str(queries.reads.COMBO_NOT_FOUND) == "Ese menú no existe en este negocio."
 
 
 def test_placeholders_survive_the_translation():

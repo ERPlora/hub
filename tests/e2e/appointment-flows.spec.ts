@@ -9,10 +9,12 @@
 // (F12), booked again (F13), edited from an occurrence on (F14), paused, reactivated and deleted (F15); the
 // customer's card shows her visits (F20). Each size works on a day of its own; what it creates is «E2E Apf …»,
 // removed before and after, and the settings of Citas are put back at the end.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { aMonday } from './appointment-helpers';
+import { aMonday, salonCleanUp } from './appointment-helpers';
+import { cardDeletes } from './customer-helpers';
 import { pickDay, pickTime } from './date-time-fields';
+import { cutLabels } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, ownerPage, pick, post, rowAction, settled } from './service-helpers';
 
@@ -24,32 +26,7 @@ const named = (label: string): string => `${TAG} ${label} ${RUN}`;
 const PAST = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
 
 function cleanUp(): void {
-  const customers = `select id from customer_customer where name like '${TAG}%'`;
-  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
-  const series = `select id from appointment_recurring where customer_id in (${customers})`;
-  const services = `select id from service_service where name like '${TAG}%'`;
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  const orders = `select id from sale_order where appointment_id in (${appointments})`;
-  psql(
-    [
-      `delete from sale_orderline where order_id in (${orders})`,
-      `delete from sale_order where id in (${orders})`,
-      `delete from appointment_history where appointment_id in (${appointments})`,
-      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
-      `delete from appointment_appointment where id in (${appointments})`,
-      `delete from appointment_recurringservice where recurring_id in (${series})`,
-      `delete from appointment_recurring where id in (${series})`,
-      `delete from appointment_blockedtime where title like '${TAG}%'`,
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-      `delete from service_service where name like '${TAG}%'`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from customer_activity where customer_id in (${customers})`,
-      `delete from customer_consent where customer_id in (${customers})`,
-      `delete from customer_customer where name like '${TAG}%'`,
-    ].join('; '),
-  );
+  psql([...salonCleanUp(TAG), ...cardDeletes(`select id from customer_customer where name like '${TAG}%'`)].join('; '));
 }
 
 /** The business's own settings of Citas, kept before the spec changes them and put back after. */
@@ -147,16 +124,6 @@ async function chooseCustomer(page: Page, modal: string, who: Cast): Promise<voi
 /** Waits until the agenda's row of appointment `id` shows `status`: the live list has caught up with the change. */
 async function showsStatus(page: Page, id: string, status: string): Promise<void> {
   await expect(shown(page).locator(`[data-testid=appointment-list-row][data-id="${id}"]`).first()).toContainText(status);
-}
-
-/** The fields of `form` whose label does not fit and is cut with «…» (none should be). */
-async function cutLabels(form: Locator): Promise<string[]> {
-  return form.locator('ion-input, ion-select, ion-textarea').evaluateAll((fields) =>
-    fields.flatMap((field) => {
-      const label = field.shadowRoot?.querySelector('.label-text') ?? field.querySelector('.label-text');
-      return label && label.scrollWidth > label.clientWidth + 1 ? [field.getAttribute('data-testid') ?? field.tagName] : [];
-    }),
-  );
 }
 
 /** The searched word of a name built by `named` («E2E Apf <word> …»). */

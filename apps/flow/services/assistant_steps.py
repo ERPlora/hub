@@ -43,6 +43,8 @@ UNATTENDED = (
     "This is a step of the automation «%(name)s» and nobody is watching: never ask a question, decide with your "
     "tools and answer with what you found or did, in a few words."
 )
+#: What the step's model does when none of its tools does what was asked: it is offered no search of other tools.
+NO_TOOL = "- If something cannot be done from here (you have no tool for it), say on which screen it is done."
 #: What the assistant hears of a call of its answer that was not made: one change waits for a person at a time.
 NOT_MADE = shared.error_content("not_made", "Not made: ask for one change at a time.")
 #: What the assistant hears of a call whose fixed datum is empty in this run: the tool is not used (nothing half done).
@@ -113,7 +115,7 @@ def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
         screens={},
     )
     mode = CHANGES.get(step.get("mode", "ask"), CHANGES["ask"])
-    return f"{text}\n\n{UNATTENDED % {'name': flow.name}} {mode}"
+    return f"{text}\n{NO_TOOL}\n\n{UNATTENDED % {'name': flow.name}} {mode}"
 
 
 def _step_of(ctx: OperationContext, run: FlowRun, flow: Flow) -> dict:

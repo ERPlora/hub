@@ -27,7 +27,7 @@ from live.operations import on_commit as after_commit
 from live.operations import operation
 from live.outbox import record_event
 
-from base import activation, blueprint, entitlement, events, home, queries
+from base import activation, app_switch, blueprint, entitlement, events, home, listing, queries
 from base.activation import CREATING, FAILED
 from base.models.activation import AppActivation
 from base.models import Hub
@@ -143,7 +143,7 @@ def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
 @_cache
 def _code_leaves() -> dict[str, str]:
     """This code's last migration of each app (its migrations never change while the process runs)."""
-    return dict(migrator.code_migrations().leaves)
+    return dict(migrator.app_sets.code_migrations().leaves)
 
 
 def _code_leaf(label: str) -> str:
@@ -191,12 +191,8 @@ def _named(ctx: OperationContext, labels: Iterable[str]) -> list[dict[str, str]]
 
 
 def _names_said(ctx: OperationContext, labels: list[str]) -> str:
-    """«A», «A and B», «A, B and C», in the language of who asks."""
-    with translation.override(ctx.language):
-        names = [item["name"] for item in _named(ctx, labels)]
-        if len(names) == 1:
-            return names[0]
-        return gettext("%(first)s and %(last)s") % {"first": ", ".join(names[:-1]), "last": names[-1]}
+    """«A», «A and B», «A, B, and C», in the language of who asks, as the screens order and join them."""
+    return listing.joined(listing.ordered(item["name"] for item in _named(ctx, labels)), ctx.language)
 
 
 def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]], *, already: bool) -> dict:
@@ -204,20 +200,43 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     return {"app": label, "state": row.state, "chosen": row.wanted and row.chosen, "along": along, "already": already}
 
 
-def _enable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
-    """The card of turning an app on, and of one the business's country requires, the reason the Apps screen gives why
-    it never goes off: the person reads it before the yes, not on trying to turn it off. A name of no app, or of
-    several, is drawn as it is: the card's check (``base.app.get``) refuses it before anyone sees it."""
+def _card_app(ctx: OperationContext, arguments: dict) -> tuple[Hub | None, Any]:
+    """The business's hub and the app a card names; no app for a name of none, or of several: the card's check
+    (``base.app.get``) refuses it before anyone sees it, and the card is drawn as it is."""
     hub = _business_hub(ctx)
     try:
-        config = _business_module(ctx, arguments["app"], hub)
+        return hub, _business_module(ctx, arguments["app"], hub)
     except (NotFound, Conflict):
+        return hub, None
+
+
+def _enable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The card of turning an app on: the apps it needs that are off, which come along (``app_switch``), and, for one
+    the business's country requires, the reason the Apps screen gives why it never goes off: the person reads both
+    before the yes, not after it."""
+    hub, config = _card_app(ctx, arguments)
+    if config is None:
         return fields
+    others = app_switch.along(config.label, activation.states_of(ctx.scope), activation.module_graph(), on=True)
+    shown = [*fields, *app_switch.card_datum(app_switch.said(config.label, others, on=True, language=ctx.language))]
     country = hub.country if hub else ""
-    if not home.mandatory_in(config, country):
-        return fields
+    if not home.mandatory_apps.mandatory_in(config, country):
+        return shown
     reason = activation.mandatory_off(config, country)
-    return [*fields, {"name": "mandatory", "label": str(ONCE_ON), "kind": "text", "value": reason}]
+    return [*shown, {"name": "mandatory", "label": str(ONCE_ON), "kind": "text", "value": reason}]
+
+
+def _disable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The card of turning an app off: what came along only with it goes off too (``app_switch``, never one the
+    business's country requires on). One another app on needs is only named: its yes is refused, saying which apps go
+    off first."""
+    hub, config = _card_app(ctx, arguments)
+    if config is None:
+        return fields
+    current = activation.states_of(ctx.scope)
+    kept = activation.mandatory_on(current, hub.country if hub else "")
+    others = app_switch.along(config.label, current, activation.module_graph(), kept, on=False)
+    return [*fields, *app_switch.card_datum(app_switch.said(config.label, others, on=False, language=ctx.language))]
 
 
 @operation(
@@ -288,7 +307,7 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
         raise AppVetoed(vetoed[1], app=vetoed[0])
     if changes.get(app, current[app]).chosen and not (current[app].wanted and current[app].chosen):
         limit = queries.apps.app_limit(hub)
-        shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
+        shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
         if limit is not None and enabled >= limit:
             with translation.override(ctx.language):
@@ -339,6 +358,7 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
         "was off already.",
         "risk": "high",
         "check": "base.app.get",
+        "summary": _disable_card,
         "asks": {
             "en": (
                 "turn off the reservations app",

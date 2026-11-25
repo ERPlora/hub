@@ -69,7 +69,7 @@ CONTROL_LOGIN = (
 
 #: ``<path>::<function>`` → why Django's atomic (or the rest of its transactions) on its alias is the one meant there.
 DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
-    "base/catalog.py::register_apps": (
+    "base/catalog/register_apps.py::register_apps": (
         "It writes shared.app and shared.app_doc on the `shared` alias, which it names (SHARED_CATALOG_REASON of "
         "tests/test_guardrails.py): no hub's database and no operation."
     ),
@@ -77,12 +77,9 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
         "It is part of LIVE['operation_database']: it opens the operation's own transaction on the alias the tenancy "
         "gave it (APPROVAL_SPEND_REASON of tests/test_guardrails.py), before live.operations runs the operation."
     ),
-    "base/services/hub_registry.py::hub_register": (
-        "base.hub.register is the platform's operation (use_control): its writes (control.Hub) and its two savepoints "
-        "are control's, the alias of its own transaction. The registry block is left as it is here."
-    ),
     "base/services/sessions.py::open_session_from_saas": CONTROL_LOGIN,
     "base/services/devices.py::open_session_on_device": CONTROL_LOGIN,
+    "base/services/support_entry.py::open_support_session": CONTROL_LOGIN,
     "base/services/sessions.py::open_admin_session_from_saas": (
         "Only control's models (the staff copy, its groups, Django's session), on the platform host: control's "
         "transaction."
@@ -348,7 +345,7 @@ def test_the_scanner_lets_lives_atomic_and_the_rest_of_transaction_be():
 def test_the_scan_reads_the_apps_and_base_but_not_the_tenancy_the_migrations_nor_the_tests():
     files = {str(path) for path in scanned_files()}
 
-    assert {"apps/sale/services/checkout.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog.py"} <= files
+    assert {"apps/sale/services/checkout.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog/register_apps.py"} <= files
     assert not any(path.startswith("base/tenancy/") for path in files)
     assert not any("/migrations/" in path or "/tests/" in path for path in files)
 

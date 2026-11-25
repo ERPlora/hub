@@ -1,0 +1,36 @@
+"""Schemas of ERPlora's support access to the business (``base.support_access.*``)."""
+
+import datetime as dt
+
+from ninja import Field, Schema
+
+
+class SupportAccessIn(Schema):
+    """No input."""
+
+
+class SupportVisitOut(Schema):
+    person: str = Field(description="Who of ERPlora's support entered: their name, else their email.")
+    entered_at: dt.datetime
+
+
+class SupportAccessOut(Schema):
+    enabled: bool = Field(description="Whether ERPlora's support may enter the business; off by default.")
+    can_change: bool = Field(description="Whether who asks may change it (who runs the business).")
+    updated_by: str = Field(description="Who changed it last; empty if nobody has.")
+    updated_at: dt.datetime | None
+    visits: list[SupportVisitOut] = Field(description="The last times support entered, the most recent first.")
+
+
+class SupportAccessUpdateIn(Schema):
+    enabled: bool
+
+
+class SupportEnterIn(Schema):
+    username: str = Field(max_length=150, description="The local copy of the person of support: saas-support:<id>.")
+    name: str = Field("", max_length=150)
+    email: str = Field("", max_length=254)
+
+
+class SupportEnterOut(Schema):
+    entered: bool = Field(description="Whether the business let the person of support in: its support access is on.")

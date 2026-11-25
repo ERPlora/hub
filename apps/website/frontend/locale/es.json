@@ -182,6 +182,11 @@
       "qr": "Código QR de tu página web",
       "downloadPng": "Descargar PNG",
       "downloadSvg": "Descargar SVG",
+      "catalog": {
+        "url": "La dirección de tu catálogo",
+        "qr": "Código QR de tu catálogo",
+        "hint": "Abre tu página web directamente en el catálogo: imprime su QR para tus mesas o tu mostrador."
+      },
       "signedIn": "En este dispositivo tienes la sesión abierta, así que esta dirección abre la app. Ábrela en tu móvil o en una ventana privada para ver tu página web.",
       "notLive": "Tu página web no está en línea: hasta que la publiques, esta dirección abre la página de acceso de tu equipo.",
       "close": "Cerrar"

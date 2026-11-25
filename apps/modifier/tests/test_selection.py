@@ -1,6 +1,6 @@
 """The valuation of the options chosen for a product gives each pick with its allergens (MODIFIER-F11), the ones that
 go on a line of their own included: what the till adds up on the line (MODIFIER-F12). The rest of the valuation, its
-prices, lines and refusals (MODIFIER-F07, F08), is tested in ``test_queries.py``."""
+prices, lines and refusals (MODIFIER-F07, F08), is tested in ``test_queries_till.py``."""
 
 from .conftest import GENERIC, HUB_DB, make_product, run
 

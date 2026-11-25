@@ -325,7 +325,8 @@ Pasos:
    cantidad que el de la ficha (si la ficha dice «0,37 € por 100 ud», el de la tarifa también es por 100 ud).
 5. Pulsa **Añadir**.
 Entra: la tarifa (activa), el artículo y su precio. El asistente nombra la tarifa por su código o su
-nombre y el artículo por su nombre o su SKU.
+nombre y el artículo por su nombre o su SKU, y toma lo que se cobra por algo en una tarifa como su precio en
+ella («En la terraza la caña la cobro a 2,50», con la tarifa Terraza), no como cobrar una cuenta.
 Sale: el precio y `pricing.price_item.added`.
 Si falla: debajo de su campo y sin guardar nada: «Esa tarifa no está disponible: no existe en este
 negocio o está desactivada.», «Ese artículo ya tiene precio en esta tarifa desde esa cantidad.», un
@@ -634,9 +635,10 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
-  Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
+  `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `tests/test_<fichero>.py` por fichero (un `tests/test_services_<módulo>.py` por módulo de `services/`),
+  más `tests/test_integration_*.py` con Inventario, Clientes y Servicios de verdad, `tests/test_concurrency.py`
+  con hilos y `tests/test_relay.py` (PRICING-F14 de punta
   a punta: la operación real de la otra app, un tick real del worker y su relay, la reacción una sola vez y
   el hub B sin tocar al A). En Chrome, `tests/e2e/pricing-flows.spec.ts` (un test por flujo con pantalla,
   PRICING-F01 a F12, con sus capturas en tres tamaños) y `tests/e2e/pricing-lists.spec.ts` (de la tarifa al
@@ -701,11 +703,20 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `asks` del Hub y las 857 sondas de la capa 2: ningún ask de otra app pierde puesto.
   `tests/test_assistant_asks.py` mide con las frases reales de la QA
   (`tests/e2e/qa/probes/owner-es-pricing-2026-11-08.json`), nunca con los propios `asks`: cada una ofrece su
-  herramienta entre las 19 que ofrece un turno antes de la búsqueda, la de reactivar una regla antes que `payment.method.activate`, y
+  herramienta entre las 15 que ofrece un turno antes de la búsqueda, la de reactivar una regla antes que `payment.method.activate`, y
   una frase propia por herramienta (ni `ask` ni sonda, con `assert_its_asks_bring` de la plataforma) la trae
   entre las diez primeras solo con sus `asks`; el empleado no recibe ninguna escritura. Reactivar una
   tarifa o una regla sale antes que `base.app.enable`: live lee «activar» también como la acción `activate`
   (ERPlora/live#70).
+- Lo que el negocio cobra por algo a un importe es su precio: `apps.py` declara «cobro a» y «cobramos a»
+  seguidos de un importe junto a «precio», y añadir un precio se describe como lo que la tarifa cobra. Sin
+  ellas, «En la terraza la caña la cobro a 2,50 y el refresco a 3 euros.» solo se leía como cobrar una venta y
+  el turno no ofrecía Tarifas. Una frase casa palabras seguidas, sin comodines, y un importe se lee por su parte
+  entera («2,50» como «2»): por eso cada importe hasta 999 es una frase. Sin el importe, «se la cobro a la mesa
+  4» contiene «la cobro a» y sacaba del turno la vista previa del cobro y las herramientas de Mesas. «I charge»
+  no se declara: también es cobrar una cuenta («should I charge again?», «can I charge table 4 now?»); en
+  inglés, la búsqueda encuentra dónde añadir el precio. Medido sobre todos los `asks` del Hub y las sondas de
+  la capa 2: ninguno pierde puesto (`tests/test_assistant_list_price.py`).
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id
   con las marcas `refers` de `schemas/` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
   `A_GROUP`), leídas como quien pregunta: la tarifa y la regla por su nombre, el precio por su `label` («Champú ·

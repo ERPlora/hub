@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:595d38efe10f8dc9056e1256bf4b85e4e94acf57688c85801d5fe7993cecc91a -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:f11adaa65fc6 -->
 
 Invoicing turns every charged sale into a numbered fiscal document and keeps it forever: the ticket of every charge,
 the full invoice when the customer gives their tax ID and the rectifying invoice when money is refunded or a document
@@ -8,6 +7,7 @@ was wrong. Here you search and view your invoices, issue one by hand, keep your 
 business's fiscal details.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:5a4b37d89479 -->
 
 Invoicing turns every charged sale into a **numbered fiscal document** and keeps it forever: the
 **ticket** (simplified invoice, F2) of every charge, the **full invoice** (F1) when the customer gives
@@ -18,19 +18,24 @@ the link between Sales and VeriFactu in the Spanish fiscal chain (sale → invoi
 restaurant and the hair salon alike: nothing in it belongs to one vertical.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:17d871062173 -->
 
-- The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them,
-  issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
+- The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them, downloads
+  them in PDF, sends them by email, issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
   paid.
-- The **manager**, besides, sees everyone's invoices, rectifies and keeps the numbering series.
+- The **manager**, besides, sees everyone's invoices, downloads them in Excel, rectifies and keeps the numbering
+  series.
 - The **owner** and the **administrator**, besides, set up the **issuer** (the business's tax identity
   that appears on every invoice).
+- The **accountancy firm** sees everyone's invoices and downloads them, in Excel or one by one in PDF, without issuing or
+  changing anything.
 - The **system**, with nobody in front, invoices every charge and rectifies every refund and every void.
 
 It does not charge or refund money (that is Sales), it sends nothing to the AEAT and does not compute the
 fingerprint (that is VeriFactu), and it does not keep the payment method.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:27ba2a3ddf4a -->
 
 Here the official specification prevails over the market:
 
@@ -57,6 +62,7 @@ Here the official specification prevails over the market:
   pre-bill carry no series number.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:84ef7942fb52 -->
 
 - Turning Invoicing on also turns on **Sales**, **Taxes** and **Customers** (it requires them).
   **VeriFactu** does not turn on by itself, but in Spain it is needed for every invoice to reach the AEAT.
@@ -67,7 +73,8 @@ Here the official specification prevails over the market:
   here, by hand: it does not come from the
   ERPlora account.
 - **"Today" is the business's day**, in its time zone (the one in "Settings"), not Madrid's: it decides the
-  date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers in the
+  date of each document and, with it, the year of its series; only an invoice made by hand can carry an earlier
+  day's (INVOICE-F03). A charge at 00:30 on 1 January numbers in the
   new year's series, and one at 23:30 on 31 December in the Canary Islands in the series of the year that ends,
   even if it is already 1 January in Madrid. A refund or a void carries as its operation date the business's
   day they were made on.
@@ -89,24 +96,30 @@ Initial setup, step by step:
    number (INVOICE-F01, INVOICE-F16).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Invoices
+<!-- from WORKBOOK.md sha256:8fb16efbe94e -->
 All the business's invoices: the tickets of every charge, the full invoices and the rectifying ones, the latest
-issued on top. Search them by number, customer or tax ID, filter them by status, type, series, date or total, and
-open them to view, print or save them as a PDF. From each one you mark it paid, rectify it or turn a ticket into a
+issued on top. Search them by number, customer or tax ID, filter them by status (also the overdue ones not paid),
+type, series, date or total, and open them to view, print or download them in PDF. From each one you mark it paid, rectify it or turn a ticket into a
 full invoice; **+** issues an invoice by hand. An employee sees only theirs: the ones they issued, the ones of their
 sales (the ones they charged and the ones attributed to them) and what rectifies or replaces one of them; the manager,
 the owner and the administrator see everyone's.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:49605717b75e -->
 Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card view; on the phone, cards
 with the number as title) with "Number", "Customer", "Total", "Status", "Date" and "Type"; every column
-sorts. Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
+sorts. An issued one that has not been paid and whose due date has passed says "Overdue" instead of "Issued".
+"Download in Excel", for whoever sees everyone's invoices, saves the list as it is filtered (INVOICE-F24).
+Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status" ("Issued", which are
+the ones not paid, overdue or not; "Overdue", "Paid" and "Cancelled"),
 "Type", "Series", "Source", "Date" (between two days) and "Total" (between two amounts, in the business's
 currency). Unsorted, the latest issued comes on top. While the issuer is not set up, the bell's notice "You cannot
 issue invoices yet" says it once ("No ticket or invoice can be issued until this is set up: Your business details."
 and "Set up your business details", which opens **Issuer**; to whoever cannot change the issuer, with no button,
-"An administrator has to set this up."), with no other identical warning on the screen. Per row: "View" (also when tapping the row), "Mark as paid" (only on those "Issued" that are not
+"An administrator has to set this up."), with no other identical warning on the screen. Per row: "View" (also when tapping the row), "Mark as paid" (only on those "Issued" or "Overdue" that are not
 rectifying invoices) and "Rectify" (only on those that are not rectifying invoices and are neither
 cancelled nor replaced). The **+** button opens "New manual invoice" (INVOICE-F03); without permission to
 issue it does not appear, nor does "Mark as paid". The list updates by itself when an invoice is issued,
@@ -115,18 +128,22 @@ Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry
 action shows as a notice above the table.
 
 #### Invoice detail
+<!-- from WORKBOOK.md sha256:c24544971c9f -->
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
-tag and the buttons "Print / PDF" and "← Back". If it is a full invoice, or a rectifying invoice of a full
+tag and the buttons "Print / PDF", "Download PDF", "Send by email" (for whoever issues invoices) and "← Back". If the last
+email did not leave, the notice "The invoice was not sent by email" and why. If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
 printer cannot print it as a full invoice.". Below, "Type", "Series", "Issue date", "Operation date" (if
-it is another), "Customer", "Customer tax ID", "Address", "Issuer", "Source" ("POS sale", "Manual",
+it is another), "Due date" (if it has one), "Customer", "Customer tax ID", "Address", "Issuer", "Source" ("POS sale", "Manual",
 "Replaces a simplified invoice", "Rectification", "Sale refund", "Sale void"), "Sale" (its number),
 "Rectifies" (the number of the original, which opens it), "Replaces" / "Replaced by" (links), "Rectifying
-invoices" (those that correct it), "Paid on" and "Notes". The lines: "#", "Description", "Qty", "Price",
+invoices" (those that correct it), "Paid on" and "Notes"; below, "Email": to whom and when it was sent each time ("Sent to … on
+…", "Sending to …" or "Not sent to …"). The lines: "#", "Description", "Qty", "Price",
 the rate with the name of the tax the invoice declares ("VAT %", "IGIC %" or "IPSI %"; "Tax %" if it mixes
 taxes), "Base", "Tax", "Total" (on the phone, each line as a block); without lines, "No detail lines.".
 The breakdown per rate ("VAT 21%", "Equivalence surcharge 5.2%", "Exempt (E1)", "Not subject",
-"Reverse charge") with its base and its quota, and the totals "Base", "Taxes" and "Total". The buttons
+"Reverse charge") with its base and its quota, and the totals "Base", "Taxes" and "Total"; if the invoice carries a
+withholding, after them, "IRPF withholding 15%" (negative) and "Amount due". The buttons
 "Mark as paid", "Rectify" and "Full invoice" (only on a ticket that has not been replaced) with the same
 rule as on the row. A refusal shows right above those buttons. With **VeriFactu** on and permission to
 see its records, below, the card "VeriFactu receipt": the status of the record at the AEAT ("Pending",
@@ -135,7 +152,15 @@ the test environment), the "CSV" once the AEAT has answered, the QR and "Check a
 Without VeriFactu, without a record yet or without permission, the card does not show.
 Error when opening: "Invoice not found" or the message of the failure, with "← Back".
 
+#### Send by email
+<!-- from WORKBOOK.md sha256:8a5683887af0 -->
+Window opened by "Send by email" on the detail. It has the field "Customer's email", with the email on the customer's card
+already there (empty if it has none or the invoice is of no card), which can be changed, the note "Invoice … goes attached
+as a PDF. Replies reach the business owner's email.", "Send" (grey while there is no email) and "Cancel". On sending it
+closes and a notice says "Sending the invoice to …".
+
 #### Rectify
+<!-- from WORKBOOK.md sha256:d49de4985cac -->
 Window opened by "Rectify", from the row or from the detail. Title "Rectify {number}", the note "A
 rectifying invoice (RECT series) will be issued with the amounts negated and the original invoice will be
 cancelled. This cannot be undone.", the "Type of rectifying invoice" (R1 to R4; on a ticket, always R5,
@@ -145,12 +170,14 @@ cannot be rectified ("A rectifying invoice cannot be rectified.", "The invoice i
 and the result "Rectifying invoice {number} issued. {original} is cancelled.", each with "Close".
 
 #### Full invoice (replace a ticket)
+<!-- from WORKBOOK.md sha256:1936f5dd4bc1 -->
 Window opened by "Full invoice" on the detail of a ticket. Title "Full invoice of ticket {number}", the
 customer search of Customers (it fills in the details) and "Name or company name", "Country", "Document
 type" (only outside Spain), "Tax ID" and "Address", all mandatory except the type. "Issue full invoice"
 and "Cancel". On issuing, the window closes and the detail opens the new F3.
 
 #### Ask for the ticket's invoice (public page)
+<!-- from WORKBOOK.md sha256:a19072e3e5a2 -->
 The customer opens it, without an account, with their ticket's code (`/p/<business>/invoice/<code>`, INVOICE-F04).
 Title "Request your invoice". At the top, "Ticket {number}" with "Business", "Date" and "Total". Below,
 "Enter your tax details to get the full invoice for this ticket.", the same fields as in "Full invoice" without the
@@ -165,23 +192,28 @@ registered or too many attempts), with "Retry" except when the code opens nothin
 from the server, "The ticket could not be loaded. Try again.".
 
 #### New manual invoice
+<!-- from WORKBOOK.md sha256:ec623635a3d2 -->
 Window with the "Series" (the active ones of the year that issue F1 or F2; at first, the default one or
-FACT), the customer search of Customers, "Customer", "Customer tax ID", "Address", "Country", "Notes" and
+FACT), the "Date" (today at first; the calendar does not offer a later day), the "Due date" (empty at first; not
+before the date), the customer search of Customers, "Customer", "Customer tax ID", "Address", "Country", "Notes" and
 the lines: "Description", "Qty" (1 at first; it takes decimals), "Price" (without tax, in the business's
 currency and with its decimals; its symbol or its code around the figure do not count, as in 12,50 zł)
 and the rate, with the name of the tax of the business's tax territory: "VAT %" (21 at first), "IGIC %"
 in the Canary Islands or "IPSI %" in Ceuta and Melilla, which start at the general rate of its rule in
 Taxes and are empty if the territory has no rule for its tax yet. "+ Line" adds another and the cross
-removes it. "Issue invoice" (with a spinning wheel while it goes) is grey until the business has told its
+removes it. Below, the "IRPF withholding" ("No withholding" at first; 15%, 7%, 1% or 19%), which does not show for a
+ticket series nor in a business outside Spain. "Issue invoice" (with a spinning wheel while it goes) is grey until the business has told its
 currency and every line has a description, quantity, price and rate. A refusal shows above the buttons, per field when it is about a
 field.
 
 ### Series
+<!-- from WORKBOOK.md sha256:a6b504427144 -->
 The series your documents are numbered with, each with its code, type, year, prefix and the number it has reached.
 They are created by themselves with your first sale: create or change one only if you want another prefix or
 another format, or to continue the numbering you brought from another system. Only whoever keeps the series sees it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:52c5039d98c5 -->
 Menu **Invoicing → Series** (only with permission to keep the series). The intro "Each series sets the
 prefix, the format and the counter of the numbering of one invoice type and one year…" and a table with
 "Code", "Name", "Type", "Year", "Prefix", "Format" (empty reads `PREFIX-YYYY-NNNNNN`), "Current no.",
@@ -194,11 +226,13 @@ continue another system’s numbering.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
 ### Issuer
+<!-- from WORKBOOK.md sha256:a6d8c1a79747 -->
 Your business's fiscal details that appear on every invoice: legal name, tax ID and full address, and whether it is
 registered in the ROI. Without them no ticket or invoice is issued. Only the owner and the administrator see this tab and change
 them.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:5cd5d82f821f -->
 Menu **Invoicing → Issuer**. "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and
 "Country"; the switch "Registered in the ROI (intra-EU operations)", off at first, with "Your invoices and tickets
 will print your tax ID with your country’s prefix (ES…). VeriFactu keeps receiving it without the prefix." under
@@ -207,6 +241,7 @@ if the ERPlora account sent it, "Received from your ERPlora account on {date}.".
 administrator change it; the rest see it without being able to edit.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:4bf663a3acae -->
 
 | State | What the person sees |
 |---|---|
@@ -218,6 +253,7 @@ administrator change it; the rest see it without being able to edit.
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:76581dd3cc1a -->
 
 In "New manual invoice", "Rectify", "New numbering series", "Edit series" and "Full invoice of ticket", the phone's
 Back button asks "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and
@@ -226,6 +262,7 @@ the series the window picks by itself on opening and the rate that comes from th
 rectifying invoice already issued: Back closes its result (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:ea5c6c62f6b9 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -251,8 +288,12 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F20 | Give other apps the invoice of a sale | done |
 | INVOICE-F21 | Set up the issuer | done |
 | INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
+| INVOICE-F24 | Download the issued invoices in Excel | done |
+| INVOICE-F25 | Download an invoice in PDF | done |
+| INVOICE-F26 | Send an invoice by email | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
+<!-- from WORKBOOK.md sha256:420fc999d774 -->
 Status: done — Sales asks for it within the same charge
 Actor: system
 Screen: none
@@ -285,6 +326,7 @@ simplified invoice (€3,000) is watched by Sales when charging.
 Involved: SALE-F01, SALE-F04, TAX-F18, TAX-F19
 
 ### INVOICE-F02 The full invoice when charging a customer with a tax ID
+<!-- from WORKBOOK.md sha256:aaab0a0fefac -->
 Status: done — Sales asks for it within the same charge
 Actor: system
 Screen: none
@@ -310,6 +352,7 @@ without the tax ID (it stays in the application's log), so that it never stays "
 Involved: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Issue an invoice by hand
+<!-- from WORKBOOK.md sha256:8eca069000b3 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoices, New manual invoice
@@ -317,29 +360,49 @@ Steps:
 1. In **Invoices**, tap **+**: "New manual invoice" opens.
 2. Choose the "Series" (the active ones of the year that issue invoices, F1, or tickets, F2, and always
    "FACT" and "TICKET" even if the year has not opened them yet; it starts at the default one or at
-   "FACT") and, if you want, look the customer up in Customers: it fills in name, tax ID, address and
-   country. Type or correct "Customer", "Customer tax ID", "Address" and "Notes".
-3. Fill in each line: "Description", "Qty" (1 at first; up to three decimals), "Price" without tax and in
+   "FACT").
+3. Leave the "Date" on today or choose an earlier day, and set the "Due date" if the invoice is paid later on.
+4. If you want, look the customer up in Customers: it fills in name, tax ID, address and country. Type or correct
+   "Customer", "Customer tax ID", "Address" and "Notes".
+5. Fill in each line: "Description", "Qty" (1 at first; up to three decimals), "Price" without tax and in
    the business's currency, and the rate, which carries the name of the tax of the business's tax
    territory: "VAT %" (21 at first), "IGIC %" in the Canary Islands or "IPSI %" in Ceuta and Melilla. It
    starts at the general rate of its rule in Taxes (in the Canary Islands, that of the Canary Islands
    rule); if the territory has no rule for its tax yet, it is empty: type it yourself. "+ Line" adds
    another, with the same starting rate, and the cross removes it.
-4. Tap "Issue invoice"; it is grey until the business has told its currency (each price is read in it) and
+6. If the customer withholds IRPF (Spanish income tax), choose the "IRPF withholding": 15%, 7%, 1% or 19%. It is worked
+   out over the taxable base of the whole invoice and only takes from what you collect: the VAT and the total do not
+   change.
+7. Tap "Issue invoice"; it is grey until the business has told its currency (each price is read in it) and
    every line has a description, quantity, price and rate. The window closes and the invoice appears in the
    list with its number, "Issued" and "Source" "Manual".
-In: what the person types; the configured issuer. Through the API or the assistant a line can also carry
-the tax category of Taxes: then its rate and its qualification are those of the rule in force today, not
-the typed rate. The typed rate belongs to the tax of the business's tax territory (Taxes → Settings,
+8. The due date shows on the detail and on the paper. From the day after, if it has not been paid, the list and the
+   detail say "Overdue" and, once marked as paid, "Paid".
+9. The withholding shows on the detail and on the paper, after the total: on an invoice of €100 plus 21% VAT with 15%
+   withheld, "Total" €121.00, "IRPF withholding 15%" -€15.00 and "Amount due" €106.00. The list shows the invoice's
+   total.
+In: what the person types; the configured issuer. The date, the due date and the withholding can also be told to the
+assistant ("make an invoice for Carpintería Lema dated yesterday, due in 30 days", "make an invoice for Carpintería Lema
+with 15% withholding") and through the API; without a date, the invoice is of today, and without a withholding, its total
+is collected. Through the API or the assistant a line can also carry
+the tax category of Taxes: then its rate and its qualification are those of the rule in force on the day of the
+invoice, not the typed rate. The typed rate belongs to the tax of the business's tax territory (Taxes → Settings,
 TAX-F11): in the Canary Islands it is declared as IGIC and in Ceuta and Melilla as IPSI.
-Out: the invoice (F1 in an invoice series, F2 in a ticket series) with the tax computed on top of the
+Out: the invoice (F1 in an invoice series, F2 in a ticket series), numbered in the series of the year of its date, with
+that same date as its operation date and with the tax computed on top of the
 price, closed once per rate and spread over the lines by largest remainder (the items add up to the
 printed total), and as the description of the operation its items ("Curso de corte, Kit de tinte", up to
-500 characters); announces `invoice.invoice.issued`.
+500 characters); announces `invoice.invoice.issued`. The due date is not declared in VeriFactu, nor is the withholding:
+the invoice's record, its fingerprint and its QR are the same with it and without it.
 If it fails: inside the window, above the buttons: "A full invoice needs the customer's name, tax ID and
 address.", "That tax ID is not valid." (under the field), "Line 2: the price is not an amount…", a line
 with a price that comes to 0.00, a series that is inactive, does not issue invoices or belongs to another
-year ("That series numbers another year…"), a ticket above the Sales limit ("Above €3,000.00 a ticket
+year than the date ("That series numbers another year…"), a date after today ("An invoice cannot be dated after
+today.") or before that of the last invoice of its series ("An invoice cannot be dated before the last one of its
+series, which is of 11/24/2026."), a due date before the date ("The due date cannot be before the invoice's date."), a
+withholding on a ticket, asked for through the API or the assistant ("A ticket carries no IRPF withholding: issue an
+invoice (F1) with the customer's details.") or in a business outside Spain ("IRPF withholding is a Spanish tax: a
+business outside Spain does not withhold it."), a ticket above the Sales limit ("Above €3,000.00 a ticket
 cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. A line with a tax category (through the API
 or the assistant) that has no rule in force in the business's territory is refused on that line's field, naming the category as Taxes names
 it in the reader's language (e.g. "Product — generic") and with "Create its
@@ -351,9 +414,10 @@ too. If the tax territory cannot be read, the rate is called "Tax %", comes empt
 read the business’s tax territory: type the rate of each line."; the invoice is issued anyway, with the
 territory's tax. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up.
-Involved: TAX-F18, CUSTOMER-F17, TAX-F11
+Involved: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18, INVOICE-F23
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
+<!-- from WORKBOOK.md sha256:91d0d524459a -->
 Status: done
 Actor: customer, without an account
 Screen: Ask for the ticket's invoice (the business's public page, `/p/<business>/invoice/<code>`)
@@ -383,6 +447,7 @@ number, even if other details are typed.
 Involved: SALE-F29, INVOICE-F05, INVOICE-F18
 
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter
+<!-- from WORKBOOK.md sha256:78da7c840d80 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Invoice detail, Full invoice
@@ -395,7 +460,7 @@ Steps:
    number; the ticket says "Replaced by" with the F3's.
 In: the ticket (F2) being replaced and the customer's tax details.
 Out: the F3 in the year's "FACT" series, with the ticket's lines and amounts copied to the cent (same
-operation) and the same operation date; the ticket is not touched. If the ticket was paid, the F3 is born
+operation) and the same operation date and, if it had one, the same due date; the ticket is not touched. If the ticket was paid, the F3 is born
 paid. Announces `invoice.invoice.issued`. From then on, rectifying or refunding that sale rectifies the
 F3, not the ticket.
 If it fails: without name, tax ID or address, refusal; a Spanish tax ID that is not valid, "That tax ID
@@ -410,6 +475,7 @@ or the customer themselves with the code of their ticket.
 Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
+<!-- from WORKBOOK.md sha256:6954ac8ae03c -->
 Status: done
 Actor: system, employee, manager, administrator, assistant
 Screen: none
@@ -439,6 +505,7 @@ document that already came out issues no other and uses no number.
 Involved: SALE-F01, SALE-F29
 
 ### INVOICE-F07 Void a charged sale that already has its ticket
+<!-- from WORKBOOK.md sha256:f006da9259db -->
 Status: done — Sales asks for it within the same void
 Actor: system
 Screen: none
@@ -457,6 +524,7 @@ cannot, the void goes ahead and both stay "pending", in sight, until "Issue now"
 Involved: SALE-F30
 
 ### INVOICE-F08 Rectify an invoice by hand
+<!-- from WORKBOOK.md sha256:bf91ff98284c -->
 Status: done
 Actor: manager, administrator, assistant
 Screen: Rectify
@@ -473,8 +541,9 @@ Steps:
 4. With the assistant, before issuing anything it shows you the rectifying invoice about to be born: the
    invoice it rectifies (number, date and customer), the type (R1 at first, R5 if it is a ticket), the
    reason, the next number of the year's "RECT" series (it is not reserved: it takes it when issued),
-   today's date, its lines and the base, the taxes and the total, negative; if the invoice already had
-   rectifying invoices by differences, also what is left to rectify of it.
+   today's date, its lines and the base, the taxes and the total, negative; if the invoice carried a withholding, also
+   what is no longer withheld and what is given back, and if it already had rectifying invoices by differences, what is
+   left to rectify of it.
 5. In that same answer, without you having to ask again, "Run this action?" comes with the invoice's
    "Number" and the "Reason" and, in "What will happen", the rectifying invoice about to be born: the "Type of rectifying invoice" by its name, never by its code alone
    ("Rectifying invoice: other causes (R4)"; also when the assistant asks for it when rectifying), the series' "Next number"
@@ -488,7 +557,8 @@ In: the chosen invoice, the type and the reason, in the window or told to the as
 the date: the business day.
 Out: the rectifying invoice numbered in the year's "RECT" series, with the original's issuer and
 customer, its breakdown negated and its lines negated (the quantity carries the sign; the price does
-not); the original becomes "Cancelled" (announces `invoice.invoice.issued` and
+not); if the original carried a withholding, the same one the other way round (a negative "Amount due" is what was
+collected); the original becomes "Cancelled" (announces `invoice.invoice.issued` and
 `invoice.invoice.rectified`). It moves no money nor till. If the original already had rectifying invoices
 by differences (partial refunds), this one rectifies exactly what is left, with one line per tax key at
 its own rate.
@@ -505,6 +575,7 @@ you confirm, no other is issued: "The invoice is already cancelled." comes.
 Involved: SALE-F31
 
 ### INVOICE-F09 The rectifying invoice when refunding a whole sale
+<!-- from WORKBOOK.md sha256:8865f5c99f3e -->
 Status: done — Sales asks for it within the same refund
 Actor: system
 Screen: none
@@ -526,6 +597,7 @@ stay "pending", in sight, until "Issue now" (INVOICE-F06).
 Involved: SALE-F31
 
 ### INVOICE-F10 The rectifying invoice by differences when refunding part of a sale
+<!-- from WORKBOOK.md sha256:871172bf4299 -->
 Status: done — Sales asks for it within the same refund
 Actor: system
 Screen: none
@@ -547,20 +619,21 @@ original is rectified.
 Involved: SALE-F31
 
 ### INVOICE-F11 Number each document in its series and its year
+<!-- from WORKBOOK.md sha256:b103e410cfbc -->
 Status: done
 Actor: system
 Screen: none
 Steps:
 1. Every time a document is issued (ticket, invoice, replacing or rectifying invoice), Invoicing takes the
-   series of its code and of the year of the business day; if it does not exist, it creates it at that
-   moment with the counter at 0, inheriting name, prefix and format from the previous year's one with
+   series of its code and of the year of its date (the business day or, in a manual invoice, the one chosen); if it
+   does not exist, it creates it at that moment with the counter at 0, inheriting name, prefix and format from the previous year's one with
    that code (or, the first time, with the code as prefix).
 2. It raises that series' counter by one and writes the number with the series' format (without format,
    `TICKET-2026-000001`) in the same operation that saves the document.
 3. On 1 January, at the business's time, the next document opens the new year's series and goes back to
    1 (or to the "Next number" set for it).
 In: the series code that applies (TICKET for tickets, FACT for full and replacing invoices, RECT for
-rectifying invoices; in the manual entry, the chosen series) and the business day.
+rectifying invoices; in the manual entry, the chosen series) and the document's date.
 Out: the document's number. The number goes into VeriFactu's chained fingerprint.
 If it fails: if the issue is refused or fails, nothing is saved and the counter does not go up: no gap is
 left. Two charges at once in the same series wait for each other and get consecutive numbers; two
@@ -569,6 +642,7 @@ documents of the same series cannot carry the same number ("The number {number} 
 Involved: none
 
 ### INVOICE-F12 Create a numbering series
+<!-- from WORKBOOK.md sha256:b2b766a5beba -->
 Status: done
 Actor: manager, administrator
 Screen: Series
@@ -599,6 +673,7 @@ refused too.
 Involved: none
 
 ### INVOICE-F13 Change a series
+<!-- from WORKBOOK.md sha256:c0361f88f022 -->
 Status: done
 Actor: manager, administrator
 Screen: Series
@@ -618,6 +693,7 @@ is part of the VeriFactu chain. Create a new series if you need others." says so
 Involved: none
 
 ### INVOICE-F14 Know whether the year's numbering is ready
+<!-- from WORKBOOK.md sha256:d205ec105467 -->
 Status: done
 Actor: owner, manager, administrator, assistant
 Screen: Home, Series
@@ -645,6 +721,7 @@ the assistant says there are no series yet and that they will be created on thei
 Involved: none
 
 ### INVOICE-F15 Check that the numbering has no gaps
+<!-- from WORKBOOK.md sha256:6b9d08af9773 -->
 Status: done
 Actor: employee, manager, administrator, assistant
 Screen: none (assistant or API)
@@ -661,13 +738,15 @@ numbers, or one that was never used; before the first number of a series it does
 Involved: none
 
 ### INVOICE-F16 Find an invoice
+<!-- from WORKBOOK.md sha256:f543b51d56c9 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoices
 Steps:
 1. Open **Invoicing → Invoices**.
 2. Type in "Search invoices…" a number, a customer's name or a tax ID; or filter (status, type, series,
-   source, date, total); or tap a column to sort.
+   source, date, total); or tap a column to sort. The status "Overdue" keeps the ones that have not been paid and
+   whose due date has passed, on the business's day; the ones replaced by a full invoice do not count.
 3. The table shows the matching ones, 50 at a time; the latest issued, on top. An employee only sees theirs:
    the ones they issued and the ones of their sales (the ones they charged and the ones attributed to their
    Staff record), and what follows one of them: the full invoice that replaced a ticket of theirs and the
@@ -682,16 +761,18 @@ any amount field of the Hub and as in the other lists ("1.000,50", "1,000.50", "
 an amount. Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000" in euros,
 "This amount can be read in two ways…"), and an end date before the start date, "The end date cannot be
 before the start date."; neither of the two filters.
-Involved: none
+Involved: INVOICE-F03, INVOICE-F24
 
 ### INVOICE-F17 View an invoice
+<!-- from WORKBOOK.md sha256:dbecc5c6d846 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
 Steps:
 1. In **Invoices**, open the invoice.
-2. Read the header, the lines (with their "Price" without VAT and before discounts and, if any has one, the
-   "Disc." column with the discount without VAT), the breakdown and the totals.
+2. Read the header (with the "Due date", if it has one), the lines (with their "Price" without VAT and before discounts and, if any has one, the
+   "Disc." column with the discount without VAT), the breakdown and the totals (and, if it carries a withholding, what is
+   withheld and what is collected).
 3. With **VeriFactu**, read below the "VeriFactu receipt": the status of the record at the AEAT, its
    "CSV" once the AEAT has answered and the QR, which can be scanned or opened with "Check at the tax
    agency ↗" (in the installed app, in the device's browser).
@@ -705,9 +786,10 @@ without permission to see it, the detail shows without the receipt card. In the 
 AEAT's page, "Could not open that page. Try again.". An invoice the person does not see (someone else's, for an
 employee) does not open, not even by its number: "Invoice not found", as one that does not exist. What rectifies
 or replaces one of theirs is theirs, so its links open.
-Involved: VERIFACTU-F19
+Involved: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
+<!-- from WORKBOOK.md sha256:9b7526e4de98 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -720,9 +802,9 @@ Steps:
    print screen: the system's dialog, with the printer or "Save as PDF", and the job named, for example,
    "Invoice FACT-2026-000003") with the A4 invoice (with VeriFactu, on top
    the record's QR with "QR tributario:" and "VERI*FACTU", fixed in Spanish by the AEAT; issuer, with its EU VAT
-   number if it is registered in the ROI, "Bill
-   to", lines, breakdown per rate, totals and the note of what it rectifies), from where it can be saved
-   as PDF. While the record arrives, "Print / PDF" waits: the paper never goes out without its QR.
+   number if it is registered in the ROI, date and, if it has one, "Due date", "Bill
+   to", lines, breakdown per rate, totals, if it carries a withholding what is withheld and what is collected, and the
+   note of what it rectifies), from where it can be saved as PDF. While the record arrives, "Print / PDF" waits: the paper never goes out without its QR.
 4. Always in the language of whoever prints. A document of a sale comes out as "Copy" (the original was
    the paper of the charge); one issued from Invoicing, as the original.
 In: the invoice and its lines.
@@ -731,15 +813,19 @@ If it fails: "Could not print the invoice", also if the VeriFactu record of an i
 be read (it is not printed without its QR). If the installed app does not open its print screen, the notice
 says why after a colon ("…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open"…). Someone else's, for an employee, is neither printed nor downloaded: the API and the
-assistant say "Invoice not found.".
-Involved: PRINTING-F08, VERIFACTU-F19, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F21
+assistant say "Invoice not found.". Asked of the assistant, it is only done if a system printer takes it; if not,
+its receipt says "Not done, it failed: Print in Invoicing." with the reason, "No system printer takes this invoice:
+open it to print it or save it as PDF." or, if its record cannot be read, "Its VeriFactu record could not be read,
+and an invoice never prints without its QR.".
+Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Mark an invoice as paid
+<!-- from WORKBOOK.md sha256:3bb70b44599f -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's), assistant
 Screen: Invoices, Invoice detail
 Steps:
-1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice; or ask the assistant
+1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" or "Overdue" invoice; or ask the assistant
    ("mark invoice FACT-2026-000001 as paid", "Carpintería Lema has paid their invoice") and go on at step 4.
 2. Confirm in "Mark FACT-2026-000001 as paid?" ("The payment is recorded with the current date and time.") with
    "Mark as paid", or go back with "Cancel".
@@ -748,14 +834,16 @@ Steps:
    "Paid" as from the screen, or "Cancel" and nothing changes.
 In: the chosen invoice.
 Out: the status "Paid" and the payment date (announces `invoice.invoice.paid`). No amount changes and the
-till is not touched.
+till is not touched. With a withholding, the invoice counts as paid with what "Amount due" says: the customer pays what
+they withheld to the tax agency.
 If it fails: if meanwhile someone paid it or rectified it, "This invoice cannot be marked as paid: only an
 issued invoice that is not paid yet can be. Nothing was changed.". Someone else's, for an employee, "Invoice not
 found.", without changing anything. The invoices born from a sale are
 already born paid and a rectifying invoice is not paid: they do not offer the action.
-Involved: none
+Involved: INVOICE-F23
 
 ### INVOICE-F20 Give other apps the invoice of a sale
+<!-- from WORKBOOK.md sha256:b0a7e73cec22 -->
 Status: done
 Actor: system
 Screen: none
@@ -770,6 +858,7 @@ answers about a sale they see: someone else's, for an employee, "That sale does 
 Involved: SALE-F29
 
 ### INVOICE-F21 Set up the issuer
+<!-- from WORKBOOK.md sha256:745684432c4c -->
 Status: done
 Actor: owner, administrator
 Screen: Home, Invoices, Series, Issuer
@@ -802,9 +891,10 @@ next try is refused too; a refusal that names no field shows above the form and 
 Involved: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
+<!-- from WORKBOOK.md sha256:e0e635e87417 -->
 Status: done
 Actor: system (the ERPlora account)
-Screen: none (nobody enters the platform hub)
+Screen: none (the account issues it; it shows in Invoices)
 Steps:
 1. Before charging real money, the account asks the platform hub whether it is ready: it is with its issuer
    and VeriFactu and, in production, only while real filing with the AEAT is open on the server
@@ -821,6 +911,19 @@ Steps:
    "accepted with errors" or "rejected" when it answers (with its code and its message).
 5. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
    tributario:", "VERI*FACTU") only once the AEAT has accepted it, as in the old account.
+6. In ERPlora's own business `ERP` and `ERPR` belong to the account alone: nobody numbers in them by hand, nor creates
+   or changes them (INVOICE-F12, INVOICE-F13), and they are not offered when making an invoice (INVOICE-F03), in
+   **Series** or when asking about the numbering (INVOICE-F14). Sales and invoices made by hand go in the business's
+   own series ("TICKET", "FACT", "RECT" or the ones it creates), in the same VeriFactu chain. An invoice of the account
+   is corrected in the account, with its credit note: "Rectify" (INVOICE-F08) and "Full invoice" (INVOICE-F05) are not
+   offered here.
+7. In **Invoices** and on its page (INVOICE-F16, INVOICE-F17) an invoice of the account shows as what it is: "Source"
+   "erplora.com" and "Paid", because the account only sends it once the customer has paid; credited in full,
+   "Cancelled". Its credit note also says "erplora.com" and, like every rectifying invoice, "Issued". None of them offers
+   "Mark as paid" (INVOICE-F19). The list filters and sorts by that same status, and the "Source" filter does not take
+   them for handmade ones: they are found by their series.
+8. Who enters that business and how is HUBS-F39 (erplora.com); that it has no plan and buys nothing, BASE-F11 and
+   BASE-F40.
 In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines
 (each with its discount) and, in a credit note, the invoice it corrects.
 Out: the invoice, with the account's reference (announces `invoice.invoice.issued`; a credit note, also
@@ -830,17 +933,113 @@ writing anything; a credit note of an invoice that did not arrive is refused; ab
 payer's tax ID it is refused; an invoice that does not follow the contract is refused with its reason; a
 VeriFactu refusal undoes the whole invoice; in production with real filing with the AEAT closed, "not ready":
 "Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it.", and the account
-does not charge.
-Involved: VERIFACTU-F13
+does not charge. Through the window, the API, the assistant or an automation, choosing, creating or changing one of
+those two series, or giving another one a prefix or a format that would print its numbers (`ERP-2026-00123`),
+"erplora.com numbers the ERP and ERPR series: use another series."; rectifying or replacing an invoice of the account,
+"erplora.com issued this invoice and corrects it, in its ERPR series: it cannot be corrected by hand here."; marking an
+invoice of the account or its credit note as paid, the refusal of INVOICE-F19. Nothing is written and no number is used.
+Involved: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14, INVOICE-F16,
+INVOICE-F17, INVOICE-F19, HUBS-F39 (erplora.com), BASE-F11, BASE-F40
+
+### INVOICE-F24 Download the issued invoices in Excel
+<!-- from WORKBOOK.md sha256:09578b93d648 -->
+Status: done
+Actor: owner, administrator, manager, accountancy firm, assistant
+Screen: Invoices
+Steps:
+1. In **Invoicing → Invoices**, filter the list by what you want: usually the date, between the first and the last day
+   of the month or the quarter; also by status, type, series, source, total or a search.
+2. Tap "Download in Excel".
+3. An Excel file is downloaded, for example "invoices-2026-10.xlsx", with the invoices the list keeps (all of them, not
+   only those of the page), from the oldest to the newest. One row per invoice and tax rate: "Number", "Date",
+   "Customer", "Tax ID", "Taxable base", "Rate %", "Tax" and "Total". An invoice with three rates has three rows, each
+   with its part; in the "Total" column, the rows of an invoice add up to its total, and the whole column adds up to the
+   total of what was downloaded. If any has an equivalence surcharge, "Surcharge rate %" and "Surcharge" come too; if any
+   carries an IRPF withholding, "Withholding %", "Withholding" (negative, shared out by the base among the rows of the
+   invoice) and "Amount due", which on the others is their total. The currency is the business's and the figures are
+   numbers.
+4. A rectifying invoice comes with its amount in negative and the invoice it corrects with its own, as the list counts
+   them.
+5. The same can be asked of the assistant ("download the invoices of October in Excel for my accountant"): the file
+   stays under its answer, with "Download" and its name.
+In: the invoices the person sees and the list filters.
+Out: the file; nothing changes. With no invoice, the button is off.
+If it fails: an employee does not have the button and the API answers that they have no permission; if the business is
+busy or another failure prevents it, a notice says that the invoices could not be downloaded and why, and it can be
+tapped again.
+Involved: INVOICE-F16, BASE-F112
+
+### INVOICE-F25 Download an invoice in PDF
+<!-- from WORKBOOK.md sha256:93d690dcb305 -->
+Status: done
+Actor: employee (their invoices), manager, administrator, owner and accountancy firm (everyone's), assistant
+Screen: Invoice detail
+Steps:
+1. In **Invoices**, open the invoice and tap "Download PDF".
+2. A file called as the invoice is downloaded, for example "FACT-2026-000003.pdf"; if the number has a slash or another
+   sign a file does not take, a dash goes in its place. In the installed app it stays in Downloads and a notice says
+   where.
+3. It is the A4 that "Print / PDF" prints and it says the same: issuer, date and, if it has one, "Due date", "Bill to",
+   the lines with their discounts, the breakdown per rate with its surcharge, the totals, the withholding and "Amount
+   due" if it carries one, what it rectifies and the notes. With VeriFactu, on top goes the record's QR, with "QR
+   tributario:" and "VERI*FACTU", which can be scanned. The text can be selected and searched. A long invoice goes on
+   in more pages, with the header of the lines on each one and the totals at the end.
+4. It comes out in the language of whoever downloads it, as its paper; the one the ERPlora account issued, in its
+   payer's. A document of a sale comes out as "Copy", as when it is printed from the detail.
+5. The same can be asked of the assistant ("download FACT-2026-000003 as a PDF"): the file stays under its answer, with
+   "Download" and its name.
+In: the invoice, its lines and, with VeriFactu, the QR of its record.
+Out: the file; the invoice does not change and the file is not kept in the Hub. While it is made, the button says
+"Preparing…".
+If it fails: a notice says "The PDF could not be downloaded" and why, and it can be tapped again. If the VeriFactu record
+of an invoice that has one cannot be read, "Its VeriFactu record could not be read, and an invoice never prints without
+its QR."; if the server cannot make it, "The PDF cannot be made right now. Try again later.". Someone else's, for an
+employee, is not downloaded, through the API or with the assistant either: "Invoice not found.".
+Involved: INVOICE-F17, INVOICE-F18, INVOICE-F23, VERIFACTU-F19, BASE-F112
+
+### INVOICE-F26 Send an invoice by email
+<!-- from WORKBOOK.md sha256:adc0599b2824 -->
+Status: done
+Actor: employee (their invoices), manager, administrator and owner (everyone's), assistant
+Screen: Invoice detail
+Steps:
+1. In **Invoices**, open the invoice and tap "Send by email".
+2. The window proposes the email on the customer's card. Leave it or write another one: what you write is for this email
+   and does not change the card.
+3. Tap "Send". The window closes and the detail says "Sending to …" until it leaves; then it says "Sent to …" with the day
+   and the time, with nothing else to do.
+4. The customer gets an email in the business's language (the invoice's, if it keeps one) with the number, the date, the
+   due date if it carries one and the total, or the "Amount due" if it carries a withholding, and with the invoice
+   attached as a PDF: the same file as "Download PDF", with the QR of its VeriFactu record.
+5. ERPlora sends it (noreply@erplora.com) on the business's behalf. If the customer answers, their reply reaches the email
+   of the owner's account.
+6. It can be sent again as many times as needed, to the same address or to another: the detail keeps each one, the last
+   on top.
+7. The same can be asked of the assistant ("email FACT-2026-000003 to Ana"), which shows which address it goes to and asks
+   for a confirmation before sending it.
+In: the invoice and the address (without it, the one on the customer's card).
+Out: an email and its line on the detail. The invoice, its VeriFactu record and its status do not change. If the same
+request is sent again after a network failure, the customer does not get it twice.
+If it fails: a badly written address is said under its field and nothing is sent. If the email cannot leave, the detail
+does not say it was sent: it says "Not sent to …" and, on top, "The invoice was not sent by email" with the reason: "The
+email could not be sent right now. Try again in a few minutes.", "That address does not accept the email. Check it and
+send it again.", that its PDF cannot be made or its VeriFactu record read, or that it could not be confirmed. It is sent
+again with the same button; it is never repeated on its own. If the customer's mailbox returns it later, nothing is known
+here. If the owner's account has no email, it is not sent and it says so; a demo sends no emails. A business sends at
+most 50 emails an hour, because every business shares ERPlora's sending mailbox; the next one is not sent and says "This
+business has sent all the emails it can send in an hour. Try again later.". Someone else's, for an employee, is not
+sent: "Invoice not found.". The accountancy firm sees the emails and sends none.
+Involved: INVOICE-F17, INVOICE-F25, CUSTOMER-F16, VERIFACTU-F19
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:8fb8b9e9c251 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
 session) and the API, with the same rules and the same permissions. Designed for voice: an invoice is named
 by its number (`FACT-2026-000012`), a sale by its number of the day (`20261014-0003`), a customer by their
 name, their phone or their email (as in Customers) and a series by its code.
 
-What reads or touches an issued invoice (the list, the invoice, its document and its paper, turning it into a full
+What reads or touches an issued invoice (the list, the invoice, its document, its PDF, its paper and its emails, turning it into a full
 invoice, marking it paid and rectifying it) and the invoice of a sale only reach the ones the person sees: without
 "See all invoices", the ones they issued, the ones of their sales and what rectifies or replaces one of them. One
 they do not see does not exist for them
@@ -849,14 +1048,18 @@ not a person, reach all the ones their permission opens. The numbering (its gaps
 whole series'.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:a870c57de80f -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The invoices, with search, filters, sorting and pages (up to 100) | view | F16 | `invoice.invoice.list` |
+| The invoices, with search, filters (also the overdue ones not paid), sorting and pages (up to 100) | view | F16 | `invoice.invoice.list` |
 | An invoice with its lines, breakdown and links, by its id or its number | view | F17 | `invoice.invoice.get` |
+| The invoices the list's search and filters keep, in an Excel (a row per invoice and tax rate) | view everyone's | F24 | `invoice.invoice.export` |
 | The ticket its code opens (number, date and total) and, if it has one, its full invoice with its VeriFactu QR | the public page | F04 | `invoice.public.ticket` |
 | The current invoice of a sale | view | F20 | `invoice.invoice.by_source` |
 | The printable document (A4 HTML) of an invoice | view | F18 | `invoice.invoice.document` |
+| The PDF of an invoice, with the VeriFactu QR, in a file | view | F25 | `invoice.invoice.pdf` |
+| The emails an invoice was sent in (to whom, when and how each one ended) and the email on the customer's card | view | F26 | `invoice.email.list` |
 | The rectifying invoice that rectifying an invoice would issue, without issuing it or using a number (what the assistant shows before its confirmation and inside it) | rectify | F08 | `invoice.invoice.rectification_preview` |
 | The rate a typed line starts with: the territory's general rate, from its own rule in Taxes (empty without it) | issue | F03 | `invoice.invoice.line_defaults` |
 | The series, with search, filters and pages | view | F12, F13 | `invoice.series.list` |
@@ -871,13 +1074,14 @@ whole series'.
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
 | Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
 
-All of them can be followed live.
+All of them but the Excel and the PDF can be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:0bcf1ecf524d -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
-| Issues an invoice by hand | issue | F03 | `invoice.invoice.create` |
+| Issues an invoice by hand, with its date and, if wanted, its due date and its IRPF withholding | issue | F03 | `invoice.invoice.create` |
 | Issues the invoice of a charged sale (also the reaction to its charge) | issue | F01, F02, F06 | `invoice.invoice.create_from_sale` |
 | Replaces a ticket by a full invoice | issue | F04, F05 | `invoice.invoice.substitute` |
 | Issues, with the ticket's code and the customer's details, the full invoice that replaces it, and answers it with its VeriFactu QR | the public page | F04 | `invoice.public.substitute` |
@@ -888,11 +1092,14 @@ All of them can be followed live.
 | Creates a series | keep the series | F12 | `invoice.series.create` |
 | Changes a series | keep the series | F13 | `invoice.series.update` |
 | Saves the issuer | set up the issuer | F21 | `invoice.issuer.update` |
-| Sends the A4 page of an invoice to the Printing queue (or says it was not queued: the device prints it) | view | F18 | `invoice.invoice.print` |
+| Sends the A4 page of an invoice to the Printing queue (with no printer to take it, it fails and says why) | view | F18 | `invoice.invoice.print` |
+| Emails an invoice with its PDF (once per request key) | issue | F26 | `invoice.email.send` |
+| Takes an email to send it, keeps how it ended and, every five minutes, hands over again the ones nobody took and tells as not confirmed the ones that stopped half-way | system only | F26 | `invoice.email.claim`, `invoice.email.record`, `invoice.email.resume` |
 | Saves the issuer as the system; nothing calls it today | only the system | — | `invoice.issuer.sync` |
 | Issues an ERPlora invoice with its VeriFactu record | only the system | F23 | `invoice.invoice.issue_platform` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:68bc605887e7 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -902,6 +1109,7 @@ All of them can be followed live.
 | New series | Create a series | `id`, `code`, `year` | `invoice.series.created` |
 | Series changed | Change a series | `id`, `code`, `year`, `fields` | `invoice.series.updated` |
 | Issuer changed | Save or receive the issuer | `source` | `invoice.issuer.updated` |
+| Email asked for, sent or not sent | Asking to email an invoice, the mail server taking it or it not leaving | `id` (of the email), `invoice_id`, `number`; never the address | `invoice.email.requested`, `invoice.email.sent`, `invoice.email.failed` |
 
 Contract of the source with Sales: `source.type` is the document's `source_type` (`sale`, `manual`,
 `substitution`, `rectification`, `refund`, `void`); `source.sale_id` the sale it comes from (also in its F3
@@ -914,15 +1122,18 @@ longer changes anything.
 
 What each notice refreshes: the list, the detail, the invoice of a sale and the document, with "issued",
 "rectified" and "paid"; the series, the next number, the status of the numbering, the gaps and the book,
-with "issued" and those of the series; the issuer, with "issuer changed".
+with "issued" and those of the series; the emails of an invoice, with the three notices of the email and with the changes
+of the customer's card; the issuer, with "issuer changed".
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:7f86fa512f22 -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
 | Sale charged (`sale.sale.completed`) | Sales | Issues its F2 or its F1 (F01, F02) | `invoice.invoice.create_from_sale` |
 | Sale refunded (`sale.sale.refunded`) | Sales | Issues the rectifying invoice of the refund (F09, F10) | `invoice.invoice.rectify_from_refund` |
 | Sale voided (`sale.sale.voided`) | Sales | Issues the rectifying invoice of the whole ticket (F07) | `invoice.invoice.rectify_from_void` |
+| A customer's data erased (`customer.customer.erased`) | Customers | Takes the address off the emails of their invoices; the invoices are kept (F26) | `invoice.email.forget_customer` |
 
 Each reaction runs as the system, in its own transaction, and is idempotent: one per sale, one per refund
 and one per void. Sales asks for the document first within its charge, its void or its refund; the hub's
@@ -930,12 +1141,13 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 8… seconds up to 8 times; after that, it comes out with "Issue now" (INVOICE-F06).
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:138fda6dac4f -->
 
 - **Sales** (requirement): the sale, its lines, its refunds and its void, read from its rows; and
   `sale.sale.record_invoice`, by name and with the platform's permission, to give the sale, its void or
   its refund the document it was waiting for (INVOICE-F06).
 - **Taxes** (requirement): the rule frozen in each line of the sale (tax, regime, qualification, rate and
-  surcharge) and, in the manual entry by category, the rule in force today (`resolve_tax`, in the
+  surcharge) and, in the manual entry by category, the rule in force on the day of the invoice (`resolve_tax`, in the
   business's tax territory); the tax of a territory (`tax_kind_of`, `business_tax_kind`) for what has no
   rule: the line with a typed rate (the business's territory) and that of a sale whose rule no longer
   exists (the territory the line froze when it was charged); rounding half up (`round_half_up`). The
@@ -947,15 +1159,18 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
   without sales.
 - **Customers** (requirement): the customer's card (name or company, tax ID, address and country) that
   fills in the tax details in the manual entry, in the replacement and in the F1 of a sale that does not
-  bring them.
+  bring them; and their email, the one proposed when an invoice is emailed (F26).
 - **Platform**: the business's currency (`base.business.get`, that of its country), which the invoice you
   make by hand keeps.
 - **Printing** (by name, without requirement): `printing.job.create` with the A4 page of an invoice for
   the system printer (F18), in a savepoint of its own; without Printing turned on, without a system
   printer or if it refuses it, nothing is queued and the device prints it.
 - **VeriFactu** (by name, without requirement): `verifactu.record.by_invoice`, the QR that A4 page carries.
+- **Platform, the mail** (`base.business_mail`): ERPlora's sender, the owner's email for the replies and the mail server
+  (F26).
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:3d14a69ce8e5 -->
 
 | App | What for | Service |
 |---|---|---|
@@ -966,12 +1181,14 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 | Platform (Home) | The steps "Your business details" (F21) and "Your invoice numbering" (F14) of "Finish setting up your business" | `invoice.issuer.get`, `invoice.numbering.status` |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:5e4b09781db1 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
-| View invoices, series, numbering and issuer; print | yes | yes | yes | yes | `invoice.view_invoice` |
+| View invoices, series, numbering and issuer; print and download an invoice in PDF | yes | yes | yes | yes | `invoice.view_invoice` |
 | View everyone's invoices (without it, only theirs: the ones they issued, the ones of their sales and what rectifies or replaces them) | yes | yes | yes | no | `invoice.view_all_invoices` |
-| Issue by hand, invoice a sale, replace a ticket, mark as paid | yes | yes | yes | yes | `invoice.add_invoice` |
+| Download the issued invoices in Excel | yes | yes | yes | no | `invoice.view_all_invoices` |
+| Issue by hand, invoice a sale, replace a ticket, mark as paid, email an invoice | yes | yes | yes | yes | `invoice.add_invoice` |
 | Rectify (by hand, by refund and by void) | yes | yes | yes | no | `invoice.rectify_invoice` |
 | Create and change series | yes | yes | yes | no | `invoice.manage_series` |
 | Set up the issuer | yes | yes | no | no | `invoice.manage_issuer` |
@@ -982,6 +1199,6 @@ Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: o
 the ticket's public page holds `invoice.public`, without a session and without any other permission; no automation
 issues from it alone (high risk, as replacing a ticket at the counter).
 
-The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print" and "View
-everyone's invoices": it opens, prints and downloads everyone's invoices issued, without issuing, rectifying or setting
-up anything.
+The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print and download an invoice in PDF" and "View
+everyone's invoices": it opens, prints and downloads in PDF (INVOICE-F25) and in Excel (INVOICE-F24) everyone's invoices issued, without
+issuing, rectifying or setting up anything.

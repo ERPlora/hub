@@ -1,5 +1,5 @@
-"""The search the assistant has in every turn (``base.assistant.find_tools``): a turn offers only the twenty tools that
-best match the person's words, so when none of them does what was asked, the model searches the person's whole
+"""The search the assistant has in every turn (``base.assistant.find_tools``): a turn offers only the fifteen tools
+that best match the person's words, so when none of them does what was asked, the model searches the person's whole
 catalogue for the task and the next round of the same request offers what it found.
 
 Before it, a phrase that shared no word with the tool it needed left that tool out of the turn, and the model answered
@@ -63,14 +63,41 @@ def test_the_search_is_the_assistants_own_and_takes_no_place_from_the_persons_to
     for said in ("Sube un 5 % las bebidas", "¿Qué vendí hoy?"):
         ranked = [op.name for op in shared.relevant(tools, [said], "es", **ranking)]
         offered = [op.name for op in assistant.relevance.relevant(tools, [said], "es")]
-        assert offered == [*ranked[: shared.MAX_TOOLS - 1], SEARCH]
+        assert offered == [*ranked[: assistant.relevance.PLACES], SEARCH]
+
+
+def test_a_turn_offers_fifteen_tools_and_the_search_of_the_rest(make_user):
+    """«¿cuántos productos tengo?» names many more tools than a turn offers (every read of the products and the stock).
+    On the QA's phrases, fifteen places keep every tool a request needs; each place more only sends the model a tool
+    nobody asked for, and each one less leaves out tools the requests need."""
+    context = owner_of_a(make_user, "es")
+    tools = assistant.tools.catalog(context)
+    said = "¿cuántos productos tengo?"
+    ranked = [op.name for op in shared.relevant(tools, [said], "es", **assistant.relevance.ranking(tools))]
+    assert len(ranked) > 15  # positive control: the words name more tools than fit
+    assert [op.name for op in assistant.relevance.relevant(tools, [said], "es")] == [*ranked[:15], SEARCH]
+    assert len(turn(context, user(said))["tools"]) == 16
+
+
+def test_after_a_search_the_turn_keeps_fifteen_places_with_what_it_found_first(make_user):
+    """What the model searched for goes right after what is always at hand, and the person's words fill what is left of
+    the fifteen places."""
+    context = owner_of_a(make_user, "es")
+    tools = assistant.tools.catalog(context)
+    said, task = "¿cuántos productos tengo?", "crear una franja de reservas"
+    found = [op.name for op in assistant.relevance.found(tools, task, "es")]
+    offered = [op.name for op in assistant.relevance.relevant(tools, [said], "es", searched=[task])]
+    always = list(assistant.relevance.ALWAYS)
+    assert offered[: len(always) + len(found)] == [*always, *found]
+    assert len(offered) == 16
+    assert offered[-1] == SEARCH
 
 
 def test_a_search_finds_the_tools_of_the_task_described_with_what_each_does(make_user):
     found = searched(owner_of_a(make_user, "en"), "list the products of a category")
     assert "inventory__product__list" in names(found)
     assert all(tool["description"] for tool in found)
-    assert len(found) <= assistant.relevance.FOUND
+    assert len(found) <= shared.FOUND
 
 
 def test_a_search_never_finds_what_the_person_may_not_use():
@@ -202,7 +229,7 @@ def test_the_tool_a_phrase_left_out_is_offered_once_the_model_searches_for_it(
         plan = turn(context, user(said), asked(call), pending=(call,))
         assert [row["outcome"] for row in plan["executed"]] == ["ok"], task
         assert shared.tool_name(expected) in names(plan["tools"]), task
-        assert len(plan["tools"]) <= shared.MAX_TOOLS
+        assert len(plan["tools"]) <= assistant.relevance.PLACES + 1
 
 
 def test_a_search_the_model_wrote_wrong_finds_nothing_and_the_turn_goes_on(make_user):

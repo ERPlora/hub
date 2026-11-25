@@ -1,5 +1,5 @@
 """Invoicing and Customers together, no mocks (INVOICE-F02, F03, F05): the recipient of a full invoice is
-copied from a real customer card (by its id or, for voice, by its exact name, phone or email), checked, and
+copied from a real customer card (by its id or, for voice, by its name, phone or email), checked, and
 never changes when the card does afterwards.
 """
 

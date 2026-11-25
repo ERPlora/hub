@@ -5,7 +5,6 @@ VeriFactu's testing environment and never sent: nothing here leaves the machine.
 import datetime as dt
 
 import pytest
-from django.utils import timezone
 
 from apps.invoice.services import writes
 from apps.invoice.models import Invoice
@@ -23,18 +22,6 @@ RECIPIENT = {
     "customer_tax_id": "B12345674",
     "customer_address": "Calle Luna 3, Madrid",
 }
-
-
-@pytest.fixture
-def at(monkeypatch, in_business_a):
-    """``at((zone, instant))``: business A in ``zone``, its clock stopped at ``instant``."""
-
-    def move(moment):
-        zone, instant = moment
-        monkeypatch.setattr(timezone, "now", lambda: instant)
-        monkeypatch.setattr(in_business_a, "timezone", zone)
-
-    return move
 
 
 def manual():

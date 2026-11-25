@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:a9ddb3c5c90c914e155a8d83f4e3070bcd0c4762409607e984cbfeb0ecaff7ee -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:28f2a7fa1245 -->
 
 Automations is where the business writes down rules that carry themselves out: "when someone does not
 turn up to their appointment, leave me the task of calling them", "every morning at 9, leave me the task
@@ -8,6 +7,7 @@ of going over the diary". You pick a ready-made one from the gallery or build on
 the permissions it needs, try it without effects, turn it on and read what it did each time.
 
 ### What an automation is like
+<!-- from WORKBOOK.md sha256:0d6410f7a4dd -->
 
 An automation is **one column**: at the top, **when it starts** (something that happens in the business, a
 schedule, a date or only by hand); below, its **steps**, done in order: **Do something** (an action of
@@ -17,12 +17,14 @@ app), **Only continue if…** (a condition: if it is not met, the automation end
 at their time or on their date (FLOW-F21, F22), and also with **Run now**.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:0ae9e1b80604 -->
 
 Only the **owner** and the **administrator** see, build and change the automations: an automation acts
 on behalf of the business with nobody in front of it. The **manager** and the **employee** only answer
 what an automation asks them, in **Waiting for your answer** (FLOW-F29): it is all they see of the app.
 
 ### With the assistant
+<!-- from WORKBOOK.md sha256:51161bf8c617 -->
 
 With the Hub's assistant it is used by voice or by text, with the session of whoever speaks: "create a flow
 that creates a task for me when a sale over €100 is completed" (it leaves it as a **draft**, off, for you to
@@ -31,6 +33,7 @@ review, FLOW-F17), "turn on the welcome automation", "pause the till one", "what
 assistant, with nobody in front of it: **Ask the assistant** (FLOW-F37 to F39).
 
 ## Adopted reference
+<!-- from WORKBOOK.md sha256:0792fa391578 -->
 
 **With which permissions an automation acts, and whether it can be run by hand while paused** (skill
 `market-decision`, 2026-10-15).
@@ -68,6 +71,7 @@ automations; **starting from a template** of the gallery; and what the assistant
 **draft**.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:815cb2ddb507 -->
 
 1. Only the **owner** or an **administrator** open Automations (menu **Automations**).
 2. Automations use **notices and actions of other apps**: the gallery and the drop-downs only offer those of
@@ -85,8 +89,10 @@ Initial setup, step by step:
 6. When it fires, check it in **History** (FLOW-F16).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Automations
+<!-- from WORKBOOK.md sha256:3a7b50696967 -->
 A single screen, from top to bottom: **Waiting for your answer**, with what an automation asks you (a
 manager or an employee only see this); **Proposed by the assistant**, with the drafts it wrote for you;
 **Your automations**, with their search box, their filters and the switch of each one; and **the
@@ -94,6 +100,7 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
+<!-- from WORKBOOK.md sha256:2a6d9b6c391c -->
 Menu **Automations**, a single entry. From top to bottom:
 
 - The **New automation** button, top right; on a phone it is only its **+**, so that the title can be read
@@ -122,6 +129,7 @@ Menu **Automations**, a single entry. From top to bottom:
   Tasks.") (FLOW-F04).
 
 #### Automation editor
+<!-- from WORKBOOK.md sha256:57e78ff26488 -->
 It opens when you tap a row, press **New automation**, use a card or review a draft. Header: ← (back to
 the list; if there are unsaved changes, it asks first), the name (empty: "Untitled automation"), the
 "Active"/"Paused" label, the switch, **Try it**, **Run now** and **Save** ("Saving…"). Four tabs:
@@ -141,11 +149,13 @@ the list; if there are unsaved changes, it asks first), the name (empty: "Untitl
   stopped by an error in a step carries **Resume from the step that failed** (FLOW-F24).
 
 #### Guide
+<!-- from WORKBOOK.md sha256:fdc6a89d7568 -->
 The gallery's **How does this work?** button. "How automations work", with five sections: "What an
 automation is", "Your first automation, step by step", "Permissions: why you have to say yes", "How to
 know whether it worked" and "What it cannot do yet". **Back to the automations** goes back (FLOW-F08).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:b9c8d764e072 -->
 
 | State | What is seen |
 |---|---|
@@ -158,6 +168,7 @@ know whether it worked" and "What it cannot do yet". **Back to the automations**
 | App inactive | "This app is not active in this business" |
 
 ## Flows
+<!-- from WORKBOOK.md sha256:3e158a62284a -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -202,6 +213,7 @@ know whether it worked" and "What it cannot do yet". **Back to the automations**
 | FLOW-F39 | The SaaS serves an automation's AI step | done |
 
 ### FLOW-F01 Open Automations
+<!-- from WORKBOOK.md sha256:65a8c737158f -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automations
@@ -217,6 +229,7 @@ your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
+<!-- from WORKBOOK.md sha256:f1ee30a2384a -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -236,6 +249,7 @@ painted stays.
 Involved: FLOW-F01, FLOW-F03, FLOW-F06, FLOW-F07
 
 ### FLOW-F03 Turn on or pause from the list, one or several
+<!-- from WORKBOOK.md sha256:c330bcc1a2ee -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -254,6 +268,7 @@ If it fails: the message in red at the top; the row stays as it was.
 Involved: FLOW-F12, FLOW-F14, FLOW-F22, FLOW-F23
 
 ### FLOW-F04 Create an automation from a gallery card
+<!-- from WORKBOOK.md sha256:74ee22014b8c -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automations
@@ -291,6 +306,7 @@ The ten cards of the gallery, with their sector, when they start and what they d
 | Hear about big sales | any | A sale is charged | Only if it is over 100,00 €: leaves a task |
 
 ### FLOW-F05 Reach a card from somewhere else
+<!-- from WORKBOOK.md sha256:4b833ce83f77 -->
 Status: done (screen)
 Actor: owner, administrator
 Screen: Automations
@@ -306,6 +322,7 @@ this business"; a card that cannot be used here does not open.
 Involved: FLOW-F04, FLOW-F20
 
 ### FLOW-F06 Make a copy
+<!-- from WORKBOOK.md sha256:e8ff2e18925c -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -321,6 +338,7 @@ If it fails: the message in red at the top; nothing is created.
 Involved: FLOW-F02, FLOW-F12
 
 ### FLOW-F07 Delete an automation
+<!-- from WORKBOOK.md sha256:4164b2f84b2a -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -335,9 +353,11 @@ If it fails: the message in red at the top; the row stays.
 Involved: FLOW-F02, FLOW-F16, FLOW-F23
 
 ### FLOW-F08 Read the guide
+<!-- from WORKBOOK.md sha256:5af1fcb3610e -->
 Status: done (screen)
 Actor: owner, administrator
 Screen: Guide
+Operations: none
 Steps:
 1. In the gallery, press **How does this work?**.
 2. Read the five sections. "What it cannot do yet" says what is really missing: branches, counting back
@@ -350,6 +370,7 @@ If it fails: it reads nothing of the business; without permission, "You do not h
 Involved: FLOW-F04, FLOW-F21
 
 ### FLOW-F09 Create an automation from scratch
+<!-- from WORKBOOK.md sha256:a7da458aa63d -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -370,6 +391,7 @@ saved.
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Choose when it starts
+<!-- from WORKBOOK.md sha256:2e4a8b622098 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -398,6 +420,7 @@ that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
+<!-- from WORKBOOK.md sha256:7f7588b6c2e4 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -465,6 +488,7 @@ another action.") and saving from it is refused with that same reason. After tur
 Involved: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Grant and withdraw the permissions
+<!-- from WORKBOOK.md sha256:f409fa27faa7 -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -493,6 +517,7 @@ her rules (the minimum notice, the opening hours and never a time already past).
 Involved: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37, APPOINTMENT-F01, APPOINTMENT-F04
 
 ### FLOW-F13 Try it without it doing anything
+<!-- from WORKBOOK.md sha256:e1176f770d80 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -521,6 +546,7 @@ real notices, "You do not have permission".
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F14 Save and turn on from the editor
+<!-- from WORKBOOK.md sha256:ded1034ddf3d -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -540,6 +566,7 @@ technical text; what was written stays in the editor.
 Involved: FLOW-F03, FLOW-F12, FLOW-F13, FLOW-F15
 
 ### FLOW-F15 Run by hand
+<!-- from WORKBOOK.md sha256:9a5d018f4015 -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -557,6 +584,7 @@ with unsaved changes it is disabled: "Save it first: "Run now" runs what is save
 Involved: FLOW-F14, FLOW-F16, FLOW-F21
 
 ### FLOW-F16 See what it did and why it failed
+<!-- from WORKBOOK.md sha256:7060399034ec -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -589,6 +617,7 @@ run yet.".
 Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Ask the assistant for an automation
+<!-- from WORKBOOK.md sha256:cc79aff52021 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: assistant
@@ -596,8 +625,13 @@ Steps:
 1. Open the Hub's assistant and ask it for something that happens on its own, speaking or typing ("create a
    flow that creates a task for me when a sale over €100 is completed").
 2. The assistant writes a **draft**: name, when it starts, from one to eight "do something", "only continue
-   if" or "wait" steps, and the notes of what it could not decide. Before leaving it, it shows you its card
-   and waits for your yes, like any change it asks you for.
+   if" or "wait" steps, and the notes of what it could not decide. To write it, it first looks at the names of
+   the notices and actions of the apps involved, and then reads whole, with the data each action asks for, only
+   the ones it will use: in a business with many apps too, it reaches any action and uses the real names and
+   data, without warning you that it could not check them. Before leaving it, it shows you its card and waits
+   for your yes, like any change it asks you for. The card says the name, when it starts and each step with the
+   same phrases as the list and the editor ("When a till is closed", "Every day at 10:00", "Create a task",
+   "Wait 1 hour"), never the codes of its definition; the same if you ask it to create the automation directly.
 3. It tells you it has left it waiting in Automations and repeats its doubts; you review it in **Proposed by
    the assistant** (FLOW-F18).
 In: what is asked for, in words, and what the business's automations can use.
@@ -608,6 +642,7 @@ step leaves, is refused before it is saved and the assistant says so.
 Involved: FLOW-F18, FLOW-F19
 
 ### FLOW-F18 Review an assistant's draft and create it
+<!-- from WORKBOOK.md sha256:9ebe604d4a2e -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automations
@@ -627,6 +662,7 @@ nothing is created; a draft already decided, "That draft was already decided.".
 Involved: FLOW-F17, FLOW-F19, FLOW-F12
 
 ### FLOW-F19 Discard an assistant's draft
+<!-- from WORKBOOK.md sha256:87bb5445fb0a -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automations
@@ -639,6 +675,7 @@ If it fails: one already decided cannot be decided again: "That draft was alread
 Involved: FLOW-F17, FLOW-F18
 
 ### FLOW-F20 Another app asks whether an automation is already set up
+<!-- from WORKBOOK.md sha256:9668d738ecc9 -->
 Status: done
 Actor: another app, assistant
 Screen: none
@@ -652,6 +689,7 @@ If it fails: without the permission to see automations, it is refused.
 Involved: FLOW-F05
 
 ### FLOW-F21 When something happens in the business, the automation starts
+<!-- from WORKBOOK.md sha256:bddbf5bda4fd -->
 Status: done
 Actor: the platform
 Screen: none (it is seen in History)
@@ -679,6 +717,7 @@ run with "This "Only continue if…" can no longer be read…".
 Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 When the time comes, the automation starts
+<!-- from WORKBOOK.md sha256:98a5805fb8fa -->
 Status: done
 Actor: the platform
 Screen: none (it is seen in History)
@@ -695,6 +734,7 @@ still stands.
 Involved: FLOW-F03, FLOW-F10, FLOW-F16
 
 ### FLOW-F23 When a wait ends, the automation carries on
+<!-- from WORKBOOK.md sha256:59b67d88241f -->
 Status: done
 Actor: the platform
 Screen: none (it is seen in History)
@@ -714,6 +754,7 @@ texts). The other customers' runs carry on.
 Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
+<!-- from WORKBOOK.md sha256:3917331922d1 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -746,6 +787,7 @@ the free texts of their history.
 Involved: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 "Only if…" and "If it fails, it carries on" on each step
+<!-- from WORKBOOK.md sha256:0407bf55891e -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -772,6 +814,7 @@ read…", and that run is not resumed: the step has to be corrected.
 Involved: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F26 Keep secrets that cannot be read again
+<!-- from WORKBOOK.md sha256:ec5e1f8ac241 -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -801,6 +844,7 @@ do. A secret can only be inserted in **Call another system**: in any other step 
 Involved: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F27
 
 ### FLOW-F27 Call another system
+<!-- from WORKBOOK.md sha256:b771beefcfb5 -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -834,6 +878,7 @@ not follow redirects. A run whose automation is deleted while it calls is cancel
 Involved: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
 
 ### FLOW-F28 Ask someone first
+<!-- from WORKBOOK.md sha256:33a1e1b502ab -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -863,6 +908,7 @@ question that names a secret is not either.
 Involved: FLOW-F13, FLOW-F16, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F38
 
 ### FLOW-F29 Answer what an automation asks
+<!-- from WORKBOOK.md sha256:7b39da98ded8 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Automations
@@ -905,6 +951,7 @@ questions.
 Involved: FLOW-F16, FLOW-F28, FLOW-F30
 
 ### FLOW-F30 Close what nobody answered in time
+<!-- from WORKBOOK.md sha256:ba6609cac75c -->
 Status: done
 Actor: system
 Screen: none
@@ -923,6 +970,7 @@ waited."). If someone answers just as the pass closes it, only one wins.
 Involved: FLOW-F16, FLOW-F28, FLOW-F29
 
 ### FLOW-F31 Send a message to a customer
+<!-- from WORKBOOK.md sha256:818b57ce996f -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -955,6 +1003,7 @@ delivered"). Without the WhatsApp inbox the button does not appear; by email it 
 Involved: FLOW-F11, FLOW-F12, FLOW-F16, FLOW-F32, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
 
 ### FLOW-F32 Put a photo, a video or a PDF at the top of a WhatsApp
+<!-- from WORKBOOK.md sha256:98ebbf594b97 -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -982,6 +1031,7 @@ in the automation's history; a file of another business is never sent.
 Involved: FLOW-F11, FLOW-F16, FLOW-F31, WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### FLOW-F33 Turn on an automation another app brings
+<!-- from WORKBOOK.md sha256:24f2e5fc65c4 -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -1012,6 +1062,7 @@ line below says which is missing; the message in red inside the card.
 Involved: FLOW-F04, FLOW-F12, FLOW-F21, FLOW-F34, FLOW-F35
 
 ### FLOW-F34 Pause an automation another app brings, without deleting it
+<!-- from WORKBOOK.md sha256:c9580be93d3b -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -1027,6 +1078,7 @@ automation on: there is nothing to change.".
 Involved: FLOW-F03, FLOW-F33
 
 ### FLOW-F35 Restore the factory version of an automation another app brings
+<!-- from WORKBOOK.md sha256:fa32459c32be -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -1047,6 +1099,7 @@ themselves, nothing changes.
 Involved: FLOW-F33, FLOW-F36
 
 ### FLOW-F36 Repair a set-up automation with a fault its app already fixed
+<!-- from WORKBOOK.md sha256:0647eb1e73ad -->
 Status: done (server and screen)
 Actor: the platform, owner, administrator, assistant
 Screen: Automations
@@ -1085,6 +1138,7 @@ of "…": give it another value, take "…" off what it may use or make a copy."
 Involved: FLOW-F06, FLOW-F13, FLOW-F21, FLOW-F29, FLOW-F33, FLOW-F35, FLOW-F37, FLOW-F38
 
 ### FLOW-F37 "Ask the assistant" step
+<!-- from WORKBOOK.md sha256:f3341d790bd3 -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -1128,6 +1182,7 @@ step, like the request. Nor one its app fixes, left without a value or removed.
 Involved: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 The assistant does its step inside an automation
+<!-- from WORKBOOK.md sha256:0a300a1c7dc3 -->
 Status: done
 Actor: the platform, assistant
 Screen: none (it is seen in History)
@@ -1194,6 +1249,7 @@ action is no longer allowed or available, so the assistant's change was not made
 Involved: APPOINTMENT-F06, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F39
 
 ### FLOW-F39 The SaaS serves an automation's AI step
+<!-- from WORKBOOK.md sha256:657c1d83a4d1 -->
 Status: done
 Actor: the platform
 Screen: none
@@ -1219,6 +1275,7 @@ spending anything of the business's searches.
 Involved: FLOW-F37, FLOW-F38
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:8925c38a6914 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and the same permissions, except saving a secret, which the
@@ -1233,47 +1290,49 @@ what it asks. A record the person confirming cannot see (a run, for whoever only
 question asked of another role) does not show on the card.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:ada15a0332da -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
-| The automations, with search, filters, order and their last run, in pages of up to 100 (live) | see | F02 | `flow.flow.list` |
-| An automation, with the permissions it needs and those it lacks (live) | see | F09–F16 | `flow.flow.detail` |
+| The automations, with search, filters, order and their last run, in pages of up to 100 (live) | see | F01, F02, F05 | `flow.flow.list` |
+| An automation, with the permissions it needs and those it lacks (live) | see | F09–F16, F25, F27, F28, F31, F32, F37 | `flow.flow.detail` |
 | An automation's runs, 20 at a time, and how many failed (live) | see | F16 | `flow.run.list` |
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
-| The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
+| The assistant's pending drafts (live) | see | F01, F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object) | see | F10, F11 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object); all of them, or only those of some apps or some names, whole or only their names | see | F01, F05, F10, F11, F17, F25, F27, F28, F31, F37 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |
-| The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26 | `flow.secret.list` |
-| The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F29, F38 | `flow.question.list` |
+| The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26, F27 | `flow.secret.list` |
+| The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F01, F29, F38 | `flow.question.list` |
 | A question waiting for an answer, as it shows in "Waiting for your answer", only for whoever can answer it | answer (their role) | F29 | `flow.question.get` |
-| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F33–F36 | `flow.recipe.list` |
+| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F01, F33–F36 | `flow.recipe.list` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:fc67ed817046 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
 | Creates an automation (from scratch, from a card or from a draft), paused and without permissions | manage | F04, F09, F18 | `flow.flow.create` |
-| Changes the name, the trigger or the steps (the switch is `set_enabled`); it does not let what its recipe's app fixes be removed (`flow.recipe_fixed`) | manage | F10, F11, F14, F36 | `flow.flow.update` |
+| Changes the name, the trigger or the steps (the switch is `set_enabled`); it does not let what its recipe's app fixes be removed (`flow.recipe_fixed`) | manage | F10, F11, F14, F25, F27, F28, F31, F32, F36, F37 | `flow.flow.update` |
 | Turns on or pauses | manage | F03, F14 | `flow.flow.set_enabled` |
 | Makes a copy, paused and without permissions | manage | F06 | `flow.flow.duplicate` |
 | Deletes (its history stays) | manage | F07 | `flow.flow.delete` |
-| Sets the whole list of actions and queries it can do | manage | F12 | `flow.flow.grant` |
+| Sets the whole list of actions and queries it can do | manage | F12, F27, F31, F37 | `flow.flow.grant` |
 | Runs it now | manage | F15 | `flow.flow.run` |
 | Leaves an assistant's draft | manage | F17 | `flow.draft.propose` |
 | Discards a draft | manage | F19 | `flow.draft.dismiss` |
 | Starts the automations of a notice | only the platform | F21 | `flow.run.react` |
-| When a customer's data are erased, cancels the runs that could still go on with hers and makes every run that names her card, also one that has ended, forget what it read and the free texts of its history (CUSTOMER-F16) | only the platform | F16, F23, F24 | `flow.customer.erase` |
+| When a customer's data are erased, cancels the runs that could still go on with hers and makes every run that names her card, also one that has ended, forget what it read and the free texts of its history (CUSTOMER-F16) | only the platform | F23 | `flow.customer.erase` |
 | Starts the scheduled or dated ones that are due | only the platform | F22 | `flow.schedule.fire_due` |
 | Carries on the runs whose wait is over | only the platform | F23 | `flow.run.resume_due` |
 | Resumes a run stopped by an error at the step that failed | manage | F24 | `flow.run.retry` |
 | Saves (or changes) a secret, sealed | manage (never the assistant) | F26 | `flow.secret.set` |
 | Deletes a secret | manage | F26 | `flow.secret.delete` |
-| Makes, in the background, the call of a run that is waiting for it | only the platform | F27 | `flow.run.call` |
-| Takes a run's call to make it | only the platform | F27 | `flow.run.claim_call` |
-| Writes down how the call ended and carries the run on | only the platform | F27 | `flow.run.record_call` |
+| Makes, in the background, the call of a run that is waiting for it | only the platform | — | `flow.run.call` |
+| Takes a run's call to make it | only the platform | — | `flow.run.claim_call` |
+| Writes down how the call ended and carries the run on | only the platform | — | `flow.run.record_call` |
 | Answers yes or no, with a note, to an automation's question | answer (their role) | F29 | `flow.question.answer` |
 | Closes the questions nobody answered in time | only the platform | F30 | `flow.question.expire_due` |
 | Turns on an automation another app brings: the first time it creates it on with exactly its permissions; afterwards it only turns it on | manage | F33 | `flow.recipe.enable` |
@@ -1282,6 +1341,7 @@ question asked of another role) does not show on the card.
 | Writes down what its app fixed for it, which already counts: what its "Only when…" lacks and the fixed data of its assistant step (no screen: there is nothing to wait for from the owner) | manage | F36 | `flow.recipe.repair` |
 
 ### What it notifies
+<!-- from WORKBOOK.md sha256:386b82eadcdb -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -1307,6 +1367,7 @@ question asked of another role) does not show on the card.
 Notices carry ids, never names or contents.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:02348b741259 -->
 - **To all the notices of the active apps** (FLOW-F21), except its own: it is the only app that listens to
   any notice. It does other apps' actions and queries **by their name** (`task.task.create`), with their
   rules and their messages, never touching their data; that is why it needs no app (`requires` empty): an
@@ -1333,7 +1394,13 @@ Notices carry ids, never names or contents.
 - From the platform: the business's time zone (the schedules) and the outbox's notices (the last one of a
   kind, for Try it and the examples).
 
+| From | What for | Flows | Service |
+|---|---|---|---|
+| WhatsApp inbox | The templates it can fill in, to choose one in the step | F31, F32 | `whatsapp_inbox.template.list` |
+| WhatsApp inbox | Keeping the header's file and reading it when the step opens | F32 | `whatsapp_inbox.template_sample.upload`, `.detail` |
+
 ### Who may do what
+<!-- from WORKBOOK.md sha256:3e06ba799884 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

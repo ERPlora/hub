@@ -608,8 +608,8 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Los menús, con búsqueda, filtros y orden, en páginas de hasta 100 (en vivo) | ver | F01 | `combo.combo.list` |
-| Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
-| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20, BASE-F97) | ver | F06, F07 | `combo.option.get` |
+| Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12, F13 | `combo.combo.get` |
+| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20, BASE-F97) | ver | F06 | `combo.option.get` |
 | Un plato de un menú con sus elecciones, por su id o por su nombre dentro del menú: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F05, F06 | `combo.group.get` |
 | Lo que nombra una elección nueva, antes de la tarjeta del asistente que la añade: el plato, con su menú, y el producto de Inventario; si alguno no existe o vale para varios, no sale tarjeta (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06 | `combo.option.check` |
 | Lo mismo con varias elecciones a la vez: el plato y cada producto, antes de la tarjeta que las añade (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06 | `combo.option.bulk_check` |
@@ -629,7 +629,7 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Cambia un plato (solo lo enviado) | gestionar | F05 | `combo.group.update` |
 | Retira un plato con sus elecciones | gestionar | F05 | `combo.group.delete` |
 | Ordena los platos de un menú, todos a la vez | gestionar | F05 | `combo.group.reorder` |
-| Añade una elección (al final) | gestionar | F06, F15 | `combo.option.create` |
+| Añade una elección (al final) | gestionar | F06, F13, F15 | `combo.option.create` |
 | Añade varias elecciones de golpe | gestionar | F06 | `combo.option.bulk_create` |
 | Cambia una elección: producto, suplemento o disponible (solo lo enviado) | gestionar | F06, F12 | `combo.option.update` |
 | Quita una elección | gestionar | F06 | `combo.option.delete` |
@@ -665,10 +665,10 @@ producto recuperado no reacciona: sus elecciones vuelven desde la copia (F15).
 
 | De | Para qué | Flujos | Servicio |
 |---|---|---|---|
-| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
+| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` (los activos, agotados o no) |
 | Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
 | Plataforma | La librería de imágenes: buscarla y nombrar por su título la imagen que se pone a un menú | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
-| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | `recoverable_from_copy` de `apps.py` |
+| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | lo que declara su módulo de app (recoverable_from_copy) |
 
 ### Contrato con Ventas
 
@@ -729,7 +729,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
+  `tests/test_<fichero>.py` por fichero (los que comparten nombre con otra puerta, `test_queries_<módulo>.py` y
+  `test_services_<módulo>.py`), más
+  `test_integration_inventory.py`,
   `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
   reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y
   producto eliminado) y `test_concurrency.py`.
@@ -741,18 +743,18 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   migración depende de `inventory 0001` y `tax 0005`.
 - **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara tres cosas, en este orden,
   cada una con su cuenta: «Menus», «Menu courses» y «Menu choices of products». Cada lectura de la copia va con su propio
-  SQL sobre los nombres del modelo (`queries.combos_in_copy` y `queries.groups_in_copy`, por `_rows_in_copy`;
-  `queries.options_in_copy`, con el SKU del producto allí). `reads_since` de los menús es `0002_combo_image` (leen la
+  SQL sobre los nombres del modelo (`queries.recovery.combos_in_copy` y `queries.recovery.groups_in_copy`, por `_rows_in_copy`;
+  `queries.recovery.options_in_copy`, con el SKU del producto allí). `reads_since` de los menús es `0002_combo_image` (leen la
   imagen); los otros dos, `0001_initial`. El menú y el plato que se rehacen guardan por cuál de la copia se hicieron
-  (`Combo.stands_for` y `ChoiceGroup.stands_for`, migración `0003_stands_for`), y `queries._standing_for` da el del
+  (`Combo.stands_for` y `ChoiceGroup.stands_for`, migración `0003_stands_for`), y `queries.recovery._standing_for` da el del
   negocio que hace de cada uno de la copia: el mismo mientras lo tiene; si no, el que una recuperación hizo por él (el
-  más antiguo); uno hecho a mano no hace de ninguno. `queries.combos_not_in_business` deja fuera el menú que el negocio
+  más antiguo); uno hecho a mano no hace de ninguno. `queries.recovery.combos_not_in_business` deja fuera el menú que el negocio
   tiene o que una recuperación rehízo, y uno con su nombre hecho a mano (sin mayúsculas ni espacios; cada uno vale por
   uno de la copia, el más antiguo primero); los crea `combo.combo.recover` (solo sistema, `INTERNAL`, sin ruta):
-  `combo.combo.create` y, con la imagen que deja `base.images.from_copy`, `_change_image`. `queries.groups_not_in_business`
+  `combo.combo.create` y, con la imagen que deja `base.images.from_copy`, `_change_image`. `queries.recovery.groups_not_in_business`
   pone cada plato en el menú que hace del suyo (el id de la copia si no hay ninguno, y `create` lo rechaza como
   `not_found`) y deja fuera el que el negocio tiene, el que una recuperación rehízo y uno con su nombre en ese menú; los
-  añade `combo.group.recover` (solo sistema): `combo.group.create`, que bloquea el menú. `queries.options_not_in_business`
+  añade `combo.group.recover` (solo sistema): `combo.group.create`, que bloquea el menú. `queries.recovery.options_not_in_business`
   pone cada elección en el plato que hace del suyo y en el producto que hace del suyo
   (`apps.inventory.queries.recovery.products_standing_for`, la misma pareja que Tarifas y Suplementos: el mismo mientras vive; si
   no, el vivo con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe
@@ -784,7 +786,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   ofrecida ∧ cada plato obligatorio con elecciones ofrecidas suficientes (`min`, o una si se puede
   repetir) ∧ (partido) algún precio de catálogo que pesar. Ofrecida = disponible ∧ producto activo,
   no eliminado y por unidades ∧ (menú «para llevar») con categoría para llevar.
-- **Reparto** (`queries.split_amount`): proporcional al `precio de catálogo × cantidad`, resto mayor,
+- **Reparto** (`queries.lines.split_amount`): proporcional al `precio de catálogo × cantidad`, resto mayor,
   empate al primero; partir solo si `goods` y hay más de una categoría fiscal. Sin redondeos de más:
   enteros en céntimos.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` en las acciones; `high` al retirar
@@ -808,7 +810,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   y «del día», «euros» o «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario
   que lo dicen. «ordena» y «orden» ya no nombran los dispositivos: «ordenador» tiene raíz propia en `live`.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#669): nombra el registro que una escritura señala por su
-  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el menú por su `name` con
+  id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: el menú por su `name` con
   `combo.combo.get` (`A_MENU`: el `id` de `ComboRefIn` y el `combo_id` de `_ComboOfIn`), el plato por su `name` con
   `combo.group.get` (`A_COURSE`: el `id` de `GroupRefIn`, el `group_id` de `_GroupOfIn` y de `OptionRefIn` y cada
   elemento de `group_ids`), la elección por el `product_name` de `combo.option.get` (`A_CHOICE`: el `id` de

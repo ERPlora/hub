@@ -2,29 +2,23 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent } from 'vue';
 
+import { app as appRow } from '../__tests__/app-row';
 import { ADMIN, EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations/apps';
 import AppBlockedPage from './AppBlockedPage.vue';
 
+/** A paid app the business has no right to: blocked, off and nowhere to open. */
 function app(id: string, fields: Partial<AppRow> = {}): AppRow {
-  return {
-    id,
-    name: id[0].toUpperCase() + id.slice(1),
-    icon: 'ion:cube-outline',
+  return appRow(id, {
     category: 'catalog',
     category_label: 'Catalog and stock',
-    summary: '',
     premium: true,
     right: 'missing',
     state: 'blocked',
     chosen: false,
     path: null,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
     ...fields,
-  };
+  });
 }
 
 const STORE = 'https://erplora.com/store/modules?business=h1';
@@ -93,6 +87,13 @@ describe('AppBlockedPage', () => {
     await m.result(m.call, 'base.app.list', LIST);
     expect(m.wrapper.find('[data-testid="app-blocked-buy"]').exists()).toBe(false);
     expect(m.wrapper.find('[data-testid="app-blocked-subscription"]').text()).toContain('erplora.com');
+  });
+
+  it('where the Store’s address does not come (ERPlora’s own business buys nothing) the owner gets no link', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.app.list', { ...LIST, store_url: '', plan_url: '' });
+    expect(m.wrapper.find('[data-testid="app-blocked-subscription"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="app-blocked-buy"]').exists()).toBe(false);
   });
 
   it('bought meanwhile: it offers to open the app with a full load (the session comes up to date)', async () => {

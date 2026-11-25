@@ -58,19 +58,75 @@ Para qué: abrir el local, servir las mesas del mediodía y cobrar.
 
 Un defecto se abre como issue en el repo del Hub, con el ID del flujo y el paso del recorrido en el que salió.
 
+## Por pantalla o hablando con el asistente
+
+El mismo recorrido, en el mismo orden, se hace por pantalla o pidiéndole cada paso al asistente. No hay recorridos
+aparte para el asistente: `journeys/assistant.md` prueba su propio panel. Cuando se hace hablando:
+
+- **Cada paso se pide como lo pediría quien actúa en él**, en español o en inglés, con la frase entera o a medias a
+  propósito. Las frases no se guardan en el recorrido: las escribe quien prueba, como lo diría el dueño o el empleado,
+  sin nombrar herramientas, pantallas ni campos.
+- **Con la frase a medias, lo correcto es que el asistente pregunte** lo que falta antes de hacer nada.
+- **En un flujo que el asistente no hace, lo correcto es que lo diga** y mande a la pantalla donde se hace; quien prueba
+  lo hace entonces en pantalla, para que el recorrido siga. Qué hace el asistente en cada flujo lo dice
+  `manage.py qa_coverage --assistant` (más abajo).
+- **El resultado se comprueba en pantalla o en los datos**, nunca en lo que contesta el asistente.
+
 ## La cobertura
 
 ```bash
 uv run python manage.py qa_coverage
 uv run python manage.py qa_coverage --ledger ~/qa/walks.csv
+uv run python manage.py qa_coverage --assistant
 ```
 
 - Sin opciones dice, por app, qué flujos hechos con pantalla están en algún recorrido, cuáles en ninguno y cuáles
   quedan **fuera del alcance visual**: los que no están `hecho` y los de `Pantalla: ninguna…`, que hace el sistema
   solo (su efecto se comprueba en el paso del recorrido que lo provoca).
-- Con `--ledger` cruza con el **registro de pasadas**, un CSV que vive fuera del repo con las columnas
-  `flow,date,device,app_version,result,issue` (una fila por flujo recorrido, la fecha como `AAAA-MM-DD`) y dice qué
-  flujos no se han recorrido nunca y cuándo fue la última vez de los demás, empezando por los más antiguos.
+- Con `--ledger` cruza con el **registro de pasadas**, un CSV que vive fuera del repo con una fila por flujo recorrido,
+  y dice, para la pantalla y para el asistente, qué flujos no se han recorrido nunca así y cuándo fue la última pasada
+  de los demás en cada canal, empezando por los más antiguos.
+
+| Columna | Qué lleva |
+|---|---|
+| `flow` | el ID del flujo; también los de erplora.com y la aplicación, que el comando solo nombra al final |
+| `date` | el día de la pasada, `AAAA-MM-DD` |
+| `device`, `app_version` | dónde se hizo y con qué versión |
+| `result` | `ok`, `partial` o `fail`: si el flujo hizo lo que dice su WORKBOOK; vacía si no llegó a hacerse |
+| `issue` | la issue del defecto, `repo#N`, o vacía |
+| `channel` | por dónde se hizo: `screen`, `assistant-es` o `assistant-en` |
+| `phrase` | la frase, `whole` (entera) o `partial` (a medias); vacía en pantalla |
+| `model_result` | `ok`, `partial` o `fail`: si el modelo entendió, preguntó cuando debía o mandó a la pantalla correcta; vacía en pantalla |
+
+El comando se para si al registro le falta una columna y, diciendo la línea, si una fecha no es `AAAA-MM-DD` o un canal
+no es uno de los tres.
+
+- Con `--assistant` dice, por flujo hecho con pantalla, su grupo, lo que se espera al pedirlo hablando y las operaciones
+  que lo respaldan, con las que son herramientas del asistente marcadas (`tool`). No hay lista escrita a mano: las
+  operaciones de un flujo son las de las filas que lo nombran en la columna `Flujos` de las tablas de servicios de los
+  WORKBOOK, y qué es herramienta lo dice el registro de operaciones. La columna cita una operación en los flujos en los
+  que la ejecuta quien los hace: una escritura del sistema va en el flujo del sistema, no en la consulta que enseña lo
+  que dejó. La de otra app que pide la pantalla de un flujo se cita en la fila de esa app o en una tabla del WORKBOOK del
+  flujo. Lo que va entre comillas invertidas en `Servicio` es una operación o un modelo, y `Flujos` solo nombra flujos
+  del Hub. Un flujo que no usa ninguna operación lo dice con la clave `Operaciones: ninguna`, debajo de `Pantalla:`.
+
+| Grupo | Cuándo | Qué se espera al pedirlo hablando |
+|---|---|---|
+| `can` | alguna de sus escrituras es herramienta, o solo lee y todas sus lecturas lo son | lo hace, y se comprueba en pantalla o en los datos |
+| `assistant only` | `Pantalla:` nombra solo al asistente | lo mismo, y no hay otro camino |
+| `cannot` | cualquier otro, también el que dice `Operaciones: ninguna` | dice que no lo hace él y en qué pantalla se hace |
+
+Después da lo que queda por escribir en los WORKBOOK, en cuatro listas que tienen que salir vacías:
+
+- los flujos sin decidir, porque no se conoce ninguna de sus operaciones ni dicen que no usen ninguna;
+- los que se contradicen: `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, lo nombra
+  `Pantalla:` y las que se conocen no son herramientas ni las del propio panel del asistente, o dice `Operaciones:
+  ninguna` y una tabla lo cita. Que el asistente pueda hacerlo y `Actor:` no lo nombre no es una contradicción: lo dice
+  su grupo;
+- las herramientas que no cita ningún flujo;
+- lo que se cita y no existe: un flujo que no está en ningún WORKBOOK o, en un flujo `hecho`, algo que no es una
+  operación del registro ni un modelo. El WORKBOOK de una app que aún no está hecha puede nombrar las operaciones que
+  tendrá.
 
 ## Cómo se mantiene
 
@@ -79,7 +135,8 @@ uv run python manage.py qa_coverage --ledger ~/qa/walks.csv
 
 - un recorrido cita un ID que no existe en ningún WORKBOOK o que no está `hecho`;
 - un flujo `hecho` con pantalla no está en ningún recorrido;
-- un recorrido no sigue el formato de arriba.
+- un recorrido no sigue el formato de arriba;
+- `qa_coverage --assistant` da algo en cualquiera de sus cuatro listas.
 
 Un flujo nuevo entra en el recorrido en el que lo haría una persona, en su sitio dentro de la sesión; si ninguno
 encaja, se escribe un recorrido nuevo.

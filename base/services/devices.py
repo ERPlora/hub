@@ -153,7 +153,7 @@ def badge_owner(slug: str, raw: str):
     if credential is None:
         return None, digest
     membership = (
-        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        Membership.objects.team(slug).filter(user__username=credential.username)
         .select_related("user")
         .first()
     )

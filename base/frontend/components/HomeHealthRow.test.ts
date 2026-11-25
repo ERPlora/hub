@@ -2,9 +2,11 @@
 // receipt printer, the WhatsApp number), the way to fix what can be fixed and «View system». Nobody else sees it, nor
 // asks for it. It reads `base.health.list` when the Home opens and again each time the person comes back to it.
 import { StatusPill } from '@erplora/ui/components';
+import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
+import { ref } from 'vue';
 
-import { EMPLOYEE, flush, mountBase } from '../__tests__/mount-base';
+import { EMPLOYEE, flush, mountBase, OWNER } from '../__tests__/mount-base';
 import type { HomeHealthItem } from '../operations/home';
 import HomeHealthRow from './HomeHealthRow.vue';
 
@@ -159,6 +161,32 @@ describe('HomeHealthRow', () => {
     expect(m.items()).toEqual([
       { app: 'printing', pill: expect.objectContaining({ label: 'Printer ready', tone: 'success' }), action: null },
     ]);
+  });
+
+  it('reads it again when the person’s language changes with the Home open (the assistant changed it)', async () => {
+    const me = ref<SessionMe>(OWNER);
+    const PRINTER_OFF_ES = { ...PRINTER_OFF, title: 'Impresora sin conexión' };
+    const m = await row([told(PRINTER_OFF), told(PRINTER_OFF_ES)], { session: me });
+
+    me.value = { ...OWNER, apps: [{ label: 'demo', state: 'on' }] };
+    await settle();
+    expect(m.asked).toEqual(['/api/home/health']);
+
+    me.value = { ...OWNER, language: 'es' };
+    await settle();
+    expect(m.asked).toEqual(['/api/home/health', '/api/home/health']);
+    expect(m.items()).toEqual([
+      { app: 'printing', pill: expect.objectContaining({ label: 'Impresora sin conexión' }), action: 'Set up printing' },
+    ]);
+  });
+
+  it('for who does not run the business, a new language asks nothing either', async () => {
+    const me = ref<SessionMe>(EMPLOYEE);
+    const m = await row([told(PRINTER_OFF)], { session: me });
+
+    me.value = { ...EMPLOYEE, language: 'es' };
+    await settle();
+    expect(m.asked).toEqual([]);
   });
 
   it('says «View system» in the language of the page', async () => {

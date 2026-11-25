@@ -18,6 +18,7 @@ import {
   itPaintsTheTabsItsSessionOpens,
   type MountOptions,
   mountReservation,
+  OWNER,
   page,
 } from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
@@ -143,6 +144,20 @@ describe('ReservationsPage', () => {
       ['/api/reservation/reservations/seat', { id: 'r1' }],
     ]);
     expect(s.find('reservation-list-outcome').text()).toBe('Ana García is seated at table 5 (Terrace): its check is open in Sales.');
+  });
+
+  it('in Spanish the seated notice speaks of the reservation, so it reads right whoever the guest is', async () => {
+    const s = await setup({ session: { ...OWNER, language: 'es' }, locale: 'es' });
+    const marta = reservationRow({ guest_name: 'Marta Ruiz', table_label: '1 (Sala)', status: 'confirmed' });
+    await s.show([marta]);
+    s.answer(200, { ...marta, status: 'seated', table_session_id: 'ts1' });
+    await s.action('seat', marta);
+    await flush();
+    expect(s.find('reservation-list-outcome').text()).toBe('Reserva de Marta Ruiz sentada en la mesa 1 (Sala): su cuenta está abierta en Ventas.');
+    s.answer(200, { ...marta, status: 'seated', table_id: null, table_label: '', table_session_id: null });
+    await s.action('seat', marta);
+    await flush();
+    expect(s.find('reservation-list-outcome').text()).toBe('Reserva de Marta Ruiz sentada.');
   });
 
   it('a refused step says why above the list', async () => {

@@ -30,7 +30,7 @@ from apps.sale.schemas.fields import (
     Said,
     _text,
 )
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 
 
 class LineFields(Closed):
@@ -65,8 +65,7 @@ class ProductLineIn(LineFields):
         max_length=MAX_OPTIONS,
         title=gettext_noop("Modifiers"),
         description="The options of Modifiers chosen for the product (modifier.group.for_target), in the order "
-        "they were chosen; one chosen twice is named twice. Modifiers checks and values them: their price comes "
-        "from it and stays frozen on the line.",
+        "they were chosen; one chosen twice is named twice.",
     )
 
     @model_validator(mode="after")
@@ -94,8 +93,7 @@ class ComboChoiceIn(Closed):
         max_length=MAX_OPTIONS,
         title=gettext_noop("Modifiers"),
         description="The options of Modifiers chosen for the dish (modifier.group.for_target of its product), in the "
-        "order they were chosen: the same the dish asks sold on its own. Each pick of the dish carries them all. "
-        "Modifiers checks and values them, and their price adds to the menu's, frozen on the line.",
+        "order they were chosen: the same the dish asks sold on its own. Each pick of the dish carries them all.",
     )
 
     @model_validator(mode="after")
@@ -114,8 +112,7 @@ class ComboLineFields(LineFields):
         default_factory=list,
         max_length=MAX_OPTIONS,
         title=gettext_noop("Dishes"),
-        description="The dishes picked, course by course. Menus checks each course (its minimum, maximum and "
-        "repeats) and prices the menu: its closed price plus the supplements, frozen on the line.",
+        description="The dishes picked, course by course; Menus checks the courses and prices the menu.",
     )
 
     @model_validator(mode="after")
@@ -180,9 +177,8 @@ class ServiceLineFields(LineFields):
     booked_price: Cents | None = Field(
         None,
         title=gettext_noop("Booked price"),
-        description="The price the appointment of the check booked for this service, in cents, frozen on the "
-        "line whatever the catalog says today. Checked against the appointment (its service at that price; "
-        "lower only with the open-price right); without an appointment it is an open price.",
+        description="The price the check's appointment booked for this service, in cents, whatever the catalog "
+        "says today; without an appointment it is an open price.",
     )
 
     @model_validator(mode="after")

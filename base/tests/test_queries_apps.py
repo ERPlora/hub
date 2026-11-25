@@ -1,7 +1,7 @@
 """``base.app.list``: the Apps screen.
 
-Every module of the deployment the scope shows (``home.shown_modules``), from its ``LiveAppConfig`` in this process
-(never the SaaS): name, icon, category, one line, whether it is paid and where its right comes from
+Every module of the deployment the scope shows (``home.shown_modules.shown_modules``), from its ``LiveAppConfig`` in
+this process (never the SaaS): name, icon, category, one line, whether it is paid and where its right comes from
 (``base.entitlement``), its state (``on``, or ``blocked`` without the right), the first screen this person may open,
 what it needs and what needs it, and erplora.com's Store of this business's modules. Re-run when the SaaS's photo
 changes (``base.hub.state_applied``): a module bought there turns up here without reloading.
@@ -74,7 +74,7 @@ def test_every_module_of_the_deployment_from_its_own_config():
 def test_each_app_shows_the_icon_the_shell_paints_for_it():
     """The icon of an app is its first menu entry's, as the launcher and «My apps» paint it (registered in the shell:
     frontend/icons.test.ts); without a menu, the shell's own for an app. The module's ``icon`` is the store's, baked
-    apart for erplora.com (base/catalog.py), and HubIcon refuses a name the shell does not know: the whole screen went
+    apart for erplora.com (base/catalog/app_registry.py), and HubIcon refuses a name the shell does not know: the whole screen went
     blank on Staff's ``ion:id-card-outline``."""
     document = by_id(app_list())
     for config in module_configs():

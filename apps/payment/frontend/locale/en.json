@@ -4,7 +4,6 @@
     "tabs": {
       "label": "Sections of Payments"
     },
-    "loading": "Loading…",
     "noResults": "No results",
     "noResultsMessage": "Nothing matches the search or the filters.",
     "noPermission": "You do not have permission",
@@ -60,7 +59,6 @@
       "form": {
         "title": "New payment",
         "method": "Method",
-        "methodPlaceholder": "Method…",
         "date": "Date",
         "amount": "Amount",
         "amountIn": "Amount ({currency})",

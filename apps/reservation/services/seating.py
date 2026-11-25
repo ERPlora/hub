@@ -10,11 +10,12 @@ from live.errors import Conflict
 from apps.customer.models import Customer
 from apps.reservation import engine
 from apps.reservation.models import Reservation
-from apps.reservation.queries import in_service
+from apps.reservation.queries.gate import in_service
 from apps.reservation.services.gate import refuse
 from apps.reservation.services.other_apps import call_app
 from apps.table.models import Hold, Table
-from apps.table.queries import floor, seatable
+from apps.table.queries import floor
+from apps.table.queries.tables import seatable
 
 TABLE_NOT_FREE = _(
     "Table %(table)s is taken right now: free it, or move the reservation to another table before seating it."

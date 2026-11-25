@@ -13,6 +13,7 @@ from django.core.files.storage import storages
 from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.utils.translation import gettext, pgettext_lazy
+from live.assistant import choice_label
 from live.context import OperationContext
 from live.errors import InvalidPayload
 from live.operations import AI, atomic, operation
@@ -20,7 +21,7 @@ from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from base import access, events, queries
+from base import access, chosen_language, events, queries
 from base.media import AVATARS_FOLDER
 from base.models.access import AccessSettings
 from base.models.profile import Profile
@@ -170,6 +171,18 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     return queries.profile.profile_get(ctx, ProfileIn())
 
 
+def _preferences_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The card: each preference that is sent, an empty one by the choice «My profile» names it with (the business's),
+    since a blank datum does not show."""
+    return [
+        {**field, "kind": "text", "value": str(choice_label("base", "profile", field["name"], ""))}
+        if field["value"] == ""
+        else field
+        for field in fields
+        if field["value"] is not None
+    ]
+
+
 @operation(
     "base.profile.preferences_set",
     kind="command",
@@ -177,24 +190,32 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     permission=VIEW_HOME,
     input=PreferencesIn,
     output=PreferencesOut,
-    ai=AI(
-        description="Sets the person's own language (Spanish, English or the business's) and appearance.",
-        asks={
+    ai={
+        "description": (
+            "Sets the person's own language (Spanish, English or the business's) and appearance. Send only what they "
+            "asked to change: what is not sent stays as it is; an empty value goes back to the business's."
+        ),
+        "risk": "normal",
+        "summary": _preferences_summary,
+        "asks": {
             "en": ("switch me to English", "put the app in dark mode", "change my language to Spanish"),
             "es": ("ponme el idioma en inglés", "quiero el modo oscuro", "cámbiame la apariencia a clara"),
         },
-    ),
+    },
 )
 def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
-    """«Preferences»: saved as chosen and applied at once; empty = the business's. They follow the person
-    on any device of the hub (the language from their next entry on another one)."""
+    """«Preferences»: what is sent is saved as chosen and applied at once; empty = the business's. They follow the
+    person on any device of the hub (the language from their next entry on another one)."""
     user = queries.profile.signed_in(ctx)
     profile = _profile(user)
-    profile.language, profile.theme_mode, profile.palette = data.language, data.theme_mode, data.palette
-    profile.ui_scale = data.ui_scale
+    changes = data.model_dump(exclude_none=True)
+    for field, value in changes.items():
+        setattr(profile, field, value)
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     language = queries.profile.language_of(user, ctx.scope.key) or settings.LANGUAGE_CODE
+    if "language" in changes:
+        chosen_language.choose(ctx.request, language)
     return {"language": language, "theme_mode": profile.theme_mode, "palette": profile.palette, "ui_scale": profile.ui_scale}
 
 

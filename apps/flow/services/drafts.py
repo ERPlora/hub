@@ -7,7 +7,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.flow import events
+from apps.flow import assistant_card, events
 from apps.flow.models import Draft, Flow
 from apps.flow.queries.drafts import DRAFT_NOT_FOUND, draft_row
 from apps.flow.queries.reads import MANAGE
@@ -59,6 +59,7 @@ def _decide_draft(
         "the event and action names of `flow.catalog.read`. Put what you guessed in `notes`, then say it "
         "is waiting in Automations and repeat your doubts.",
         "risk": "normal",
+        "summary": assistant_card.draft,
     },
 )
 def propose_draft(ctx: OperationContext, data: DraftProposeIn) -> dict:

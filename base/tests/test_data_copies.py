@@ -26,7 +26,7 @@ from live.errors import NotFound, OperationError, PermissionDenied
 from live.operations import get
 
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import permissions_of_role
 from base.tenancy import connections, names
 from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.tests.business import HUB_DB
@@ -185,7 +185,7 @@ def person(slug: str, role=Membership.Role.OWNER) -> OperationContext:
     user = get_user_model().objects.create_user(username=f"{role}-{slug}", password="pw")
     Membership.objects.create(user=user, host=slug, role=role)
     scope = Scope("host", slug)
-    return OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope), language="es")
+    return OperationContext(scope=scope, actor=user, permissions=permissions_of_role(role), language="es")
 
 
 def call(ctx, name, /, **data):

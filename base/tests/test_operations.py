@@ -1,4 +1,5 @@
-"""The context builder: scope = first label of the Host, permissions by Membership."""
+"""The context builder: scope = first label of the Host, permissions by Membership (and the role the business gave
+the person, read from its own database, which its host's requests and its live streams' re-runs work in)."""
 
 import dataclasses
 
@@ -19,6 +20,7 @@ from base.operations import (
     is_platform_host,
     is_platform_hub,
 )
+from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A
 
 
@@ -27,6 +29,13 @@ def request_for(host: str, user=None, language: str = "en"):
     request.user = user if user is not None else AnonymousUser()
     request.LANGUAGE_CODE = language
     return request
+
+
+@pytest.fixture
+def in_a(hub_a):
+    """Business A entered, as a request to its host is (``base.middleware``) and a live re-run of it (``enter``)."""
+    with use_hub(hub_a):
+        yield hub_a
 
 
 @pytest.mark.parametrize(
@@ -38,6 +47,9 @@ def request_for(host: str, user=None, language: str = "en"):
         ("acme-2.localhost", "acme-2"),
         # A demo's host is a hub's too; whether it answers is the registry's (base.middleware).
         ("demo-0000beef.localhost:8000", "demo-0000beef"),
+        # ERPlora's own hub: the one reserved name that is a hub's.
+        ("erp.localhost:8000", "erp"),
+        ("ERP.localhost", "erp"),
     ],
 )
 def test_scope_is_the_first_label_of_the_host(host, key):
@@ -53,6 +65,9 @@ def test_scope_is_the_first_label_of_the_host(host, key):
         "www.localhost",
         "WWW.localhost:8000",
         "api.localhost",
+        "test.localhost",
+        # The name ERPlora's own hub had before is served no more.
+        "erplora.localhost",
         # The bare host and an IP are no hub.
         "localhost:8000",
         "127.0.0.1:8000",
@@ -201,10 +216,10 @@ def test_anonymous_request():
     )
 
 
-@pytest.mark.django_db
-def test_authenticated_request_gets_its_role_on_that_host(make_user):
-    user = make_user(host="a", role="hub_employee")
-    ctx_a = HubContextBuilder().from_request(request_for("a.localhost:8000", user))
+@HUB_DB
+def test_authenticated_request_gets_its_role_on_that_host(make_user, in_a):
+    user = make_user(host=A.key, role="hub_employee")
+    ctx_a = HubContextBuilder().from_request(request_for(HOST, user))
     # demo is the reference app; the other modules' grants are pinned by their own tests.
     assert {permission for permission in ctx_a.permissions if permission.startswith("demo.")} == {"demo.view"}
     ctx_b = HubContextBuilder().from_request(request_for("b.localhost:8000", user))
@@ -219,7 +234,7 @@ def test_a_superusers_request_holds_nothing_on_a_business_s_host_without_a_membe
 
 
 @HUB_DB
-def test_refresh_sees_a_revoked_membership(make_user, hub_a):
+def test_refresh_sees_a_revoked_membership(make_user, in_a):
     user = make_user(host=A.key, role="hub_admin")
     builder = HubContextBuilder()
     ctx = builder.from_request(request_for(HOST, user, language="es"))
@@ -233,7 +248,7 @@ def test_refresh_sees_a_revoked_membership(make_user, hub_a):
 
 
 @HUB_DB
-def test_refresh_sees_a_role_change(make_user, hub_a):
+def test_refresh_sees_a_role_change(make_user, in_a):
     user = make_user(host=A.key, role="hub_employee")
     builder = HubContextBuilder()
     ctx = builder.from_request(request_for(HOST, user))
@@ -250,7 +265,7 @@ def test_refresh_rereads_the_user_itself(superuser, hub_a):
 
 
 @HUB_DB
-def test_refresh_of_a_deactivated_user(make_user, hub_a):
+def test_refresh_of_a_deactivated_user(make_user, in_a):
     user = make_user(host=A.key, role="hub_admin")
     builder = HubContextBuilder()
     ctx = builder.from_request(request_for(HOST, user))
@@ -301,13 +316,11 @@ def test_a_scope_without_a_hub_has_no_id(scope):
     assert (caught.value.status, caught.value.message) == (404, "Ningún hub responde en este host.")
 
 
-def test_erploras_own_hub_is_the_one_of_its_slug(settings):
-    # ERPlora's own hub issues ERPlora's invoices; it is named by its reserved slug (PLATFORM_HUB_SLUG). Apps ask
-    # here, never there.
-    settings.PLATFORM_HUB_SLUG = "erplora"
-
-    assert is_platform_hub(Scope("host", "erplora")) is True
-    assert is_platform_hub(Scope("host", "a")) is False
+@pytest.mark.parametrize(("slug", "expected"), [("erp", True), ("erplora", True), ("a", False), ("test", False)])
+def test_erploras_own_hub_is_the_one_of_its_name_and_of_the_one_it_had_before(slug, expected):
+    # ERPlora's own hub issues ERPlora's invoices. Its row keeps its former name until it is renamed, and it is the
+    # same hub under both. Apps ask here, never the setting.
+    assert is_platform_hub(Scope("host", slug)) is expected
 
 
 def a_stream_of_an_admin_of_a(make_user, language: str = "en"):
@@ -333,7 +346,7 @@ class TestRefreshHearsTheHostGate:
             pytest.param({"status": "failed"}, id="preparation-failed"),
         ],
     )
-    def test_a_hub_that_stopped_serving_ends_the_stream_with_the_gate_s_envelope(self, hub_a, make_user, client, change):
+    def test_a_hub_that_stopped_serving_ends_the_stream_with_the_gate_s_envelope(self, in_a, make_user, client, change):
         from live.errors import Unauthorized
 
         from base.models import Hub
@@ -357,7 +370,7 @@ class TestRefreshHearsTheHostGate:
         from base.models import Hub
 
         Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True, expires_at=timezone.now() + dt.timedelta(hours=1))
-        user = make_user(host="demo-0000beef", role="hub_admin")
+        user = make_user(host="demo-0000beef", role="hub_owner")  # who enters a demo (base.services.demos)
         builder = HubContextBuilder()
         ctx = builder.from_request(request_for("demo-0000beef.localhost", user))
         Hub.objects.filter(slug="demo-0000beef").update(expires_at=timezone.now() - dt.timedelta(seconds=1))
@@ -367,7 +380,7 @@ class TestRefreshHearsTheHostGate:
 
         assert (ended.value.status, ended.value.code) == (410, "base.hub_gone")
 
-    def test_a_hub_whose_row_is_gone_ends_the_stream_as_not_found(self, hub_a, make_user, client):
+    def test_a_hub_whose_row_is_gone_ends_the_stream_as_not_found(self, in_a, make_user, client):
         from live.errors import Unauthorized
 
         from base.models import Hub
@@ -381,7 +394,7 @@ class TestRefreshHearsTheHostGate:
 
         assert (ended.value.status, ended.value.envelope()) == (404, gate.json())
 
-    def test_a_hub_in_its_grace_days_keeps_serving(self, hub_a, make_user):
+    def test_a_hub_in_its_grace_days_keeps_serving(self, in_a, make_user):
         from base.models import Hub
 
         builder, ctx = a_stream_of_an_admin_of_a(make_user)

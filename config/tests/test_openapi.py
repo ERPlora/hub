@@ -2,7 +2,7 @@
 
 from ninja import Router
 
-from apps.appointment.schemas import SettingsIn as AppointmentSettingsIn
+from apps.appointment.schemas.settings import SettingsIn as AppointmentSettingsIn
 from apps.cart_checkout.schemas import ItemRefIn as CartItemRefIn
 from apps.demo.schemas import ItemRefIn as DemoItemRefIn
 from apps.printing.schemas import DeviceOut as PrintingDeviceOut

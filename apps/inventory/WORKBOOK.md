@@ -154,15 +154,16 @@ Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno 
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
 solo en productos físicos) y «Editar». En el menú «⋮»: «Detalles» (la misma ficha que abre tocar la
 fila), «Dar de baja stock» (además, solo en artículos con control de stock), «Marcar agotado» o, si
-ya lo está, «Volver a poner a la venta» (para quien puede cambiar productos) y «Eliminar». Tocar la
+ya lo está, «Volver a poner a la venta», «Ocultar de la página web» o, si ya lo está, «Mostrar en la página web»
+(estos dos pares, para quien puede cambiar productos) y «Eliminar». Tocar la
 fila abre la ficha. Si la fila no tiene sitio, también los de la vista pasan al «⋮».
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
 SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
 crear), «Umbral stock bajo», «EAN-13», «Descripción», «Tipo» («Físico» o «Servicio», solo al
 crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad de medida», «Categoría
-fiscal» («Elige una categoría fiscal») y «Categorías» (si hay alguna), y «Guardar» / «Guardar
-cambios» («Guardando…»).
+fiscal» («Elige una categoría fiscal»), «Categorías» (si hay alguna) y la casilla «Mostrar en la página web»
+(marcada en un alta), y «Guardar» / «Guardar cambios» («Guardando…»).
 
 La foto del artículo (INVENTORY-F30 a F32): la tabla lleva la columna «Foto», delante del nombre, con la
 miniatura de la foto o las iniciales sobre su color, y las tarjetas su línea «Foto»; la ficha la enseña
@@ -177,7 +178,8 @@ Vacía: «Sin productos». Cargando: «Cargando…». Error: el aviso de la tabl
 rechazo del formulario sale dentro del panel; el de una acción de fila, encima de la tabla.
 
 #### Ficha del producto
-Ventana con el nombre del producto: SKU, Precio, Stock y Estado («Sí · Agotado» si está agotado); el
+Ventana con el nombre del producto: SKU, Precio, Stock, Estado («Sí · Agotado» si está agotado) y «Página web»
+(«Visible» u «Oculto»); el
 código de barras del SKU en una placa blanca con el SKU debajo; «Imprimir código de barras» y, con
 permiso de stock y en un producto físico, «Recibir stock» y «Contar stock», y «Dar de baja stock» si
 el artículo controla su stock; con permiso para cambiar productos, «Marcar agotado» o «Volver a poner
@@ -292,6 +294,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
 | INVENTORY-F35 | Declarar los alérgenos de un producto | hecho |
+| INVENTORY-F36 | Mostrar u ocultar un producto en la página web | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -355,7 +358,8 @@ entero o no se guarda nada. Si se dio stock inicial, queda en **Movimientos** co
 Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrece en la rejilla del
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28). Por el asistente o la API
 se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTORY-F03), como vuelve uno
-que estaba desactivado al recuperarse desde una copia aparte (BASE-F114).
+que estaba desactivado al recuperarse desde una copia aparte (BASE-F114). Una copia de seguridad o una plantilla de
+«Datos y copias» (BASE-F35) guarda qué productos son «Servicio», y al cargarla (BASE-F31) lo siguen siendo.
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
 como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
@@ -370,7 +374,7 @@ otro producto del catálogo». Una categoría fiscal que ya no está en Impuesto
 llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada. El coste solo lo escribe
 quien ve los costes: un alta con coste de quien no los ve, por el asistente o la API, se rechaza como una operación
 sin permiso y no se guarda nada; sin coste, el producto se da de alta con coste 0.
-Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F31, BASE-F35, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
 los productos que el negocio ya no tiene en absoluto, cada uno por esta misma alta; uno eliminado vuelve el mismo,
 INVENTORY-F34)
 
@@ -554,8 +558,10 @@ Pasos:
 Entra: el fichero; las categorías fiscales, sus nombres (también los traducidos) y los textos
 aprendidos, de Impuestos; las unidades.
 Sale: un producto activo y «Físico» por fila lista, que sigue el control de stock del negocio y no
-lleva categorías de TPV; Inventario avisa de cada producto nuevo. El stock que trae cada fila queda
-en **Movimientos** como «Inicial». En Impuestos, los textos aprendidos y las categorías creadas
+lleva categorías de TPV; Inventario avisa de cada producto nuevo. Por el asistente o la API, una fila puede decir
+además que es un «Servicio» y a qué cantidad y unidad se refiere su precio (INVENTORY-F26). El stock que trae cada
+fila queda en **Movimientos** como «Inicial», también uno por debajo de cero (-3, el de un negocio que
+vende sin stock), tal como viene. En Impuestos, los textos aprendidos y las categorías creadas
 desde la ventana fiscal. Una fila con un SKU que ya tiene un producto vivo se cuenta como omitida y
 ese producto no se toca, digan lo que digan sus otras celdas (así el propio export se vuelve a importar
 sin fallos, también con un stock negativo); un SKU de un producto eliminado crea uno nuevo.
@@ -563,13 +569,15 @@ Si falla: motivos de fila: «Faltan nombre o SKU», «Precio no numérico» (tam
 «Precio o coste demasiado alto», «SKU duplicado en el fichero», «Cantidad no numérica», «Cantidad
 demasiado grande», «La cantidad no respeta el incremento permitido para esta unidad», «Unidad de
 medida no reconocida», «Un texto es más largo de lo que admite su columna», «Ese EAN-13 ya lo tiene
-otro producto del catálogo» y «Falta la categoría fiscal» o «Categoría fiscal no reconocida». Si Impuestos no puede guardar un texto aprendido o una categoría
+otro producto del catálogo» y «Falta la categoría fiscal» o «Categoría fiscal no reconocida»; por el asistente o la
+API, también «Tipo de producto no reconocido», «Un servicio no lleva stock.» y «El precio tiene que referirse a una
+unidad del mismo tipo que la del producto.». Si Impuestos no puede guardar un texto aprendido o una categoría
 creada, se dice en el informe y sus filas quedan como fallidas con ese motivo. «Cancelar» en la
 ventana fiscal no importa nada. «Parar» deja lo ya creado y el informe dice «La importación se
 paró a medias. Lo que ya se había creado está contado abajo; el resto del fichero se quedó como
 estaba.». Los costes solo los importa quien ve los costes: un fichero con costes de quien no los ve se rechaza
 entero como una operación sin permiso y no se crea nada.
-Implicados: TAX-F02, TAX-F14, TAX-F15, BASE-F119
+Implicados: TAX-F02, TAX-F14, TAX-F15, BASE-F119, INVENTORY-F26
 
 ### INVENTORY-F10 Importar categorías desde un CSV
 Estado: hecho
@@ -601,6 +609,9 @@ Pasos:
    filtros, no solo la página que se ve.
 3. En **Categorías**, el mismo botón descarga «inventario-categorias.csv» (Nombre, Slug y número de
    productos).
+4. Pedido al asistente («Sácame la carta entera en un CSV»), bajo su respuesta sale «Descargar
+   inventario-productos.csv», el mismo fichero que da el botón; el asistente no pega su contenido en el
+   chat.
 Entra: los productos o las categorías que cumplen la búsqueda y los filtros.
 Sale: el fichero, con las mismas cabeceras que reconoce la importación (Nombre, SKU, Precio, Coste,
 Stock, Umbral, EAN-13, Descripción, Alérgenos, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
@@ -609,7 +620,7 @@ la lleva el fichero de quien ve los costes; el de quien no los ve sale sin ella.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
 sale y la app no lo entrega por ninguna otra puerta. Un texto que una hoja de cálculo ejecutaría como
 fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la importación quita.
-Implicados: BASE-F112 (dentro de la app), BASE-F119
+Implicados: BASE-F112 (dentro de la app y desde el asistente), BASE-F119
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
 Estado: hecho
@@ -970,12 +981,13 @@ Pasos:
 Entra: las unidades del negocio, que llegan al activar Inventario.
 Sale: el producto con su unidad. Ventas la lee para la línea; el precio es por 1 de la unidad.
 Por el asistente o la API, el precio se puede referir a otra cantidad (por 100 g, o por kilo con
-el stock en gramos).
+el stock en gramos). Una copia de seguridad o una plantilla de «Datos y copias» (BASE-F35) guarda a qué cantidad y
+unidad se refiere, y el producto que entra al cargarla (BASE-F31) se cobra al mismo precio.
 Si falla: «La cantidad no respeta el incremento permitido para esta unidad» en pantalla; «La
 cantidad no respeta el incremento permitido para esta unidad: usa múltiplos de …» por el asistente o la
 API. La unidad de un producto
 con stock no se cambia.
-Implicados: SALE-F10
+Implicados: SALE-F10, INVENTORY-F09, BASE-F31, BASE-F35
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
 Estado: hecho
@@ -986,7 +998,9 @@ Pasos:
    gris), las categorías, qué categorías tiene cada producto y las unidades. Al cobrar, pide el
    catálogo de venta entero: precio, coste, categoría fiscal, unidad, alérgenos y si cada artículo lleva
    control de stock.
-2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
+2. Cocina pide los productos y las categorías para elegir qué envía a cada estación. La Página web pide el
+   mismo catálogo de venta para su carta, con la descripción, la foto y los alérgenos de cada producto, y solo
+   los que el negocio enseña en ella (INVENTORY-F36, WEBSITE-F05).
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
 4. Sin Inventario activo, el TPV lo dice en la rejilla («Inventario no está activa, así que no hay
@@ -1003,7 +1017,7 @@ enseña ni comprueba cuántas unidades quedan.
 Si falla: lo decide quien pide. Ventas rechaza una línea de catálogo si no puede leer el catálogo de
 venta y avisa en el TPV si Inventario está activo y no contesta; Cocina se queda sin opciones de
 reparto.
-Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
+Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, INVENTORY-F36, WEBSITE-F05
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
 Estado: hecho
@@ -1038,14 +1052,18 @@ Pasos:
 4. Cuando vuelve a haber, toca «Volver a poner a la venta» en el menú «⋮» o en la ficha: la insignia
    desaparece y el TPV lo vuelve a vender.
 Entra: el artículo (por la pantalla, o por su SKU o su nombre desde el asistente o la API) y si está
-agotado o vuelve a la venta.
+agotado o vuelve a la venta. La tarjeta del asistente dice el artículo que va a cambiar tal como lo
+encuentra, aunque se dijera con otras palabras («Cambiar en Inventario: Tarta de queso QA · Agotado: Sí»
+cuando se dijo «la tarta de queso»).
 Sale: el artículo marcado o desmarcado; Inventario avisa del cambio (`inventory.product.updated`).
 Marcarlo dos veces no cambia nada. Desactivarlo, activarlo o editarlo no le quita la marca. Un
 artículo agotado sigue contando en su categoría, porque el TPV lo sigue enseñando en gris
 (INVENTORY-F27), y no sale en el catálogo de venta.
 Si falla: el motivo sale encima de la tabla o dentro de la ficha («No se pudo cambiar si el producto
 está agotado» o el que dé la app). Quien no puede cambiar productos ve la insignia, pero no las
-acciones. Un artículo que ya no existe da «Este producto no existe en este hub».
+acciones. Un artículo que ya no existe da «Este producto no existe en este hub». Por el asistente,
+unas palabras que valen para varios artículos o para ninguno no sacan tarjeta: el asistente dice
+cuáles encajan y pregunta cuál.
 Implicados: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Elegir la imagen de un artículo desde la librería
@@ -1058,7 +1076,7 @@ Pasos:
    producto.
 2. Busca en español o en inglés («café con leche», «latte», «champú»): el buscador mira el título y los
    sinónimos de cada imagen, nunca el nombre de su archivo. Cada imagen sale con su título en el idioma
-   del negocio (en inglés si no es el español). Las pestañas «Todas», «Hostelería», «Peluquería»,
+   de quien la mira, el de «Mi perfil» (en inglés si no es el español). Las pestañas «Todas», «Hostelería», «Peluquería»,
    «Estética», «Comercio», «Deporte» y «Spa y bienestar» acotan por sector; salen de 60 en 60 con
    «Cargar más».
 3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
@@ -1132,10 +1150,11 @@ Pasos:
    más grande.
 Entra: la foto de cada artículo, de la librería o propia.
 Sale: nada: solo se enseña. Las imágenes de la librería se guardan en el dispositivo y no se vuelven a
-pedir; las propias solo las ve quien ha entrado en el negocio.
+pedir. Las propias, como las de la librería, las puede abrir cualquiera que tenga su dirección, porque la
+página web del negocio las enseña en su carta (WEBSITE-F05), como hacen las tiendas en línea.
 Si falla: una foto que no carga (sin conexión, borrada o que la librería ya no tiene) deja las iniciales,
 sin aviso; el TPV vende igual.
-Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
+Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29, WEBSITE-F05
 
 ### INVENTORY-F33 Las fotos viajan en el blueprint
 Estado: hecho
@@ -1230,6 +1249,33 @@ resto del formulario.
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
 KITCHEN-F32
 
+### INVENTORY-F36 Mostrar u ocultar un producto en la página web
+Estado: hecho
+Actor: administrador, responsable, asistente, API
+Pantalla: Productos, Ficha del producto
+Pasos:
+1. Un producto se vende en el TPV pero no tiene que salir en la carta de la página web del negocio (la comida del
+   personal, un plato que solo se ofrece en la barra). En **Productos**, en el menú «⋮» de su fila, toca «Ocultar de
+   la página web», o abre «Editar» y desmarca la casilla «Mostrar en la página web»: debajo sale la nota «El
+   catálogo de tu página web no lo enseña; el TPV lo sigue vendiendo.». Pulsa «Guardar cambios».
+2. Al dar de alta un producto la casilla sale marcada: se ve en la página web salvo que la desmarques.
+3. La ficha del producto dice «Página web: Visible» u «Oculto».
+4. Para que vuelva a salir, toca «Mostrar en la página web» en el «⋮» de su fila o marca otra vez la casilla.
+Entra: el producto (por la pantalla, o por su SKU o su nombre desde el asistente o la API, que lo hacen con el mismo
+cambio del producto, INVENTORY-F02, y los mismos permisos: «oculta el producto Café de la página web» pide antes la
+tarjeta de confirmación) y si se muestra o no.
+Sale: el producto con la marca; Inventario avisa del cambio (`inventory.product.updated`, con `show_on_website`). La
+carta de la página web (WEBSITE-F05) deja fuera los productos ocultos, también en la vista previa, y no ocupan sitio
+en sus 200 elementos; la página publicada lo refleja en la siguiente visita, como mucho al minuto. El TPV, Cocina y
+Menús no cambian: un producto oculto se sigue vendiendo, y agotarlo o desactivarlo no le quita la marca. Los productos
+que ya existían salen en la página web, como hasta ahora. Recuperar el negocio desde una copia aparte (BASE-F114)
+devuelve cada producto con su marca. Una copia de seguridad o una plantilla de «Datos y copias» (BASE-F35) dice qué
+productos están ocultos y, al cargarla (BASE-F31), los que entran siguen ocultos; el producto que el negocio ya tenía
+se queda como estaba, y un archivo que no lo dice trae sus productos visibles.
+Si falla: el motivo sale encima de la tabla o dentro del formulario («No se pudo actualizar el producto» o el que dé
+la app). Quien no puede cambiar productos ve la línea de la ficha, pero no las acciones ni el formulario.
+Implicados: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F31, BASE-F35, BASE-F114
+
 ## Qué comparten los verticales
 
 El restaurante usa Inventario para la carta y la peluquería para los productos de venta, con las
@@ -1272,9 +1318,9 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
+| Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29, F32, F33, F36 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
-| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste (vacío para quien no ve los costes), categoría fiscal, unidad, alérgenos y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
+| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste (vacío para quien no ve los costes), categoría fiscal, unidad, alérgenos, descripción, foto y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
@@ -1286,23 +1332,23 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste (vacío para quien no ve los costes) y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
 | Los ajustes del inventario | gestionar ajustes | F19 | `inventory.config.get` |
-| Hasta cinco imágenes de la librería para la foto de un producto, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver productos | F30 | `inventory.product.suggest_image` |
+| Hasta cinco imágenes de la librería para la foto de un producto, por su nombre y tituladas en el idioma de quien pregunta; no pone ninguna | ver productos | F30 | `inventory.product.suggest_image` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
 | Qué hace | Quién puede | Confirmación en el asistente | Flujos | Servicio |
 |---|---|---|---|---|
-| Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35 | `inventory.product.create` |
-| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F35 | `inventory.product.bulk_create` |
-| Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
+| Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35, F36 | `inventory.product.create` |
+| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F12, F26, F33, F35 | `inventory.product.bulk_create` |
+| Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F12, F20, F35, F36 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
 | Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
-| Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F30 | `inventory.product.set_image` |
-| Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31 | `inventory.product.upload_image` |
+| Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F12, F30, F33 | `inventory.product.set_image` |
+| Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31, F33 | `inventory.product.upload_image` |
 | Añade un producto a una categoría (también la plataforma, al recuperar desde una copia aparte una categoría eliminada con los productos que el negocio conserva) | cambiar productos | un clic | F08, F07 | `inventory.product_category.add` |
 | Quita un producto de una categoría | cambiar productos | un clic | F08 | `inventory.product_category.remove` |
-| Crea una categoría | crear categorías | un clic | F06 | `inventory.category.create` |
+| Crea una categoría | crear categorías | un clic | F06, F12 | `inventory.category.create` |
 | Crea muchas categorías de una vez, con informe por fila | crear categorías | un clic | F10 | `inventory.category.bulk_create` |
 | Cambia una categoría | cambiar categorías | un clic | F06 | `inventory.category.update` |
 | Elimina una categoría y desvincula sus productos | eliminar categorías | escribir para confirmar | F07 | `inventory.category.delete` |
@@ -1319,7 +1365,7 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 | Aviso | Cuándo | Qué lleva | Quién lo usa | Servicio |
 |---|---|---|---|---|
 | Producto nuevo | Alta por pantalla, importación, plantilla, asistente o API | El producto y sus categorías | Flujos; paneles del Inicio | `inventory.product.created` |
-| Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta | El producto como queda, también si está agotado | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
+| Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta, mostrar u ocultar en la página web | El producto como queda, también si está agotado y si la página web lo enseña | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
 | Producto eliminado | Eliminar | Cuál era (SKU y nombre) | Flujos; paneles del Inicio | `inventory.product.deleted` |
 | Producto recuperado | Recuperar un producto eliminado (también la repetición) | El producto como vuelve | Flujos; paneles del Inicio | `inventory.product.restored` |
 | Producto añadido a una categoría | Alta, cambio o enlace suelto | Producto y categoría | Flujos | `inventory.product.categorized` |
@@ -1400,7 +1446,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   «apúntame», «anota» y «registra que…». Nunca «llegan» ni «llegado» sueltos, que dice también la gente que llega («han
   llegado dos más para la mesa 7», «ya llegan los de la reserva», «ha llegado la clienta de la cita»), ni «arrived» en
   inglés. Quien apunta que ha llegado gente («apunta que han llegado los de la reserva de Luis») ve también la
-  recepción entre las herramientas que se le ofrecen. Lo comprueba `tests/test_assistant_asks.py`.
+  recepción entre las herramientas que se le ofrecen. Un pedido que llega sí es mercancía, porque «pedido» y «order»
+  solos son la cuenta de una mesa: «ha llegado el pedido de bebidas», «acaba de llegar el pedido», «el pedido ha
+  llegado», «the drinks order just came in», «the order has arrived». El pedido de un cliente se toma, se manda a cocina
+  o se sirve, pero no llega: «pon el pedido de bebidas en la mesa 4» no ofrece la recepción. Con un pedido de bebidas que
+  llega, el turno ofrece la recepción y, por si al final era de una mesa, añadir la línea a su cuenta: en inglés se ofrece
+  también y en español la encuentra la búsqueda de su tarea. Lo comprueba `tests/test_assistant_asks.py`.
 
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
@@ -1436,9 +1487,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
   rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
   productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
-  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, no suben esa migración: están en
-  `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo si la tabla de la copia tiene su columna (`pg_attribute`), así
-  que una copia anterior devuelve sus productos sin ellos. Una migración que añada, quite o renombre una columna que
+  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, y si la página web los enseña, de
+  `0007_product_show_on_website`, no suben esa migración: están en `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo
+  si la tabla de la copia tiene su columna (`pg_attribute`), así que una copia anterior devuelve sus productos sin
+  ellos (visibles en la página web). Una migración que añada, quite o renombre una columna que
   se lee cambia también la lectura y su `reads_since`, salvo una columna nueva que pueda faltar en la copia, que va a
   `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
   contrato de `base/tenancy/tests/test_recovery.py`.
@@ -1536,6 +1588,20 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   (permiso de cambiar productos) reutiliza `inventory.product.updated`, con `is_sold_out` en la carga:
   el TPV, Cocina y Menús re-ejecutan sus consultas sin tocar `live.py`. La ficha (`inventory.product.get`)
   sigue dando el artículo, marcado: es lo que lee Ventas al congelar una línea.
+- **Mostrar en la página web (INVENTORY-F36)**: `Product.show_on_website` (encendido por defecto, también en la base,
+  `db_default`) se cambia con `inventory.product.create` y `inventory.product.update`, sin operación propia, y viaja en
+  `inventory.product.updated`. `list_for_sale` lo devuelve y admite `show_on_website=true|false`: la Página web pide
+  `true`, así que lo oculto no ocupa sitio en su tope de elementos; el TPV no lo pide. Las acciones de la fila, con las
+  de agotado, salen de `frontend/composables/useFlagActions.ts`. No entra en el CSV de importación y exportación, que no
+  lleva ninguna otra marca del producto salvo «Activo» en la exportación. En el fichero de «Datos y copias», la fila de
+  un producto oculto lleva `show_on_website: false` y la de uno visible no lleva nada (`base/blueprint_products.py`); al
+  cargarla se aplica con `inventory.product.update`, tras la importación.
+- **Tipo y precio por otra cantidad en la importación (INVENTORY-F01, F09, F26)**: las filas de
+  `inventory.product.bulk_create` admiten `product_type`, `price_quantity` y `pricing_unit`, opcionales (vacías:
+  `physical`, 1 y la unidad del producto), con las reglas de `inventory.product.create`. La pantalla del CSV no los
+  manda y la exportación CSV no los lleva. En el fichero de «Datos y copias», la fila los lleva solo cuando no son esos
+  (`base/blueprint_products.py`) y entran al crear el producto, no con un cambio posterior: nunca hay un producto a otro
+  precio.
 - **Referencia de una venta (INVENTORY-F16, 2026-10-21)**: la nota por venta (`SaleStock`) guarda
   `sale_number` (del aviso `sale.sale.completed`) y `document_number` (el `invoice_number` que da
   `sale.sale.get`, leído como sistema al bajar el stock; vacío si Ventas no lo sabe). `inventory.movement.list`
@@ -1573,14 +1639,14 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     pone un `catalog:` que exista en el manifiesto o vacía; un `file:` solo lo escribe la subida, así nadie
     apunta un artículo a otro archivo del negocio), `inventory.product.upload_image` (acción, cambiar
     productos: ≤ 2 MB, Pillow a WebP 512×512 recortada al centro, el espacio del plan con
-    `base.files.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
+    `base.files.space.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
     en `base`, `base.catalog_image.search` (consulta: título y `tags` del manifiesto en `es` y `en`; título en
-    el idioma del negocio). Reutilizan `inventory.product.updated`.
+    el idioma de quien pregunta, el de la petición). Reutilizan `inventory.product.updated`.
   - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs
     (`shared/catalog/…`, de solo lectura para los hubs) con caché inmutable, la misma vista genérica que
     `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por
-    `/p/media/<hub>/inventory/products/…`: inventory declara `members_media` con esa carpeta (hoy no declara
-    ninguna).
+    `/p/media/<hub>/inventory/products/…`: inventory declara esa carpeta en `public_media`, porque la carta de la
+    página web las enseña a sus visitantes, sin sesión (WEBSITE-F05).
   - TPV: `apps/sale/frontend/components/pos/ProductTile.vue`, `ServiceTile.vue` y `ComboTiles.vue` pintan la foto con
     `ItemImage` de base (`base/frontend/components/ItemImage.vue`): `image_url` entera (`fit="contain"`: las fotos de
     la librería son recortes sobre blanco y una baldosa ancha solo enseñaría una franja), cargada en diferido, con

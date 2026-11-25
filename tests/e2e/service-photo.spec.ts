@@ -5,7 +5,8 @@
 //     service tile load it from the library;
 //   - F35: «Upload photo» with a PNG made here: uploaded after «Save changes» and kept as a 512 × 512 WebP in the
 //     business's folder, which the list loads;
-//   - screenshots of the library window at 390, 834 and 1440.
+//   - the library names its images in the language the person reads the Hub in, whatever the business's;
+//   - screenshots of the library window at 390, 834 and 1440, in English and in Spanish.
 // What this file creates is deleted after it (its own photo through «Remove photo», which removes it from the folder);
 // the cash register goes back as it was.
 import { expect, type Locator, type Page, test } from '@playwright/test';
@@ -23,6 +24,7 @@ interface Service {
 }
 
 let highlights: Service;
+let colour: Service;
 let own: Service;
 const LIBRARY_URL = '/p/catalog/beauty_hair/mechas.webp';
 
@@ -33,6 +35,7 @@ test.beforeAll(async ({ browser }) => {
   // The till opens without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
   await drawerOff(context);
   highlights = await post<Service>(context, '/service/services', { name: named('Highlights'), price: 4500, tax_category_key: 'service.generic' });
+  colour = await post<Service>(context, '/service/services', { name: named('Colour'), price: 5000, tax_category_key: 'service.generic' });
   own = await post<Service>(context, '/service/services', { name: named('Signature cut'), price: 3000, tax_category_key: 'service.generic' });
   await context.close();
 });
@@ -100,6 +103,29 @@ test('SERVICE-F34: a library image, Hair and Beauty first, is the service’s ph
   await shown(page).locator('[data-testid=pos-category-services]').click();
   const tile = shown(page).locator(`[data-testid=pos-service-${highlights.id}]`);
   expect(await tilePhotoLoaded(tile, highlights.name, LIBRARY_URL)).toBe(512);
+});
+
+test('SERVICE-F34: the library names its images in the language the person reads the Hub in', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  for (const [language, title] of [['es', 'Mechas'], ['en', 'Highlights']] as const) {
+    // As the language picker of «My profile» leaves it; the business has no language of its own here.
+    await page.context().addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+    const form = await editForm(page, colour);
+    await expect(page.locator('html')).toHaveAttribute('lang', language);
+    await form.locator('[data-testid=service-form-image-library]').click();
+    const library = dialog(page, 'service-form-image-library-modal');
+    await library.locator('[data-testid=service-form-image-library-modal-search] input').fill('Mechas');
+    const choice = library.locator('[data-testid=service-form-image-library-modal-image-beauty_hair-mechas]');
+    await expect(choice).toHaveText(title);
+    await expect(choice.locator('img')).toHaveAttribute('alt', title);
+    if (language !== 'es') continue;
+    await photoLoaded(choice);
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await capture(page, `APP-SERVICE-F34-ES-${viewport.label}`);
+    }
+    await page.setViewportSize({ width: 1280, height: 860 });
+  }
 });
 
 test('SERVICE-F35: a photo of its own goes up with «Save changes» and comes back as a 512 × 512 WebP', async ({ page }) => {

@@ -25,11 +25,11 @@ from live.operations import get
 
 from apps.verifactu.queries.app_hooks import enable_refusal
 from base import activation, apps_on, blueprint, events as base_events, registry, services
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 from base.models.activation import AppActivation
 from base.models import Hub, Membership
 from base.models.blueprints import ImportBatch
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.context import HubWithoutDatabase, current_alias, use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from control.models import HubDue
@@ -38,10 +38,10 @@ __all__ = ["in_business_a"]
 pytestmark = HUB_DB
 
 
-def person(role, username="olga"):
+def person(role, username="olga", language="es"):
     user = get_user_model().objects.create_user(username=username, password="pw")
     Membership.objects.create(user=user, host=A.key, role=role)
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
+    return OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
 
 
 @pytest.fixture
@@ -277,6 +277,17 @@ def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
         ("table", "Mesas", 12),
     }
     assert total(owner, "inventory.product.list") == 16  # nothing removed
+
+
+@pytest.mark.parametrize("asked", [{"dry_run": True}, {"apps": ["table"], "confirm": A.key}], ids=["plan", "reset"])
+def test_erploras_own_hub_is_never_emptied(owner, asked):
+    Hub.objects.filter(slug=A.key).update(is_platform=True)
+
+    with pytest.raises(Conflict) as refused:
+        call(owner, "base.hub.reset", **asked)
+
+    assert refused.value.code == "base.platform_hub_kept"
+    assert Hub.objects.get(slug=A.key).reset_requested_at is None
 
 
 def test_without_a_business_name_the_hubs_address_is_typed(owner):

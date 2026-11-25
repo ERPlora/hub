@@ -548,6 +548,9 @@ Si falla: mientras falte algo, «Pasar a producción» se queda desactivado, el 
 Sin emisor en Facturación, pide configurarlo antes. Ya en producción, no hace nada. En un negocio de fuera de España,
 Ajustes dice arriba «VeriFactu solo es para negocios de España.» como único motivo y «Pasar a producción» va
 deshabilitado.
+Pedido al asistente («pasa VeriFactu a la AEAT real»), mientras falte algo no sale la tarjeta de confirmar: el
+asistente dice que todavía no se puede y por qué, con el mismo motivo con el que se rechazaría la acción. Cuando no
+falta nada, sale su tarjeta y hay que escribir CONFIRMAR.
 Si en producción se pierde la vía fijada (con la de ERPlora, se revoca tu autorización; con la del certificado, caduca
 o se quita), no se cambia de vía ni se vuelve a pruebas: no se sella nada nuevo. La venta o la factura se rechazan con
 «No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros:» y el
@@ -1174,7 +1177,7 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 
 `setup` y `widgets` en `apps.py` (sin `bell`). **Paso** `verifactu.sending_route`
 («Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante» en pruebas, gh:hub#1726; ⛔ «Necesario
-para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home.py`: el nivel
+para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home/setup_steps.py`: el nivel
 es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
 production, scope)` sobre la vía que tendría en producción, `queries.route.sending_route`: certificado propio vigente que
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
@@ -1579,7 +1582,7 @@ necesitan para el soporte». Por eso:
 17. **Ninguna plantilla la enciende, tampoco en España** (hub#998): una app que ata al
     negocio con la AEAT hasta fin de año y no se apaga (decisión 16) la activa el dueño, de forma explícita, como en
     Square, Odoo, Holded o Sage 50. La app no lista ningún sector en `verticals` (`apps.py`), así que
-    `base.catalog.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
+    `base.catalog.verticals.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
     la anuncia ni la carga la activa. En erplora.com, `verticals` es también lo que la tienda pública usa para
     «Pensada para» y para las apps de cada sector (`public/industries.py` del SaaS), así que VeriFactu no sale en las
     páginas de restaurante ni de peluquería, como Pagos, que tampoco viene en ninguna plantilla.

@@ -22,6 +22,7 @@ from django.utils import translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
+from pydantic import ValidationError
 
 from apps.invoice.tests.conftest import catalog_of
 from apps.sale.tests.conftest import db_dsn, make_user
@@ -44,6 +45,11 @@ TODAY = dt.date(2026, 10, 14)
 TOMORROW = dt.date(2026, 10, 15)
 #: Thursday = 3 (Monday = 0).
 THURSDAY = 3
+#: Madrid's clocks go back an hour (03:00 summer time is 02:00 again) and forward (02:00 is 03:00).
+CLOCKS_BACK = dt.date(2026, 10, 25)
+CLOCKS_FORWARD = dt.date(2026, 3, 29)
+#: Thursday 15 October 2026 at 21:00, as each language writes a day and a time (the card's own CLDR words).
+WHEN = {"es": "15 oct 2026 · 21:00", "en": "Oct 15, 2026 · 9:00 PM"}
 
 
 def ctx_for(
@@ -66,10 +72,23 @@ def ctx_for(
     )
 
 
+def in_(language: str):
+    return ctx_for(language=language)
+
+
 def run(name: str, data: dict | None = None, ctx: OperationContext | None = None):
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
+
+
+def errors(schema, data) -> dict[str, str]:
+    with pytest.raises(ValidationError) as caught:
+        schema.model_validate(data)
+    return {
+        ".".join(str(p) for p in e["loc"]) or "__root__": e["msg"]
+        for e in caught.value.errors()
+    }
 
 
 def pin_clock(monkeypatch, instant: dt.datetime) -> None:

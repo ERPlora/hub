@@ -9,6 +9,10 @@
 //   page the Home's block gives, already signed in: its click goes with the pass (`useSaasPass`).
 // - A write a manager must approve goes through the managers' approvals: the dialog «An approval is
 //   needed», then the same turn again with the pass in `X-Elevation-Token`.
+// - A copy of a business (`.blueprint.zip`) may be attached for `base.blueprint.import`, which takes it whole: with the
+//   limit and the words of Settings › Data › Import.
+// - A file a read hands the person (the CSV or the Excel of an export) is saved as every download of the Hub
+//   (`saveFile`), also inside the installed app.
 // - base's words: the verb of each write (`base.assistant.card.actions.<action>`, or of the whole operation when its
 //   action's verb does not say it, `base.assistant.card.operations.<app>.<entity>.<action>`; one per action of every
 //   write the assistant may run, guardrail: base/tests/test_assistant.py), the platform's screens
@@ -19,6 +23,8 @@ import { parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 import type { SetupStatus } from '../operations/home';
 import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
+import { base64ToBlob, BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
+import { saveFile } from './download';
 import { type HubHome, readJsonBlock } from './home';
 import { OWN_BUSINESS } from './plan-link';
 import { useSaasPass } from './saas-pass';
@@ -124,10 +130,18 @@ export async function speakAloud(
 
 const planUrl = () => readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
 
+/** The file a read handed, as a screen saves it: a text as it comes, any other type from its base64. */
+async function handedBytes(file: Blob): Promise<Blob> {
+  return file.type.startsWith('text/') ? file : base64ToBlob(await file.text(), file.type);
+}
+
 /** base's modules are read when each piece runs, never when this is built: a test that mocks one of them (an app's
  *  `approval` without `approvalPass`) still loads this file through a helper that configures it. */
 export const HUB_ASSISTANT: AssistantConfig = {
   turnUrl: '/api/assistant/turn',
+  toolFiles: [{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }],
+  imageNames: true,
+  saveFile: async (filename, file, t) => saveFile(filename, await handedBytes(file), t),
   elevationToken: () => approvalPass(),
   approval: hubApproval(),
   usage: (client) => client.api.call('base.assistant.usage', {}),

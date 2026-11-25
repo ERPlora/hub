@@ -5,6 +5,7 @@ The gateway is ``fake_gateway.FakeGateway``: a real HTTP server on 127.0.0.1 tha
 """
 
 import asyncio
+import json
 
 import pytest
 
@@ -39,6 +40,15 @@ def test_a_report_goes_to_erplora_with_the_question_and_the_answer(gateway):
     assert answer == {"sent": True, "duplicate": False}
     seen = gateway.sent("/internal/assistant/report")[0]
     assert seen.body == {"hub": A.key, "message_id": "m1", "reason": "incorrect", "comment": "", "question": "¿Qué vendí?", "answer": "Nada"}
+    assert signed(seen)
+
+
+def test_what_the_hub_sends_travels_as_compact_json(gateway):
+    """No space after a comma or a colon, and «¿Qué» as written: the tools of a turn are most of each call's body."""
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    assistant.gateway.report(A, message_id="m1", reason="incorrect", comment="", question="¿Qué vendí?", answer="Nada")
+    seen = gateway.sent("/internal/assistant/report")[0]
+    assert seen.raw == json.dumps(seen.body, ensure_ascii=False, separators=(",", ":")).encode()
     assert signed(seen)
 
 
@@ -211,3 +221,34 @@ def test_a_report_that_does_not_know_leaves_the_web_out(gateway):
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     assistant.gateway.report(A, message_id="m1", reason="other", comment="", question="", answer="x", web=None)
     assert "web" not in gateway.sent("/internal/assistant/report")[0].body
+
+
+# ── The web addresses erplora.com's own tools consulted, which the panel checks the answer's against (BASE-F99) ─────
+
+LAW, RATE = "https://www.boe.es/doc", "https://frankfurter.dev"
+
+
+def test_the_addresses_its_tools_consulted_close_the_round(gateway):
+    gateway.turn(
+        {"type": "sources", "sources": [LAW]},
+        {"type": "text_delta", "text": "Según el BOE, sube."},
+        {"type": "sources", "sources": [RATE]},
+        {"type": "response", "output": [], "usage": {}, "continuation": None},
+    )
+    frames = frames_of(**TURN)
+    assert [frame["type"] for frame in frames] == ["text", "done"]
+    assert frames[-1]["sources"] == [LAW, RATE]
+
+
+def test_a_round_whose_tools_consulted_nothing_says_none(gateway):
+    gateway.turn({"type": "text_delta", "text": "Hola"}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    assert frames_of(**TURN)[-1]["sources"] == []
+
+
+def test_what_was_consulted_before_a_failure_stays_with_what_was_said(gateway):
+    gateway.turn(
+        {"type": "sources", "sources": [LAW]},
+        {"type": "text_delta", "text": "Según el BOE"},
+        {"type": "error", "code": "assistant.provider_unavailable", "message": "x", "retriable": True},
+    )
+    assert frames_of(**TURN)[-1]["sources"] == [LAW]

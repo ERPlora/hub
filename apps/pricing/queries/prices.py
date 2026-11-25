@@ -8,7 +8,8 @@ from live.operations import operation
 
 from apps.pricing.queries.reads import ITEM_NOT_FOUND, _page, find_list, live_items
 from apps.pricing.queries.rows import item_label, item_row
-from apps.pricing.schemas import Page, PriceItemDetailOut, PriceItemIdIn, PriceItemListIn, PriceItemOut
+from apps.pricing.schemas.fields import Page
+from apps.pricing.schemas.prices import PriceItemDetailOut, PriceItemIdIn, PriceItemListIn, PriceItemOut
 from base.ordering import list_order
 
 

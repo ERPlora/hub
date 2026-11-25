@@ -1,9 +1,7 @@
-"""The business's people and roles (``base.person.*``, ``base.role.list``, ``base.hub_user.get``) and how a person is
-named in this hub."""
+"""The business's people (``base.person.*``, ``base.hub_user.get``) and how a person is named in this hub."""
 
 from typing import Any
 
-from django.utils import translation
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound
@@ -13,14 +11,14 @@ from base import access, people as people_rules
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
-from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_of_role
-from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
+from base.permissions import ADMINISTER_HUB, VIEW_HOME, is_a_person
+from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
 from .usage import _is_count
 
 
-# ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
+# ── People and permissions: people ──────────────────────────────────────────────────────────────────────────────────
 
 
 def people_of(slug: str) -> list[dict[str, Any]]:
@@ -29,7 +27,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
     with what the hub keeps of their way in (``Credential``) and their name in it (``Profile``). Two reads per side,
     never a join: who is a member is control's and the ways in are the hub's."""
     found: dict[str, dict[str, Any]] = {}
-    memberships = Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+    memberships = Membership.objects.team(slug).select_related("user")
     for membership in memberships:
         user = membership.user
         found[user.get_username()] = {
@@ -111,11 +109,6 @@ def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
         "entered": person["entered"],
         "me": signed_in_username(ctx) == person["id"],
     }
-
-
-def is_a_person(actor: Any) -> bool:
-    """Whether ``actor`` is a signed-in person (a control user), not the platform, an API key or nobody."""
-    return hasattr(actor, "get_username") and bool(getattr(actor, "is_authenticated", False))
 
 
 def hub_user_of(ctx: OperationContext) -> HubUser | None:
@@ -219,41 +212,6 @@ def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
 def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     """A person's page, for who runs the business."""
     return person_detail_out(ctx, person_of(ctx, data.person))
-
-
-@operation(
-    "base.role.list",
-    kind="query",
-    permission=VIEW_HOME,
-    input=RoleListIn,
-    output=RoleListOut,
-    ai=AI(
-        description=(
-            "Lists the roles of this business (owner, admin, manager, employee): how many people have each one and how "
-            "many permissions of the apps it gives. Roles are given on erplora.com."
-        ),
-        asks={
-            "en": ("how many managers do we have?", "what can a manager do here?"),
-            "es": ("¿qué roles hay en el negocio?", "¿cuántos encargados tenemos?"),
-        },
-    ),
-)
-def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
-    """Employees › Roles: erplora.com's, from the top, with their people and permissions."""
-    found = people_of(ctx.scope.key)
-    with translation.override(ctx.language):
-        return {
-            "roles": [
-                {
-                    "key": role.value,
-                    "label": str(role.label),
-                    "origin": "basic",
-                    "members": sum(1 for person in found if person["role"] == role),
-                    "permissions": len(permissions_of_role(role.value)),
-                }
-                for role in people_rules.ROLE_ORDER
-            ]
-        }
 
 
 def person_label(user) -> str:

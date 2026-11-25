@@ -119,13 +119,19 @@ def test_the_reported_cash_register_request_offers_its_existing_operation(catalo
     assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
 
 
+#: The task the model searches for when a reported request brings the read it needs first past the places of a turn.
+FIRST_SEARCHED = {"cash_register.session.get": "ver el turno de caja abierto"}
+
+
 @HUB_DB
 @pytest.mark.parametrize(("role", "name", "phrase"), [case for case in REPORTED if case[1] in FIRST])
 def test_the_reported_request_is_offered_the_read_it_needs_first(catalog_of, role, name, phrase):
     tools = catalog_of(role, "es")
     assert FIRST[name] in tools  # positive control: the role holds the read
     offered = offered_to(tools, phrase)
-    assert FIRST[name] in offered, (len(offered), offered[:10])
+    task = FIRST_SEARCHED.get(name)
+    found = [op.name for op in assistant.relevance.found(tools, task, "es")] if task else []
+    assert FIRST[name] in offered + found, (len(offered), offered[:10])
 
 
 #: Money coming into the drawer said as a business says it, in words that are none of the tool's asks nor a probe:

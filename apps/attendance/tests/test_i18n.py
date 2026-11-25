@@ -12,6 +12,7 @@ from live.meta import Nav
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
+from apps.attendance.queries import people
 from base.tests.po import catalogue_key as source
 from base.tests.po import (
     compiled_differences,
@@ -36,7 +37,7 @@ def visible_texts() -> set[str]:
     lazies = [
         *config_texts(config),
         *(panel.title for panel in config.widgets),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, people, services, schemas),
     ]
     lazies += model_texts(MODELS)
     for choices in (Record.Status, Record.Source):
@@ -85,14 +86,14 @@ def test_spanish_texts_are_the_old_modules():
         assert [str(nav.label) for nav in config.navigation] == ["Fichar", "Registros", "Ajustes"]
         assert [str(panel.title) for panel in config.widgets] == ["Fichados ahora"]
         assert [str(label) for label in Record.Status.labels] == ["Abierta", "Cerrada", "Por revisar"]
-        assert str(services.ALREADY_IN) == "Ya tienes una jornada abierta: ficha la salida antes de volver a entrar."
-        assert str(services.OVERLAP) == "Estas horas se solapan con otra jornada de esta persona."
+        assert str(services.clocking.ALREADY_IN) == "Ya tienes una jornada abierta: ficha la salida antes de volver a entrar."
+        assert str(services.corrections.OVERLAP) == "Estas horas se solapan con otra jornada de esta persona."
         assert str(schemas.OUT_BEFORE_IN) == "La salida tiene que ser posterior a la entrada."
-        assert str(services.OUTSIDE_RADIUS) % {"distance": 850, "radius": 100} == (
+        assert str(services.location.OUTSIDE_RADIUS) % {"distance": 850, "radius": 100} == (
             "Estás a 850 m del lugar de trabajo, fuera de los 100 m permitidos. Acércate para fichar o ficha "
             "en el mostrador."
         )
-        assert str(queries.TERMINATED_REASON) == "Jornada cerrada al dar de baja a la persona en Personal."
+        assert str(queries.corrections.TERMINATED_REASON) == "Jornada cerrada al dar de baja a la persona en Personal."
 
 
 def test_short_labels_carry_their_context():

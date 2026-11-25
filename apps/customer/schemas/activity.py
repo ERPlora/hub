@@ -10,6 +10,7 @@ from pydantic import field_validator
 
 from apps.customer.models import Activity
 from apps.customer.schemas.fields import OWN_KIND, CustomerOfIn, Page, PageIn, _decimals, _text
+from apps.customer.schemas.health import NOT_FOR_HEALTH_DATA
 from base.relay import by_platform
 
 
@@ -38,7 +39,7 @@ class ActivityIn(CustomerOfIn):
     title: _text(200, 1) = Field(
         description="The entry's title, in the caller's words."
     )
-    text: _text(5000) = Field("", description="Details of the entry.")
+    text: _text(5000) = Field("", description=f"Details of the entry. {NOT_FOR_HEALTH_DATA}")
     data: dict[str, Any] = Field(
         {}, description="Data of the caller's own about the entry."
     )

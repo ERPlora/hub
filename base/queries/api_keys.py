@@ -1,5 +1,6 @@
 """The business's API keys (``base.api_key.*``) and the API's documentation (``base.api_doc.*``)."""
 
+from collections import defaultdict
 from typing import Any
 
 from django.utils import translation
@@ -9,7 +10,7 @@ from live.errors import Conflict, NotFound
 from live.meta import module_configs
 from live.operations import AI, operation, registry as operation_registry
 
-from base import activation, api_docs, entitlement
+from base import activation, api_actions, api_docs, entitlement
 from base.models.api_keys import ApiKey, ApiSettings
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.api_keys import (
@@ -23,6 +24,8 @@ from base.schemas.api_keys import (
     ApiKeyOut,
 )
 
+from .people import without_address
+
 
 # ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────
 
@@ -33,10 +36,9 @@ def api_key_out(key: ApiKey) -> dict[str, Any]:
         "id": key.id,
         "name": key.name,
         "prefix": key.prefix,
-        "mode": key.mode,
-        "scopes": key.scopes if key.mode == ApiKey.Mode.PER_APP and isinstance(key.scopes, dict) else {},
+        "scopes": api_actions.normalised(key.scopes),
         "rate_per_minute": key.rate_per_minute,
-        "created_by": key.created_by,
+        "created_by": without_address(key.created_by),
         "created_at": key.created_at,
         "rotated_at": key.rotated_at,
         "last_used_at": key.last_used_at,
@@ -44,22 +46,51 @@ def api_key_out(key: ApiKey) -> dict[str, Any]:
     }
 
 
-def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
-    """The modules this business has on (not blocked by its plan, not turned off) that publish operations
-    (``expose_api``), each with whether it publishes queries (a key may read it) and commands (write), by name in who
-    asks's language."""
+def _reachable(ctx: OperationContext) -> dict[str, list]:
+    """The published operations (``expose_api``) of each app a key reaches in this business, base's included: not
+    blocked by its plan, not turned off."""
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
-    published: dict[str, set[str]] = {}
+    reachable: dict[str, list] = defaultdict(list)
     for op in operation_registry.values():
-        if op.expose_api:
-            published.setdefault(op.app_label, set()).add(op.kind)
+        if op.expose_api and op.app_label not in blocked:
+            reachable[op.app_label].append(op)
+    return reachable
+
+
+def _actions(ops) -> list[str]:
+    found = {api_actions.action_of(op) for op in ops}
+    return [action for action in api_actions.ACTIONS if action in found]
+
+
+def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
+    """The modules this business has on that publish operations, each with what it publishes (read, create, update,
+    delete), by name in who asks's language."""
+    reachable = _reachable(ctx)
     with translation.override(ctx.language):
         apps = [
-            {"id": config.label, "name": str(config.verbose_name), "read": "query" in kinds, "write": "command" in kinds}
+            {"id": config.label, "name": str(config.verbose_name), "actions": _actions(reachable[config.label])}
             for config in module_configs()
-            if (kinds := published.get(config.label)) and config.label not in blocked
+            if reachable.get(config.label)
         ]
     return sorted(apps, key=lambda app: app["name"].casefold())
+
+
+def grantable(ctx: OperationContext) -> dict[str, list[str]]:
+    """The most who asks may give a key, as a key's permissions: on each module, the actions they may do there (at
+    least one of its operations of it: at each call the key is held to its maker's permission of that very operation);
+    on ``"*"``, the actions they may do on every app that publishes them, base's included."""
+    reachable = _reachable(ctx)
+    published = {app: _actions(ops) for app, ops in reachable.items()}
+    held = {app: _actions(op for op in ops if ctx.has(op.permission)) for app, ops in reachable.items()}
+    everywhere = [
+        action
+        for action in api_actions.ACTIONS
+        if any(action in actions for actions in published.values())
+        and all(action in held[app] for app, actions in published.items() if action in actions)
+    ]
+    modules = {config.label for config in module_configs()}
+    given = {app: actions for app, actions in held.items() if app in modules and actions}
+    return {api_actions.EVERY_APP: everywhere, **given} if everywhere else given
 
 
 @operation(
@@ -71,8 +102,8 @@ def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
     ai=AI(
         description=(
             "Lists this business's API keys for other systems: name, the start of the token (never the whole), what "
-            "each may do (all, read, write or per app), its requests a minute, when it was last used and whether it "
-            "was revoked; and the apps whose API a key can reach."
+            "each may do (read, create, update or delete, on every app or app by app), its requests a minute, when it "
+            "was last used and whether it was revoked; and the apps whose API a key can reach."
         ),
         asks={
             "en": (
@@ -89,8 +120,9 @@ def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
     ),
 )
 def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
-    """Employees › API keys: every key, the newest first, and the apps a key per app may reach."""
-    return {"keys": [api_key_out(key) for key in ApiKey.objects.all()], "apps": api_apps(ctx)}
+    """Employees › API keys: every key, the newest first, the apps a key may reach and the most who asks may give one."""
+    keys = [api_key_out(key) for key in ApiKey.objects.all()]
+    return {"keys": keys, "apps": api_apps(ctx), "grantable": grantable(ctx)}
 
 
 @operation(

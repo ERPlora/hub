@@ -8,7 +8,7 @@ from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
 
-from apps.appointment import queries, schemas, services
+from apps.appointment import assistant_cards, queries, schemas, services
 from apps.appointment.models import (
     Appointment,
     AppointmentService,
@@ -19,6 +19,7 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
+from apps.appointment.schemas import references
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -44,7 +45,7 @@ def visible_texts() -> set[str]:
         *config_texts(config),
         *(counter.label for counter in config.bell),
         *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, services, schemas, assistant_cards),
     ]
     lazies += model_texts(MODELS)
     for choices in (
@@ -129,9 +130,9 @@ def test_spanish_texts_of_the_workbook():
             "Cada dos semanas",
             "Cada mes",
         ]
-        assert str(queries.VERDICTS["outside_schedule"]) == "Esa hora está fuera del horario del negocio."
+        assert str(queries.agenda.VERDICTS["outside_schedule"]) == "Esa hora está fuera del horario del negocio."
         assert str(services.writes.CANNOT["confirm"]) == "Esta cita ya no se puede confirmar: ya no está pendiente."
-        assert str(queries.APPOINTMENT_NOT_FOUND) == "Esa cita no existe en este negocio."
+        assert str(queries.reads.APPOINTMENT_NOT_FOUND) == "Esa cita no existe en este negocio."
 
 
 def test_spanish_says_citas_own_words_not_an_earlier_apps():
@@ -168,8 +169,8 @@ def test_spanish_says_citas_own_words_not_an_earlier_apps():
             "BlockedTime.updated_at": "actualizado el",
             "BlockedTime.created_by": "creado por",
         }
-        assert str(schemas.SAY_WHICH_STAFF) == "Di qué profesional: su id o su nombre."
-        assert str(schemas.SAY_WHICH_SERVICE) == "Di qué servicio: su id o su nombre."
+        assert str(references.SAY_WHICH_STAFF) == "Di qué profesional: su id o su nombre."
+        assert str(references.SAY_WHICH_SERVICE) == "Di qué servicio: su id o su nombre."
 
 
 @HUB_DB

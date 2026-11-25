@@ -184,6 +184,9 @@ msgstr "activo"
 msgid "sold out"
 msgstr "agotado"
 
+msgid "show on website"
+msgstr "mostrar en la página web"
+
 msgid "product"
 msgstr "producto"
 
@@ -400,6 +403,10 @@ msgstr "SKU duplicado en el fichero"
 msgid "Unit of measure not recognized: %(text)s"
 msgstr "Unidad de medida no reconocida: %(text)s"
 
+#, python-format
+msgid "Product type not recognized: %(text)s"
+msgstr "Tipo de producto no reconocido: %(text)s"
+
 msgid "Quantity is not a number"
 msgstr "Cantidad no numérica"
 
@@ -458,6 +465,9 @@ msgstr "Categoría"
 
 msgid "Sold out"
 msgstr "Agotado"
+
+msgid "Show on website"
+msgstr "Mostrar en la página web"
 
 msgid "Initial stock"
 msgstr "Stock inicial"

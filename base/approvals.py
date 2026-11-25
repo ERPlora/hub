@@ -13,7 +13,8 @@ the request with the pass (:class:`Approved`), ``base.operations`` adds the perm
 pass is spent (``base.approval.spend``, its row locked) in the command's own transaction (``base.approval_spend``,
 from ``LIVE["operation_database"]``): a command that fails leaves it unspent, one that went through cannot be repeated,
 and of two at once only one runs. A pass that is spent, late, forged, another person's, another command's or another
-request's is the same question again, never a way in. Whoever is not of the business gets the refusal of always.
+request's is the same question again, never a way in. Whoever is not of the business, or has a role of the
+business that says no to it, gets the refusal of always, with a pass or without.
 What the approved command asks of another app on the way (``base.operations.call``) goes with it, while it runs: a
 command of another app gets its permission too (:func:`consequence_context`); a read, never.
 """
@@ -26,7 +27,7 @@ import re
 import secrets
 import types
 import typing
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -42,13 +43,14 @@ from django.utils.functional import Promise
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import OperationError
-from live.meta import all_live_app_configs
+from live.meta import LiveAppConfig, all_live_app_configs
 from live.operations import Operation, current_operation, get
 from ninja import NinjaAPI
 from ninja.security import django_auth
 
 from base.api_keys import KeyDoor
 from base.business import money_text
+from base.permissions import VIEW_HOME, refused_outright
 
 TOKEN_PREFIX = "elev_"
 #: The header a pass travels in (the SDK's ``ELEVATION_TOKEN_HEADER``).
@@ -234,6 +236,27 @@ def approvable(name: str) -> tuple[Operation, str] | None:
     return None if label is None else (op, label)
 
 
+def approvable_permissions(configs: Iterable[LiveAppConfig]) -> frozenset[str]:
+    """The permissions a manager's approval stands in for: those of the commands ``configs`` name approvable."""
+    return frozenset(
+        found[0].permission
+        for config in configs
+        for name in getattr(config, "approvals", {})
+        if (found := approvable(name)) is not None
+    )
+
+
+def asks_a_manager(ctx: OperationContext, op: Operation) -> bool:
+    """Whether ``op`` is put to a manager for whoever runs it: its app names it, they are of the business, they may not
+    run it themselves and no role the business gave them says no to it."""
+    return (
+        label_of(op) is not None
+        and ctx.has(VIEW_HOME)
+        and not ctx.has(op.permission)
+        and not refused_outright(ctx.actor, ctx.scope, {op.permission})
+    )
+
+
 def fingerprint(request: HttpRequest, business: str) -> str:
     """The SHA-256 of one request of ``business``: its method, path and body (JSON in a canonical order)."""
     raw = request.body or b""
@@ -325,11 +348,9 @@ class ApprovalDoor:
         op, label = found
         from base.operations import HubContextBuilder
 
-        from base.permissions import VIEW_HOME
-
         ctx = HubContextBuilder().from_request(request)
-        if ctx.has(op.permission) or not ctx.has(VIEW_HOME):
-            # Somebody who may, or somebody who is not of the business: the command's own refusal of always.
+        if not asks_a_manager(ctx, op):
+            # Somebody who may, whose role says no or who is not of the business: the command's own answer of always.
             return user
         asked = fingerprint(request, ctx.scope.key)
         figures = figures_from(op, request.body)

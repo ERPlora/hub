@@ -14,6 +14,7 @@ from live.ninja import ensure_api_parity
 from apps.flow.api import router
 from apps.flow.models import Flow
 from apps.task.models import Task
+from base.tenancy.context import use_hub
 from base.tests.routes import spa_routes
 from config.api import api
 
@@ -273,13 +274,14 @@ def test_drafts_over_http(owner_client):
 
 
 @HUB_DB
-def test_the_sample_of_this_business_only(owner_client):
-    OutboxEvent.objects.create(
-        scope_kind="host",
-        scope_key="b",
-        name="sale.sale.completed",
-        payload={"total": 1},
-    )
+def test_the_sample_of_this_business_only(owner_client, hub_b):
+    with use_hub(hub_b):
+        OutboxEvent.objects.create(
+            scope_kind="host",
+            scope_key=hub_b.slug,
+            name="sale.sale.completed",
+            payload={"total": 1},
+        )
     assert (
         get(owner_client, "/flow/events/sample", event="sale.sale.completed").json()[
             "found"

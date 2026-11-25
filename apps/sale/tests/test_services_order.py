@@ -131,9 +131,9 @@ def test_a_product_is_named_by_its_sku_or_its_name_and_never_guessed(product):
     with pytest.raises(Conflict) as refusal:
         add(order.id, product="coffee")
     assert refusal.value.code == "inventory.product_ambiguous"
-    with pytest.raises(Conflict) as refusal:
+    with pytest.raises(InvalidPayload) as refusal:
         add(order.id, product="tea")
-    assert refusal.value.code == "sale.product_not_available"
+    assert refusal.value.fields == {"product": "There is no product “tea”. Say which one."}
 
 
 def test_an_inactive_product_is_not_sold(coffee):
@@ -717,7 +717,7 @@ def test_whoever_builds_checks_voids_an_empty_one(coffee):
     assert run("sale.order.void", {"order_id": str(emptied.id)}, waiter).status == "voided"
 
 
-def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee):
+def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee, without_kitchen):
     waiter = ctx_for(EMPLOYEE)
     ordered = open_order({"product": "COF"}, ctx=waiter)
     with pytest.raises(PermissionDenied) as refusal:

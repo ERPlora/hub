@@ -273,6 +273,7 @@ export interface ConfigPatchIn {
 export interface SaleProductOut {
   id: string;
   name: string;
+  description: string;
   sku: string;
   product_type: ProductType;
   /** Cents, per `price_quantity` of `pricing_unit`. */
@@ -296,7 +297,6 @@ export interface SaleProductOut {
 
 export interface ProductOut extends SaleProductOut {
   ean13: string | null;
-  description: string;
   stock: string;
   low_stock_threshold: string;
   /** Its own decision; `null` follows the business. */

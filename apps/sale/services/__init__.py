@@ -16,6 +16,7 @@ still works (the session comes back on its own at its deadline).
 
 from . import (
     charge_card as charge_card,
+    charge_kitchen as charge_kitchen,
     charge_validation as charge_validation,
     checkout as checkout,
     discounts as discounts,

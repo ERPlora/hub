@@ -21,16 +21,15 @@ from apps.kitchen.queries.rounds import unsaved_views
 from apps.kitchen.queries.scope import station_map
 from apps.kitchen.queries.state import effective, in_flight_views
 from apps.kitchen.queries.views import ItemView, TicketView, saved_views
-from apps.kitchen.schemas import (
+from apps.kitchen.schemas.fields import ItemRefIn, TicketRefIn
+from apps.kitchen.schemas.tickets import (
     ByOrderIn,
     ItemOut,
-    ItemRefIn,
     NoticesIn,
     NoticesOut,
     TicketListIn,
     TicketOut,
     TicketPage,
-    TicketRefIn,
     TicketsOut,
 )
 from apps.sale.models import OrderLine

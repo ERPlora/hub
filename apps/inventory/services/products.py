@@ -13,7 +13,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.inventory import events
-from apps.inventory.models import Category, Product, ProductCategory, StockMovement, UNIT_SPECS
+from apps.inventory.models import Category, measure_alike, Product, ProductCategory, StockMovement
 from apps.inventory.queries.products import load_product
 from apps.inventory.queries.reads import find_product, held
 from apps.inventory.queries.settings import current_settings
@@ -38,6 +38,7 @@ from apps.inventory.services.writes import (
     _tax_category,
 )
 from base import images
+from base.assistant import card_order
 
 SKU_TAKEN = _("That SKU already exists in the catalog.")
 EAN13_TAKEN = _("Another product of the catalog already has that EAN-13.")
@@ -69,6 +70,7 @@ _PRODUCT_CONSTRAINTS = {
         "description": "Create a product of the catalog with its tax category, its categories and, if given, "
         "its initial stock.",
         "risk": "normal",
+        "summary": card_order.said_first("name", "price", "tax_category_key"),
         "asks": {
             "en": (
                 "add a new product: Iced Coffee, 3.50",
@@ -112,6 +114,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         tax_category=tax_category,
         track_stock=None if data.product_type == Product.Type.SERVICE else data.track_stock,
         is_active=data.is_active,
+        show_on_website=data.show_on_website,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
     )
@@ -135,7 +138,8 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
     expose_api=True,
     ai={
         "description": "Change a product, named by its id, SKU or name: its data, active or not, its stock "
-        "control and its categories. The SKU, the type and the stock are not changed here.",
+        "control, its categories and whether the website's catalog shows it. The SKU, the type and the stock are not "
+        "changed here.",
         "risk": "normal",
         "check": "inventory.product.get",
         "asks": {
@@ -143,11 +147,13 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
                 "change the price of the coffee to 1.80",
                 "rename the Tea product and make it inactive",
                 "the croissant now costs 2.20",
+                "hide the product Coffee from the website",
             ),
             "es": (
                 "cámbiale el precio al café a 1,80",
                 "renombra el producto Té y desactívalo",
                 "el cruasán ahora cuesta 2,20",
+                "oculta el producto Café de la página web",
             ),
         },
     },
@@ -337,14 +343,14 @@ def _live_categories(category_ids: list[UUID]) -> list[Category]:
 
 
 def _check_pricing_unit(unit: str, pricing_unit: str) -> None:
-    if UNIT_SPECS[unit].category != UNIT_SPECS[pricing_unit].category:
+    if not measure_alike(unit, pricing_unit):
         message = str(PRICING_UNIT_MISMATCH)
         raise InvalidPayload(message, code="invalid_field", fields={"pricing_unit": message})
 
 
 def _same_kind(pricing_unit: str, unit: str) -> str:
     """The pricing unit to keep when the unit changes: the same one if it measures alike, else the new unit."""
-    return pricing_unit if UNIT_SPECS[pricing_unit].category == UNIT_SPECS[unit].category else unit
+    return pricing_unit if measure_alike(pricing_unit, unit) else unit
 
 
 def _save(product: Product, **options) -> None:

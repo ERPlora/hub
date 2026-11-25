@@ -162,7 +162,7 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, json={"results": [EXCERPT]})
         pending = calls(HOW_TO)
 
-        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)):
+        with assistant.gateway.prepared(assistant.gateway.Prepared(docs=assistant.gateway.prepare_docs(ctx(), pending))):
             found = search()
 
         assert found == {"results": [CITED]}
@@ -172,7 +172,7 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, status=503, json={"error": {"code": "assistant.provider_unavailable", "message": "x"}})
         pending = calls(HOW_TO)
 
-        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
+        with assistant.gateway.prepared(assistant.gateway.Prepared(docs=assistant.gateway.prepare_docs(ctx(), pending))), pytest.raises(OperationError) as caught:
             search()
 
         assert caught.value.code == "base.assistant_unavailable"

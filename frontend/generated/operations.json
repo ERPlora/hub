@@ -751,6 +751,10 @@
     "method": "get",
     "path": "/api/sale/checkout/preview"
   },
+  "sale.checkout.steps": {
+    "method": "get",
+    "path": "/api/sale/checkout/steps"
+  },
   "sale.order.list": {
     "method": "get",
     "path": "/api/sale/orders"
@@ -818,6 +822,10 @@
   "sale.order.print_bill": {
     "method": "post",
     "path": "/api/sale/orders/print_bill"
+  },
+  "sale.order.note_bill": {
+    "method": "post",
+    "path": "/api/sale/orders/note_bill"
   },
   "sale.order.split": {
     "method": "post",
@@ -1251,6 +1259,10 @@
     "method": "get",
     "path": "/api/invoice/invoices"
   },
+  "invoice.invoice.export": {
+    "method": "get",
+    "path": "/api/invoice/invoices/export"
+  },
   "invoice.invoice.get": {
     "method": "get",
     "path": "/api/invoice/invoices/detail"
@@ -1262,6 +1274,18 @@
   "invoice.invoice.document": {
     "method": "get",
     "path": "/api/invoice/invoices/document"
+  },
+  "invoice.invoice.pdf": {
+    "method": "get",
+    "path": "/api/invoice/invoices/pdf"
+  },
+  "invoice.email.list": {
+    "method": "get",
+    "path": "/api/invoice/emails"
+  },
+  "invoice.email.send": {
+    "method": "post",
+    "path": "/api/invoice/emails/send"
   },
   "invoice.invoice.print": {
     "method": "post",
@@ -1410,6 +1434,14 @@
   "online_booking.public.cancel": {
     "method": "post",
     "path": "/api/online_booking/public/cancel"
+  },
+  "online_order.qr_code.list": {
+    "method": "get",
+    "path": "/api/online_order/qr_codes"
+  },
+  "online_order.qr_code.regenerate": {
+    "method": "post",
+    "path": "/api/online_order/qr_codes/regenerate"
   },
   "reservation.reservation.list": {
     "method": "get",
@@ -2747,6 +2779,34 @@
     "method": "post",
     "path": "/api/cart_checkout/customers/erase"
   },
+  "tip.settings.get": {
+    "method": "get",
+    "path": "/api/tip/settings"
+  },
+  "tip.settings.update": {
+    "method": "post",
+    "path": "/api/tip/settings"
+  },
+  "tip.tip.list": {
+    "method": "get",
+    "path": "/api/tip/tips"
+  },
+  "tip.tip.get": {
+    "method": "get",
+    "path": "/api/tip/tips/detail"
+  },
+  "tip.tip.add": {
+    "method": "post",
+    "path": "/api/tip/tips"
+  },
+  "tip.tip.update": {
+    "method": "post",
+    "path": "/api/tip/tips/update"
+  },
+  "tip.tip.void": {
+    "method": "post",
+    "path": "/api/tip/tips/void"
+  },
   "verifactu.config.get": {
     "method": "get",
     "path": "/api/verifactu/config"
@@ -3007,6 +3067,22 @@
     "method": "get",
     "path": "/api/roles/detail"
   },
+  "base.role.create": {
+    "method": "post",
+    "path": "/api/roles"
+  },
+  "base.role.update": {
+    "method": "post",
+    "path": "/api/roles/update"
+  },
+  "base.role.delete": {
+    "method": "post",
+    "path": "/api/roles/delete"
+  },
+  "base.role.assign": {
+    "method": "post",
+    "path": "/api/roles/assign"
+  },
   "base.api_key.list": {
     "method": "get",
     "path": "/api/keys"
@@ -3054,6 +3130,14 @@
   "base.api_doc.settings_update": {
     "method": "post",
     "path": "/api/api-docs/settings/update"
+  },
+  "base.support_access.get": {
+    "method": "get",
+    "path": "/api/support-access"
+  },
+  "base.support_access.update": {
+    "method": "post",
+    "path": "/api/support-access/update"
   },
   "base.assistant.turn": {
     "method": "post",

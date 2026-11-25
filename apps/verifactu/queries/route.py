@@ -7,6 +7,7 @@ import datetime as dt
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 
 from apps.invoice.models import Issuer
@@ -19,6 +20,7 @@ from .country import OUTSIDE_SPAIN, outside_spain
 
 #: The waits that are a past attempt's failure, kept on the record (the rest are computed when read).
 ATTEMPT_FAILURES = ("unreachable", "refused", "unknown", "aeat_fault", "xml_invalid")
+ISSUER_MISSING = _("Set up the issuer first in Invoicing → Issuer.")
 
 
 def config_row() -> Config:

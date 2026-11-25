@@ -2,7 +2,7 @@
 
 from ninja import Field
 
-from apps.pricing.schemas import DeletedOut
+from apps.pricing.schemas.fields import DeletedOut
 
 
 class PriceRemovedOut(DeletedOut):

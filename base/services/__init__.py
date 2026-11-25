@@ -2,6 +2,7 @@
 
 from . import (
     activation as activation,
+    address_change as address_change,
     api_keys as api_keys,
     approvals as approvals,
     apps as apps,
@@ -17,11 +18,16 @@ from . import (
     offboarding as offboarding,
     people as people,
     photo as photo,
+    platform_hub as platform_hub,
     profile as profile,
     provisioning as provisioning,
     relay_runs as relay_runs,
     reset as reset,
+    roles as roles,
     sessions as sessions,
+    single_row as single_row,
     support as support,
+    support_access as support_access,
+    support_entry as support_entry,
     usage as usage,
 )

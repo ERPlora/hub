@@ -17,17 +17,19 @@ from apps.invoice.queries.rectifying import rectifiable, rectification_figures, 
 from apps.invoice.queries.refunds import REFUND_NOT_FOUND
 from apps.invoice.queries.rows import document_of_sale, find_invoice, remaining_of
 from apps.invoice.queries.series import RECTIFYING
-from apps.invoice.schemas import FromRefundIn, FromVoidIn, IssueOut, RectifyIn
+from apps.invoice.schemas.invoices import IssueOut
+from apps.invoice.schemas.rectifying import FromRefundIn, FromVoidIn, RectifyIn
 from apps.invoice.services.from_sale import _sale_key, _tell_sales
 from apps.invoice.services.issuer import _issuer_of
 from apps.invoice.services.issuing import VERBATIM, _issue, _settle_rectified
 from apps.invoice.services.numbering import series_of_year
 from apps.invoice.services.recipient import _recipient_of
 from apps.invoice.services.writes import _now, _result, _today
+from apps.invoice.withholding import columns
 from apps.sale.models import Refund, Sale
 from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
-from apps.tax.queries import round_half_up
+from apps.tax.queries.calculation import round_half_up
 from base.business import business_zone
 
 SALE_NOT_INVOICED = _(
@@ -76,6 +78,7 @@ def _rectify(  # noqa: PLR0913
         source_refund=source_refund,
         rectifies=original,
         rectification_kind=Invoice.RectificationKind.DIFFERENCES,
+        **columns(sum(item["base"] for item in entries), original.withholding_rate),
         description=reason[:500],
         currency=original.currency,
     )

@@ -625,7 +625,7 @@ def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authorit
 def test_each_declaration_names_a_migration_of_its_app_and_an_operation_of_its_app():
     from base.tenancy import migrator
 
-    code = migrator.code_migrations()
+    code = migrator.app_sets.code_migrations()
     for label, declared in recovery.recoverable_apps().items():
         for one in declared:
             assert (label, one.reads_since) in code.nodes
@@ -661,5 +661,5 @@ def test_a_declaration_restores_only_what_it_reads_deleted_and_both_come_togethe
 def test_the_lease_is_the_moves():
     from base.tenancy import move
 
-    assert recovery.LEASE == move.LEASE
+    assert recovery.LEASE == move.moving.LEASE
     assert provisioning.LEASE_OWNER

@@ -30,15 +30,25 @@ from base.schemas.assistant import (
     permission=VIEW_HOME,
     input=AssistantUsageIn,
     output=AssistantUsageOut,
-    ai={"description": "Not an assistant tool (the panel's own footer: the messages of the month left)."},
-    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    ai=AI(
+        description=(
+            "Reads this month's messages of the assistant (yours) of this business, as erplora.com counts them and "
+            "«Usage and plan» in System shows them: how many are used, how many the plan includes a month and when "
+            "they come back. Nothing else of the plan: that is base.plan.usage."
+        ),
+        asks={
+            "en": ("how many assistant messages do we have left?", "how much of the assistant have we used this month?"),
+            "es": ("¿cuántos mensajes le quedan al asistente?", "¿cuánto hemos gastado del asistente este mes?"),
+        },
+    ),
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile (in a turn, its route asked first).
     database=False,
 )
 def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
     """This month's messages of the assistant as erplora.com counts them: used, of how many, and when
     they come back. What cannot be read is an error, never a number made up."""
     try:
-        usage = assistant.gateway.usage(ctx.scope)
+        usage = assistant.gateway.month_usage(ctx.scope)
     except assistant.gateway.GatewayError:
         raise OperationError(
             gettext("The assistant's plan could not be read now."), code="base.assistant_unavailable", status=503
@@ -61,7 +71,7 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
         description=(
             "Finds the tools for a task when none of the tools you were given does it: describe the task in a few "
             "words («list the products of a category», «create a product», «change an employee's schedule»). Returns "
-            f"up to {assistant.relevance.FOUND} tools, best first, with what each does; from your next step you can "
+            f"up to {shared.FOUND} tools, best first, with what each does; from your next step you can "
             "call them. Search before you say that something cannot be done here; if none fits, search again in other "
             "words."
         ),

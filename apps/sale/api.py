@@ -131,6 +131,11 @@ async def checkout_preview(request, params: Query[PreviewIn]):
     return await run_operation(request, queries.checkout.preview, params)
 
 
+@bind(router, "sale.checkout.steps", "/sale/checkout/steps")
+async def checkout_steps(request):
+    return await run_operation(request, queries.checkout_steps.checkout_steps)
+
+
 # Open checks
 
 
@@ -217,6 +222,11 @@ async def order_fire(request, data: OrderFireIn):
 @bind(router, "sale.order.print_bill", "/sale/orders/print_bill")
 async def order_print_bill(request, data: OrderRefIn):
     return await run_operation(request, services.printouts.print_bill, data)
+
+
+@bind(router, "sale.order.note_bill", "/sale/orders/note_bill")
+async def order_note_bill(request, data: OrderRefIn):
+    return await run_operation(request, services.printouts.note_bill, data)
 
 
 @bind(router, "sale.order.split", "/sale/orders/split")

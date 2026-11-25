@@ -2,7 +2,7 @@
 
 The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
 (no general list taken from another, no coherence of a rule): the actions that need one call the operations of
-services.py. Only a rule's tiers are read as the API reads them, because the price of a line reads them as such.
+services/. Only a rule's tiers are read as the API reads them, because the price of a line reads them as such.
 """
 
 import pydantic
@@ -11,7 +11,7 @@ from django.contrib import admin
 from django.core.exceptions import ValidationError
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
-from apps.pricing.schemas import MAX_TIERS, TIERS_RISING, TOO_MANY_TIERS, Tier
+from apps.pricing.schemas.rules import MAX_TIERS, TIERS_RISING, TOO_MANY_TIERS, Tier
 
 
 class PriceItemInline(admin.TabularInline):
@@ -50,7 +50,7 @@ class PriceItemAdmin(admin.ModelAdmin):
 
 
 class DiscountRuleForm(forms.ModelForm):
-    """The rule's raw columns, with its tiers read as the API reads them (``schemas.Tier``, rising)."""
+    """The rule's raw columns, with its tiers read as the API reads them (``schemas.rules.Tier``, rising)."""
 
     class Meta:
         model = DiscountRule

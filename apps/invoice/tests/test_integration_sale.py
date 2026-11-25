@@ -17,7 +17,6 @@ from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import A, HUB_DB, ISSUER, ctx_for, deliver, run
 from apps.sale import events as sale_events
 from apps.sale.models import Sale, SaleLine
-from apps.tax.models import TaxRule
 from apps.verifactu.models import Record
 
 pytestmark = HUB_DB
@@ -178,22 +177,8 @@ def test_four_cheap_lines_vat_included_close_once_for_the_rate(issuer, product, 
 
 
 def test_the_equivalence_surcharge_is_declared_apart_from_the_vat(
-    issuer, shelf, charge
+    issuer, shelf, charge, equivalence_surcharge
 ):
-    root = TaxRule.objects.get(
-        category__key="product.generic", country_code="ES", parent__isnull=True
-    )
-    run(
-        "tax.rule.create",
-        {
-            "country_code": "ES",
-            "tax_category_key": "product.generic",
-            "rate_pct": "5.2",
-            "tax_type": "surcharge",
-            "parent_id": str(root.id),
-            "component_label": "Recargo de equivalencia",
-        },
-    )
     sale = charge("inv-0005", [{"product": "SHA"}])
     invoice = deliver("sale.sale.completed").invoice
     entry = invoice.tax_breakdown[0]
@@ -739,24 +724,10 @@ def test_a_sale_line_without_its_rule_keeps_the_tax_of_its_territory(product, ch
 
 
 def test_the_preview_counts_the_surcharge_in_its_tax_as_the_rectification_does(
-    issuer, shelf, charge
+    issuer, shelf, charge, equivalence_surcharge
 ):
     # INVOICE-F08 asked to the assistant, on a ticket under the equivalence surcharge: the preview's tax carries the
     # surcharge's quota too, and the rectification writes the figures it said.
-    root = TaxRule.objects.get(
-        category__key="product.generic", country_code="ES", parent__isnull=True
-    )
-    run(
-        "tax.rule.create",
-        {
-            "country_code": "ES",
-            "tax_category_key": "product.generic",
-            "rate_pct": "5.2",
-            "tax_type": "surcharge",
-            "parent_id": str(root.id),
-            "component_label": "Recargo de equivalencia",
-        },
-    )
     sale = charge("inv-0032", [{"product": "SHA"}])
     ticket = deliver("sale.sale.completed").invoice
     entry = ticket.tax_breakdown[0]
