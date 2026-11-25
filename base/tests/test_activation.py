@@ -265,7 +265,7 @@ def test_an_app_may_refuse_to_go_on_by_its_own_hook():
 
 
 # ── What a business must have on in its country (hub#997) ────────────────────────────────────────────────────────
-# An app says where it is mandatory (``mandatory`` on its LiveAppConfig, ``base.home.mandatory_in``). Once on in a
+# An app says where it is mandatory (``mandatory`` on its LiveAppConfig, ``base.home.mandatory_apps.mandatory_in``). Once on in a
 # business of one of those countries it never goes off there: base refuses it, with a reason of its own when the app
 # gives none, and turning off another app it came along with leaves it on.
 

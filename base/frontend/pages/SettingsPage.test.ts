@@ -25,8 +25,8 @@ function tabIds(m: Awaited<ReturnType<typeof settings>>): string[] {
   return (m.wrapper.getComponent(AppPage).props('tabs') ?? []).map((tab) => tab.id);
 }
 
-// «API documentation» closes General.
-const GENERAL_CARDS = ['device-mode-card', 'pin-policy-card', 'devices-card', 'api-docs-card'];
+// «Support access» closes General, after «API documentation».
+const GENERAL_CARDS = ['device-mode-card', 'pin-policy-card', 'devices-card', 'api-docs-card', 'support-access-card'];
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -136,6 +136,16 @@ describe('SettingsPage — General', () => {
       'Only an administrator can see and remove the devices.',
     );
     expect(client.stream.subscriptions('base.device.list')).toHaveLength(0);
+  });
+
+  it('closes with «Support access», which whoever does not run the hub reads too', async () => {
+    for (const [who, person] of [['owner', OWNER_ALL], ['employee', EMPLOYEE]] as const) {
+      const { wrapper, client } = await settings('/settings', 'en', person);
+      const cards = wrapper.findAll('section.settings-card').map((card) => card.attributes('data-testid'));
+      expect(cards.at(-1), who).toBe('support-access-card');
+      expect(client.stream.subscriptions('base.support_access.get')).toHaveLength(1);
+      wrapper.unmount();
+    }
   });
 
   it('speaks Spanish', async () => {

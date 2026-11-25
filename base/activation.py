@@ -185,9 +185,9 @@ def baseline(graph: Graph) -> dict[str, Activation]:
 
 def born_on(country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
     """The modules a business of ``country`` is born with on: those it must have on there, as each says in its
-    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
+    ``mandatory`` (``base.home.mandatory_apps.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
     (``platform_turns_on``: Taxes), never one that binds the business to a tax authority (VeriFactu)."""
-    from base.home import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
+    from base.home.mandatory_apps import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
 
     return frozenset(
         config.label
@@ -302,10 +302,10 @@ def plan_limit(photo: Any) -> int | None:
 
 def mandatory_on(current: Mapping[str, Activation], country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
     """The modules on in ``current`` that a business of ``country`` must have on (hub#997), as each says in its
-    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain): they never go off there, by themselves
+    ``mandatory`` (``base.home.mandatory_apps.mandatory_in``; without a country, Spain): they never go off there, by themselves
     (:func:`refusals`) nor along with another (:func:`disabling`). One being set up, or that could not be, binds
     nothing yet: it can still be given up on."""
-    from base.home import mandatory_in  # base.home reads the modules' declarations; this module is imported earlier
+    from base.home.mandatory_apps import mandatory_in  # base.home reads the modules' declarations; this module is imported earlier
 
     return frozenset(
         config.label

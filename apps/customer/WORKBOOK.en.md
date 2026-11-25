@@ -665,13 +665,14 @@ are joined with CUSTOMER-F13).
 Involved: SALE-F05, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F19 Link the customer to the open order
-<!-- from WORKBOOK.md sha256:39e630b3e464 -->
+<!-- from WORKBOOK.md sha256:8e10cfecae79 -->
 Status: done
 Actor: system (Sales & POS asks for it)
 Screen: none
 Steps:
 1. With a customer assigned, Sales & POS opens or saves the order (the table's check, the cart) and asks
-   Customers to link it.
+   Customers to link it. Appointments does the same with the check it opens when an appointment is
+   charged, with the appointment's customer.
 2. Customers notes which customer that order has. Reassigning another customer to the same order
    replaces the previous one (an order, at most one customer); the same customer again rewrites nothing.
 3. On letting go of the customer (removing them, leaving the check at the table, deleting the check),
@@ -682,7 +683,7 @@ Sales & POS reads it to give the customer back to the check (CUSTOMER-F17) and, 
 without naming the customer (through the assistant or the API), so that the sale is theirs (SALE-F01).
 If it fails: the sale goes on; Sales & POS warns "The customer could not be linked to the check. Choose
 them again." (or with the reason Customers gives). A customer that is no longer available is not linked.
-Involved: SALE-F01, SALE-F17
+Involved: SALE-F01, SALE-F17, APPOINTMENT-F17
 
 ### CUSTOMER-F20 Add the purchase to the card when charging
 <!-- from WORKBOOK.md sha256:8e0ed5299360 -->
@@ -1081,13 +1082,13 @@ confirmation card is shown.
 | The name of an open order, as Sales names it: what the assistant's card reads (BASE-F97) | view (and view sales, in Sales) | F19 | no | `customer.order.get` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:62db8e789d82 -->
+<!-- from WORKBOOK.md sha256:0f4967e2b658 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
-| Adds a card | manage | F01, F18, F25, F26 | `customer.customer.create` |
-| Changes the card (only what is sent) and its custom fields | manage | F04 | `customer.customer.update` |
-| Creates up to 50 cards from a CSV, row by row | manage | F08 | `customer.customer.import` |
+| Adds a card | manage | F01, F11, F18, F25, F26 | `customer.customer.create` |
+| Changes the card (only what is sent) and its custom fields | manage | F04, F11 | `customer.customer.update` |
+| Creates up to 50 cards from a CSV, row by row | manage | F08, F11 | `customer.customer.import` |
 | Replaces a card's groups | manage | F06 | `customer.customer.set_groups` |
 | Replaces a card's tags | manage | F06 | `customer.customer.set_tags` |
 | Deletes a card (keeps its data) | delete | F07 | `customer.customer.delete` |

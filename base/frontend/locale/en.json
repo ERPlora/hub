@@ -628,6 +628,7 @@
         },
         "demo": "Use is not measured in a demo: its data is deleted when it ends.",
         "unknown": "We do not know this business's plan yet: it shows up as soon as erplora.com sends it.",
+        "platform": "This is ERPlora's own business: it has no plan.",
         "managed": "Plans are managed from your ERPlora account, on erplora.com."
       }
     },
@@ -1142,6 +1143,21 @@
         "loadFailed": "Could not load the setting.",
         "retry": "Retry"
       }
+    },
+    "supportAccess": {
+      "title": "Support access",
+      "toggle": "Let ERPlora support in",
+      "note": "On, ERPlora's support staff can come into the business with their own accounts to help you set it up, as an administrator would. It stays on until you turn it off, and they leave as soon as you do.",
+      "changed": "Last changed by {who}, {when}.",
+      "adminOnly": "Only who runs the business can change it.",
+      "visits": "Latest support visits",
+      "noVisits": "Nobody from ERPlora support has come in yet.",
+      "loading": "Loading the support access…",
+      "loadFailed": "Could not load the support access.",
+      "retry": "Retry",
+      "saveFailed": "Could not save the change.",
+      "turnedOn": "Support access is on: ERPlora support can come in.",
+      "turnedOff": "Support access is off: ERPlora support can no longer come in."
     },
     "files": {
       "title": "Files",

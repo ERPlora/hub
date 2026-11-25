@@ -8,8 +8,7 @@ from django.http import HttpRequest
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from base import access
-from base.auth import SAAS_PANEL_PATH, saas_url
+from base import access, saas_store
 from base.models.access import AccessSettings, Credential
 from base.models import Membership
 from base.models.sessions import SessionOwner
@@ -40,7 +39,7 @@ def pin_people(slug: str, *, exclude: str = "") -> list[tuple[Credential, Any]]:
     Two reads, never a join: who is a member is control's (``Membership``) and the PINs are the hub's."""
     users = {
         membership.user.get_username(): membership.user
-        for membership in Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+        for membership in Membership.objects.team(slug).select_related("user")
     }
     users.pop(exclude, None)
     credentials = Credential.objects.filter(username__in=list(users)).exclude(pin_hash="")
@@ -58,7 +57,7 @@ def pin_owner(slug: str, person: str, pin: str) -> Any | None:
     if credential is None:
         return None
     membership = (
-        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        Membership.objects.team(slug).filter(user__username=credential.username)
         .select_related("user")
         .first()
     )
@@ -130,7 +129,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
         "people": faces,
         "wait": wait,
         # «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
-        "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans"),
+        "plan_url": saas_store.plans_url(ctx.scope.key),
     }
 
 

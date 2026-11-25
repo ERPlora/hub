@@ -49,7 +49,7 @@ def named(ctx: OperationContext, texts: Iterable[str], searched: Iterable[str]) 
     texts, searched = list(texts), list(searched)
     words = set().union(*(stems(text) for text in [*texts, *searched]))
     on = tools.active_apps(ctx.scope)
-    not_on = {config.label for config in home.shown_modules()} - set(on)
+    not_on = {config.label for config in home.shown_modules.shown_modules()} - set(on)
     called = {label for label in not_on if not words.isdisjoint(_names(label, ctx.language))}
     if not called:
         return []

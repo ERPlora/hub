@@ -82,6 +82,8 @@ def approval_approve(ctx: OperationContext, data: ApprovalIn) -> dict:
     op, _label = found
     if ctx.has(op.permission):
         raise Conflict(gettext("This no longer needs an approval: do it again."), code="base.approval_not_needed")
+    if not approval_rules.asks_a_manager(ctx, op):
+        raise Conflict(gettext("This is not approved with a PIN."), code="base.approval_not_offered")
     if not data.badge and not (data.person and data.pin):
         raise InvalidPayload(
             gettext("Choose who approves it and type their PIN."), code="base.approval_incomplete", fields={"pin": "required"}

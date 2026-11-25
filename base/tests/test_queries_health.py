@@ -34,7 +34,7 @@ def modules(monkeypatch, settings):
 
     def use(*configs, on=None):
         labels = {config.label for config in configs} if on is None else set(on)
-        monkeypatch.setattr("base.home.module_configs", lambda: list(configs))
+        monkeypatch.setattr("base.home.shown_modules.module_configs", lambda: list(configs))
         monkeypatch.setattr("base.queries.health.active_apps", lambda scope: frozenset(labels | {"base"}))
 
     return use

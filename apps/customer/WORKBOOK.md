@@ -638,7 +638,8 @@ Actor: sistema (lo pide Venta)
 Pantalla: ninguna
 Pasos:
 1. Con un cliente asignado, Venta abre o guarda el pedido (la cuenta de la mesa, el carrito) y le
-   pide a Clientes que lo enlace.
+   pide a Clientes que lo enlace. Citas hace lo mismo con la cuenta que abre al cobrar una cita, con la
+   clienta de la cita.
 2. Clientes anota qué cliente tiene ese pedido. Reasignar otro cliente al mismo pedido sustituye el
    anterior (un pedido, como mucho un cliente); el mismo cliente otra vez no reescribe nada.
 3. Al soltar el cliente (quitarlo, dejar la cuenta en la mesa, eliminar la cuenta), Venta pide el
@@ -649,7 +650,7 @@ Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17) y, al cobrar un
 cliente (por el asistente o la API), para que la venta sea suya (SALE-F01).
 Si falla: la venta sigue; Venta avisa «No se ha podido unir el cliente a la cuenta. Vuelve a
 elegirlo.» (o con el motivo que dé Clientes). Un cliente que ya no está disponible no se enlaza.
-Implicados: SALE-F01, SALE-F17
+Implicados: SALE-F01, SALE-F17, APPOINTMENT-F17
 
 ### CUSTOMER-F20 Sumar la compra a la ficha al cobrar
 Estado: hecho
@@ -1033,9 +1034,9 @@ nada y sale la tarjeta nueva.
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Da de alta una ficha | gestionar | F01, F18, F25, F26 | `customer.customer.create` |
-| Cambia la ficha (solo lo enviado) y sus campos personalizados | gestionar | F04 | `customer.customer.update` |
-| Crea hasta 50 fichas de un CSV, fila a fila | gestionar | F08 | `customer.customer.import` |
+| Da de alta una ficha | gestionar | F01, F11, F18, F25, F26 | `customer.customer.create` |
+| Cambia la ficha (solo lo enviado) y sus campos personalizados | gestionar | F04, F11 | `customer.customer.update` |
+| Crea hasta 50 fichas de un CSV, fila a fila | gestionar | F08, F11 | `customer.customer.import` |
 | Sustituye los grupos de una ficha | gestionar | F06 | `customer.customer.set_groups` |
 | Sustituye las etiquetas de una ficha | gestionar | F06 | `customer.customer.set_tags` |
 | Elimina una ficha (conserva sus datos) | eliminar | F07 | `customer.customer.delete` |

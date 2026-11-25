@@ -562,11 +562,12 @@ buttons are not seen.
 Involved: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Go to the receipt text, which is written in Sales
-<!-- from WORKBOOK.md sha256:e1d175ae8b9c -->
+<!-- from WORKBOOK.md sha256:6b283cc7f829 -->
 Status: done — the receipt header and footer live in the Sales settings, and the Settings note leads
 there
 Actor: administrator
 Screen: Settings
+Operations: none
 Steps:
 1. Open **Printing → Settings**.
 2. The header and footer note leads, with "Open the receipt settings", to the Sales settings,
@@ -782,7 +783,7 @@ PRINTING-F18
 The other apps and the assistant use Printing through these operations, by their name; never its tables.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:39fbee70568b -->
+<!-- from WORKBOOK.md sha256:a0d468f987b2 -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -795,12 +796,12 @@ The other apps and the assistant use Printing through these operations, by their
 | The state of a printer (by id or name) | view | F19 | `printing.printer.status` |
 | The queue, from the most recent to the oldest, with search by document, filters (status, role, printer) and pages | view | F01, F14 | `printing.job.list` |
 | A queue job by id or by its document's number (the most recent one), with its title as the queue puts it | view | F14, F16 | `printing.job.get` |
-| The queue summary per role, with the printer each one comes out of, how many jobs no device set up can take out and how many have waited a minute without a switched-on device | view | F01 | `printing.job.summary` |
+| The queue summary per role, with the printer each one comes out of, how many jobs no device set up can take out and how many have waited a minute without a switched-on device | view | F01, F22 | `printing.job.summary` |
 | Whether a role has a set-up device that prints it, switched on or not (the Home step), and how many of its jobs have waited a minute or more in the queue without a switched-on device to take them out (the bell) | view | F01 | `printing.device.coverage` |
 | Whether a role's station answers right now: ready (a set-up device that prints it gave signs in the last 90 s), not connected (set up, but silent) or not set up (none); for the Home's health row and the "Your printer" card | view | F21 | `printing.device.health` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:235368aed276 -->
+<!-- from WORKBOOK.md sha256:9433afcb7150 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
@@ -808,11 +809,11 @@ The other apps and the assistant use Printing through these operations, by their
 | Adds a printer | settings | F03 | `printing.printer.create` |
 | Changes a printer, or deactivates and activates it | settings | F04 | `printing.printer.update` |
 | Queues a printer's test page | print | F05 | `printing.printer.test` |
-| Queues a document (idempotent by its key) | print | F07–F13, F16, F17 | `printing.job.create` |
+| Queues a document (idempotent by its key) | print | F07–F13, F16, F17, F22 | `printing.job.create` |
 | Sets up the device it is asked from, with its name and its printers | settings | F18 | `printing.device.register` |
 | Changes the name or the printers of a device | settings | F18 | `printing.device.update` |
 | Retires a device: it no longer prints | settings | F18 | `printing.device.retire` |
-| Notes that the device set up with an identifier is there (for the device's channel, when it connects and in each heartbeat; with no route, no assistant and no notice) | print | F01, F18 | `printing.device.seen` |
+| Notes that the device set up with an identifier is there (for the device's channel, when it connects and in each heartbeat; with no route, no assistant and no notice) | print | F18 | `printing.device.seen` |
 | Gives the set-up device the next job of its printers | print | F18 | `printing.job.claim` |
 | Confirms a printed job | print | F18 | `printing.job.complete` |
 | Reports that a job did not come out | print | F18 | `printing.job.fail` |

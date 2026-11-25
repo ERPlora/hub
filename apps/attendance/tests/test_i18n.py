@@ -93,7 +93,7 @@ def test_spanish_texts_are_the_old_modules():
             "Estás a 850 m del lugar de trabajo, fuera de los 100 m permitidos. Acércate para fichar o ficha "
             "en el mostrador."
         )
-        assert str(queries.TERMINATED_REASON) == "Jornada cerrada al dar de baja a la persona en Personal."
+        assert str(queries.corrections.TERMINATED_REASON) == "Jornada cerrada al dar de baja a la persona en Personal."
 
 
 def test_short_labels_carry_their_context():

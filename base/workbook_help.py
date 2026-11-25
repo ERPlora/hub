@@ -29,6 +29,7 @@ KEYS = {
     "vertical": pgettext_lazy("workbook", "Vertical"),
     "actor": pgettext_lazy("workbook", "Actor"),
     "screen": pgettext_lazy("workbook", "Screen"),
+    "operations": pgettext_lazy("workbook", "Operations"),
     "steps": pgettext_lazy("workbook", "Steps"),
     "in": pgettext_lazy("workbook", "In"),
     "out": pgettext_lazy("workbook", "Out"),
@@ -215,14 +216,14 @@ def is_done(status: str, vocabulary: Words) -> bool:
 def _places(screen: list[str], places: dict[str, str]) -> tuple[str, ...]:
     """The tabs a flow's screen names: its parts split on «,» and «;», what goes in parentheses left out."""
     found: list[str] = []
-    for part in re.split(r"[,;]", _without_parentheses(" ".join(screen))):
+    for part in re.split(r"[,;]", without_parentheses(" ".join(screen))):
         tab_id = places.get(_place(part))
         if tab_id is not None and tab_id not in found:
             found.append(tab_id)
     return tuple(found)
 
 
-def _without_parentheses(text: str) -> str:
+def without_parentheses(text: str) -> str:
     while (inner := _PARENTHESES.sub("", text)) != text:
         text = inner
     return text
@@ -234,7 +235,7 @@ def _name(text: str | None) -> str:
 
 def _place(text: str) -> str:
     """How a flow's screen and a tab's or a window's name are compared: what goes in parentheses left out."""
-    return _name(_without_parentheses(text))
+    return _name(without_parentheses(text))
 
 
 def _capital(text: str) -> str:

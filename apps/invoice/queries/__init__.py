@@ -22,6 +22,7 @@ from . import (
     platform_invoices as platform_invoices,
     documents as documents,
     fiscal_archive as fiscal_archive,
+    overdue as overdue,
     ownership as ownership,
     rows as rows,
 )

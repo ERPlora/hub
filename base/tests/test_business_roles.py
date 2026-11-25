@@ -11,7 +11,7 @@ from django.db.models import ProtectedError
 
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
-from base.roles import APPROVAL, OFF, ON, effective, saved, to_review
+from base.roles import APPROVAL, OFF, ON, effective, raised, saved, to_review
 from base.tenancy.tests.business import HUB_DB, in_business_a
 
 __all__ = ["in_business_a"]
@@ -82,6 +82,19 @@ class TestWhatSavingAChangeKeeps:
         self.change(states, sale__view_sale=OFF)
 
         assert states == REVIEWED_SALE
+
+
+class TestWhatAChangeRaises:
+    @pytest.mark.parametrize("before", [ON, APPROVAL, OFF, None])
+    @pytest.mark.parametrize("after", [ON, APPROVAL, OFF])
+    def test_is_what_does_more_than_it_did(self, before, after):
+        more = {(None, APPROVAL), (None, ON), (OFF, APPROVAL), (OFF, ON), (APPROVAL, ON)}
+        was = {} if before is None else {"sale.void_sale": before}
+
+        assert raised(was, {"sale.void_sale": after}) == ({"sale.void_sale": after} if (before, after) in more else {})
+
+    def test_is_nothing_of_what_stays_as_it_was_or_is_gone(self):
+        assert raised({"sale.view_sale": ON, "sale.void_sale": APPROVAL}, {"sale.view_sale": ON}) == {}
 
 
 class TestWhatIsLeftToReview:

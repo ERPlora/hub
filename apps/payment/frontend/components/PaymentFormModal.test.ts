@@ -18,7 +18,16 @@ import type { MethodOut, PaymentOut } from '../operations';
 import { business, click, errorFrame, ionValue, JAPANESE, mountPayment, page, POLISH, RECORDER, settle } from '../__tests__/mount-payment';
 import PaymentFormModal from './PaymentFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; placeholder?: string; readonly?: boolean; required?: boolean };
+type Control = HTMLElement & {
+  label?: string;
+  labelPlacement?: string;
+  value?: unknown;
+  errorText?: string;
+  disabled?: boolean;
+  placeholder?: string;
+  readonly?: boolean;
+  required?: boolean;
+};
 
 const METHODS = 'payment.method.list';
 const method = (id: string, name: string): MethodOut => ({
@@ -70,7 +79,6 @@ describe('PaymentFormModal', () => {
     ]);
     // The day is the app's own calendar (never the device's), and a payment always has one.
     expect([picked(s.field('date')), s.field('date').readonly, s.field('date').required]).toEqual([localDay(), true, true]);
-    expect(s.field('method').placeholder).toBe('Method…');
     expect([...s.field('method').querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toEqual([
       'BBVA account',
       'Cash drawer',
@@ -181,8 +189,17 @@ describe('PaymentFormModal', () => {
 
   it('while the methods load, the picker waits, with no warning', async () => {
     const s = await setup();
-    expect([s.field('method').disabled, s.field('method').placeholder]).toEqual([true, 'Loading…']);
+    expect(s.field('method').disabled).toBe(true);
     expect(s.banner('payment-form-no-methods')).toBeUndefined();
+  });
+
+  // Ionic shows a floating select's placeholder as soon as it has focus, but lifts the label only once there is a
+  // value: focused and empty, the two would be painted on the same line.
+  it('the method picker floats its label and has no placeholder, loading or loaded', async () => {
+    const s = await setup();
+    expect([s.field('method').labelPlacement, s.field('method').placeholder]).toEqual(['floating', undefined]);
+    await s.result(METHODS, page([BANK, CASH]));
+    expect([s.field('method').labelPlacement, s.field('method').placeholder]).toEqual(['floating', undefined]);
   });
 
   it('speaks Spanish', async () => {

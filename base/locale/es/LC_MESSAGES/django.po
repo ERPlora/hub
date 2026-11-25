@@ -308,12 +308,12 @@ msgstr "Tus apps"
 msgid "Turn on at least one business app so your till has something to sell."
 msgstr "Activa al menos una app de negocio para que el TPV tenga algo que vender."
 
-#: home.py
+#: home/mandatory_apps.py
 #, python-format
 msgid "Turn on %(app)s"
 msgstr "Activa %(app)s"
 
-#: home.py
+#: home/mandatory_apps.py
 #, python-format
 msgid "It is mandatory for businesses in %(country)s."
 msgstr "Es obligatoria para los negocios de %(country)s."
@@ -1809,6 +1809,10 @@ msgstr "Entra con tu cuenta de erplora.com para ir directamente."
 msgid "You don't have permission to manage this business on erplora.com."
 msgstr "No tienes permiso para gestionar este negocio en erplora.com."
 
+#: base/services/support.py
+msgid "This business has no plan."
+msgstr "Este negocio no tiene plan."
+
 #: base/services.py
 msgid "We could not open erplora.com directly."
 msgstr "No se ha podido abrir erplora.com directamente."
@@ -2359,6 +2363,11 @@ msgstr "Pantalla"
 
 #: workbook_help.py
 msgctxt "workbook"
+msgid "Operations"
+msgstr "Operaciones"
+
+#: workbook_help.py
+msgctxt "workbook"
 msgid "Steps"
 msgstr "Pasos"
 
@@ -2822,6 +2831,27 @@ msgstr "entrada de soporte"
 msgctxt "support visit"
 msgid "support entries"
 msgstr "entradas de soporte"
+
+msgid "ERPlora support"
+msgstr "Soporte de ERPlora"
+
+msgctxt "way in"
+msgid "ERPlora support"
+msgstr "Soporte de ERPlora"
+
+msgid "This business does not let support in"
+msgstr "Este negocio no deja entrar a soporte"
+
+msgid ""
+"The owner or an administrator of this business has to turn on ERPlora's "
+"support access before you can come in. Ask them to, then try again."
+msgstr ""
+"El propietario o un administrador de este negocio tiene que encender el "
+"acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a "
+"intentarlo."
+
+msgid "Try again"
+msgstr "Volver a intentarlo"
 
 #: people.py
 msgid "The owner is always the owner: nobody gives them another role."

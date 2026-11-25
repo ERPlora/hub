@@ -628,6 +628,7 @@
         },
         "demo": "En una demo no se mide el uso: sus datos se borran al terminar.",
         "unknown": "Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.",
+        "platform": "Este es el negocio de ERPlora: no tiene plan.",
         "managed": "Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com."
       }
     },
@@ -1142,6 +1143,21 @@
         "loadFailed": "No se pudo cargar el ajuste.",
         "retry": "Reintentar"
       }
+    },
+    "supportAccess": {
+      "title": "Acceso de soporte",
+      "toggle": "Dejar entrar al soporte de ERPlora",
+      "note": "Encendido, el personal de soporte de ERPlora puede entrar en el negocio con su propia cuenta para ayudarte a configurarlo, como lo haría un administrador. Sigue encendido hasta que lo apagues, y en cuanto lo apagas sale.",
+      "changed": "Último cambio: {who}, {when}.",
+      "adminOnly": "Solo quien administra el negocio puede cambiarlo.",
+      "visits": "Últimas entradas de soporte",
+      "noVisits": "Nadie del soporte de ERPlora ha entrado todavía.",
+      "loading": "Cargando el acceso de soporte…",
+      "loadFailed": "No se pudo cargar el acceso de soporte.",
+      "retry": "Reintentar",
+      "saveFailed": "No se pudo guardar el cambio.",
+      "turnedOn": "Acceso de soporte encendido: el soporte de ERPlora puede entrar.",
+      "turnedOff": "Acceso de soporte apagado: el soporte de ERPlora ya no puede entrar."
     },
     "files": {
       "title": "Archivos",

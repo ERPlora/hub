@@ -82,6 +82,8 @@ APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED)
 API_DOC_SETTINGS_CHANGED = "base.api_doc.settings_changed"
 #: Whoever runs the business turned ERPlora's support access on or off.
 SUPPORT_ACCESS_CHANGED = "base.support_access.changed"
+#: A person of ERPlora's support came into the business (``base.support_access.enter``).
+SUPPORT_ACCESS_ENTERED = "base.support_access.entered"
 
 # ── Files ───────────────
 #: A file went up to the business's files: its path.
@@ -139,5 +141,6 @@ ALL = [
     *APPROVAL_EVENTS,
     API_DOC_SETTINGS_CHANGED,
     SUPPORT_ACCESS_CHANGED,
+    SUPPORT_ACCESS_ENTERED,
     *APP_EVENTS,
 ]

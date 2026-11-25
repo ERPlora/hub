@@ -12,6 +12,7 @@ from live.errors import NotFound
 
 from apps.invoice.document_issuer import document_issuer
 from apps.invoice.models import Invoice, InvoiceLine
+from apps.invoice.queries.overdue import is_overdue
 from apps.invoice.queries.ownership import INVOICES
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
@@ -26,10 +27,11 @@ def with_links(invoices):
 
 
 def _flags(invoice: Invoice, *, substituted: bool, rectified: bool) -> dict:
-    """What can still be done to a document: the row and the detail ask the same questions."""
+    """What can still be done to a document, and whether it is overdue: the row and the detail ask the same questions."""
     ordinary = not invoice.is_rectification
     return {
         "substituted": substituted,
+        "overdue": is_overdue(invoice, substituted=substituted),
         "can_mark_paid": ordinary and invoice.status == Invoice.Status.ISSUED,
         "can_rectify": ordinary
         and invoice.status != Invoice.Status.CANCELLED
@@ -55,6 +57,7 @@ def invoice_row(invoice: Invoice) -> dict:
         "series_code": invoice.series_code,
         "year": invoice.year,
         "issue_date": invoice.issue_date,
+        "due_date": invoice.due_date,
         "issued_at": invoice.issued_at,
         "customer_name": invoice.customer_name,
         "customer_tax_id": invoice.customer_tax_id,

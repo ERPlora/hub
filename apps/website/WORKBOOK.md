@@ -428,7 +428,7 @@ las mismas reglas y los mismos permisos.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| El borrador, su estado de publicación y la dirección pública (se sigue en vivo) | ver | F01–F03, F07, F08 | `website.site.get` |
+| El borrador, su estado de publicación y la dirección pública (se sigue en vivo) | ver | F01–F03, F07, F08, F11, F12 | `website.site.get` |
 | El borrador pintado como la página pública (HTML, para la vista previa) | gestionar | F06 | `website.site.preview` |
 | Las categorías de Inventario o de Servicios para elegir | gestionar | F05 | `website.catalog.categories` |
 | Una imagen subida por el nombre de su archivo: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | ver | F04, F11 | `website.image.get` |
@@ -446,7 +446,7 @@ minuto.
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Guarda el borrador (plantilla, paleta y fondo, contenido) | gestionar | F01–F03, F05 | `website.site.save` |
+| Guarda el borrador (plantilla, paleta y fondo, contenido) | gestionar | F01–F03, F05, F11, F12 | `website.site.save` |
 | Publica el borrador con la copia del catálogo | gestionar | F07 | `website.site.publish` |
 | Desconecta la página | gestionar | F08 | `website.site.unpublish` |
 | Sube una imagen (base64, hasta 5 MB) | gestionar | F04 | `website.image.upload` |

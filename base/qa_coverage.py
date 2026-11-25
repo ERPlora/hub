@@ -18,8 +18,9 @@ from base import catalog, workbook_help
 
 JOURNEYS = Path("qa/journeys")
 WORKBOOKS = ("base/WORKBOOK.md", "apps/*/WORKBOOK.md")
-#: How a source WORKBOOK, written in Spanish, opens the screen of a flow no one does on one: «ninguna (se ve en …)».
-NO_SCREEN = "ninguna"
+#: How a source WORKBOOK, written in Spanish, opens what a flow has none of: its screen, «ninguna (se ve en …)», or its
+#: operations.
+NONE = "ninguna"
 ANY_VERTICAL = "any"
 HEADER_FENCE = "---"
 HEADER_KEYS = ("title", "vertical", "roles")
@@ -46,6 +47,9 @@ class WorkbookFlow:
     app: str
     done: bool
     on_screen: bool
+    actor: str
+    screen: str
+    no_operations: bool
 
     @property
     def walkable(self) -> bool:
@@ -84,17 +88,28 @@ def workbook_flows(root: Path) -> dict[str, WorkbookFlow]:
     with translation.override(workbook_help.SOURCE_LANGUAGE):
         vocabulary = workbook_help.words()
     flows: dict[str, WorkbookFlow] = {}
-    for path in sorted(found for pattern in WORKBOOKS for found in root.glob(pattern)):
+    for path in workbooks(root):
         markdown = catalog.user_part(path.read_text(encoding="utf-8"))
         for flow_id, _title, fields in workbook_help.flow_fields(markdown, vocabulary):
-            done = workbook_help.is_done(" ".join(fields.get("status", [])), vocabulary)
-            flows[flow_id] = WorkbookFlow(flow_id, path.parent.name, done, _on_screen(fields.get("screen", [])))
+            done = workbook_help.is_done(_text(fields, "status"), vocabulary)
+            actor, screen = _text(fields, "actor"), _text(fields, "screen")
+            on_screen, no_operations = not _says_none(screen), _says_none(_text(fields, "operations"))
+            flows[flow_id] = WorkbookFlow(flow_id, path.parent.name, done, on_screen, actor, screen, no_operations)
     return flows
 
 
-def _on_screen(screen: list[str]) -> bool:
-    first = " ".join(screen).split(maxsplit=1)
-    return not first or first[0].strip(";,.:").casefold() != NO_SCREEN
+def workbooks(root: Path) -> list[Path]:
+    """The source WORKBOOKs under ``root``."""
+    return sorted(found for pattern in WORKBOOKS for found in root.glob(pattern))
+
+
+def _text(fields: Mapping[str, list[str]], key: str) -> str:
+    return " ".join(" ".join(fields.get(key, [])).split())
+
+
+def _says_none(text: str) -> bool:
+    first = text.split(maxsplit=1)
+    return bool(first) and first[0].strip(";,.:").casefold() == NONE
 
 
 def read_journeys(root: Path, verticals: Iterable[str]) -> list[Journey]:

@@ -5,9 +5,10 @@
 // table says it under the field (the page, with `amountFilterErrors` on `TOTAL_ENDS`).
 import type { DataTableFilters } from '@erplora/ui/components';
 
-import type { InvoiceListIn, InvoiceSource, InvoiceStatus, InvoiceType } from '../operations';
+import type { InvoiceStatusFilter } from '../invoice-dates';
+import type { InvoiceListIn, InvoiceSource, InvoiceType } from '../operations';
 import { filterCents, type Money } from './format';
-import { SOURCE_CODES, STATUS_CODES, TYPE_CODES } from './invoice';
+import { SOURCE_CODES, STATUS_FILTERS, TYPE_CODES } from './invoice';
 
 /** The two ends of «Total», in the business's money as typed. */
 export const TOTAL_ENDS = ['total_amount_from', 'total_amount_to'] as const;
@@ -24,7 +25,7 @@ export function reversedDates(values: DataTableFilters): boolean {
 /** What the list query takes from the filters, the totals in minor units of the business's `money`. */
 export function filterQuery(values: DataTableFilters, money?: Money): Partial<InvoiceListIn> {
   const query: Partial<InvoiceListIn> = {};
-  if (STATUS_CODES.includes(values.status as InvoiceStatus)) query.status = values.status as InvoiceStatus;
+  if (STATUS_FILTERS.includes(values.status as InvoiceStatusFilter)) query.status = values.status as InvoiceStatusFilter;
   if (TYPE_CODES.includes(values.invoice_type as InvoiceType)) query.invoice_type = values.invoice_type as InvoiceType;
   if (SOURCE_CODES.includes(values.source_type as InvoiceSource)) query.source_type = values.source_type as InvoiceSource;
   const series = typed(values, 'series_code');

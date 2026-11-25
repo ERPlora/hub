@@ -37,6 +37,7 @@
     },
     "status": {
       "issued": "Issued",
+      "overdue": "Overdue",
       "paid": "Paid",
       "cancelled": "Cancelled"
     },
@@ -112,6 +113,7 @@
         "series": "Series",
         "issueDate": "Issue date",
         "operationDate": "Operation date",
+        "dueDate": "Due date",
         "customer": "Customer",
         "customerTaxId": "Customer tax ID",
         "address": "Address",
@@ -231,6 +233,8 @@
     "create": {
       "title": "New manual invoice",
       "series": "Series",
+      "issueDate": "Date",
+      "dueDate": "Due date",
       "customer": "Customer",
       "taxId": "Customer tax ID",
       "address": "Address",
@@ -330,6 +334,7 @@
       "number": "No.",
       "date": "Date",
       "operationDate": "Operation date",
+      "dueDate": "Due date",
       "billTo": "Bill to",
       "taxId": "Tax ID",
       "description": "Description",

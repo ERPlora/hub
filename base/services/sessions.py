@@ -34,6 +34,7 @@ from base.models import Hub, HubUser, Membership
 from base.models.api_keys import ApiKey
 from base.models.sessions import SessionOwner
 from base.models.access import TrustedDevice
+from base.permissions import is_a_person
 from base.registry import internal_only
 from base.schemas.sessions import HubUserSyncIn, HubUserSyncOut, SessionRevokeIn, SessionRevokeOut
 from control.models import HubVisit
@@ -112,7 +113,8 @@ def _note_the_owner(
 ) -> None:
     """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index, and
     on which device and with which credential it was opened; and, on a hub, that its person came in today
-    (``control.HubVisit``, its nightly use and who is active now).
+    (``control.HubVisit``, its nightly use and who is active now), unless they are ERPlora's support, who is none of
+    the business's people.
 
     ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
     no key until it is saved, which happens here, in the login's transaction.
@@ -129,7 +131,7 @@ def _note_the_owner(
             "credential": credential,
         },
     )
-    if host and host != PLATFORM_SESSION_HOST:
+    if host and host != PLATFORM_SESSION_HOST and credential != SessionOwner.Credential.SUPPORT:
         # Who came into the business today (its nightly use, ``base.usage``): once a day, whatever the logins; what they
         # do next keeps ``last_seen_at`` going (``base.meter``).
         now = timezone.now()
@@ -228,14 +230,19 @@ def _end_other_devices(slug: str, device: TrustedDevice) -> None:
     """Keep within the devices the business's plan covers (``plan.max_devices`` of the SaaS's photo; 0 or none, no
     cap): an entry on ``device`` ends the live sessions on this host of every other device past the
     ``max_devices - 1`` most recently entered, and marks those devices so their next way in says why. A session with
-    no device (from before the rule) never counts as a kept one. Their tabs wake after the COMMIT and leave."""
+    no device (from before the rule) never counts as a kept one; ERPlora's support's is no device of the business and
+    stays. Their tabs wake after the COMMIT and leave."""
     hub = Hub.objects.filter(slug=slug).first()
     plan = (hub.state or {}).get("plan") if hub is not None and isinstance(hub.state, dict) else None
     cap = plan.get("max_devices") if isinstance(plan, dict) else None
     if not isinstance(cap, int) or cap < 1:
         return
     now = timezone.now()
-    others = SessionOwner.objects.filter(host=slug, session__expire_date__gt=now).exclude(device_id=device.pk)
+    others = (
+        SessionOwner.objects.filter(host=slug, session__expire_date__gt=now)
+        .exclude(device_id=device.pk)
+        .exclude(credential=SessionOwner.Credential.SUPPORT)
+    )
     latest = (
         others.exclude(device_id=None).values("device_id").annotate(opened=Max("created_at")).order_by("-opened")
     )
@@ -294,7 +301,7 @@ def ensure_hub_user(user) -> HubUser:
 def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     """The ``HubUser`` of the person behind ``ctx``, made if missing, for what a write signs; ``None`` for the
     platform, an API key or nobody (no person)."""
-    if not queries.people.is_a_person(ctx.actor):
+    if not is_a_person(ctx.actor):
         return None
     return ensure_hub_user(ctx.actor)
 

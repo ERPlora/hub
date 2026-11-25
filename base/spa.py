@@ -36,7 +36,7 @@ from live.errors import OperationError
 from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
 
-from base import public_home, queries
+from base import public_home, queries, saas_store
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models.sessions import SessionOwner
@@ -96,7 +96,7 @@ def shell(request: HttpRequest, *, blocks: dict | None = None) -> HttpResponse:
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,
-            "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if account else "",
+            "plan_url": saas_store.plans_url(hub.slug, hub.id) if account else "",
             "account_url": saas_url(f"{SAAS_PANEL_PATH}/account") if account else "",
             # «Members» of the business on erplora.com, where people are invited.
             "members_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/members") if account else "",

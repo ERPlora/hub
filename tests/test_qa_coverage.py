@@ -33,9 +33,12 @@ Un ejemplo.
 ### SAMPLE-F01 Hecho en una pantalla
 Estado: hecho
 Pantalla: Lista
+Operaciones: las de la lista, ninguna más
 
 ### SAMPLE-F02 Hecho con una nota
 Estado: hecho — también por la API
+Actor: responsable,
+  asistente
 Pantalla: Lista, Ficha
 
 ### SAMPLE-F03 Parcial
@@ -57,6 +60,7 @@ Pantalla: Ninguna; la dirección sigue igual
 ### SAMPLE-F08 Hecho y sin recorrido
 Estado: hecho
 Pantalla: Ficha
+Operaciones: ninguna (solo lleva a otra pantalla)
 
 ## Para quien lo mantiene
 
@@ -184,6 +188,10 @@ class TestTheWorkbooks:
             assert flows[flow_id].done
             assert not flows[flow_id].on_screen
 
+    def test_a_flow_says_that_it_uses_no_operation(self, tree):
+        flows = qa_coverage.workbook_flows(tree)
+        assert [flow_id for flow_id, flow in flows.items() if flow.no_operations] == ["SAMPLE-F08"]
+
     def test_a_partial_flow_and_one_not_done_are_not_done(self, tree):
         flows = qa_coverage.workbook_flows(tree)
         assert not flows["SAMPLE-F03"].done
@@ -193,6 +201,11 @@ class TestTheWorkbooks:
         flows = qa_coverage.workbook_flows(tree)
         assert flows["BASE-F01"].app == "base"
         assert flows["SAMPLE-F01"].app == "sample"
+
+    def test_each_flow_says_who_does_it_and_where_on_one_line(self, tree):
+        flows = qa_coverage.workbook_flows(tree)
+        assert (flows["SAMPLE-F02"].actor, flows["SAMPLE-F02"].screen) == ("responsable, asistente", "Lista, Ficha")
+        assert (flows["SAMPLE-F01"].actor, flows["SAMPLE-F01"].screen) == ("", "Lista")
 
     def test_only_the_customers_part_of_the_source_is_read(self, tree):
         flows = qa_coverage.workbook_flows(tree)
