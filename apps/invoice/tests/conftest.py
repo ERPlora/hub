@@ -98,6 +98,18 @@ def today():
 
 
 @pytest.fixture
+def at(monkeypatch, in_business_a):
+    """``at((zone, instant))``: business A in ``zone``, its clock stopped at ``instant``."""
+
+    def move(moment):
+        zone, instant = moment
+        monkeypatch.setattr(timezone, "now", lambda: instant)
+        monkeypatch.setattr(in_business_a, "timezone", zone)
+
+    return move
+
+
+@pytest.fixture
 def make_user(db):
     def make(
         username: str = "ana",
