@@ -383,6 +383,14 @@ class TestTheyComeIn:
 
         assert (me(client, ERP)["user"], roles_at(erp)) == (None, {})
 
+    def test_nor_does_support_while_it_does_not_let_support_in(self, client, fake_saas, erp):
+        fake_saas(body=arrives(ANA, Membership.SUPPORT))
+
+        answer = callback(client, {"code": "c1", "next": "/"}, host=ERP)
+
+        assert answer.status_code == 403
+        assert (me(client, ERP)["user"], roles_at(erp), people_in(erp)) == (None, {}, {})
+
     @pytest.mark.parametrize(
         ("slug", "is_platform"),
         [("erplora", True), ("test", False), ("hub", False), ("www", False), ("erp", False)],
