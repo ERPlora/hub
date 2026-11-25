@@ -3407,7 +3407,7 @@ Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes 
 business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
 
 ### BASE-F112 Save a downloaded file inside the app
-<!-- from WORKBOOK.md sha256:c6659b50cacd -->
+<!-- from WORKBOOK.md sha256:1042602d77fa -->
 Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
@@ -3420,8 +3420,8 @@ Steps:
      Downloads folder, and "Saved to" appears with the file's path (on Android, "Saved to Download/menu.pdf"): inside
      the app there is no downloads bar nor any other notice.
   4. In the assistant, when asked for an export ("Give me the whole menu as a CSV"), "Download" with the file's name
-     comes under its answer: the same file the export button of that screen gives, which comes down as in steps 2 and 3.
-     The assistant says it is there, without pasting its content into the chat.
+     comes under its answer: the same file the export button of that screen gives, which comes down as in the two steps
+     before. The assistant says it is there, without pasting its content into the chat.
 In: the file the screen already holds, with its name.
 Out: the file in Downloads and, inside the app, the notice with its path. Nothing is kept in the Hub.
 If it fails: inside the app the button is never left without an answer. With no downloads folder the person can open

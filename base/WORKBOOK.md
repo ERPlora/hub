@@ -3280,8 +3280,7 @@ Pasos:
      Download/carta.pdf»): dentro de la app no hay barra de descargas ni otro aviso.
   4. En el asistente, al pedirle una exportación («Sácame la carta entera en un CSV»), bajo su respuesta sale
      «Descargar» con el nombre del archivo: el mismo archivo que da el botón de exportar de esa pantalla, que baja como
-     en los pasos 2 y
-     3. El asistente dice que lo tiene ahí, sin pegar su contenido en el chat.
+     en los dos pasos anteriores. El asistente dice que lo tiene ahí, sin pegar su contenido en el chat.
 Entra: el archivo que la pantalla ya tiene, con su nombre.
 Sale: el archivo en Descargas y, dentro de la app, el aviso con su ruta. En el Hub no se guarda nada.
 Si falla: dentro de la app el botón nunca se queda sin respuesta. Sin una carpeta de descargas que la persona pueda

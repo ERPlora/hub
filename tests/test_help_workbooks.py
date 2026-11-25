@@ -9,7 +9,7 @@ screen's summary, and each flow's title, steps and what happens if it fails) hol
 reference, no size in pixels, no flow id (also a short one, «F09»), no placeholder of a message («{n}», «<total>»), no
 Markdown the window's reader does not read («***», a backslash escape), no operation or event name and no quoted title
 of a part of the WORKBOOK the window does not show («Pantallas»), while the detail under a ``###`` of the first section
-or a ``####`` of a screen may hold any of them; every published flow has its steps; and no flow that reads as done on a
+or a ``####`` of a screen may hold any of them; every published flow has its steps, numbered in order; and no flow that reads as done on a
 tab is left out, also when its screen names the tab with an arrow or «y» instead of a comma. A translation
 publishes the same tabs and flows as its source, each with its steps and what happens if it fails when the source has
 them, so a word of the vocabulary that is missing or wrong in it cannot empty the help in that language. The platform (base)
@@ -50,6 +50,7 @@ JOINING_WORD = re.compile(r"\s+(?:y|e|o|u|and|or)\s+")
 #: The title of a section (``##``) or a part of one (``###``) of the WORKBOOK, and that of a flow.
 HEADING = re.compile(r"^#{2,3} +(.+?) *$", re.MULTILINE)
 FLOW_HEADING = re.compile(r"^[A-Z][A-Z0-9_]*-F\d+\s")
+STEP = re.compile(r"^\s*(\d+)[.)]\s", re.MULTILINE)
 QUOTES = ("«{}»", '"{}"', "“{}”")
 #: ``<app>.<entity>.<action>`` (or ``<fact>``): an operation's or an event's name, when its first part is an app.
 DOTTED = re.compile(r"(?<![\w.])([a-z][a-z0-9_]*)\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*(?!\w|\.\w)")
@@ -174,10 +175,21 @@ def published_problems(read: workbook_help.Help, markdown: str, tabs) -> list[st
     return found + reference_problems(read, markdown, tabs)
 
 
+def numbered(flow: workbook_help.Flow) -> list[int]:
+    """The numbers its steps start with, as the window lists them: a line the file wraps at «3. …» starts one too."""
+    return [int(number) for number in STEP.findall(flow.steps)]
+
+
+def in_order(numbers: list[int]) -> list[int]:
+    return list(range(1, len(numbers) + 1))
+
+
 def task_problems(read: workbook_help.Help, markdown: str, tabs, vocabulary: workbook_help.Words, app: str) -> list[str]:
-    """The tasks done on a tab of ``app`` that are left out of it, and those published without steps."""
+    """The tasks done on a tab of ``app`` that are left out of it, and those published without steps or with steps
+    numbered out of order."""
     found = placement_problems(read, markdown, tabs, vocabulary, app)
     found += [f"{flow.id} is published without steps" for flow in read.flows if not flow.steps.strip()]
+    found += [f"the steps of {flow.id} are numbered {seen}" for flow in read.flows if (seen := numbered(flow)) != in_order(seen)]
     return found + [
         f"{draft.id} is done on a tab, but its status «{draft.status}» is not read as done: it is left out"
         for draft in read.unpublished
@@ -304,6 +316,7 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         ("Una tabla de zonas.", "Sale «{n} zonas».", "the screen «Zonas» has a placeholder"),
         ("Una tabla de mesas.", "Una tabla de mesas que lee table.table.list.", "names 'table.table.list'"),
         ("Pasos:\n1. Pulsa «+».\n", "", "TABLE-F01 is published without steps"),
+        ("1. Pulsa «+».\n", "1. Pulsa «+», como en los pasos 2 y\n   3. Guarda.\n", "the steps of TABLE-F01 are numbered [1, 3]"),
         ("Estado: hecho\n", "Estado: hecho, también por la API\n", "TABLE-F01 is done on a tab, but its status"),
         ("Tocar una mesa abre su ventana.\n", "", "the screen «Plano de sala» has no summary"),
         ("Una tabla de zonas.", "Z" * (SUMMARY_MAX + 1), f"the summary of «Zonas» has {SUMMARY_MAX + 1} characters"),
@@ -329,6 +342,7 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         "placeholder",
         "operation",
         "no-steps",
+        "wrapped-into-a-step",
         "dropped",
         "no-summary",
         "long-summary",
