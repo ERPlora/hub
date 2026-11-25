@@ -29,6 +29,7 @@ PAGES = {
     "suspended": ("base/hub_suspended.html", {"back_url": f"{SAAS}/launch"}),
     "login-retry": ("base/login_retry.html", {"retry_url": "/auth/login?next=%2F"}),
     "too-many-attempts": ("base/too_many_attempts.html", {"minutes": 15}),
+    "support-access-off": ("base/support_access_off.html", {"retry_url": "/auth/login?next=%2F"}),
     "jump": ("base/jump.html", {"target": "/auth/login?next=", "csp_nonce": "n0nce"}),
     "database-cut": ("base/database_cut.html", {"message": "ERPlora will be back in a moment."}),
 }

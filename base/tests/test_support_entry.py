@@ -14,6 +14,7 @@ import json
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.test import Client
 from django.utils import timezone
 from live.context import Scope, system_context
@@ -22,7 +23,8 @@ from live.models import OutboxEvent
 from apps.staff.queries import list_accounts
 from apps.staff.schemas.accounts import AccountListIn
 from apps.whatsapp_inbox.queries.agents import team_roles
-from base import auth, meter, queries
+from base import access as access_rules
+from base import auth, meter, queries, services
 from base.models import Hub, HubUser, Membership
 from base.models.access import Credential, TrustedDevice
 from base.models.sessions import SessionOwner
@@ -193,6 +195,25 @@ class TestWithTheAccessOn:
             on_the_pin_pad = [credential.username for credential, _ in queries.access.pin_people(A)]
         assert [row.name for row in rows] == ["Olga"]
         assert on_the_pin_pad == ["saas:1"]
+
+    def test_a_pin_or_a_badge_of_support_opens_no_till(self, client, fake_saas, make_user, hub_a):
+        support_enters(client, fake_saas)
+        make_user("saas:3", host=A, role=Membership.Role.EMPLOYEE, first_name="Eva")
+        cards = {"saas:3": "CARD-0003", SUPPORT_COPY: "CARD-0009"}
+        with use_hub(hub_a):
+            key = services.devices.badge_key()
+            people = [
+                Credential.objects.create(
+                    username=username,
+                    pin_hash=make_password("4821"),
+                    badge_digest=access_rules.badge_digest(card, key=key),
+                )
+                for username, card in cards.items()
+            ]
+            by_pin = [queries.access.pin_owner(A, str(person.pk), "4821") for person in people]
+            by_badge = [services.devices.badge_owner(A, card)[0] for card in cards.values()]
+        assert [user and user.get_username() for user in by_pin] == ["saas:3", None]
+        assert [user and user.get_username() for user in by_badge] == ["saas:3", None]
 
 
 @pytest.mark.usefixtures("access_on")

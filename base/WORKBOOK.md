@@ -3649,10 +3649,10 @@ Pasos:
      soporte haya entrado, la lista está vacía.
   4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
      cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
-     negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no ocupa plaza ni
-     cuenta en el uso del plan y su navegador no se queda como dispositivo del negocio: ni cierra la sesión de otro
-     dispositivo ni se la cierra la entrada de otro (BASE-F57). Cada entrada se suma al momento a la lista de las
-     últimas entradas, y lo que hace queda a su nombre en los registros.
+     negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
+     con PIN ni con tarjeta, no ocupa plaza ni cuenta en el uso del plan y su navegador no se queda como dispositivo
+     del negocio: ni cierra la sesión de otro dispositivo ni se la cierra la entrada de otro (BASE-F57). Cada entrada
+     se suma al momento a la lista de las últimas entradas, y lo que hace queda a su nombre en los registros.
   5. Con el acceso apagado no entra: ve «Este negocio no deja entrar a soporte» — «El propietario o un administrador
      de este negocio tiene que encender el acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a
      intentarlo.» con «Volver a intentarlo».

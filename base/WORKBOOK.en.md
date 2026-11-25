@@ -3786,7 +3786,7 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:2e2d525ed55e -->
+<!-- from WORKBOOK.md sha256:666f8cd95550 -->
 Status: partial — it is changed and read through the API and with the assistant, and the business already lets support
 in or refuses it as it says; its card in Settings › General is still missing, and so is erplora.com giving the support
 staff their code to come in
@@ -3803,10 +3803,11 @@ Steps:
      come in, the list is empty.
   4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
      and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
-     resetting it, its copies). They are not in Employees nor among who can give access, take no place and do not
-     count in the plan's use, and their browser does not stay as a device of the business: it neither ends another
-     device's session nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest
-     entries at once, and what they do stays in the records under their name.
+     resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
+     a PIN or a badge, take no place and do not count in the plan's use, and their browser does not stay as a device
+     of the business: it neither ends another device's session nor has its own ended by another one's entry
+     (BASE-F57). Each entry joins the list of the latest entries at once, and what they do stays in the records under
+     their name.
   5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
      administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
      try again." with "Try again".
