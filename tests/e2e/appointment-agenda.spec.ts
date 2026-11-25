@@ -11,6 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
+import { cardDeletes } from './customer-helpers';
 import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
@@ -44,9 +45,7 @@ function cleanUp(): void {
       `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
       `delete from service_service where name like '${TAG}%'`,
       `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from customer_activity where customer_id in (${customers})`,
-      `delete from customer_consent where customer_id in (${customers})`,
-      `delete from customer_customer where name like '${TAG}%'`,
+      ...cardDeletes(customers),
     ].join('; '),
   );
 }
