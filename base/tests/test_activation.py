@@ -12,7 +12,7 @@ from live.meta import module_configs
 
 from base import activation
 from base.activation import OFF, ON, Activation
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 
 #: A small graph: sale needs tax and customer, invoice needs sale (and so tax and customer), verifactu needs invoice.
 GRAPH = {

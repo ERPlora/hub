@@ -74,7 +74,6 @@
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
 1367 apps/whatsapp_inbox/tests/test_services.py ERPlora/erplora-next#74
-922 base/catalog.py ERPlora/erplora-next#74
 802 base/files.py ERPlora/erplora-next#74
 655 base/frontend/components/SystemUsage.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74

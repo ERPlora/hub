@@ -430,7 +430,7 @@ def write_workbooks(root: Path, translations: dict[str, str], source: str = ES) 
     """``WORKBOOK.md`` in ``root`` and, for each language, its ``WORKBOOK.<language>.md`` current with it."""
     (root / "WORKBOOK.md").write_text(source, encoding="utf-8")
     for language, body in translations.items():
-        text = marked(catalog.user_part(source), body)
+        text = marked(catalog.workbooks.user_part(source), body)
         assert text is not None, f"the made-up {language} has other headings than its source"
         (root / f"WORKBOOK.{language}.md").write_text(text, encoding="utf-8")
     return root

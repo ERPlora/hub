@@ -35,7 +35,7 @@ def names_the_suite_derives(databases: dict) -> list[str]:
     from base.tenancy import names
     from base.tenancy.tests import hubs
 
-    verticals = (None, hubs.TEMPLATE_VERTICAL, *catalog.known_verticals())
+    verticals = (None, hubs.TEMPLATE_VERTICAL, *catalog.verticals.known_verticals())
     derived = []
     for suffix in XDIST_SUFFIXES:
         control = databases["default"]["TEST"]["NAME"] + suffix

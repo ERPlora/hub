@@ -6,7 +6,7 @@ from functools import cache
 from pathlib import Path
 
 from base.blueprint.archive import PURPOSE_TEMPLATE, Bundle, _in_order, _rows, manifest
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 
 SEEDS_DIR = Path(__file__).resolve().parent.parent / "seeds"
 

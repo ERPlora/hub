@@ -117,11 +117,11 @@ def workbook(root: Path, language: str) -> tuple[str, str]:
     """The language served and the customer's part in it: ``WORKBOOK.<language>.md`` while it carries the marks of the
     source's part (``workbook_sections``), else the file of its base language (``en`` for ``en-gb``), else the source's
     part of ``WORKBOOK.md``."""
-    source = catalog.user_part((root / catalog.WORKBOOK).read_text(encoding="utf-8"))
+    source = catalog.workbooks.user_part((root / catalog.workbooks.WORKBOOK).read_text(encoding="utf-8"))
     for candidate in dict.fromkeys((language, language.split("-")[0])):
         if candidate == SOURCE_LANGUAGE:
             break
-        path = root / catalog.WORKBOOK_TRANSLATION.format(candidate)
+        path = root / catalog.workbooks.WORKBOOK_TRANSLATION.format(candidate)
         body = _current(path, source) if _LANGUAGE.fullmatch(candidate) else None
         if body is not None:
             return candidate, body
