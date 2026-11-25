@@ -14,7 +14,7 @@ import json
 import re
 from pathlib import Path
 
-from base.catalog import WORKBOOK
+from base.catalog.workbooks import WORKBOOK
 from base.tests.po import po_entries
 
 REPO = Path(__file__).resolve().parent.parent

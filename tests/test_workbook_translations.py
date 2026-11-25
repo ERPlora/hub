@@ -7,7 +7,7 @@ walks the repository, so a module written down before its code has one too.
 
 from pathlib import Path
 
-from base.catalog import WORKBOOK, WORKBOOK_EN, user_part, workbook_configs
+from base.catalog.workbooks import WORKBOOK, WORKBOOK_EN, user_part, workbook_configs
 from base.workbook_sections import current_body, marked
 
 REPO = Path(__file__).resolve().parent.parent

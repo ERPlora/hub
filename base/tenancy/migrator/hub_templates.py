@@ -66,8 +66,8 @@ def templates(control: str | None = None) -> list[Template]:
     )
     portable = set(app_sets.portable_apps())
     verticals = []
-    for vertical in catalog.known_verticals():
-        wanted = set(catalog.template_apps(vertical))
+    for vertical in catalog.verticals.known_verticals():
+        wanted = set(catalog.verticals.template_apps(vertical))
         verticals.append(
             Template(
                 db_name=names.template_db_name(control, vertical),

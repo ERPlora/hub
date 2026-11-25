@@ -48,7 +48,7 @@ from live.context import system_context
 
 from base import activation, registry
 from base.services import demos, hub_registry, photo, provisioning
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 from base.schemas.demos import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops
@@ -75,7 +75,7 @@ Seed = Callable[[Hub], None]
 
 
 def vertical_apps(vertical: str) -> list[str]:
-    """The apps a hub of ``vertical`` is born with (``base.catalog.template_apps``); none for no vertical, or for one no
+    """The apps a hub of ``vertical`` is born with (``base.catalog.verticals.template_apps``); none for no vertical, or for one no
     module lists (its template's own apps are brought to the leaf all the same)."""
     if not vertical:
         return []

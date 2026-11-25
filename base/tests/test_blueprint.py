@@ -230,14 +230,14 @@ def test_the_catalogue_has_a_seed_of_every_vertical_in_spanish_and_in_english():
     templates = blueprint.seeds.catalog()
 
     assert sorted((template.vertical, template.language) for template in templates) == sorted(
-        (vertical, language) for vertical in catalog.known_verticals() for language in ("es", "en")
+        (vertical, language) for vertical in catalog.verticals.known_verticals() for language in ("es", "en")
     )
     for template in templates:
         assert template.key == f"{template.vertical}.{template.language}"
         assert template.name and template.description and template.version
         assert template.country == "ES"
         # What a seed turns on is its vertical's: every app that lists it, closed by requires.
-        assert template.bundle.manifest["apps"] == catalog.template_apps(template.vertical)
+        assert template.bundle.manifest["apps"] == catalog.verticals.template_apps(template.vertical)
         assert blueprint.seeds.template(template.key) == template
 
 

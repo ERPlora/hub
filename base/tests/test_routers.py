@@ -11,7 +11,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
 
-from base.catalog import register_apps
+from base.catalog.register_apps import register_apps
 from base.models import Membership
 from base.routers import SharedRouter
 from shared.models import App, AppDoc

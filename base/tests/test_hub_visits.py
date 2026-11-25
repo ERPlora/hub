@@ -30,7 +30,7 @@ from live.models import OutboxEvent
 from live.operations import get as get_operation
 
 from base import apps_on, catalog, hub_visits, relay, scheduler, worker
-from base.catalog import RegisterResult
+from base.catalog.register_apps import RegisterResult
 from base.models.activation import AppActivation
 from base.models.relay import EventDelivery
 from base.models.scheduler import TaskSchedule
@@ -306,7 +306,7 @@ def test_a_task_of_an_app_that_is_off_is_left_as_it_is_while_the_others_run(hub_
 
 def test_the_worker_closes_its_listen_on_the_way_out(monkeypatch):
     closed = []
-    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
     monkeypatch.setattr(hub_visits.HubVisits, "close", lambda self: closed.append(self))
     stop = threading.Event()
     stop.set()
