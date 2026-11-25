@@ -8,10 +8,7 @@ from live.operations import operation
 from apps.whatsapp_inbox import clock, gateway
 from apps.whatsapp_inbox.models import Channel
 from apps.whatsapp_inbox.schemas.channel import ChannelGetIn, ChannelOut
-from base.auth import SAAS_PANEL_PATH
-
-#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (no packs).
-PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
+from base.saas_store import plans_url
 
 
 def channel(scope: Scope) -> Channel | None:
@@ -66,11 +63,5 @@ def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
         "cap_reached": row.cap_reached(month),
         "synced_at": row.synced_at,
         "manage_url": str(getattr(settings, "SAAS_URL", "") or ""),
-        "plans_url": plans_url(),
+        "plans_url": plans_url(ctx.scope.key),
     }
-
-
-def plans_url() -> str:
-    """erplora.com's plans, where more WhatsApp messages are bought by upgrading; empty without erplora.com."""
-    saas = str(getattr(settings, "SAAS_URL", "") or "").rstrip("/")
-    return f"{saas}{PLANS_PATH}" if saas else ""

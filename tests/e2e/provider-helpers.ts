@@ -44,9 +44,10 @@ export function spend(messages: number): void {
   if (messages === 0) return;
   saasSql(
     'insert into assistant_assistantusage (id, demo, month, model, messages, tokens_input, tokens_output, ' +
-      'tokens_embedding, transcriptions, speech_characters, cost_usd, created_at, updated_at, hub_id) ' +
-      `select gen_random_uuid(), '', date_trunc('month', now() at time zone 'UTC')::date, '', ${messages}, 0, 0, 0, 0, ` +
-      `0, 0, now(), now(), id from hubs_hub where slug = 'a'`,
+      'tokens_cache_read, tokens_cache_write, tokens_embedding, transcriptions, speech_characters, cost_usd, created_at, ' +
+      'updated_at, hub_id) ' +
+      `select gen_random_uuid(), '', date_trunc('month', now() at time zone 'UTC')::date, '', ${messages}, 0, 0, 0, 0, 0, ` +
+      `0, 0, 0, now(), now(), id from hubs_hub where slug = 'a'`,
   );
 }
 

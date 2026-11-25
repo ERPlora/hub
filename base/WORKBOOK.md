@@ -479,7 +479,7 @@ En la pantalla Archivos:
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
-| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
+| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | hecho |
 | BASE-F127 | Crear un rol propio a partir de otro | parcial |
 | BASE-F128 | Ajustar lo que permite un rol propio | parcial |
 | BASE-F129 | Borrar un rol propio | parcial |
@@ -769,7 +769,8 @@ entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pe
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
 que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
 y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
-ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran.
+ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran. En el negocio
+propio de ERPlora, que no tiene plan ni compra nada, tampoco los tiene su propietario; «Gestionar en erplora.com», sí.
 Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -1467,7 +1468,8 @@ las veces que se quedó corta llevan contándose menos que su periodo, dicen «D
 erplora.com aparte: si no contesta, su fila dice «No disponible ahora», sin cifra, y la pantalla sigue; lo mismo si no
 se puede leer WhatsApp. En una demo, en lugar de todo: «En una demo no se mide el uso: sus datos se borran al
 terminar.». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en cuanto
-erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba.
+erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba. El negocio propio de
+ERPlora no lo tendrá nunca: en su lugar dice «Este es el negocio de ERPlora: no tiene plan.», con las mismas cifras.
 Implicados: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Saber qué versión corre y cuándo se actualizó
@@ -2984,13 +2986,16 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. La persona pide una cadena («crea la categoría Bebidas y el producto Caña a 2,50 €»).
-  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar, pide una acción, se hace y sigue. Todo lo
-     que dice va a la misma burbuja, y lo de cada ronda en su propio párrafo: nunca pegado a lo de la anterior.
-  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra: aceptar la primera no acepta
-     las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
+  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar (varias cosas en la misma ronda, si le
+     hacen falta), pide una acción, se hace y sigue. Todo lo que dice va a la misma burbuja, y lo de cada ronda en su
+     propio párrafo: nunca pegado a lo de la anterior.
+  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra, también las que pide en la
+     misma ronda: aceptar o cancelar la primera no responde por las siguientes. Si detrás esperan más, la tarjeta lleva
+     «Cancelar todo», que cancela esta y las que faltan.
   4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
-  5. Una petición admite como mucho veinte rondas, y cada acción es una: es un freno contra los bucles, no un cupo, y
-     una lectura y un cambio por cada día de la semana caben de sobra. En la vigésima el asistente ya no puede hacer
+  5. Una petición admite como mucho veinte rondas, cada una con todo lo que el asistente pide de una vez: es un freno
+     contra los bucles, no un cupo, y una lectura y un cambio por cada día de la semana caben de sobra aunque los pida
+     de uno en uno. En la vigésima el asistente ya no puede hacer
      nada más y contesta con lo que ha hecho y lo que falta, para pedirlo en otro mensaje; si aun así pide una acción,
      no se hace ni sale su tarjeta, y se le dice que conteste. Si sigue intentándolo, «He parado: esto necesitaba
      demasiados pasos. Pídelo por partes.».
@@ -3779,8 +3784,7 @@ dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
-Estado: parcial — se cambia y se consulta en Ajustes › General, por la API y con el asistente, y el negocio ya deja
-entrar o rechaza a soporte según esté; falta que erplora.com dé al personal de soporte su código para entrar
+Estado: hecho
 Actor: propietario, administrador, personal de soporte de ERPlora
 Pantalla: Ajustes · General, la página «Este negocio no deja entrar a soporte»
 Pasos:
@@ -3797,12 +3801,13 @@ Pasos:
      cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
      soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
      «Solo quien administra el negocio puede cambiarlo.».
-  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
-     cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
-     negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
-     con PIN ni con tarjeta, no ocupa plaza ni cuenta en el uso del plan y su navegador no se queda como dispositivo
-     del negocio: ni cierra la sesión de otro dispositivo ni se la cierra la entrada de otro (BASE-F57). Cada entrada
-     se suma al momento a la lista de las últimas entradas, y lo que hace queda a su nombre en los registros.
+  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio con «Entrar como soporte», en el
+     admin de erplora.com, con su propia cuenta (HUBS-F38 de erplora.com), y llega como un administrador: puede hacer
+     todo menos lo que solo hace el propietario (comprar para el negocio, reiniciarlo, sus copias). No sale en Empleados
+     ni entre quienes pueden dar acceso, no entra en las cajas con PIN ni con tarjeta, no ocupa plaza ni cuenta en el
+     uso del plan y su navegador no se queda como dispositivo del negocio: ni cierra la sesión de otro dispositivo ni se
+     la cierra la entrada de otro (BASE-F57). Cada entrada se suma al momento a la lista de las últimas entradas, y lo
+     que hace queda a su nombre en los registros.
   5. Con el acceso apagado no entra: ve «Este negocio no deja entrar a soporte» — «El propietario o un administrador
      de este negocio tiene que encender el acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a
      intentarlo.» con «Volver a intentarlo».
@@ -3816,7 +3821,7 @@ estaba; al consultarlo, le sale que no puede cambiarlo. Si el cambio no se puede
 guardar el cambio.» y el interruptor vuelve a lo guardado; si la tarjeta no puede leer el ajuste, «No se pudo cargar
 el acceso de soporte.» con «Reintentar». Con el acceso apagado, soporte no abre sesión ni deja entrada (la página del
 paso 5).
-Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 
 ## Para quien lo mantiene
 
@@ -4213,10 +4218,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   ERPlora (`Hub.is_platform`) no tiene plan y su foto solo trae a sus personas: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`) para esas personas: queda
-  por decidir qué les enseña aquí, porque el aviso de plan desconocido les promete uno que nunca llega.
-  Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
-  `test_plan_usage_figures.py`.
+  en falso porque no hay plan que leer, y `platform` dice que no lo habrá: la pantalla lo cuenta en vez de prometer uno.
+  Tests: `base/tests/test_meter.py`, `test_meter_requests.py`, `test_plan_usage_figures.py` y
+  `test_platform_hub_no_plan.py`, y `SystemUsage.platform.test.ts`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
   `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
@@ -4413,7 +4417,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   caducaría en un minuto y lo leería cualquier script: `signing.dumps({user, hub, next, nonce}, key=INTERNAL_SHARED_SECRET,
   salt="erplora.hub-pass.v1")`, y devuelve `SAAS_URL/hub-pass/?pass=…`. Solo en una sesión abierta con la cuenta
   (`_session_account`; si no, `base.saas_pass_needs_account`: nunca PIN, placa ni demo); `next=business`, además, con
-  `base.open_management` (`base.saas_pass_needs_management`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
+  `base.open_management` (`base.saas_pass_needs_management`); `next=plan`, nunca en el hub de ERPlora (409
+  `base.saas_pass_no_plan`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
   firmante de Django caería en `SECRET_KEY`. No se consulta al SaaS (PLAN-SAAS §2) y el pase no va a ningún log.
   `base/frontend/lib/saas-pass.ts` (`useSaasPass`) es la segunda puerta de salida del Hub: abre `about:blank` dentro del
   clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
@@ -4423,7 +4428,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   que su sitio le pone dentro, y quien la coloca decide su clase y `data-testid`. Si sale lo decide una sola regla,
   `useMayBuy` de `base/frontend/lib/plan-link.ts`: en la web y con `base.own_business`, porque en erplora.com solo el
   propietario compra (`usePlanLink` la aplica a la dirección de `hub-home`; `canUpgrade` del asistente y los enlaces a
-  la Tienda de `AppsPage` y `AppBlockedPage`, también). La colocan
+  la Tienda de `AppsPage` y `AppBlockedPage`, también). Las direcciones de los planes y de la Tienda las da
+  `base/saas_store.py`, vacías en el hub de ERPlora (`platform_hub.is_platform_slug`): sin dirección no sale ninguno
+  (`base/tests/test_saas_store.py`, `test_platform_hub_no_plan.py`). La colocan
   `UpgradePlanLink` (pie del menú, con su icono), `SystemUsage`, `PeopleList`, `AppsPage` y la Bandeja de WhatsApp
   (`InboxPage`, `MessageComposer`, `ChannelSettings`, con su «Mejorar el plan»); su test prohíbe que un `.vue` vuelva a
   escribir a mano `openSaasPass('plan', …)`. Además usan `useSaasPass` `ManageLink` (`business`) y `openPlan` de
@@ -4675,8 +4682,11 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   todas las herramientas del Hub, sin excepciones (hub#1175 arregló las nueve que quedaban en Control horario,
   Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
-  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; la ronda que llega
-  a `MAX_ROUNDS` = 20 (de live: una herramienta por ronda) va a la pasarela sin herramientas y con `LAST_ROUND` en las
+  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; una respuesta del
+  modelo puede pedir varias herramientas y es una sola ronda (`rounds` de live): sus lecturas corren seguidas en la
+  misma vuelta y cada escritura espera su tarjeta, de una en una, con un sí o un no que vale solo para la llamada que
+  nombra (`base/tests/test_services_assistant.py`, `…_in_one_answer_…`); la ronda que llega
+  a `MAX_ROUNDS` = 20 (de live) va a la pasarela sin herramientas y con `LAST_ROUND` en las
   instrucciones, para que el modelo conteste con lo hecho y lo que falta; lo que pide después no corre ni saca tarjeta
   ni recibo, y vuelve con `base.assistant_out_of_steps` (`OUT_OF_STEPS`) para que conteste, y si aun así pide otra
   cosa, corta con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
