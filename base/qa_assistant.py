@@ -44,20 +44,15 @@ EXPECTED = {
 }
 
 
-class Contradiction(StrEnum):
-    ACTOR_WITHOUT_WRITE = "Actor: names the assistant, and no write of the flow is a tool"
-    ACTOR_LEFT_OUT = "a write of the flow is a tool, and Actor: does not name the assistant"
-    SCREEN_WITHOUT_TOOL = "Pantalla: names the assistant, and no operation of the flow is a tool"
-
-
 @dataclass(frozen=True)
 class Asked:
-    """A flow asked for by talking; its group is ``None`` while none of its operations is known."""
+    """A flow asked for by talking; its group is ``None`` while none of its operations is known, and it contradicts
+    itself when it names the assistant and no tool backs it."""
 
     flow: WorkbookFlow
     operations: tuple[Operation, ...]
     group: Group | None
-    contradictions: tuple[Contradiction, ...]
+    contradicts: bool
 
     @property
     def expected(self) -> str:
@@ -84,7 +79,7 @@ def report(root: Path, flows: Mapping[str, WorkbookFlow], operations: Mapping[st
 
 
 def asked(flow: WorkbookFlow, operations: Sequence[Operation]) -> Asked:
-    return Asked(flow, tuple(operations), _group(flow, operations), tuple(_contradictions(flow, operations)))
+    return Asked(flow, tuple(operations), _group(flow, operations), _contradicts(flow, operations))
 
 
 def _group(flow: WorkbookFlow, operations: Sequence[Operation]) -> Group | None:
@@ -92,13 +87,9 @@ def _group(flow: WorkbookFlow, operations: Sequence[Operation]) -> Group | None:
         return Group.ASSISTANT_ONLY
     if not operations:
         return None
-    writes = _writes(operations)
+    writes = [op for op in operations if op.kind == "command"]
     can = any(map(is_tool, writes)) if writes else all(map(is_tool, operations))
     return Group.CAN if can else Group.CANNOT
-
-
-def _writes(operations: Sequence[Operation]) -> list[Operation]:
-    return [op for op in operations if op.kind == "command"]
 
 
 def _only_the_assistant(screen: str) -> bool:
@@ -108,16 +99,13 @@ def _only_the_assistant(screen: str) -> bool:
     return bool(places) and all(map(ASSISTANT.search, places))
 
 
-def _contradictions(flow: WorkbookFlow, operations: Sequence[Operation]) -> Iterator[Contradiction]:
-    writes_a_tool = any(map(is_tool, _writes(operations)))
-    if ASSISTANT.search(flow.actor):
-        if not writes_a_tool:
-            yield Contradiction.ACTOR_WITHOUT_WRITE
-    elif writes_a_tool:
-        yield Contradiction.ACTOR_LEFT_OUT
-    backed = any(is_tool(op) or op.name.startswith(PANEL) for op in operations)
-    if operations and not backed and ASSISTANT.search(flow.screen):
-        yield Contradiction.SCREEN_WITHOUT_TOOL
+def _contradicts(flow: WorkbookFlow, operations: Sequence[Operation]) -> bool:
+    """Whether ``flow`` names the assistant with no tool behind it; as its screen, only against operations that are not
+    its panel's: the panel is also where its own flows are done."""
+    if any(map(is_tool, operations)):
+        return False
+    of_another_screen = bool(operations) and not any(op.name.startswith(PANEL) for op in operations)
+    return bool(ASSISTANT.search(flow.actor) or (of_another_screen and ASSISTANT.search(flow.screen)))
 
 
 def cited_operations(root: Path) -> dict[str, tuple[str, ...]]:

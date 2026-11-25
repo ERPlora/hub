@@ -79,10 +79,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"  {one.flow.id} {one.group}: {one.expected}{_backing(one)}")
         undecided = [one.flow.id for one in report.flows if one.group is None]
         self._write_list("undecided, none of their operations is known", undecided)
-        contradictory = [(kind, one.flow.id) for one in report.flows for kind in one.contradictions]
-        self.stdout.write(f"contradictions: {len(contradictory)}")
-        for kind in qa_assistant.Contradiction:
-            self._write_list(f"  {kind}", [f"  {flow_id}" for found, flow_id in contradictory if found is kind])
+        contradictory = [one.flow.id for one in report.flows if one.contradicts]
+        self._write_list("contradictions, the assistant is named and no tool backs it", contradictory)
         self._write_list("tools no flow cites", report.uncited_tools)
 
     def _write_list(self, title: str, items: Sequence[str]) -> None:

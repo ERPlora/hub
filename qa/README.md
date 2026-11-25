@@ -114,8 +114,9 @@ no es uno de los tres.
 
 Después da lo que queda por escribir en los WORKBOOK, en tres listas: los flujos sin decidir, porque no se conoce
 ninguna de sus operaciones; los que se contradicen, y las herramientas que no cita ningún flujo. Un flujo se contradice
-si `Actor:` nombra al asistente y ninguna de sus escrituras es herramienta, si una lo es y `Actor:` no lo nombra, o si
-`Pantalla:` lo nombra y ninguna de sus operaciones es herramienta.
+si `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, o si lo nombra `Pantalla:` y las que se
+conocen no son herramientas ni las del propio panel del asistente. Que el asistente pueda hacerlo y `Actor:` no lo nombre
+no es una contradicción: lo dice su grupo.
 
 ## Cómo se mantiene
 

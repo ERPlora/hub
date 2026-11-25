@@ -15,7 +15,7 @@ from live.operations import AI, INTERNAL, Operation, registry
 from ninja import Schema
 
 from base import qa_assistant, qa_coverage
-from base.qa_assistant import Contradiction, Group
+from base.qa_assistant import Group
 from base.qa_coverage import WorkbookFlow
 
 REPO = Path(__file__).resolve().parents[2]
@@ -301,39 +301,33 @@ class TestTheGroupOfAFlow:
         assert "Ficha" not in expected[Group.CAN]
 
 
-class TestTheContradictionsOfAFlow:
+class TestWhetherAFlowContradictsItself:
     @pytest.mark.parametrize(
-        ("actor", "screen", "operations", "contradictions"),
+        ("actor", "screen", "operations", "contradicts"),
         [
-            ("responsable, asistente", "Ficha", [WRITE], []),
-            ("responsable", "Ficha", [OTHER_WRITE, READ], []),
-            ("responsable", "Ficha", [READ], []),
-            ("responsable", "Ficha", [], []),
-            ("responsable; por el asistente, cualquiera", "Ficha", [WRITE], []),
-            ("responsable, asistente", "Ficha", [OTHER_WRITE], [Contradiction.ACTOR_WITHOUT_WRITE]),
-            ("responsable, asistente", "Ficha", [READ], [Contradiction.ACTOR_WITHOUT_WRITE]),
-            ("responsable, asistente", "Ficha", [], [Contradiction.ACTOR_WITHOUT_WRITE]),
-            ("responsable", "Ficha", [WRITE, OTHER_WRITE], [Contradiction.ACTOR_LEFT_OUT]),
-            ("los asistentes", "Ficha", [WRITE], [Contradiction.ACTOR_LEFT_OUT]),
-            ("responsable", "asistente", [WRITE], [Contradiction.ACTOR_LEFT_OUT]),
-            ("responsable", "asistente", [READ], []),
-            ("responsable", "asistente", [OTHER_WRITE], [Contradiction.SCREEN_WITHOUT_TOOL]),
-            ("responsable", "Ficha (también el asistente)", [OTHER_READ], [Contradiction.SCREEN_WITHOUT_TOOL]),
-            ("responsable", "Ficha; asistente", [], []),
-            ("responsable", "Asistente", [PANEL], []),
-            (
-                "responsable, asistente",
-                "asistente",
-                [OTHER_WRITE],
-                [Contradiction.ACTOR_WITHOUT_WRITE, Contradiction.SCREEN_WITHOUT_TOOL],
-            ),
+            ("responsable, asistente", "Ficha", [WRITE], False),
+            ("responsable, asistente", "Ficha", [READ], False),
+            ("responsable, asistente", "Ficha", [OTHER_WRITE, READ], False),
+            ("responsable, asistente", "Ficha", [OTHER_WRITE], True),
+            ("responsable, asistente", "Ficha", [OTHER_READ], True),
+            ("responsable, asistente", "Ficha", [], True),
+            ("responsable; por el asistente, cualquiera", "Ficha", [OTHER_WRITE], True),
+            ("responsable, asistente", "Asistente", [PANEL], True),
+            ("los asistentes", "Ficha", [OTHER_WRITE], False),
+            ("responsable", "Ficha", [WRITE, OTHER_WRITE], False),
+            ("responsable", "Ficha", [OTHER_WRITE], False),
+            ("responsable", "Ficha", [], False),
+            ("responsable", "asistente", [WRITE], False),
+            ("responsable", "asistente", [OTHER_WRITE, READ], False),
+            ("responsable", "asistente", [OTHER_WRITE], True),
+            ("responsable", "Ficha (también el asistente)", [OTHER_READ], True),
+            ("responsable", "Ficha; asistente", [], False),
+            ("responsable", "Asistente", [PANEL], False),
+            ("responsable", "Asistente", [OTHER_READ, PANEL], False),
         ],
     )
-    def test_they_are_what_its_actor_and_its_screen_say_against_its_operations(
-        self, actor, screen, operations, contradictions
-    ):
-        found = qa_assistant.asked(flow(actor=actor, screen=screen), operations).contradictions
-        assert list(found) == contradictions
+    def test_it_does_when_it_names_the_assistant_and_no_tool_backs_it(self, actor, screen, operations, contradicts):
+        assert qa_assistant.asked(flow(actor=actor, screen=screen), operations).contradicts is contradicts
 
 
 class TestTheReport:
@@ -399,12 +393,8 @@ class TestTheCommand:
             "  SAMPLE-F08 can: does it; check it on the screen or in the data — sample.item.delete (tool)",
             "undecided, none of their operations is known: 1",
             "  SAMPLE-F05",
-            "contradictions: 2",
-            f"  {Contradiction.ACTOR_WITHOUT_WRITE.value}: 1",
-            "    SAMPLE-F04",
-            f"  {Contradiction.ACTOR_LEFT_OUT.value}: 1",
-            "    SAMPLE-F08",
-            f"  {Contradiction.SCREEN_WITHOUT_TOOL.value}: 0",
+            "contradictions, the assistant is named and no tool backs it: 1",
+            "  SAMPLE-F04",
             "tools no flow cites: 1",
             "  sample.item.rebuild",
         ]
