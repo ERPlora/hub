@@ -18,7 +18,7 @@ const rate = defineModel<WithholdingRate | null>({ required: true });
 const NONE = 0;
 const locale = useLocale();
 const { data: business } = useLive('base.business.get', {});
-const asked = computed(() => (business.value?.country ?? HOME_COUNTRY) === HOME_COUNTRY);
+const asked = computed(() => (business.value?.country || HOME_COUNTRY) === HOME_COUNTRY);
 </script>
 
 <template>

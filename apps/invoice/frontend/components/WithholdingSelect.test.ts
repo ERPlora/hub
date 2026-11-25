@@ -50,6 +50,12 @@ describe('WithholdingSelect', () => {
     expect(s.find('invoice-create-withholding').exists()).toBe(true);
   });
 
+  it('is asked in a business that keeps no country: it is read as one in Spain', async () => {
+    const s = await setup();
+    await s.result('base.business.get', business({ country: '' }));
+    expect(s.find('invoice-create-withholding').exists()).toBe(true);
+  });
+
   it('is not asked in a business abroad: the tax is Spanish', async () => {
     const s = await setup();
     await s.result('base.business.get', business(POLISH));
