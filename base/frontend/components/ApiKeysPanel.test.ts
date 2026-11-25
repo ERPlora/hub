@@ -80,6 +80,12 @@ async function where(value: 'all' | 'apps'): Promise<void> {
 /** The actions the form offers on `app`. */
 const offered = (app: string) => ALL.filter((action) => byTestId(`api-key-form-${app}-${action}`) !== null);
 
+/** The boxes painted as ticked. */
+const checkedBoxes = () =>
+  [...document.querySelectorAll<HTMLIonCheckboxElement>('[data-testid="api-key-form-apps"] ion-checkbox')]
+    .filter((box) => box.checked)
+    .map((box) => box.dataset.testid);
+
 async function named(name: string): Promise<void> {
   type(byTestId('api-key-form-name')!, name);
   await flush();
@@ -240,6 +246,7 @@ describe('ApiKeysPanel', () => {
     await where('all');
     await tick('*', 'update');
     await where('apps');
+    expect(checkedBoxes()).toEqual(['api-key-form-tax-read']);
     await create();
     expect(posted(m)).toEqual([['/api/keys', { name: 'Tienda', rate_per_minute: 60, scopes: { tax: ['read'] } }]]);
   });
