@@ -49,13 +49,15 @@ def test_six_documents_at_once_take_six_numbers_in_a_row_without_a_hole(today):
 
 
 def test_a_day_before_an_invoice_being_issued_meanwhile_is_refused_and_spends_no_number(at):
-    # The last invoice of a series is read with the series locked: one that is being issued counts.
+    # The last invoice of a series is read with the series locked: one that is being issued counts. The series is there
+    # from before, so what the second one waits for is that lock, not the series' birth.
     at(("Europe/Madrid", dt.datetime(2026, 11, 24, 11, 0, tzinfo=dt.UTC)))
+    manual(issue_date="2026-11-22")
     with meanwhile(writes("invoice_invoice"), lambda: manual(issue_date="2026-11-23")) as outcomes:
         manual()
     assert [outcome(result) for result in outcomes] == ["invoice.issue_date_before_last"]
-    assert [str(day) for day in Invoice.objects.values_list("issue_date", flat=True)] == ["2026-11-24"]
-    assert fact_numbers() == 1
+    assert sorted(str(day) for day in Invoice.objects.values_list("issue_date", flat=True)) == ["2026-11-22", "2026-11-24"]
+    assert fact_numbers() == 2
 
 
 def charged_without_document(charge, key: str):
