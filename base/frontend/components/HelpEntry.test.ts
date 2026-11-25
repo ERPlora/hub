@@ -140,6 +140,14 @@ describe('HelpEntry in the bar of the page in view', () => {
     expect(buttonInDoc()).not.toBeNull();
   });
 
+  it('stays where it is when what enters is a window, which has no bar', async () => {
+    const inView = page('in-view');
+    await setupOn('/settings');
+    document.body.insertAdjacentHTML('beforeend', '<ion-modal><div id="window-content"></div></ion-modal>');
+    await enters(document.getElementById('window-content')!);
+    expect(inView.contains(buttonInDoc())).toBe(true);
+  });
+
   it('stops following the pages once it is gone', async () => {
     const m = await setupOn('/settings');
     const removed = vi.spyOn(document, 'removeEventListener');

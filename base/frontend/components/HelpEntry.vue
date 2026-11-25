@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { HubIcon, useMyApps, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, nextTick, onMounted, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { PLATFORM, PLATFORM_NAME } from '../lib/help';
@@ -31,8 +31,19 @@ function placeTrigger(): void {
   triggerTarget.value = headers.at(-1)?.querySelector<HTMLElement>('[slot="end"]') ?? null;
 }
 
+// Going back, the page that leaves is still the last in the document until Ionic's transition ends. A window enters too,
+// without a bar.
+function placeInEntered(event: Event): void {
+  const bar = (event.target as HTMLElement).querySelector<HTMLElement>('.app-topbar [slot="end"]');
+  if (bar) triggerTarget.value = bar;
+}
+
 watch(() => route.fullPath, () => void nextTick(placeTrigger));
-onMounted(placeTrigger);
+onMounted(() => {
+  placeTrigger();
+  document.addEventListener('ionViewDidEnter', placeInEntered, true);
+});
+onBeforeUnmount(() => document.removeEventListener('ionViewDidEnter', placeInEntered, true));
 
 watch(app, () => {
   open.value = false;
