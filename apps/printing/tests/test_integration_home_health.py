@@ -11,8 +11,7 @@ import datetime as dt
 import pytest
 from live.operations import get
 
-from apps.printing.tests.conftest import B, HUB_DB, ctx_for, printer, run
-from apps.printing.tests.test_queries import reaches
+from apps.printing.tests.conftest import B, HUB_DB, ctx_for, printer, reaches, run
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.health import HealthListIn
 from base.tenancy.context import use_hub
