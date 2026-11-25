@@ -21,7 +21,7 @@ def _make_destination(hub, target, roles: bootstrap.Names, ours=None) -> None:
         template = provision.template_for(hub)
     except services.provisioning.ProvisioningFailed as missing:
         raise MoveFailed("move_template_missing", missing) from missing
-    if control_services.attributed(target.pk, hub.db_name, besides=hub.id):
+    if control_services.worker_move.attributed(target.pk, hub.db_name, besides=hub.id):
         raise MoveStopped(f"control says {hub.db_name} on {target.name} is a hub's database: it is never dropped.")
     if ours is not None:
         ours()

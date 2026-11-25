@@ -647,7 +647,7 @@ def test_get_tells_the_real_maintenance_and_recovers_after_it_is_lifted(client, 
 
     from base.registry import REGISTRY_SCOPE
     from control.schemas import FreezeIn
-    from control.services import freeze_set
+    from control.services.freeze import freeze_set
 
     path = f"/internal/hubs/{HUB_ID}"
     platform = system_context(REGISTRY_SCOPE)

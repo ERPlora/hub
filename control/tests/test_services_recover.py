@@ -43,7 +43,7 @@ class TestRecover:
     def ask(self, ctx, copy, *apps: str):
         from control.schemas import CopyRecoverIn
 
-        return services.copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=list(apps or ["customer"])))
+        return services.recover.copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=list(apps or ["customer"])))
 
     def test_asks_the_worker_to_bring_back_the_customers_and_says_who_asked(self, admin_ctx):
         from control.models import CopyRecovery
@@ -131,7 +131,7 @@ class TestRecover:
         with pytest.raises(PermissionDenied):
             self.ask(as_actor(person("support", is_staff=True)), copy)
         with pytest.raises(NotFound):
-            services.copy_recover(admin_ctx, CopyRecoverIn(copy_id=uuid.uuid7(), apps=["customer"]))
+            services.recover.copy_recover(admin_ctx, CopyRecoverIn(copy_id=uuid.uuid7(), apps=["customer"]))
         assert not CopyRecovery.objects.exists()
 
     def test_the_recovery_is_an_internal_command_of_control(self):
@@ -143,5 +143,5 @@ class TestRecover:
             "command",
             "control",
             INTERNAL,
-            "control.services",
+            "control.services.recover",
         )

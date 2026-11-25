@@ -72,13 +72,9 @@ from control.schemas import (
     HubMoveIn,
     HubRestoreIn,
 )
-from control.services import (
-    copy_recover,
-    hub_move,
-    hub_move_cancel,
-    hub_restore,
-    hub_restore_aside,
-)
+from control.services.move import hub_move, hub_move_cancel
+from control.services.recover import copy_recover
+from control.services.restore import hub_restore, hub_restore_aside
 
 
 def default_server() -> str:

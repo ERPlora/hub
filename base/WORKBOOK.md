@@ -5072,14 +5072,14 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 - **«Mover a otro clúster…» de madrugada** (hub#1508, parte de hub#931) es `control.admin.HubAdmin.move_to_cluster`
   con «Cuándo»: «En su próxima madrugada» (marcada de entrada, como la «próxima ventana de mantenimiento» de RDS) o
   «Ahora» (lo de siempre; también lo que hace `control.hub.move` sin `when`). La de madrugada deja en el hub
-  `move_scheduled_to` y `move_scheduled_for` (`control.services.night_start`: arranca entre las 03:00 y las 05:00 de
+  `move_scheduled_to` y `move_scheduled_for` (`control.services.move.night_start`: arranca entre las 03:00 y las 05:00 de
   su `Hub.timezone`, o de la del despliegue si no tiene una válida; dentro de esa franja, en el acto) y el negocio
   sigue abierto: la lista de Hubs lo dice en la columna del clúster, con la hora en su reloj. La franja acota el
   arranque, no el final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del
   negocio; Business Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o
   «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.worker_pass.run_due`
   (`launch_due`), con el arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
-  (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
+  (`control.services.worker_move.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
   cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
   cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
   (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
@@ -5140,7 +5140,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `control/tests/test_services_restore_any_size.py::test_a_copy_of_any_size_is_asked`.
 - **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
   formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
-  `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
+  `control.hub.restore` (`control.services.restore._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
   `<control>_copy_<hex de la fila>` (`base.tenancy.names.copy_db_name`). El worker la hace en el hilo de los traslados
   (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: vuelca la
   copia al bucket, clona sin conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore` desde el bucket,

@@ -26,7 +26,7 @@ class TestMove:
         old, new = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
         hub = self.a_hub(cluster=old, last_error="schema_failed: an old one")
 
-        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+        out = services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
         hub.refresh_from_db()
         assert (hub.moving_to_id, hub.cluster_id, hub.last_error) == (new.pk, old.pk, "")
@@ -42,7 +42,7 @@ class TestMove:
         new = a_cluster()
         hub = self.a_hub()
 
-        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+        out = services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
         assert (out.cluster, out.moving_to) == (None, new.pk)
         assert small == [(None, [hub.db_name])]
@@ -59,7 +59,7 @@ class TestMove:
         hub = self.a_hub(**fields)
 
         with pytest.raises(Conflict) as refused:
-            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+            services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
         assert refused.value.code == "control.hub_not_movable"
         hub.refresh_from_db()
@@ -74,7 +74,7 @@ class TestMove:
 
         for hub, code in ((moving, "control.hub_moving"), (there, "control.hub_already_there")):
             with pytest.raises(Conflict) as refused:
-                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+                services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
             assert refused.value.code == code
 
     def test_only_an_open_cluster_with_room_takes_it_counting_the_hubs_on_their_way(self, admin_ctx, small):
@@ -90,11 +90,11 @@ class TestMove:
 
         for cluster, code in ((closed, "control.cluster_closed"), (full, "control.cluster_full")):
             with pytest.raises(Conflict) as refused:
-                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk))
+                services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk))
             assert refused.value.code == code
         full.max_hubs = 3
         full.save(update_fields=["max_hubs"])
-        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk)).moving_to == full.pk
+        assert services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk)).moving_to == full.pk
 
     def test_a_demo_never_moves(self, admin_ctx, small):
         from control.schemas import HubMoveIn
@@ -103,7 +103,7 @@ class TestMove:
         demo = self.a_hub(slug="demo-0000beef", is_demo=True)
 
         with pytest.raises(Conflict) as refused:
-            services.hub_move(admin_ctx, HubMoveIn(hub=demo.pk, cluster=new.pk))
+            services.move.hub_move(admin_ctx, HubMoveIn(hub=demo.pk, cluster=new.pk))
 
         assert refused.value.code == "control.hub_is_demo"
 
@@ -116,7 +116,7 @@ class TestMove:
         hub = self.a_hub()
         monkeypatch.setattr(queries, "measure", lambda cluster, names: {names[0]: 40 * 1024**3})
 
-        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when=when))
+        out = services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when=when))
 
         hub.refresh_from_db()
         assert new.pk in (out.moving_to, out.scheduled_to)
@@ -132,7 +132,7 @@ class TestMove:
         hub = self.a_hub()
         monkeypatch.setattr(queries, "measure", lambda cluster, names: {})
         with pytest.raises(Conflict) as refused:
-            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+            services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
         assert refused.value.code == "control.hub_database_missing"
 
         def unreachable(cluster, names):
@@ -140,7 +140,7 @@ class TestMove:
 
         monkeypatch.setattr(queries, "measure", unreachable)
         with pytest.raises(OperationError) as failed:
-            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+            services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
         assert failed.value.code == "control.cluster_unreachable"
         hub.refresh_from_db()
         assert hub.moving_to_id is None
@@ -151,7 +151,7 @@ class TestMove:
         new = a_cluster()
         hub = self.a_hub(db_name=hub_databases.a)
 
-        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk)).moving_to == new.pk
+        assert services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk)).moving_to == new.pk
 
     def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
         from control.schemas import HubMoveIn
@@ -159,10 +159,10 @@ class TestMove:
         new = a_cluster()
         hub = self.a_hub()
         with pytest.raises(PermissionDenied):
-            services.hub_move(as_actor(person("support", is_staff=True)), HubMoveIn(hub=hub.pk, cluster=new.pk))
+            services.move.hub_move(as_actor(person("support", is_staff=True)), HubMoveIn(hub=hub.pk, cluster=new.pk))
         for move in (HubMoveIn(hub=uuid.uuid7(), cluster=new.pk), HubMoveIn(hub=hub.pk, cluster=uuid.uuid7())):
             with pytest.raises(NotFound):
-                services.hub_move(admin_ctx, move)
+                services.move.hub_move(admin_ctx, move)
         hub.refresh_from_db()
         assert hub.moving_to_id is None
 
@@ -178,7 +178,7 @@ def test_a_cluster_a_hub_is_moving_to_or_that_keeps_a_moved_copy_or_a_leftover_i
 
     for cluster in (target, old, dead):
         with pytest.raises(Conflict) as refused:
-            services.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
+            services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
         assert refused.value.code == "control.cluster_holds_hubs"
     assert Cluster.objects.count() == 3
 
@@ -188,7 +188,7 @@ def test_the_move_is_an_internal_command_of_control():
     from live.operations import get as get_operation
 
     op = get_operation("control.hub.move")
-    assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services")
+    assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services.move")
 
 
 class TestCancelAMove:
@@ -207,7 +207,7 @@ class TestCancelAMove:
         # An older copy of this hub on its cluster, from a move off it two days ago.
         MovedCopy.objects.create(hub=hub, cluster=old, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-29T10:00Z")
 
-        out = services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+        out = services.move.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
 
         hub.refresh_from_db()
         assert hub.move_undo_asked_at is not None and hub.moving_to_id == new.pk
@@ -223,9 +223,9 @@ class TestCancelAMove:
         hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
 
         with pytest.raises(Conflict) as refused:
-            services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+            services.move.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
         assert refused.value.code == "control.hub_not_moving"
         with pytest.raises(PermissionDenied):
-            services.hub_move_cancel(as_actor(person("support", is_staff=True)), HubIdIn(id=hub.pk))
+            services.move.hub_move_cancel(as_actor(person("support", is_staff=True)), HubIdIn(id=hub.pk))
         with pytest.raises(NotFound):
-            services.hub_move_cancel(admin_ctx, HubIdIn(id=uuid.uuid7()))
+            services.move.hub_move_cancel(admin_ctx, HubIdIn(id=uuid.uuid7()))

@@ -1,5 +1,6 @@
 """Fixtures shared by control's tests."""
 
+import datetime as dt
 import uuid
 
 import pytest
@@ -11,12 +12,14 @@ from base.registry import REGISTRY_SCOPE
 from base.tenancy import credentials
 from base.tenancy.context import use_control
 from base.tenancy.tests.concurrency import hub_staff
-from control.models import Cluster, Hub
+from control.models import Cluster, Hub, RestoredCopy
 
 __all__ = [
+    "COPY_MOMENT",
     "SERVICES_MARKS",
     "a_cluster",
     "a_ready_hub",
+    "a_separate_copy",
     "admin_ctx",
     "as_actor",
     "events",
@@ -83,3 +86,13 @@ def small(monkeypatch):
 def a_ready_hub(**fields) -> Hub:
     row = {"slug": "acme", "status": Hub.Status.READY, "db_name": f"hub_{uuid.uuid7().hex}"}
     return Hub.objects.create(**(row | fields))
+
+
+#: The moment a separate copy is asked of, in the tests of the worker's side.
+COPY_MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
+
+
+def a_separate_copy(hub: Hub, **fields) -> RestoredCopy:
+    """A separate copy of ``hub``'s database still to make on its own cluster, as ``control.hub.restore_aside`` asks."""
+    row = {"hub": hub, "cluster": hub.cluster, "restore_point": COPY_MOMENT, "asked_by": "root"}
+    return RestoredCopy.objects.create(**(row | {"db_name": f"copy_{uuid.uuid7().hex}"} | fields))
