@@ -23,7 +23,7 @@ from django.core.management import CommandError, call_command
 
 from base import catalog, workbook_help
 from base.management.commands import translate_workbooks
-from base.tests.test_catalog import ENGLISH, OLD_PART, USER_PART, WORKBOOK, by_hand, module, translated
+from base.tests.apps_on_disk import ENGLISH, OLD_PART, USER_PART, WORKBOOK, by_hand, module, translated
 from base.workbook_sections import mark, sections
 
 
@@ -46,8 +46,8 @@ def installed(monkeypatch):
     """Make ``configs`` our installed apps: the modules (``kind == "app"``) and the platform's."""
 
     def install(*configs):
-        monkeypatch.setattr(catalog, "module_configs", lambda: [config for config in configs if config.kind == "app"])
-        monkeypatch.setattr(catalog, "all_live_app_configs", lambda: list(configs))
+        monkeypatch.setattr(catalog.app_registry, "module_configs", lambda: [config for config in configs if config.kind == "app"])
+        monkeypatch.setattr(catalog.workbooks, "all_live_app_configs", lambda: list(configs))
         return configs
 
     return install
@@ -105,7 +105,7 @@ def test_a_changed_user_part_is_translated_once_with_the_new_marks(tmp_path, ins
     assert fake.sources == [USER_PART]
     assert en_file(config).read_text() == translated(USER_PART)
     # What register_apps then accepts as current.
-    assert catalog.workbook_translation(config).state == "current"
+    assert catalog.workbooks.workbook_translation(config).state == "current"
 
 
 def test_a_module_without_translation_gets_one(tmp_path, installed, translator):
@@ -340,7 +340,7 @@ def test_check_of_one_app_looks_at_its_dates_only(tmp_path, installed, translato
 def test_check_reads_no_date_in_a_mark_though_its_hash_spells_aaaa(tmp_path, installed, translator):
     """A mark's hash is hex: about one in seven thousand spells «aaaa», and that is no Spanish date."""
     workbook = WORKBOOK.replace("Guarda **cosas**.", "Guarda **cosas** (18988).")
-    source = catalog.user_part(workbook)
+    source = catalog.workbooks.user_part(workbook)
     assert "aaaa" in mark(sections(source)[0])
     installed(module(tmp_path, workbook=workbook, en=translated(source, ENGLISH)))
     translator(allowed=False)
@@ -513,7 +513,7 @@ def test_a_changed_user_part_of_the_real_base_workbook_fails_the_check(tmp_path,
     with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\.") as raised:
         call_command("translate_workbooks", "--check")
 
-    [flows] = [section for section in sections(catalog.user_part(edited)) if section.startswith("## Flujos\n")]
+    [flows] = [section for section in sections(catalog.workbooks.user_part(edited)) if section.startswith("## Flujos\n")]
     assert str(raised.value).endswith(f"(the same headings, in the same order): ## Flujos → {mark(flows)}")
 
 
@@ -535,7 +535,7 @@ def test_a_platform_app_without_workbook_is_no_app_to_translate_and_base_stays_o
     with pytest.raises(CommandError, match=r"No app 'control' with a WORKBOOK to translate; the apps are: base, things\."):
         call_command("translate_workbooks", "--app", "control")
 
-    assert catalog.catalog_modules() == [things]
+    assert catalog.app_registry.catalog_modules() == [things]
 
 
 def test_check_fails_on_a_platform_workbook_it_cannot_read(tmp_path, installed, translator):

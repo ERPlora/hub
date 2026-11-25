@@ -1,7 +1,7 @@
 """The Hub's mirror of the ``shared`` schema of the SaaS's database.
 
 The SaaS owns ``shared.app`` and ``shared.app_doc`` and migrates them; the Hub writes them through
-these models, ``managed = False``, from ``base/catalog.py`` only. The columns come from
+these models, ``managed = False``, from ``base/catalog/register_apps.py`` only. The columns come from
 ``live.shared_catalog`` (written once for both projects); what the mirror adds is pinned here: the
 quoted tables, no migrations of its own and the unique constraint the SaaS's migration creates.
 """
@@ -21,7 +21,7 @@ def test_shared_is_a_platform_app_at_the_root_with_only_models():
     config = apps.get_app_config("shared")
     assert isinstance(config, LiveAppConfig)
     assert (config.name, config.label, config.kind) == ("shared", "shared", "platform")
-    # No routes: the Hub never serves the catalog; base/catalog.py writes it.
+    # No routes: the Hub never serves the catalog; base/catalog/register_apps.py writes it.
     assert find_spec("shared.api") is None
 
 

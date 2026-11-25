@@ -1,12 +1,12 @@
 """``manage.py translate_workbooks [--app <id>] [--check]``: each app's ``WORKBOOK.<language>.md``.
 
 The WORKBOOK is written in Spanish (it is the specification); its translation into each other language of
-``settings.LANGUAGES`` is made from its user part (``base.catalog.user_part``), versioned next to it and marked section
+``settings.LANGUAGES`` is made from its user part (``base.catalog.workbooks.user_part``), versioned next to it and marked section
 by section (``base.workbook_sections``). The marks are the user part's, so editing «Para quien lo mantiene» never asks
 for a new translation.
 
 ERPlora uses no ``ANTHROPIC_API_KEY``: whoever edits a WORKBOOK translates the
-change by hand, with the marks ``base.catalog.translate_by_hand`` names. ``--check`` is what runs (in
+change by hand, with the marks ``base.catalog.workbooks.translate_by_hand`` names. ``--check`` is what runs (in
 CI, through the tests): it never reaches the network nor needs the key, and fails listing, by language, the apps
 whose translation exists and is out of date (a missing one is no error), telling the sections to translate
 by hand, and every Spanish date placeholder (``AAAA``, ``aaaa``) a current one keeps outside its
@@ -78,11 +78,11 @@ def spanish_dates(configs, language: str) -> list[str]:
     """
     found = []
     for config in configs:
-        if not (Path(config.path) / catalog.WORKBOOK).is_file():
+        if not (Path(config.path) / catalog.workbooks.WORKBOOK).is_file():
             continue
         try:
-            state = catalog.workbook_translation(config, language)
-        except catalog.WorkbookError:
+            state = catalog.workbooks.workbook_translation(config, language)
+        except catalog.errors.WorkbookError:
             continue
         if state.state != "current":
             continue
@@ -150,7 +150,7 @@ class Command(BaseCommand):
     def handle(self, *args, app: str | None = None, check: bool = False, **options):
         # The modules and base (the platform's WORKBOOK): base is no module of the store, but its
         # translations are generated and checked like theirs.
-        configs = catalog.workbook_configs()
+        configs = catalog.workbooks.workbook_configs()
         if app is not None:
             known = ", ".join(sorted(config.label for config in configs))
             configs = [config for config in configs if config.label == app]
@@ -160,14 +160,14 @@ class Command(BaseCommand):
             self._check(configs)
             return
         for config in configs:
-            if (Path(config.path) / catalog.WORKBOOK).is_file():
+            if (Path(config.path) / catalog.workbooks.WORKBOOK).is_file():
                 self._translate(config)
 
     def _check(self, configs) -> None:
-        files = {language: catalog.WORKBOOK_TRANSLATION.format(language) for language in languages()}
+        files = {language: catalog.workbooks.WORKBOOK_TRANSLATION.format(language) for language in languages()}
         problems = []
         for language, file in files.items():
-            stale = catalog.stale_translations(configs, language)
+            stale = catalog.workbooks.stale_translations(configs, language)
             if stale:
                 problems += [f"Out of date {file}: {', '.join(stale)}."]
                 problems += [f"{label}: {what_to_do}" for label, what_to_do in stale.items()]
@@ -187,10 +187,10 @@ class Command(BaseCommand):
     def _translate_into(self, config, language: str) -> bool:
         """Write ``config``'s translation into ``language``; ``False`` when it was already current."""
         try:
-            state = catalog.workbook_translation(config, language)
-        except catalog.WorkbookError as error:
+            state = catalog.workbooks.workbook_translation(config, language)
+        except catalog.errors.WorkbookError as error:
             raise CommandError(
-                f"{config.label}: {catalog.WORKBOOK}: {error}"
+                f"{config.label}: {catalog.workbooks.WORKBOOK}: {error}"
             ) from error
         if state.state == "current":
             return False
@@ -210,14 +210,14 @@ class Command(BaseCommand):
                 f"{file}: the translation kept the Spanish date placeholders {', '.join(spanish_dates)}: nothing written."
             )
         try:
-            catalog.check_anchors(translated)
-        except catalog.WorkbookError as error:
+            catalog.workbooks.check_anchors(translated)
+        except catalog.errors.WorkbookError as error:
             raise CommandError(
                 f"{file}: the translation {error} Nothing written."
             ) from error
         text = marked(state.source, translated)
         if text is None:
-            raise CommandError(f"{file}: the translation has other headings than {catalog.WORKBOOK}: nothing written.")
+            raise CommandError(f"{file}: the translation has other headings than {catalog.workbooks.WORKBOOK}: nothing written.")
         state.path.write_text(text, encoding="utf-8")
         self.stdout.write(
             f"{config.label}: wrote {state.path.name}; review the diff before committing it."

@@ -1,4 +1,4 @@
-"""Only ``base/catalog.py`` reaches the SaaS's ``shared`` schema.
+"""Only ``base/catalog/register_apps.py`` reaches the SaaS's ``shared`` schema.
 
 It is the single exception to «only ``services.py`` and ``queries.py`` touch the ORM», as
 ``base/tenancy/migrator/`` is for the DDL: ``register_apps`` runs for no hub and no user, so it is
@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 HUB_DIR = Path(__file__).resolve().parent.parent.parent
 SOURCE_ROOTS = ("base", "apps", "config", "shared")
 #: The only file that may: the registry of the Hub's modules in the SaaS.
-OWNER = PurePosixPath("base/catalog.py")
+OWNER = PurePosixPath("base/catalog/register_apps.py")
 #: The mirror itself declares the models it is about.
 MIRROR = PurePosixPath("shared/models.py")
 ALIAS = "shared"
@@ -124,7 +124,7 @@ def test_only_base_catalog_reaches_the_shared_schema():
     ]
 
     assert offenders == [], (
-        "Only base/catalog.py reaches the SaaS's shared schema: register_apps goes "
+        "Only base/catalog/register_apps.py reaches the SaaS's shared schema: register_apps goes "
         f"through it, never an operation nor another module: {offenders}"
     )
 

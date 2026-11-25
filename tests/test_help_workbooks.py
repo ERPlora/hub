@@ -30,7 +30,7 @@ from django.utils import translation
 from live.meta import all_live_app_configs
 
 from base import platform_screens, workbook_help
-from base.catalog import user_part
+from base.catalog.workbooks import user_part
 from base.queries import app_help
 from base.tests.help_workbooks import EN, EN_TABS, EN_WORDS, ES, ES_TABS, ES_WORDS, PLATFORM_ES
 

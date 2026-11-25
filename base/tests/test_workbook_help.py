@@ -8,7 +8,7 @@ the Hub speaks today.
 import pytest
 from django.utils import translation
 
-from base.catalog import user_part
+from base.catalog.workbooks import user_part
 from base.tests.help_workbooks import (
     EN,
     EN_TABS,

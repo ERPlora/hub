@@ -297,7 +297,7 @@ del Hub» de erplora-next.
   (`AppNotPortable`) y las plantillas la dejarían fuera, y el lint «(h)» de `tests/test_guardrails.py` lo impide antes.
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):
   `<control>_template`, con la plataforma y todas las apps portables (`migrator.hub_templates.templates`, PLAN-DB ronda 2026-11-01),
-  y una `<control>_template_<vertical>` por vertical de `base/catalog.py`, clonada de la anterior (las apps de su
+  y una `<control>_template_<vertical>` por vertical de `base/catalog/verticals.py`, clonada de la anterior (las apps de su
   vertical, `template_apps`, ya están en ella) y todo apagado (ninguna `AppActivation`). La de la plataforma la crea
   **solo** `bootstrap_databases` (roles, `vector`, privilegios por defecto, sin acceso para PUBLIC); si falta en un servidor, `migrate_hubs` para con `TemplateMissing` («run
   db-bootstrap there»). La de una vertical que falta se clona (reintenta mientras otro tenga abierta la de la

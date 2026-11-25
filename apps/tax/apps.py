@@ -27,7 +27,7 @@ class TaxConfig(LiveAppConfig):
         "ready, lets you schedule a rate change ahead, never lets two rates apply on the same day, "
         "and is what the till and the invoices use to charge and declare each line."
     )
-    # Both sectors' templates carry it (base.catalog.template_apps); every business is born with it on anyway (below).
+    # Both sectors' templates carry it (base.catalog.verticals.template_apps); every business is born with it on anyway (below).
     verticals = ["hair_salon", "restaurant"]
     # Mandatory wherever the business is: no sale is priced without it. The Home asks whoever runs a business to turn it
     # on while it is off (base.home.mandatory_apps.mandatory_steps), and the platform turns it on by itself at sign-up

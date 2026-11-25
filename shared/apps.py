@@ -2,7 +2,7 @@
 
 A platform app at the root, next to ``base/``: always installed, only ``models.py`` (no routes, no
 migrations). Its models live on the ``shared`` database alias (``base.routers.SharedRouter``) and
-only ``base/catalog.py`` uses them, to register the Hub's modules in the SaaS.
+only ``base/catalog/register_apps.py`` uses them, to register the Hub's modules in the SaaS.
 """
 
 from live.meta import LiveAppConfig
