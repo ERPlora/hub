@@ -141,6 +141,15 @@ def test_the_special_days_loaded_at_once_are_said_by_their_day_and_name(language
 
 
 @HUB_DB
+def test_an_automations_card_says_the_days_by_the_mark_of_their_name():
+    """With nobody at hand (an automation's card) no summary runs: the name the person wrote still names each day."""
+    days = [{"date": "2027-01-01", "name": "Año Nuevo"}]
+    card = assistant.cards.card(get("schedule.special_day.bulk_create"), {"special_days": days}, "es")
+    special = next(field for field in card["fields"] if field["name"] == "special_days")
+    assert (special["value"], special.get(NAMED)) == ([{"date": "1 ene 2027", "name": "Año Nuevo"}], True)
+
+
+@HUB_DB
 def test_special_days_the_write_refuses_keep_their_card_as_it_came():
     """A date that is none: the whole list is refused, and the card counts it."""
     days = [{"date": "2027-02-30", "name": "Nunca"}]
