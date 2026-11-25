@@ -8,21 +8,18 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.schedule import queries, services
-from apps.schedule.schemas import (
+from apps.schedule.schemas.hours import HoursRangeIn
+from apps.schedule.schemas.is_open import IsOpenIn
+from apps.schedule.schemas.overrides import OverrideIn, OverrideListIn, OverridePatchIn, OverrideRefIn
+from apps.schedule.schemas.settings import SettingsIn
+from apps.schedule.schemas.special_days import (
     BulkSpecialDayIn,
-    HoursRangeIn,
-    IsOpenIn,
-    OverrideIn,
-    OverrideListIn,
-    OverridePatchIn,
-    OverrideRefIn,
-    SetDayIn,
-    SettingsIn,
     SpecialDayIn,
     SpecialDayListIn,
     SpecialDayPatchIn,
     SpecialDayRefIn,
 )
+from apps.schedule.schemas.week import SetDayIn
 
 router = Router(tags=["schedule"])
 

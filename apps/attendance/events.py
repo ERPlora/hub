@@ -1,6 +1,6 @@
 """Events of the attendance app (``attendance.<entity>.<fact>``) and its reaction to Staff's events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids only: never a position or the reason of a correction (personal data).
 
 Reaction: a staff member's termination closes their open working day (ATTENDANCE-F13), through an

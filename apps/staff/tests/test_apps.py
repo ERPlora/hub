@@ -1,16 +1,19 @@
 """The staff app declares its module metadata, its menu entries, its permissions, what each role gets,
 the assistant's contract of every operation (``ai`` and described input fields), its help and its panels of the Home."""
 
+import pytest
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.staff import events as E
 from apps.staff import queries, services  # noqa: F401  (importing them registers the operations)
 from base import home
 from base.queries import app_help
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 # The old module's permissions, one by one (module.json), plus asking for one's own time off.
@@ -177,8 +180,25 @@ def test_the_help_window_s_tabs_are_the_menu_s_entries():
     ]
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert staff().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert staff().help.videos == {"es": "7taPYc-k-qs", "en": "nJ9BqRfPEjk"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("STAFF-F01", "STAFF-F02", "STAFF-F06"), "Gk4r1B106fg", "nwm7h2QLwqg"),
+    (("STAFF-F03",), "LtnOnUQgr4A", "HJOfAE_-p5c"),
+    (("STAFF-F08",), "wTNTqelgVUc", "uAYP1JX9JFA"),
+    (("STAFF-F04",), "sLq3eX0EGo0", "P--8qxE9jec"),
+    (("STAFF-F17", "STAFF-F18", "STAFF-F19"), "0LsycLDgSbE", "TZviOQ5zg_o"),
+    (("STAFF-F24",), "I5v2868sR3w", "XOdtwmIA5qk"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("staff", language) == help_videos.by_task(TASK_VIDEOS, language)
 
 
 # The operations and the assistant's contract

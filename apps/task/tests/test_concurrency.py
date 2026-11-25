@@ -24,7 +24,7 @@ from live.operations import atomic, get
 from apps.staff.models import Member
 from apps.task import events
 from apps.task.models import Comment, Project, Task
-from apps.task.queries import PROJECT_NOT_FOUND, TASK_NOT_FOUND
+from apps.task.queries.reads import PROJECT_NOT_FOUND, TASK_NOT_FOUND
 from base.services.sessions import ensure_hub_user
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import at_once, meanwhile

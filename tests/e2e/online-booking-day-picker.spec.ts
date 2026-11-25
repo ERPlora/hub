@@ -2,11 +2,11 @@
 // The day of the booking page (`/p/<slug>/book`, without a session) on a tablet held sideways, a phone, an upright
 // tablet and a laptop: wherever the field is on the screen, its calendar shows whole, with Cancel, Clear and Done; the
 // day tapped (or taken with the keyboard) is the one of the field, with its free times, and it is booked. Closing the
-// calendar without taking a day leaves the field as it was.
+// calendar without taking a day leaves the field as it was. Its wheel of years offers the years ahead too.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
-import { cutInPicker, dayIn, openPicker, spin } from './date-time-fields';
+import { cutInPicker, dayIn, openPicker, pickDay, spin } from './date-time-fields';
 import { A, capture, psql, settled } from './helpers';
 import { cast, keepTheBusiness } from './online-booking-helpers';
 import { ownerPage } from './service-helpers';
@@ -137,7 +137,7 @@ test('with the keyboard: the calendar opens, a day is taken with Enter and the f
 test('moving through the months and the years takes no day until one is tapped, and Done keeps the same day of another year', async ({ browser }) => {
   const [size] = SIZES;
   const { context: owner } = await ownerPage(browser, '/online_booking/bookings');
-  // The wheel of years offers up to this one; the first of a month exists in every year.
+  // The first of a month exists in every year.
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -173,6 +173,41 @@ test('moving through the months and the years takes no day until one is tapped, 
       await picker.locator('#clear-button').click();
       await expect(picker).toBeHidden();
       await expect(value).toHaveValue('');
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await owner.close();
+  }
+});
+
+test('the wheel of years goes on past this year, and marks the year ahead of a day reached with the arrows', async ({ browser }) => {
+  const [size] = SIZES;
+  const { context: owner } = await ownerPage(browser, '/online_booking/bookings');
+  const next = new Date().getFullYear() + 1;
+  const day = `${next}-02-01`;
+  try {
+    const who = await cast(owner, named('years'), aMonday(SIZES.length + 2));
+    const { context, page } = await bookingPage(browser, size, who.service.id, SIZES.length + 2);
+    try {
+      const field = dayField(page);
+      const value = field.locator('input');
+      await pickDay(page, field, day);
+      await expect(value).toHaveValue(asShown(day, size));
+
+      const picker = await openPicker(page, field, 'date');
+      const shownMonth = picker.locator('.calendar-month-year-toggle');
+      await shownMonth.click();
+      await settled(page);
+      const held = picker.locator('ion-picker-column[aria-label="Select a year"] ion-picker-column-option.option-active[part~="active"]');
+      await expect(held).toHaveText(String(next));
+      await spin(picker, 'Select a year', String(next + 1));
+      await shownMonth.click();
+      // Only the year: on a busy machine Ionic's wheel of months can settle on the month before as it opens.
+      await expect(shownMonth).toContainText(String(next + 1));
+      await picker.locator('#cancel-button').click();
+      await expect(picker).toBeHidden();
+      await expect(value).toHaveValue(asShown(day, size));
     } finally {
       await context.close();
     }

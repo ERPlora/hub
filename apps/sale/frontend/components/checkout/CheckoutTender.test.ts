@@ -10,21 +10,12 @@ import { describe, expect, it } from 'vitest';
 import { click, mountSale } from '../../__tests__/mount-sale';
 import type { Leg } from '../../lib/checkout/tender';
 import { plain } from '../../lib/format';
-import type { PaymentMethodOut } from '../../operations';
 import CheckoutTender from './CheckoutTender.vue';
 import MethodPicker from './MethodPicker.vue';
 import PayKeypad from './PayKeypad.vue';
 import TenderList from './TenderList.vue';
+import { method } from './__tests__/methods';
 
-const method = (id: string, type: PaymentMethodOut['type'], display_name: string): PaymentMethodOut => ({
-  id,
-  name: id,
-  display_name,
-  type,
-  sort_order: 0,
-  requires_change: type === 'cash',
-  allowed: true,
-});
 const CASH = method('m-cash', 'cash', 'Cash');
 const CARD = method('m-card', 'card', 'Card');
 

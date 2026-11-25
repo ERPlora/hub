@@ -15,7 +15,7 @@ from apps.printing import events
 from apps.printing.models import PrintDevice, Printer, PrintJob
 from apps.printing.queries.device_reads import active_devices
 from apps.printing.queries.jobs import LEASE, MAX_ATTEMPTS, actor, find_job, job_row
-from apps.printing.schemas import JobAckOut, JobClaimIn, JobClaimOut, JobCompleteIn, JobFailIn
+from apps.printing.schemas.claims import JobAckOut, JobClaimIn, JobClaimOut, JobCompleteIn, JobFailIn
 from apps.printing.services.writes import MANAGE_SETTINGS, _queued
 
 NOT_YOURS = _("That job is not this device's: another device or another hand-out has it now.")

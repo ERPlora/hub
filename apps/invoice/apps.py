@@ -94,6 +94,7 @@ class InvoiceConfig(LiveAppConfig):
             "INVOICE-F08": {"es": ["bUVP4k5SZs8"], "en": ["b8EAicT5vjo"]},
             "INVOICE-F17": {"es": ["Yc8UiKuP1s8"], "en": ["73SPPT0_dSY"]},
             "INVOICE-F18": {"es": ["Yc8UiKuP1s8"], "en": ["73SPPT0_dSY"]},
+            "INVOICE-F21": {"es": ["3jb2tjLO8w8"], "en": ["ASShGRv53hc"]},
         },
     )
     # The Home's steps: ⛔ «Your business details» (the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``)

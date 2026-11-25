@@ -8,7 +8,7 @@ from live.errors import NotFound
 
 from apps.printing.models import Printer, PrintJob
 from apps.printing.queries.printers import get_printer
-from apps.printing.schemas import PrinterRefIn
+from apps.printing.schemas.printers import PrinterRefIn
 from apps.printing.tests.conftest import HUB_DB, age, ctx_for, enqueue, printer, run
 
 pytestmark = HUB_DB

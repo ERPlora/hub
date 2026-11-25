@@ -34,52 +34,52 @@ router = Router(tags=["task"])
 
 @bind(router, "task.task.list", "/task/tasks")
 async def task_list(request, params: Query[TaskListIn]):
-    return await run_operation(request, queries.list_tasks, params)
+    return await run_operation(request, queries.tasks.list_tasks, params)
 
 
 @bind(router, "task.task.mine", "/task/tasks/mine")
 async def task_mine(request, params: Query[TaskMineIn]):
-    return await run_operation(request, queries.my_tasks, params)
+    return await run_operation(request, queries.tasks.my_tasks, params)
 
 
 @bind(router, "task.task.detail", "/task/tasks/detail")
 async def task_detail(request, params: Query[TaskRefIn]):
-    return await run_operation(request, queries.task_detail, params)
+    return await run_operation(request, queries.tasks.task_detail, params)
 
 
 @bind(router, "task.task.subtasks", "/task/tasks/subtasks")
 async def task_subtasks(request, params: Query[SubtaskListIn]):
-    return await run_operation(request, queries.list_subtasks, params)
+    return await run_operation(request, queries.tasks.list_subtasks, params)
 
 
 @bind(router, "task.task.create", "/task/tasks", status=201)
 async def task_create(request, data: TaskIn):
-    return await run_operation(request, services.create_task, data)
+    return await run_operation(request, services.tasks.create_task, data)
 
 
 @bind(router, "task.task.update", "/task/tasks/update")
 async def task_update(request, data: TaskPatchIn):
-    return await run_operation(request, services.update_task, data)
+    return await run_operation(request, services.tasks.update_task, data)
 
 
 @bind(router, "task.task.set_status", "/task/tasks/set_status")
 async def task_set_status(request, data: SetStatusIn):
-    return await run_operation(request, services.set_status, data)
+    return await run_operation(request, services.tasks.set_status, data)
 
 
 @bind(router, "task.task.complete", "/task/tasks/complete")
 async def task_complete(request, data: TaskRefIn):
-    return await run_operation(request, services.complete_task, data)
+    return await run_operation(request, services.tasks.complete_task, data)
 
 
 @bind(router, "task.task.assign", "/task/tasks/assign")
 async def task_assign(request, data: AssignIn):
-    return await run_operation(request, services.assign_task, data)
+    return await run_operation(request, services.tasks.assign_task, data)
 
 
 @bind(router, "task.task.delete", "/task/tasks/delete")
 async def task_delete(request, data: TaskRefIn):
-    return await run_operation(request, services.delete_task, data)
+    return await run_operation(request, services.tasks.delete_task, data)
 
 
 # Comments
@@ -87,12 +87,12 @@ async def task_delete(request, data: TaskRefIn):
 
 @bind(router, "task.comment.list", "/task/comments")
 async def comment_list(request, params: Query[CommentListIn]):
-    return await run_operation(request, queries.list_comments, params)
+    return await run_operation(request, queries.comments.list_comments, params)
 
 
 @bind(router, "task.comment.add", "/task/comments", status=201)
 async def comment_add(request, data: CommentIn):
-    return await run_operation(request, services.add_comment, data)
+    return await run_operation(request, services.comments.add_comment, data)
 
 
 # Projects
@@ -100,24 +100,24 @@ async def comment_add(request, data: CommentIn):
 
 @bind(router, "task.project.list", "/task/projects")
 async def project_list(request, params: Query[ProjectListIn]):
-    return await run_operation(request, queries.list_projects, params)
+    return await run_operation(request, queries.projects.list_projects, params)
 
 
 @bind(router, "task.project.detail", "/task/projects/detail")
 async def project_detail(request, params: Query[ProjectRefIn]):
-    return await run_operation(request, queries.project_detail, params)
+    return await run_operation(request, queries.projects.project_detail, params)
 
 
 @bind(router, "task.project.create", "/task/projects", status=201)
 async def project_create(request, data: ProjectIn):
-    return await run_operation(request, services.create_project, data)
+    return await run_operation(request, services.projects.create_project, data)
 
 
 @bind(router, "task.project.update", "/task/projects/update")
 async def project_update(request, data: ProjectPatchIn):
-    return await run_operation(request, services.update_project, data)
+    return await run_operation(request, services.projects.update_project, data)
 
 
 @bind(router, "task.project.delete", "/task/projects/delete")
 async def project_delete(request, data: ProjectRefIn):
-    return await run_operation(request, services.delete_project, data)
+    return await run_operation(request, services.projects.delete_project, data)

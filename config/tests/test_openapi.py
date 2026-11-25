@@ -5,8 +5,8 @@ from ninja import Router
 from apps.appointment.schemas.settings import SettingsIn as AppointmentSettingsIn
 from apps.cart_checkout.schemas import ItemRefIn as CartItemRefIn
 from apps.demo.schemas import ItemRefIn as DemoItemRefIn
-from apps.printing.schemas import DeviceOut as PrintingDeviceOut
-from apps.printing.schemas import JobCreateIn
+from apps.printing.schemas.devices import DeviceOut as PrintingDeviceOut
+from apps.printing.schemas.jobs import JobCreateIn
 from apps.sale.schemas.settings import SettingsOut as SaleSettingsOut
 from apps.table.schemas import SettingsIn as TableSettingsIn
 from apps.table.schemas import SettingsOut as TableSettingsOut

@@ -9,3 +9,5 @@ live("tip.tip.list", on=TIP_EVENTS)
 live("tip.tip.get", on=TIP_EVENTS)
 # Its payment methods are Sales': a new one or one switched off changes what can be set.
 live("tip.settings.get", on=[SETTINGS_UPDATED, PAYMENT_METHOD_CREATED, SALE_SETTINGS_UPDATED])
+# What the charge proposes is the settings' suggestions of a payment method.
+live("tip.suggestion.get", on=[SETTINGS_UPDATED, PAYMENT_METHOD_CREATED, SALE_SETTINGS_UPDATED])

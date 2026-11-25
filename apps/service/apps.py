@@ -141,7 +141,21 @@ class ServiceConfig(LiveAppConfig):
             permission="service.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "toNEQIwtQDY", "en": "vxEm9WTDpi0"},
+        flow_videos={
+            "SERVICE-F01": {"es": ["LbOhuQ82bpw"], "en": ["RncbXpYLq-I"]},
+            "SERVICE-F02": {"es": ["LbOhuQ82bpw"], "en": ["RncbXpYLq-I"]},
+            "SERVICE-F03": {"es": ["Vr7GaLsXYy0"], "en": ["Ul5ANHNCxTo"]},
+            "SERVICE-F04": {"es": ["LbOhuQ82bpw"], "en": ["RncbXpYLq-I"]},
+            "SERVICE-F07": {"es": ["lSNrQpprRDU"], "en": ["VXDOqc0EWU8"]},
+            "SERVICE-F08": {"es": ["lSNrQpprRDU"], "en": ["VXDOqc0EWU8"]},
+            "SERVICE-F12": {"es": ["oD_kZLu2xYQ"], "en": ["3XPQhS5SNrc"]},
+            "SERVICE-F13": {"es": ["oD_kZLu2xYQ"], "en": ["3XPQhS5SNrc"]},
+            "SERVICE-F31": {"es": ["zX1YGJDGZgs"], "en": ["P2zoniTyTbU"]},
+            "SERVICE-F32": {"es": ["zX1YGJDGZgs"], "en": ["P2zoniTyTbU"]},
+        },
+    )
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff

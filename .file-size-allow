@@ -6,7 +6,6 @@
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
-688 apps/attendance/services.py ERPlora/erplora-next#74
 560 apps/cart_checkout/queries.py ERPlora/erplora-next#74
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 758 apps/cart_checkout/services.py ERPlora/erplora-next#74
@@ -29,18 +28,16 @@
 597 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
-578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
-713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
+594 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
 604 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
 438 apps/sale/frontend/composables/pos/useTill.ts ERPlora/erplora-next#74
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
 564 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 862 apps/sale/models.py ERPlora/erplora-next#74
-562 apps/schedule/queries.py ERPlora/erplora-next#74
-667 apps/schedule/schemas.py ERPlora/erplora-next#74
-609 apps/schedule/services.py ERPlora/erplora-next#74
+552 apps/schedule/queries.py ERPlora/erplora-next#74
+601 apps/schedule/services.py ERPlora/erplora-next#74
 686 apps/service/frontend/operations.d.ts ERPlora/erplora-next#74
 622 apps/service/models.py ERPlora/erplora-next#74
 1222 apps/service/tests/test_queries.py ERPlora/erplora-next#74
@@ -49,8 +46,6 @@
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
 825 apps/table/schemas/__init__.py ERPlora/erplora-next#74
-612 apps/task/queries.py ERPlora/erplora-next#74
-645 apps/task/services.py ERPlora/erplora-next#74
 311 apps/tax/frontend/operations.d.ts ERPlora/erplora-next#74
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
@@ -61,7 +56,6 @@
 558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
-1367 apps/whatsapp_inbox/tests/test_services.py ERPlora/erplora-next#74
 655 base/frontend/components/SystemUsage.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
