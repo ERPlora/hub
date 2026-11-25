@@ -80,7 +80,10 @@ class Command(BaseCommand):
         undecided = [one.flow.id for one in report.flows if one.group is None]
         self._write_list("undecided, none of their operations is known", undecided)
         contradictory = [one.flow.id for one in report.flows if one.contradicts]
-        self._write_list("contradictions, the assistant is named and no tool backs it", contradictory)
+        self._write_list(
+            "contradictions, the assistant is named and no tool backs it, or no operation is said and one is cited",
+            contradictory,
+        )
         self._write_list("tools no flow cites", report.uncited_tools)
 
     def _write_list(self, title: str, items: Sequence[str]) -> None:

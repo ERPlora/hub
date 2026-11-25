@@ -1017,15 +1017,15 @@ when splitting by its name. What the person cannot see (the Sales check, without
 not show.
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:c76c32487833 -->
+<!-- from WORKBOOK.md sha256:018ff97c6240 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The zones with their tables and the free ones, search, filters, order and pages (up to 100) | view zones | F01, F06 | `table.zone.list` |
 | A zone | view zones | F06 | `table.zone.get` |
-| The tables with their live status (guests, since when, server, customer, booking), in natural order, with search, filters and pages | view tables | F02, F09 | `table.table.list` |
+| The tables with their live status (guests, since when, server, customer, booking), in natural order, with search, filters and pages | view tables | F02, F09, F18, F20, F33, F34 | `table.table.list` |
 | A table with its open checks and its name with the zone, like 5 (Terrace) | view tables | F09–F17 | `table.table.get` |
-| The checks of the room (open, closed, all), with charged, filters and pages | view checks | F22 | `table.session.list` |
+| The checks of the room (open, closed, all), with charged, filters and pages | view checks | F18–F20, F22 | `table.session.list` |
 | A table check and where it is: its table with the zone, or "Parked" | view checks | F21, F22 | `table.session.get` |
 | The table checks of a Sales check (for the till: the table of the check on screen) | view checks | F12, F13, F24 | `table.session.by_order` |
 | A line of the Sales check of a table, with its name and its quantity, as "Split check" lists them | view checks | F17 | `table.session.line` |
@@ -1082,13 +1082,13 @@ For the platform only (without a route in the API, as the system): `table.sessio
 No notice carries names or free notes: only ids and numbers.
 
 ### What it reacts to
-<!-- from WORKBOOK.md sha256:8ccba51a5db3 -->
+<!-- from WORKBOOK.md sha256:43ef4766b347 -->
 
-| Notice | From | What it does | Service |
-|---|---|---|---|
-| `sale.order.completed` | Sales | Closes the table checks of that check (F18) | `table.session.close_by_order` |
-| `sale.order.voided` | Sales | Closes the table checks of that check (F20) | `table.session.close_by_order` |
-| `customer.customer.erased` | Customers | Erases the name from their holds (F31) | `table.hold.forget_customer` |
+| Notice | From | What it does | Flows | Service |
+|---|---|---|---|---|
+| `sale.order.completed` | Sales | Closes the table checks of that check | F18 | `table.session.close_by_order` |
+| `sale.order.voided` | Sales | Closes the table checks of that check (F20) | — | `table.session.close_by_order` |
+| `customer.customer.erased` | Customers | Erases the name from their holds | F31 | `table.hold.forget_customer` |
 
 The reactions arrive in the background, shortly after, and repeating them changes nothing. What Sales
 says is also read on every read and on every write: a table check whose Sales check is charged or voided

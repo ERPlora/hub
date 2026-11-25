@@ -1104,7 +1104,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 (FLOW-F12), so its notices and answers by WhatsApp keep reading the number.
 
 ### What it offers: reads (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:a1b29bfbc584 -->
+<!-- from WORKBOOK.md sha256:296bc2fdb552 -->
 
 | Operation | What it returns | Flows |
 |---|---|---|
@@ -1114,7 +1114,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 | `whatsapp_inbox.conversation.summary` | Open, unread and waiting for an answer, and whether the month's cap is spent | F09, F13 |
 | `whatsapp_inbox.conversation.count_awaiting_reply` | How many customers are waiting for an answer (open with the customer's last message or marked "Needs attention"): the bell counts it | F09 |
 | `whatsapp_inbox.conversation.notices` | The customers waiting for an answer, from the newest to the oldest, with who, what they last wrote and when: the device's notifications | F09 |
-| `whatsapp_inbox.message.list` | A conversation's messages, from the newest to the oldest | F05, F06 |
+| `whatsapp_inbox.message.list` | A conversation's messages, from the newest to the oldest | F05, F06, F34 |
 | `whatsapp_inbox.message.get` | A message by its id (the one that started an automation): what it says, who and when, the exact international number of its conversation, what to call the customer, whether they can be written to now and the last thing the business wrote them from the Hub in the 24 hours before (the list they may be answering, F19) | F19–F22, F24, F25 |
 | `whatsapp_inbox.note.list` | A conversation's internal notes | F36 |
 | `whatsapp_inbox.template.list` | The templates (filters by status, category, language, name and whether they can be sent), with their way to Meta | F27, F28, F33 |
@@ -1126,7 +1126,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 | `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to | F07 |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:f8295e14bd8d -->
+<!-- from WORKBOOK.md sha256:85ab6a2bff11 -->
 
 | Operation | What it does | Flows |
 |---|---|---|
@@ -1154,8 +1154,8 @@ The system's (with no public route):
 | Operation | Who calls it | Flows |
 |---|---|---|
 | `whatsapp_inbox.message.receive` | erplora.com, through `/internal` | F03, F04, F08, F38 |
-| `whatsapp_inbox.message.update_status` | erplora.com, through `/internal` | F34 |
-| `whatsapp_inbox.channel.sync` | erplora.com, through `/internal` | F01, F02, F13, F27, F28 |
+| `whatsapp_inbox.message.update_status` | erplora.com, through `/internal` | — |
+| `whatsapp_inbox.channel.sync` | erplora.com, through `/internal` | F01, F02, F28 |
 | `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | the deliveries | F32, F33 |
 | `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | the deliveries | F10, F11 |
 | `whatsapp_inbox.template.claim_submit`, `whatsapp_inbox.template.record_submit` | the deliveries | F29, F30 |
@@ -1178,7 +1178,7 @@ The system's (with no public route):
 They carry identifiers, never a number, a name or a text of the conversation.
 
 ### What it reacts to and what it needs from other apps
-<!-- from WORKBOOK.md sha256:c76430a21229 -->
+<!-- from WORKBOOK.md sha256:c4c2dc904535 -->
 
 - **Customers** (required): `customer.customer.created` and `customer.customer.updated` link the conversations with no
   card of that number (F04); `customer.customer.merged` moves them to the card that stays (F12);
@@ -1186,6 +1186,15 @@ They carry identifiers, never a number, a name or a text of the conversation.
   `customer.customer.restored` (the deleted card coming back from the separate copy, CUSTOMER-F33) links them again,
   as a new card does (F04); `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
   creates cards only with `customer.customer.create`.
+
+| From | What for | Flows | Service |
+|---|---|---|---|
+| Automations | Whether an automatic answer is on and whether it brings a better version | F14, F15, F17, F18 | `flow.recipe.list` |
+| Automations | Turn an automatic answer on | F14, F15 | `flow.recipe.enable` |
+| Automations | Pause it, also when the other one is turned on | F14, F15, F17 | `flow.recipe.disable` |
+| Automations | Take it back to the version the app brings | F18 | `flow.recipe.restore` |
+| Appointments | Whether appointments confirm by themselves | F16 | `appointment.settings.get`, `.update` |
+| Reservations | Whether reservations confirm by themselves | F16 | `reservation.settings.get`, `.update` |
 
 ### Who uses it
 <!-- from WORKBOOK.md sha256:670e49f2135c -->
