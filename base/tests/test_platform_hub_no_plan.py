@@ -73,6 +73,15 @@ class TestNothingToBuy:
         assert (refused.status_code, refused.json()["error"]["code"]) == (409, "base.saas_pass_no_plan")
         assert "url" not in refused.json()
 
+    @pytest.mark.parametrize(
+        ("locale", "said"), [("en", "This business has no plan."), ("es", "Este negocio no tiene plan.")]
+    )
+    def test_the_refusal_speaks_the_person_s_language(self, client, fake_saas, locale, said):
+        fake_saas(body={**arrives(ANA, "hub_owner"), "locale": locale})
+        callback(client, {"code": "c1", "next": "/"}, host=ERP)
+
+        assert ask(client, "plan", ERP).json()["error"]["message"] == said
+
     def test_the_pass_to_its_panel_is_signed(self, enter):
         said = read_as_the_saas(the_pass(ask(enter(ERP), "business", ERP)))
 

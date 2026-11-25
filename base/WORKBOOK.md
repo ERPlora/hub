@@ -769,7 +769,8 @@ entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pe
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
 que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
 y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
-ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran.
+ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran. En el negocio
+propio de ERPlora, que no tiene plan ni compra nada, tampoco los tiene su propietario; «Gestionar en erplora.com», sí.
 Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -1467,7 +1468,8 @@ las veces que se quedó corta llevan contándose menos que su periodo, dicen «D
 erplora.com aparte: si no contesta, su fila dice «No disponible ahora», sin cifra, y la pantalla sigue; lo mismo si no
 se puede leer WhatsApp. En una demo, en lugar de todo: «En una demo no se mide el uso: sus datos se borran al
 terminar.». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en cuanto
-erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba.
+erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba. El negocio propio de
+ERPlora no lo tendrá nunca: en su lugar dice «Este es el negocio de ERPlora: no tiene plan.», con las mismas cifras.
 Implicados: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Saber qué versión corre y cuándo se actualizó
@@ -4207,10 +4209,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   ERPlora (`Hub.is_platform`) no tiene plan y su foto solo trae a sus personas: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`) para esas personas: queda
-  por decidir qué les enseña aquí, porque el aviso de plan desconocido les promete uno que nunca llega.
-  Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
-  `test_plan_usage_figures.py`.
+  en falso porque no hay plan que leer, y `platform` dice que no lo habrá: la pantalla lo cuenta en vez de prometer uno.
+  Tests: `base/tests/test_meter.py`, `test_meter_requests.py`, `test_plan_usage_figures.py` y
+  `test_platform_hub_no_plan.py`, y `SystemUsage.platform.test.ts`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
   `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
@@ -4407,7 +4408,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   caducaría en un minuto y lo leería cualquier script: `signing.dumps({user, hub, next, nonce}, key=INTERNAL_SHARED_SECRET,
   salt="erplora.hub-pass.v1")`, y devuelve `SAAS_URL/hub-pass/?pass=…`. Solo en una sesión abierta con la cuenta
   (`_session_account`; si no, `base.saas_pass_needs_account`: nunca PIN, placa ni demo); `next=business`, además, con
-  `base.open_management` (`base.saas_pass_needs_management`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
+  `base.open_management` (`base.saas_pass_needs_management`); `next=plan`, nunca en el hub de ERPlora (409
+  `base.saas_pass_no_plan`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
   firmante de Django caería en `SECRET_KEY`. No se consulta al SaaS (PLAN-SAAS §2) y el pase no va a ningún log.
   `base/frontend/lib/saas-pass.ts` (`useSaasPass`) es la segunda puerta de salida del Hub: abre `about:blank` dentro del
   clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
@@ -4417,7 +4419,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   que su sitio le pone dentro, y quien la coloca decide su clase y `data-testid`. Si sale lo decide una sola regla,
   `useMayBuy` de `base/frontend/lib/plan-link.ts`: en la web y con `base.own_business`, porque en erplora.com solo el
   propietario compra (`usePlanLink` la aplica a la dirección de `hub-home`; `canUpgrade` del asistente y los enlaces a
-  la Tienda de `AppsPage` y `AppBlockedPage`, también). La colocan
+  la Tienda de `AppsPage` y `AppBlockedPage`, también). Las direcciones de los planes y de la Tienda las da
+  `base/saas_store.py`, vacías en el hub de ERPlora (`platform_hub.is_platform_slug`): sin dirección no sale ninguno
+  (`base/tests/test_saas_store.py`, `test_platform_hub_no_plan.py`). La colocan
   `UpgradePlanLink` (pie del menú, con su icono), `SystemUsage`, `PeopleList`, `AppsPage` y la Bandeja de WhatsApp
   (`InboxPage`, `MessageComposer`, `ChannelSettings`, con su «Mejorar el plan»); su test prohíbe que un `.vue` vuelva a
   escribir a mano `openSaasPass('plan', …)`. Además usan `useSaasPass` `ManageLink` (`business`) y `openPlan` de
