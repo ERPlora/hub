@@ -48,13 +48,44 @@ for permission and fails indoors; generating a table's QR again is the way out w
 3. Each table gets its code the first time its QR is generated; from then on the same code works until it is
    regenerated.
 
+## Screens
+<!-- from WORKBOOK.md sha256:f8e76bf31d0d -->
+
+The **Online orders** menu has one tab: **QR codes**. Only those who can see the tables' QR codes see it (the
+owner, the administrator and the manager); the buttons to generate and regenerate, only those who can regenerate them.
+
+### QR codes
+<!-- from WORKBOOK.md sha256:7e72bfa0c2af -->
+Here you have every table of the venue, in the floor plan's order, each with the address its QR opens and when it was
+generated. From here you print the sheet with each table's QR to cut out and leave on it, you print the QR of a single
+table and, if a QR should no longer work, you regenerate it.
+
+#### Details
+<!-- from WORKBOOK.md sha256:0ac3b4e0a268 -->
+Menu **Online orders → QR codes**. List: Table, Zone ("No zone" if it has none), Address and Generated ("No QR
+yet" on a table without a code), in table or card view. At the top, **Print sheet**: it opens the device's print dialog
+with one card per table with a QR, three per row, each with "Scan to order", the QR, "Table 4" and its zone, and its
+dashed edge to cut it out; in the installed app it goes to its print screen. Per row, **Print QR** (that table only)
+and **Regenerate QR**, which asks for confirmation ("Regenerate the QR of table 4 (Terrace)?"), or **Generate QR** on a
+table that has none yet. If some tables have no QR, a notice says how many are not on the sheet, with **Generate the
+missing QR codes**. The QR is drawn on the device itself: the sheet asks nothing of the internet.
+
+## States of each screen
+<!-- from WORKBOOK.md sha256:99e230118c05 -->
+
+| Screen | Loading | Empty | Error |
+|---|---|---|---|
+| QR codes | The list loading; **Print sheet**, off until all the tables are in | "No tables yet", with **Go to Tables** for whoever can add them | The list's, with "Retry"; that of generating or regenerating, in a passing notice with its reason; "The sheet could not be printed." |
+
+"Reconnecting…" while the live connection recovers (what is painted stays).
+
 ## Flows
-<!-- from WORKBOOK.md sha256:3116455ead1e -->
+<!-- from WORKBOOK.md sha256:a4befbc441e7 -->
 
 | ID | Flow | Status |
 |---|---|---|
-| ONLINE_ORDER-F01 | Generate or regenerate a table's QR | partial — through the API and the assistant; the button on the QR sheet is missing |
-| ONLINE_ORDER-F02 | See and print the tables' QR sheet | partial — the list of tables with their code, through the API and the assistant; the sheet is missing |
+| ONLINE_ORDER-F01 | Generate or regenerate a table's QR | done |
+| ONLINE_ORDER-F02 | See and print the tables' QR sheet | done |
 | ONLINE_ORDER-F03 | The customer opens the menu from their table's QR | not done |
 | ONLINE_ORDER-F04 | The customer orders from their table | not done |
 | ONLINE_ORDER-F05 | Accept or reject a table's first order | not done |
@@ -63,36 +94,44 @@ for permission and fails indoors; generating a table's QR again is the way out w
 | ONLINE_ORDER-F08 | The check says the order is online | not done |
 
 ### ONLINE_ORDER-F01 Generate or regenerate a table's QR
-<!-- from WORKBOOK.md sha256:bbcf3dd90c94 -->
-Status: partial — done through the API and with the assistant; the «Regenerate QR» button of the QR sheet is missing
+<!-- from WORKBOOK.md sha256:8ca4c9e30385 -->
+Status: done
 Actor: owner, administrator or manager; the assistant, with the session of whoever speaks
-Screen: none yet (it will come with the tables' QR sheet)
+Screen: QR codes
 Steps:
-1. Choose the table, by its number and, if the number repeats, by its zone («table 4 on the terrace»).
-2. Ask to regenerate its QR: the assistant shows its card with the table and warns that the printed QR will stop
-   working.
-3. On confirming, the table gets a new code: the previous one stops opening the table's page at that moment. A table
-   that had no code yet gets its first one.
+1. Choose the table in **QR codes** or, talking to the assistant, by its number and, if the number repeats, by
+   its zone ("table 4 on the terrace").
+2. Press **Regenerate QR**: the confirmation names the table and warns that the printed QR stops working at that
+   moment. The assistant shows the same on its card.
+3. On confirming, the table gets a new code: the previous one stops opening the table's page at that moment, and a
+   notice asks to print the new one (**Print QR**, ONLINE_ORDER-F02).
+4. A table that has no code yet gets its first one with **Generate QR**, without confirmation, because nothing printed
+   stops working; **Generate the missing QR codes** gives one, one after another, to every table that has none yet.
 In: the table, from Tables.
 Out: the table's new code, the address of its page and when it was generated; the notice that it was regenerated.
-If it fails: nothing changes. The table does not exist or was deleted («That table does not exist in this business.»); the
-number repeats across zones and no zone is said (Tables asks for the zone); whoever asks cannot change the tables' QR codes
-(«You do not have permission»).
+If it fails: nothing changes on that table, and the notice says why. The table does not exist or was deleted ("That
+table does not exist in this business."); the number repeats across zones and no zone is said (Tables asks for the
+zone); whoever asks cannot change the tables' QR codes ("You do not have permission"; on screen the buttons do not
+show). **Generate the missing QR codes** stops at the first table that fails: the ones before it already have their
+QR.
 Involved: TABLE-F02, TABLE-F04
 
 ### ONLINE_ORDER-F02 See and print the tables' QR sheet
-<!-- from WORKBOOK.md sha256:a8cd3b1a0955 -->
-Status: partial — the list of tables with their code and their address is read through the API and with the assistant; the sheet printed from the browser is missing
-Actor: owner, administrator or manager
-Screen: none yet (it will come as the tables' QR sheet)
+<!-- from WORKBOOK.md sha256:da167843a9cd -->
+Status: done
+Actor: owner, administrator or manager; the assistant, with the session of whoever speaks, gives the list
+Screen: QR codes
 Steps:
-1. Open the list of tables: each with its number, its zone and, if it already has a code, the address of its page
-   and when it was generated. The tables come in the floor plan's order (2 before 10).
-2. Print the sheet: one QR per table with its number and its zone, to cut out and leave on each table.
+1. Open **Online orders → QR codes**: each table with its number, its zone and, if it already has a code, the
+   address of its page and when it was generated. The tables come in the floor plan's order (2 before 10).
+2. Press **Print sheet**: the device's print dialog brings one QR per table with its number and its zone, to cut out
+   and leave on each table. The tables with no QR yet are not on it, and the screen says how many there are.
+3. For a single table (the one whose QR was regenerated), **Print QR** on its row brings only its own.
 In: the tables and their zones, from Tables.
-Out: nothing; it only reads.
-If it fails: without tables, the list is empty; whoever cannot see the tables' QR codes does not see it («You do not
-have permission»).
+Out: nothing; it only reads and prints.
+If it fails: without tables, "No tables yet", with **Go to Tables**; if the device does not print, "The sheet could not
+be printed."; whoever cannot see the tables' QR codes does not see the tab ("You do not have permission" through the
+API).
 Involved: TABLE-F02, WEBSITE-F09
 
 ### ONLINE_ORDER-F03 The customer opens the menu from their table's QR
@@ -185,11 +224,11 @@ If it fails: does not apply; the order itself sets it.
 Involved: SALE-F19, KITCHEN-F05
 
 ## Services: what comes in and what goes out
-<!-- from WORKBOOK.md sha256:b1d234af79e4 -->
+<!-- from WORKBOOK.md sha256:573fa44af031 -->
 
-Everything can be asked for through the API and the assistant (by voice or text, with the session of whoever
-speaks), with the same rules and permissions; the screens will come with the QR sheet. A table is named by its id or
-as a person says it: its number and, if it repeats, its zone.
+Everything can be asked for on the screen, through the API and the assistant (by voice or text, with the session of
+whoever speaks), with the same rules and permissions. A table is named by its id or as a person says it: its number
+and, if it repeats, its zone.
 
 ### What it offers: queries
 <!-- from WORKBOOK.md sha256:3310f0dd2146 -->

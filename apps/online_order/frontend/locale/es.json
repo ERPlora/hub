@@ -1,0 +1,49 @@
+{
+  "online_order": {
+    "qrCodes": {
+      "title": "Códigos QR",
+      "columns": {
+        "number": "Mesa",
+        "zone": "Zona",
+        "url": "Dirección",
+        "issuedAt": "Generado"
+      },
+      "noZone": "Sin zona",
+      "noCode": "Sin QR todavía",
+      "entity": {
+        "one": "mesa",
+        "many": "mesas"
+      },
+      "empty": "Aún no hay mesas",
+      "emptyMessage": "Da de alta las mesas de tu sala en Mesas: cada una tendrá su propio QR.",
+      "goToTables": "Ir a Mesas",
+      "loadError": "No se han podido cargar las mesas.",
+      "retry": "Reintentar",
+      "reconnecting": "Reconectando…",
+      "print": "Imprimir hoja",
+      "missing": "{count} mesa aún no tiene QR, así que no sale en la hoja. | {count} mesas aún no tienen QR, así que no salen en la hoja.",
+      "generateMissing": "Generar los QR que faltan",
+      "generatedMissing": "{count} mesa ya tiene su QR. | {count} mesas ya tienen su QR.",
+      "actions": {
+        "generate": "Generar QR",
+        "regenerate": "Regenerar QR",
+        "print": "Imprimir QR"
+      },
+      "regenerate": {
+        "title": "¿Regenerar el QR de la mesa {table}?",
+        "message": "El QR impreso de esta mesa deja de valer en ese momento. Imprime el nuevo y cámbialo en la mesa.",
+        "confirm": "Regenerar QR"
+      },
+      "generated": "La mesa {table} ya tiene su QR.",
+      "regenerated": "La mesa {table} tiene un QR nuevo. Imprímelo y cambia el anterior.",
+      "failed": "No se ha podido generar el QR.",
+      "printFailed": "No se ha podido imprimir la hoja."
+    },
+    "sheet": {
+      "title": "Códigos QR de las mesas",
+      "scan": "Escanea para pedir",
+      "table": "Mesa {number}",
+      "alt": "Código QR de la mesa {table}"
+    }
+  }
+}

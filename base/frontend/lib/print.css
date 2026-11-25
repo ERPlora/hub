@@ -1,0 +1,17 @@
+/* The paper `printPaper` (print.ts) prints: a copy of it lives in `body > .ep-print-root` while the browser prints, and
+   the body carries `.ep-printing` meanwhile. On screen the copy never shows. On paper, while the body is marked, it is
+   the only thing that does; the root's rule is more specific than another app's always-on `body > :not(...)`, so it
+   shows wherever that app's stylesheet was loaded before. A paper that needs its own margins names its own page. */
+.ep-print-root {
+  display: none;
+}
+
+@media print {
+  body.ep-printing > :not(.ep-print-root) {
+    display: none !important;
+  }
+
+  body.ep-printing > .ep-print-root {
+    display: block !important;
+  }
+}

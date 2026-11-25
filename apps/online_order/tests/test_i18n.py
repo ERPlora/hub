@@ -36,3 +36,4 @@ def test_spanish_texts():
         assert str(config.verbose_name) == "Pedidos online"
         assert str(config.permissions["online_order.view_qr_code"]) == "Ver los QR de las mesas"
         assert str(config.permissions["online_order.change_qr_code"]) == "Regenerar los QR de las mesas"
+        assert [str(nav.label) for nav in config.navigation] == ["Códigos QR"]
