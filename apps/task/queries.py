@@ -1,4 +1,4 @@
-"""Read operations of the task app (``READ ONLY``), and the loaders services.py reuses.
+"""Read operations of the task app (``READ ONLY``), and the loaders services/ reuses.
 
 Who sees what: a caller with ``task.view_all`` sees every task; anyone else, their own — the ones
 assigned to their staff record (the one linked to their account) and the ones they created. A task the
