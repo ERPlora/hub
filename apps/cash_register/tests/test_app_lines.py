@@ -202,3 +202,12 @@ def test_the_lines_of_hub_b_are_nobody_in_hub_a(hub_a, hub_b):
         assert not Movement.objects.filter(app=APP).exists()
     # Positive control: in hub B the line is there.
     assert in_hub_b == [(APP, "Demo in cash", 500), (APP, "Demo by card", 0), (APP, "Demo paid out", 0)]
+
+
+def test_each_line_names_its_app_in_the_readers_language():
+    open_session(10000)
+    marked, by_hand = add("in", 500, app="printing"), add("in", 300, app=None)
+    assert (marked.app_name, by_hand.app_name) == ("Printing", "")
+    number = run("cash_register.session.current").session.number
+    listed = run("cash_register.movement.list", {"session": number}, ctx_for(language="es"))
+    assert {row.amount: row.app_name for row in listed.rows} == {500: "Impresión", 300: ""}

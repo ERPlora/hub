@@ -683,8 +683,9 @@ Steps:
 In: the written message (not the history, nor the owner's answers from the phone, nor photos without text).
 Out: a new card if needed (Customers), the conversation linked to the card, the proposal in **Waiting for your
 answer** and, after the yes, an appointment confirmed or pending (Appointments, `appointment.appointment.created`)
-and an answer by WhatsApp. The services and their length come from the Services catalogue; the free times, from
-Appointments.
+with WhatsApp as its source and an answer by WhatsApp; never on someone else's card even if the message names it: the
+card is set by the automation and the assistant cannot change it. The services and their length come from the Services
+catalogue; the free times, from Appointments, those of a customer (the minimum notice counts and nothing overlaps).
 If it fails: F20; with no slot, she is told why and offered others. With the plan's messages for the month spent she
 gets nothing (no acknowledgement, no answer, no appointment) and her message stays in the inbox with "Needs
 attention" (F13).

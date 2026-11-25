@@ -1,5 +1,13 @@
-// A closed session as `cash_register.session.get` answers it: the fixture of the detail's components.
+// A closed session as `cash_register.session.get` answers it: the fixture of the detail's components. `TIPS` are the
+// lines another app (Tips) records in a session, as its summary names them.
 import type { SessionOut } from '../../operations';
+import type { AppLine } from '../../operations/app-lines';
+
+export const TIPS: AppLine[] = [
+  { app: 'tip', label: 'Tips in cash', amount: 500 },
+  { app: 'tip', label: 'Tips by card', amount: 700 },
+  { app: 'tip', label: 'Tips paid out', amount: -200 },
+];
 
 export const SESSION: SessionOut = {
   id: 's1',
@@ -32,6 +40,7 @@ export const SESSION: SessionOut = {
     total_cash_in: 0,
     total_cash_out: 300,
     total_gifts: 40,
+    app_lines: [],
     expected_cash: 10000,
     counted: 9950,
     difference: -50,
