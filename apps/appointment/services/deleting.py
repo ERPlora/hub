@@ -10,15 +10,10 @@ from apps.appointment import events
 from apps.appointment.models import Appointment
 from apps.appointment.queries.booking import resolve_services
 from apps.appointment.queries.reads import APPOINTMENT_NOT_FOUND, MOVABLE, find_appointment, load_detail
-from apps.appointment.schemas import (
-    AppointmentIdIn,
-    AppointmentOut,
-    AppointmentRefIn,
-    BulkDeletedOut,
-    BulkDeleteIn,
-    DeletedOut,
-    ServiceRefIn,
-)
+from apps.appointment.schemas.appointments import AppointmentIdIn, AppointmentOut, AppointmentRefIn
+from apps.appointment.schemas.changes import BulkDeletedOut, BulkDeleteIn
+from apps.appointment.schemas.fields import DeletedOut
+from apps.appointment.schemas.references import ServiceRefIn
 from apps.appointment.services.writes import (
     CANNOT,
     SYSTEM,

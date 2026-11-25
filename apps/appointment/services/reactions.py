@@ -12,7 +12,7 @@ from apps.appointment import events
 from apps.appointment.models import Appointment, History, Recurring
 from apps.appointment.queries.business import now
 from apps.appointment.queries.reads import BUSY, MOVABLE
-from apps.appointment.schemas import (
+from apps.appointment.schemas.reactions import (
     CustomerEventIn,
     MemberEventIn,
     MergedIn,

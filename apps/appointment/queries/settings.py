@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.appointment.models import Settings
-from apps.appointment.schemas import NoIn, SettingsOut
+from apps.appointment.schemas.fields import NoIn
+from apps.appointment.schemas.settings import SettingsOut
 from base.business import zone_name
 
 from .access import VIEW_OWN

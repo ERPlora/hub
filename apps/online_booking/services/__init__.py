@@ -26,7 +26,7 @@ from live.outbox import record_event
 from apps.appointment.models import Appointment
 from apps.appointment.queries.booking import bookable_members
 from apps.appointment.queries.business import now
-from apps.appointment.schemas import AppointmentCreateIn, CancelIn as AppointmentCancelIn, SettingsIn as RulesIn
+from apps.appointment.schemas import booking as diary_booking, changes as diary_changes, settings as diary_settings
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries.reads import business_country
@@ -329,7 +329,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
         record_event(ctx, SETTINGS_UPDATED, {})
     if rules:
         # The diary's own operation, with the caller's right to change its settings: all or nothing.
-        get("appointment.settings.update")(ctx, RulesIn(**rules))
+        get("appointment.settings.update")(ctx, diary_settings.SettingsIn(**rules))
     return settings_out(ctx, settings)
 
 
@@ -407,7 +407,7 @@ def _book(
     create = get("appointment.appointment.create")
     refusals: list[Conflict] = []
     for person in [member] if member else bookable_members(services):
-        booking = AppointmentCreateIn.model_validate(
+        booking = diary_booking.AppointmentCreateIn.model_validate(
             {
                 "customer_id": str(card.id),
                 "services": [{"service_id": str(service.id)} for service in services],
@@ -531,7 +531,7 @@ def public_cancel(ctx: OperationContext, data: PublicCancelIn) -> dict:
     cancel = get("appointment.appointment.cancel")
     cancel(
         delegated(ctx),
-        AppointmentCancelIn(
+        diary_changes.CancelIn(
             id=appointment.id,
             on_behalf_of_customer=True,
             customer_id=appointment.customer_id,

@@ -9,33 +9,27 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.appointment import queries, services
-from apps.appointment.schemas import (
-    AppointmentCreateIn,
-    AppointmentListIn,
+from apps.appointment.schemas.agenda import AppointmentListIn, LanesIn
+from apps.appointment.schemas.appointments import (
     AppointmentRefIn,
-    BlockedTimeCreateIn,
-    BlockedTimeListIn,
-    BlockedTimeRefIn,
-    BulkCreateIn,
-    BulkDeleteIn,
-    CancelIn,
-    CheckIn,
     CountForServiceIn,
     ForCustomerIn,
     HistoryIn,
-    LanesIn,
-    MaterializeIn,
     NoticesIn,
+)
+from apps.appointment.schemas.availability import CheckIn, SlotsIn
+from apps.appointment.schemas.blocked_times import BlockedTimeCreateIn, BlockedTimeListIn, BlockedTimeRefIn
+from apps.appointment.schemas.booking import AppointmentCreateIn, BulkCreateIn
+from apps.appointment.schemas.changes import BulkDeleteIn, CancelIn, RescheduleIn, UpdateIn
+from apps.appointment.schemas.series import (
+    MaterializeIn,
     RecurringCreateIn,
     RecurringGetIn,
     RecurringListIn,
     RecurringRefIn,
     RecurringUpdateIn,
-    RescheduleIn,
-    SettingsIn,
-    SlotsIn,
-    UpdateIn,
 )
+from apps.appointment.schemas.settings import SettingsIn
 
 router = Router(tags=["appointment"])
 
