@@ -19,15 +19,17 @@ from live.operations import AI, operation
 
 from base import people as people_rules
 from base.apps_on import active_apps
-from base.approvals import approvable
+from base.approvals import approvable_permissions
 from base.models import HubUser, Membership
 from base.models.roles import BusinessRole
-from base.permissions import RoleHeld, VIEW_HOME, grantable, permissions_of_business_role, permissions_of_role, role_held
-from base.roles import APPROVAL, basic_state, effective, to_review
+from base.permissions import (
+    RoleHeld, VIEW_HOME, grantable, permissions_of_business_role, permissions_of_role, role_held, states_of_business_role,
+)
+from base.roles import APPROVAL, basic_state, to_review
 from base.schemas.roles import RoleDetailOut, RoleIn, RoleListIn, RoleListOut
 from base.sensitive import DATA_PERMISSIONS
 
-from .people import is_a_person, people_of
+from .people import people_of
 
 BUSINESS = _("The business")
 SENSITIVE_DATA = _("Sensitive data")
@@ -95,26 +97,24 @@ def role_detail(ctx: OperationContext, data: RoleIn) -> dict:
         on = configs_on(ctx.scope)
         members = members_by_role(ctx.scope)
         if basic is not None:
-            return {**_basic_out(basic, members), "apps": _panels(on, _states_of_basic(basic.value, on))}
+            return {**_basic_out(basic, members), "apps": _panels(on, states_of(RoleHeld(basic.value, None), on))}
         role = business_role(data.role)
-        return {**_own_out(role, members, on), "apps": _panels(on, _states_of_own(role, on))}
+        return {**_own_out(role, members, on), "apps": _panels(on, states_of(RoleHeld(role.origin, role), on))}
 
 
-def _states_of_basic(role: str, on: list[LiveAppConfig]) -> dict[str, str]:
-    """What a basic role does today with each permission of the apps ``on``."""
-    given, approved = permissions_of_role(role), approvable_permissions(on)
-    return {permission: basic_state(permission, given, approved) for config in on for permission in config.permissions}
-
-
-def _states_of_own(role: BusinessRole, on: list[LiveAppConfig]) -> dict[str, str]:
-    """What a role of the business does today with each permission of the apps ``on`` it may hold."""
-    given = permissions_of_role(role.origin)
-    return effective(role.states, grantable(on), given=given, approvable=approvable_permissions(on))
+def states_of(held: RoleHeld, configs: list[LiveAppConfig]) -> dict[str, str]:
+    """What the role that rules does today with each permission of ``configs``: a basic one, with all they declare; one of
+    the business, with those it may hold."""
+    approved = approvable_permissions(configs)
+    if held.own is not None:
+        return states_of_business_role(held.own, configs, approved)
+    given = permissions_of_role(held.invitation)
+    return {permission: basic_state(permission, given, approved) for config in configs for permission in config.permissions}
 
 
 def signed_in_role_held(ctx: OperationContext) -> RoleHeld | None:
     """What who asks is in this business; ``None`` for nobody, the platform, an API key or somebody of another one."""
-    return role_held(ctx.actor, ctx.scope) if is_a_person(ctx.actor) else None
+    return role_held(ctx.actor, ctx.scope)
 
 
 def role_label(held: RoleHeld) -> str:
@@ -127,8 +127,7 @@ def role_label(held: RoleHeld) -> str:
 
 def approvable_of(ctx: OperationContext, held: RoleHeld) -> list[str]:
     """What who asks may do only if a manager approves it with their PIN, of the apps that are on."""
-    on = configs_on(ctx.scope)
-    states = _states_of_basic(held.invitation, on) if held.own is None else _states_of_own(held.own, on)
+    states = states_of(held, configs_on(ctx.scope))
     return sorted(permission for permission, state in states.items() if state == APPROVAL)
 
 
@@ -157,16 +156,6 @@ def configs_on(scope: Scope) -> list[LiveAppConfig]:
     """The apps that are on in ``scope`` and declare permissions, base among them."""
     active = active_apps(scope)
     return [config for config in all_live_app_configs() if config.permissions and config.label in active]
-
-
-def approvable_permissions(configs: Iterable[LiveAppConfig]) -> frozenset[str]:
-    """The permissions a manager's approval stands in for: those of the commands ``configs`` name approvable."""
-    return frozenset(
-        found[0].permission
-        for config in configs
-        for name in getattr(config, "approvals", {})
-        if (found := approvable(name)) is not None
-    )
 
 
 def members_by_role(scope: Scope) -> Counter[str]:

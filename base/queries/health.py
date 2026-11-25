@@ -25,5 +25,5 @@ def health_list(ctx: OperationContext, data: HealthListIn) -> dict:
     empty for everybody else, so the Home asks it for everybody."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        configs = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
+        configs = home.shown_modules.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"items": home_health.health_items(ctx, configs)}

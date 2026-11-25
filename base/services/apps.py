@@ -220,7 +220,7 @@ def _enable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) -> 
     others = app_switch.along(config.label, activation.states_of(ctx.scope), activation.module_graph(), on=True)
     shown = [*fields, *app_switch.card_datum(app_switch.said(config.label, others, on=True, language=ctx.language))]
     country = hub.country if hub else ""
-    if not home.mandatory_in(config, country):
+    if not home.mandatory_apps.mandatory_in(config, country):
         return shown
     reason = activation.mandatory_off(config, country)
     return [*shown, {"name": "mandatory", "label": str(ONCE_ON), "kind": "text", "value": reason}]
@@ -307,7 +307,7 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
         raise AppVetoed(vetoed[1], app=vetoed[0])
     if changes.get(app, current[app]).chosen and not (current[app].wanted and current[app].chosen):
         limit = queries.apps.app_limit(hub)
-        shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
+        shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
         if limit is not None and enabled >= limit:
             with translation.override(ctx.language):

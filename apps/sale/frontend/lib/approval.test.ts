@@ -2,10 +2,11 @@
 // action, the manager's door — directly for whoever holds the permission, through «An approval is needed» for anybody
 // else. Any other refusal, and a manager's door that is refused too, reach the screen untouched.
 import { ApiError } from '@erplora/ui/sdk';
+import { toastError, toastInfo } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { withApproval } from '../../../../base/frontend/lib/approval';
-import { throughManager } from './approval';
+import { mayBegin, throughManager } from './approval';
 
 vi.mock('../../../../base/frontend/lib/approval', () => ({ withApproval: vi.fn() }));
 // The approval itself (the dialog, the repeat with the pass) is base's: here a manager always approves.
@@ -47,5 +48,28 @@ describe('throughManager', () => {
     );
     expect(manager).not.toHaveBeenCalled();
     expect(withApproval).not.toHaveBeenCalled();
+  });
+});
+
+describe('mayBegin', () => {
+  const words = { no: 'Your role does not let you.', approval: 'A manager will have to approve it.' };
+
+  it('what the role does begins with nothing said', () => {
+    expect(mayBegin('allowed', words)).toBe(true);
+    expect(toastInfo).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('what a manager approves begins, saying so first', () => {
+    expect(mayBegin('approval', words)).toBe(true);
+    // At the top edge: the window that opens has its button at the bottom one.
+    expect(toastInfo).toHaveBeenCalledExactlyOnceWith('A manager will have to approve it.', { position: 'top' });
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('what the role says no to does not begin, and says why', () => {
+    expect(mayBegin('no', words)).toBe(false);
+    expect(toastError).toHaveBeenCalledExactlyOnceWith('Your role does not let you.');
+    expect(toastInfo).not.toHaveBeenCalled();
   });
 });

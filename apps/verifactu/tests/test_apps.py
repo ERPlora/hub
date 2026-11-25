@@ -271,8 +271,8 @@ def test_the_step_is_important_in_testing_and_its_text_never_says_it_stops_the_s
     (step,) = verifactu().setup
     key = f"verifactu.{step.key}"
     assert step.required is True
-    assert home.level_of(key, step.required, {"environment": "testing"}) == home.LEVEL_FUNCTIONAL
-    assert home.level_of(key, step.required, {"environment": "production"}) == home.LEVEL_LEGAL
+    assert home.setup_steps.level_of(key, step.required, {"environment": "testing"}) == home.setup_steps.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(key, step.required, {"environment": "production"}) == home.setup_steps.LEVEL_LEGAL
     for language, description in product(("en", "es"), DESCRIPTIONS):
         with translation.override(language):
             text = f"{step.title} {description}".lower()

@@ -23,18 +23,10 @@ from live.outbox import record_event
 
 from apps.attendance import events
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
-from apps.attendance.queries import (
-    RECORD_NOT_FOUND,
-    TERMINATED_REASON_SOURCE,
-    business_date,
-    is_stale,
-    load_record,
-    review_hours,
-    saved_settings,
-    settings_values,
-    user_name,
-)
+from apps.attendance.queries.corrections import TERMINATED_REASON_SOURCE
+from apps.attendance.queries.days import RECORD_NOT_FOUND, is_stale, load_record
 from apps.attendance.queries.people import MEMBER_NOT_FOUND, clocked
+from apps.attendance.queries.reads import business_date, review_hours, saved_settings, settings_values, user_name
 from apps.attendance.schemas import (
     BOTH_COORDINATES,
     BreakIn,

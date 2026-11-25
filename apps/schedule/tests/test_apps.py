@@ -224,7 +224,7 @@ def test_the_homes_step_is_confirm_your_opening_hours_done_once_the_week_is_conf
         False,
     )
     assert "hours_confirmed" in registry[step.operation].output.model_fields
-    assert home.level_of(f"schedule.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"schedule.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_says_what_it_asks_in_the_language_of_whoever_reads_it():
