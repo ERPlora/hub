@@ -470,10 +470,6 @@
       {
         "name": "_customer_load",
         "complexity": 17
-      },
-      {
-        "name": "_inventory_product_load",
-        "complexity": 39
       }
     ]
   },
