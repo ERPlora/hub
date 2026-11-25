@@ -1082,13 +1082,13 @@ confirmation card is shown.
 | The name of an open order, as Sales names it: what the assistant's card reads (BASE-F97) | view (and view sales, in Sales) | F19 | no | `customer.order.get` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:62db8e789d82 -->
+<!-- from WORKBOOK.md sha256:0f4967e2b658 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
-| Adds a card | manage | F01, F18, F25, F26 | `customer.customer.create` |
-| Changes the card (only what is sent) and its custom fields | manage | F04 | `customer.customer.update` |
-| Creates up to 50 cards from a CSV, row by row | manage | F08 | `customer.customer.import` |
+| Adds a card | manage | F01, F11, F18, F25, F26 | `customer.customer.create` |
+| Changes the card (only what is sent) and its custom fields | manage | F04, F11 | `customer.customer.update` |
+| Creates up to 50 cards from a CSV, row by row | manage | F08, F11 | `customer.customer.import` |
 | Replaces a card's groups | manage | F06 | `customer.customer.set_groups` |
 | Replaces a card's tags | manage | F06 | `customer.customer.set_tags` |
 | Deletes a card (keeps its data) | delete | F07 | `customer.customer.delete` |

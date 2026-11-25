@@ -259,7 +259,7 @@ def test_at_most_three_apps_not_on_are_named_the_best_first(make_user):
     context = owner_of_a(make_user, "es")
     said = "crea una reserva, una cita, una tarea y una factura"
     called = {"reservation", "online_booking", "appointment", "task", "invoice"}  # the apps it says by their names
-    shown = {config.label for config in home.shown_modules()}
+    shown = {config.label for config in home.shown_modules.shown_modules()}
     every = assistant.tools.catalog(context, active_labels={*shown, "base"})
     ranked = assistant.relevance.relevant(every, [said], "es")
     best = list(dict.fromkeys(op.app_label for op in ranked if op.app_label in called))

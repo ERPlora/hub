@@ -2461,7 +2461,7 @@ If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
 
 ### BASE-F127 Make a role of your own from another
-<!-- from WORKBOOK.md sha256:37c95552ec56 -->
+<!-- from WORKBOOK.md sha256:2f11a6c0c5cd -->
 Status: partial — it is made by asking the assistant or through the Hub's API; its screen is missing
 Actor: owner, administrator
 Screen: Assistant
@@ -2477,13 +2477,14 @@ In: the role it comes from, the name (up to 80 letters) and, if wanted, the desc
 Out: the business's own role. Event `base.role.created`. It never leaves the business: erplora.com does not know it.
 If it fails: without a name, "Give the role a name."; with the name of another role of your own, capitals aside, "There
 is already a role with that name. Choose another."; a role that is not there, "This role does not exist in this
-business.". Nobody gives what they do not have: if the role it comes from allows something whoever makes it may not do,
-"A role may not allow more than you may do yourself." and it is not made. The assistant does not offer it to who does
+business.". Nobody gives what they do not have: if the role it comes from allows something whoever makes it may not do, or
+leaves "With approval" something their own role says "No" to, "A role may not allow more than you may do yourself." and
+it is not made. The assistant does not offer it to who does
 not manage roles, and the API answers 403.
 Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
-<!-- from WORKBOOK.md sha256:b3009bb37d77 -->
+<!-- from WORKBOOK.md sha256:ef43ab553ddc -->
 Status: partial — it is adjusted by asking the assistant or through the Hub's API; its screen is missing
 Actor: owner, administrator
 Screen: Assistant
@@ -2500,7 +2501,8 @@ Steps:
 In: the role and what changes: the name, the description or the state of each permission.
 Out: the role changed. Event `base.role.updated`.
 If it fails: a basic role is not changed: "This is one of erplora.com's roles. Duplicate it and change the copy.".
-Nobody gives what they do not have: "A role may not allow more than you may do yourself."; and owning the business is
+Nobody gives what they do not have, nor "With approval" what their own role refuses them: "A role may not allow more
+than you may do yourself."; and owning the business is
 given to nobody: "That is only the owner's of the business: no role gives it.". A permission that is not of an app that
 is on, "That permission is not of any app that is on in this business."; "With approval" for something a manager cannot
 approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it.
@@ -2523,7 +2525,7 @@ deleting it.". A basic role is not deleted: "This is one of erplora.com's roles.
 Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
 
 ### BASE-F130 Give a person a role of your own
-<!-- from WORKBOOK.md sha256:f852186014a5 -->
+<!-- from WORKBOOK.md sha256:16b78f396cff -->
 Status: partial — it is given by asking the assistant or through the Hub's API; its place in the person's page is missing
 Actor: owner, administrator
 Screen: Assistant
@@ -2543,8 +2545,9 @@ invitation.
 If it fails: nobody gives the owner another role, "The owner is always the owner: nobody gives them another role.";
 nobody changes their own, "Nobody changes their own role: ask somebody above you."; nor the one of somebody who is not
 below them by their invitation, "You may only give a role to people below you in the business.". Nobody gives a role that
-allows more than they may do themselves, the one of the invitation when returning a person to it and what an app that is
-off would give included: "A role may not allow more than you may do yourself.". Another basic role, "That role is given
+allows more than they may do themselves, the one of the invitation when returning a person to it, what an app that is
+off would give and, "With approval", what their own role refuses them included: "A role may not allow more than you may
+do yourself.". Another basic role, "That role is given
 on erplora.com. Here you give one of the business's own."; a role that is not there, "This role does not exist in this
 business."; a person who is not of the business, "That person is not in this business.". If somebody deletes the role at
 the same time, it is either deleted or given, never both: one hears "This role does not exist in this business." or "2
@@ -2570,7 +2573,7 @@ the last it knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
-<!-- from WORKBOOK.md sha256:05dd4133812d -->
+<!-- from WORKBOOK.md sha256:f5aca9f7e571 -->
 Status: done
 Actor: employee, manager
 Screen: An approval is needed
@@ -2586,6 +2589,11 @@ Steps:
      shows at once). The manager taps theirs and types their PIN on the pad, whole in view without scrolling, the 0
      and "Erase" too ("Another person" goes back to the faces), or swipes their badge at any moment.
   4. The action is done once and "Approved by {name}" shows. The session of whoever asked is not closed.
+  5. Whoever has one of your own roles (BASE-F130) is asked as that role says of that action: "Allowed", they do it
+     without a question; "With approval", the question shows; "No", there is no question: it is refused and no PIN lets
+     it through, nor an approval they had already been given. If the role changes, it counts from the next action on,
+     without closing the session (BASE-F13). An app turned on after the role was saved asks as the basic role it came
+     from; a permission an app added later is "No" until it is reviewed (BASE-F131). The owner is never asked.
   From the assistant too: the "yes" of its card opens the same dialog, with the figures of what it was asked.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
@@ -2597,11 +2605,12 @@ voucher sessions it gives back) goes with the approval, as when the manager does
 is only looked up, nor the next action. Whoever is not of the business gets the refusal of always, without the
 approval's question.
 If it fails: the dialog stays open with "Those details do not approve this. Check the name and the PIN, and try
-again.", "That person cannot approve this: ask somebody who may do it themselves.", "This no longer needs an
-approval: do it again.", "This is not approved with a PIN.", the wait after too many attempts or "Could not send
-the approval. Check the connection and try again.". With nobody with a PIN who may: "Nobody here can approve this
+again.", "That person cannot approve this: ask somebody who may do it themselves." (nor whoever does it "With
+approval"), "This no longer needs an approval: do it again.", "This is not approved with a PIN." (also if meanwhile the
+role of whoever asks became "No"), the wait after too many attempts or "Could not send the approval. Check the
+connection and try again.". With nobody with a PIN who may: "Nobody here can approve this
 with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the app back its refusal.
-Involved: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
+Involved: BASE-F85, BASE-F55, BASE-F56, BASE-F100, BASE-F128, BASE-F130, SALE-F30, SALE-F31
 
 ### BASE-F85 Look up who approved what
 <!-- from WORKBOOK.md sha256:a356799e6ecb -->
@@ -3073,7 +3082,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-<!-- from WORKBOOK.md sha256:9e8f8f1f0472 -->
+<!-- from WORKBOOK.md sha256:10089937bc9a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3081,7 +3090,8 @@ Steps:
   1. The assistant works with the session of whoever is in front of it: it sees and does what that person would see
      and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
      permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
-     its button on the screen is. The assistant knows the role it talks to (owner, administrator, manager or
+     its button on the screen is, unless the person's role of your own says "No" to it (BASE-F84): that one is neither
+     offered nor found, and no PIN lets it through. The assistant knows the role it talks to (owner, administrator, manager or
      employee, said in the language of the conversation, or the role of your own the person was given, by its name,
      BASE-F130) and that its tools are that role's: asked for something none
      of them does, it neither looks for another way nor tells the state of something else, but says in one sentence
@@ -3938,21 +3948,25 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:666f8cd95550 -->
-Status: partial — it is changed and read through the API and with the assistant, and the business already lets support
-in or refuses it as it says; its card in Settings › General is still missing, and so is erplora.com giving the support
-staff their code to come in
+<!-- from WORKBOOK.md sha256:a939d641b5a9 -->
+Status: partial — it is changed and read in Settings › General, through the API and with the assistant, and the
+business already lets support in or refuses it as it says; erplora.com giving the support staff their code to come in
+is still missing
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
 Steps:
   1. When the business wants ERPlora's support staff to come in and help set it up (loading the products, adjusting
-     its apps), the owner or an administrator turns support access on. It comes off. Today it is turned on and off
-     through the API or by asking the assistant, which confirms it before changing it (BASE-F97).
-  2. The change is saved at once, with who made it and when. It does not expire: it stays on until someone of the
-     business turns it off, because getting started can take several days.
-  3. Anyone of the business can read whether it is on, who changed it last and when, whether they may change it
-     themselves and the last 10 entries of support (who and when), the most recent first. While nobody of support has
-     come in, the list is empty.
+     its apps), the owner or an administrator turns on "Let ERPlora support in" in the "Support access" card, the last
+     one of Settings › General. It comes off. It is also turned on and off through the API or by asking the
+     assistant, which confirms it before changing it (BASE-F97).
+  2. The change is saved at once, with who made it and when, and a notice confirms it: "Support access is on: ERPlora
+     support can come in." or "Support access is off: ERPlora support can no longer come in.". It does not expire: it
+     stays on until someone of the business turns it off, because getting started can take several days.
+  3. Anyone of the business sees in the card whether it is on, who changed it last and when ("Last changed by Ana,
+     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when), the
+     most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
+     support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
+     business can change it.".
   4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
      and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
      resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
@@ -3969,6 +3983,8 @@ In: on or off; the support account erplora.com vouches for.
 Out: the business's setting, with who changed it and when. Event `base.support_access.changed`. Each entry of
 support, with who and when. Event `base.support_access.entered`.
 If it fails: whoever does not run the business has the change refused (403 `permission_denied`) and the setting stays
-as it was; reading it, they see they cannot change it. With the access off, support opens no session and leaves no
-entry (the page of step 5).
+as it was; reading it, they see they cannot change it. If the change cannot be saved, "Could not save the change."
+shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
+support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step
+5).
 Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100

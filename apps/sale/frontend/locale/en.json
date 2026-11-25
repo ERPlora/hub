@@ -515,6 +515,8 @@
     },
     "void": {
       "title": "Void sale {number}",
+      "notAllowed": "Your role does not let you void a sale. Ask a manager to do it.",
+      "withApproval": "A manager will have to approve this void.",
       "explain": "The sale stays on record as voided; cash and stock are reversed once. A reason is required.",
       "reason": "Reason (required)",
       "reasonRequired": "A reason is required to void a sale",
@@ -525,6 +527,8 @@
     },
     "refund": {
       "title": "Refund sale {number}",
+      "notAllowed": "Your role does not let you refund a sale. Ask a manager to do it.",
+      "withApproval": "A manager will have to approve this refund.",
       "loading": "Loading what can be refunded…",
       "loadError": "The sale could not be loaded, so there is nothing to refund yet. Try again.",
       "nothing": "There is nothing left to refund on this sale.",

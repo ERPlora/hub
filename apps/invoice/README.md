@@ -17,15 +17,15 @@ Sirve igual al restaurante y a la peluquería.
 - **Emitir al cobrar** (F01, F02, F06): Ventas pide el tique o la factura completa dentro del mismo cobro; si no
   se puede (sin emisor, sin permiso, importes que no cuadran), cobra igual y el documento queda «pendiente», con
   reintentos del hub y «Emitir ahora». Una factura por venta, nunca dos números.
-- **Emitir a mano y sustituir** (F03, F05): la factura manual con el impuesto del territorio fiscal del negocio
-  (IVA, IGIC o IPSI) y la F3 que sustituye a un tique desde su ficha.
+- **Emitir a mano y sustituir** (F03, F05): la factura manual con su fecha (hoy o un día anterior), su vencimiento
+  opcional y el impuesto del territorio fiscal del negocio (IVA, IGIC o IPSI), y la F3 que sustituye a un tique desde su ficha.
 - **Rectificar** (F07–F10): la rectificativa de una anulación (R5 del tique entero), de una devolución entera o
   por diferencias de una parcial (una línea por clave fiscal), y la rectificación a mano (R1–R4) desde la ventana
   o el asistente, con vista previa y confirmación.
 - **Numerar** (F11–F15): series por código y año (`TICKET`, `FACT`, `RECT`) que nacen solas, con prefijo, formato
   y siguiente número que se bloquean con el primer documento; numeración con `UPDATE … RETURNING` en la misma
   transacción, sin huecos, y el paso «Tu numeración de facturas» del Inicio.
-- **Consultar, imprimir y cobrar** (F16–F20): lista paginada viva con búsqueda y filtros, ficha con el
+- **Consultar, imprimir y cobrar** (F16–F20): lista paginada viva con búsqueda y filtros (también las vencidas), ficha con el
   «Justificante VeriFactu», A4 por la impresora del sistema o el diálogo del navegador (nunca sin su QR), «Marcar
   pagada» y la factura vigente de una venta para otras apps.
 - **El emisor** (F21): la identidad fiscal del negocio, obligatoria para emitir; el paso «Los datos de tu negocio»
@@ -50,7 +50,7 @@ Sirve igual al restaurante y a la peluquería.
 | Inicio | los pasos «Los datos de tu negocio» (`invoice.issuer.get`, `required=True`) y «Tu numeración de facturas» (`invoice.numbering.status`, recomendado) |
 | Operaciones | 19 consultas (`queries/`) y 14 acciones (`services/`), todas con `ai=`; 26 con ruta en `/api/invoice/…` (`invoice.issuer.sync` y las cuatro del hub de plataforma no tienen ruta: solo el sistema; las dos de la página pública del tique, `invoice.public.ticket` e `invoice.public.substitute`, tampoco: se llaman por la puerta pública de `base`, sin sesión) |
 | Eventos | 6, `invoice.invoice.{issued,rectified,paid}`, `invoice.series.{created,updated}` e `invoice.issuer.updated` (`events.py`); reacciona a `sale.sale.completed`, `sale.sale.refunded` y `sale.sale.voided` |
-| Migraciones | `0001_initial` … `0006_customer_id_type_choices` |
+| Migraciones | `0001_initial` … `0008_due_date` |
 | Admin | Django admin en `hubs.erplora.com`: series y emisor editables; facturas y líneas en solo lectura, sin alta ni borrado (solo las notas) |
 
 Las decisiones de diseño (el número se gasta al cobrar, el libro de números es la propia factura, la factura de
@@ -79,6 +79,6 @@ CI=1 pnpm e2e tests/e2e/invoice-sale.spec.ts tests/e2e/invoice-manual.spec.ts te
 - **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora;
   choca con «Dos identidades» de PLAN-SAAS (los datos fiscales del negocio viven en el Hub): contradicción señalada,
   sin elegir.
-- Lo que no hace a propósito (enviar a la AEAT, cobrar, presupuestos, vencimientos, el libro registro para la
+- Lo que no hace a propósito (enviar a la AEAT, cobrar, presupuestos, recordatorios de impago, el libro registro para la
   gestoría…): «Lo que NO hace, a propósito» del WORKBOOK.
 - Los iconos y las piezas compartidas de [`UI-REQUESTS.md`](UI-REQUESTS.md).

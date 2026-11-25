@@ -9,10 +9,12 @@
 // Taxes publishes it (`tax.settings.get`, followed live): IGIC in the Canary Islands, IPSI in Ceuta and
 // Melilla, VAT elsewhere; it starts at the territory's general rate (`invoice.invoice.line_defaults`, live);
 // without a rule of its own tax, the person types it.
+import { DateField } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, POLISH } from '../__tests__/mount-invoice';
@@ -338,6 +340,97 @@ describe('InvoiceCreateModal', () => {
     const s = await setup('es');
     expect(s.inDoc('invoice-create')?.getAttribute('aria-label')).toBe('Nueva factura manual');
     expect(s.submit().textContent?.trim()).toBe('Emitir factura');
+  });
+});
+
+describe('InvoiceCreateModal: the day it is dated and the day it falls due', () => {
+  // 23:30 of the 24th in the Canary Islands, 00:30 of the 25th in Madrid.
+  beforeEach(() => vi.useFakeTimers({ now: new Date('2026-11-24T23:30:00Z'), toFake: ['Date'] }));
+  afterEach(() => vi.useRealTimers());
+
+  type Field = HTMLElement & { label?: string; errorText?: string };
+  async function dates(company: Partial<Business> = { timezone: 'Atlantic/Canary' }, locale: 'en' | 'es' = 'en') {
+    const s = await setup(locale, company);
+    await s.choose('TICKET', 'F2');
+    await s.line('Course', '10');
+    const issued = () => s.inDoc('invoice-create-issue-date') as Field;
+    const due = () => s.inDoc('invoice-create-due-date') as Field;
+    /** What the window sends of the two dates. */
+    async function sent() {
+      s.answer(201, CREATED);
+      await click(s.submit());
+      const { issue_date, due_date } = s.sent().at(-1)?.body as { issue_date?: string; due_date?: string };
+      return { issue_date, due_date };
+    }
+    return { ...s, issued, due, sent };
+  }
+
+  it('is dated today on the business’s clock and has no due date, and the server is told neither', async () => {
+    const s = await dates();
+    expect([s.issued().label, picked(s.issued()), s.due().label, picked(s.due())]).toEqual(['Date', '2026-11-24', 'Due date', '']);
+    expect(await s.sent()).toEqual({ issue_date: undefined, due_date: undefined });
+    expect(picked((await dates({ timezone: 'Europe/Madrid' })).issued())).toBe('2026-11-25');
+  });
+
+  it('sends the day and the due date chosen', async () => {
+    const s = await dates();
+    await pick(s.issued(), '2026-11-23');
+    await pick(s.due(), '2026-12-23');
+    expect(await s.sent()).toEqual({ issue_date: '2026-11-23', due_date: '2026-12-23' });
+  });
+
+  it('today chosen again, or a due date cleared, is as if nobody had', async () => {
+    const s = await dates();
+    await pick(s.issued(), '2026-11-23');
+    await pick(s.issued(), '2026-11-24');
+    await pick(s.due(), '2026-12-23');
+    await pick(s.due(), '');
+    expect(await s.sent()).toEqual({ issue_date: undefined, due_date: undefined });
+  });
+
+  it('offers no day after today, nor a due date before the day it is dated', async () => {
+    const s = await dates();
+    const limits = () => s.wrapper.findAllComponents(DateField).map((field) => [field.props('min'), field.props('max'), field.props('required')]);
+    expect(limits()).toEqual([
+      [undefined, '2026-11-24', true],
+      ['2026-11-24', undefined, false],
+    ]);
+    await pick(s.issued(), '2026-11-20');
+    expect(limits()[1][0]).toBe('2026-11-20');
+  });
+
+  it('a refusal of a date goes under it, and goes away when another is chosen', async () => {
+    const s = await dates();
+    const fields = { issue_date: 'Before the last invoice.', due_date: 'Before its date.' };
+    s.answer(409, { error: { code: 'invoice.issue_date_before_last', message: 'Before the last invoice.', fields } });
+    await click(s.submit());
+    expect([s.issued().errorText, s.due().errorText]).toEqual(['Before the last invoice.', 'Before its date.']);
+    await pick(s.issued(), '2026-11-24');
+    expect([s.issued().errorText || null, s.due().errorText]).toEqual([null, 'Before its date.']);
+  });
+
+  it('opened again, starts on today and without a due date', async () => {
+    const s = await dates();
+    await pick(s.issued(), '2026-11-20');
+    await pick(s.due(), '2026-12-20');
+    await s.wrapper.setProps({ open: false });
+    vi.setSystemTime(new Date('2026-11-26T10:00:00Z'));
+    await s.wrapper.setProps({ open: true });
+    expect([picked(s.issued()), picked(s.due())]).toEqual(['2026-11-26', '']);
+  });
+
+  it('Android Back asks once a date is chosen, and no more once it is as it was', async () => {
+    const s = await dates();
+    await s.line('', '', '1', '');
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    const overlay = () => s.inDoc('invoice-create');
+    await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.issued(), '2026-11-23'), restore: () => pick(s.issued(), '2026-11-24') });
+    await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.due(), '2026-12-23'), restore: () => pick(s.due(), '') });
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await dates({}, 'es');
+    expect([s.issued().label, s.due().label]).toEqual(['Fecha', 'Vencimiento']);
   });
 });
 

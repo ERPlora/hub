@@ -1,20 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, subId } from '../__tests__/mount-base';
+import { openSettingsCard, posted, switchOf } from '../__tests__/settings-card';
 import ApiDocsCard from './ApiDocsCard.vue';
 
-async function open(options: Parameters<typeof mountBase>[1] = {}) {
-  const m = await mountBase(ApiDocsCard, { path: '/settings', routes: ['/settings', '/api-docs'], ...options });
-  const call = await m.live();
-  return { ...m, call };
-}
-
-const toggle = (m: { wrapper: { get: (s: string) => { element: Element } } }) =>
-  m.wrapper.get('[data-testid="api-docs-toggle"]').element as HTMLElement & { checked: boolean; disabled: boolean };
-
-function posted(m: { net: { api: { url: string; init: RequestInit }[] } }) {
-  return m.net.api.map((call) => [new URL(call.url, 'http://a.localhost').pathname, JSON.parse(String(call.init.body))]);
-}
+const open = (options: Parameters<typeof openSettingsCard>[1] = {}) =>
+  openSettingsCard(ApiDocsCard, { routes: ['/settings', '/api-docs'], ...options });
+const toggle = (m: Parameters<typeof switchOf>[0]) => switchOf(m, 'api-docs-toggle');
 
 afterEach(() => {
   document.body.innerHTML = '';

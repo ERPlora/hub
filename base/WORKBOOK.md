@@ -2360,8 +2360,9 @@ Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la des
 Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
 Si falla: sin nombre, «Ponle nombre al rol.»; con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
 con ese nombre. Elige otro.»; un rol que no está, «Este rol no existe en este negocio.». Nadie da lo que no tiene: si
-el rol del que parte permite algo que quien lo crea no puede hacer, «Un rol no puede permitir más de lo que puedes
-hacer tú.» y no se crea. A quien no gestiona roles el asistente no se lo ofrece, y la API contesta 403.
+el rol del que parte permite algo que quien lo crea no puede hacer, o deja «Con aprobación» algo a lo que su propio rol
+le dice «No», «Un rol no puede permitir más de lo que puedes hacer tú.» y no se crea. A quien no gestiona roles el
+asistente no se lo ofrece, y la API contesta 403.
 Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Ajustar lo que permite un rol propio
@@ -2381,10 +2382,11 @@ Pasos:
 Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
 Sale: el rol cambiado. Evento `base.role.updated`.
 Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
-tiene: «Un rol no puede permitir más de lo que puedes hacer tú.»; y ser el propietario no se da a nadie: «Eso es solo
-del propietario del negocio: ningún rol lo da.». Un permiso que no es de una app encendida, «Ese permiso no es de
-ninguna app encendida de este negocio.»; «Con aprobación» en algo que un responsable no puede aprobar con su PIN, «Eso
-no se puede aprobar con un PIN: elige permitido o no.». El nombre, como al crearlo.
+tiene, tampoco «Con aprobación» lo que su propio rol le niega: «Un rol no puede permitir más de lo que puedes hacer
+tú.»; y ser el propietario no se da a nadie: «Eso es solo del propietario del negocio: ningún rol lo da.». Un permiso que
+no es de una app encendida, «Ese permiso no es de ninguna app encendida de este negocio.»; «Con aprobación» en algo que
+un responsable no puede aprobar con su PIN, «Eso no se puede aprobar con un PIN: elige permitido o no.». El nombre, como
+al crearlo.
 Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Borrar un rol propio
@@ -2420,11 +2422,12 @@ Sale: la persona con ese rol. Evento `base.role.assigned`. erplora.com no lo sab
 Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; nadie
 se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está por
 debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
-permite más de lo que puede hacer él, tampoco el de la invitación al devolverla ni lo que daría una app apagada: «Un rol
-no puede permitir más de lo que puedes hacer tú.». Otro rol básico, «Ese rol se da en erplora.com. Aquí se da uno propio
-del negocio.»; un rol que no está, «Este rol no existe en este negocio.»; una persona que no es del negocio, «Esa
-persona no está en este negocio.». Si alguien borra el rol a la vez, o se borra o se da, nunca las dos cosas: se oye el
-«Este rol no existe en este negocio.» o el «2 personas tienen este rol. Dales otro antes de borrarlo.».
+permite más de lo que puede hacer él, tampoco el de la invitación al devolverla, ni lo que daría una app apagada, ni
+«Con aprobación» lo que su propio rol le niega: «Un rol no puede permitir más de lo que puedes hacer tú.». Otro rol
+básico, «Ese rol se da en erplora.com. Aquí se da uno propio del negocio.»; un rol que no está, «Este rol no existe en
+este negocio.»; una persona que no es del negocio, «Esa persona no está en este negocio.». Si alguien borra el rol a la
+vez, o se borra o se da, nunca las dos cosas: se oye el «Este rol no existe en este negocio.» o el «2 personas tienen
+este rol. Dales otro antes de borrarlo.».
 Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
 
 ### BASE-F131 Ver en la campana los roles por revisar
@@ -2460,6 +2463,12 @@ Pasos:
      sale ya). El responsable toca la suya y teclea su PIN en el teclado, entero a la vista sin desplazar, también el
      0 y «Borrar» («Otra persona» vuelve a las caras), o pasa su placa en cualquier momento.
   4. La acción se hace una vez y sale «Aprobado por {name}». La sesión de quien lo pidió no se cierra.
+  5. A quien tiene un rol propio (BASE-F130) se le pregunta según lo que ese rol dice de esa acción: «Permitido», la
+     hace sin preguntar; «Con aprobación», sale la pregunta; «No», no hay pregunta: se rechaza y ningún PIN la deja
+     pasar, tampoco una aprobación que ya le hubieran dado. Si el rol cambia, vale desde la acción siguiente, sin cerrar
+     la sesión (BASE-F13). Una app que se encendió después de guardar el rol pregunta como el rol básico del que salió;
+     un permiso que una app añadió después está en «No» hasta que se revisa (BASE-F131). Al propietario no se le pregunta
+     nunca.
   También desde el asistente: el «sí» de su tarjeta abre el mismo diálogo, con las cifras de lo que se le pidió.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
@@ -2470,11 +2479,12 @@ aprobada hace por el camino en otras apps (la factura rectificativa de una anula
 devuelve) va con la aprobación, como cuando lo hace el propio responsable; nada más: ni lo que solo se consulta ni la
 acción siguiente. Quien no es del negocio recibe el rechazo de siempre, sin la pregunta de la aprobación.
 Si falla: el diálogo se queda abierto con «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a
-intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.», «Esto ya no necesita
-aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.», la espera tras demasiados intentos o «No se pudo
-enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede
-aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
-Implicados: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
+intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.» (tampoco quien lo hace «Con
+aprobación»), «Esto ya no necesita aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.» (también si
+mientras tanto el rol de quien lo pide pasó a «No»), la espera tras demasiados intentos o «No se pudo enviar la
+aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede aprobarlo con
+un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
+Implicados: BASE-F85, BASE-F55, BASE-F56, BASE-F100, BASE-F128, BASE-F130, SALE-F30, SALE-F31
 
 ### BASE-F85 Consultar quién aprobó qué
 Estado: hecho
@@ -2945,12 +2955,13 @@ Pasos:
   1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con sus
      botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
      al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
-     pantalla. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado, dicho en el
-     idioma de la conversación, o el propio que el negocio le dio, por su nombre, BASE-F130) y que sus herramientas son
-     las de ese rol: si le piden algo que ninguna hace, no busca
-     otro camino ni cuenta el estado de otra cosa, sino que dice en una frase que no lo tiene disponible aquí, porque
-     su rol no puede o porque esa app no está encendida, y quién puede (al empleado, un encargado o el propietario; al
-     encargado, el propietario o un administrador) o en qué pantalla se hace.
+     pantalla, salvo que el rol propio de la persona le diga «No» (BASE-F84): esa no se le ofrece ni se le encuentra, y
+     ningún PIN la deja pasar. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado,
+     dicho en el idioma de la conversación, o el propio que el negocio le dio, por su nombre, BASE-F130) y que sus
+     herramientas son las de ese rol: si le piden algo que ninguna hace, no busca otro camino ni cuenta el estado de otra
+     cosa, sino que dice en una frase que no lo tiene disponible aquí, porque su rol no puede o porque esa app no está
+     encendida, y quién puede (al empleado, un encargado o el propietario; al encargado, el propietario o un
+     administrador) o en qué pantalla se hace.
   2. Esa acción sale con su tarjeta, como cualquier otra, y el asistente avisa antes de que la tarjeta pedirá la
      aprobación de un responsable. Al pulsar «Ejecutar» se abre «Hace falta una aprobación», la misma de la pantalla:
      un responsable toca su cara y teclea su PIN, o pasa su placa, y la acción se hace una vez, con quien la pidió
@@ -3774,20 +3785,24 @@ dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
-Estado: parcial — se cambia y se consulta por la API y con el asistente, y el negocio ya deja entrar o rechaza a
-soporte según esté; falta su tarjeta en Ajustes › General y que erplora.com dé al personal de soporte su código para
-entrar
+Estado: parcial — se cambia y se consulta en Ajustes › General, por la API y con el asistente, y el negocio ya deja
+entrar o rechaza a soporte según esté; falta que erplora.com dé al personal de soporte su código para entrar
 Actor: propietario, administrador, personal de soporte de ERPlora
 Pantalla: Ajustes · General, la página «Este negocio no deja entrar a soporte»
 Pasos:
   1. Cuando el negocio quiere que el personal de soporte de ERPlora entre para ayudarle a configurarlo (cargar los
-     productos, ajustar sus apps), el propietario o un administrador enciende el acceso de soporte. Viene apagado.
-     Hoy se enciende y se apaga por la API o pidiéndoselo al asistente, que lo confirma antes de cambiarlo (BASE-F97).
-  2. El cambio se guarda al instante, con quién lo hizo y cuándo. No caduca: sigue encendido hasta que alguien del
-     negocio lo apaga, porque una puesta en marcha puede durar varios días.
-  3. Cualquiera del negocio puede consultar si está encendido, quién lo cambió por última vez y cuándo, si él mismo
-     puede cambiarlo y las 10 últimas entradas de soporte (quién y cuándo), la más reciente primero. Mientras nadie de
-     soporte haya entrado, la lista está vacía.
+     productos, ajustar sus apps), el propietario o un administrador enciende «Dejar entrar al soporte de ERPlora» en
+     la tarjeta «Acceso de soporte», la última de Ajustes › General. Viene apagado. También se enciende y se apaga por
+     la API o pidiéndoselo al asistente, que lo confirma antes de cambiarlo (BASE-F97).
+  2. El cambio se guarda al instante, con quién lo hizo y cuándo, y lo confirma un aviso: «Acceso de soporte
+     encendido: el soporte de ERPlora puede entrar.» o «Acceso de soporte apagado: el soporte de ERPlora ya no puede
+     entrar.». No caduca: sigue encendido hasta que alguien del negocio lo apaga, porque una puesta en marcha puede
+     durar varios días.
+  3. Cualquiera del negocio ve en la tarjeta si está encendido, quién lo cambió por última vez y cuándo («Último
+     cambio: Ana, 24/11/2026, 10:30.») y, en «Últimas entradas de soporte», las 10 últimas entradas de soporte (quién y
+     cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
+     soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
+     «Solo quien administra el negocio puede cambiarlo.».
   4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
      cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
      negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
@@ -3803,8 +3818,10 @@ Entra: encendido o apagado; la cuenta de soporte que comprueba erplora.com.
 Sale: el ajuste del negocio, con quién lo cambió y cuándo. Evento `base.support_access.changed`. Cada entrada de
 soporte, con quién y cuándo. Evento `base.support_access.entered`.
 Si falla: a quien no administra el negocio se le rechaza el cambio (403 `permission_denied`) y el ajuste se queda como
-estaba; al consultarlo, le sale que no puede cambiarlo. Con el acceso apagado, soporte no abre sesión ni deja entrada
-(la página del paso 5).
+estaba; al consultarlo, le sale que no puede cambiarlo. Si el cambio no se puede guardar, debajo sale «No se pudo
+guardar el cambio.» y el interruptor vuelve a lo guardado; si la tarjeta no puede leer el ajuste, «No se pudo cargar
+el acceso de soporte.» con «Reintentar». Con el acceso apagado, soporte no abre sesión ni deja entrada (la página del
+paso 5).
 Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 
 ## Para quien lo mantiene
@@ -3850,12 +3867,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Las tres consultas vivas del Inicio son de `base/queries/`, con permiso `base.view_home` y ruta ninja en
   `base/api/home.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
-  `base/home.py` (sin ORM).
+  `base/home/` (sin ORM).
 - Punto de extensión: cada módulo declara en su `LiveAppConfig` `setup` (`SetupStep`), `widgets`
   (`Widget`) y `bell` (`BellCounter`), dataclasses de `live.meta` comprobadas por `live.checks`
   (E009–E016). Cada consulta que nombran es un `kind="query"` de la propia app; base la ejecuta como la
   persona (`run_hook`).
-- País: un paso con `countries` solo sale en un hub de esos países (`home.applies_to_country`); el país del hub
+- País: un paso con `countries` solo sale en un hub de esos países (`home.setup_steps.applies_to_country`); el país del hub
   se lee con `base.business.country_or_market`, la única lectura de la plataforma: sin país (una demo, el hub de
   ERPlora sin fila) es `MARKET_COUNTRY`, España, el mercado de ERPlora, como lo cuenta VeriFactu
   (`queries.outside_spain` la usa), hub#682.
@@ -3874,13 +3891,13 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Campana por reloj: un contador cuya cifra cambia porque pasa el
   tiempo, sin evento (un trabajo que lleva un minuto en cola sin dispositivo vivo), lo dice su módulo en
   `bell_refresh_every` de su `LiveAppConfig` (clave del contador → segundos; la forma de `scheduled_tasks` y
-  `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home.py`) exige claves de su propio `bell` y
+  `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home/bell_counters.py`) exige claves de su propio `bell` y
   segundos enteros desde `MIN_BELL_REFRESH_SECONDS` (30). `base.bell.counters` devuelve
   `refresh_every`, el menor de los contadores que la persona puede ver de las apps encendidas (también a cero: es el
   tiempo el que los sube), y `base/frontend/lib/bell-counters.ts` vuelve a leer `GET /api/home/bell` cada tantos
   segundos mientras la página está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se
   descarta, y una que falla deja lo último. Sin `refresh_every`, la campana solo se mueve por eventos. Tests:
-  `test_home.py`, `test_queries_home_bell.py` y `bell-counters.test.ts`.
+  `test_bell_counters.py`, `test_queries_home_bell.py` y `bell-counters.test.ts`.
 - El centro de avisos: la campana, la tarjeta de llegada y el panel son de `@erplora/ui` y los monta el shell; el Hub
   solo le da su fuente, `useHubActionNotices` (`base/frontend/lib/action-notices.ts`), en `actionNotices` de
   `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso con lo que dice el servidor
@@ -3926,14 +3943,14 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   (`live` en `WidgetOut`). Un panel con `component` monta `apps/<app>/frontend/components/<Nombre>.vue`, que carga
   `frontend/lib/app-components.ts`, la única puerta de `base/frontend` hacia `apps/` (`platform-boundary.test.ts`).
 - Tarjetas de Sistema (hub#683, BASE-F39): una app declara en su `LiveAppConfig` `system_cards`, una lista de
-  `{"key", "component"}` y, si no la ve todo el mundo, `"permission"`. `base.E015` (`base/home.py`) comprueba al arrancar
+  `{"key", "component"}` y, si no la ve todo el mundo, `"permission"`. `base.E015` (`base/home/system_cards.py`) comprueba al arrancar
   que cada clave es única, que el componente es un nombre (nunca una ruta) con su fichero en
   `apps/<app>/frontend/components/` y que el permiso es de la app. `base.system.cards` (viva: la foto y
   encender o apagar una app la re-ejecutan; `GET /api/system/cards`) lista las de las apps encendidas que la persona
   puede ver, y `SystemAppCards.vue` las monta al final de «Uso y plan».
   Lo que dice una tarjeta es de su app. Las puertas de erplora.com a la app de ERPlora de cada sistema
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
-  `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
+  `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_system_cards.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
 - La fila de salud del Inicio (hub#573, BASE-F02): una app declara en su `LiveAppConfig` `health`, un diccionario con
   `operation` (una consulta suya cuya primera fila dice `state`: `ok`, `no_signal` o `not_configured`), `params`, el
@@ -3959,15 +3976,15 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
-  con la AEAT). `base.E016` (`base/home.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
+  con la AEAT). `base.E016` (`base/home/mandatory_apps.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
   mayúsculas sin repetir (nunca una lista vacía, que leería «en ninguno» o «en todos») y `platform_turns_on`
-  booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_steps` da un paso `base.mandatory.<app>`
+  booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_apps.mandatory_steps` da un paso `base.mandatory.<app>`
   (nivel `functional`, orden 15, ruta `/apps#all`, el icono con que el shell pinta la app: el de su primera entrada de
-  menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
+  menú, `home.shown_modules.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
   (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
   `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
   (`creating`) el paso sigue: todavía no está encendida. Tests:
-  `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
+  `test_mandatory_apps.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
   hubs reales) y `apps/tax/tests/test_apps.py`.
   Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
   da las obligatorias del país que están `on` (no `creating` ni `failed`, que aún no atan y se pueden dejar), que
@@ -4016,7 +4033,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   (`tests/e2e/fix-hub-home-timeline-raw-utc-time.spec.ts`).
 - `demo` (módulo no listado) sale en el menú, en «Mis apps» y con su ejemplo en el Inicio solo con
   `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
-  Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.
+  Una sola regla, `base.home.shown_modules.shown_modules`, para `base.session.me` y los ganchos del Inicio.
 - Cada entrada del menú de un módulo (`Nav` de su `apps.py`) declara el permiso que la abre (`permission`, uno de los
   del propio módulo; `live.E025` lo exige). `base.session.me` lleva en `menu` solo las entradas abiertas a la persona y
   solo los módulos con alguna (`_can_see` de `base/queries/apps.py`), y «Mis apps» (`useMyApps` de `@erplora/ui`) sale
@@ -4085,7 +4102,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Frontend en `base/frontend/` (rutas, catálogos `en`/`es` bajo `base`, componentes y su `lib/home.ts`);
   los destellos y «Mejorar plan» se enchufan en `frontend/main.ts` por `chrome` de `createShell`, y los avisos de la
   campana por `actionNotices`. La ruta `/` de base (`base-home`) gana a la rejilla del shell (`home`).
-- Tests: `base/tests/test_home.py`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
+- Tests: los `base/tests/test_<módulo>.py` de cada módulo de `base/home/`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
   Vitest en `base/frontend/**`; e2e `tests/e2e/base-home.spec.ts` y `base-home-activity.spec.ts`.
 - BASE-F13: cada login anota de quién y dónde es su sesión (`base.SessionOwner`, en control junto a las
   sesiones de Django; `CASCADE` con la sesión). `POST /internal/sessions/revoke {user_id, hub_id?}`
@@ -4093,7 +4110,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   índice, sin descodificar ninguna sesión: las del negocio y las que no anotaron host (de antes de la regla),
   o sin `hub_id` todas, las del admin incluidas; idempotente, un negocio desconocido responde `{ended: 0}` y
   un cuerpo fuera de contrato, 422 `internal.payload_invalid`. La foto (`base.hub.state_apply`) aplica
-  `members` en su transacción, sin crear copias locales. Una baja borra la `Membership` y cierra las sesiones de
+  `members` en su transacción, sin crear copias locales; de la del negocio propio de ERPlora, nada más que eso
+  (`base/tests/test_platform_hub_people.py`). Una baja borra la `Membership` y cierra las sesiones de
   ese negocio; tras el COMMIT se despierta el host (`_wake_open_apps`): el stream vivo re-ejecuta,
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Un rol nuevo cambia la `Membership` y no cierra nada: tras el COMMIT también se
@@ -4150,7 +4168,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `base.apps_on.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
   despliegue (hoy) no se lee nada. Tests: `base/tests/test_entitlement.py` (dos hubs, demo, fin del derecho, 402).
 - `base.app.list` (`GET /api/apps`, `base.view_home`, viva con `base.hub.state_applied`): los módulos de
-  `home.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
+  `home.shown_modules.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
   entrada del menú si la persona ve la app), `icon` (el de la primera entrada del menú, el que pinta el shell, como el
   lanzador y «Mis apps»: el `icon` del módulo es el de la Tienda, horneado aparte, y `HubIcon` rechaza un nombre no
   registrado, que dejaba la pantalla en blanco), `requires` (cierre) y `required_by`, y `store_url` =
@@ -4174,7 +4192,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
 - Las apps no activadas en el asistente (BASE-F24 paso 6, hub#2178; `base/assistant/apps_not_on.py`): el catálogo de
-  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules` cuando las
+  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules.shown_modules` cuando las
   palabras de la petición abierta o las búsquedas del modelo dicen su nombre en el idioma de la persona (`_names`: las
   raíces de su `verbose_name`, comparadas con las palabras tal como se dicen, sin el vocabulario de `live`, que haría
   de «precio» una palabra de Tarifas) y tiene una herramienta en los `PLACES` puestos de ese turno contra el catálogo
@@ -4191,18 +4209,18 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
-  `LiveAppConfig` (`home.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
+  `LiveAppConfig` (`home.plan_meters.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
   cuenta en la memoria de cada proceso que atiende peticiones y lo vuelca cada 60 s y al salir
   (`services.usage.activity_recorded`, `services.usage.people_seen`): peticiones en `HubDatabaseMiddleware`, personas en
   `HubContextBuilder.from_request`, pico en `Limiter.take`, fuera de su lock. «Sin hueco» solo cuando llega a un cliente
   (`HubBusy.reached_client`, gancho de `live`): nunca un reintento del ejecutor vivo. Solo lo arranca `config/asgi.py`: lo
   que hace el worker no es la petición de nadie. Una lectura suma lo que su proceso aún no ha volcado (`meter.unflushed`).
   El tope es el efectivo (`PGBOUNCER_MAX_DB_CONNECTIONS`, `limits.plan_limits`), también en el semáforo. El hub de
-  ERPlora (`Hub.is_platform`) no tiene plan ni foto, y no la tendrá porque el SaaS no lo conoce: es su fila la que le da
+  ERPlora (`Hub.is_platform`) no tiene plan y su foto solo trae a sus personas: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`), donde nadie tiene acceso
-  todavía: queda por decidir qué enseña aquí, porque el aviso de plan desconocido le prometería uno que nunca llega.
+  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`) para esas personas: queda
+  por decidir qué les enseña aquí, porque el aviso de plan desconocido les promete uno que nunca llega.
   Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
   `test_plan_usage_figures.py`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
@@ -4352,7 +4370,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - **La hora del negocio** (hub#687): la zona la lee un solo sitio, `base.business.business_zone()`: la del hub en el que se
   trabaja (`control.Hub.timezone`, la manda el SaaS), la del despliegue en la plataforma o si no tiene una que Python
   conozca (`zone_of`); sin contexto, `HubContextMissing`, como un modelo de hub. La usan la tarjeta del asistente, los
-  avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
+  avisos del Inicio y los textos de las automatizaciones (`base.home.device_notices.moment`), el CSV de autorizaciones y las apps; una
   lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. En pantalla, `useBusinessZone`
   (`base/frontend/lib/zone.ts`), que también siguen Fichajes, Tareas y la bandeja de WhatsApp (hub#779). Las fechas de
   la factura, el día y el número de una venta, el «hoy» de Impuestos y las horas de VeriFactu (la de generación de cada
@@ -4535,7 +4553,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   del SaaS; `knowledge/raw/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant/` (sin ORM) les añade
   lo suyo, un módulo por pieza (`_Words`, pantallas, `ALWAYS`, `NOT_FROM_CHAT`, checks y pasarela): el catálogo de herramientas (`catalog`:
   toda `@operation` de las apps activas cuyo `ai=` es una herramienta (`Operation.ai_spec()` es un `AI`) y cuyo permiso
-  tiene la persona, o que su app deja aprobar a un responsable (`approvals.label_of`). Toda operación declara `ai=`
+  tiene la persona, o que su app deja aprobar a un responsable (`approvals.label_of`) y el rol propio de la persona no
+  le niega (`permissions.refused_outright`). Toda operación declara `ai=`
   (`live.E017`): `AI(description=…, risk=…)` o `ai=INTERNAL`; un `dict` se sigue aceptando y `ai_spec()` lo lee como
   `INTERNAL` si no tiene descripción, si dice «Not an assistant tool» / «System only» o si es de la plataforma (sin
   permiso, o con uno que ninguna app declara, `<app>.system` o `system.<app>`: sus reacciones y tareas programadas, que
@@ -4674,7 +4693,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   Una escritura que toma su registro por el nombre sin marcarlo ni comprobarlo no queda fijada: su tarjeta tiene que
   leerlo (patrón de Demo, hub#1206); el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
-  con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
+  con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`; si su rol propio
+  dice «No», la herramienta no está en su catálogo y no corre ni con pase), y arma las
   instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
   zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
   encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
@@ -4820,10 +4840,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   (`Credential`): mismo hash, mismos frenos.
 - Roles propios (`base.models.roles.BusinessRole`, en la BD del negocio): `base/roles.py` dice sin ORM lo que permite
   uno hoy y lo que queda por revisar; `base.permissions.permissions_of_business_role` es el único cálculo, el mismo de
-  quien lo tiene (`access_for`), y con él `base/services/roles.py` mide la escalada: solo lo que pasa a «Permitido» y
-  antes no lo estaba, en todas las apps de este despliegue, también las apagadas (una app que se encienda da lo de su
-  rol de origen). Guardar `states` escribe lo que llega; si llega algo de una app que el rol no había guardado, se
-  escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
+  quien lo tiene (`access_for`), y `base/services/roles.py` mide la escalada con `queries.roles.states_of`: solo lo que
+  sube (`roles.raised`: de «No» a «Con aprobación» o de cualquiera a «Permitido»), en todas las apps de este despliegue,
+  también las apagadas (una app que se encienda da lo de su rol de origen). Lo «Permitido» lo da quien lo tiene; lo «Con
+  aprobación», quien lo tiene o lo hace también con aprobación: sin eso, quien gestiona roles se quitaría a sí mismo el
+  «No» que le puso el dueño. Guardar `states` escribe lo que llega; si llega algo de una app que el rol no había
+  guardado, se escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
   despierta todas las consultas vivas del negocio tras el COMMIT (`_wake_open_apps`). El nombre es único sin contar
   mayúsculas (`base_businessrole_name_unique`), como en Shopify POS, Lightspeed, Odoo, NetSuite, Business Central y
   WordPress; y solo quien está en el negocio impide borrarlo, como en Square y Lightspeed. `base.role.assign` escribe
@@ -4844,7 +4866,10 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
-  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras:
+  quien no es del negocio (sin `base.view_home`) y a quien su rol propio le dice «No»
+  (`permissions.refused_outright`, leído en cada petición), el `permission_denied` de siempre, también con un pase: el
+  pase no se marca ni se gasta. `base.approval.approve` tampoco lo da (`base.approval_not_offered`). Un rol básico no
+  dice «No»: lo que no da y su app deja aprobar es «Con aprobación». La frase con cifras:
   junto a `approvals`, la
   app declara `approval_figures = {"<orden>": [_("… {campo} …"), …]}`, frases que se prueban en orden con huecos de
   la entrada de la orden: `{campo}` (texto o número), `{campo, percent}` (0–100, `format_percent`) y
@@ -4880,7 +4905,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   de `apps/sale/queries/other_apps.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
   `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
-  `frontend/main.ts`). El registro es `base.models.approvals.Approval` (`base.approval.list`).
+  `frontend/main.ts`). Para decirlo antes de empezar, `useAccess(permiso)` de `base/frontend/lib/use-access.ts` da
+  `allowed`, `approval` o `no` desde `permissions` y `approvable` de `base.session.me`, que se vuelve a leer al cambiar el
+  rol; lo usa Ventas (SALE-F30, SALE-F31). El registro es `base.models.approvals.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
   en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento
@@ -4903,7 +4930,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   forma de entrar `support`, y la operación interna `base.support_access.enter` anota la visita
   (`base.support_access.entered`) o, apagado, la rechaza con `base/templates/base/support_access_off.html`. El equipo del
   negocio es `Membership.objects.team(host)`, que deja fuera a soporte: quien liste personas lo usa. Al apagar, el mismo
-  `base.support_access.update` cierra sus sesiones.
+  `base.support_access.update` cierra sus sesiones. La tarjeta es `base/frontend/components/SupportAccessCard.vue` (e2e
+  en `tests/e2e/base-support-access.spec.ts`); su interruptor, como el de `ApiDocsCard`, se guarda al moverlo con
+  `useSavedSwitch` (`base/frontend/lib/saved-switch.ts`), que lo vuelve a pintar en lo guardado si falla.
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
   además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección

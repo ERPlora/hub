@@ -583,7 +583,7 @@ def test_the_control_database_is_never_limited():
     assert limits._limiters == {}
 
 
-# ── ERPlora's own hub: no photo, no plan, limits of its own ───────────────────────────────────────────────────────────
+# ── ERPlora's own hub: no plan, limits of its own ─────────────────────────────────────────────────────────────────────
 
 
 #: Standard's at once, what PgBouncer gives each database in prod; twice the paid plans' statement timeout.
@@ -592,7 +592,8 @@ PLATFORM_ALIAS = "hub_" + "e" * 32
 
 
 def row_of(*, is_platform, state=None, version=0, pk=ACME):
-    """A registry's row as ``use_hub`` hands it: the platform hub stays on ``state_version`` 0 for ever."""
+    """A registry's row as ``use_hub`` hands it: the platform hub stays on ``state_version`` 0 until a photo of its
+    people comes."""
     return SimpleNamespace(pk=pk, is_demo=False, is_platform=is_platform, state=state or {}, state_version=version)
 
 
@@ -630,8 +631,9 @@ def test_the_platform_hub_never_passes_pgbouncer_and_a_senseless_ceiling_leaves_
         {"plan": {"slug": "pro", "max_db_connections": 12, "statement_timeout_seconds": 15}},
         {"plan": {"slug": "broken", "max_db_connections": 0}},
         {"plan": "standard"},
+        {"members": []},
     ],
-    ids=["free", "pro", "broken", "not-a-plan"],
+    ids=["free", "pro", "broken", "not-a-plan", "its-people"],
 )
 def test_a_photo_changes_nothing_on_the_platform_hub(caplog, settings, state):
     """What it gets comes from its row: whatever a photo said, it is no plan's customer."""

@@ -39,6 +39,7 @@ CYCLE_ANCESTORS = {
     "base",
     "base.api",
     "base.blueprint",
+    "base.home",
     "base.models",
     "base.tenancy",
     "base.services",

@@ -231,7 +231,7 @@ def test_the_homes_step_is_your_service_catalogue_done_once_one_service_can_be_c
         True,
     )
     assert "sellable_services" in registry[step.operation].output.model_fields
-    assert home.level_of(f"service.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(f"service.{step.key}", step.required) == home.setup_steps.LEVEL_FUNCTIONAL
 
 
 def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():

@@ -250,6 +250,8 @@ class Invoice(UUIDModel):
     number = models.CharField(_("number"), max_length=NUMBER_MAX_LENGTH)
     issue_date = models.DateField(_("issue date"))
     operation_date = models.DateField(_("operation date"))
+    # When it has to be paid; none, unless the invoice says so.
+    due_date = models.DateField(pgettext_lazy("invoice", "due date"), null=True, blank=True)
     issued_at = models.DateTimeField(_("issued at"), default=timezone.now)
     # The issuer as it was when the document was issued.
     # VeriFactu's NombreRazon (≤ 120) and NIF / IDOtro ID (≤ 20): SuministroInformacion.xsd.

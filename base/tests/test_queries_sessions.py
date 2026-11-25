@@ -76,7 +76,7 @@ def test_a_manager_opens_the_setup_apps_except_what_only_the_owner_and_admin_set
 def test_the_owner_and_the_admin_open_every_screen_of_every_app(make_user):
     every = {
         config.label: [nav.path for nav in config.navigation]
-        for config in home.shown_modules(demo_hub=False)
+        for config in home.shown_modules.shown_modules(demo_hub=False)
         if config.navigation
     }
     assert menu_of(make_user("olga"), "hub_owner") == every
@@ -95,7 +95,7 @@ def test_every_screen_of_an_app_is_either_open_in_the_menu_or_locked(make_user):
     for username, role in (("eva", "hub_employee"), ("mario", "hub_manager")):
         me = session_me(make_user(username), role)
         menu = {group["id"]: [item["path"] for item in group["items"]] for group in me["menu"]}
-        for config in home.shown_modules(demo_hub=False):
+        for config in home.shown_modules.shown_modules(demo_hub=False):
             opened, closed = menu.get(config.label, []), me["locked"].get(config.label, [])
             assert sorted(opened + closed) == sorted(nav.path for nav in config.navigation), (role, config.label)
             assert role != "hub_employee" or config.label not in SETUP_APPS or not opened, config.label
