@@ -54,7 +54,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
         credential = credentials.get(username)
         profile = profiles.get(username)
         own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-        name = own or without_address(person["name"]) or without_address(person["email"]) or username
+        name = without_address(own or person["name"]) or without_address(person["email"]) or username
         people.append(
             {
                 **person,
