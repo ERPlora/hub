@@ -4,7 +4,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
-import { psql, record, shot, shown, signedInSpanish, untilStill } from './helpers';
+import { capture, psql, record, shown, signedInSpanish, untilStill } from './helpers';
 import { ownerPage, post } from './service-helpers';
 import { steady } from './table-columns';
 
@@ -77,7 +77,7 @@ for (const lang of ['en', 'es'] as const) {
       const ends = lang === 'en' ? 'Ends' : 'Termina';
       expect(seen.columns.map((column) => column.label), 'no column is given up for it').toEqual(expect.arrayContaining([professional, ends]));
       expect(seen.overflow, 'nothing scrolls sideways').toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${lang}`) });
+      await capture(page, `${KEY}-${lang}`);
     } finally {
       await context.close();
     }
