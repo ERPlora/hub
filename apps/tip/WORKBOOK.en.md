@@ -90,12 +90,12 @@ Tips opens from the **Tips** menu and has four entries: **Tips**, **Distribution
 **Settings**. Whoever cannot manage sees only **My tips**.
 
 ### "Tip" step in the Charge
-<!-- from WORKBOOK.md sha256:dcaa00b16a69 -->
+<!-- from WORKBOOK.md sha256:582768602156 -->
 Inside the Sales **Charge** sheet (SALE-F39), only with tips turned on: the "Tip" row with
 the three suggestions of the chosen payment method ("3 %", "5 %", "10 %", each with its amount below),
 "Other amount" and "No tip"; the one marked by default is "No tip". Below, "For <name>" (whoever
 serves). In cash, when what is tendered exceeds the total, the "Keep the change" button. With a tip
-set, the big amount says "<total> + <tip> tip".
+set, "+ <tip> tip" shows below the big amount.
 
 ### Tips
 <!-- from WORKBOOK.md sha256:328f530e757a -->
@@ -138,14 +138,14 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:6a1beadd61ad -->
+<!-- from WORKBOOK.md sha256:ae4629a54ed4 -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
 | TIP-F01 | Set up tips | common | partial — the Settings screen is missing |
-| TIP-F02 | Suggest the tip when charging | common | not done |
-| TIP-F03 | Record a card tip | common | partial — the Charge and the Tips screen are missing |
-| TIP-F04 | Record a cash tip | common | partial — the Charge and the Tips screen are missing |
+| TIP-F02 | Suggest the tip when charging | common | partial — "For <name>" and the tip of each payment when splitting are missing |
+| TIP-F03 | Record a card tip | common | partial — the Tips screen is missing |
+| TIP-F04 | Record a cash tip | common | partial — "Keep the change" at the Charge and the Tips screen are missing |
 | TIP-F05 | Put a tip with no ticket into the pool | restaurant | partial — the Tips screen is missing |
 | TIP-F06 | Adjust or void a tip | common | partial — the Tips screen is missing |
 | TIP-F07 | Declare the cash tips when closing the shift | restaurant | not done |
@@ -178,8 +178,10 @@ the screen shows locked with "You do not have permission to change these setting
 Involved: SALE-F37
 
 ### TIP-F02 Suggest the tip when charging
-<!-- from WORKBOOK.md sha256:b6ac4ccc4a7d -->
-Status: not done — Tips does not declare its step on the Charge sheet yet (hub#1498, hub#1500)
+<!-- from WORKBOOK.md sha256:8e1578e7d694 -->
+Status: partial — the Charge sheet shows the "Tip" row with the payment method's suggestions, charges the tip with the
+sale in a charge with a single payment method and records it with its sale, only once even if it is retried; "For <name>"
+and the tip of each payment when splitting the charge, which today is charged with no tip, are missing (hub#1500)
 Vertical: common
 Actor: employee, manager
 Screen: Charge
@@ -202,9 +204,9 @@ assigned when it is adjusted (TIP-F06).
 Involved: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Record a card tip
-<!-- from WORKBOOK.md sha256:d36d271cbbfc -->
-Status: partial — a card tip is recorded on its sale through the API and the assistant and shows apart in the cash
-register; recording it at the Charge and on the Tips screen is missing (hub#1498, hub#1500)
+<!-- from WORKBOOK.md sha256:ebd7795131b6 -->
+Status: partial — a card tip is recorded at the Charge and, on its sale, through the API and the assistant, and shows
+apart in the cash register; recording it on the Tips screen is missing (hub#1498)
 Vertical: common
 Actor: employee, manager, assistant
 Screen: Charge, Tips
@@ -222,9 +224,11 @@ a sale of a day already distributed, "That day is already distributed: reopen it
 Involved: CASH_REGISTER-F18
 
 ### TIP-F04 Record a cash tip
-<!-- from WORKBOOK.md sha256:9b9c6a93331b -->
-Status: partial — a cash tip is recorded on its sale through the API and the assistant and goes into the drawer;
-"Keep the change" at the Charge and the Tips screen are missing (hub#1498, hub#1500)
+<!-- from WORKBOOK.md sha256:3877a4e21149 -->
+Status: partial — a cash tip is recorded at the Charge (what is tendered covers the bill and the tip, and the change
+takes both off) and, on its sale, through the API and the assistant, and goes into the drawer; at the Charge, "Keep the
+change" and its own notice when what is tendered does not cover the total and the tip are missing (hub#1500), and so is the
+Tips screen (hub#1498)
 Vertical: common
 Actor: employee, manager, assistant
 Screen: Charge, Tips
