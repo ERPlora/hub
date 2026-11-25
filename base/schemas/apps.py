@@ -59,7 +59,8 @@ class AppListOut(Schema):
     #: The business's country by its name in the reader's language (a business without one is in Spain): what
     #: «Mandatory in …» says.
     country_name: str
-    #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
+    #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub); empty in
+    #: ERPlora's own business, which buys nothing, as ``plan_url``.
     store_url: str
     #: erplora.com's plans of this business, where a higher limit is bought.
     plan_url: str
