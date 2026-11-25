@@ -147,7 +147,7 @@ def _is_near(used: int, limit: int) -> bool:
 
 def _files_usage(state: dict, known: bool, last: HubUsageDaily | None) -> dict:
     """What the files take up (``s3_bytes``) against the plan's space (BASE-F40, step 3); nothing to compare, no status."""
-    limit = files.space_limit(state) if known else None
+    limit = files.space.space_limit(state) if known else None
     used = last.s3_bytes if last else None
     percent = status = None
     if limit is not None and used is not None:

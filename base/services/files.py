@@ -70,7 +70,7 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     """Keep the file, numbered when its name is taken, within the plan's space."""
     with translation.override(ctx.language):
         content = _file_bytes(data.content_base64)
-        saved = files.upload(
+        saved = files.create.upload(
             storages["hub_files"],
             hub_id(ctx.scope),
             data.folder,
@@ -103,7 +103,7 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
 def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
     """A new folder, never over a file or folder of that name."""
     with translation.override(ctx.language):
-        made = files.create_folder(storages["hub_files"], hub_id(ctx.scope), data.parent, data.name)
+        made = files.create.create_folder(storages["hub_files"], hub_id(ctx.scope), data.parent, data.name)
     record_event(ctx, events.FILE_FOLDER_CREATED, {"path": made["path"]})
     return made
 
@@ -129,7 +129,7 @@ def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
 def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
     """A new name in the same folder; a folder takes everything in it along."""
     with translation.override(ctx.language):
-        renamed = files.rename(storages["hub_files"], hub_id(ctx.scope), data.path, data.name)
+        renamed = files.relocate.rename(storages["hub_files"], hub_id(ctx.scope), data.path, data.name)
     if renamed["path"] != data.path:
         record_event(ctx, events.FILE_RENAMED, {"path": renamed["path"], "from": data.path})
     return renamed
@@ -159,7 +159,7 @@ def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
     with translation.override(ctx.language):
         if not ctx.has(UPLOAD_FILES):
             raise PermissionDenied(gettext("Only who runs the business can change the files."))
-        moved = files.move(storages["hub_files"], hub_id(ctx.scope), data.path, data.to)
+        moved = files.relocate.move(storages["hub_files"], hub_id(ctx.scope), data.path, data.to)
     record_event(ctx, events.FILE_MOVED, {"path": moved["path"], "from": data.path})
     return moved
 
@@ -186,6 +186,6 @@ def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
 def file_delete(ctx: OperationContext, data: FileDeleteIn) -> dict:
     """The file, or the folder and everything in it; no bin."""
     with translation.override(ctx.language):
-        deleted = files.delete(storages["hub_files"], hub_id(ctx.scope), data.path)
+        deleted = files.delete.delete(storages["hub_files"], hub_id(ctx.scope), data.path)
     record_event(ctx, events.FILE_DELETED, {"path": deleted["path"], "folder": deleted["folder"]})
     return deleted
