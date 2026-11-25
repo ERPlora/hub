@@ -282,3 +282,22 @@ def test_a_list_asks_for_at_most_a_hundred_rows(admin_client):
 def test_the_issuer_reads_empty_before_it_is_set_up(employee_client):
     body = get(employee_client, "/invoice/issuer").json()
     assert (body["configured"], body["legal_name"]) == (False, "")
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("language", "required"),
+    [("en", "This field is required."), ("es", "Este campo es obligatorio.")],
+)
+def test_an_issuer_left_blank_says_each_field_is_required(admin_client, language, required):
+    """INVOICE-F21: saving with no legal name, tax ID or address says so under each field, not a length rule."""
+    blank = {**ISSUER, "legal_name": "", "tax_id": "", "address": ""}
+
+    response = post(admin_client, "/invoice/issuer", blank, HTTP_ACCEPT_LANGUAGE=language)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["fields"] == {
+        "legal_name": required,
+        "tax_id": required,
+        "address": required,
+    }
