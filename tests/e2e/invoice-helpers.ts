@@ -137,6 +137,14 @@ export interface InvoiceOut extends InvoiceLink {
   rectifications: InvoiceLink[];
 }
 
+/** An invoice issued by hand through the app's API, as the window would, and noted for `cleanInvoices()`. */
+export async function issueByHand(context: BrowserContext, data: Record<string, unknown>): Promise<{ id: string; number: string }> {
+  const issued = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', data);
+  expect(issued.status, JSON.stringify(issued.data)).toBe(201);
+  issuedIds.add(issued.data.id);
+  return issued.data;
+}
+
 interface IssueOut {
   issued: boolean;
   already: boolean;

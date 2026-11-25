@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-import { A, api, EMPLOYEE, login, settled, shown } from './helpers';
-import { cleanInvoices, flowShots, issuedIds, readyToInvoice } from './invoice-helpers';
+import { A, EMPLOYEE, login, settled, shown } from './helpers';
+import { cleanInvoices, flowShots, issueByHand, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 
 const CUSTOMER = `e2e PDF ${stamp()}`;
@@ -16,14 +16,11 @@ let invoice: { id: string; number: string };
 
 test.beforeAll(async ({ browser }) => {
   const context = await readyToInvoice(browser);
-  const issued = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', {
+  invoice = await issueByHand(context, {
     ...RECIPIENT,
     lines: [{ description: 'Consultoría', quantity: '1', unit_price: 10000, tax_rate: '21' }],
     withholding_rate: 15,
   });
-  expect(issued.status, JSON.stringify(issued.data)).toBe(201);
-  invoice = issued.data;
-  issuedIds.add(invoice.id);
   await context.close();
 });
 
@@ -97,11 +94,9 @@ test('an employee downloads their own invoices', async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/invoice/invoices', EMPLOYEE);
-  const mine = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', { ...RECIPIENT, lines: [{ description: 'Curso', quantity: '1', unit_price: 5000, tax_rate: '21' }] });
-  expect(mine.status, JSON.stringify(mine.data)).toBe(201);
-  issuedIds.add(mine.data.id);
-  await page.goto(`${A}/invoice/invoices/${mine.data.id}`);
+  const mine = await issueByHand(context, { ...RECIPIENT, lines: [{ description: 'Curso', quantity: '1', unit_price: 5000, tax_rate: '21' }] });
+  await page.goto(`${A}/invoice/invoices/${mine.id}`);
 
-  expect((await downloaded(page)).name).toBe(`${mine.data.number}.pdf`);
+  expect((await downloaded(page)).name).toBe(`${mine.number}.pdf`);
   await context.close();
 });
