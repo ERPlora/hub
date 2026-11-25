@@ -1,6 +1,7 @@
 """hub#2288: the card of an invoice made by hand says each of its lines — what it bills, its tax, how many and its price
 without VAT —, never «Lines: 2 items»: an issued invoice is never edited, so the person checks its amounts before
-saying yes. A typed rate is said as a percentage, as the invoice prints it; a tax category, by its name (INVOICE-F03).
+saying yes. A typed rate is said as a percentage, as the invoice prints it; a tax category, by its name and its rate
+(INVOICE-F03).
 """
 
 import dataclasses
@@ -49,9 +50,9 @@ def test_a_rate_with_decimals_keeps_them():
 
 
 @HUB_DB
-def test_a_line_with_a_tax_category_says_the_category_by_its_name():
+def test_a_line_with_a_tax_category_says_the_category_by_its_name_and_its_rate():
     said = lines_of([{**MENUS, "tax_rate": None, "tax_category_key": "restaurant.food"}])
-    assert said["value"][0]["tax_category_key"] == "Restaurant — food"
+    assert said["value"][0]["tax_category_key"] == "Restaurant — food · 10%"
     assert said.get(NAMED) is True
 
 

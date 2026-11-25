@@ -2912,7 +2912,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:392787ff4873 -->
+<!-- from WORKBOOK.md sha256:2ac115069559 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2970,8 +2970,9 @@ Steps:
      or no in the person's language, a date as it is written in it and a field that is cleared, with a dash ("Custom
      fields: Table preference · Terrace, VIP · Yes"; "VIP · —"); the special days loaded at once, by their date and
      their name and, when that day opens, its hours ("Jan 1, 2027 · New Year's Day; Jan 6, 2027 · Epiphany; Mar 26,
-     2027 · Good Friday and 7 more"); and any other, such as a line with two records (the employee and the product of
-     a sale), one with a yes or no or a list inside or a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
+     2027 · Good Friday and 7 more"); a line with two records the card names, by both (the product and who serves it in
+     a sale, "Shampoo · Bea Ruiz · 2"); and any other, such as a line with a record the card cannot name, one with a
+     yes or no or a list inside or a list of codes, by how many items it carries; a charge, by its total and how it is paid, as the button of the
      **Charge** sheet: the total, as the POS works it out for whoever asks ("Total: €12.50"), and each payment method
      with what it pays ("Payments: Cash · €12.50"; the one without an amount pays what the others leave and, when none
      is said, all of it in cash, as the action charges), never "1 item" nor the check's version, which only the

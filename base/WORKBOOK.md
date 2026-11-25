@@ -2847,8 +2847,10 @@ Pasos:
      de la persona, una fecha como se escribe en él y un campo que se vacía, con una raya («Campos personalizados:
      Preferencia de mesa · Terraza, VIP · Sí»; «VIP · —»); los días especiales que se cargan de golpe, por su fecha y
      su nombre y, si ese día abre, sus horas («1 ene 2027 · Año Nuevo, 6 ene 2027 · Epifanía del Señor, 26 mar 2027 ·
-     Viernes Santo y 7 más»); y cualquier otra, como una línea con dos registros (el empleado y el producto de una
-     venta), una con un sí o un no o una lista dentro o una lista de códigos, por cuántos elementos lleva; un cobro,
+     Viernes Santo y 7 más»); una línea con dos registros que la tarjeta nombra, por los dos (el producto y quien lo
+     atiende en una venta, «Champú · Bea Ruiz · 2»); y cualquier otra, como una línea con un registro que la tarjeta
+     no puede nombrar, una con un sí o un no o una lista dentro o una lista de códigos, por cuántos elementos lleva;
+     un cobro,
      por su total y cómo se paga, como el botón de la hoja **Cobro**: el total, tal como lo calcula el TPV para quien
      pregunta («Total: 12,50 €»), y cada forma de pago con lo que paga («Pagos: Efectivo · 12,50 €»; la que va sin
      importe paga lo que dejan las otras y, si no se dice ninguna, todo en efectivo, como cobra la acción), nunca
