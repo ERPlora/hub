@@ -14,6 +14,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
 import { pickDay } from './date-time-fields';
+import { expectTextClearOfLabel } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
 import { type Cast, cast, keepTheBusiness, uploadBookingLogo } from './online-booking-helpers';
 import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, rowAction, settled } from './service-helpers';
@@ -261,6 +262,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(dialog).toContainText(`Cancel ${named(`Nora ${vp.label}`)}'s booking`);
       await presented(page, 'ob-cancel');
       await dialog.locator('[data-testid=ob-cancel-reason] textarea').fill('Fully booked');
+      await expectTextClearOfLabel(dialog.locator('p'), dialog.locator('[data-testid=ob-cancel-reason]'), `cancelling a booking at ${vp.label}`);
       await capture('ONLINE_BOOKING-F05');
       await page.locator('[data-testid=ob-cancel-submit]').click();
       await expect(dialog).toBeHidden();

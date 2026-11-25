@@ -5,6 +5,7 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
+import { expectTextClearOfLabel } from './field-labels';
 import { A, horizontalOverflow, hostPage, psql, shot, shown, THREE_SIZES, untilStill } from './helpers';
 
 /** What the run plants carries it in its payload, so it goes after. */
@@ -375,6 +376,7 @@ for (const { label, ...viewport } of THREE_SIZES) {
       await expect(dialog).toBeVisible();
       await expect(dialog).toContainText('will never reach Invoicing again');
       await dialog.locator('[data-testid="failed-event-discard-reason"] textarea').fill('Invoiced by hand.');
+      await expectTextClearOfLabel(dialog.locator('p').last(), dialog.getByTestId('failed-event-discard-reason'), `discarding an event at ${width}`);
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-7-BASE-G94-${width}`) });
       await page.locator('[data-testid="failed-event-discard-dialog-submit"]').click();
