@@ -49,11 +49,10 @@ async function inSpanish(browser: Browser, next: string): Promise<{ context: Bro
   return signedInSpanish(browser, DESK, next);
 }
 
-test('each screen of the Hub opens its own help, at three sizes', async ({ browser }) => {
-  const { context, page } = await inSpanish(browser, '/');
-  await saveSessionForTheSweep(context);
-  for (const [path, name, title] of SCREENS) {
-    await page.goto(`${A}${path}`);
+for (const [path, name, title] of SCREENS) {
+  test(`${name} opens its own help with its tasks, at three sizes`, async ({ browser }) => {
+    const { context, page } = await inSpanish(browser, path);
+    await saveSessionForTheSweep(context);
     for (const size of [DESK, TABLET, PHONE]) {
       await page.setViewportSize(size);
       await inTheBar(page);
@@ -73,9 +72,9 @@ test('each screen of the Hub opens its own help, at three sizes', async ({ brows
       await capture(page, `base-help-platform-${name}-task-${size.width}x${size.height}`);
       await closeHelp(page);
     }
-  }
-  await context.close();
-});
+    await context.close();
+  });
+}
 
 test('the help follows the tab in view and the screen the person moves to, back included', async ({ browser }) => {
   const { context, page } = await inSpanish(browser, '/');
