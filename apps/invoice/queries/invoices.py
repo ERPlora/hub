@@ -8,6 +8,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.invoice.queries.documents import render_document
+from apps.invoice.queries.overdue import OVERDUE, overdue
 from apps.invoice.queries.ownership import INVOICES
 from apps.invoice.queries.rows import _page, document_of_sale, find_invoice, invoice_detail, invoice_row, with_links
 from apps.invoice.schemas.invoices import (
@@ -63,8 +64,10 @@ def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
             | Q(customer_name__icontains=text)
             | Q(customer_tax_id__icontains=text)
         )
+    if params.status == OVERDUE:
+        invoices = invoices.filter(overdue())
     exact = {
-        "status": params.status,
+        "status": params.status if params.status != OVERDUE else None,
         "invoice_type": params.invoice_type,
         "series_code": params.series_code.strip().upper()
         if params.series_code
@@ -93,15 +96,17 @@ def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
             "en": (
                 "which invoices have we issued this month?",
                 "show me the invoices of Carpintería Lema that are still pending",
+                "which invoices are overdue?",
             ),
             "es": (
                 "¿qué facturas hemos emitido este mes?",
                 "busca las facturas de Carpintería Lema que siguen pendientes",
+                "¿qué facturas están vencidas sin cobrar?",
             ),
         },
         "description": "List the invoices, the last issued first: search by number, customer's name or tax ID; filter "
-        "by status (issued, paid, cancelled), type (F1, F2 ticket, F3, R1–R5), series, source, issue dates and total "
-        "(cents). Pages of up to 100."
+        "by status (issued, paid, cancelled; overdue: not paid and past its due date), type (F1, F2 ticket, F3, R1–R5), "
+        "series, source, issue dates and total (cents). Pages of up to 100."
     },
 )
 def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:

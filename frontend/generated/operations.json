@@ -3107,6 +3107,14 @@
     "method": "post",
     "path": "/api/api-docs/settings/update"
   },
+  "base.support_access.get": {
+    "method": "get",
+    "path": "/api/support-access"
+  },
+  "base.support_access.update": {
+    "method": "post",
+    "path": "/api/support-access/update"
+  },
   "base.assistant.turn": {
     "method": "post",
     "path": "/api/assistant/turn"

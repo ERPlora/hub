@@ -222,9 +222,11 @@ def test_the_period_is_the_issue_date_of_the_business_s_clock(issuer, monkeypatc
     # 23:30 of 31 October in the Canary Islands is 00:30 of 1 November in Madrid: the invoice belongs to October.
     monkeypatch.setattr(timezone, "now", lambda: dt.datetime(2026, 11, 2, 12, 0, tzinfo=dt.UTC))
     november = manual()
+    # In another series: the days of a series go in the order of its numbers.
+    run("invoice.series.create", {"code": "SHOP", "invoice_type": "F1", "year": 2026})
     monkeypatch.setattr(timezone, "now", lambda: dt.datetime(2026, 10, 31, 23, 30, tzinfo=dt.UTC))
     monkeypatch.setattr(in_business_a, "timezone", "Atlantic/Canary")
-    october = manual()
+    october = manual(series_code="SHOP")
 
     assert [r["Number"] for r in values(export(issue_date_from="2026-10-01", issue_date_to="2026-10-31"))] == [
         october.number

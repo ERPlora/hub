@@ -1,10 +1,10 @@
-// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas.py. Written by
-// hand, as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
-// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
-// parameters, an invoice's id or number travels in the input. Money is whole cents with a sign (a rectifying invoice is
-// negative); decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO
-// `YYYY-MM-DD`.
+// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas. Written by
+// hand, as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with the
+// schemas and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters,
+// an invoice's id or number travels in the input. Money is whole cents with a sign (a rectifying invoice is negative);
+// decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
+import type { InvoiceDatesIn, InvoiceDueOut, InvoiceStatusFilter } from './invoice-dates';
 import type { DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut } from './document-issuer';
 
 export type SortDir = 'asc' | 'desc';
@@ -42,7 +42,7 @@ export interface RecipientIn {
 
 export interface InvoiceListIn extends PageIn {
   search?: string;
-  status?: InvoiceStatus;
+  status?: InvoiceStatusFilter;
   invoice_type?: InvoiceType;
   series_code?: string;
   source_type?: InvoiceSource;
@@ -94,7 +94,7 @@ export interface InvoiceLinkOut {
   total_amount: number;
 }
 
-export interface InvoiceRowOut {
+export interface InvoiceRowOut extends InvoiceDueOut {
   id: string;
   number: string;
   invoice_type: InvoiceType;
@@ -196,7 +196,7 @@ export interface ManualLineIn {
   product_id?: string;
 }
 
-export interface InvoiceCreateIn extends RecipientIn {
+export interface InvoiceCreateIn extends RecipientIn, InvoiceDatesIn {
   series_id?: string;
   series_code?: string;
   notes?: string;

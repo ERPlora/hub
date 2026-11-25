@@ -3116,21 +3116,22 @@ failed: …" and the assistant tells it.
 Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
-<!-- from WORKBOOK.md sha256:d13d6abe2da3 -->
+<!-- from WORKBOOK.md sha256:b63066914a0f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
-  2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
-     goes on. All it says goes to the same bubble, and what each round says in its own paragraph: never glued to the
-     previous one.
-  3. Each action that changes something asks for its own card (BASE-F97), one after the other: accepting the first
-     does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
-     those left.
+  2. The assistant solves it in rounds: it reads what it needs without asking (several things in the same round, if it
+     needs them), asks for an action, it is done and it goes on. All it says goes to the same bubble, and what each
+     round says in its own paragraph: never glued to the previous one.
+  3. Each action that changes something asks for its own card (BASE-F97), one after the other, also those it asks for
+     in the same round: accepting or cancelling the first does not answer for the next ones. If more wait behind it,
+     the card carries "Cancel all", which cancels this one and those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows twenty rounds at most, and each action is one: it is a brake against loops, not an allowance,
-     and a read and a change for each day of the week fit easily. On the twentieth the assistant can do nothing more
+  5. A request allows twenty rounds at most, each with all the assistant asks for at once: it is a brake against
+     loops, not an allowance, and a read and a change for each day of the week fit easily even if it asks for them one
+     by one. On the twentieth the assistant can do nothing more
      and answers with what it has done and what is left, to ask for it in another message; if it still asks for an
      action, it is not done and its card does not appear, and it is told to answer. If it keeps trying, "I stopped:
      this needed too many steps. Ask for it in parts.".
@@ -3944,21 +3945,25 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:666f8cd95550 -->
-Status: partial — it is changed and read through the API and with the assistant, and the business already lets support
-in or refuses it as it says; its card in Settings › General is still missing, and so is erplora.com giving the support
-staff their code to come in
+<!-- from WORKBOOK.md sha256:a939d641b5a9 -->
+Status: partial — it is changed and read in Settings › General, through the API and with the assistant, and the
+business already lets support in or refuses it as it says; erplora.com giving the support staff their code to come in
+is still missing
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
 Steps:
   1. When the business wants ERPlora's support staff to come in and help set it up (loading the products, adjusting
-     its apps), the owner or an administrator turns support access on. It comes off. Today it is turned on and off
-     through the API or by asking the assistant, which confirms it before changing it (BASE-F97).
-  2. The change is saved at once, with who made it and when. It does not expire: it stays on until someone of the
-     business turns it off, because getting started can take several days.
-  3. Anyone of the business can read whether it is on, who changed it last and when, whether they may change it
-     themselves and the last 10 entries of support (who and when), the most recent first. While nobody of support has
-     come in, the list is empty.
+     its apps), the owner or an administrator turns on "Let ERPlora support in" in the "Support access" card, the last
+     one of Settings › General. It comes off. It is also turned on and off through the API or by asking the
+     assistant, which confirms it before changing it (BASE-F97).
+  2. The change is saved at once, with who made it and when, and a notice confirms it: "Support access is on: ERPlora
+     support can come in." or "Support access is off: ERPlora support can no longer come in.". It does not expire: it
+     stays on until someone of the business turns it off, because getting started can take several days.
+  3. Anyone of the business sees in the card whether it is on, who changed it last and when ("Last changed by Ana,
+     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when), the
+     most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
+     support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
+     business can change it.".
   4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
      and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
      resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
@@ -3975,6 +3980,8 @@ In: on or off; the support account erplora.com vouches for.
 Out: the business's setting, with who changed it and when. Event `base.support_access.changed`. Each entry of
 support, with who and when. Event `base.support_access.entered`.
 If it fails: whoever does not run the business has the change refused (403 `permission_denied`) and the setting stays
-as it was; reading it, they see they cannot change it. With the access off, support opens no session and leaves no
-entry (the page of step 5).
+as it was; reading it, they see they cannot change it. If the change cannot be saved, "Could not save the change."
+shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
+support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step
+5).
 Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100

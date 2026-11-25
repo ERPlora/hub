@@ -35,6 +35,10 @@ describe('invoice filters', () => {
     expect(filterQuery({ total_amount_from: '12' })).toEqual({ total_amount_from: 1200 });
   });
 
+  it('take the overdue ones as one more status', () => {
+    expect(filterQuery({ status: 'overdue' })).toEqual({ status: 'overdue' });
+  });
+
   it('drop what is not one of the server’s values and what is blank', () => {
     expect(filterQuery({ status: 'draft', invoice_type: 'X9', source_type: 'web', series_code: '  ' })).toEqual({});
   });

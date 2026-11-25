@@ -712,7 +712,7 @@ changes, by its name, never by its internal code; it reads them with the permiss
 it names none to whoever may not see the sessions.
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:2a8dc68f31c7 -->
+<!-- from WORKBOOK.md sha256:c5d5adfa3d26 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -720,9 +720,9 @@ it names none to whoever may not see the sessions.
 | The drawers, with search by name, an active filter and pages (up to 100) | view sessions | F02, F03 | `cash_register.register.list` |
 | One drawer by its id, active or not: its name (the one the assistant's confirmation says) | view sessions | F02, F03 | `cash_register.register.get` |
 | The sessions, from the most recent to the oldest (or by when they were closed), with search by number, filters (status, number, drawer, dates and amounts) and pages | view sessions | F03, F09, F12 | `cash_register.session.list` |
-| The open session with its expected cash (if whoever asks may see it), whether the cash register is turned on and the sale lines in no shift (how many and their cash) | view sessions | F04, F10, F12, F17 | `cash_register.session.current` |
-| A session (by id or number) with its summary: sales by payment method, refunds, cash in, cash out, what other apps record (tips), comps, expected, counted and difference | view sessions | F11, F16, F18 | `cash_register.session.get` |
-| The movements of a session (or the sale lines in no shift), with search, filters and pages; with the blind count, to whoever cannot see the expected cash, only those recorded by hand in the open session | view movements | F07, F11, F17 | `cash_register.movement.list` |
+| The open session with its expected cash (if whoever asks may see it), whether the cash register is turned on and the sale lines in no shift (how many and their cash) | view sessions | F04, F10, F12–F15, F17 | `cash_register.session.current` |
+| A session (by id or number) with its summary: sales by payment method, refunds, cash in, cash out, what other apps record (tips), comps, expected, counted and difference | view sessions | F11, F13–F16, F18 | `cash_register.session.get` |
+| The movements of a session (or the sale lines in no shift), with search, filters and pages; with the blind count, to whoever cannot see the expected cash, only those recorded by hand in the open session | view movements | F07, F11, F13–F15, F17 | `cash_register.movement.list` |
 | The counts of a session, with pages | view counts | F06, F09, F11 | `cash_register.count.list` |
 | The close's summary of a session (the open one if none is said) with the counted cash: its number, the counted cash and, if whoever asks may see it, the expected cash and the difference, and what the shift review finds open; it closes nothing | close | F08, F09 | `cash_register.session.closing_summary` |
 | The business's currency, its decimals and its notes and coins | view sessions | F06, F12 | `cash_register.currency.get` |

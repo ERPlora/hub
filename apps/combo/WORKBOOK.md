@@ -608,8 +608,8 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Los menús, con búsqueda, filtros y orden, en páginas de hasta 100 (en vivo) | ver | F01 | `combo.combo.list` |
-| Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
-| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20, BASE-F97) | ver | F06, F07 | `combo.option.get` |
+| Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12, F13 | `combo.combo.get` |
+| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20, BASE-F97) | ver | F06 | `combo.option.get` |
 | Un plato de un menú con sus elecciones, por su id o por su nombre dentro del menú: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F05, F06 | `combo.group.get` |
 | Lo que nombra una elección nueva, antes de la tarjeta del asistente que la añade: el plato, con su menú, y el producto de Inventario; si alguno no existe o vale para varios, no sale tarjeta (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06 | `combo.option.check` |
 | Lo mismo con varias elecciones a la vez: el plato y cada producto, antes de la tarjeta que las añade (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06 | `combo.option.bulk_check` |
@@ -629,7 +629,7 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Cambia un plato (solo lo enviado) | gestionar | F05 | `combo.group.update` |
 | Retira un plato con sus elecciones | gestionar | F05 | `combo.group.delete` |
 | Ordena los platos de un menú, todos a la vez | gestionar | F05 | `combo.group.reorder` |
-| Añade una elección (al final) | gestionar | F06, F15 | `combo.option.create` |
+| Añade una elección (al final) | gestionar | F06, F13, F15 | `combo.option.create` |
 | Añade varias elecciones de golpe | gestionar | F06 | `combo.option.bulk_create` |
 | Cambia una elección: producto, suplemento o disponible (solo lo enviado) | gestionar | F06, F12 | `combo.option.update` |
 | Quita una elección | gestionar | F06 | `combo.option.delete` |
