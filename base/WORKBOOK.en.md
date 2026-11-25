@@ -3116,21 +3116,22 @@ failed: …" and the assistant tells it.
 Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
-<!-- from WORKBOOK.md sha256:d13d6abe2da3 -->
+<!-- from WORKBOOK.md sha256:b63066914a0f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
-  2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
-     goes on. All it says goes to the same bubble, and what each round says in its own paragraph: never glued to the
-     previous one.
-  3. Each action that changes something asks for its own card (BASE-F97), one after the other: accepting the first
-     does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
-     those left.
+  2. The assistant solves it in rounds: it reads what it needs without asking (several things in the same round, if it
+     needs them), asks for an action, it is done and it goes on. All it says goes to the same bubble, and what each
+     round says in its own paragraph: never glued to the previous one.
+  3. Each action that changes something asks for its own card (BASE-F97), one after the other, also those it asks for
+     in the same round: accepting or cancelling the first does not answer for the next ones. If more wait behind it,
+     the card carries "Cancel all", which cancels this one and those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows twenty rounds at most, and each action is one: it is a brake against loops, not an allowance,
-     and a read and a change for each day of the week fit easily. On the twentieth the assistant can do nothing more
+  5. A request allows twenty rounds at most, each with all the assistant asks for at once: it is a brake against
+     loops, not an allowance, and a read and a change for each day of the week fit easily even if it asks for them one
+     by one. On the twentieth the assistant can do nothing more
      and answers with what it has done and what is left, to ask for it in another message; if it still asks for an
      action, it is not done and its card does not appear, and it is told to answer. If it keeps trying, "I stopped:
      this needed too many steps. Ask for it in parts.".
