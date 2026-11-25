@@ -176,9 +176,10 @@ Pasos:
    Servicios los enseña («Mostrar precios», «Mostrar duración»).
 3. Si el negocio lo permite, elige profesional entre los que hacen todos esos servicios, o «Sin
    preferencia».
-4. Elige el día: salen las **horas libres** que la agenda daría a la clienta (horario del negocio, turno y
-   ausencias del profesional, bloqueos y otras citas; nunca dentro de la antelación mínima, más allá de la
-   máxima, en el pasado ni encima de otra cita).
+4. Toca el día en el calendario, que se abre entero en el centro de la pantalla, y queda elegido sin pulsar más:
+   salen las **horas libres** que la agenda daría a la clienta (horario del negocio, turno y ausencias del
+   profesional, bloqueos y otras citas; nunca dentro de la antelación mínima, más allá de la máxima, en el
+   pasado ni encima de otra cita).
 5. Escribe su nombre, su **móvil** (obligatorio), su email (si el negocio lo pide) y, si se permite, una nota.
 6. Pulsa **Reservar**: la cita entra en la agenda con el origen «Reserva online», **Confirmada** o
    **Pendiente** según «Confirmar automáticamente las reservas de la clienta» (y siempre Pendiente si un

@@ -1,8 +1,8 @@
-// The pickers of date-time-fields.ts on a real TimeField: the time of «New appointment» in Appointments, in American
-// English, so its wheel has AM and PM.
+// The pickers of date-time-fields.ts on real fields: the day and the time of «New appointment» in Appointments, in
+// American English, so the wheel of the time has AM and PM.
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 
-import { pickTime, timeAsShown } from './date-time-fields';
+import { cutInPicker, openPicker, pickTime, timeAsShown } from './date-time-fields';
 import { shown } from './helpers';
 import { ownerPage } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -14,17 +14,22 @@ const TIMES = ['10:15', '20:30', '09:45', '19:00', '11:30', '21:15'];
 /** Ionic's hour wheel: `setValue` is what it calls itself on the option it settles on. */
 type HourWheel = HTMLElement & { value: number; setValue(hour: number): Promise<void> };
 
-/** Runs `body` on the time field of a new appointment, and leaves the form without saving it. */
-async function onTimeField(browser: Browser, body: (page: Page, field: Locator) => Promise<void>): Promise<void> {
-  const { context, page } = await ownerPage(browser, '/appointment/agenda');
+/** Runs `body` on the form of a new appointment, at `viewport`, and leaves it without saving it. */
+async function onNewAppointment(browser: Browser, body: (page: Page, form: Locator) => Promise<void>, viewport?: { width: number; height: number }): Promise<void> {
+  const { context, page } = await ownerPage(browser, '/appointment/agenda', viewport);
   try {
     await shown(page).locator('[data-testid=appointment-list-add]').click();
-    await body(page, page.locator('ion-modal[data-testid=appointment-form] [data-testid=appointment-form-time]'));
+    await body(page, page.locator('ion-modal[data-testid=appointment-form]'));
     await page.locator('[data-testid=appointment-form-cancel]').click();
     await discardChanges(page);
   } finally {
     await context.close();
   }
+}
+
+/** Runs `body` on the time field of a new appointment, and leaves the form without saving it. */
+async function onTimeField(browser: Browser, body: (page: Page, field: Locator) => Promise<void>): Promise<void> {
+  await onNewAppointment(browser, (page, form) => body(page, form.locator('[data-testid=appointment-form-time]')));
 }
 
 /** The next hour tapped is let go, as Ionic does with a tap made while the wheel settles: the wheel takes the hour but is
@@ -73,6 +78,26 @@ async function moveTheHourAtDone(page: Page): Promise<void> {
     }, true);
   });
 }
+
+test('on a tablet held sideways the calendar and the wheel of a form show whole in the middle of the screen', async ({ browser }) => {
+  const tablet = { width: 1280, height: 665 };
+  await onNewAppointment(browser, async (page, form) => {
+    const fields = { date: form.locator('[data-testid=appointment-form-day]'), time: form.locator('[data-testid=appointment-form-time]') };
+    for (const presentation of ['date', 'time'] as const) {
+      for (const block of ['start', 'center', 'end'] as const) {
+        await fields[presentation].evaluate((el, at) => el.scrollIntoView({ block: at }), block);
+        const picker = await openPicker(page, fields[presentation], presentation);
+        expect(await cutInPicker(picker), `cut in the ${presentation} with its field at the ${block}`).toEqual([]);
+        const box = (await picker.boundingBox())!;
+        expect(Math.abs(box.x + box.width / 2 - tablet.width / 2), `${presentation}, across`).toBeLessThanOrEqual(1);
+        expect(Math.abs(box.y + box.height / 2 - tablet.height / 2), `${presentation}, down`).toBeLessThanOrEqual(1);
+        await page.keyboard.press('Escape');
+        await expect(picker).toBeHidden();
+      }
+    }
+    await pickTime(page, fields.time, '10:15');
+  }, tablet);
+});
 
 test('pickTime holds the hour it taps right after AM or PM redraws the hours of the wheel', async ({ browser }) => {
   await onTimeField(browser, async (page, field) => {

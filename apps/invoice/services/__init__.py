@@ -22,6 +22,8 @@ from . import (
     series as series,
     platform_invoices as platform_invoices,
     paper as paper,
+    emails as emails,
+    customer_reactions as customer_reactions,
     writes as writes,
     numbering as numbering,
     issuing as issuing,

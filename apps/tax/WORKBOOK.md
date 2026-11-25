@@ -642,7 +642,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `test_a_component_stays_right_under_its_root_in_a_descending_list`.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
-  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas/`, `queries/`, `services.py`, `events.py`,
+  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas/`, `queries/`, `services/`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero, y las páginas
   (`frontend/`: Categorías, Reglas, Alias y Ajustes, con sus diálogos) con su Vitest y su e2e por flujo en
   tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules`, `tax-employee`,
@@ -727,7 +727,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `gettext_noop` y su español en el catálogo de Impuestos, la palabra de las pantallas («Categoría»). Lo
   vigila `tests/test_integration_assistant.py`, que recorre todas las escrituras `tax.*` del registro.
   Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide
-  (`live.E020`: Impuestos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1094; `tests/test_services.py` y
+  (`live.E020`: Impuestos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1094; `tests/test_services_declarations.py` y
   `tests/test_queries_declarations.py` exigen la clave). Sin ellas, desactivar, reactivar o poner fecha de fin a una
   regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las herramientas que ofrece un turno y el
   asistente manda a la pantalla o busca una automatización. `tests/test_assistant_asks.py` mide con las

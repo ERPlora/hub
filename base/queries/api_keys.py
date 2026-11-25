@@ -24,6 +24,8 @@ from base.schemas.api_keys import (
     ApiKeyOut,
 )
 
+from .people import without_address
+
 
 # ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────
 
@@ -36,7 +38,7 @@ def api_key_out(key: ApiKey) -> dict[str, Any]:
         "prefix": key.prefix,
         "scopes": api_actions.normalised(key.scopes),
         "rate_per_minute": key.rate_per_minute,
-        "created_by": key.created_by,
+        "created_by": without_address(key.created_by),
         "created_at": key.created_at,
         "rotated_at": key.rotated_at,
         "last_used_at": key.last_used_at,
