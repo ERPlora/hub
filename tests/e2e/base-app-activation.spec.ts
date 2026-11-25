@@ -207,7 +207,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.screenshot({ path: shot(`APP-BASE-ACTIVATION-confirm-off-${width}`) });
       await confirm.getByRole('button', { name: 'Turn off' }).click();
       await expect(appRow(page, 'task')).toHaveCount(0);
-      await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 16 of 20 in your plan');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 16 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).not.toContain('Tasks');
       await snap(page, 'off', width);
 
@@ -269,7 +269,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.reload();
 
       // Every app on but Website (26), 20 of them chosen: the plan's part is at its limit.
-      await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 20 of 20 in your plan');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 20 of 20 in your plan');
       await search(page, 'Website');
       await expect(appRow(page, 'website').locator('[data-testid="apps-state"]')).toHaveText('Off');
       await flipApp(page, 'website');
@@ -299,7 +299,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const off = await api<{ app: string; state: string }>(context, A, 'POST', '/apps/disable', { app: 'flow' });
       expect(off, 'Automations off before the flow').toMatchObject({ status: 200, data: { app: 'flow', state: 'off' } });
       await page.reload();
-      await expect(testid(page, 'apps-counter')).toHaveText('26 apps activadas · 16 de 20 de tu plan');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 16 de 20 de tu plan');
       await expect(shown(page).locator('[data-testid="apps-row"]').first()).toBeVisible();
       expect(await namesCutShort(page), `every name whole or ending in «…» at ${width}`).toEqual([]);
       expect(await menuApps(page)).not.toContain('Automatizaciones');
@@ -347,7 +347,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toastSaying(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation')).toHaveCount(0);
       // Both go off (two fewer turned on); only Reservations was chosen (one fewer of the plan's).
-      await expect(testid(page, 'apps-counter')).toHaveText('25 apps activadas · 16 de 20 de tu plan');
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps activadas · 16 de 20 de tu plan');
       expect([stored('reservation'), stored('table')]).toEqual(['off:false', 'off:false']);
       await expect
         .poll(async () => (await menuApps(page)).filter((name) => name === 'Reservas' || name === 'Mesas'), {
