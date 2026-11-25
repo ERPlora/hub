@@ -1,8 +1,11 @@
-"""The Hub's own screens, as its help serves them (``base.help.get``): each one is a section of base's WORKBOOK."""
+"""The Hub's own screens, as its help serves them (``base.help.get``): each one is a section of base's WORKBOOK. And what
+a person holds to get a task done on them, from who does it there."""
+
+from collections.abc import Collection
 
 from django.utils.translation import pgettext_lazy
 
-from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, OPEN_MANAGEMENT, OWN_BUSINESS, VIEW_HOME
 from base.workbook_help import Tab
 
 #: How the help of these screens is named: base's own name means nothing to whoever uses the Hub.
@@ -33,3 +36,19 @@ SCREENS = (
     Tab("settings_data", pgettext_lazy("workbook", "Settings · Data and backups"), "/settings#data", ADMINISTER_HUB),
     Tab("profile", pgettext_lazy("workbook", "My profile"), "/profile", VIEW_HOME),
 )
+
+#: The roles base's WORKBOOK names as a task's actor, the least first, each with what it and those above it hold and those
+#: below it do not.
+ROLES = (
+    (pgettext_lazy("workbook", "accountancy firm"), VIEW_HOME),
+    (pgettext_lazy("workbook", "employee"), VIEW_HOME),
+    (pgettext_lazy("workbook", "manager"), OPEN_MANAGEMENT),
+    (pgettext_lazy("workbook", "administrator"), ADMINISTER_HUB),
+    (pgettext_lazy("workbook", "owner"), OWN_BUSINESS),
+)
+
+
+def permission_of(actors: Collection[str]) -> str:
+    """What whoever does a task of ``actors``, written in the active language, holds: what the least of the roles among
+    them does. With none of them (the system, whoever downloads a file), anyone who sees its screen."""
+    return next((permission for role, permission in ROLES if str(role) in actors), VIEW_HOME)
