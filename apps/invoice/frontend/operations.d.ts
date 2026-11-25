@@ -1,10 +1,10 @@
 // Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas. Written by
-// hand, as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with the
-// schemas and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters,
-// an invoice's id or number travels in the input. Money is whole cents with a sign (a rectifying invoice is negative);
-// decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO `YYYY-MM-DD`.
+// hand, as `frontend/sdk-types.ts` is: keep it in step with them and with `frontend/generated/operations.json`. One input
+// per operation (ninja's parity): an invoice's id or number travels in it. Money is whole cents with a sign (a rectifying
+// invoice is negative); decimals are JSON strings on the way out («2.000», «21.00»); dates are ISO `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
 import type { InvoiceDatesIn, InvoiceDueOut, InvoiceStatusFilter } from './invoice-dates';
+import type { WithholdingIn, WithholdingOut } from './invoice-withholding';
 import type { DocumentIssuerOut, IntraEuOperatorIn, IntraEuOperatorOut } from './document-issuer';
 
 export type SortDir = 'asc' | 'desc';
@@ -120,7 +120,7 @@ export interface InvoiceRowOut extends InvoiceDueOut {
   can_substitute: boolean;
 }
 
-export interface InvoiceOut extends InvoiceRowOut, DocumentIssuerOut {
+export interface InvoiceOut extends InvoiceRowOut, DocumentIssuerOut, WithholdingOut {
   series_id: string;
   sequence: number;
   operation_date: string;
@@ -196,7 +196,7 @@ export interface ManualLineIn {
   product_id?: string;
 }
 
-export interface InvoiceCreateIn extends RecipientIn, InvoiceDatesIn {
+export interface InvoiceCreateIn extends RecipientIn, InvoiceDatesIn, WithholdingIn {
   series_id?: string;
   series_code?: string;
   notes?: string;
@@ -224,7 +224,7 @@ export interface RectifyIn extends RectificationPreviewIn {
 
 /** The rectifying invoice a rectification would issue now, before it is issued (INVOICE-F08): its number is the
  *  series' next one, not reserved. */
-export interface RectificationPreviewOut {
+export interface RectificationPreviewOut extends WithholdingOut {
   original: {
     invoice_id: string;
     number: string;

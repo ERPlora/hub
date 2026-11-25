@@ -29,6 +29,9 @@ const INVOICE = {
   base_amount: 2000,
   tax_amount: 420,
   total_amount: 2420,
+  withholding_rate: null,
+  withholding_amount: 0,
+  payable_amount: 2420,
   currency: 'EUR',
   currency_decimals: 2,
   tax_breakdown: [{ tax: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate: '21.00', surcharge_rate: '0.00', base: 2000, quota: 420, surcharge_quota: 0 }],
@@ -94,6 +97,21 @@ describe('InvoicePaper', () => {
     const es = await setup({ invoice: due }, 'es');
     expect(es.text('invoice-paper-due-date')).toBe('13/11/2026');
     expect(es.find('invoice-paper-due-date').element.previousElementSibling?.textContent).toBe('Vencimiento');
+  });
+
+  it('prints what is withheld and what is left to collect after its total, only if something is', async () => {
+    const rows = (s: Awaited<ReturnType<typeof setup>>) => s.find('invoice-paper-taxes').findAll('tr').map((tr) => tr.findAll('td').map((td) => plain(td.text())));
+    const withheld = { ...INVOICE, withholding_rate: '15.00', withholding_amount: 300, payable_amount: 2120 };
+    expect(rows(await setup({ invoice: withheld })).slice(-3)).toEqual([
+      ['TOTAL', '€24.20'],
+      ['IRPF withholding 15%', '-€3.00'],
+      ['Amount due', '€21.20'],
+    ]);
+    expect(rows(await setup({ invoice: withheld }, 'es')).slice(-2)).toEqual([
+      ['Retención IRPF 15 %', '-3,00 €'],
+      ['Total a pagar', '21,20 €'],
+    ]);
+    expect(rows(await setup()).at(-1)).toEqual(['TOTAL', '€24.20']);
   });
 
   it('a ticket is a simplified invoice without «Bill to»; a reprint says «Copy»', async () => {

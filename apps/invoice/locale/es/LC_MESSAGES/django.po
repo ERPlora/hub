@@ -332,6 +332,16 @@ msgctxt "invoice"
 msgid "due date"
 msgstr "vencimiento"
 
+#: models.py
+msgctxt "invoice"
+msgid "IRPF withholding (%)"
+msgstr "retención de IRPF (%)"
+
+#: models.py
+msgctxt "invoice"
+msgid "IRPF withholding"
+msgstr "retención de IRPF"
+
 #: models.py:236
 msgid "issued at"
 msgstr "emitida el"
@@ -714,6 +724,22 @@ msgstr ""
 msgid "The due date cannot be before the invoice's date."
 msgstr "El vencimiento no puede ser anterior a la fecha de la factura."
 
+#: services/manual.py
+msgid ""
+"IRPF withholding is a Spanish tax: a business outside Spain does not "
+"withhold it."
+msgstr ""
+"La retención de IRPF es un impuesto español: un negocio de fuera de España no "
+"la practica."
+
+#: services/manual.py
+msgid ""
+"A ticket carries no IRPF withholding: issue an invoice (F1) with the "
+"customer's details."
+msgstr ""
+"Un tique no lleva retención de IRPF: emite una factura (F1) con los datos del "
+"cliente."
+
 #: services/manual.py:40
 #, python-format
 msgid ""
@@ -905,6 +931,17 @@ msgstr "Fecha de operación"
 msgctxt "invoice"
 msgid "Due date"
 msgstr "Vencimiento"
+
+#: queries/documents.py
+#, python-format
+msgctxt "invoice"
+msgid "IRPF withholding %(rate)s"
+msgstr "Retención IRPF %(rate)s"
+
+#: templates/invoice/invoice.html
+msgctxt "invoice"
+msgid "Amount due"
+msgstr "Total a pagar"
 
 #: templates/invoice/invoice.html:79
 msgid "Bill to"
@@ -1129,3 +1166,18 @@ msgstr "Cuota de recargo"
 msgctxt "invoice export"
 msgid "Total"
 msgstr "Total"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Withholding %"
+msgstr "Retención %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Withholding"
+msgstr "Retención"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Amount due"
+msgstr "Total a pagar"

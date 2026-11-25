@@ -58,6 +58,12 @@
       "notSubject": "No sujeto",
       "reverseCharge": "Inversión del sujeto pasivo"
     },
+    "withholding": {
+      "label": "Retención de IRPF",
+      "none": "Sin retención",
+      "of": "Retención IRPF {rate}",
+      "payable": "Total a pagar"
+    },
     "taxPct": {
       "vat": "IVA %",
       "igic": "IGIC %",
