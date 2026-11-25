@@ -1103,6 +1103,8 @@
       "online_booking__settings__get": "Leer los ajustes de la reserva online",
       "online_booking__settings__update": "Cambiar los ajustes de la reserva online",
       "online_booking__settings__upload_logo": "Subir el logo de la página de reservas",
+      "online_order__public__menu": "Leer la carta de una mesa",
+      "online_order__public__options": "Leer los suplementos de un plato de la carta de una mesa",
       "online_order__qr_code__list": "Buscar los códigos QR de las mesas",
       "payment__method__activate": "Activar un método de pago",
       "payment__method__create": "Crear un método de pago",
@@ -1463,6 +1465,7 @@
       "send": "Enviar"
     },
     "fields": {
+      "combos": "Menús",
       "dish_id": "Plato",
       "modifier_id": "Suplemento",
       "quick_note_id": "Nota rápida",
