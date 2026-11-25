@@ -159,6 +159,48 @@ class TestCreate:
         assert (refused.status_code, code(refused)) == (403, "base.role_beyond_editor")
         assert not BusinessRole.objects.filter(name="Stock too").exists()
 
+    @pytest.mark.parametrize(
+        ("mine", "theirs", "given"),
+        [(OFF, APPROVAL, False), (APPROVAL, APPROVAL, True), (ON, APPROVAL, True), (OFF, OFF, True)],
+    )
+    @pytest.mark.parametrize("on", [{"base", "sale"}, {"base"}], ids=["on", "off"])
+    def test_nor_one_that_does_with_approval_what_their_role_says_no_to(
+        self, client, rosa, monkeypatch, mine, theirs, given, on
+    ):
+        """Measured with the app on and off: what the role keeps of it comes back when it is turned on."""
+        everything = {permission: OFF for permission in permissions_of_role(Membership.Role.ADMIN)}
+        hers = {"base.view_home": ON, "base.manage_roles": ON, "sale.view_sale": ON, "sale.void_sale": mine}
+        BusinessRole.objects.filter(name="People").update(states=everything | hers)
+        source = a_role("Till")
+        source.states = everything | {"base.view_home": ON, "sale.view_sale": ON, "sale.void_sale": theirs}
+        source.save()
+        client.force_login(rosa)
+        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: frozenset(on))
+
+        response = post(client, "/roles", {"based_on": str(source.pk), "name": "Till too"})
+
+        if given:
+            assert response.status_code == 200, response.content
+            assert BusinessRole.objects.get(name="Till too").states["sale.void_sale"] == theirs
+        else:
+            assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
+            assert not BusinessRole.objects.filter(name="Till too").exists()
+
+    def test_nor_what_the_role_it_came_from_does_with_approval_in_an_app_turned_on_later(self, client, rosa, monkeypatch):
+        """The employee's role voids with approval; Rosa's says no. A role not saved with the till will do it."""
+        everything = {permission: OFF for permission in permissions_of_role(Membership.Role.ADMIN)}
+        hers = {p: ON for p in permissions_of_role(EMPLOYEE)} | {"base.manage_roles": ON}
+        BusinessRole.objects.filter(name="People").update(states=everything | hers)
+        source = a_role("Till")
+        source.states = {p: s for p, s in (everything | hers).items() if not p.startswith("sale.")}
+        source.save()
+        client.force_login(rosa)
+        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: frozenset({"base"}))
+
+        response = post(client, "/roles", {"based_on": str(source.pk), "name": "Till too"})
+
+        assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
+
     @pytest.mark.parametrize("name", ["", "   "])
     def test_a_role_has_a_name(self, client, olga, name):
         client.force_login(olga)
@@ -339,13 +381,56 @@ class TestUpdate:
 
         assert response.status_code == 200, response.content
 
-    def test_to_allow_it_with_approval_gives_nothing_by_itself(self, client, rosa):
-        role = a_role(sale__void_sale=OFF)
+    @pytest.mark.parametrize(
+        ("mine", "theirs", "becomes", "given"),
+        [
+            (OFF, OFF, "approval", False),
+            (OFF, APPROVAL, "on", False),
+            (OFF, APPROVAL, "off", True),
+            (OFF, ON, "approval", True),
+            (APPROVAL, OFF, "approval", True),
+            (APPROVAL, APPROVAL, "on", False),
+            (ON, OFF, "approval", True),
+            (ON, APPROVAL, "on", True),
+        ],
+    )
+    def test_nobody_lets_a_role_do_more_than_their_own(self, client, rosa, mine, theirs, becomes, given):
+        """What Rosa's role says no to she does not leave to approval either; what she does with approval she does."""
+        BusinessRole.objects.filter(name="People").update(
+            states={"base.view_home": ON, "base.manage_roles": ON, "sale.view_sale": ON, "sale.void_sale": mine}
+        )
+        role = a_role(sale__view_sale=ON, sale__void_sale=theirs)
         client.force_login(rosa)
 
-        response = post(client, "/roles/update", {"role": str(role.pk), "states": {"sale.void_sale": "approval"}})
+        response = post(client, "/roles/update", {"role": str(role.pk), "states": {"sale.void_sale": becomes}})
 
-        assert response.status_code == 200, response.content
+        role.refresh_from_db()
+        if given:
+            assert response.status_code == 200, response.content
+            assert role.states["sale.void_sale"] == becomes
+        else:
+            assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
+            assert role.states["sale.void_sale"] == theirs
+
+    def test_nobody_lifts_the_no_of_their_own_role(self, client, rosa):
+        mine = BusinessRole.objects.get(name="People")
+        client.force_login(rosa)
+
+        response = post(client, "/roles/update", {"role": str(mine.pk), "states": {"sale.void_sale": "approval"}})
+
+        assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
+        mine.refresh_from_db()
+        assert "sale.void_sale" not in mine.states
+
+    @pytest.mark.parametrize("state", ["on", "approval", "off"])
+    def test_what_it_becomes_is_what_its_detail_answers(self, client, olga, state):
+        role = a_role(sale__view_sale=ON, sale__void_sale=ON, sale__refund_sale=APPROVAL)
+        client.force_login(olga)
+
+        assert post(client, "/roles/update", {"role": str(role.pk), "states": {"sale.void_sale": state}}).status_code == 200
+
+        shown = detail(client, role)
+        assert (shown["sale.void_sale"], shown["sale.refund_sale"], shown["sale.view_sale"]) == (state, APPROVAL, ON)
 
     def test_only_what_a_manager_can_approve_is_left_to_approval(self, client, olga):
         role = a_role(sale__view_sale=ON)

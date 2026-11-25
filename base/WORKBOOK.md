@@ -2360,8 +2360,9 @@ Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la des
 Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
 Si falla: sin nombre, «Ponle nombre al rol.»; con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
 con ese nombre. Elige otro.»; un rol que no está, «Este rol no existe en este negocio.». Nadie da lo que no tiene: si
-el rol del que parte permite algo que quien lo crea no puede hacer, «Un rol no puede permitir más de lo que puedes
-hacer tú.» y no se crea. A quien no gestiona roles el asistente no se lo ofrece, y la API contesta 403.
+el rol del que parte permite algo que quien lo crea no puede hacer, o deja «Con aprobación» algo a lo que su propio rol
+le dice «No», «Un rol no puede permitir más de lo que puedes hacer tú.» y no se crea. A quien no gestiona roles el
+asistente no se lo ofrece, y la API contesta 403.
 Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Ajustar lo que permite un rol propio
@@ -2381,10 +2382,11 @@ Pasos:
 Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
 Sale: el rol cambiado. Evento `base.role.updated`.
 Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
-tiene: «Un rol no puede permitir más de lo que puedes hacer tú.»; y ser el propietario no se da a nadie: «Eso es solo
-del propietario del negocio: ningún rol lo da.». Un permiso que no es de una app encendida, «Ese permiso no es de
-ninguna app encendida de este negocio.»; «Con aprobación» en algo que un responsable no puede aprobar con su PIN, «Eso
-no se puede aprobar con un PIN: elige permitido o no.». El nombre, como al crearlo.
+tiene, tampoco «Con aprobación» lo que su propio rol le niega: «Un rol no puede permitir más de lo que puedes hacer
+tú.»; y ser el propietario no se da a nadie: «Eso es solo del propietario del negocio: ningún rol lo da.». Un permiso que
+no es de una app encendida, «Ese permiso no es de ninguna app encendida de este negocio.»; «Con aprobación» en algo que
+un responsable no puede aprobar con su PIN, «Eso no se puede aprobar con un PIN: elige permitido o no.». El nombre, como
+al crearlo.
 Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Borrar un rol propio
@@ -2420,11 +2422,12 @@ Sale: la persona con ese rol. Evento `base.role.assigned`. erplora.com no lo sab
 Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; nadie
 se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está por
 debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
-permite más de lo que puede hacer él, tampoco el de la invitación al devolverla ni lo que daría una app apagada: «Un rol
-no puede permitir más de lo que puedes hacer tú.». Otro rol básico, «Ese rol se da en erplora.com. Aquí se da uno propio
-del negocio.»; un rol que no está, «Este rol no existe en este negocio.»; una persona que no es del negocio, «Esa
-persona no está en este negocio.». Si alguien borra el rol a la vez, o se borra o se da, nunca las dos cosas: se oye el
-«Este rol no existe en este negocio.» o el «2 personas tienen este rol. Dales otro antes de borrarlo.».
+permite más de lo que puede hacer él, tampoco el de la invitación al devolverla, ni lo que daría una app apagada, ni
+«Con aprobación» lo que su propio rol le niega: «Un rol no puede permitir más de lo que puedes hacer tú.». Otro rol
+básico, «Ese rol se da en erplora.com. Aquí se da uno propio del negocio.»; un rol que no está, «Este rol no existe en
+este negocio.»; una persona que no es del negocio, «Esa persona no está en este negocio.». Si alguien borra el rol a la
+vez, o se borra o se da, nunca las dos cosas: se oye el «Este rol no existe en este negocio.» o el «2 personas tienen
+este rol. Dales otro antes de borrarlo.».
 Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
 
 ### BASE-F131 Ver en la campana los roles por revisar
@@ -2460,6 +2463,12 @@ Pasos:
      sale ya). El responsable toca la suya y teclea su PIN en el teclado, entero a la vista sin desplazar, también el
      0 y «Borrar» («Otra persona» vuelve a las caras), o pasa su placa en cualquier momento.
   4. La acción se hace una vez y sale «Aprobado por {name}». La sesión de quien lo pidió no se cierra.
+  5. A quien tiene un rol propio (BASE-F130) se le pregunta según lo que ese rol dice de esa acción: «Permitido», la
+     hace sin preguntar; «Con aprobación», sale la pregunta; «No», no hay pregunta: se rechaza y ningún PIN la deja
+     pasar, tampoco una aprobación que ya le hubieran dado. Si el rol cambia, vale desde la acción siguiente, sin cerrar
+     la sesión (BASE-F13). Una app que se encendió después de guardar el rol pregunta como el rol básico del que salió;
+     un permiso que una app añadió después está en «No» hasta que se revisa (BASE-F131). Al propietario no se le pregunta
+     nunca.
   También desde el asistente: el «sí» de su tarjeta abre el mismo diálogo, con las cifras de lo que se le pidió.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
@@ -2470,11 +2479,12 @@ aprobada hace por el camino en otras apps (la factura rectificativa de una anula
 devuelve) va con la aprobación, como cuando lo hace el propio responsable; nada más: ni lo que solo se consulta ni la
 acción siguiente. Quien no es del negocio recibe el rechazo de siempre, sin la pregunta de la aprobación.
 Si falla: el diálogo se queda abierto con «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a
-intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.», «Esto ya no necesita
-aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.», la espera tras demasiados intentos o «No se pudo
-enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede
-aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
-Implicados: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
+intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.» (tampoco quien lo hace «Con
+aprobación»), «Esto ya no necesita aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.» (también si
+mientras tanto el rol de quien lo pide pasó a «No»), la espera tras demasiados intentos o «No se pudo enviar la
+aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede aprobarlo con
+un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
+Implicados: BASE-F85, BASE-F55, BASE-F56, BASE-F100, BASE-F128, BASE-F130, SALE-F30, SALE-F31
 
 ### BASE-F85 Consultar quién aprobó qué
 Estado: hecho
@@ -2945,12 +2955,13 @@ Pasos:
   1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con sus
      botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
      al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
-     pantalla. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado, dicho en el
-     idioma de la conversación, o el propio que el negocio le dio, por su nombre, BASE-F130) y que sus herramientas son
-     las de ese rol: si le piden algo que ninguna hace, no busca
-     otro camino ni cuenta el estado de otra cosa, sino que dice en una frase que no lo tiene disponible aquí, porque
-     su rol no puede o porque esa app no está encendida, y quién puede (al empleado, un encargado o el propietario; al
-     encargado, el propietario o un administrador) o en qué pantalla se hace.
+     pantalla, salvo que el rol propio de la persona le diga «No» (BASE-F84): esa no se le ofrece ni se le encuentra, y
+     ningún PIN la deja pasar. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado,
+     dicho en el idioma de la conversación, o el propio que el negocio le dio, por su nombre, BASE-F130) y que sus
+     herramientas son las de ese rol: si le piden algo que ninguna hace, no busca otro camino ni cuenta el estado de otra
+     cosa, sino que dice en una frase que no lo tiene disponible aquí, porque su rol no puede o porque esa app no está
+     encendida, y quién puede (al empleado, un encargado o el propietario; al encargado, el propietario o un
+     administrador) o en qué pantalla se hace.
   2. Esa acción sale con su tarjeta, como cualquier otra, y el asistente avisa antes de que la tarjeta pedirá la
      aprobación de un responsable. Al pulsar «Ejecutar» se abre «Hace falta una aprobación», la misma de la pantalla:
      un responsable toca su cara y teclea su PIN, o pasa su placa, y la acción se hace una vez, con quien la pidió
@@ -4529,7 +4540,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   del SaaS; `knowledge/raw/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant/` (sin ORM) les añade
   lo suyo, un módulo por pieza (`_Words`, pantallas, `ALWAYS`, `NOT_FROM_CHAT`, checks y pasarela): el catálogo de herramientas (`catalog`:
   toda `@operation` de las apps activas cuyo `ai=` es una herramienta (`Operation.ai_spec()` es un `AI`) y cuyo permiso
-  tiene la persona, o que su app deja aprobar a un responsable (`approvals.label_of`). Toda operación declara `ai=`
+  tiene la persona, o que su app deja aprobar a un responsable (`approvals.label_of`) y el rol propio de la persona no
+  le niega (`permissions.refused_outright`). Toda operación declara `ai=`
   (`live.E017`): `AI(description=…, risk=…)` o `ai=INTERNAL`; un `dict` se sigue aceptando y `ai_spec()` lo lee como
   `INTERNAL` si no tiene descripción, si dice «Not an assistant tool» / «System only» o si es de la plataforma (sin
   permiso, o con uno que ninguna app declara, `<app>.system` o `system.<app>`: sus reacciones y tareas programadas, que
@@ -4668,7 +4680,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   Una escritura que toma su registro por el nombre sin marcarlo ni comprobarlo no queda fijada: su tarjeta tiene que
   leerlo (patrón de Demo, hub#1206); el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
-  con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
+  con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`; si su rol propio
+  dice «No», la herramienta no está en su catálogo y no corre ni con pase), y arma las
   instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
   zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
   encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
@@ -4811,10 +4824,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   (`Credential`): mismo hash, mismos frenos.
 - Roles propios (`base.models.roles.BusinessRole`, en la BD del negocio): `base/roles.py` dice sin ORM lo que permite
   uno hoy y lo que queda por revisar; `base.permissions.permissions_of_business_role` es el único cálculo, el mismo de
-  quien lo tiene (`access_for`), y con él `base/services/roles.py` mide la escalada: solo lo que pasa a «Permitido» y
-  antes no lo estaba, en todas las apps de este despliegue, también las apagadas (una app que se encienda da lo de su
-  rol de origen). Guardar `states` escribe lo que llega; si llega algo de una app que el rol no había guardado, se
-  escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
+  quien lo tiene (`access_for`), y `base/services/roles.py` mide la escalada con `queries.roles.states_of`: solo lo que
+  sube (`roles.raised`: de «No» a «Con aprobación» o de cualquiera a «Permitido»), en todas las apps de este despliegue,
+  también las apagadas (una app que se encienda da lo de su rol de origen). Lo «Permitido» lo da quien lo tiene; lo «Con
+  aprobación», quien lo tiene o lo hace también con aprobación: sin eso, quien gestiona roles se quitaría a sí mismo el
+  «No» que le puso el dueño. Guardar `states` escribe lo que llega; si llega algo de una app que el rol no había
+  guardado, se escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
   despierta todas las consultas vivas del negocio tras el COMMIT (`_wake_open_apps`). El nombre es único sin contar
   mayúsculas (`base_businessrole_name_unique`), como en Shopify POS, Lightspeed, Odoo, NetSuite, Business Central y
   WordPress; y solo quien está en el negocio impide borrarlo, como en Square y Lightspeed. `base.role.assign` escribe
@@ -4835,7 +4850,10 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
-  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras:
+  quien no es del negocio (sin `base.view_home`) y a quien su rol propio le dice «No»
+  (`permissions.refused_outright`, leído en cada petición), el `permission_denied` de siempre, también con un pase: el
+  pase no se marca ni se gasta. `base.approval.approve` tampoco lo da (`base.approval_not_offered`). Un rol básico no
+  dice «No»: lo que no da y su app deja aprobar es «Con aprobación». La frase con cifras:
   junto a `approvals`, la
   app declara `approval_figures = {"<orden>": [_("… {campo} …"), …]}`, frases que se prueban en orden con huecos de
   la entrada de la orden: `{campo}` (texto o número), `{campo, percent}` (0–100, `format_percent`) y
@@ -4871,7 +4889,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   de `apps/sale/queries/other_apps.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
   `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
-  `frontend/main.ts`). El registro es `base.models.approvals.Approval` (`base.approval.list`).
+  `frontend/main.ts`). Para decirlo antes de empezar, `useAccess(permiso)` de `base/frontend/lib/use-access.ts` da
+  `allowed`, `approval` o `no` desde `permissions` y `approvable` de `base.session.me`, que se vuelve a leer al cambiar el
+  rol; lo usa Ventas (SALE-F30, SALE-F31). El registro es `base.models.approvals.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
   en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento

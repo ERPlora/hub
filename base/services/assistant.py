@@ -216,12 +216,12 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
     """Who runs a write the person said yes to: the person. When they may not and a manager may approve it
-   , the turn asks as the screen does — ``requires_elevation`` for this very request — and, repeated with
-    the pass, runs it with that one permission more; the pass is spent in the write's own transaction
+    (``approvals.asks_a_manager``), the turn asks as the screen does — ``requires_elevation`` for this very request —
+    and, repeated with the pass, runs it with that one permission more; the pass is spent in the write's own transaction
     (``base.approval_spend``), so a write that fails leaves it unspent and one that ran cannot run twice. The question
     says the figures of that write, read from its ``arguments`` as the command validates them."""
     request = getattr(ctx, "request", None)
-    if ctx.has(op.permission) or request is None or approval_rules.approvable(op.name) is None:
+    if request is None or not approval_rules.asks_a_manager(ctx, op):
         return ctx
     asked = approval_rules.fingerprint(request, ctx.scope.key)
     figures = approval_rules.figures_from(op, arguments)

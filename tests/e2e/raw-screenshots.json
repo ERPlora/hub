@@ -121,7 +121,6 @@
   "prod-csp.spec.ts": 7,
   "reconnect.spec.ts": 2,
   "reservation-book.spec.ts": 3,
-  "sale-approval.spec.ts": 3,
   "sale-backoffice.spec.ts": 1,
   "sale-business-currency.spec.ts": 5,
   "sale-cash-gate.spec.ts": 1,
