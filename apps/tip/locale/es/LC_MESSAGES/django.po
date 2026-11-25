@@ -1,0 +1,188 @@
+# Spanish translation of the tips app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next tip\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-25 00:00+0100\n"
+"PO-Revision-Date: 2026-11-25 00:00+0100\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Tips"
+msgstr "Propinas"
+
+msgid "Record the tips left by card or in cash, who each one belongs to, and see them apart in the drawer."
+msgstr "Anota las propinas que dejan con tarjeta o en efectivo, de quién es cada una, y velas aparte en la caja."
+
+msgid "Tips keeps the tip a customer leaves when paying, by card or in cash, with its sale and the person it belongs to: whoever served the check or did the service. A tip is no sale: it carries no VAT and never changes the ticket. A tip in cash enters the drawer and one by card shows apart in the cash register, a tip can be corrected or voided with its reason, and voiding or refunding a sale voids its tip by itself."
+msgstr "Propinas guarda la propina que el cliente deja al pagar, con tarjeta o en efectivo, con su venta y la persona a quien pertenece: quien atendió la cuenta o hizo el servicio. Una propina no es una venta: no lleva IVA y nunca cambia el tique. La propina en efectivo entra en el cajón y la de tarjeta sale aparte en la caja, una propina se puede corregir o anular con su motivo, y anular o devolver una venta anula su propina sola."
+
+msgid "View tips (an employee, their own)"
+msgstr "Ver propinas (el empleado, las suyas)"
+
+msgid "Record tips"
+msgstr "Anotar propinas"
+
+msgid "Adjust and void tips"
+msgstr "Ajustar y anular propinas"
+
+msgid "Change the tip settings"
+msgstr "Cambiar los ajustes de propinas"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "ask for a tip at the charge"
+msgstr "pedir propina al cobrar"
+
+msgid "allow another amount"
+msgstr "permitir otra cantidad"
+
+msgid "chosen suggestion"
+msgstr "sugerencia marcada"
+
+msgid "suggestions by payment method"
+msgstr "sugerencias por forma de pago"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "tip settings"
+msgstr "ajustes de propinas"
+
+msgctxt "tip status"
+msgid "Active"
+msgstr "Activa"
+
+msgctxt "tip status"
+msgid "Voided"
+msgstr "Anulada"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "for"
+msgstr "para"
+
+msgid "payment method"
+msgstr "medio de pago"
+
+msgid "payment method name"
+msgstr "nombre de la forma de pago"
+
+msgid "payment method type"
+msgstr "tipo de forma de pago"
+
+msgid "amount"
+msgstr "importe"
+
+msgid "status"
+msgstr "estado"
+
+msgid "cash session"
+msgstr "sesión de caja"
+
+msgid "attempt key"
+msgstr "clave del intento"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "adjusted at"
+msgstr "ajustada el"
+
+msgid "adjusted by"
+msgstr "ajustada por"
+
+msgid "reason of the adjustment"
+msgstr "motivo del ajuste"
+
+msgid "voided at"
+msgstr "anulado el"
+
+msgid "voided by"
+msgstr "anulada por"
+
+msgid "reason of the void"
+msgstr "motivo de la anulación"
+
+msgid "tip"
+msgstr "propina"
+
+msgid "tips"
+msgstr "propinas"
+
+msgid "That tip no longer exists."
+msgstr "Esa propina ya no existe."
+
+msgid "The sale %(number)s has several tips: say which one by its id."
+msgstr "La venta %(number)s tiene varias propinas: di cuál por su id."
+
+msgid "Say the tip's sale, or that it goes to the pool."
+msgstr "Di la venta de la propina, o que va al bote."
+
+msgid "Say the tip's payment method."
+msgstr "Di la forma de pago de la propina."
+
+msgid "The pool takes cash: leave the payment method out."
+msgstr "El bote es en efectivo: no digas forma de pago."
+
+msgid "Say which tip: its id or its sale's number."
+msgstr "Di qué propina: su id o el número de su venta."
+
+msgid "Write the reason."
+msgstr "Escribe el motivo."
+
+msgid "That suggestion is already there."
+msgstr "Esa sugerencia ya está."
+
+msgid "A percentage goes up to 100."
+msgstr "Un porcentaje llega como mucho a 100."
+
+msgid "Say what changes: the amount or the person."
+msgstr "Di qué cambia: el importe o la persona."
+
+msgid "Tip"
+msgstr "Propina"
+
+msgid "Sale"
+msgstr "Venta"
+
+msgid "For"
+msgstr "Para"
+
+msgid "Payment method"
+msgstr "Forma de pago"
+
+msgid "The drawer is closed: open a cash register session to record a tip in cash."
+msgstr "La caja está cerrada: abre una sesión de caja para anotar una propina en efectivo."
+
+msgid "That sale does not exist."
+msgstr "Esa venta no existe."
+
+msgid "That sale is voided: it takes no tip."
+msgstr "Esa venta está anulada: no admite propina."
+
+msgid "That person is not on the team: choose someone from Staff."
+msgstr "Esa persona no está en el equipo: elige a alguien de Personal."
+
+msgid "That attempt already recorded another tip."
+msgstr "Ese intento ya anotó otra propina."
+
+msgid "That tip is being recorded right now: try again in a moment."
+msgstr "Esa propina se está anotando ahora mismo: inténtalo de nuevo en un momento."
+
+msgid "That tip is voided: it no longer changes."
+msgstr "Esa propina está anulada: ya no cambia."

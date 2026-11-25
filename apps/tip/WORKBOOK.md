@@ -1,7 +1,8 @@
 # Workbook — Propinas (app)
 Prefijo: TIP
 Alcance MVP: etapa TPV (restaurante y peluquería)
-Estado de la app: no hecha — especificación escrita el 2026-11-14 (hub#562); el código va por hub#1497 a hub#1502
+Estado de la app: parcial — una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la caja;
+faltan sus pantallas, su paso en el Cobro, el informe y «Mis propinas» (hub#1498, hub#1500) y el reparto (hub#1501)
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y
@@ -72,9 +73,8 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (consultado el 20
 
 ## Antes de empezar
 
-- **Ventas**, **Caja**, **Personal** y **Control horario** se encienden con Propinas: la propina va con su
-  venta, la de efectivo entra en la caja, es de una persona del equipo y el reparto por horas usa los
-  fichajes.
+- **Ventas**, **Caja** y **Personal** se encienden con Propinas: la propina va con su venta, la de efectivo entra
+  en la caja y es de una persona del equipo.
 - **Ajustes**: de fábrica, las propinas están **apagadas** (como en Square, SumUp, Revo u Odoo). Se encienden en
   **Propinas → Ajustes** (TIP-F01).
 - **Quien atiende**: la propina es de la persona del chip «Atiende» de la cuenta (SALE-F16); con «Yo», de quien
@@ -141,12 +141,12 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 
 | ID | Flujo | Vertical | Estado |
 |---|---|---|---|
-| TIP-F01 | Configurar las propinas | común | no hecho |
+| TIP-F01 | Configurar las propinas | común | parcial — falta la pantalla Ajustes |
 | TIP-F02 | Proponer la propina al cobrar | común | no hecho |
-| TIP-F03 | Anotar una propina con tarjeta | común | no hecho |
-| TIP-F04 | Anotar una propina en efectivo | común | no hecho |
-| TIP-F05 | Echar al bote una propina sin tique | restaurante | no hecho |
-| TIP-F06 | Ajustar o anular una propina | común | no hecho |
+| TIP-F03 | Anotar una propina con tarjeta | común | parcial — faltan el Cobro y la pantalla Propinas |
+| TIP-F04 | Anotar una propina en efectivo | común | parcial — faltan el Cobro y la pantalla Propinas |
+| TIP-F05 | Echar al bote una propina sin tique | restaurante | parcial — falta la pantalla Propinas |
+| TIP-F06 | Ajustar o anular una propina | común | parcial — falta la pantalla Propinas |
 | TIP-F07 | Declarar las propinas en efectivo al cerrar el turno | restaurante | no hecho |
 | TIP-F08 | Definir el reparto | restaurante | no hecho |
 | TIP-F09 | Repartir a otro puesto (tip-out) | restaurante | no hecho |
@@ -157,7 +157,7 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 | TIP-F14 | Ver mis propinas | común | no hecho |
 
 ### TIP-F01 Configurar las propinas
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: parcial — los ajustes se leen y se guardan por la API y el asistente; falta la pantalla Ajustes (hub#1498)
 Vertical: común
 Actor: propietario, administrador, asistente
 Pantalla: Ajustes
@@ -176,7 +176,7 @@ bloqueada con «No tienes permiso para cambiar estos ajustes.».
 Implicados: SALE-F37
 
 ### TIP-F02 Proponer la propina al cobrar
-Estado: no hecho — la app no existe y la hoja Cobro aún no pinta pasos de otras apps (hub#1498, hub#1500)
+Estado: no hecho — Propinas aún no declara su paso en la hoja Cobro (hub#1498, hub#1500)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro
@@ -199,7 +199,8 @@ al ajustarla (TIP-F06).
 Implicados: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Anotar una propina con tarjeta
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: parcial — la propina con tarjeta se anota sobre su venta por la API y el asistente y sale aparte en la caja;
+faltan anotarla en el Cobro y en la pantalla Propinas (hub#1498, hub#1500)
 Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Cobro, Propinas
@@ -216,7 +217,8 @@ una venta de un día ya repartido, «Ese día ya está repartido: reábrelo para
 Implicados: CASH_REGISTER-F18
 
 ### TIP-F04 Anotar una propina en efectivo
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: parcial — la propina en efectivo se anota sobre su venta por la API y el asistente y entra en el cajón; faltan
+«Quédese el cambio» en el Cobro y la pantalla Propinas (hub#1498, hub#1500)
 Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Cobro, Propinas
@@ -235,7 +237,7 @@ total y la propina».
 Implicados: SALE-F01, CASH_REGISTER-F18
 
 ### TIP-F05 Echar al bote una propina sin tique
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: parcial — el bote se anota por la API y el asistente y entra en el cajón; falta la pantalla Propinas (hub#1498)
 Vertical: restaurante
 Actor: responsable
 Pantalla: Propinas
@@ -250,7 +252,8 @@ Si falla: la caja cerrada, el mismo aviso que TIP-F04.
 Implicados: TIP-F08, CASH_REGISTER-F18
 
 ### TIP-F06 Ajustar o anular una propina
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: parcial — ajustar y anular van por la API y el asistente, y anular o devolver entera la venta anula su
+propina sola; falta la pantalla Propinas (hub#1498)
 Vertical: común
 Actor: responsable, asistente
 Pantalla: Propinas
@@ -268,7 +271,7 @@ cambiar sus propinas.».
 Implicados: SALE-F30, SALE-F31, CASH_REGISTER-F18
 
 ### TIP-F07 Declarar las propinas en efectivo al cerrar el turno
-Estado: no hecho — la app no existe todavía (hub#1501)
+Estado: no hecho — llega con el reparto (hub#1501)
 Vertical: restaurante
 Actor: empleado
 Pantalla: Propinas
@@ -286,7 +289,7 @@ debajo de su campo.
 Implicados: ATTENDANCE-F01
 
 ### TIP-F08 Definir el reparto
-Estado: no hecho — la app no existe todavía (hub#1501)
+Estado: no hecho — llega con el reparto (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador
 Pantalla: Reparto
@@ -304,7 +307,7 @@ aporta y recibe a la vez en la misma regla, «Un puesto no puede aportar y recib
 Implicados: STAFF-F04, ATTENDANCE-F01
 
 ### TIP-F09 Repartir a otro puesto (tip-out)
-Estado: no hecho — la app no existe todavía (hub#1501)
+Estado: no hecho — llega con el reparto (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador
 Pantalla: Reparto
@@ -318,7 +321,7 @@ Si falla: un % de más de 100 o negativo se dice debajo de su campo.
 Implicados: TIP-F08
 
 ### TIP-F10 Ver la vista previa del reparto
-Estado: no hecho — la app no existe todavía (hub#1501)
+Estado: no hecho — llega con el reparto (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador
 Pantalla: Reparto
@@ -331,7 +334,7 @@ Si falla: un día sin propinas, «Ese día no tiene propinas.».
 Implicados: TIP-F08
 
 ### TIP-F11 Aprobar el reparto de un día o servicio
-Estado: no hecho — la app no existe todavía (hub#1501)
+Estado: no hecho — llega con el reparto (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador, asistente
 Pantalla: Reparto
@@ -347,7 +350,7 @@ pagadas no se reabre: «Ese día ya tiene propinas pagadas.».
 Implicados: ATTENDANCE-F05, ATTENDANCE-F08
 
 ### TIP-F12 Pagar las propinas
-Estado: no hecho — la app no existe todavía (hub#1501)
+Estado: no hecho — llega con el reparto (hub#1501)
 Vertical: común
 Actor: responsable, administrador, asistente
 Pantalla: Reparto, Informe
@@ -363,7 +366,7 @@ más de lo pendiente, «No se puede pagar más de lo pendiente.».
 Implicados: CASH_REGISTER-F05, CASH_REGISTER-F18
 
 ### TIP-F13 Ver el informe por persona y por turno
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: no hecho — faltan el informe y «Mis propinas» (hub#1498)
 Vertical: común
 Actor: responsable, administrador
 Pantalla: Informe
@@ -377,7 +380,7 @@ Si falla: el error de carga con «Reintentar».
 Implicados: ATTENDANCE-F01
 
 ### TIP-F14 Ver mis propinas
-Estado: no hecho — la app no existe todavía (hub#1498)
+Estado: no hecho — faltan el informe y «Mis propinas» (hub#1498)
 Vertical: común
 Actor: empleado
 Pantalla: Mis propinas
@@ -448,7 +451,8 @@ confirmar.
 - **Caja** (requisito): apunta en la sesión abierta lo que entra y sale de propinas (`cash_register.movement.add`,
   CASH_REGISTER-F18).
 - **Personal** (requisito): las personas y su rol, para saber de quién es cada propina y repartir por puesto.
-- **Control horario** (requisito): las horas fichadas, para el reparto por horas y el informe por turno.
+- **Control horario**: las horas fichadas, para el reparto por horas y el informe por turno; se enciende con
+  Propinas cuando llegan el reparto y el informe.
 
 ### Quién puede qué
 

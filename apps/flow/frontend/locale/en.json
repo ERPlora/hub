@@ -1413,7 +1413,13 @@
       "website__site__publish": "Publish the website",
       "website__site__save": "Save the website's draft",
       "website__site__unpublish": "Take the website offline",
-      "invoice__public__ticket": "Read the ticket a ticket's code opens"
+      "invoice__public__ticket": "Read the ticket a ticket's code opens",
+      "tip__settings__get": "Read the tip settings",
+      "tip__settings__update": "Change the tip settings",
+      "tip__tip__list": "Look for tips",
+      "tip__tip__add": "Record a tip",
+      "tip__tip__update": "Adjust a tip",
+      "tip__tip__void": "Void a tip"
     },
     "facts": {
       "created": "created",
@@ -2774,7 +2780,20 @@
       "issued": "Issued now",
       "aeat_proof": "AEAT test environment",
       "aeat_proof_detail": "Why the AEAT test environment refused it",
-      "steps": "Steps"
+      "steps": "Steps",
+      "enabled": "Tips asked for at the charge",
+      "allow_custom": "Another amount allowed",
+      "preselected": "Suggestion chosen",
+      "methods": "Payment methods",
+      "suggestions": "Suggestions",
+      "pool": "To the pool",
+      "attempt_key": "Attempt key",
+      "adjusted_at": "Adjusted at",
+      "adjusted_by": "Adjusted by",
+      "adjust_reason": "Reason of the adjustment",
+      "tip_id": "Tip",
+      "before": "Before",
+      "after": "After"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

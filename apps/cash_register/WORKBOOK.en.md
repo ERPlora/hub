@@ -192,7 +192,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05); the drawer chosen by itself and the cash the closing proposes from the last count are no change.
 
 ## Flows
-<!-- from WORKBOOK.md sha256:4d8131ef8ecc -->
+<!-- from WORKBOOK.md sha256:abecb0155ecb -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -213,7 +213,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
-| CASH_REGISTER-F18 | See the tips in the cash register | common | partial — the Tips app, which is the one that records them, is missing |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | done |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 <!-- from WORKBOOK.md sha256:0654bfa2fb50 -->
@@ -672,17 +672,15 @@ If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
-<!-- from WORKBOOK.md sha256:8d537e282630 -->
-Status: partial — the Cash register already shows apart what another app records, in the Session detail, in
-Movements, in the "Close session" window and on the X or Z report; the Tips app, which is the one that records it,
-is missing (hub#1498)
+<!-- from WORKBOOK.md sha256:56383bb55b12 -->
+Status: done
 Vertical: common
 Actor: system, employee, manager
 Screen: Cash register, Session detail
 Steps:
-1. With the Tips app turned on, the cashier takes a tip or a manager pays it out.
+1. With the Tips app turned on, someone records a tip, adjusts it or voids it.
 2. Without anyone typing anything, the open session gets its line: "Tip" in cash or by card, or "Tips paid
-   out" in cash, with the sale or the person in the concept.
+   out" what goes out in cash, with the sale's number in the concept.
 3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Tips in
    cash", "Tips by card" (and with other payment methods, if there were any) and "Tips paid out". A tip by card or
    with another payment method that is lowered comes off its line; "Tips paid out" is what left the drawer in cash.
@@ -696,8 +694,8 @@ In: the cash in and cash out that Tips records in the open session, marked as it
 (`cash_register.movement.add`).
 Out: the lines in the session (announces: `cash_register.movement.added`), with the name of the app that
 records them. The sales figures do not change: a tip is never a sale.
-If it fails: with no open session, Tips does not record a cash tip and refuses it with its notice; a
-card tip is kept in Tips and goes into no session. A tip line is not corrected with a movement by hand: it is
+If it fails: with "Turn on the cash register" on and no open session, Tips refuses a cash tip with its notice; with
+the cash register off, or by card with no open session, the tip is kept in Tips and goes into no session. A tip line is not corrected with a movement by hand: it is
 adjusted or voided in Tips, which records the difference in the open session; the closed one is never
 touched.
 Involved: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16

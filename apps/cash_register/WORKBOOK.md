@@ -207,7 +207,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
 | CASH_REGISTER-F16 | Imprimir el informe de la sesión (X o Z) | común | hecho |
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
-| CASH_REGISTER-F18 | Ver las propinas en la caja | común | parcial — falta la app Propinas, que es la que las apunta |
+| CASH_REGISTER-F18 | Ver las propinas en la caja | común | hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
 Estado: hecho
@@ -644,15 +644,14 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-Estado: parcial — Caja ya enseña aparte lo que apunta otra app, en el Detalle de la sesión, en Movimientos, en la
-ventana «Cerrar sesión» y en el informe X o Z; falta la app Propinas, que es la que lo apunta (hub#1498)
+Estado: hecho
 Vertical: común
 Actor: sistema, empleado, responsable
 Pantalla: Caja, Detalle de la sesión
 Pasos:
-1. Con la app Propinas encendida, el cajero cobra una propina o un responsable la paga.
+1. Con la app Propinas encendida, alguien anota una propina, la ajusta o la anula.
 2. Sin que nadie teclee nada, la sesión abierta recibe su línea: «Propina» en efectivo o con tarjeta, o
-   «Propinas pagadas» en efectivo, con la venta o la persona en el concepto.
+   «Propinas pagadas» lo que sale en efectivo, con el número de la venta en el concepto.
 3. En el **Detalle de la sesión**, el resumen las enseña aparte de las ventas, de las entradas y de las salidas:
    «Propinas en efectivo», «Propinas con tarjeta» (y con otras formas de pago, si las hubo) y «Propinas pagadas».
    La propina con tarjeta o con otra forma de pago que se rebaja se resta de su línea; «Propinas pagadas» es lo que
@@ -666,8 +665,8 @@ Entra: las entradas y salidas que Propinas apunta en la sesión abierta, marcada
 (`cash_register.movement.add`).
 Sale: las líneas en la sesión (avisa: `cash_register.movement.added`), con el nombre de la app que las apunta.
 Las cifras de ventas no cambian: la propina nunca es venta.
-Si falla: sin sesión abierta, Propinas no apunta la propina en efectivo y la rechaza con su aviso; la de
-tarjeta se guarda en Propinas y no entra en ninguna sesión. Una línea de propina no se corrige con un movimiento a
+Si falla: con «Activar caja» encendido y sin sesión abierta, Propinas rechaza la propina en efectivo con su aviso;
+con la caja apagada, o con tarjeta sin sesión abierta, la propina se guarda en Propinas y no entra en ninguna sesión. Una línea de propina no se corrige con un movimiento a
 mano: se ajusta o se anula en Propinas, que apunta la diferencia en la sesión abierta; la cerrada no se
 toca.
 Implicados: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
