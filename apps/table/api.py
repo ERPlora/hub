@@ -48,12 +48,12 @@ router = Router(tags=["table"])
 
 @bind(router, "table.zone.list", "/table/zones")
 async def zone_list(request, params: Query[ZoneListIn]):
-    return await run_operation(request, queries.list_zones, params)
+    return await run_operation(request, queries.zones.list_zones, params)
 
 
 @bind(router, "table.zone.get", "/table/zones/detail")
 async def zone_get(request, params: Query[ZoneRefIn]):
-    return await run_operation(request, queries.get_zone, params)
+    return await run_operation(request, queries.zones.get_zone, params)
 
 
 @bind(router, "table.zone.create", "/table/zones", status=201)
@@ -76,12 +76,12 @@ async def zone_delete(request, data: ZoneRefIn):
 
 @bind(router, "table.table.list", "/table/tables")
 async def table_list(request, params: Query[TableListIn]):
-    return await run_operation(request, queries.list_tables, params)
+    return await run_operation(request, queries.tables.list_tables, params)
 
 
 @bind(router, "table.table.get", "/table/tables/detail")
 async def table_get(request, params: Query[TableRefIn]):
-    return await run_operation(request, queries.get_table, params)
+    return await run_operation(request, queries.tables.get_table, params)
 
 
 @bind(router, "table.table.create", "/table/tables", status=201)
@@ -114,22 +114,22 @@ async def table_delete(request, data: TableRefIn):
 
 @bind(router, "table.session.list", "/table/sessions")
 async def session_list(request, params: Query[SessionListIn]):
-    return await run_operation(request, queries.list_sessions, params)
+    return await run_operation(request, queries.sessions.list_sessions, params)
 
 
 @bind(router, "table.session.get", "/table/sessions/detail")
 async def session_get(request, params: Query[SessionRefIn]):
-    return await run_operation(request, queries.get_session, params)
+    return await run_operation(request, queries.sessions.get_session, params)
 
 
 @bind(router, "table.session.by_order", "/table/sessions/by_order")
 async def session_by_order(request, params: Query[ByOrderIn]):
-    return await run_operation(request, queries.sessions_by_order, params)
+    return await run_operation(request, queries.sessions.sessions_by_order, params)
 
 
 @bind(router, "table.session.line", "/table/sessions/line")
 async def session_line(request, params: Query[LineRefIn]):
-    return await run_operation(request, queries.get_line, params)
+    return await run_operation(request, queries.sessions.get_line, params)
 
 
 @bind(router, "table.session.open", "/table/sessions/open", status=201)
@@ -187,17 +187,17 @@ async def session_delete(request, data: ByIdIn):
 
 @bind(router, "table.waiter.list", "/table/waiters")
 async def waiter_list(request, params: Query[WaiterListIn]):
-    return await run_operation(request, queries.list_waiters, params)
+    return await run_operation(request, queries.waiters.list_waiters, params)
 
 
 @bind(router, "table.floor.status", "/table/floor/status")
 async def floor_status(request):
-    return await run_operation(request, queries.floor_status)
+    return await run_operation(request, queries.floor_plan.floor_status)
 
 
 @bind(router, "table.settings.get", "/table/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "table.settings.update", "/table/settings")
@@ -210,7 +210,7 @@ async def settings_update(request, data: SettingsIn):
 
 @bind(router, "table.hold.by_reservation", "/table/holds/by_reservation")
 async def hold_by_reservation(request, params: Query[HoldByReservationIn]):
-    return await run_operation(request, queries.hold_by_reservation, params)
+    return await run_operation(request, queries.holds.hold_by_reservation, params)
 
 
 @bind(router, "table.hold.place", "/table/holds", status=201)

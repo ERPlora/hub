@@ -11,7 +11,8 @@ from live.outbox import record_event
 
 from apps.table import events
 from apps.table.models import SessionMove, TableSession
-from apps.table.queries import find_session, order_is_open, session_out
+from apps.table.queries.lookups import find_session
+from apps.table.queries.sessions import order_is_open, session_out
 from apps.table.schemas import (
     ByIdIn,
     ByOrderIn,
