@@ -1,0 +1,70 @@
+# Spanish translation of the online order app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next online_order\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-25 01:43+0100\n"
+"PO-Revision-Date: 2026-11-25 01:45+0100\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: apps.py:12
+msgid "Online orders"
+msgstr "Pedidos online"
+
+#: apps.py:17
+msgid ""
+"Let customers order from their table by scanning its QR, straight to the "
+"check and the kitchen."
+msgstr ""
+"Deja que tus clientes pidan desde la mesa escaneando su QR, directo a la "
+"cuenta y a cocina."
+
+#: apps.py:19
+msgid ""
+"Online orders gives each table its own QR. The customer scans it with their "
+"phone, sees the menu and orders without an account or an app, and the order "
+"goes into the table's check and on to the kitchen; the first order of a "
+"table without a check waits for an employee to accept it. Payment stays at "
+"the POS. If a QR should stop working, regenerate it and print the new one."
+msgstr ""
+"Pedidos online da a cada mesa su propio QR. El cliente lo escanea con su "
+"móvil, ve la carta y pide sin cuenta ni app, y el pedido entra en la cuenta "
+"de la mesa y va a cocina; el primer pedido de una mesa sin cuenta espera a "
+"que un empleado lo acepte. El cobro sigue en el TPV. Si un QR tiene que "
+"dejar de valer, regéneralo e imprime el nuevo."
+
+#: apps.py:29
+msgid "See the tables' QR codes"
+msgstr "Ver los QR de las mesas"
+
+#: apps.py:30
+msgid "Regenerate the tables' QR codes"
+msgstr "Regenerar los QR de las mesas"
+
+#: models.py:10
+msgid "table"
+msgstr "mesa"
+
+#: models.py:12
+msgid "code"
+msgstr "código"
+
+#: models.py:13
+msgid "generated at"
+msgstr "generado el"
+
+#: models.py:16
+msgid "table code"
+msgstr "código de mesa"
+
+#: models.py:17
+msgid "table codes"
+msgstr "códigos de mesa"

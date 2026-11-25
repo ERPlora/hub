@@ -26,9 +26,9 @@ from apps.website.tests.conftest import (
     page_names,
     with_language,
 )
-from apps.website.tests.test_qr import expected_dark, png_dark, svg_dark
 from apps.website.tests.test_services import run
 from base.models import Hub
+from base.tests.test_qr import expected_dark, png_dark, svg_dark
 from base.tenancy.context import use_hub
 
 pytestmark = HUB_DB
