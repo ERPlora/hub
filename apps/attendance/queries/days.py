@@ -136,7 +136,7 @@ def record_out(record: Record, as_of: dt.datetime, hours: int) -> dict:
 
 
 def load_record(record_id: UUID, as_of: dt.datetime | None = None) -> dict:
-    """One day as services.py returns it after a write."""
+    """One day as services/ returns it after a write."""
     record = annotated(Record.objects.filter(pk=record_id)).get()
     return record_out(record, as_of or timezone.now(), review_hours())
 

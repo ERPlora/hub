@@ -52,7 +52,7 @@ async def record_export(request, params: Query[RecordExportIn]):
 
 @bind(router, "attendance.record.correct", "/attendance/records/correct")
 async def record_correct(request, data: CorrectIn):
-    return await run_operation(request, services.correct_record, data)
+    return await run_operation(request, services.corrections.correct_record, data)
 
 
 # Clocking
@@ -60,22 +60,22 @@ async def record_correct(request, data: CorrectIn):
 
 @bind(router, "attendance.record.clock_in", "/attendance/clock_in")
 async def clock_in(request, data: ClockInIn):
-    return await run_operation(request, services.clock_in, data)
+    return await run_operation(request, services.clocking.clock_in, data)
 
 
 @bind(router, "attendance.record.clock_out", "/attendance/clock_out")
 async def clock_out(request, data: ClockOutIn):
-    return await run_operation(request, services.clock_out, data)
+    return await run_operation(request, services.clocking.clock_out, data)
 
 
 @bind(router, "attendance.break.start", "/attendance/breaks/start")
 async def break_start(request, data: BreakIn):
-    return await run_operation(request, services.start_break, data)
+    return await run_operation(request, services.breaks.start_break, data)
 
 
 @bind(router, "attendance.break.end", "/attendance/breaks/end")
 async def break_end(request, data: BreakIn):
-    return await run_operation(request, services.end_break, data)
+    return await run_operation(request, services.breaks.end_break, data)
 
 
 # History, who is in, people and settings
@@ -113,4 +113,4 @@ async def settings_get(request):
 
 @bind(router, "attendance.settings.update", "/attendance/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)

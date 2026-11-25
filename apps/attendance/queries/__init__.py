@@ -1,4 +1,4 @@
-"""Read operations of the attendance app, and the lookups services.py shares (WORKBOOK «Servicios»).
+"""Read operations of the attendance app, and the lookups services/ shares (WORKBOOK «Servicios»).
 
 Every query runs READ ONLY. Who sees what: whoever clocks sees their own working days and their history
 (the law makes them accessible to the worker); ``attendance.view_all`` sees the team. «Own» is every day
