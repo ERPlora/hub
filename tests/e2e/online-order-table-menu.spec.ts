@@ -59,6 +59,8 @@ test.beforeAll(async ({ browser }) => {
       category_ids: [categoryId],
     })
   ).id;
+  const photo = await api(owner, A, 'POST', '/inventory/products/image', { id: productId, image: 'catalog:hospitality/cafe_con_leche' });
+  expect(photo.status, JSON.stringify(photo.data)).toBe(200);
   // A customer's phone: no session of the business.
   visitor = await browser.newContext({ viewport: SIZES[0] });
   page = await visitor.newPage();
@@ -88,7 +90,9 @@ test('ONLINE_ORDER-F03: the table’s QR opens its menu on a phone; a regenerate
   await expect(dish).toContainText('Six, of ham');
   await expect(dish).toContainText('Allergens: Gluten, Milk');
   await expect(dish).toContainText('€7.50');
-  const group = view.locator('[data-testid=oo-menu-group]', { has: dish });
+  // Its photo, served to a phone without a session.
+  await expect.poll(() => dish.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  const group = view.locator('[data-testid=oo-menu-group]', { has: page.locator(`[data-testid=oo-menu-dish-${productId}]`) });
   await expect(group.locator('ion-list-header')).toHaveText(CATEGORY);
 
   for (const size of SIZES) {
