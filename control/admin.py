@@ -12,8 +12,8 @@ hubs with their database.
   next night (first, as a database's maintenance waits for its window) or now. One asked for the night stays open and
   its cluster says where and when it goes, on the business's own clock, until the worker starts it; «Cancel the move»
   takes it away until then, and undoes a started one. Its page says under each hub how long it can stay closed by the
-  size of its database (``base.tenancy.move.longest_closure``), and what the staff is told adds them up, as the hubs
-  move one after another.
+  size of its database (``base.tenancy.move.bucket.longest_closure``), and what the staff is told adds them up, as
+  the hubs move one after another.
 - **«Restore from a copy…»** (BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
   cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
   its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
@@ -48,7 +48,8 @@ from live.errors import OperationError
 
 from base import admin as base_admin
 from base.registry import database_is_made
-from base.tenancy.move import MOVED_COPY_DAYS, longest_closure
+from base.tenancy.move.bucket import longest_closure
+from base.tenancy.move.worker_pass import MOVED_COPY_DAYS
 from control.admin_clusters import ClusterAdmin
 from control.admin_freeze import FreezeAdmin
 from control.admin_hub_actions import (

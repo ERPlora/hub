@@ -6,7 +6,7 @@ from live.operations import get
 
 from apps.tax.schemas.aliases import AliasListIn, AliasPage, AliasResolveIn, AliasResolveOut
 from apps.tax.schemas.calculation import CalculateIn, CalculationOut
-from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn, CategoryOut, CategoryPage
+from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn, CategoryNamedOut, CategoryPage
 from apps.tax.schemas.rules import (
     RuleCountriesIn,
     RuleCountriesOut,
@@ -31,7 +31,7 @@ pytestmark = HUB_DB
     [
         # expose_api as in the current product's manifest: the calculation and the status were not.
         ("tax.category.list", CategoryListIn, CategoryPage, True),
-        ("tax.category.get", CategoryGetIn, CategoryOut, True),
+        ("tax.category.get", CategoryGetIn, CategoryNamedOut, True),
         ("tax.rule.list", RuleListIn, RulePage, True),
         ("tax.rule.status", RuleStatusIn, RuleStatusOut, False),
         # The pickers of the rules screen: the roots a component may hang from, the countries in use.

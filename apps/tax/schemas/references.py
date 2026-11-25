@@ -22,6 +22,9 @@ CATEGORY = gettext_noop("Category")
 #: What the assistant's card calls the rule a write acts on by its id (its Spanish in this app's catalog), as the Rules
 #: list calls one, never «Record».
 T_RULE = gettext_noop("Rule")
-#: How the assistant's card names a rule a write acts on, and a category the write of any app takes (``REFERS``): never by an id or a key.
+#: How the assistant's card names a rule a write acts on, and a category the write of any app takes, with the rate it
+#: charges today (``REFERS``): never by an id or a key.
 A_RULE = names("tax.rule.get", name=("label",))
-A_TAX_CATEGORY = names("tax.category.get", by="key", name=("display_name",), as_said=True)
+A_TAX_CATEGORY = names("tax.category.get", by="key", name=("label",), as_said=True)
+#: The category of a rule: its name alone, because the rule has a country and a rate of its own.
+A_RULE_CATEGORY = names("tax.category.get", by="key", name=("display_name",), as_said=True)

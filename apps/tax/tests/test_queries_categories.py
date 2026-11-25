@@ -3,15 +3,19 @@
 The lists are those of the current product's SQL batteries.
 """
 
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.utils import timezone
 from live.errors import NotFound
 
 from apps.tax.models import TaxCategory
 from apps.tax.schemas.categories import CategoryGetIn
+from base.models import Hub
+from base.tenancy.context import use_hub
 
-from .conftest import HUB_DB, categories, category, rule, run
+from .conftest import HUB_DB, A, categories, category, keep_region, rule, run
 
 pytestmark = HUB_DB
 
@@ -156,3 +160,56 @@ def test_get_a_missing_category(no_seed):
     with pytest.raises(NotFound) as excinfo:
         run("tax.category.get", CategoryGetIn(key="product.books"))
     assert str(excinfo.value.message) == "This tax category does not exist."
+
+
+def label(key: str, language: str = "es") -> str:
+    return run("tax.category.get", CategoryGetIn(key=key), role="hub_employee", language=language).label
+
+
+@pytest.mark.parametrize(
+    ("language", "said"), [("es", "Restauración — comida · 10\xa0%"), ("en", "Restaurant — food · 10%")]
+)
+def test_a_category_says_the_rate_it_charges_today_in_the_readers_language(language, said):
+    """As the Sections screen says it: «Restauración — comida · 10 %»."""
+    assert label("restaurant.food", language) == said
+    assert label("Restaurant — food", language) == said  # said by its name, the same category
+
+
+def test_the_rate_a_category_says_carries_its_components_and_decimals(no_seed):
+    root = rule(category("product.books", "Libros"), "4")
+    rule(root.category, "0.5", parent=root, tax_type="surcharge")
+    assert label("product.books") == "Libros · 4,5\xa0%"
+    assert label("product.books", "en") == "Libros · 4.5%"
+
+
+def test_an_exempt_category_says_that_it_charges_nothing():
+    assert label("service.health") == "Servicio — sanitario (exento de IVA) · 0\xa0%"
+
+
+def test_a_category_says_the_rate_of_the_businesss_region(no_seed):
+    generic, food = category("product.generic", "Todo"), category("restaurant.food", "Comida")
+    rule(generic, "21")
+    rule(generic, "7", region="ES-CN", tax_type="igic")
+    rule(food, "10")
+    keep_region("ES-CN")
+    # The national VAT never stands in for a missing IGIC rule.
+    assert (label("product.generic"), label("restaurant.food")) == ("Todo · 7\xa0%", "Comida")
+
+
+def test_a_category_without_a_rule_in_force_says_its_name_alone(no_seed):
+    today = timezone.localdate()
+    category("product.none", "Sin regla")
+    rule(category("product.off", "Desactivada"), "21", is_active=False)
+    rule(category("product.past", "Pasada"), "18", valid_to=today - timedelta(days=2))
+    rule(category("product.next", "Futura"), "22", valid_from=today + timedelta(days=2))
+    keys = ("product.none", "product.off", "product.past", "product.next")
+    assert [label(key) for key in keys] == ["Sin regla", "Desactivada", "Pasada", "Futura"]
+
+
+def test_a_category_says_the_rate_of_the_businesss_country_never_another_one():
+    """The factory catalogue brings Spain's rules alone: a business in Portugal charges by its own."""
+    Hub.objects.filter(slug=A.key).update(country="PT")
+    rule(TaxCategory.objects.get(key="product.generic"), "23", country="PT")
+    with use_hub(Hub.objects.get(slug=A.key)):
+        assert label("product.generic") == "Producto — general · 23\xa0%"
+        assert label("restaurant.food") == "Restauración — comida"

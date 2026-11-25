@@ -15,7 +15,8 @@ The business is never closed nor changed: it is not restored, so its fiscal reco
 production VeriFactu record made after the moment stops nothing. In the copy, nothing reaches the tax authority, by
 construction: it is no business (no row of ``base_hub`` names it, the worker never serves it), it is closed to the
 app's roles, and its name is one of a copy left behind, which no process registers an alias for. Any failure drops what
-it made and notes why on the row. The copies go after ``move.MOVED_COPY_DAYS``, with their rows, in the moves' pass.
+it made and notes why on the row. The copies go after ``move.worker_pass.MOVED_COPY_DAYS``, with their rows, in the
+moves' pass.
 
 Real databases on the session's server, as ``test_restore.py``: the temporary cluster's row points at it, so the hub's
 copy there has a name of its own (``run_aside_due(source=…)``). The bucket is a real S3 server (moto's, ``s3.py``).
@@ -134,14 +135,14 @@ class TestACopyAside:
         hub, aside = a_hub_with_its_copy(asides)
         hubs.grant_connect(app_role, hub.db_name)
         meanwhile: list[tuple[bool, bool]] = []
-        real = move._restore_from_bucket
+        real = move.bucket._restore_from_bucket
 
         def restoring(key, name, cluster, heartbeat, cancelled=None):
             # While the copy is filled, the business is open: its host answers and the app reaches its database.
             meanwhile.append((registry.is_copying(Hub.objects.get(pk=hub.pk)), hubs.reaches(app_role, hub.db_name)))
             return real(key, name, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_restore_from_bucket", restoring)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", restoring)
 
         assert run(asides, roles=hubs.app_roles(app_role)) == 1
 
@@ -203,7 +204,7 @@ class TestACopyAside:
         # The business goes on meanwhile: its apps' setup and data work, under the hub's lease, never wait for its copy.
         hub, aside = a_hub_with_its_copy(asides)
         held: list[tuple[bool, str]] = []
-        real = move._restore_from_bucket
+        real = move.bucket._restore_from_bucket
 
         def restoring(key, name, cluster, heartbeat, cancelled=None):
             held.append((provisioning.claim_hub(hub.id, timezone.now(), restore.LEASE, owner="other:1") is not None,
@@ -211,7 +212,7 @@ class TestACopyAside:
             provisioning.release_hub(hub.id, timezone.now(), owner="other:1")
             return real(key, name, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_restore_from_bucket", restoring)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", restoring)
 
         run(asides)
 
@@ -330,9 +331,9 @@ class TestAFailureDropsWhatItMade:
         hub, aside = a_hub_with_its_copy(asides)
 
         def broken(*args, **kwargs):
-            raise move.MoveFailed(f"move_{code.removeprefix('restore_aside_')}", "it broke on purpose")
+            raise move.exceptions.MoveFailed(f"move_{code.removeprefix('restore_aside_')}", "it broke on purpose")
 
-        monkeypatch.setattr(move, step, broken)
+        monkeypatch.setattr(move.bucket, step, broken)
 
         assert run(asides) == 1
 
@@ -414,7 +415,7 @@ class TestTheCopyGoesThroughTheBucket:
         write(other_moment, OTHER_MOMENT)
         key_for = dumps.key_for
         monkeypatch.setattr(dumps, "key_for", lambda copied, kind, at: key_for(copied, kind, AT))
-        real = move._clone_emptied
+        real = move.destination._clone_emptied
         meanwhile: list[RestoredCopy] = []
 
         def the_other_made_meanwhile(*args, **kwargs):
@@ -427,7 +428,7 @@ class TestTheCopyGoesThroughTheBucket:
                 control_services.worker_copy.release_copy(second.pk, OTHER_WORKER)
             return real(*args, **kwargs)
 
-        monkeypatch.setattr(move, "_clone_emptied", the_other_made_meanwhile)
+        monkeypatch.setattr(move.destination, "_clone_emptied", the_other_made_meanwhile)
 
         assert run(asides) == 1
 
@@ -455,7 +456,7 @@ class TestTheCopyGoesThroughTheBucket:
     def test_a_worker_that_stops_while_it_fills_the_copy_leaves_it_to_the_next_one(self, asides, monkeypatch):
         hub, aside = a_hub_with_its_copy(asides)
 
-        run(asides, cancelled=s3.stopping_as(monkeypatch, move, "_restore_command"))
+        run(asides, cancelled=s3.stopping_as(monkeypatch, move.bucket, "_restore_command"))
 
         # Not a failure: nothing noted and its lease let go; the next worker makes the copy anew over what was left.
         left = fresh(aside)
@@ -494,13 +495,13 @@ class TestTheCopyGoesThroughTheBucket:
 class TestTwoWorkers:
     def test_a_lease_lost_meanwhile_leaves_the_copy_to_its_new_holder(self, asides, monkeypatch):
         aside = a_hub_with_its_copy(asides)[1]
-        real = move._restore_from_bucket
+        real = move.bucket._restore_from_bucket
 
         def taken(key, name, cluster, heartbeat, cancelled=None):
             real(key, name, cluster, heartbeat, cancelled)
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
 
-        monkeypatch.setattr(move, "_restore_from_bucket", taken)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", taken)
 
         run(asides)
 
@@ -511,7 +512,7 @@ class TestTwoWorkers:
 
     def test_a_lease_lost_while_it_dumps_never_touches_what_its_new_holder_made(self, asides, monkeypatch):
         hub, aside = a_hub_with_its_copy(asides)
-        real = move._dump_to_bucket
+        real = move.bucket._dump_to_bucket
 
         def taken(*args, **kwargs):
             real(*args, **kwargs)
@@ -519,7 +520,7 @@ class TestTwoWorkers:
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
             something_of_its_name(aside, hub)
 
-        monkeypatch.setattr(move, "_dump_to_bucket", taken)
+        monkeypatch.setattr(move.bucket, "_dump_to_bucket", taken)
 
         run(asides)
 
@@ -532,9 +533,9 @@ class TestTwoWorkers:
 
         def taken_then_broken(key, name, cluster, heartbeat, cancelled=None):
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
-            raise move.MoveFailed("move_restore_failed", "it broke on purpose")
+            raise move.exceptions.MoveFailed("move_restore_failed", "it broke on purpose")
 
-        monkeypatch.setattr(move, "_restore_from_bucket", taken_then_broken)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", taken_then_broken)
 
         run(asides)
 
@@ -546,19 +547,19 @@ class TestTwoWorkers:
     def test_a_lease_lost_while_a_failed_copy_is_dropped_leaves_the_row_to_its_new_holder(self, asides, monkeypatch):
         aside = a_hub_with_its_copy(asides)[1]
         failing: list[bool] = []
-        real = move._drop_copy
+        real = move.databases._drop_copy
 
         def broken(*args, **kwargs):
             failing.append(True)
-            raise move.MoveFailed("move_restore_failed", "it broke on purpose")
+            raise move.exceptions.MoveFailed("move_restore_failed", "it broke on purpose")
 
         def dropped_then_taken(name, cluster):
             real(name, cluster)
             if failing:
                 RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
 
-        monkeypatch.setattr(move, "_restore_from_bucket", broken)
-        monkeypatch.setattr(move, "_drop_copy", dropped_then_taken)
+        monkeypatch.setattr(move.bucket, "_restore_from_bucket", broken)
+        monkeypatch.setattr(move.databases, "_drop_copy", dropped_then_taken)
 
         run(asides)
 
@@ -608,11 +609,13 @@ class TestTheCopiesGoAfterTheirDays:
         run(asides)
 
         with use_control():
-            restore.drop_old_aside_copies(AT + dt.timedelta(days=move.MOVED_COPY_DAYS) - dt.timedelta(minutes=1))
+            restore.drop_old_aside_copies(
+                AT + dt.timedelta(days=move.worker_pass.MOVED_COPY_DAYS) - dt.timedelta(minutes=1)
+            )
         assert aside.db_name in databases()
 
         with use_control():
-            assert restore.drop_old_aside_copies(AT + dt.timedelta(days=move.MOVED_COPY_DAYS)) == 1
+            assert restore.drop_old_aside_copies(AT + dt.timedelta(days=move.worker_pass.MOVED_COPY_DAYS)) == 1
         assert aside_absent(aside) and not RestoredCopy.objects.filter(pk=aside.pk).exists()
         assert marker(hub.db_name) == [AS_THEN, SINCE]
 
@@ -624,7 +627,7 @@ class TestTheCopiesGoAfterTheirDays:
         waiting = a_hub_with_its_copy(asides)[1]
 
         with use_control():
-            restore.drop_old_aside_copies(timezone.now() + dt.timedelta(days=move.MOVED_COPY_DAYS))
+            restore.drop_old_aside_copies(timezone.now() + dt.timedelta(days=move.worker_pass.MOVED_COPY_DAYS))
 
         assert not RestoredCopy.objects.filter(pk=failed.pk).exists()
         assert fresh(waiting).status == "copying"
@@ -637,7 +640,7 @@ class TestTheCopiesGoAfterTheirDays:
         monkeypatch.setattr(restore, "source_name", asides.source)
 
         worker_data._moves(AT)
-        RestoredCopy.objects.filter(pk=made.pk).update(made_at=AT - dt.timedelta(days=move.MOVED_COPY_DAYS))
+        RestoredCopy.objects.filter(pk=made.pk).update(made_at=AT - dt.timedelta(days=move.worker_pass.MOVED_COPY_DAYS))
         worker_data._moves(AT)
 
         assert not RestoredCopy.objects.filter(pk=made.pk).exists() and aside_absent(made)

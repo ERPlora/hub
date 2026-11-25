@@ -19,7 +19,7 @@ from live.operations import get as get_operation
 
 from apps.modifier import queries
 from apps.modifier.models import ModifierGroup, ModifierOption
-from apps.modifier.services import DEFAULT_KEPT
+from apps.modifier.services.recovery import DEFAULT_KEPT
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of, giving_back
 from base.tenancy.context import current_alias, use_hub

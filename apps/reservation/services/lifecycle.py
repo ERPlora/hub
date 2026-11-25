@@ -14,7 +14,8 @@ from live.outbox import record_event
 
 from apps.reservation import engine, events
 from apps.reservation.models import Reservation
-from apps.reservation.queries import business_now, in_service, starts_at
+from apps.reservation.queries.business import business_now, starts_at
+from apps.reservation.queries.gate import in_service
 from apps.reservation.schemas.fields import DeletedOut, NoIn
 from apps.reservation.schemas.reservations import CancelIn, ReleasedOut, ReservationOut, ReservationRefIn
 from apps.reservation.services.gate import lock_book, refuse

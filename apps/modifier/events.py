@@ -1,6 +1,6 @@
 """Events of the modifier app (``modifier.<entity>.<fact>``) and its reactions to Inventory's events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
 Reactions (MODIFIER-F09): a product or a category deleted in Inventory drops the groups hung from it,

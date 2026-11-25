@@ -563,7 +563,7 @@ reactivarla, la última desactivada).
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las categorías, con búsqueda, filtro de origen, páginas (hasta 100) y su tipo vigente hoy en un país y región | ver | F01, F19 | `tax.category.list` |
-| Una categoría por su clave, con su nombre traducido | ver | F02, F19 | `tax.category.get` |
+| Una categoría por su clave, su nombre o un alias, con su nombre traducido y con la etiqueta que dice su tipo de hoy en el país y la región del negocio («Producto — general · 21 %»; sin una regla en vigor, solo el nombre): la que lee la tarjeta del asistente (BASE-F97) | ver | F02, F19 | `tax.category.get` |
 | Las reglas, con búsqueda, filtros (país, región, categoría, tipo, calificación, estado) y páginas | ver | F03 | `tax.rule.list` |
 | Cuántas reglas raíz aplican hoy en el país del negocio y si los impuestos están configurados (el aviso y el paso «Tus impuestos» del Inicio) | ver | F17 | `tax.rule.status` |
 | Las reglas raíz de las que puede colgar un componente en un país, región y categoría: las mismas que acepta el alta (también una raíz que empieza en el futuro; una sin impuesto, solo para un componente al 0 %) | ver | F06 | `tax.rule.parent_candidates` |
@@ -758,6 +758,12 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   (el alta de un componente), que ya sale «Regla raíz» por el `verbose_name` de `TaxRule.parent`. Una regla
   desactivada se sigue nombrando (para reactivarla). Sin persona detrás, sin `tax.view`, con un id de otro negocio o
   de una regla que no existe, queda fuera, nunca su id (`tests/test_assistant_card_records.py`).
+- **La categoría fiscal en la tarjeta**: toda escritura de cualquier app que toma una la marca con `A_TAX_CATEGORY`
+  (`schemas/references.py`), leída con `tax.category.get` por su clave, su nombre o un alias. Su `label` es el nombre en
+  el idioma de quien lee y el tipo de hoy en la jurisdicción del negocio (`current_rates`, como las Secciones de
+  Ventas), escrito con `base.business.percent_text`, el mismo con el que se escribe el de una regla; solo esa lectura lo
+  calcula. Las escrituras de reglas usan `A_RULE_CATEGORY`, que dice el nombre solo: el tipo del país del negocio junto
+  al de una regla de otro país se leería como el nuevo (`tests/test_assistant_card_category.py`).
 - **Países en la tarjeta**: `country_code` es una lista cerrada (los 249 códigos ISO 3166-1) que ningún campo del
   modelo etiqueta; `choices.py` la declara (`TaxConfig.choices`) con el nombre de cada país en el idioma de quien
   lee (CLDR por `base.business.country_name`, el mismo que enseña el selector de País de la pantalla con

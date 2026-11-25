@@ -160,9 +160,9 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy", "base.tenancy.migrator",
-    "base.services", "base.queries", "base.schemas", "base.ws_print", "control", "control.services", "control.queries",
-    "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
+    "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy",
+    "base.tenancy.migrator", "base.tenancy.move", "base.services", "base.queries", "base.schemas", "base.ws_print",
+    "control", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
 ]
 depth = 0
 ignore_imports = [
@@ -186,7 +186,9 @@ ignore_imports = [
     "base.tenancy.cut -> base.services.photo",
     "base.tenancy.cut -> base.services.provisioning",
     "base.tenancy.dumps -> base.services",
-    "base.tenancy.move -> base.services",
+    "base.tenancy.move.destination -> base.services",
+    "base.tenancy.move.moving -> base.services",
+    "base.tenancy.move.worker_pass -> base.services",
     "base.tenancy.offboarding -> base.services",
     "base.tenancy.offboarding -> base.services.provisioning",
     "base.tenancy.provision -> base.services.demos",

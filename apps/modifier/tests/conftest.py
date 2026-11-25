@@ -7,10 +7,13 @@ Every test with the database runs as production does: inside business A's own da
 The models are imported lazily, so that the tests of apps.py still collect while models.py does not exist.
 """
 
+import json
+
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 
 from apps.flow.tests.test_relay import heard, listen, worker_loop
@@ -97,11 +100,11 @@ def make_category(name: str = "Mains"):
     return run("inventory.category.create", {"name": name})
 
 
-def group(name, **fields):
+def group(name="Sauces", **fields):
     return run("modifier.group.create", {"name": name, **fields})
 
 
-def option(group_name, name, **fields):
+def option(group_name="Sauces", name="Ketchup", **fields):
     return run("modifier.option.create", {"group": group_name, "name": name, "price_delta": 0, **fields})
 
 
@@ -111,3 +114,18 @@ def link(group_name, **target):
 
 def names(page) -> list[str]:
     return [row.name for row in page.rows]
+
+
+def events(name: str) -> list[dict]:
+    return [
+        event.payload
+        for event in OutboxEvent.objects.filter(name=name).order_by("created_at", "id")
+    ]
+
+
+def refusal(error) -> tuple:
+    return (type(error.value).__name__, error.value.code, error.value.fields)
+
+
+def received(session, timeout=1.0, stop_after=None):
+    return [json.loads(note.payload) for note in session.notifies(timeout=timeout, stop_after=stop_after)]

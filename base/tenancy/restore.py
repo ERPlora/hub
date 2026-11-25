@@ -5,10 +5,10 @@ copy comes from a cluster made for it (a point-in-time restore of the hub's own,
 new hubs, its secrets ``erplora/<env>/clusters/<name>/{app,migrator}``), and the hub stays on its own cluster. The Hub
 admin asks (``control.hub.restore``: ``Hub.restoring_from`` and ``restore_point``; its host answers 503 «maintenance»
 from then on, ``base.registry``); the worker restores it here (:func:`run_due`, in the moves' thread), one hub at a
-time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewed while it copies).
+time, under the hub's lease (``hub_due``, provisioning's: ``move.moving.LEASE``, renewed while it copies).
 
 1. **Copied**: ``pg_dump`` of the hub's database on the temporary cluster (:func:`source_name`; nobody uses it), before
-   the business is closed, sent to the dumps bucket as it is made, as a move's copy (``move._dump_to_bucket``:
+   the business is closed, sent to the dumps bucket as it is made, as a move's copy (``move.bucket._dump_to_bucket``:
    ``<hex>/<AAAAMMDDTHHMMSSZ>-restore.dump``, kept the bucket's 90 days and listed to nobody), never to a file of the
    worker: no size stops a restore. Without a bucket nothing is closed and the restore ends there, with why.
 2. **Checked, fiscal**: every app whose records reach the tax authority answers what each of them says in its database
@@ -26,9 +26,9 @@ time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewe
 5. **Made**: a new database of its name on its own cluster, cloned from its vertical's template there, emptied of the
    template's tables (only while the kept copy is there with its note: what has the hub's name then is never its data)
    and closed to the app until the end; filled in one transaction by ``pg_restore`` reading the copy from the bucket on
-   its input (``move._restore_from_bucket``); its identity (``base_hub_identity``) checked and its schema brought to
-   the code's leaf (``migrator.schema.ensure_schema``: it learns the apps the copy has). Each half of the copy has
-   ``move.COPY_TIMEOUT_SECONDS``; the host answers «maintenance» for both.
+   its input (``move.bucket._restore_from_bucket``); its identity (``base_hub_identity``) checked and its schema
+   brought to the code's leaf (``migrator.schema.ensure_schema``: it learns the apps the copy has). Each half of the
+   copy has ``move.bucket.COPY_TIMEOUT_SECONDS``; the host answers «maintenance» for both.
 6. **Ended**: opened to the app, and control ends the restore and dates the kept copy in one transaction.
 
 Every step that drops, renames or ends first checks that the restore is still this worker's: it holds the hub's lease
@@ -39,7 +39,8 @@ Any failure before the end puts the hub's own database back, nothing lost: the n
 is there with its note), the kept copy renamed back and opened to the app again, the schema record of before given back
 to control, the hub ready with the reason in ``last_error`` (``restore_<step>: <why>``). An undo that cannot finish
 leaves the hub restoring, closed, and says why; the next pass undoes it again, never taking it forward. The kept copies
-are dropped after ``move.MOVED_COPY_DAYS`` by the moves' pass (``move.drop_old_copies``), with their rows.
+are dropped after ``move.worker_pass.MOVED_COPY_DAYS`` by the moves' pass (``move.worker_pass.drop_old_copies``),
+with their rows.
 
 **Aside** (BASE-F114): the same copy, made next to the business instead of in its place, for a
 business the fiscal guard would refuse (its production VeriFactu records after the moment are at the tax authority) or
@@ -76,11 +77,11 @@ from control import services as control_services
 logger = logging.getLogger(__name__)
 
 #: The worker's lease of a hub being restored: the move's (provisioning's), renewed while it copies.
-LEASE = move.LEASE
+LEASE = move.moving.LEASE
 #: What ``last_error`` says after the reason of a restore that could not be undone yet.
 UNDO_FAILED_MARK = " (restore_undo_failed: "
 #: How long a separate copy is kept once made (and a failed one's row): as a move's copies.
-ASIDE_COPY_DAYS = move.MOVED_COPY_DAYS
+ASIDE_COPY_DAYS = move.worker_pass.MOVED_COPY_DAYS
 #: The kind of a restore's copy in the dumps bucket (``<hex>/<AAAAMMDDTHHMMSSZ>-restore.dump``).
 RESTORE_DUMP_KIND = "restore"
 
@@ -141,7 +142,7 @@ def restore_hub(
         try:
             control_services.worker_move.still_restoring(hub.id, origin.pk, provisioning.LEASE_OWNER, forward=forward)
         except control_services.worker_move.MoveTaken as taken:
-            raise move.MoveStopped(str(taken)) from taken
+            raise move.exceptions.MoveStopped(str(taken)) from taken
 
     try:
         if hub.move_undo_asked_at is not None:
@@ -151,15 +152,15 @@ def restore_hub(
         try:
             copy = source(hub)
             key = dumps.key_for(hub, RESTORE_DUMP_KIND, timezone.now())
-            move._dump_to_bucket(key, copy, origin, ours, cancelled)
+            move.bucket._dump_to_bucket(key, copy, origin, ours, cancelled)
             _close_and_keep(hub, kept_name, roles, ours, copy, origin)
             _make_new(hub, kept_name, roles, ours)
-            move._restore_from_bucket(key, hub.db_name, hub.cluster, ours, cancelled)
+            move.bucket._restore_from_bucket(key, hub.db_name, hub.cluster, ours, cancelled)
             heartbeat()
-            move._verify_identity(hub.db_name, hub.cluster, hub.id)
-            move._ensure_schema(hub, hub.cluster, heartbeat)
+            move.destination._verify_identity(hub.db_name, hub.cluster, hub.id)
+            move.destination._ensure_schema(hub, hub.cluster, heartbeat)
             _finish(hub, origin, kept_name, roles, ours, now)
-        except (provisioning.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
+        except (provisioning.ProvisioningStopped, move.exceptions.MoveStopped, dumps.DumpStopped) as stopped:
             logger.info("base.tenancy.restore.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
             return
         except Exception as error:
@@ -169,13 +170,13 @@ def restore_hub(
             return
         logger.info("base.tenancy.restore.restored hub=%s database=%s kept=%s", hub.slug, hub.db_name, kept_name)
     finally:
-        move._close_this_processs(hub)
+        move.moving._close_this_processs(hub)
 
 
 def _reason(error: Exception, prefix: str = "restore_") -> str:
     """Why a restore failed, as ``last_error`` says it: ``restore_<step>: <why>`` (``prefix``: ``restore_aside_`` for a
     separate copy), a step of the move's own included."""
-    if not isinstance(error, move.MoveFailed):
+    if not isinstance(error, move.exceptions.MoveFailed):
         return f"{prefix}unexpected: {type(error).__name__}: {error}"
     code = error.code
     if code.startswith("move_"):
@@ -187,7 +188,7 @@ def _back(hub, kept_name: str, roles, ours, *, reason: str) -> None:
     """Undo the restore of ``hub`` and note why; one that cannot be undone now stays restoring, undone next time."""
     try:
         _put_back(hub, kept_name, roles, ours)
-    except (provisioning.ProvisioningStopped, move.MoveStopped) as stopped:
+    except (provisioning.ProvisioningStopped, move.exceptions.MoveStopped) as stopped:
         logger.info("base.tenancy.restore.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
         return
     except Exception as undo_error:
@@ -244,22 +245,22 @@ def make_aside(
         try:
             control_services.worker_copy.still_making(row.pk, provisioning.LEASE_OWNER)
         except control_services.worker_move.MoveTaken as taken:
-            raise move.MoveStopped(str(taken)) from taken
+            raise move.exceptions.MoveStopped(str(taken)) from taken
 
     try:
         if row.source is None:
-            raise move.MoveFailed("move_source_missing", "its temporary cluster is gone")
+            raise move.exceptions.MoveFailed("move_source_missing", "its temporary cluster is gone")
         key = dumps.key_for(hub, aside_dump_kind(row), timezone.now())
-        move._dump_to_bucket(key, source(hub), row.source, ours, cancelled)
+        move.bucket._dump_to_bucket(key, source(hub), row.source, ours, cancelled)
         ours()
-        move._clone_emptied(hub, cluster, roles, aside=name)
-        move._restore_from_bucket(key, name, cluster, ours, cancelled)
-        move._verify_identity(name, cluster, hub.id)
+        move.destination._clone_emptied(hub, cluster, roles, aside=name)
+        move.bucket._restore_from_bucket(key, name, cluster, ours, cancelled)
+        move.destination._verify_identity(name, cluster, hub.id)
         ours()
         with ops.connect_ops(cluster=cluster) as conn:
-            move._close(conn, name, roles)
+            move.databases._close(conn, name, roles)
         _made(row, now)
-    except (provisioning.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
+    except (provisioning.ProvisioningStopped, move.exceptions.MoveStopped, dumps.DumpStopped) as stopped:
         logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", name, stopped)
         return
     except Exception as error:
@@ -281,7 +282,7 @@ def _made(row, now: dt.datetime) -> None:
     try:
         control_services.worker_copy.copy_made(row.pk, now, provisioning.LEASE_OWNER)
     except control_services.worker_move.MoveTaken as taken:
-        raise move.MoveStopped(str(taken)) from taken
+        raise move.exceptions.MoveStopped(str(taken)) from taken
 
 
 def _aside_failed(row, ours, reason: str) -> None:
@@ -289,8 +290,8 @@ def _aside_failed(row, ours, reason: str) -> None:
     the row failed all the same: its database, if any, goes with it after its days."""
     try:
         ours()
-        move._drop_copy(row.db_name, row.cluster)
-    except move.MoveStopped as stopped:
+        move.databases._drop_copy(row.db_name, row.cluster)
+    except move.exceptions.MoveStopped as stopped:
         logger.info(
             "base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, stopped
         )
@@ -309,7 +310,7 @@ def drop_old_aside_copies(now: dt.datetime) -> int:
     dropped = 0
     for row in control_services.worker_copy.aside_copies_due(now - dt.timedelta(days=ASIDE_COPY_DAYS)):
         try:
-            move._drop_copy(row.db_name, row.cluster)
+            move.databases._drop_copy(row.db_name, row.cluster)
             control_services.worker_copy.forget_aside_copy(row.pk)
         except Exception:
             logger.exception(
@@ -332,15 +333,15 @@ def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str
     name, cluster = hub.db_name, hub.cluster
     try:
         with ops.connect_ops(cluster=cluster) as conn:
-            present = move._present(conn, name, kept_name)
+            present = move.databases._present(conn, name, kept_name)
         kept_already = control_services.worker_move.pending_copy(hub.id) is not None and kept_name in present
         if not kept_already and name not in present:
-            raise move.MoveFailed("restore_database_missing", f"{name} is not on its cluster")
+            raise move.exceptions.MoveFailed("restore_database_missing", f"{name} is not on its cluster")
         live = kept_name if kept_already else name
         _refuse_fiscal_changes(live, cluster, copy, origin)
         with ops.connect_ops(cluster=cluster) as conn:
             ours()
-            move._close(conn, live, roles)
+            move.databases._close(conn, live, roles)
         _refuse_fiscal_changes(live, cluster, copy, origin)
         if kept_already:
             return
@@ -349,11 +350,11 @@ def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str
         )
         with ops.connect_ops(cluster=cluster) as conn:
             ours()
-            move._rename(conn, name, kept_name)
+            move.databases._rename(conn, name, kept_name)
     except psycopg.Error as error:
-        raise move.MoveFailed("restore_close_failed", ops.reason(error)) from error
+        raise move.exceptions.MoveFailed("restore_close_failed", ops.reason(error)) from error
     except ops.DatabaseOpsError as error:
-        raise move.MoveFailed("restore_close_failed", error) from error
+        raise move.exceptions.MoveFailed("restore_close_failed", error) from error
 
 
 def _make_new(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
@@ -362,12 +363,16 @@ def _make_new(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
     data (``restore_copy_missing`` otherwise, and it is put back)."""
     ours()
     with ops.connect_ops(cluster=hub.cluster) as conn:
-        kept = control_services.worker_move.pending_copy(hub.id) is not None and kept_name in move._present(conn, kept_name)
+        kept = control_services.worker_move.pending_copy(hub.id) is not None and kept_name in move.databases._present(
+            conn, kept_name
+        )
     if not kept:
-        raise move.MoveFailed("restore_copy_missing", f"{hub.db_name} was not kept aside as {kept_name}: none is made")
-    move._clone_emptied(hub, hub.cluster, roles)
+        raise move.exceptions.MoveFailed(
+            "restore_copy_missing", f"{hub.db_name} was not kept aside as {kept_name}: none is made"
+        )
+    move.destination._clone_emptied(hub, hub.cluster, roles)
     with ops.connect_ops(cluster=hub.cluster) as conn:
-        move._close(conn, hub.db_name, roles)
+        move.databases._close(conn, hub.db_name, roles)
 
 
 def _finish(hub, origin, kept_name: str, roles: bootstrap.Names, ours, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
@@ -375,13 +380,13 @@ def _finish(hub, origin, kept_name: str, roles: bootstrap.Names, ours, now: dt.d
     transaction on its locked row, only if the restore is still this worker's (``MoveStopped`` otherwise)."""
     ours()
     with ops.connect_ops(cluster=hub.cluster) as conn:
-        move._open(conn, hub.db_name, roles)
+        move.databases._open(conn, hub.db_name, roles)
     try:
         control_services.worker_move.restore_finished(
             hub.id, origin.pk, hub.cluster_id, kept_name, now, owner=provisioning.LEASE_OWNER
         )
     except control_services.worker_move.MoveTaken as taken:
-        raise move.MoveStopped(str(taken)) from taken
+        raise move.exceptions.MoveStopped(str(taken)) from taken
 
 
 def _put_back(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
@@ -391,16 +396,16 @@ def _put_back(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
     ours(forward=False)
     noted = control_services.worker_move.pending_copy(hub.id) is not None
     with ops.connect_ops(cluster=hub.cluster) as conn:
-        present = move._present(conn, hub.db_name, kept_name)
+        present = move.databases._present(conn, hub.db_name, kept_name)
     if noted and kept_name in present:
         if hub.db_name in present:
             ours(forward=False)
             ops.drop_database(hub.db_name, cluster=hub.cluster)
         ours(forward=False)
-        move._rename_back(hub.cluster, kept_name, hub.db_name)
+        move.undo._rename_back(hub.cluster, kept_name, hub.db_name)
     with ops.connect_ops(cluster=hub.cluster) as conn:
-        if hub.db_name in move._present(conn, hub.db_name):
-            move._open(conn, hub.db_name, roles)
+        if hub.db_name in move.databases._present(conn, hub.db_name):
+            move.databases._open(conn, hub.db_name, roles)
 
 
 # ── The fiscal guard: it only reads ──────────────────────────────────────────────────────────────────────────────────
@@ -429,10 +434,12 @@ def _refuse_fiscal_changes(name: str, cluster, copy: str, origin) -> None:
             return
         then = _fiscal_records(copy, origin)
     except (psycopg.Error, ops.DatabaseOpsError) as error:
-        raise move.MoveFailed("restore_fiscal_unread", f"its fiscal records could not be read: {error}") from error
+        raise move.exceptions.MoveFailed(
+            "restore_fiscal_unread", f"its fiscal records could not be read: {error}"
+        ) from error
     changed = sum(1 for record, state in now.items() if then.get(record) != state)
     if changed:
-        raise move.MoveFailed(
+        raise move.exceptions.MoveFailed(
             "restore_fiscal_records",
             f"fiscal records made, sent or changed after the copy: {changed}; restoring it would repeat numbers the "
             "tax authority already has",

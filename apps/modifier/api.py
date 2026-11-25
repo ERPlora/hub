@@ -38,17 +38,17 @@ async def group_for_target(request, params: Query[TargetIn]):
 
 @bind(router, "modifier.group.create", "/modifier/groups", status=201)
 async def group_create(request, data: GroupIn):
-    return await run_operation(request, services.create_group, data)
+    return await run_operation(request, services.groups.create_group, data)
 
 
 @bind(router, "modifier.group.update", "/modifier/groups/update")
 async def group_update(request, data: GroupPatchIn):
-    return await run_operation(request, services.update_group, data)
+    return await run_operation(request, services.groups.update_group, data)
 
 
 @bind(router, "modifier.group.delete", "/modifier/groups/delete")
 async def group_delete(request, data: GroupRefIn):
-    return await run_operation(request, services.delete_group, data)
+    return await run_operation(request, services.groups.delete_group, data)
 
 
 # Options
@@ -66,17 +66,17 @@ async def option_get(request, params: Query[OptionRefIn]):
 
 @bind(router, "modifier.option.create", "/modifier/options", status=201)
 async def option_create(request, data: OptionIn):
-    return await run_operation(request, services.create_option, data)
+    return await run_operation(request, services.options.create_option, data)
 
 
 @bind(router, "modifier.option.update", "/modifier/options/update")
 async def option_update(request, data: OptionPatchIn):
-    return await run_operation(request, services.update_option, data)
+    return await run_operation(request, services.options.update_option, data)
 
 
 @bind(router, "modifier.option.delete", "/modifier/options/delete")
 async def option_delete(request, data: OptionRefIn):
-    return await run_operation(request, services.delete_option, data)
+    return await run_operation(request, services.options.delete_option, data)
 
 
 @bind(router, "modifier.category.get", "/modifier/categories/detail")
@@ -99,12 +99,12 @@ async def link_get(request, params: Query[LinkRefIn]):
 
 @bind(router, "modifier.link.attach", "/modifier/links/attach", status=201)
 async def link_attach(request, data: LinkIn):
-    return await run_operation(request, services.attach_link, data)
+    return await run_operation(request, services.links.attach_link, data)
 
 
 @bind(router, "modifier.link.detach", "/modifier/links/detach")
 async def link_detach(request, data: LinkRefIn):
-    return await run_operation(request, services.detach_link, data)
+    return await run_operation(request, services.links.detach_link, data)
 
 
 # The till's valuation of what was chosen

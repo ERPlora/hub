@@ -26,16 +26,16 @@ class TestTwoWorkers:
     def test_a_late_switch_never_puts_the_hub_on_no_cluster(self, moves, monkeypatch, caplog):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        real = move._ensure_schema
+        real = move.destination._ensure_schema
         state = {"inner": False}
 
         def slow(moving, cluster, heartbeat=None):
             real(moving, cluster, heartbeat)
             if not state["inner"]:
                 state["inner"] = True
-                move.move_hub(moving.id)  # the worker that took the lease over, all the way to its switch
+                move.moving.move_hub(moving.id)  # the worker that took the lease over, all the way to its switch
 
-        monkeypatch.setattr(move, "_ensure_schema", slow)
+        monkeypatch.setattr(move.destination, "_ensure_schema", slow)
 
         run()
 
@@ -47,18 +47,18 @@ class TestTwoWorkers:
     def test_a_stale_worker_never_drops_the_live_destination_nor_touches_control(self, moves, monkeypatch, caplog):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        real_dump = move._dump_to_bucket
+        real_dump = move.bucket._dump_to_bucket
         state = {"nested": False}
 
         def dump(key, source, cluster, heartbeat, cancelled=None):
             real_dump(key, source, cluster, heartbeat, cancelled)
             if not state["nested"]:
                 state["nested"] = True
-                move.move_hub(hub.id)  # the other worker, all the way to its switch
+                move.moving.move_hub(hub.id)  # the other worker, all the way to its switch
                 with hubs._maintenance(fresh(hub).db_name) as conn:
                     conn.execute("INSERT INTO w8a_marker VALUES ('written after the switch')")
 
-        monkeypatch.setattr(move, "_dump_to_bucket", dump)
+        monkeypatch.setattr(move.bucket, "_dump_to_bucket", dump)
 
         run()
 
@@ -75,8 +75,10 @@ class TestTwoWorkers:
         # A row of control that says the name is a hub's database on that cluster (another hub, here: a broken state).
         Hub.objects.filter(pk=other.pk).update(db_name=hub.db_name)
 
-        with pytest.raises(move.MoveStopped):
-            move._make_destination(fresh(hub), target, move.ops.environment_roles(tenancy_connections.control_name()))
+        with pytest.raises(move.exceptions.MoveStopped):
+            move.destination._make_destination(
+                fresh(hub), target, move.moving.ops.environment_roles(tenancy_connections.control_name())
+            )
 
         assert marker(hub.db_name) == [MARKER]
 
@@ -84,14 +86,14 @@ class TestTwoWorkers:
     def test_a_lease_another_worker_took_just_before_the_switch_is_never_switched(self, moves, monkeypatch, caplog):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        real = move._ensure_schema
+        real = move.destination._ensure_schema
 
         def then_taken(moving, cluster, heartbeat=None):
             real(moving, cluster, heartbeat)
             with use_control():
                 HubDue.objects.filter(pk=moving.id).update(lease_owner="other:1")
 
-        monkeypatch.setattr(move, "_ensure_schema", then_taken)
+        monkeypatch.setattr(move.destination, "_ensure_schema", then_taken)
 
         run()
 
@@ -105,7 +107,7 @@ class TestTwoWorkers:
     ):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        real = move._dump_to_bucket
+        real = move.bucket._dump_to_bucket
 
         def cancelled_meanwhile(key, source, cluster, heartbeat, cancelled=None):
             real(key, source, cluster, heartbeat, cancelled)
@@ -113,7 +115,7 @@ class TestTwoWorkers:
                 Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
 
         with monkeypatch.context() as patched:
-            patched.setattr(move, "_dump_to_bucket", cancelled_meanwhile)
+            patched.setattr(move.bucket, "_dump_to_bucket", cancelled_meanwhile)
             run()
         assert fresh(hub).moving_to_id == target.pk
 
@@ -128,15 +130,15 @@ class TestTwoWorkers:
     ):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        stale = move.control_services.worker_move.moving_row(hub.id)  # read before the other worker's switch
+        stale = move.moving.control_services.worker_move.moving_row(hub.id)  # read before the other worker's switch
         run()
         assert fresh(hub).cluster_id == target.pk
-        monkeypatch.setattr(move.control_services.worker_move, "moving_row", lambda hub_id: stale)
+        monkeypatch.setattr(move.moving.control_services.worker_move, "moving_row", lambda hub_id: stale)
         with use_control():
-            move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
+            move.moving.services.provisioning.claim_hub(hub.id, AT, move.moving.LEASE)
 
         with use_control():
-            move.move_hub(hub.id)
+            move.moving.move_hub(hub.id)
 
         hub = fresh(hub)
         copy = names.moved_db_name(tenancy_connections.control_name(), hub.id)
@@ -146,7 +148,7 @@ class TestTwoWorkers:
     def test_its_lease_is_renewed_while_its_schema_is_migrated(self, moves, monkeypatch):
         hub = moves.hub(to=moves.cluster())
         leases: list[tuple[dt.datetime, dt.datetime]] = []
-        real = move.migrator.schema.ensure_schema
+        real = move.destination.migrator.schema.ensure_schema
 
         def ensure(moving, *, heartbeat=None, **kwargs):
             # A migration that takes a while beats the heart: the hub's lease (claimed at AT) moves on to now's.
@@ -155,7 +157,7 @@ class TestTwoWorkers:
             leases.append((before, HubDue.objects.get(pk=hub.pk).lease_until))
             return real(moving, heartbeat=heartbeat, **kwargs)
 
-        monkeypatch.setattr(move.migrator.schema, "ensure_schema", ensure)
+        monkeypatch.setattr(move.destination.migrator.schema, "ensure_schema", ensure)
 
         run()
 

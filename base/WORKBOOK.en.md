@@ -2912,7 +2912,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:986a02e69f6b -->
+<!-- from WORKBOOK.md sha256:ebc90db105a2 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2927,7 +2927,7 @@ Steps:
      records by their names); each datum after it, and a figure, an amount or a yes or a no in first place, carries the
      name of its datum in front, the same as on its screen, because alone it does not say what it is: "Change in
      Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same as its price;
-     "Create in Sales & POS: Misc · Tax category: Product — general · Position: 0"; "Open in Tables: Table: 4 ·
+     "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
      Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
@@ -2953,8 +2953,8 @@ Steps:
      POS, Invoicing"), also when none is chosen and it loads all of its own ("Time clock, Cash register, Menus and
      combos and 17 more"); the rows of a file being imported (products, categories or customers), by the name of each,
      as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
-     another of its cells) and, in Inventory, the tax categories they take, once each and by their name ("Tax category:
-     Restaurant — food"); a list of lines that carry only their record, such as the services of an appointment, the same
+     another of its cells) and, in Inventory, the tax categories they take, once each, by their name and today's rate ("Tax
+     category: Restaurant — food · 10%"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
@@ -2975,7 +2975,11 @@ Steps:
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value), also that of a datum its app does not call like the field that names it
      ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. A record said in words is looked up as the action will
+     Gil"): otherwise the card leaves it out, never by its code. A tax category also carries the rate it charges today
+     in the business's country and region, as the **Sections** screen does ("Tax category: Product — generic · 21%");
+     without a rule in force, its name alone, and its name alone too in a rule of Taxes, which carries its own country
+     and its own rate. Adding a product says it on its line, after the name and the price ("Create in Inventory: Spoon ·
+     Price: €2.50 · Tax category: Product — generic · 21%"). A record said in words is looked up as the action will
      look it up, also inside another (a course inside its menu), and the one it finds comes up ("Course: Homemade
      desserts" when "desserts" was said); if those words fit several or none, they come up as they were said; and if the action does
      not use them because its record's identifier comes, they are neither read nor shown. Nor does
@@ -3020,7 +3024,7 @@ Lucía QA" alone): the assistant hears there is nothing to change and goes on wi
 that does it, or asks what to change; if the record is not there, it hears that. "Run it" holds only for what the card
 shows: if it changes before it is tapped — the action finds another
 record by its name, because someone created one that fits what was said better ("Mesa" when the card said "Mesa 4"),
-the record is renamed, or what "What will happen" says is no longer the same —, nothing is done and the new card
+the record is renamed, the rate of its tax category changes, or what "What will happen" says is no longer the same —, nothing is done and the new card
 shows, to be confirmed again; if what it found is no longer there, no card shows and the assistant tells it as its
 error. "Cancel" and a typed word that does not match count the same even if it changed. If the page is reloaded with
 the card open nothing is done, and the answer ends in "The answer was cut off." with "Try again".

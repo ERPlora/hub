@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.reservation import events
 from apps.reservation.models import TimeSlot
-from apps.reservation.queries import find_slot, slot_out
+from apps.reservation.queries.slots import find_slot, slot_out
 from apps.reservation.schemas.fields import DeletedOut
 from apps.reservation.schemas.slots import TimeSlotIn, TimeSlotOut, TimeSlotRefIn
 from apps.reservation.services.gate import lock_book
