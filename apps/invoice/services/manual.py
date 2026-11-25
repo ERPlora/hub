@@ -11,7 +11,7 @@ from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import operation
 
-from apps.invoice import fiscal
+from apps.invoice import assistant_cards, fiscal
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.queries.series import FULL
 from apps.invoice.schemas.invoices import InvoiceCreateIn, InvoiceOut
@@ -166,6 +166,7 @@ def _rule_key(category_key: str, *, field: str, on: dt.date) -> fiscal.FiscalKey
         "quantity, unit price WITHOUT VAT in cents, and its VAT % or its tax category. The server computes the VAT, "
         "closed once per rate. An issued invoice is never edited: it is corrected with a rectifying invoice.",
         "risk": "high",
+        "summary": assistant_cards.lines,
     },
 )
 def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
