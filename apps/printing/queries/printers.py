@@ -16,7 +16,8 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.printing.models import Printer, PrintJob
-from apps.printing.schemas import Page, PrinterListIn, PrinterOut, PrinterRefIn, PrinterStatusOut
+from apps.printing.schemas.fields import Page
+from apps.printing.schemas.printers import PrinterListIn, PrinterOut, PrinterRefIn, PrinterStatusOut
 from base.ordering import list_order
 
 from .settings import DEFAULT_FIELDS, current_settings

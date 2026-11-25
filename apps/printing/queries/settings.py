@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.printing.models import Settings, Usage
-from apps.printing.schemas import EmptyIn, SettingsOut
+from apps.printing.schemas.fields import EmptyIn
+from apps.printing.schemas.settings import SettingsOut
 
 #: The functions, in the order the screens and the summary show them.
 USAGES = [usage.value for usage in Usage]
