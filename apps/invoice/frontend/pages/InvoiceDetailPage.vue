@@ -34,7 +34,7 @@ import VerifactuReceipt from '../components/VerifactuReceipt.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, moneyOf } from '../lib/format';
-import { documentNote, missingTaxId, statusTone } from '../lib/invoice';
+import { documentNote, missingTaxId, shownStatus, statusTone } from '../lib/invoice';
 import type { InvoiceLinkOut, InvoiceOut } from '../operations';
 
 const props = defineProps<{ id: string }>();
@@ -68,6 +68,7 @@ const fields = computed(() => {
   if (doc.operation_date && doc.operation_date !== doc.issue_date) {
     rows.push({ key: 'operation-date', label: t('invoice.detail.fields.operationDate'), value: formatDate(doc.operation_date, locale.value) });
   }
+  if (doc.due_date) rows.push({ key: 'due-date', label: t('invoice.detail.fields.dueDate'), value: formatDate(doc.due_date, locale.value) });
   rows.push(
     { key: 'customer', label: t('invoice.detail.fields.customer'), value: doc.customer_name || '—' },
     { key: 'customer-tax-id', label: t('invoice.detail.fields.customerTaxId'), value: doc.customer_tax_id || '—' },
@@ -201,8 +202,8 @@ function onSubstituted(full: InvoiceOut): void {
           </h2>
           <StatusPill
             data-testid="invoice-detail-status"
-            :tone="statusTone(invoice.status)"
-            :label="$t(`invoice.status.${invoice.status}`)"
+            :tone="statusTone(shownStatus(invoice))"
+            :label="$t(`invoice.status.${shownStatus(invoice)}`)"
           />
         </div>
         <div class="invoice-detail__header-actions">

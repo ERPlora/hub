@@ -41,7 +41,8 @@ VERIFACTU_STATUS = (
     "record is sealed), unavailable (VeriFactu is not in this business) or pending (it refused now; its "
     "reaction to invoice.invoice.issued seals it later)."
 )
-Status = Literal[*Invoice.Status.values]
+#: What the list's status filter takes: the statuses an invoice keeps, and those past their due date.
+StatusFilter = Literal[*Invoice.Status.values, "overdue"]
 SourceType = Literal[*Invoice.Source.values]
 
 
@@ -54,8 +55,10 @@ class InvoiceFiltersIn(Schema):
     search: str | None = Field(
         None, max_length=120, description=SEARCH + " Number, customer's name or tax ID."
     )
-    status: Status | None = Field(
-        None, description="Only those in this status: issued, paid or cancelled."
+    status: StatusFilter | None = Field(
+        None,
+        description="Only those in this status: issued (not paid yet, overdue or not), paid or cancelled; or overdue: "
+        "issued and not paid once their due date has passed.",
     )
     invoice_type: InvoiceTypeCode | None = Field(
         None, description="Only this type: F1, F2, F3 or R1–R5."
@@ -180,8 +183,18 @@ class InvoiceCreateIn(RecipientIn):
         _text(SERIES_CODE_MAX_LENGTH) | None, BeforeValidator(_blank_to_none)
     ] = Field(
         None,
-        description="Code of this year's series instead of its id (FACT for invoices, TICKET for tickets). "
+        description="Code of the series of its year instead of its id (FACT for invoices, TICKET for tickets). "
         "Without series, the default series of the year, else FACT.",
+    )
+    issue_date: dt.date | None = Field(
+        None,
+        # The first year a series may number.
+        ge=dt.date(2000, 1, 1),
+        description="The invoice's date (YYYY-MM-DD): leave it out for today. Never a future day, nor one before the "
+        "last invoice of its series.",
+    )
+    due_date: dt.date | None = Field(
+        None, description="The day it has to be paid by (YYYY-MM-DD), if it says one: never before its date."
     )
     notes: _text(2000) = Field("", description="Free notes printed on the invoice.")
     lines: list[ManualLineIn] = Field(
@@ -284,6 +297,7 @@ class InvoiceRowOut(Schema):
     series_code: str
     year: int
     issue_date: dt.date
+    due_date: dt.date | None = Field(description="The day it has to be paid by; none if it does not say one.")
     issued_at: dt.datetime
     customer_name: str
     customer_tax_id: str
@@ -297,6 +311,7 @@ class InvoiceRowOut(Schema):
     rectifies_id: UUID | None
     rectifies_number: str
     substituted: bool = Field(description="A ticket replaced by a full invoice (F3).")
+    overdue: bool = Field(description="Issued and not paid, and its due date has passed.")
     can_mark_paid: bool
     can_rectify: bool
     can_substitute: bool

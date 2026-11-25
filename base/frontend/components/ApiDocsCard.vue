@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Settings › General: whether the business shows its API documentation page, saved as soon as it is switched. A change
-// that cannot be saved puts the switch back to the saved value.
+// Settings › General: whether the business shows its API documentation page, saved as soon as it is switched.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonToggle } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
+import { useSavedSwitch } from '../lib/saved-switch';
 import '../settings.css';
 
 const { t } = useBaseI18n();
@@ -17,20 +17,7 @@ const loaded = computed(() => data.value !== undefined);
 const failed = computed(() => status.value === 'error' && !loaded.value);
 const enabled = computed(() => data.value?.docs_enabled === true);
 const canChange = computed(() => data.value?.can_change === true);
-const saveFailed = ref(false);
-// Repaints the switch on the saved value when a change could not be saved.
-const repaint = ref(0);
-
-async function onToggle(checked: boolean): Promise<void> {
-  if (checked === enabled.value) return;
-  saveFailed.value = false;
-  try {
-    await run({ docs_enabled: checked });
-  } catch {
-    saveFailed.value = true;
-    repaint.value += 1;
-  }
-}
+const { change, failed: saveFailed, repaint } = useSavedSwitch(enabled, (checked) => run({ docs_enabled: checked }));
 </script>
 
 <template>
@@ -65,7 +52,7 @@ async function onToggle(checked: boolean): Promise<void> {
         :disabled="!canChange || pending"
         label-placement="start"
         justify="space-between"
-        @ion-change="onToggle($event.detail.checked)"
+        @ion-change="change($event.detail.checked)"
       >
         {{ t('base.apiDocs.card.toggle') }}
       </ion-toggle>

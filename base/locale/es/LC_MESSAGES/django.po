@@ -1809,6 +1809,10 @@ msgstr "Entra con tu cuenta de erplora.com para ir directamente."
 msgid "You don't have permission to manage this business on erplora.com."
 msgstr "No tienes permiso para gestionar este negocio en erplora.com."
 
+#: base/services/support.py
+msgid "This business has no plan."
+msgstr "Este negocio no tiene plan."
+
 #: base/services.py
 msgid "We could not open erplora.com directly."
 msgstr "No se ha podido abrir erplora.com directamente."
@@ -2356,6 +2360,11 @@ msgstr "Actor"
 msgctxt "workbook"
 msgid "Screen"
 msgstr "Pantalla"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Operations"
+msgstr "Operaciones"
 
 #: workbook_help.py
 msgctxt "workbook"

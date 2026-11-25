@@ -74,7 +74,8 @@ Aquí manda la especificación oficial sobre el mercado:
   negocio». El emisor se escribe aquí, a mano: no llega de la cuenta de
   ERPlora.
 - **«Hoy» es el día del negocio**, en su zona horaria (la de «Ajustes»), no el de Madrid: decide la fecha de
-  cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero numera en la serie del
+  cada documento y, con ella, el año de su serie; solo una factura hecha a mano puede llevar la de un día anterior
+  (INVOICE-F03). Un cobro a las 00:30 del 1 de enero numera en la serie del
   año nuevo, y uno a las 23:30 del 31 de diciembre en Canarias, en la del año que acaba, aunque en Madrid ya
   sea 1 de enero. Una devolución o una anulación llevan como fecha de la operación el día del negocio en que
   se hicieron.
@@ -99,7 +100,7 @@ Configuración inicial, paso a paso:
 
 ### Facturas
 Todas las facturas del negocio: los tiques de cada cobro, las facturas completas y las rectificativas, lo último
-emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado, tipo, serie, fecha o total, y ábrelas para
+emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado (también las vencidas sin cobrar), tipo, serie, fecha o total, y ábrelas para
 verlas, imprimirlas o guardarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
 completa; con **+** emites una factura a mano. Un empleado ve solo las suyas: las que emitió, las de sus ventas
 (las que cobró y las que se le atribuyeron) y lo que rectifica o sustituye a una de ellas; el responsable, el
@@ -108,14 +109,16 @@ propietario y el administrador ven las de todos.
 #### Detalle
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
-columna se ordena. «Descargar en Excel», para quien ve las facturas de todos, guarda la lista tal como está filtrada (INVOICE-F24).
-Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
+columna se ordena. Una emitida que no se ha cobrado y cuyo vencimiento ya pasó dice «Vencida» en lugar de «Emitida».
+«Descargar en Excel», para quien ve las facturas de todos, guarda la lista tal como está filtrada (INVOICE-F24).
+Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»
+(«Emitida», que son las no cobradas, vencidas o no; «Vencida», «Pagada» y «Cancelada»),
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
 último emitido sale arriba. Mientras el emisor no está configurado, lo dice una sola vez el aviso «Todavía no puedes
 facturar» de la campana («No se podrá emitir ningún tique ni factura hasta que configures esto: Los datos de tu
 negocio.» y «Configurar los datos del negocio», que abre **Emisor**; a quien no puede cambiar el emisor, sin botón,
 «Esto lo tiene que configurar un administrador.»), sin otro aviso igual en la pantalla. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
-que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
+que están «Emitida» o «Vencida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
 rectifica o se paga una factura en cualquier dispositivo.
@@ -127,7 +130,7 @@ Se abre desde una fila de **Facturas** (`/invoice/invoices/<id>`). Arriba, «Fac
 etiqueta de estado y los botones «Imprimir / PDF» y «← Volver». Si es una factura completa o una
 rectificativa de una factura completa sin NIF del cliente, el aviso «Esta factura no tiene el NIF del
 cliente: la impresora de tiques no puede sacarla como factura completa.». Debajo, «Tipo», «Serie»,
-«Fecha de emisión», «Fecha de operación» (si es otra), «Cliente», «NIF cliente», «Dirección», «Emisor»,
+«Fecha de emisión», «Fecha de operación» (si es otra), «Vencimiento» (si lo tiene), «Cliente», «NIF cliente», «Dirección», «Emisor»,
 «Origen» («Venta del TPV», «Alta manual», «Sustituye a una factura simplificada», «Rectificación»,
 «Devolución de la venta», «Anulación de la venta»), «Venta» (su número), «Rectifica a» (el número de la
 original, que la abre), «Sustituye a» / «Sustituida por» (enlaces), «Rectificativas» (las que la
@@ -175,7 +178,8 @@ del servidor, «No se pudo cargar el tique. Inténtalo de nuevo.».
 
 #### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
-el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
+la «Fecha» (hoy de entrada; el calendario no deja elegir un día posterior), el «Vencimiento» (vacío de entrada; no
+antes que la fecha), el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
 líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en la moneda del negocio y con sus decimales; su símbolo o su código alrededor de la
 cifra no cuentan, como en 12,50 zł) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
@@ -326,30 +330,39 @@ Pantalla: Facturas, Nueva factura manual
 Pasos:
 1. En **Facturas**, pulsa **+**: se abre «Nueva factura manual».
 2. Elige la «Serie» (las activas del año que emiten facturas, F1, o tiques, F2, y siempre «FACT» y «TICKET»
-   aunque el año aún no las haya abierto; empieza en la predeterminada o en «FACT») y, si quieres, busca al
-   cliente en Clientes: rellena nombre, NIF, dirección y país. Escribe o corrige «Cliente», «NIF
-   cliente», «Dirección» y «Notas».
-3. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin impuesto
+   aunque el año aún no las haya abierto; empieza en la predeterminada o en «FACT»).
+3. Deja la «Fecha» en hoy o elige un día anterior, y pon el «Vencimiento» si la factura se paga más adelante.
+4. Si quieres, busca al cliente en Clientes: rellena nombre, NIF, dirección y país. Escribe o corrige «Cliente»,
+   «NIF cliente», «Dirección» y «Notas».
+5. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin impuesto
    y en la moneda del negocio, y el tipo, que lleva el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21
    de entrada), «IGIC %» en Canarias o «IPSI %» en Ceuta y Melilla. Empieza en el tipo general de su regla
    de Impuestos (en Canarias, el de la regla de Canarias); si el territorio aún no tiene regla de su
    impuesto, está vacío: escríbelo tú. «+ Línea» añade otra, con el mismo tipo de entrada, y la cruz la
    quita.
-4. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
+6. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
    cada línea tiene descripción, cantidad, precio y tipo. La ventana se cierra y la factura aparece en la lista
    con su número, «Emitida» y «Origen» «Alta manual».
-Entra: lo que escribe la persona; el emisor configurado. Por la API o el asistente una línea puede
+7. El vencimiento se ve en la ficha y en el papel. Desde el día siguiente, si no se ha cobrado, la lista y la ficha
+   dicen «Vencida», y al marcarla pagada, «Pagada».
+Entra: lo que escribe la persona; el emisor configurado. La fecha y el vencimiento se pueden decir también al
+asistente («hazle una factura a Carpintería Lema con fecha de ayer y vencimiento a 30 días») y por la API; sin fecha,
+la factura es de hoy. Por la API o el asistente una línea puede
 llevar además la categoría fiscal de Impuestos: entonces su tipo y su calificación son los de la regla
-vigente hoy, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
+vigente el día de la factura, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
 (Impuestos → Ajustes, TAX-F11): en Canarias se declara como IGIC y en Ceuta y Melilla como IPSI.
-Sale: la factura (F1 en una serie de facturas, F2 en una de tiques) con el impuesto calculado encima del
+Sale: la factura (F1 en una serie de facturas, F2 en una de tiques), numerada en la serie del año de su fecha, con
+esa misma fecha como fecha de operación y con el impuesto calculado encima del
 precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (los conceptos suman el
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
-500 caracteres); avisa `invoice.invoice.issued`.
+500 caracteres); avisa `invoice.invoice.issued`. El vencimiento no se declara en VeriFactu.
 Si falla: dentro de la ventana, encima de los botones: «Una factura completa necesita el nombre, el NIF y
 la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea 2: el precio no es un
-importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año
-(«Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
+importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año que la fecha
+(«Esa serie numera otro año…»), una fecha posterior a hoy («La fecha de una factura no puede ser posterior a hoy.») o
+anterior a la de la última factura de su serie («La fecha de una factura no puede ser anterior a la de la última de su
+serie, que es del 24/11/2026.»), un vencimiento anterior a la fecha («El vencimiento no puede ser anterior a la fecha
+de la factura.»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
 puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. Una línea con categoría fiscal (por la API o
 el asistente) sin regla vigente en el territorio del negocio se rechaza en el campo de esa línea, con la
 categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general») y
@@ -361,7 +374,7 @@ rechaza. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», 
 pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la factura se emite igual,
 con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende.
-Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
+Implicados: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
 Estado: hecho
@@ -403,7 +416,7 @@ Pasos:
    el número del tique; el tique dice «Sustituida por» con el de la F3.
 Entra: el tique (F2) que se sustituye y los datos fiscales del cliente.
 Sale: la F3 en la serie «FACT» del año, con las líneas y los importes del tique copiados al céntimo
-(misma operación) y la misma fecha de operación; el tique no se toca. Si el tique estaba pagado, la F3
+(misma operación) y la misma fecha de operación y, si lo tenía, el mismo vencimiento; el tique no se toca. Si el tique estaba pagado, la F3
 nace pagada. Avisa `invoice.invoice.issued`. Desde entonces, rectificar o devolver esa venta rectifica
 la F3, no el tique.
 Si falla: sin nombre, NIF o domicilio, rechazo; un NIF español que no es válido, «Ese NIF no es válido.»
@@ -559,15 +572,15 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada vez que se emite un documento (tique, factura, sustitutiva o rectificativa), Facturación toma
-   la serie de su código y del año del día del negocio; si no existe, la crea en ese momento con el
-   contador a 0, heredando nombre, prefijo y formato de la del año anterior con ese código (o, la
+   la serie de su código y del año de su fecha (el día del negocio o, en una factura manual, el que se haya elegido);
+   si no existe, la crea en ese momento con el contador a 0, heredando nombre, prefijo y formato de la del año anterior con ese código (o, la
    primera vez, con el código como prefijo).
 2. Sube el contador de esa serie en uno y escribe el número con el formato de la serie (sin formato,
    `TICKET-2026-000001`) en la misma operación que guarda el documento.
 3. El 1 de enero, a la hora del negocio, el siguiente documento abre la serie del año nuevo y vuelve a 1
    (o al «Siguiente número» que se le haya fijado).
 Entra: el código de serie que toca (TICKET para los tiques, FACT para las facturas completas y las
-sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida) y el día del negocio.
+sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida) y la fecha del documento.
 Sale: el número del documento. El número entra en la huella encadenada de VeriFactu.
 Si falla: si la emisión se rechaza o falla, no se guarda nada y el contador no sube: no queda hueco.
 Dos cobros a la vez en la misma serie esperan uno al otro y reciben números seguidos; dos documentos de
@@ -673,7 +686,8 @@ Pantalla: Facturas
 Pasos:
 1. Abre **Facturación → Facturas**.
 2. Escribe en «Buscar facturas…» un número, un nombre de cliente o un NIF; o filtra (estado, tipo,
-   serie, origen, fecha, total); o pulsa una columna para ordenar.
+   serie, origen, fecha, total); o pulsa una columna para ordenar. El estado «Vencida» deja las que no se han cobrado
+   y cuyo vencimiento ya pasó, en el día del negocio; las sustituidas por una factura completa no cuentan.
 3. La tabla enseña las que casan, de 50 en 50; lo último emitido, arriba. Un empleado solo ve las suyas:
    las que emitió él y las de sus ventas (las que cobró y las que se atribuyeron a su ficha de Personal), y
    lo que sigue a una de ellas: la factura completa que sustituyó a un tique suyo y la rectificativa de
@@ -688,7 +702,7 @@ en cualquier campo de importe del Hub y como en las demás listas («1.000,50»,
 («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con
 «1.000» en euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial,
 «La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
-Implicados: INVOICE-F24
+Implicados: INVOICE-F03, INVOICE-F24
 
 ### INVOICE-F17 Ver una factura
 Estado: hecho
@@ -696,7 +710,7 @@ Actor: empleado (sus facturas), responsable y administrador (las de todos)
 Pantalla: Ficha de factura
 Pasos:
 1. En **Facturas**, abre la factura.
-2. Lee la cabecera, las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
+2. Lee la cabecera (con el «Vencimiento», si lo tiene), las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
    columna «Dto.» con el descuento sin IVA), el desglose y los totales.
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
    cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
@@ -711,7 +725,7 @@ para verlo, la ficha sale sin la tarjeta del justificante. En la app instalada, 
 AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.». Una factura que la persona no ve (la de otro,
 para un empleado) no se abre, tampoco por su número: «Factura no encontrada», como una que no existe. Lo que
 rectifica o sustituye a una suya es suyo, así que sus enlaces se abren.
-Implicados: VERIFACTU-F19
+Implicados: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
 Estado: hecho
@@ -727,7 +741,7 @@ Pasos:
    instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
    trabajo llamado, por ejemplo, «Factura FACT-2026-000003») con la factura en A4 (con VeriFactu, arriba el QR del registro con
    «QR tributario:» y
-   «VERI*FACTU»; emisor, con su NIF-IVA si está inscrito en el ROI, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
+   «VERI*FACTU»; emisor, con su NIF-IVA si está inscrito en el ROI, fecha y, si lo tiene, «Vencimiento», «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
    nunca sale sin su QR.
 4. Siempre en el idioma de quien imprime. Un documento de una venta sale como «Copia» (el original fue
@@ -742,14 +756,14 @@ se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al a
 del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
 impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
 registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
-Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F21
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
 Actor: empleado (sus facturas), responsable y administrador (las de todos), asistente
 Pantalla: Facturas, Ficha de factura
 Pasos:
-1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida»; o pídeselo al
+1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida» o «Vencida»; o pídeselo al
    asistente («marca como cobrada la FACT-2026-000001», «la factura de Carpintería Lema ya está pagada»)
    y sigue en el paso 4.
 2. Confirma en «¿Marcar FACT-2026-000001 como pagada?» («El cobro se registra con la fecha y la hora de
@@ -885,7 +899,7 @@ entera.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Las facturas, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `invoice.invoice.list` |
+| Las facturas, con búsqueda, filtros (también las vencidas sin cobrar), orden y páginas (hasta 100) | ver | F16 | `invoice.invoice.list` |
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
 | Las facturas que deja la búsqueda y los filtros de la lista, en un Excel (una fila por factura y tipo de impuesto) | ver las de todos | F24 | `invoice.invoice.export` |
 | El tique que abre su código (número, fecha y total) y, si ya la tiene, su factura completa con su QR de VeriFactu | la página pública | F04 | `invoice.public.ticket` |
@@ -911,7 +925,7 @@ Todas menos el Excel se pueden seguir en vivo.
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Emite una factura a mano | emitir | F03 | `invoice.invoice.create` |
+| Emite una factura a mano, con su fecha y, si se quiere, su vencimiento | emitir | F03 | `invoice.invoice.create` |
 | Emite la factura de una venta cobrada (también la reacción a su cobro) | emitir | F01, F02, F06 | `invoice.invoice.create_from_sale` |
 | Sustituye un tique por una factura completa | emitir | F04, F05 | `invoice.invoice.substitute` |
 | Emite, con el código del tique y los datos del cliente, la factura completa que lo sustituye, y la devuelve con su QR de VeriFactu | la página pública | F04 | `invoice.public.substitute` |
@@ -969,7 +983,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
   `sale.sale.record_invoice`, por nombre y con el permiso de la plataforma, para dar a la venta, a su
   anulación o a su devolución el documento que esperaba (INVOICE-F06).
 - **Impuestos** (requisito): la regla congelada en cada línea de la venta (impuesto, régimen,
-  calificación, tipo y recargo) y, en el alta manual por categoría, la regla vigente hoy
+  calificación, tipo y recargo) y, en el alta manual por categoría, la regla vigente el día de la factura
   (`resolve_tax`, en el territorio fiscal del negocio); el impuesto de un territorio (`tax_kind_of`,
   `business_tax_kind`) para lo que no tiene regla: la línea con tipo tecleado (el territorio del negocio) y la
   de una venta cuya regla ya no existe (el territorio que la línea congeló al cobrarse); el redondeo a mitad
@@ -1189,7 +1203,14 @@ configurar nada.
   si se lleva todo lo que queda de una clave, copia sus cifras tal cual. Entera, niega cabecera,
   desglose y líneas de la original.
 - **Fechas**: `issue_date` es el día del negocio al emitir, en su zona horaria; `operation_date`, el
-  del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique.
+  del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique. Una factura
+  manual puede llevar un `issue_date` anterior, que es también su `operation_date`: la AEAT no admite una fecha de
+  expedición futura ni anterior a la de operación. `issued_at` y el orden de la cadena de VeriFactu son siempre los
+  del momento en que se emite. La última factura de la serie se lee con la fila de la serie bloqueada, que sigue
+  bloqueada hasta que se toma el número: una que se está emitiendo a la vez cuenta.
+- **Vencimiento** (`due_date`, opcional, solo el alta manual y la F3 que sustituye un tique que lo tenía): «vencida» no
+  es un estado que se guarde. `queries/overdue.py` dice cuándo lo está una factura (emitida, sin sustituir y con el
+  vencimiento antes del día del negocio) y da el filtro de la lista, que es también el del Excel.
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
   con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual
   que la guardada se ignora), pero nadie lo llama: la foto del SaaS (`PUT /internal/hubs/{id}/state`) no lleva un
@@ -1375,7 +1396,7 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 18. **El formato de una serie exige el año** (si no, la serie del año siguiente, que nace de esta,
     repetiría sus números) y el número es ASCII imprimible de 60 caracteres como mucho.
 19. **Un tique manual respeta el límite de Ventas** (3.000 € en España, RD 1619/2012 art. 4) y una
-    factura manual solo se numera en una serie de este año.
+    factura manual solo se numera en una serie del año de su fecha.
 20. **Un rechazo de VeriFactu deshace la emisión** (revisión fiscal de VeriFactu, 2026-10-15): una
     factura sin su registro de alta no se emite ni se imprime; solo un error transitorio de la base de
     datos la deja «pendiente» de la reacción, y sin VeriFactu en el negocio sale sin registro.
@@ -1457,6 +1478,35 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     todas las facturas. Un CSV con decimales de texto (como exportan Clientes e Inventario) obligaría a la gestoría a
     convertir las cifras; un formato AEAT o varias hojas piden más de lo que ha pedido nadie.
 
+25. **La fecha y el vencimiento de la factura manual** (INVOICE-F03, INVOICE-F16):
+    - **La fecha es hoy si no se elige otra, y puede ser un día anterior** mientras no sea anterior a la de la última
+      factura de su serie: los números de una serie van en el orden de sus fechas. Es lo que hace Holded: guarda la
+      fecha pasada y rechaza la que va antes que facturas ya aprobadas con un número mayor. Nunca es futura: la AEAT
+      no admite una fecha de expedición posterior a hoy.
+    - **La fecha de operación es la misma**: la AEAT solo admite una fecha de expedición anterior a la de operación en
+      los regímenes 14 y 15, que Facturación no emite. Preguntar una segunda fecha complicaría la factura para un caso
+      que nadie ha pedido.
+    - **El vencimiento es opcional** (ninguna norma lo exige) y nunca anterior a la fecha, como en QuickBooks y Clear
+      Books. Sin condiciones de pago con nombre ni plazos: se elige el día.
+    - **«Vencida» se ve y se filtra como un estado más**, pero no se guarda ni lo cambia nadie: depende del día.
+      «Emitida» sigue trayendo todas las no cobradas, vencidas o no: en QuickBooks, donde son estados separados, se
+      pide una vista que las junte.
+    - **Sin columna de vencimiento en la lista**: casi todas sus filas son tiques pagados, que no lo tienen; está en la
+      ficha y en el papel.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | Holded | conserva la fecha anterior a hoy y avisa con un error si hay facturas aprobadas con un número mayor y fecha posterior | https://intercom.help/holded/es/articles/6887128-configurar-las-preferencias-de-conformidad |
+    | AEAT (validaciones de VERI*FACTU) | la fecha de expedición no puede ser futura ni, salvo en los regímenes 14 y 15, anterior a la de operación | https://www.agenciatributaria.es/static_files/AEAT_Desarrolladores/EEDD/IVA/VERI-FACTU/Validaciones_Errores_Veri-Factu.pdf |
+    | Sage | el vencimiento no es obligatorio, pero se recomienda; su foro cuenta que una fecha de operación posterior a la de la factura no se valida | https://www.sage.com/es-es/blog/fecha-de-vencimiento-en-facturas/ · https://communityhub.sage.com/es/sage-50/f/discusion-general/259019/configuracion-factura-fechas-operacion-y-emision/619807 |
+    | Quipu | el vencimiento es opcional y recomendable | https://getquipu.com/blog/fecha-vencimiento-factura/ |
+    | Odoo | la lista de facturas de cliente se filtra por «Overdue» | https://www.odoo.com/documentation/19.0/applications/finance/accounting/payments/follow_up.html |
+    | QuickBooks | «Overdue» es una opción del filtro de estado; sus usuarios echan en falta un «no cobradas» que junte las vencidas y las que no. No admite un vencimiento anterior a la fecha | https://quickbooks.intuit.com/learn-support/en-us/reports-and-accounting/is-there-a-way-to-filter-invoices-by-unpaid-status-and-not-just/00/1483510 · https://quickbooks.intuit.com/community/reports-and-accounting-5/please-enter-a-valid-due-date-2024-update-error-57096 |
+    | Zoho Invoice | «Overdue» es uno de los filtros de la lista: pasado el vencimiento y sin cobrar | https://www.zoho.com/invoice/help/invoice/more-with-invoice.html |
+    | Xero | las vencidas son una parte de las pendientes de cobro; avisa si el vencimiento va antes que la fecha | https://www.xero.com/id/resources/small-business-guides/invoicing/chasing-outstanding-invoices · https://productideas.xero.com/forums/967115-invoices-quotes/suggestions/50816498-invoices-able-to-enter-a-due-date-prior-to-the-i |
+    | Square | lo pendiente junta lo no cobrado y lo vencido; «vencida» no se guarda, se calcula con el vencimiento | https://squareup.com/help/au/en/article/6105 · https://developer.squareup.com/forums/t/overdue-in-invoice-status/8143 |
+    | Clear Books | el vencimiento tiene que ser posterior a la fecha | https://secure.clearbooks.co.uk/community/problems/17945/likes |
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
@@ -1465,7 +1515,7 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 - No envía facturas por correo ni por WhatsApp, ni genera un PDF propio (el PDF es el del diálogo de
   impresión del navegador).
 - No hace presupuestos, proformas, borradores ni albaranes.
-- No lleva vencimientos, cobros parciales ni recordatorios de impago.
+- No lleva cobros parciales, plazos ni recordatorios de impago.
 - No exporta el libro registro de facturas expedidas en el formato oficial de la AEAT; el Excel de las facturas emitidas
   es una hoja sencilla para la gestoría (INVOICE-F24).
 - No vigila el techo de la factura simplificada: lo pide Ventas al cobrar.

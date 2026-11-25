@@ -25,6 +25,7 @@ import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
 import type { InvoiceRowOut } from '../operations';
 import source from './InvoicesPage.vue?raw';
+import { row } from '../__tests__/invoice-row';
 import { EMPTY, OP, PAGE, setup } from '../__tests__/invoices-page';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
@@ -70,6 +71,20 @@ describe('InvoicesPage: the live list', () => {
     expect(text(2).slice(2, 3)).toEqual(['-€12.10']);
   });
 
+  it('an overdue invoice says «Overdue» instead of «Issued», and can still be marked as paid', async () => {
+    const s = await setup();
+    await s.show({ ...PAGE, rows: [row('FACT-2026-000003', { due_date: '2026-11-13', overdue: true }), row('FACT-2026-000002', { due_date: '2026-12-13' })] });
+    const pills = s.wrapper.findAll('[data-testid="invoice-list-status"]');
+    expect(pills.map((pill) => [pill.text(), pill.attributes('data-tone')])).toEqual([
+      ['Overdue', 'warning'],
+      ['Issued', 'info'],
+    ]);
+    const paid = s.prop<Array<{ id: string; hidden?: (row: InvoiceRowOut) => boolean }>>('actions').find((action) => action.id === 'paid');
+    expect(paid?.hidden?.(row('FACT-2026-000003', { overdue: true }))).toBe(false);
+    await s.filter({ status: 'overdue' });
+    expect(s.params()).toEqual([{ status: 'overdue', sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
+  });
+
   it('sorts, searches and pages on the server; an empty answer says «No results»', async () => {
     const s = await setup();
     await s.show(PAGE);
@@ -111,6 +126,7 @@ describe('InvoicesPage: the live list', () => {
     ]);
     expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
       { value: 'issued', label: 'Issued' },
+      { value: 'overdue', label: 'Overdue' },
       { value: 'paid', label: 'Paid' },
       { value: 'cancelled', label: 'Cancelled' },
     ]);

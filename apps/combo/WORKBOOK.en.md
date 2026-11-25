@@ -627,13 +627,13 @@ menu or another course that comes beside the course's or the choice's, or beside
 to, reordered in or looked for in: the action does not use it and the card does not show it (hub#1278).
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:2133ad4ff098 -->
+<!-- from WORKBOOK.md sha256:a8cd4948eaef -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The menus, with search, filters and order, in pages of up to 100 (live) | view | F01 | `combo.combo.list` |
-| A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
-| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06, F07 | `combo.option.get` |
+| A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12, F13 | `combo.combo.get` |
+| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06 | `combo.option.get` |
 | A course of a menu with its choices, by its id or by its name within the menu: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view | F05, F06 | `combo.group.get` |
 | What a new choice names, before the assistant's card that adds it: the course, with its menu, and the Inventory product; if one does not exist or fits several, no card comes up (BASE-F97); it is not an assistant tool and has no API route | view | F06 | `combo.option.check` |
 | The same with several choices at once: the course and each product, before the card that adds them (BASE-F97); it is not an assistant tool and has no API route | view | F06 | `combo.option.bulk_check` |
@@ -642,7 +642,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:4f962fe147f0 -->
+<!-- from WORKBOOK.md sha256:f4fdd6c04206 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -654,7 +654,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | Changes a course (only what is sent) | manage | F05 | `combo.group.update` |
 | Withdraws a course with its choices | manage | F05 | `combo.group.delete` |
 | Orders the courses of a menu, all at once | manage | F05 | `combo.group.reorder` |
-| Adds a choice (at the end) | manage | F06, F15 | `combo.option.create` |
+| Adds a choice (at the end) | manage | F06, F13, F15 | `combo.option.create` |
 | Adds several choices at once | manage | F06 | `combo.option.bulk_create` |
 | Changes a choice: product, supplement or available (only what is sent) | manage | F06, F12 | `combo.option.update` |
 | Removes a choice | manage | F06 | `combo.option.delete` |

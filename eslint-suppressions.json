@@ -652,11 +652,6 @@
       "count": 2
     }
   },
-  "tests/e2e/assistant-provider.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "tests/e2e/fix-ui-datatable-range-filter-labels.spec.ts": {
     "max-depth": {
       "count": 1

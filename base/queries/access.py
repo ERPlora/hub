@@ -8,8 +8,7 @@ from django.http import HttpRequest
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from base import access
-from base.auth import SAAS_PANEL_PATH, saas_url
+from base import access, saas_store
 from base.models.access import AccessSettings, Credential
 from base.models import Membership
 from base.models.sessions import SessionOwner
@@ -130,7 +129,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
         "people": faces,
         "wait": wait,
         # «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
-        "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans"),
+        "plan_url": saas_store.plans_url(ctx.scope.key),
     }
 
 
