@@ -1,7 +1,9 @@
 // The figures of a session (CASH_REGISTER-F11, F16): one list, painted by the detail and printed by the
 // X/Z report, so the screen and the paper never say different things. Every amount is the server's; a
-// figure the server withholds (a blind count) is left out or «—», never computed here.
+// figure the server withholds (a blind count) is left out or «—», never computed here. What another app records
+// (Tips, CASH_REGISTER-F18) goes in its own lines, named by the server, just before the expected.
 import type { SessionOut } from '../operations';
+import type { AppLine } from '../operations/app-lines';
 import { formatMoney, formatSignedMoney, type Money } from './money';
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
@@ -47,6 +49,7 @@ export function summaryItems(
     item('cashIn', amount(s.total_cash_in)),
     item('cashOut', amount(s.total_cash_out)),
     item('gifts', amount(s.total_gifts)),
+    ...appLineItems(s.app_lines, locale, money),
     item('expected', amount(s.expected_cash)),
     item('counted', closed ? amount(s.counted) : '—'),
     item('difference', closed ? formatSignedMoney(s.difference, locale, money) : '—'),
@@ -54,4 +57,9 @@ export function summaryItems(
   if (session.opening_notes) items.push(item('openingNotes', session.opening_notes));
   if (session.closing_notes) items.push(item('closingNotes', session.closing_notes));
   return items;
+}
+
+/** The lines another app recorded, as the server names them, with their sign (paid out is negative). */
+export function appLineItems(lines: readonly AppLine[] | null | undefined, locale: string, money?: Money): SummaryItem[] {
+  return (lines ?? []).map((line, index) => ({ key: `${line.app}-${index}`, label: line.label, value: formatMoney(line.amount, locale, money) }));
 }

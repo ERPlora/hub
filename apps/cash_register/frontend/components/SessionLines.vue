@@ -1,15 +1,16 @@
 <script setup lang="ts">
 // The lines of a session (CASH_REGISTER-F11; the old detail's «Movements» table) — or, over another query,
 // the lines that fell in no session (F17) — in a server-side DataTable, newest first, 50 a page, table or
-// cards (titled by their date and time): When, Type, Amount with its sign, Method and Concept (the document
-// a sale line is: none of the columns drops in a narrow box, which turns the list to cards). The sale
-// lines are Sales' own, read by the server; they re-run by themselves on a sale, a movement or a close.
+// cards (titled by their date and time): When, Type (the app, for a line another app recorded), Amount with
+// its sign, Method and Concept (the document a sale line is: none of the columns drops in a narrow box, which
+// turns the list to cards). The sale lines are Sales' own, read by the server; they re-run by themselves on a
+// sale, a movement or a close.
 import { type DataTableColumn, DataTable, EmptyState, formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { conceptOf, methodOf } from '../lib/lines';
+import { conceptOf, methodOf, typeOf } from '../lib/lines';
 import { formatSignedMoney, useBusinessMoney } from '../lib/money';
 import type { MovementListIn, MovementRow } from '../operations';
 
@@ -39,7 +40,7 @@ const when = (row: MovementRow): string => formatDateTime(row.created_at, locale
 
 const columns = computed<DataTableColumn<MovementRow>[]>(() => [
   { key: 'created_at', label: t('cash_register.lines.columns.when'), sortable: true, width: 'minmax(9.5rem,1fr)', format: (_, row) => when(row) },
-  { key: 'type', label: t('cash_register.lines.columns.type'), sortable: true, format: (_, row) => t(`cash_register.types.${row.type}`) },
+  { key: 'type', label: t('cash_register.lines.columns.type'), sortable: true, format: (_, row) => typeOf(row, t) },
   {
     key: 'amount',
     label: t('cash_register.lines.columns.amount'),

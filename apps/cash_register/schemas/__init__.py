@@ -15,7 +15,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
-from apps.cash_register.schemas.app_lines import AppLine
+from apps.cash_register.schemas.app_lines import AppLine, AppMark
 from base.schemas.assistant import names
 from base.sensitive import COSTS
 
@@ -506,7 +506,7 @@ class MovementListIn(PageIn):
         return self
 
 
-class MovementRow(Schema):
+class MovementRow(AppMark):
     key: str = Field(
         description="Stable key of the line: the movement's id, or its sale line («sale-…», «void-…», «refund-…»)."
     )
@@ -522,7 +522,6 @@ class MovementRow(Schema):
     )
     method_name: str = Field(description="The payment method's name as Sales calls it.")
     description: str = Field(description="The concept written by hand.")
-    app: str = Field(description="The app that recorded it as its own (tip); empty = by hand, or a sale's.")
     sale_id: UUID | None = Field(description="The sale of a sale, void or refund line.")
     sale_number: str = Field(description="That sale's number.")
     document_type: str = Field(description="That sale's document: ticket or invoice.")

@@ -171,7 +171,6 @@ const canDismiss = useUnsavedFormOnOpen('payment-form', form, open);
           name="method_id"
           :value="form.methodId"
           :label="$t('payment.payments.form.method')"
-          :placeholder="loading ? $t('payment.loading') : $t('payment.payments.form.methodPlaceholder')"
           :disabled="loading || failed || none"
           label-placement="floating"
           fill="outline"

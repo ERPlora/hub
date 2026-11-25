@@ -118,13 +118,13 @@ def grantable(configs: Iterable[LiveAppConfig]) -> dict[str, tuple[str, ...]]:
 
 def permissions_of_role(role: str) -> frozenset[str]:
     """What ``role`` (a ``Membership.Role``) gives on a host: the owner, every permission declared by every app; an
-    administrator, all of them but ``OWNER_ONLY``; manager and employee, what each app's ``role_permissions`` gives
-    them, which never names ``OWNER_ONLY`` (``base/tests/test_permissions.py``)."""
+    administrator and ERPlora's support, all of them but ``OWNER_ONLY``; manager and employee, what each app's
+    ``role_permissions`` gives them, which never names ``OWNER_ONLY`` (``base/tests/test_permissions.py``)."""
     configs = all_live_app_configs()
     declared = frozenset(permission for config in configs for permission in config.permissions)
     if role == Membership.Role.OWNER:
         return declared
-    if role == Membership.Role.ADMIN:
+    if role in (Membership.Role.ADMIN, Membership.SUPPORT):
         return declared - OWNER_ONLY
     return permissions_for_role(configs, role)
 

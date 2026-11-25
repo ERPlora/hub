@@ -82,7 +82,7 @@ def _platform_steps(ctx: OperationContext, on: frozenset[str], country: str, dem
         apps_state = home.STATE_DONE
     else:
         apps_state = home.STATE_PENDING if business_apps else home.STATE_UNAVAILABLE
-    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).count()
+    people = Membership.objects.team(ctx.scope.key).count()
     return [
         home.item(
             "base.apps",
