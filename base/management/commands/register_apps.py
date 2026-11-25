@@ -29,15 +29,15 @@ class Command(BaseCommand):
     def handle(self, *args, check: bool = False, force: bool = False, **options):
         if check:
             try:
-                entries = catalog.build_registry()
-            except catalog.CatalogError as error:
+                entries = catalog.app_registry.build_registry()
+            except catalog.errors.CatalogError as error:
                 raise CommandError(str(error)) from error
             labels = ", ".join(entry.id for entry in entries)
             self.stdout.write(f"{len(entries)} app(s) ready to register: {labels}")
             return
         try:
-            result = catalog.register_apps(force=force)
-        except (catalog.CatalogError, DatabaseError) as error:
+            result = catalog.register_apps.register_apps(force=force)
+        except (catalog.errors.CatalogError, DatabaseError) as error:
             raise CommandError(f"register_apps: nothing written: {error}") from error
         if result.skipped:
             self.stdout.write(

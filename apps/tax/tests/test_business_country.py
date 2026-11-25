@@ -21,7 +21,7 @@ from apps.invoice.tests.conftest import ISSUER
 from apps.sale.models import Sale
 from apps.tax import queries
 from apps.tax.models import TaxRule, TaxSettings
-from apps.tax.schemas import FACTORY_COUNTRIES
+from apps.tax.schemas.rules import FACTORY_COUNTRIES
 from base.models import Hub
 from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub

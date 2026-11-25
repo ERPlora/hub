@@ -8,7 +8,7 @@ from ninja import Field, Schema
 from pydantic import StringConstraints
 
 from apps.inventory.schemas.fields import FILE_ROWS, MAX_BATCH, _text
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.allergens import AllergensCellIn
 from base.sensitive import COSTS
 
@@ -39,6 +39,13 @@ class ProductImportRowIn(AllergensCellIn):
     )
     unit: Cell = Field(
         "", description="Unit cell (ud, kg, g, t, l, ml, min, h); empty = ud."
+    )
+    product_type: Cell = Field("", description="Type cell: physical, or service (never has stock); empty = physical.")
+    price_quantity: Cell = Field(
+        "", description="Cell of the quantity the price is per (100 for 'per 100 g'), as written; empty = 1."
+    )
+    pricing_unit: Cell = Field(
+        "", description="Cell of the unit the price refers to, of the same kind as the product's; empty = the product's unit."
     )
     tax_category_key: Cell = Field(
         "", description="Key of the tax category chosen for this row's fiscal text.", json_schema_extra=A_TAX_CATEGORY

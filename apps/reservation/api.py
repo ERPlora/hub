@@ -8,21 +8,18 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.reservation import queries, services
-from apps.reservation.schemas import (
-    BlockedDateIn,
-    BlockedDateListIn,
-    BlockedDateRefIn,
+from apps.reservation.schemas.availability import DayIn, TablesIn
+from apps.reservation.schemas.blocked_dates import BlockedDateIn, BlockedDateListIn, BlockedDateRefIn
+from apps.reservation.schemas.reservations import (
     CancelIn,
-    DayIn,
     ReservationIn,
     ReservationListIn,
     ReservationPatchIn,
     ReservationRefIn,
-    SettingsIn,
-    TablesIn,
-    TimeSlotIn,
-    TimeSlotListIn,
-    TimeSlotRefIn,
+)
+from apps.reservation.schemas.settings import SettingsIn
+from apps.reservation.schemas.slots import TimeSlotIn, TimeSlotListIn, TimeSlotRefIn
+from apps.reservation.schemas.waitlist import (
     WaitlistConvertIn,
     WaitlistIn,
     WaitlistListIn,

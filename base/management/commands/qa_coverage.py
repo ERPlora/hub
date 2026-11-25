@@ -37,7 +37,7 @@ class Command(BaseCommand):
         root = Path(settings.BASE_DIR)
         walks = _walks(Path(ledger)) if ledger else None
         flows = qa_coverage.workbook_flows(root)
-        journeys = qa_coverage.read_journeys(root, catalog.known_verticals())
+        journeys = qa_coverage.read_journeys(root, catalog.verticals.known_verticals())
         problems = [f"{journey.name}: {problem}" for journey in journeys for problem in journey.problems]
         for problem in [*problems, *qa_coverage.citation_problems(flows, journeys)]:
             self.stdout.write(f"! {problem}")
@@ -70,7 +70,7 @@ class Command(BaseCommand):
 
     def _write_assistant(self, report: qa_assistant.Report) -> None:
         """What to expect of each flow when it is asked for by talking, and then what is left to write: the flows with
-        no group, the ones that contradict themselves and the tools no flow cites."""
+        no group, the ones that contradict themselves, the tools no flow cites and what is cited and does not exist."""
         groups = Counter(one.group for one in report.flows)
         counts = [f"{groups[group]} {group}" for group in qa_assistant.Group]
         self.stdout.write(f"assistant: {', '.join(counts)}, {groups[None]} undecided")
@@ -85,6 +85,7 @@ class Command(BaseCommand):
             contradictory,
         )
         self._write_list("tools no flow cites", report.uncited_tools)
+        self._write_list("cited and does not exist", report.broken_citations)
 
     def _write_list(self, title: str, items: Sequence[str]) -> None:
         self.stdout.write(f"{title}: {len(items)}")

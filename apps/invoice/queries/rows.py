@@ -14,6 +14,7 @@ from apps.invoice.document_issuer import document_issuer
 from apps.invoice.models import Invoice, InvoiceLine
 from apps.invoice.queries.overdue import is_overdue
 from apps.invoice.queries.ownership import INVOICES
+from apps.invoice.queries.platform_reading import source_of, status_of
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
 
@@ -29,14 +30,18 @@ def with_links(invoices):
 def _flags(invoice: Invoice, *, substituted: bool, rectified: bool) -> dict:
     """What can still be done to a document, and whether it is overdue: the row and the detail ask the same questions."""
     ordinary = not invoice.is_rectification
+    # erplora.com corrects the ones it issued.
+    by_hand = invoice.platform_ref is None
     return {
         "substituted": substituted,
         "overdue": is_overdue(invoice, substituted=substituted),
-        "can_mark_paid": ordinary and invoice.status == Invoice.Status.ISSUED,
-        "can_rectify": ordinary
+        "can_mark_paid": ordinary and status_of(invoice) == Invoice.Status.ISSUED,
+        "can_rectify": by_hand
+        and ordinary
         and invoice.status != Invoice.Status.CANCELLED
         and not substituted,
-        "can_substitute": invoice.invoice_type == "F2"
+        "can_substitute": by_hand
+        and invoice.invoice_type == "F2"
         and invoice.status != Invoice.Status.CANCELLED
         and not substituted
         and not rectified,
@@ -66,8 +71,8 @@ def invoice_row(invoice: Invoice) -> dict:
         "total_amount": invoice.total_amount,
         "currency": invoice.currency,
         "currency_decimals": get_currency_precision(invoice.currency),
-        "status": invoice.status,
-        "source_type": invoice.source_type,
+        "status": status_of(invoice),
+        "source_type": source_of(invoice),
         "rectifies_id": invoice.rectifies_id,
         "rectifies_number": invoice.rectifies.number if invoice.rectifies_id else "",
         **_flags(invoice, substituted=substituted, rectified=rectified),
@@ -81,7 +86,7 @@ def _link(invoice: Invoice | None) -> dict | None:
         "id": invoice.id,
         "number": invoice.number,
         "invoice_type": invoice.invoice_type,
-        "status": invoice.status,
+        "status": status_of(invoice),
         "issue_date": invoice.issue_date,
         "total_amount": invoice.total_amount,
     }
@@ -153,6 +158,9 @@ def invoice_detail(invoice: Invoice) -> dict:
         "customer_id_type": invoice.customer_id_type,
         "description": invoice.description,
         "notes": invoice.notes,
+        "withholding_rate": invoice.withholding_rate,
+        "withholding_amount": invoice.withholding_amount,
+        "payable_amount": invoice.payable_amount,
         "tax_breakdown": invoice.tax_breakdown,
         "rectification_kind": invoice.rectification_kind,
         "sale_id": invoice.source_sale_id,

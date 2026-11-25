@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Employees › Approvals: the read-only record of each action that needed a manager's PIN or badge. Each action is named
-// in its app's words, never by the command's technical name.
+// Employees › Approvals: the read-only record of each action a manager may approve, with their PIN or badge or done by
+// whoever needs no approval. Each action is named in its app's words, never by the command's technical name.
 import {
   DataTable,
   type DataTableColumn,
@@ -13,7 +13,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { ApprovalExportQuery, ApprovalRow } from '../operations/approvals';
+import type { ApprovalExportQuery, ApprovalRow, ApprovalWay } from '../operations/approvals';
 import ApprovalsExportButton from './ApprovalsExportButton.vue';
 
 const { t, locale } = useBaseI18n();
@@ -38,7 +38,7 @@ const actions = computed<DataTableFilterOption[]>(() =>
     .sort((a, b) => a.label.localeCompare(b.label, locale.value)),
 );
 const ways = computed<DataTableFilterOption[]>(() =>
-  (['pin', 'badge'] as const).map((way) => ({ value: way, label: t(`base.approvals.way.${way}`) })),
+  (['pin', 'badge', 'role'] satisfies ApprovalWay[]).map((way) => ({ value: way, label: t(`base.approvals.way.${way}`) })),
 );
 const uses = computed<DataTableFilterOption[]>(() => [
   { value: 'true', label: t('base.approvals.used') },
@@ -50,19 +50,22 @@ const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
     key: 'at',
     label: t('base.approvals.columns.at'),
     format: (value: unknown) => formatDateTime(value as string, locale.value),
-    width: '11rem',
     filter: { type: 'daterange' },
   },
   {
     key: 'action',
     label: t('base.approvals.columns.action'),
-    width: 'minmax(12rem,2fr)',
     filter: { type: 'select', key: 'operation', options: actions.value },
   },
-  { key: 'approved_by', label: t('base.approvals.columns.approvedBy'), width: 'minmax(8rem,1fr)' },
-  { key: 'requested_by', label: t('base.approvals.columns.requestedBy'), width: 'minmax(8rem,1fr)' },
-  { key: 'way', label: t('base.approvals.columns.way'), cell: 'way', width: '7rem', filter: { type: 'select', options: ways.value } },
-  { key: 'used', label: t('base.approvals.columns.used'), cell: 'used', width: '8rem', filter: { type: 'select', options: uses.value } },
+  { key: 'approved_by', label: t('base.approvals.columns.approvedBy') },
+  { key: 'requested_by', label: t('base.approvals.columns.requestedBy') },
+  {
+    key: 'way',
+    label: t('base.approvals.columns.way'),
+    format: (value: unknown) => t(`base.approvals.way.${value as ApprovalWay}`),
+    filter: { type: 'select', options: ways.value },
+  },
+  { key: 'used', label: t('base.approvals.columns.used'), cell: 'used', filter: { type: 'select', options: uses.value } },
 ]);
 </script>
 
@@ -92,9 +95,6 @@ const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
     >
       <template #toolbar>
         <ApprovalsExportButton :query="exportQuery" />
-      </template>
-      <template #way="{ row }">
-        <span data-testid="approvals-way">{{ t(`base.approvals.way.${(row as ApprovalRow).way}`) }}</span>
       </template>
       <template #used="{ row }">
         <StatusPill

@@ -87,13 +87,13 @@ def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_aft
     from live.context import system_context
 
     from base import catalog, worker
-    from base.catalog import RegisterResult
+    from base.catalog.register_apps import RegisterResult
     from base.registry import REGISTRY_SCOPE
     from control.schemas import FreezeIn
     from control.services import freeze_set
 
     platform = system_context(REGISTRY_SCOPE)
-    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(0, 0, 0, True))
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: RegisterResult(0, 0, 0, True))
     for target, name in ((worker, "_relay"), (worker.hub_visits.HubVisits, "serve"), (worker, "_activations"), (worker, "_reap")):
         monkeypatch.setattr(target, name, lambda *_, **__: None)
     hub = registry.hub()
@@ -126,7 +126,7 @@ def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_aft
 
 def test_its_lease_is_renewed_while_its_schema_is_migrated(registry, monkeypatch, told):
     hub = registry.hub()
-    real = migrator.ensure_schema
+    real = migrator.schema.ensure_schema
     renewed = []
 
     def beating(row, **kwargs):
@@ -135,7 +135,7 @@ def test_its_lease_is_renewed_while_its_schema_is_migrated(registry, monkeypatch
         renewed.append(HubDue.objects.get(pk=row.pk).lease_until > before)
         return real(row, **kwargs)
 
-    monkeypatch.setattr(migrator, "ensure_schema", beating)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", beating)
 
     assert provision.provision(hub) is True
     assert renewed == [True]
@@ -150,7 +150,7 @@ def test_a_lease_lost_while_its_schema_is_migrated_stops_it_there_without_failin
         HubDue.objects.filter(pk=row.pk).update(lease_owner="another-worker")
         kwargs["heartbeat"]()
 
-    monkeypatch.setattr(migrator, "ensure_schema", taken_meanwhile)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", taken_meanwhile)
 
     with caplog.at_level(logging.INFO, logger="base.tenancy.provision"):
         assert provision.provision(hub) is False

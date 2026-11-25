@@ -63,27 +63,27 @@ async def member_stats(request):
 
 @bind(router, "staff.member.create", "/staff/members", status=201)
 async def member_create(request, data: MemberIn):
-    return await run_operation(request, services.create_member, data)
+    return await run_operation(request, services.members.create_member, data)
 
 
 @bind(router, "staff.member.bulk_create", "/staff/members/bulk_create", status=201)
 async def member_bulk_create(request, data: BulkCreateIn):
-    return await run_operation(request, services.bulk_create_members, data)
+    return await run_operation(request, services.members.bulk_create_members, data)
 
 
 @bind(router, "staff.member.update", "/staff/members/update")
 async def member_update(request, data: MemberPatchIn):
-    return await run_operation(request, services.update_member, data)
+    return await run_operation(request, services.members.update_member, data)
 
 
 @bind(router, "staff.member.deactivate", "/staff/members/deactivate")
 async def member_deactivate(request, data: MemberRefIn):
-    return await run_operation(request, services.deactivate_member, data)
+    return await run_operation(request, services.members.deactivate_member, data)
 
 
 @bind(router, "staff.member.terminate", "/staff/members/terminate")
 async def member_terminate(request, data: TerminateIn):
-    return await run_operation(request, services.terminate_member, data)
+    return await run_operation(request, services.members.terminate_member, data)
 
 
 @bind(router, "staff.commission.summary", "/staff/commissions")
@@ -114,12 +114,12 @@ async def role_list(request, params: Query[RoleListIn]):
 
 @bind(router, "staff.role.create", "/staff/roles", status=201)
 async def role_create(request, data: RoleIn):
-    return await run_operation(request, services.create_role, data)
+    return await run_operation(request, services.roles.create_role, data)
 
 
 @bind(router, "staff.role.update", "/staff/roles/update")
 async def role_update(request, data: RolePatchIn):
-    return await run_operation(request, services.update_role, data)
+    return await run_operation(request, services.roles.update_role, data)
 
 
 # Schedules and availability
@@ -137,22 +137,22 @@ async def schedule_detail(request, params: Query[ByIdIn]):
 
 @bind(router, "staff.schedule.create", "/staff/schedules", status=201)
 async def schedule_create(request, data: ScheduleIn):
-    return await run_operation(request, services.create_schedule, data)
+    return await run_operation(request, services.schedules.create_schedule, data)
 
 
 @bind(router, "staff.schedule.update", "/staff/schedules/update")
 async def schedule_update(request, data: ScheduleUpdateIn):
-    return await run_operation(request, services.update_schedule, data)
+    return await run_operation(request, services.schedules.update_schedule, data)
 
 
 @bind(router, "staff.schedule.set_active", "/staff/schedules/set_active")
 async def schedule_set_active(request, data: SetActiveIn):
-    return await run_operation(request, services.set_schedule_active, data)
+    return await run_operation(request, services.schedules.set_schedule_active, data)
 
 
 @bind(router, "staff.schedule.delete", "/staff/schedules/delete")
 async def schedule_delete(request, data: ScheduleRefIn):
-    return await run_operation(request, services.delete_schedule, data)
+    return await run_operation(request, services.schedules.delete_schedule, data)
 
 
 @bind(router, "staff.availability.for_member", "/staff/availability")
@@ -185,27 +185,27 @@ async def time_off_mine(request, params: Query[MyTimeOffIn]):
 
 @bind(router, "staff.time_off.create", "/staff/time_off", status=201)
 async def time_off_create(request, data: TimeOffIn):
-    return await run_operation(request, services.create_time_off, data)
+    return await run_operation(request, services.time_off.create_time_off, data)
 
 
 @bind(router, "staff.time_off.request", "/staff/time_off/request", status=201)
 async def time_off_request(request, data: TimeOffRequestIn):
-    return await run_operation(request, services.request_time_off, data)
+    return await run_operation(request, services.time_off.request_time_off, data)
 
 
 @bind(router, "staff.time_off.approve", "/staff/time_off/approve")
 async def time_off_approve(request, data: TimeOffRefIn):
-    return await run_operation(request, services.approve_time_off, data)
+    return await run_operation(request, services.time_off.approve_time_off, data)
 
 
 @bind(router, "staff.time_off.reject", "/staff/time_off/reject")
 async def time_off_reject(request, data: TimeOffRefIn):
-    return await run_operation(request, services.reject_time_off, data)
+    return await run_operation(request, services.time_off.reject_time_off, data)
 
 
 @bind(router, "staff.time_off.cancel", "/staff/time_off/cancel")
 async def time_off_cancel(request, data: TimeOffRefIn):
-    return await run_operation(request, services.cancel_time_off, data)
+    return await run_operation(request, services.time_off.cancel_time_off, data)
 
 
 # Settings
@@ -218,4 +218,4 @@ async def settings_get(request):
 
 @bind(router, "staff.settings.update", "/staff/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)

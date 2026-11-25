@@ -571,6 +571,7 @@ TITLED_IN_SPANISH = {
         f"online_booking.booking.{action}:id": "Reserva"
         for action in ("cancel", "complete", "confirm", "delete", "no_show")
     },
+    "online_order.qr_code.regenerate:id": "Mesa",
     **{f"payment.method.{action}:id": "Método" for action in ("activate", "deactivate", "update")},
     **{f"payment.payment.{action}:id": "Pago" for action in ("approve", "cancel", "mark_completed", "mark_sent")},
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},

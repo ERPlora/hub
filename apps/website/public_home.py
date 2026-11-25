@@ -39,10 +39,10 @@ from live.context import Scope
 
 from apps.website import queries, services
 from apps.website.csp import own_domain_policy, public_policy
-from apps.website.qr import public_url
 from apps.website.render import local_day, render_site
 from base import custom_domains
 from base.business import currency_of
+from base.qr import public_url
 
 #: What the browser may keep the page for: a minute, then it asks again (and the Hub answers from its cache).
 CACHE_CONTROL = "public, max-age=60"

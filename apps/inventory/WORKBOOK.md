@@ -358,7 +358,8 @@ entero o no se guarda nada. Si se dio stock inicial, queda en **Movimientos** co
 Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrece en la rejilla del
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28). Por el asistente o la API
 se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTORY-F03), como vuelve uno
-que estaba desactivado al recuperarse desde una copia aparte (BASE-F114).
+que estaba desactivado al recuperarse desde una copia aparte (BASE-F114). Una copia de seguridad o una plantilla de
+«Datos y copias» (BASE-F35) guarda qué productos son «Servicio», y al cargarla (BASE-F31) lo siguen siendo.
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
 como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
@@ -373,7 +374,7 @@ otro producto del catálogo». Una categoría fiscal que ya no está en Impuesto
 llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada. El coste solo lo escribe
 quien ve los costes: un alta con coste de quien no los ve, por el asistente o la API, se rechaza como una operación
 sin permiso y no se guarda nada; sin coste, el producto se da de alta con coste 0.
-Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F31, BASE-F35, BASE-F119, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
 los productos que el negocio ya no tiene en absoluto, cada uno por esta misma alta; uno eliminado vuelve el mismo,
 INVENTORY-F34)
 
@@ -557,8 +558,9 @@ Pasos:
 Entra: el fichero; las categorías fiscales, sus nombres (también los traducidos) y los textos
 aprendidos, de Impuestos; las unidades.
 Sale: un producto activo y «Físico» por fila lista, que sigue el control de stock del negocio y no
-lleva categorías de TPV; Inventario avisa de cada producto nuevo. El stock que trae cada fila queda
-en **Movimientos** como «Inicial». En Impuestos, los textos aprendidos y las categorías creadas
+lleva categorías de TPV; Inventario avisa de cada producto nuevo. Por el asistente o la API, una fila puede decir
+además que es un «Servicio» y a qué cantidad y unidad se refiere su precio (INVENTORY-F26). El stock que trae cada
+fila queda en **Movimientos** como «Inicial». En Impuestos, los textos aprendidos y las categorías creadas
 desde la ventana fiscal. Una fila con un SKU que ya tiene un producto vivo se cuenta como omitida y
 ese producto no se toca, digan lo que digan sus otras celdas (así el propio export se vuelve a importar
 sin fallos, también con un stock negativo); un SKU de un producto eliminado crea uno nuevo.
@@ -566,13 +568,15 @@ Si falla: motivos de fila: «Faltan nombre o SKU», «Precio no numérico» (tam
 «Precio o coste demasiado alto», «SKU duplicado en el fichero», «Cantidad no numérica», «Cantidad
 demasiado grande», «La cantidad no respeta el incremento permitido para esta unidad», «Unidad de
 medida no reconocida», «Un texto es más largo de lo que admite su columna», «Ese EAN-13 ya lo tiene
-otro producto del catálogo» y «Falta la categoría fiscal» o «Categoría fiscal no reconocida». Si Impuestos no puede guardar un texto aprendido o una categoría
+otro producto del catálogo» y «Falta la categoría fiscal» o «Categoría fiscal no reconocida»; por el asistente o la
+API, también «Tipo de producto no reconocido», «Un servicio no lleva stock.» y «El precio tiene que referirse a una
+unidad del mismo tipo que la del producto.». Si Impuestos no puede guardar un texto aprendido o una categoría
 creada, se dice en el informe y sus filas quedan como fallidas con ese motivo. «Cancelar» en la
 ventana fiscal no importa nada. «Parar» deja lo ya creado y el informe dice «La importación se
 paró a medias. Lo que ya se había creado está contado abajo; el resto del fichero se quedó como
 estaba.». Los costes solo los importa quien ve los costes: un fichero con costes de quien no los ve se rechaza
 entero como una operación sin permiso y no se crea nada.
-Implicados: TAX-F02, TAX-F14, TAX-F15, BASE-F119
+Implicados: TAX-F02, TAX-F14, TAX-F15, BASE-F119, INVENTORY-F26
 
 ### INVENTORY-F10 Importar categorías desde un CSV
 Estado: hecho
@@ -976,12 +980,13 @@ Pasos:
 Entra: las unidades del negocio, que llegan al activar Inventario.
 Sale: el producto con su unidad. Ventas la lee para la línea; el precio es por 1 de la unidad.
 Por el asistente o la API, el precio se puede referir a otra cantidad (por 100 g, o por kilo con
-el stock en gramos).
+el stock en gramos). Una copia de seguridad o una plantilla de «Datos y copias» (BASE-F35) guarda a qué cantidad y
+unidad se refiere, y el producto que entra al cargarla (BASE-F31) se cobra al mismo precio.
 Si falla: «La cantidad no respeta el incremento permitido para esta unidad» en pantalla; «La
 cantidad no respeta el incremento permitido para esta unidad: usa múltiplos de …» por el asistente o la
 API. La unidad de un producto
 con stock no se cambia.
-Implicados: SALE-F10
+Implicados: SALE-F10, INVENTORY-F09, BASE-F31, BASE-F35
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
 Estado: hecho
@@ -1263,10 +1268,12 @@ carta de la página web (WEBSITE-F05) deja fuera los productos ocultos, también
 en sus 200 elementos; la página publicada lo refleja en la siguiente visita, como mucho al minuto. El TPV, Cocina y
 Menús no cambian: un producto oculto se sigue vendiendo, y agotarlo o desactivarlo no le quita la marca. Los productos
 que ya existían salen en la página web, como hasta ahora. Recuperar el negocio desde una copia aparte (BASE-F114)
-devuelve cada producto con su marca.
+devuelve cada producto con su marca. Una copia de seguridad o una plantilla de «Datos y copias» (BASE-F35) dice qué
+productos están ocultos y, al cargarla (BASE-F31), los que entran siguen ocultos; el producto que el negocio ya tenía
+se queda como estaba, y un archivo que no lo dice trae sus productos visibles.
 Si falla: el motivo sale encima de la tabla o dentro del formulario («No se pudo actualizar el producto» o el que dé
 la app). Quien no puede cambiar productos ve la línea de la ficha, pero no las acciones ni el formulario.
-Implicados: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F114
+Implicados: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F31, BASE-F35, BASE-F114
 
 ## Qué comparten los verticales
 
@@ -1331,7 +1338,7 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 | Qué hace | Quién puede | Confirmación en el asistente | Flujos | Servicio |
 |---|---|---|---|---|
 | Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35, F36 | `inventory.product.create` |
-| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F12, F33, F35 | `inventory.product.bulk_create` |
+| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F12, F26, F33, F35 | `inventory.product.bulk_create` |
 | Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F12, F20, F35, F36 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
 | Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
@@ -1585,7 +1592,15 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   `inventory.product.updated`. `list_for_sale` lo devuelve y admite `show_on_website=true|false`: la Página web pide
   `true`, así que lo oculto no ocupa sitio en su tope de elementos; el TPV no lo pide. Las acciones de la fila, con las
   de agotado, salen de `frontend/composables/useFlagActions.ts`. No entra en el CSV de importación y exportación, que no
-  lleva ninguna otra marca del producto salvo «Activo» en la exportación, ni en el fichero de «Datos y copias».
+  lleva ninguna otra marca del producto salvo «Activo» en la exportación. En el fichero de «Datos y copias», la fila de
+  un producto oculto lleva `show_on_website: false` y la de uno visible no lleva nada (`base/blueprint_products.py`); al
+  cargarla se aplica con `inventory.product.update`, tras la importación.
+- **Tipo y precio por otra cantidad en la importación (INVENTORY-F01, F09, F26)**: las filas de
+  `inventory.product.bulk_create` admiten `product_type`, `price_quantity` y `pricing_unit`, opcionales (vacías:
+  `physical`, 1 y la unidad del producto), con las reglas de `inventory.product.create`. La pantalla del CSV no los
+  manda y la exportación CSV no los lleva. En el fichero de «Datos y copias», la fila los lleva solo cuando no son esos
+  (`base/blueprint_products.py`) y entran al crear el producto, no con un cambio posterior: nunca hay un producto a otro
+  precio.
 - **Referencia de una venta (INVENTORY-F16, 2026-10-21)**: la nota por venta (`SaleStock`) guarda
   `sale_number` (del aviso `sale.sale.completed`) y `document_number` (el `invoice_number` que da
   `sale.sale.get`, leído como sistema al bajar el stock; vacío si Ventas no lo sabe). `inventory.movement.list`

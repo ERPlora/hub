@@ -7,7 +7,7 @@ from django.utils import timezone
 from live.operations import get
 
 from apps.tax.models import TaxCategory
-from apps.tax.schemas import CalculateIn
+from apps.tax.schemas.calculation import CalculateIn
 from apps.tax.tests.conftest import HUB_DB, ctx_for, turn_the_rate_at_midnight
 
 pytestmark = HUB_DB

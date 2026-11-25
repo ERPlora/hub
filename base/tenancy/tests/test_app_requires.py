@@ -46,7 +46,7 @@ def test_the_check_sees_a_link_and_a_migration_outside_requires():
 
 def test_every_module_links_and_migrates_only_towards_its_requires_and_the_platform():
     graph = activation.module_graph()
-    hub = migrator.hub_apps()
+    hub = migrator.app_sets.hub_apps()
     loaded = MigrationLoader(None, ignore_no_migrations=True).graph
     migration_needs = {
         label: {node[0] for leaf in loaded.leaf_nodes() if leaf[0] == label for node in loaded.forwards_plan(leaf)}
@@ -63,4 +63,4 @@ def test_every_module_links_and_migrates_only_towards_its_requires_and_the_platf
         for label in graph
     }
 
-    assert requires_problems(graph, migrator.platform_apps(), migration_needs, links) == []
+    assert requires_problems(graph, migrator.app_sets.platform_apps(), migration_needs, links) == []

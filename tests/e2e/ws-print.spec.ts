@@ -1,4 +1,4 @@
-// The print host's channel, /ws/print, in Chrome (base/ws_print.py). It answered 500: Django
+// The print host's channel, /ws/print, in Chrome (base/ws_print/). It answered 500: Django
 // serves HTTP only. A page of the hub, signed in, opens the WebSocket the way the device's print host does,
 // says hello with the printer it reaches (a device new here: the owner's session sets it up instead of being
 // refused, PRINTING-F18), is woken when a job is queued (by the API, after its COMMIT), claims it and confirms it

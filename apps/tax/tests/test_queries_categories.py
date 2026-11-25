@@ -9,7 +9,7 @@ import pytest
 from live.errors import NotFound
 
 from apps.tax.models import TaxCategory
-from apps.tax.schemas import CategoryGetIn
+from apps.tax.schemas.categories import CategoryGetIn
 
 from .conftest import HUB_DB, categories, category, rule, run
 

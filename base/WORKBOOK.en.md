@@ -303,8 +303,9 @@ The keys with which another system calls the business's API: "New API key", the 
 link to the API's documentation.
 
 ### Employees · Approvals
-<!-- from WORKBOOK.md sha256:5b086a34c109 -->
-The record of what was approved with a manager's PIN, read only.
+<!-- from WORKBOOK.md sha256:099748e4ae1e -->
+The read-only record of the actions that can need a manager's approval: who did it and who approved it for them, or that
+somebody whose role allows it did it by themselves.
 
 ### A person's page
 <!-- from WORKBOOK.md sha256:b88b0da10ded -->
@@ -387,7 +388,7 @@ On the Employees screens and the API documentation:
 | State | What the person sees |
 |---|---|
 | Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; "Loading what this role allows…" in "What it allows"; the faces in grey in "An approval is needed"; "Loading the documentation…". |
-| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "Nobody has had to approve anything in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
+| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "There is no action of this kind in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
 | Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load what this role allows.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
@@ -523,7 +524,7 @@ On the Employees screens and the API documentation:
 | BASE-F131 | See in the bell the roles to review | partial |
 
 ### BASE-F01 See what the business still has to set up
-<!-- from WORKBOOK.md sha256:b63e81f97d68 -->
+<!-- from WORKBOOK.md sha256:ed75c3653f5d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary, The "You cannot issue invoices yet" notice
@@ -542,12 +543,12 @@ Steps:
      "Turn on Taxes" with the business's country (Taxes, in every one). Only whoever runs the business sees it,
      since they are the one who turns apps on; "Set up" leads to **Apps**, to "Add apps". As soon as they turn it
      on, the step goes by itself and the app's own steps come ("Set up VeriFactu", "Your taxes"). A business of
-     another country does not see VeriFactu's (hub#997). A business just signed up does not see "Turn on Taxes",
-     since it is born with it on (BASE-F14); in Spain it does see "Turn on VeriFactu": VeriFactu never turns on by
+     another country does not see VeriFactu's. A business just signed up does not see "Turn on Taxes",
+     since it is born with it on; in Spain it does see "Turn on VeriFactu": VeriFactu never turns on by
      itself.
   5. A step that only applies to another country, or that the person may not see, does not show. A business
      without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
-     of another country (hub#682). A step whose check fails does not show either: what could not be checked is
+     of another country. A step whose check fails does not show either: what could not be checked is
      never taken as done nor as pending.
   6. While a "Needed to invoice" step is missing, the bell carries the "You cannot issue invoices yet" notice,
      with that step's button ("Set up your business details"), on any screen.
@@ -558,10 +559,10 @@ Out: nothing saved.
 If it fails: "Could not load what is left to set up" with "Retry". A step that is on us (there is no
 business app to turn on) shows as "Not available yet" with "This one is on us: there is nothing on your
 side to do yet. We are on it.".
-Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
+Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17, BASE-F14
 
 ### BASE-F02 See the business at a glance on coming in
-<!-- from WORKBOOK.md sha256:f492b0bb2912 -->
+<!-- from WORKBOOK.md sha256:7fa7cf361784 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
@@ -579,9 +580,8 @@ Steps:
      WhatsApp", which opens the Inbox's settings. The row is checked again each time the person comes back to the
      Home. With no app on that says how it is doing, there is no row. Whoever does not administer the business does
      not see it.
-  4. Below, in this order: "Start with a business like yours" (only while the business is empty and for
-     who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
-     panels.
+  4. Below, in this order: "Start with a business like yours" (only while the business is empty and for who administers
+     it), "My apps", "Finish setting up your business" and the board of panels.
   5. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
      without reloading or reopening the application.
   6. At the bottom, two tabs: "Summary" (the above) and "Activity".
@@ -591,10 +591,10 @@ If it fails: a zone that does not load does not bring the others down; each one 
 the zones stack and "My apps" folds. What could not be checked shows as neutral, never as ready and without a
 button, because it is not the viewer's task: "We couldn't check the printer", "We couldn't check WhatsApp". If the
 whole row cannot be read: "We couldn't check how your business is working." with "Retry".
-Involved: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
+Involved: PRINTING-F21, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02, BASE-F38
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
-<!-- from WORKBOOK.md sha256:54ce0c62eceb -->
+<!-- from WORKBOOK.md sha256:d4c5bcdb65e0 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Home · Summary
@@ -602,8 +602,8 @@ Steps:
   1. In "Finish setting up your business", a pending step the person can do carries "Set up".
   2. They tap "Set up": the screen of the app that completes that step opens.
   3. Back on the Home, the list already counts the step as done if it was completed.
-  4. While the business is empty, whoever runs it starts higher up, in "Start with a business like yours"
-     (BASE-F38): "See all templates" opens "Data and backups", where a template or a backup is loaded.
+  4. While the business is empty, whoever runs it starts higher up, in "Start with a business like yours": "See all
+     templates" opens "Data and backups", where a template or a backup is loaded.
 In: the screen each step declares.
 Out: nothing from here.
 If it fails: while that screen does not exist in the hub, the step shows without "Set up" (a button that
@@ -626,10 +626,10 @@ If it fails: if that step cannot be checked, it does not show.
 Involved: none
 
 ### BASE-F05 Open an app from "My apps"
-<!-- from WORKBOOK.md sha256:f14ceaafe8af -->
+<!-- from WORKBOOK.md sha256:666e291dadd0 -->
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Home · Summary · the top bar of any screen
+Screen: Home · Summary, the top bar of any screen
 Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
      fit, the whole name shows on hover). An app shows if their role lets them open at least one of its screens. An
@@ -647,16 +647,13 @@ Steps:
   5. To leave an app, tap "My apps" in the bar: the main screen of an app has no "Back". The sheet starts
      with "Home", which goes back to the Home, and goes on with the apps; tapping one opens it. "Home" is
      there even while the list loads, when it is empty or when it could not be read.
-  6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
-     or the menu); a window that cannot be closed that way stays, and one that holds something typed and
-     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key", in the cancellation-reason windows of Online bookings, Payments, Printing, Reservations, Services, VeriFactu and Kitchen (cancelling a ticket), in the reason for "Discard" on a failed event in System, in "New folder" and "Rename" in Files, in the product-import steps, in the Task and Project sheets and in quick customer creation at the till) asks first "Discard
-     changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
-     (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", "Close", the
-     "×" or Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
-     without asking (hub#1023, hub#1156; the Task and Project sheets and quick customer creation at the till,
-     hub#1233; Cash register's open shift, cash in or out, count and close windows, hub#1234). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
-     of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
-     it sends the app to the background.
+  6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet or the menu); a
+     window that cannot be closed that way stays, and one that creates, edits or cancels something, with something typed
+     and not saved, asks first "Discard changes?": "Keep editing", or back again, leaves it as it was, and "Discard
+     changes" closes it. Those same windows ask the same question when "Cancel", "Close", the "×" or Escape is pressed
+     and on a tap outside, on the phone and on the computer, and with nothing typed they close without asking. With
+     nothing open, on a record or a new one it does the same as "Back"; on the main screen of an app it goes back to the
+     Home, also when that screen was reached through a link; and on the Home it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
 Out: how many times each app is opened in this browser (only to order them).
 If it fails: while loading, grey tiles and "Loading your apps…" for the screen reader. Without apps:
@@ -666,12 +663,12 @@ In an older Android app, which cannot yet stay in the background, the back butto
 After an ERPlora update, a screen that tab had not opened yet still opens (from a tile, "My apps", the menu or
 any button), in a fresh load of the page, which already brings the new version; a tap never does nothing. If
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
-"Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
+"Could not open Reservations. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
 Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 See the apps' panels on the Home
-<!-- from WORKBOOK.md sha256:2bb6b7c4c67b -->
+<!-- from WORKBOOK.md sha256:ed4311481f23 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
@@ -699,7 +696,7 @@ Steps:
      date. With the Home open, today's become yesterday's when the day changes.
   5. At first, the ones each app marks as recommended for the business's sector show.
   6. Only the panels of the apps that are on and that this person may see show, and none whose figure is a piece of
-     data their role does not see (BASE-F119).
+     data their role does not see.
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
@@ -867,7 +864,7 @@ arrives then. A device without a connection gets it when it reconnects.
 Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118, BASE-F128, BASE-F130
 
 ### BASE-F14 See the business's apps
-<!-- from WORKBOOK.md sha256:de8a48d10c48 -->
+<!-- from WORKBOOK.md sha256:a72cf9842bfe -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -877,7 +874,7 @@ Steps:
   2. While the list arrives: "Loading your apps…". Then one row (or one card, as chosen) for each app the
      business has running, with its icon and its name, its "Category" and its "Status" ("Active"). An app the
      business's country requires also shows, next to its status, "Mandatory in Spain" (or the business's country):
-     Taxes in every country, VeriFactu in Spain (hub#997). A business just signed up already has Taxes here,
+     Taxes in every country, VeriFactu in Spain. A business just signed up already has Taxes here,
      "Active": it is born on with its country's taxes and does not count against the plan's app limit: the counter at
      the top says "1 app turned on · 0 of 20 in your plan". The other apps are born off, VeriFactu too, which the
      owner turns on.
@@ -908,7 +905,7 @@ nothing opens.
 Involved: none
 
 ### BASE-F16 Look for an app in the catalogue
-<!-- from WORKBOOK.md sha256:b70e9862b317 -->
+<!-- from WORKBOOK.md sha256:dbc036edae5e -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -918,16 +915,16 @@ Steps:
      "Price", "Comes with" and "Status" ("Active" or "Needs a subscription"), with the names and the
      descriptions in the language of whoever looks. An app the business's country requires shows "Mandatory in
      Spain" (or the business's country) next to its status, off too: that way it shows which one is still to be
-     turned on (hub#997).
+     turned on.
   3. They search in "Search apps to add…" (in "Paid", "Search paid apps…") by name, description or
      category, and filter by category or by status.
 In: the apps the hub brings and what the business has subscribed to on erplora.com.
 Out: nothing saved.
-If it fails: as in "My apps" (BASE-F14). A search without results: "No apps match your search.".
-Involved: APPS-F01
+If it fails: as in "My apps". A search without results: "No apps match your search.".
+Involved: APPS-F01, BASE-F14
 
 ### BASE-F17 Know how much an app costs before having it
-<!-- from WORKBOOK.md sha256:aff9d3b5dd14 -->
+<!-- from WORKBOOK.md sha256:e98a4a8b4b36 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -936,38 +933,37 @@ Steps:
      in your plan", "Subscribed", "Included with" and the app that brings it (a paid one that comes with
      another the business has) or "Paid".
   2. The amount of a "Paid" app is on erplora.com's Store; whoever runs the business opens it from "Upgrade
-     plan" (BASE-F20).
+     plan".
   3. "Paid" gathers only the apps subscribed to separately: a free one never shows there. If none is sold
      separately (today, every app comes with every plan), there is no "Paid" nor "Price", and a link to "Paid"
      opens "Add apps".
 In: whether each app is subscribed to separately and what the business has subscribed to on erplora.com.
 Out: nothing saved. The hub neither charges nor shows amounts: the price and the purchase are erplora.com's.
-If it fails: without the list, as in "My apps" (BASE-F14).
-Involved: APPS-F01, APPS-F07
+If it fails: without the list, as in "My apps".
+Involved: APPS-F01, APPS-F07, BASE-F14, BASE-F20
 
 ### BASE-F18 Turn on an app
-<!-- from WORKBOOK.md sha256:f1ab50597d8a -->
+<!-- from WORKBOOK.md sha256:cdbe0b45b120 -->
 Status: done
 Actor: administrator
 Screen: Apps
 Steps:
   1. The apps the business uses are already in "My apps" and in the menu; a paid one shows in both by itself,
-     without reloading, as soon as it is subscribed to on erplora.com (BASE-F20).
+     without reloading, as soon as it is subscribed to on erplora.com.
   2. In "Add apps", whoever runs the business looks for an app the business does not use, "Off", and presses "Turn
-     on". If it needs other apps that are off, it asks first, naming them (BASE-F19).
+     on". If it needs other apps that are off, it asks first, naming them.
   3. The app becomes "Active" at once and shows in "My apps" and, without reloading, in the menu of every device
      of the business. The counter at the top adds the apps turned on and one of the plan's: turning Tasks on, from
      "26 apps turned on · 16 of 20 in your plan" to "27 apps turned on · 17 of 20 in your plan"; the ones that come
      along with it add to the apps turned on, not to the plan's.
 In: the chosen app, the ones it needs and what the business has subscribed to on erplora.com.
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
-If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
-reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in
-the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
-(BASE-F20). Neither does an app this business cannot use: it shows "Not available" and, for whoever runs the
-business, the reason below it ("VeriFactu is only for businesses in Spain.", VERIFACTU-F01). Any other failure shows
-in a notice with the app's name and the reason, which stays until it is closed.
-Involved: APPS-F07, VERIFACTU-F01
+If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have reached the
+20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in the browser (not in
+the installed app). A paid app not subscribed to offers no "Turn on". Neither does an app this business cannot use: it
+shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for businesses in
+Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
+Involved: APPS-F07, VERIFACTU-F01, BASE-F19, BASE-F20
 
 ### BASE-F19 Know what else comes with an app
 <!-- from WORKBOOK.md sha256:78edf5456e80 -->
@@ -991,7 +987,7 @@ together: until then, "Needs a subscription". With "Cancel", nothing changes.
 Involved: none
 
 ### BASE-F20 Try to use an app that needs a subscription
-<!-- from WORKBOOK.md sha256:81cae1b00a28 -->
+<!-- from WORKBOOK.md sha256:314199041c77 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Apps
@@ -1007,54 +1003,55 @@ Steps:
 In: what the business has subscribed to, as erplora.com passes it to the hub.
 Out: nothing saved or charged in the hub.
 If it fails: until erplora.com tells the hub, the app keeps "Needs a subscription"; a screen of it that is
-opened says why (BASE-F27).
-Involved: APPS-F07
+opened says why.
+Involved: APPS-F07, BASE-F27
 
 ### BASE-F21 See why an app could not be turned on and try again
-<!-- from WORKBOOK.md sha256:69949ae66fc6 -->
+<!-- from WORKBOOK.md sha256:346b90771a6a -->
 Status: done
 Actor: administrator
 Screen: Apps
 Steps:
-  1. An app being set up (BASE-F22) does not finish because its data could not be prepared. The hub tries again by
+  1. An app being set up does not finish because its data could not be prepared. The hub tries again by
      itself: after a minute, after 5 minutes, after 15 and then every hour.
   2. Its row, in "My apps", says "Could not turn on" and, to whoever runs the business, offers "Retry" and "Turn off";
-     whoever does not run it sees the state, with no buttons. Meanwhile the app does not open and its screen says "{app}
-     could not be set up" — "Go to Apps to try again. Nothing of the business was lost.".
-  3. "Retry" asks for it again: "Turning on {app}… It will be ready in a moment." and the row goes back to "Turning
+     whoever does not run it sees the state, with no buttons. Meanwhile the app does not open and its screen says
+     "Website could not be set up" — "Go to Apps to try again. Nothing of the business was lost.".
+  3. "Retry" asks for it again: "Turning on Website… It will be ready in a moment." and the row goes back to "Turning
      on…".
-  4. From the assistant ("Try turning on the website app again") the app is named as in BASE-F24 and the card shows
-     its full name.
+  4. From the assistant ("Try turning on the website app again") the app is named as in "Turn an app back on" and the
+     card shows its full name.
 In: the app that could not be set up.
 Out: the activation asked for again (`base.app.activation_requested`).
 If it fails: if it fails again, it says so again with its "Retry". If it was no longer waiting, because another device
 tried it again, a notice shows with the app's name and "This app is not waiting to be set up again.", which stays
-until it is closed. From the assistant, a name that fits several apps, or none, shows no card (BASE-F24).
-Involved: BASE-F32
+until it is closed. From the assistant, a name that fits several apps, or none, shows no card.
+Involved: BASE-F32, BASE-F22, BASE-F24
 
 ### BASE-F22 Follow an app being turned on while moving around
-<!-- from WORKBOOK.md sha256:fecbceacbfbe -->
+<!-- from WORKBOOK.md sha256:faecb54a3d32 -->
 Status: done
 Actor: administrator
 Screen: Apps
 Steps:
-  1. Whoever runs the business turns on an app (BASE-F18) whose data is not prepared yet in this business: one that
-     reached ERPlora after the business was born. The others have no wait: they are on at once (BASE-F18).
-  2. "Turning on {app}… It will be ready in a moment." shows; its row says "Turning on…", with "Turn off", and "My apps"
-     on the Home says "Activating…", without opening. The person can go to another screen: it goes on by itself. It is
-     not in the menu yet.
-  3. If its screen is opened by its address, it says "{app} is being set up" — "It opens in a moment: this page shows it
-     as soon as it is ready.".
+  1. Whoever runs the business turns on an app whose data is not prepared yet in this business: one that
+     reached ERPlora after the business was born. The others have no wait: they are on at once.
+  2. "Turning on Website… It will be ready in a moment." shows; its row says "Turning on…", with "Turn off", and "My
+     apps" on the Home says "Activating…", without opening. The person can go to another screen: it goes on by itself.
+     It is not in the menu yet.
+  3. If its screen is opened by its address, it says "Website is being set up" — "It opens in a moment: this page shows
+     it as soon as it is ready.".
   4. When it is ready it opens like any other: it turns "Active" with "Open", shows in the menu of every device of the
-     business without reloading and its screen says "{app} is ready" — "It can be used now.", with "Open {app}".
+     business without reloading and its screen says "Website is ready" — "It can be used now.", with "Open Website".
 In: how the activation is going.
 Out: the app running in this business (`base.app.enabled`).
-If it fails: BASE-F21. While ERPlora's staff keeps the platform frozen for a database upgrade (a few minutes,
-hub#930), the app stays "Turning on…" and finishes by itself as soon as the freeze is lifted.
-Involved: BASE-F31, BASE-F32
+If it fails: its row says so and it is tried again, as in "See why an app could not be turned on and try again". While
+ERPlora's staff keeps the platform frozen for a database upgrade (a few minutes), the app stays "Turning on…" and
+finishes by itself as soon as the freeze is lifted.
+Involved: BASE-F31, BASE-F32, BASE-F18, BASE-F21
 
 ### BASE-F23 Turn an app off
-<!-- from WORKBOOK.md sha256:f5bebca8e639 -->
+<!-- from WORKBOOK.md sha256:a55016847ef4 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -1063,33 +1060,30 @@ Steps:
   2. It always asks, with the app's name: "Turn off Reservations?" — "It leaves the menu for everyone in this
      business. Nothing is deleted: turned on again, it has its data.". If others that came only for it go with
      it, it names them: "Tables turns off with it: only Reservations needed it.". An app the business's country
-     requires never goes with it: on turning Sales off, Taxes stays on and is not named (hub#997).
-  3. They confirm with "Turn off": "Reservations is off. Also turned off: Tables.". Both leave "My apps" and,
-     without reloading, the menu of every device of the business; their screens say the app is not available
-     (BASE-F26) and the counter at the top takes away the ones turned off and, of the plan's, the one the business
-     chose.
-  4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
-     (BASE-F24).
-  5. From the assistant ("Turn off the reservations app", or without saying "app": "take Reservations off the menu",
-     "I don't want to see Reservations in the menu") the app is named as in BASE-F24 and the high-risk card shows its
-     whole name. Before the yes it also names the ones that go with it, by the same rule and in the same words as
-     step 2: "Other apps: Schedules and Tables turn off with it: only Reservations needed them.". If it was off
+     requires never goes with it: on turning Sales off, Taxes stays on and is not named.
+  3. They confirm with "Turn off": "Reservations is off. Also turned off: Tables.". Both leave "My apps" and, without
+     reloading, the menu of every device of the business; their screens say the app is not available and the counter at
+     the top takes away the ones turned off and, of the plan's, the one the business chose.
+  4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again.
+  5. From the assistant ("Turn off the reservations app", or without saying "app": "take Reservations off the menu", "I
+     don't want to see Reservations in the menu") the app is named as in "Turn an app back on" and the high-risk card
+     shows its whole name. Before the yes it also names the ones that go with it, by the same rule and in the same words
+     as step 2: "Other apps: Schedules and Tables turn off with it: only Reservations needed them.". If it was off
      already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
-If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off"
-(BASE-F25). With "Cancel", nothing changes either. From the assistant, a name that fits several apps shows no card: it asks which one
-(BASE-F24).
-Involved: VERIFACTU-F32
+If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off". With
+"Cancel", nothing changes either. From the assistant, a name that fits several apps shows no card: it asks which one.
+Involved: VERIFACTU-F32, BASE-F24, BASE-F25, BASE-F26
 
 ### BASE-F24 Turn an app back on
-<!-- from WORKBOOK.md sha256:9200f98dc973 -->
+<!-- from WORKBOOK.md sha256:3cde5f49ed20 -->
 Status: done
 Actor: administrator
 Screen: Apps
 Steps:
   1. In "Add apps", whoever runs the business presses "Turn on" for an app they turned off, which shows "Off".
-  2. If it needs others that are off too, it asks first and names them (BASE-F19); if not, it turns it on without
+  2. If it needs others that are off too, it asks first and names them; if not, it turns it on without
      asking.
   3. The app comes back to "My apps" and to the menu, without reloading, with the data it had: "Reservations is
      on." and, if it came with others, "Also turned on: Tables.".
@@ -1097,13 +1091,13 @@ Steps:
      menu") the app is named as the person says it: by its name in any
      language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
-     even though it starts the same. The card shows its whole name (BASE-F97), never its id, and before the yes it
+     even though it starts the same. The card shows its whole name, never its id, and before the yes it
      names the ones it needs that are off, as the notice of step 2 does: "Turn on in Apps: Reservations · Other
      apps: Reservations needs Schedules and Tables: they turn on with it.". If it was on already the assistant says so
      ("Customers was on already") instead of "turned on".
   5. If the business's country requires it (VeriFactu in Spain), the card also says, before the yes, that it can no
      longer be turned off, with the reason Apps gives: "Turn on in Apps: VeriFactu · Once on: VeriFactu is mandatory
-     for businesses in Spain: it can't be turned off." (BASE-F25). The assistant also knows it when asked about it.
+     for businesses in Spain: it can't be turned off.". The assistant also knows it when asked about it.
   6. If the assistant is asked for something of an app that is off by saying its name, even without saying "app" ("I
      want to manage reservations", "book an appointment"), or if what the assistant searches for to do it names it, it
      says which app does it, what it is for as Apps says it and that it is off, instead of saying it cannot or trying it
@@ -1115,30 +1109,29 @@ Steps:
      makes it name none.
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
-If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
-subscribed to cannot be turned on (BASE-F20). Moving to a lower plan turns nothing off: with more chosen apps than
-the new plan has, all of them keep running and only no other can be turned on until it is below. From the
-assistant, a name that fits several apps ("reserva": Reservations and Online booking) shows no card and turns none
-on: the assistant asks which one, naming them; one that is no app's: "No app has that name or id.".
-Involved: BASE-F93, BASE-F97
+If it fails: with the plan's limit of apps reached, the notice "Your plan’s app limit" with "Upgrade plan"; a paid app
+not subscribed to cannot be turned on. Moving to a lower plan turns nothing off: with more chosen apps than the new plan
+has, all of them keep running and only no other can be turned on until it is below. From the assistant, a name that fits
+several apps ("reserva": Reservations and Online booking) shows no card and turns none on: the assistant asks which one,
+naming them; one that is no app's: "No app has that name or id.".
+Involved: BASE-F93, BASE-F97, BASE-F18, BASE-F19, BASE-F20, BASE-F25
 
 ### BASE-F25 See an app refuse to be turned off
-<!-- from WORKBOOK.md sha256:99a1a5598bfb -->
+<!-- from WORKBOOK.md sha256:1bde59055733 -->
 Status: done
 Actor: administrator
 Screen: Apps
 Steps:
   1. An app that refuses to be turned off offers no "Turn off": below its status, whoever runs the business reads the
      app's own reason in their language: "VeriFactu can't be turned off once it's on: the law requires your invoices
-     to keep reaching the AEAT." (VERIFACTU-F32).
+     to keep reaching the AEAT.".
   2. Neither do the apps that one needs, which cannot be turned off first, and each says which one it is for:
      "Invoicing can't be turned off: VeriFactu needs it. VeriFactu can't be turned off once it's on: the law requires
      your invoices to keep reaching the AEAT.".
-  3. An app on that the business's country requires ("Mandatory in Spain", BASE-F14) does not offer it either, and
+  3. An app on that the business's country requires ("Mandatory in Spain") does not offer it either, and
      says why: "Taxes is mandatory for businesses in Spain: it can't be turned off.". It says so itself even when
      another app needs it, because turning that other one off would change nothing; an app with a reason of its own
-     (VeriFactu) says its own. While it is being turned on, or if it could not be, it can still be given up
-     (hub#997).
+     (VeriFactu) says its own. While it is being turned on, or if it could not be, it can still be given up.
   4. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
      instance, "Tables" while "Reservations" is on). The hub changes nothing: above the table "Nothing was changed"
      shows with what has to be done first, "Turn off Reservations first." (without asking).
@@ -1149,7 +1142,7 @@ Out: nothing.
 If it fails: if it is asked for anyway through the assistant or the API, the hub answers the same reason and changes
 nothing. Without a reason of the app's own, the same notice says it could not be changed, with the app's name and
 what the hub answered.
-Involved: VERIFACTU-F32, BASE-F01
+Involved: VERIFACTU-F32, BASE-F01, BASE-F14
 
 ### BASE-F26 Understand why an app does not open
 <!-- from WORKBOOK.md sha256:2509089cfe30 -->
@@ -1192,10 +1185,10 @@ passes. A demo business has every app, the paid ones too, to try them.
 Involved: APPS-F07
 
 ### BASE-F29 Choose a template of the catalogue to import
-<!-- from WORKBOOK.md sha256:0cf49f8f40c0 -->
+<!-- from WORKBOOK.md sha256:836f685700b5 -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Import
+Screen: Settings · Data and backups (Import)
 Steps:
   1. Open "Settings" in the side menu; in "Data and backups", "Import" is what opens. It says "Load a
      template: it fills your apps with its data — a menu, services, tables — ready to use." and, below,
@@ -1208,38 +1201,38 @@ Steps:
      those in the person's language.
   3. "Search templates" searches by the name, the description or the apps it brings.
   4. Tap "Use template" on the one that fits: the button spins while it is read and "Review what it brings"
-     opens (BASE-F31).
+     opens.
 In: the Hub's templates, one per sector and language (today restaurant and hair salon, in Spanish and in
 English).
 Out: nothing saved until it is loaded.
 If it fails: "The templates could not be loaded right now. You can still import a file." with "Retry";
 with no templates, "There are no templates for your business yet."; a search with no result, "No template
-matches your search."; if the template cannot be read, "The file could not be read: {reason}" and it stays
+matches your search."; if the template cannot be read, "The file could not be read:" with the reason and it stays
 on the choice. Who does not administer the business reads "Only an administrator can see and import
 templates.".
-Involved: INVENTORY-F12
+Involved: INVENTORY-F12, BASE-F31
 
 ### BASE-F30 Upload a file to import
-<!-- from WORKBOOK.md sha256:ad29ae05157a -->
+<!-- from WORKBOOK.md sha256:22d058cd18d8 -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Import
+Screen: Settings · Data and backups (Import)
 Steps:
   1. In "Import", tap "Upload from file" and choose a .blueprint.zip: a backup of this business or a
      template another one exported.
-  2. While it is read, the button spins. Then "Review what it brings" opens (BASE-F31).
+  2. While it is read, the button spins. Then "Review what it brings" opens.
   3. After an error the same file can be chosen again.
 In: the file, of 20 MB at most (with the own photos of its products and services, INVENTORY-F33).
 Out: nothing saved until it is loaded.
-If it fails: "The file could not be read: {reason}" with the reason (it is not a .blueprint.zip, it is
+If it fails: "The file could not be read:" with the reason (it is not a .blueprint.zip, it is
 damaged, a newer version of ERPlora made it or it is larger than 20 MB) and it stays on the choice.
-Involved: none
+Involved: BASE-F31
 
 ### BASE-F31 Review and load what the file brings
-<!-- from WORKBOOK.md sha256:0cb55b80f119 -->
+<!-- from WORKBOOK.md sha256:ac59a05a4943 -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Import
+Screen: Settings · Data and backups (Import)
 Steps:
   1. After choosing a template or a file, "Review what it brings" shows: "Name", "Type" ("Template" or
      "Backup"), "Language" and "Country" by name, how many "Apps" and, for a file, when it was made
@@ -1252,36 +1245,36 @@ Steps:
      customers stay out: "Personal data: it loads only from a backup.". What the Hub never loads (people,
      PINs, fiscal data) shows in "Never loaded here". No template of the catalogue brings VeriFactu, in Spain
      either: it is not in the review and the load does not turn it on, because it binds the business to the AEAT
-     and the owner turns it on from Apps (VERIFACTU-F01).
+     and the owner turns it on from Apps.
   3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
-  4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
-     duplicated nor overwritten. If an app of the template is still being set up (BASE-F22), its part comes in by
+  4. When it ends, the report shows. What the business already had stays as it was: nothing is
+     duplicated nor overwritten. If an app of the template is still being set up, its part comes in by
      itself as soon as it is ready, with no coming back and nothing to tap.
 In: the template or the file and the apps ticked.
 Out: the apps ticked that were off, turned on before loading, with the ones they need and within the plan's
 limit of apps, as if they were turned on in Apps (`base.app.enabled`); in each app ticked, what it brings and
 was missing, added as if it were added by hand in that app (its categories, products, services, areas,
 tables and, from a backup, customers), and the report kept (`base.blueprint.imported`).
-If it fails: "The import failed: {reason}" and it stays on the review; with no app ticked, "Choose at least
+If it fails: "The import failed:" with the reason and it stays on the review; with no app ticked, "Choose at least
 one app." and it cannot be imported; if none of its apps can be turned on here, "Nothing of this file can
 load in your business: none of its apps can be turned on here.". An app that could not be turned on (the
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
 the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
 this business. Upload the file again in a minute to bring its data.".
-Involved: BASE-F22, INVENTORY-F12, VERIFACTU-F01
+Involved: BASE-F22, INVENTORY-F01, INVENTORY-F12, INVENTORY-F26, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Read the import report
-<!-- from WORKBOOK.md sha256:6013a852308a -->
+<!-- from WORKBOOK.md sha256:65b9b3c18b17 -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Import
+Screen: Settings · Data and backups (Import)
 Steps:
   1. When it ends, "Import report" with how it went: "Everything went in.", "Not everything went in." or
-     "Nothing went in.". If an app of the template is still being set up (BASE-F22), "Still loading: what is missing
+     "Nothing went in.". If an app of the template is still being set up, "Still loading: what is missing
      comes in by itself as soon as its apps are ready. You can leave this screen.", with nothing to tap.
   2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
      to copy", "Left out", "App off", "Not in this business", "Not chosen", "Being set up" or "Could not be set up".
-     Below, for each part, "{created} created · {already} already there · {failed} failed" and, of what failed, its
+     Below, for each part, "12 created · 3 already there · 2 failed" and, of what failed, its
      name and the reason.
   3. What was left out on purpose shows in "Left out on purpose".
   4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
@@ -1291,24 +1284,24 @@ In: the import's report.
 Out: nothing; the report stays kept in the business. What loaded later counts in that same import: it is undone with
 it (BASE-F34).
 If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success. If the app
-cannot be set up, at the top it says "Could not be set up yet: {apps}. It keeps trying by itself and its data will load
+cannot be set up, at the top it says "Could not be set up yet: Website. It keeps trying by itself and its data will load
 as soon as it works." and its row, "Could not be set up" with "It could not be set up yet. It keeps trying by itself and
-its data will load as soon as it works; «Retry what is missing» tries again now." (BASE-F21). If meanwhile the app is
+its data will load as soon as it works; «Retry what is missing» tries again now.". If meanwhile the app is
 turned off, the import is undone, the business is reset or the template's version changes, nothing of it loads and its
 row says why. If the load fails once the app is ready, the app stays on and its row says "Failed" with "Something went
 wrong loading this part; nothing else was affected.", with "Retry what is missing".
 Involved: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Come back to the report of an import that did not go in whole and retry
-<!-- from WORKBOOK.md sha256:71d7e60e03a0 -->
+<!-- from WORKBOOK.md sha256:a5f23a33733e -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Import
+Screen: Settings · Data and backups (Import)
 Steps:
-  1. On opening "Import", if the last import did not go in whole and was not undone, its report shows first,
-     with "This is the report of your last import of {name} ({date}). Not everything went in." or, if it still waits
-     for an app being set up, with "Still loading…" and without "Retry what is missing", which is not needed (BASE-F32).
-     When it comes in, that same report says "Everything went in.", with no jump to the catalogue.
+  1. On opening "Import", if the last import did not go in whole and was not undone, its report shows first, with "This
+     is the report of your last import of Restaurant (Nov 24, 2026, 10:30 AM). Not everything went in." or, if it still
+     waits for an app being set up, with "Still loading…" and without "Retry what is missing", which is not needed. When
+     it comes in, that same report says "Everything went in.", with no jump to the catalogue.
   2. If it came from a template, tap "Retry what is missing" ("Retrying…"): the same version of the template
      is loaded again and only what was missing goes in; what already went in is neither touched nor
      duplicated. The new report shows.
@@ -1319,22 +1312,22 @@ Steps:
   4. "See the templates" leaves that report and opens the catalogue.
 In: the last import and its report.
 Out: what was missing, if it goes in now, and the new report (`base.blueprint.imported`).
-If it fails: "The retry failed: {reason}" and the report stays in sight.
+If it fails: "The retry failed:" with the reason and the report stays in sight.
 Involved: BASE-F32
 
 ### BASE-F34 Undo an import
-<!-- from WORKBOOK.md sha256:993404044eba -->
+<!-- from WORKBOOK.md sha256:63445c3e5c16 -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Reset
+Screen: Settings · Data and backups (Reset)
 Steps:
   1. In "Reset", "Undo an import" ("Removes only what that import brought. What you created afterwards
      stays."): one row per import that brought something and was not undone, with its name, when, who and
      how many rows it brought, and "Undo".
-  2. Tap "Undo": "Undo «{name}»", with "The {n} rows this import brought will be removed. What you created
+  2. Tap "Undo": "Undo «Restaurant»", with "The 120 rows this import brought will be removed. What you created
      afterwards stays.". It asks to type nothing: it can be imported again.
   3. Confirm with "Undo" (or "Cancel").
-  4. "Import undone:" shows with one line per app ("{app} — {n} rows removed"); what could not be removed
+  4. "Import undone:" shows with one line per app ("Inventory — 85 rows removed"); what could not be removed
      (something another app still uses) shows apart with its reason. What each section has gets up to date.
 In: the import chosen.
 Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
@@ -1344,19 +1337,19 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:fee359cfd24c -->
+<!-- from WORKBOOK.md sha256:f4f311ae8d9b -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Export
+Screen: Settings · Data and backups (Export)
 Steps:
   1. Open "Export": "Packs this business's apps — and, if you want, their data — into a file you can load in
      another business or keep as a backup.".
   2. Write the "Name" (the business's comes in; without one, its address's) and choose the "Language"; below,
-     the file's final name ("File: {file}").
+     the file's final name ("File: casa-ramon_en.blueprint.zip").
   3. Answer "What is this file for?": "Backup of this business" (the one ticked; it takes the customers too)
      or "Template to share" (it never takes customers).
-  4. Choose the apps and their data (BASE-F36) and tap "Export" ("Exporting…").
-  5. The file downloads with the browser and "{file} downloaded." shows.
+  4. Choose the apps and their data and tap "Export" ("Exporting…").
+  5. The file downloads with the browser and "casa-ramon_en.blueprint.zip downloaded." shows.
   6. Asked of the assistant ("I'm opening another bar and want to take the menu and the customers"), it says it is
      done here, in Settings › Data and backups › Export, with "Template to share" or "Backup of this business", and
      what it takes: the products and the services go with their own photos inside. It does not make the file itself.
@@ -1364,24 +1357,23 @@ In: the name, the language, what it is for and what is ticked.
 Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows, with the products' and
 the services' own photos inside (INVENTORY-F33); never the sales, people, PINs nor fiscal data. Nothing is kept in the
 business.
-If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
+If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
-administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset
-(BASE-F37).
-Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F33
+administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset.
+Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F01, INVENTORY-F26, INVENTORY-F33, INVENTORY-F36, BASE-F36
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
-<!-- from WORKBOOK.md sha256:87d90fd8e515 -->
+<!-- from WORKBOOK.md sha256:da5ff03469f9 -->
 Status: done
 Actor: owner, administrator
-Screen: Settings · Data and backups › Export
+Screen: Settings · Data and backups (Export)
 Steps:
   1. In "Export", under "Apps" ("Choose which apps the file registers and whether their data travels with
      it."), one row per app on with two boxes, "App" and "Data". They all come with the app ticked and no
      data; an app with nothing of its own says "Nothing of its own to copy".
   2. Unticking the app unticks its data. "Select all" ticks every app and its data; "Deselect all" unticks
      them all.
-  3. Ticking an app's "Data" shows "Data of {app}" below, with one box per part and its rows;
+  3. Ticking an app's "Data" shows "Data of Inventory" below, with one box per part and its rows;
      unticking one leaves it out. In a template the customers cannot be ticked: "Only in a backup".
   4. While no part of an app is unticked, all of it travels, also what that app brings later on.
 In: the apps on and how many rows each part has.
@@ -1391,10 +1383,10 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-<!-- from WORKBOOK.md sha256:35f60cfc25a7 -->
+<!-- from WORKBOOK.md sha256:36c8b38f7f57 -->
 Status: done
 Actor: owner
-Screen: Settings · Data and backups › Reset
+Screen: Settings · Data and backups (Reset)
 Steps:
   1. In "Reset", "Reset the business": "Removes for good the data you mark. It cannot be undone: if in
      doubt, export a copy first.", with "Export a copy first", which opens "Export".
@@ -1402,13 +1394,13 @@ Steps:
      records, people and their access, files and the business's settings always stay.", and "Before emptying, a
      full copy of the business's data is made and kept for 90 days, in «Copies» below.".
   3. One row per section (an app) that has something, with what it has (each part and its rows) and its total.
-  4. Tick the sections and tap "Reset the business": "This cannot be undone", with "{n} rows will be removed for
-     good:" and the breakdown. Type the business's name ("Type «{name}» to confirm") and tap "Remove for good" (or
+  4. Tick the sections and tap "Reset the business": "This cannot be undone", with "120 rows will be removed for
+     good:" and the breakdown. Type the business's name ("Type «Casa Ramón» to confirm") and tap "Remove for good" (or
      "Cancel").
-  5. "Copying the business's data before emptying…" shows, with "Then {sections} will be emptied. You can leave this
-     screen: it goes on by itself.", and then "Emptying {sections}…". Meanwhile no other is offered: "A reset is under
-     way: wait for it to finish.".
-  6. "Business reset:" shows with one line per section ("{app} — {n} rows removed") and "A full copy of the data from
+  5. "Copying the business's data before emptying…" shows, with "Then Inventory, Customers will be emptied. You can
+     leave this screen: it goes on by itself.", and then "Emptying Inventory, Customers…". Meanwhile no other is
+     offered: "A reset is under way: wait for it to finish.".
+  6. "Business reset:" shows with one line per section ("Inventory — 85 rows removed") and "A full copy of the data from
      before is kept in «Copies».", and the list is worked out again.
   7. Below, "Copies of the data": one row per copy, with why it was made ("Before a reset" or "When the business was
      deleted"), its date, its size and "Download". With none: "No copies yet: one is made before each reset.".
@@ -1420,13 +1412,13 @@ name does not match.". If the copy cannot be made, nothing is emptied: "Nothing 
 data could not be made, so nothing was emptied." and "Try again", with the same sections. If emptying is what fails,
 the copy is kept: "The sections could not be emptied, so nothing was removed. The copy of the data from before is
 kept.". Who does not administer the business reads "Only an administrator can undo imports or reset the business.".
-An administrator undoes imports (BASE-F34), but instead of "Reset the business" and "Copies of the data" reads "Only the
+An administrator undoes imports, but instead of "Reset the business" and "Copies of the data" reads "Only the
 business's owner can reset it or download the copies of its data.": resetting, seeing the copies and downloading them
 is the owner's alone, also through the API and from the assistant, which answer that they are not allowed.
 Involved: BASE-F34, BASE-F35
 
 ### BASE-F38 See the Home up to date after importing a template
-<!-- from WORKBOOK.md sha256:25827a9e9e1f -->
+<!-- from WORKBOOK.md sha256:5ef2b444fec4 -->
 Status: done
 Actor: owner, administrator
 Screen: Home · Summary
@@ -1437,11 +1429,11 @@ Steps:
      business and in their language when
      there is one (those of its country first), with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
      closes the card on this device.
-  2. Tap "Use this one": "Preparing «{name}»…" while its apps are turned on and it loads, with no screens in
+  2. Tap "Use this one": "Preparing «Restaurant»…" while its apps are turned on and it loads, with no screens in
      between.
   3. In the same card, "Your apps and your catalogue are ready" ("What is left only you can answer: your
      business's details. They are in the list below.") with "Continue", which closes it. If an app is still being set
-     up, first "Your apps are being set up" ("Their data will load by itself as soon as they are ready: {apps}. You can
+     up, first "Your apps are being set up" ("Their data will load by itself as soon as they are ready: Website. You can
      carry on.") with "See the report" and "Continue"; the card turns to "Your apps and your catalogue are ready" by
      itself when it comes in, with nothing to tap.
   4. Without reloading, the Home gets up to date: "Finish setting up your business" counts as done the steps
@@ -1449,18 +1441,18 @@ Steps:
      backups".
 In: the templates and whether the business is still empty.
 Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`): VeriFactu stays off (VERIFACTU-F01).
-If it fails: if not everything went in, "Not everything went in" with "These did not go in: {apps}." (or
+If it fails: if not everything went in, "Not everything went in" with "These did not go in: Website." (or
 "Something else did not go in.") and "See the report"; if an app could not be set up, "An app could not be set up
-yet" with "It keeps trying by itself and its data will load when it works: {apps}. In the report you can try again
+yet" with "It keeps trying by itself and its data will load when it works: Website. In the report you can try again
 now." and "See the report"; if it could not be opened, "That template could not
-be opened" with "Nothing has changed in your business: {reason}" and "Try again"; if it was cut halfway,
+be opened" with "Nothing has changed in your business:" with the reason and "Try again"; if it was cut halfway,
 "The setup did not finish" with "Part of it may be in already. Check it in Settings › Data before trying
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
 could not be loaded." with "Retry" and "Not now".
 Involved: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Open System and move between its tabs
-<!-- from WORKBOOK.md sha256:3fa28d3bd8da -->
+<!-- from WORKBOOK.md sha256:a114a0dda4bc -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -1471,47 +1463,47 @@ Steps:
   3. A tab that does not exist opens "Usage and plan", and so do the old links to "Resources" and to "Plan and limits"; the
      old backups one leads to "Settings" › "Data and backups".
   4. Whoever does not run the business has no "System" in the side menu: its address, also that of any of its tabs,
-     tells them "No access" (BASE-F118).
+     tells them they have no access.
   5. At the end of "Usage and plan" come the cards the apps on in the business put there and that the person may
-     see, each with its own: Printing's is "Your printer" (PRINTING-F21). An app that is off puts none; turning it
+     see, each with its own: Printing's is "Your printer". An app that is off puts none; turning it
      on or off makes its card appear or go without reloading.
 In: the cards of the apps that are on that the person may see.
 Out: nothing saved.
-If it fails: each tab says its own (BASE-F40 to BASE-F43). If which cards apply cannot be read, none shows and the rest
+If it fails: each tab says its own. If which cards apply cannot be read, none shows and the rest
 of the tab goes on; a card that does not load is left out and the others show.
-Involved: BASE-F40, BASE-F118, PRINTING-F21
+Involved: BASE-F40, BASE-F118, PRINTING-F21, BASE-F41, BASE-F42, BASE-F43
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
-<!-- from WORKBOOK.md sha256:0328535c675e -->
+<!-- from WORKBOOK.md sha256:3ca66ec72586 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
 Steps:
   1. They open "System": "Usage and plan" opens. While it loads: "Reading the system…". At the top, their plan ("Starter
-     plan") and, for the owner, "Upgrade plan", which opens this business's plan page on erplora.com (BASE-F11); to the
-     administrator, in the installed app or where that link does not appear, with no button, "Plans are managed from your
-     ERPlora account, on erplora.com.".
-  2. Below, a line tells them whether to upgrade. In green, "Your plan is enough". In amber, "You should upgrade: {motive}",
-     with the files or the month's messages from 80 %: "you are almost out of space for files", "the assistant's messages
-     are almost spent this month" or "WhatsApp messages are almost spent this month". In red, "You have to upgrade:
-     {motive}": "no more files fit", "the assistant's messages are spent this month", "WhatsApp messages are spent this
-     month" or "your business runs out of capacity at its busiest moments". With several motives, the most serious wins
-     and, among equals, the fullest. Green only comes when everything that applies could be read: with no motives, while
-     something is answering, "Checking your plan…"; if something could not be read, "We could not check everything", with
-     "Retry". A motive is said all the same, because it is still true, and what their plan does not include is not left
-     to check.
-  3. "What your plan includes", from the fullest down: "Files" ("{used} of {limit}", with "Measured on {day}"), "Apps",
-     "People" and "Devices" ("{used} of {limit}"), and "Assistant" and, with its app on, "WhatsApp" ("{used} of {limit} a
-     month"), each with its bar, in the colour of the line at the top. From 80 %, the files and the messages say "Close";
-     on reaching the limit, any of them says "Full".
+     plan") and, for the owner, "Upgrade plan", which opens this business's plan page on erplora.com; to the
+     administrator, in the installed app or where that link does not appear, with no button, "Plans are managed from
+     your ERPlora account, on erplora.com.".
+  2. Below, a line tells them whether to upgrade. In green, "Your plan is enough". In amber, "You should upgrade:" and
+     the motive, with the files or the month's messages from 80 %: "you are almost out of space for files", "the
+     assistant's messages are almost spent this month" or "WhatsApp messages are almost spent this month". In red, "You
+     have to upgrade:" and the motive: "no more files fit", "the assistant's messages are spent this month", "WhatsApp
+     messages are spent this month" or "your business runs out of capacity at its busiest moments". With several
+     motives, the most serious wins and, among equals, the fullest. Green only comes when everything that applies could
+     be read: with no motives, while something is answering, "Checking your plan…"; if something could not be read, "We
+     could not check everything", with "Retry". A motive is said all the same, because it is still true, and what their
+     plan does not include is not left to check.
+  3. "What your plan includes", from the fullest down: "Files" ("1.2 GB of 5 GB", with "Measured on Nov 24, 2026"),
+     "Apps", "People" and "Devices" ("3 of 5"), and the assistant and, with its app on, "WhatsApp" ("120 of 500 a
+     month"), each with its bar, in the colour of the line at the top. From 80 %, the files and the messages say
+     "Close"; on reaching the limit, any of them says "Full".
   4. People, devices and apps at their limit do not change the colour at the top: a Free business with 1 of 1 device is
      fine. Under the green line it reads "People at the limit: to add more, upgrade the plan.".
-  5. With a limit of 0, "{used} · No limit", with no bar. Messages cannot be that: with 0, "Your plan does not include the
+  5. With a limit of 0, "3 · No limit", with no bar. Messages cannot be that: with 0, "Your plan does not include the
      assistant" or "Your plan does not include WhatsApp", with no bar, and they are no motive for anything.
-  6. At the end of the list, "Capacity": "{used} of {limit} connections", the highest measured today against what it
+  6. At the end of the list, "Capacity": "2 of 5 connections", the highest measured today against what it
      really has (what its plan includes or, if that is less, what the service gives), with its bar. It never goes by
      percentage, because with a limit of 1 the first operation of the day is already 100 %, but by the times someone got
-     "Too many requests. Try again in a moment.": "Fell short {count} times this week". Then, if a bigger plan would give
+     "Too many requests. Try again in a moment.": "Fell short 3 times this week". Then, if a bigger plan would give
      more, it moves to the top of the list and the line at the top turns red.
   7. If their plan already includes all the capacity the service gives, a bigger plan would give them no more: the row
      offers no upgrade, does not turn the top red and, when it falls short, says "You already have the maximum capacity:
@@ -1519,32 +1511,32 @@ Steps:
      upgrade: you already have the maximum capacity, but it sometimes falls short.". If there is another motive (the files
      or the messages), that one wins.
   8. "For your information", what no plan limits, with no bar or pill: "Requests this month", the ones the business has
-     served since day 1; "Active now", the people with activity in the last 5 minutes; "Last 30 days" and "Database size",
-     with "Measured on {day}". Neither CPU nor memory: they cannot be attributed to a business, so they do not appear, nor
-     does any sentence in their place.
+     served since day 1; "Active now", the people with activity in the last 5 minutes; "Last 30 days" and "Database
+     size", with "Measured on Nov 24, 2026". Neither CPU nor memory: they cannot be attributed to a business, so they do
+     not appear, nor does any sentence in their place.
   9. With motives the hub knows without asking erplora.com (the files, the capacity and WhatsApp), the bell of whoever
      runs the business carries the notice "1 plan limit to review", which adds one per motive, with "Your business is
      reaching what its plan includes: some things may stop or slow down until you upgrade.", and "See the plan’s
      usage" opens "System" on "Usage and plan". Without them, the notice goes away.
   10. Whoever runs the business can ask the assistant the same ("how much space do I have left?", "how many requests
       have we had this month?") and it answers with these figures. Anyone can ask it for the assistant's messages of
-      the month (BASE-F104).
+      the month.
 In: what is measured of this business: every night, what its files and its database take up and the people who had
 activity; during the day, its requests, its connections and who has activity. The plan's limits erplora.com passes to the
 hub, the apps it chose, the assistant's messages erplora.com counts and WhatsApp's.
 Out: nothing saved by looking at the screen. What is measured stays per business and day, and erplora.com collects it
 every night so ERPlora's team sees the same (HUBS-F22).
-If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
-try again." with "Retry". What has not been measured yet says so, never with a zero: before the first night, "Measured
-every night: the first figure comes tomorrow."; with no measure of the capacity or the requests today, "Not measured today
-yet."; WhatsApp before erplora.com sends its figures, "Not measured yet."; if the requests or the times it fell short have
-been counted for less than their period, they say "Since {day}". The assistant is asked of erplora.com apart: if it does
-not answer, its row says "Not available right now", with no figure, and the screen goes on; the same if WhatsApp cannot be
-read. In a demo, instead of everything: "Use is not measured in a demo: its data is deleted when it ends.". While the hub
-does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends it." and, under
-"What you use", the figures with no limit, bar, pill or line at the top. ERPlora's own business will never have one:
-instead it says "This is ERPlora's own business: it has no plan.", with the same figures.
-Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
+If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can try again."
+with "Retry". What has not been measured yet says so, never with a zero: before the first night, "Measured every night:
+the first figure comes tomorrow."; with no measure of the capacity or the requests today, "Not measured today yet.";
+WhatsApp before erplora.com sends its figures, "Not measured yet."; if the requests or the times it fell short have been
+counted for less than their period, they say "Since Nov 24, 2026". The assistant is asked of erplora.com apart: if it
+does not answer, its row says "Not available right now", with no figure, and the screen goes on; the same if WhatsApp
+cannot be read. In a demo, instead of everything: "Use is not measured in a demo: its data is deleted when it ends.".
+While the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends
+it." and, under "What you use", the figures with no limit, bar, pill or line at the top. ERPlora's own business will
+never have one: instead it says "This is ERPlora's own business: it has no plan.", with the same figures.
+Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22, BASE-F104
 
 ### BASE-F41 Know which version is running and when it was updated
 <!-- from WORKBOOK.md sha256:93231d294774 -->
@@ -1586,12 +1578,12 @@ If it fails: "The log could not be loaded. Check the connection and try again." 
 Involved: none
 
 ### BASE-F43 See the failed events
-<!-- from WORKBOOK.md sha256:14246f994509 -->
+<!-- from WORKBOOK.md sha256:7b01ec3e1db1 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
 Steps:
-  1. They come from the bell's notice of the failed events (BASE-F10) or tap the "Failed events" tab.
+  1. They come from the bell's notice of the failed events or tap the "Failed events" tab.
   2. While it loads: "Loading the failed events…". With events: "Fix the cause (a permission, an app that is
      off…) and resend. The event is never edited: if the cause is still there, it fails again and comes back
      here.".
@@ -1607,7 +1599,7 @@ In: the notices between apps of this business that ran out of retries, never ano
 Out: nothing saved.
 If it fails: "We could not read the system" — "The queue of failed events could not be loaded. Check the
 connection and try again." with "Retry" in sight: a failure never shows as "All in order".
-Involved: none
+Involved: BASE-F10
 
 ### BASE-F44 Resend a failed event
 <!-- from WORKBOOK.md sha256:89f57c907252 -->
@@ -1628,7 +1620,7 @@ resend it." or "only the owner or an administrator can do it.".
 Involved: none
 
 ### BASE-F45 Resend all the failed events
-<!-- from WORKBOOK.md sha256:5311742cbab3 -->
+<!-- from WORKBOOK.md sha256:e365ee832500 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1643,11 +1635,11 @@ Steps:
      list; those for an app that is off stay.
 In: the business's failed notices.
 Out: the notices, back in the queue; `base.failed_event.retried`, with how many.
-If it fails: "Could not resend:" and the reason, as in BASE-F44.
-Involved: none
+If it fails: "Could not resend:" and the reason, as in "Resend a failed event".
+Involved: BASE-F44
 
 ### BASE-F46 Discard a failed event
-<!-- from WORKBOOK.md sha256:d10767772685 -->
+<!-- from WORKBOOK.md sha256:6567006cfb22 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1662,8 +1654,8 @@ Steps:
 In: the notice chosen and, if they want, why.
 Out: the notice closed for good, with who, when and why; it is neither deleted nor tried again.
 `base.failed_event.discarded`.
-If it fails: "Could not discard:" and the reason, as in BASE-F44.
-Involved: none
+If it fails: "Could not discard:" and the reason, as in "Resend a failed event".
+Involved: BASE-F44
 
 ### BASE-F47 Report an error of the screen without anyone asking
 <!-- from WORKBOOK.md sha256:d43fcf749b1e -->
@@ -1686,17 +1678,18 @@ with more than 30 reports a minute from the same person, the hub does not note i
 Involved: none
 
 ### BASE-F48 Open Settings and move through its tabs
-<!-- from WORKBOOK.md sha256:e19f0083066d -->
+<!-- from WORKBOOK.md sha256:9c94834ba542 -->
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Settings, Settings · Printing
+Screen: Settings · General, Settings · Business, Settings · Printing, Settings · Data and backups
+Operations: none
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
-  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can
-     use what it holds: "Printing", for whoever sets up the Printing app (owner, administrator and manager), and "Data
-     and backups", for whoever runs the business. An employee has "General" and "Business". "General" opens
-     (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back leaves Settings instead
-     of walking its tabs. On the phone the four fit, whole.
+  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can use
+     what it holds: "Printing", for whoever sets up the Printing app (owner, administrator and manager), and "Data and
+     backups", for whoever runs the business. An employee has "General" and "Business". "General" opens. The tab chosen
+     stays in the link, so a saved link comes back to it and Back leaves Settings instead of walking its tabs. On the
+     phone the four fit, whole.
   3. Old links still take you to their place: the one of the old "General" opens "General", the one of the old
      taxes tab opens "Business", and the one of a tab that no longer exists, or that the person does not have, opens
      the first.
@@ -1705,12 +1698,11 @@ Steps:
      ticket" and takes you to "Apps".
 In: the business's apps.
 Out: nothing saved.
-If it fails: it does not fail: it is navigation. Each tab says in itself when it could not load its own (BASE-F49,
-BASE-F29).
+If it fails: it does not fail: it is navigation. Each tab says in itself when it could not load its own.
 Involved: PRINTING-F06, BASE-F29, BASE-F49, BASE-F62
 
 ### BASE-F49 See the business's country
-<!-- from WORKBOOK.md sha256:7afac51ac547 -->
+<!-- from WORKBOOK.md sha256:befe3104e7be -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business
@@ -1718,8 +1710,7 @@ Steps:
   1. In "Business", "Country" ("The one of its taxes and its invoices") says, in the person's language, the
      country the business was signed up with on erplora.com.
   2. It is not chosen here: below it reads "The country does not change once the business is ready.", because
-     its invoices are of one country. While the business is being prepared, it is changed on erplora.com
-     (HUBS-F15).
+     its invoices are of one country. While the business is being prepared, it is changed on erplora.com.
 In: the country erplora.com signed the business up with.
 Out: nothing saved; with it, the business's templates come first and "Finish setting up your business" knows
 which steps are its own.
@@ -1728,10 +1719,10 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 See the business's currency
-<!-- from WORKBOOK.md sha256:d35b0e87a24a -->
+<!-- from WORKBOOK.md sha256:448623f4586f -->
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Settings · Business; Home · Summary and Home · Activity
+Screen: Settings · Business, Home · Summary, Home · Activity
 Steps:
   1. In "Business", "Currency" ("Its country’s, for prices and totals") says the currency with its code and its
      name in the person's language: "EUR · Euro".
@@ -1742,14 +1733,14 @@ Steps:
      one in Spain. While the business has not answered, the amount shows as "—", never in another currency or with
      guessed decimals.
   4. The apps that show prices or amounts are in that same currency, Appointments too (each service's price when
-     booking and the appointment's "Total") and the preview of Online booking (hub#577).
+     booking and the appointment's "Total") and the preview of Online booking.
 In: the business's country.
 Out: nothing saved.
-If it fails: as in BASE-F49.
+If it fails: as in "See the business's country".
 Involved: BASE-F49
 
 ### BASE-F51 Change the business's language on erplora.com
-<!-- from WORKBOOK.md sha256:a65f62342ad3 -->
+<!-- from WORKBOOK.md sha256:2cc38c90bc3e -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Business
@@ -1757,7 +1748,7 @@ Steps:
   1. In "Business", "Business language" ("The one of whoever has not chosen their own") says the business's
      language by its name.
   2. Tap "Change on erplora.com": the business's settings on erplora.com open in another tab (in the installed app,
-     in the device's browser), where it is changed and "Save changes" is tapped (HUBS-F15). In the Google Play copy
+     in the device's browser), where it is changed and "Save changes" is tapped. In the Google Play copy
      the button is not there: it is changed on erplora.com from a browser.
   3. Without reloading, "Business" shows the new language as soon as the business receives it; the same with the
      name and the time zone.
@@ -1765,7 +1756,7 @@ In: the language erplora.com saved.
 Out: nothing saved in the business: it receives it from erplora.com (`base.hub.registered`). Whoever has not chosen
 a language of their own in "My profile" and enters with their PIN sees the hub in the business's, not in their
 browser's; with their account, in their erplora.com account's (BASE-F64).
-If it fails: if the business does not answer, erplora.com keeps the change and sends it again (HUBS-F08);
+If it fails: if the business does not answer, erplora.com keeps the change and sends it again;
 meanwhile, "Business" stays with the previous one. Whoever does not administer the business does not see the
 button: "Only the owner or an administrator changes them, on erplora.com.". In a demo, "This demo has no business
 on erplora.com: its data does not change.".
@@ -1794,10 +1785,11 @@ hub"); the business keeps nothing until it comes back with the person identified
 Involved: BASE-F13
 
 ### BASE-F53 Enter from the erplora.com panel without typing the password again
-<!-- from WORKBOOK.md sha256:2e95f6ff2428 -->
+<!-- from WORKBOOK.md sha256:3ff821a2583d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
+Operations: none
 Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
@@ -1953,10 +1945,11 @@ try again.".
 Involved: BASE-F55, BASE-F56
 
 ### BASE-F61 Sign out
-<!-- from WORKBOOK.md sha256:b623040eecce -->
+<!-- from WORKBOOK.md sha256:0a4ca1b69bbc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
+Operations: none
 Steps:
   1. They open the user card at the top of the side menu (on a phone, first the menu with the bar's button).
   2. They tap "Sign out".
@@ -1991,10 +1984,11 @@ connection: "Could not change this device. Check the connection and try again.".
 Involved: BASE-F55
 
 ### BASE-F63 Open a hub that is not set up yet
-<!-- from WORKBOOK.md sha256:07cd646f0aa9 -->
+<!-- from WORKBOOK.md sha256:514223787757 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
+Operations: none
 Steps:
   1. They open the address of a business erplora.com is still preparing (just created).
   2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
@@ -2042,7 +2036,7 @@ connection and try again.".
 Involved: BASE-F51
 
 ### BASE-F65 Change my PIN from My profile
-<!-- from WORKBOOK.md sha256:987920ad098c -->
+<!-- from WORKBOOK.md sha256:e5c17aa3ac08 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2053,7 +2047,7 @@ Steps:
   3. They type "New PIN" and "Repeat the new PIN" and tap "Change PIN" (or "Set PIN"): "PIN updated".
 In: the session; the business's PIN digits.
 Out: the new PIN, stored encrypted; the tills accept it at once.
-If it fails: a different length: "The PIN must have {n} digits."; the two do not match: "The two PINs do not
+If it fails: a different length: "The PIN must have 4 digits."; the two do not match: "The two PINs do not
 match."; easy to guess: "That PIN is too easy to guess: avoid repeated digits (1111) and runs (1234)."; someone
 else already uses it: "Another active person already has that PIN: choose a different one."; the current one is
 not it: "That is not your current PIN. Type it right to set a new one."; thirty tries in an hour: "Too many tries
@@ -2061,23 +2055,23 @@ to change the PIN." and the minutes they have to wait.
 Involved: BASE-F54
 
 ### BASE-F66 Choose how many digits the business's PIN has
-<!-- from WORKBOOK.md sha256:19fc60cddc4c -->
+<!-- from WORKBOOK.md sha256:c9e0ad91da78 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
-  1. With the PIN pad on (BASE-F67), under "PIN digits" they choose "4 digits" or "6 digits".
+  1. With the PIN pad on, under "PIN digits" they choose "4 digits" or "6 digits".
   2. It is saved at once. Below: "Everyone types the same number of digits, which is what lets the keypad enter
      at the last one instead of asking you to confirm. The PINs in use keep working until their owner changes
      them.".
-  3. From then on, the PIN pad, "Create your PIN" and **My profile** ask for that length.
+  3. From then on, the PIN pad, the screen where each person creates their PIN and **My profile** ask for that length.
 In: the choice.
 Out: the length of the business's PIN. It does not touch the PINs there are.
 If it fails: "Could not change it. Check the connection and try again.".
 Involved: BASE-F67
 
 ### BASE-F67 Decide whether the till asks for a PIN and when it asks again
-<!-- from WORKBOOK.md sha256:9b35fde7b3b1 -->
+<!-- from WORKBOOK.md sha256:c364906627d2 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2089,18 +2083,18 @@ Steps:
      is the name of every sale until the shift ends, whoever made them: you will not know who sold what or who
      gave a discount. Staff who only have a PIN and no account will not be able to enter.".
   3. With the PIN pad on, "Ask again after inactivity": 1, 5, 10, 15 or 30 min, or "Until signing out", and
-     below what happens ("A till nobody touches for {n} minutes closes the session and shows the PIN pad: the
+     below what happens ("A till nobody touches for 10 minutes closes the session and shows the PIN pad: the
      next sale carries the name of the next person.").
   4. Each change is saved at once, with no button, and the card shows what the business confirms.
   5. Through the assistant ("I want everyone to have to type their PIN at the till so we know who sells"), the
      assistant reads how it is and says it by the names of this card: with the PIN pad on and "Until signing
      out", each person already enters with their PIN and every sale carries their name. To ask again after
      inactivity, it first asks how many minutes (1, 5, 10, 15 or 30): it never makes them up, nor do the stored
-     ones apply unseen. The card, with each datum on its own line (BASE-F98), says each control it changes by its
+     ones apply unseen. The card, with each datum on its own line, says each control it changes by its
      name and the value it will have here: "Show PIN pad: Yes" and "Ask again after inactivity: 10 min"; "Until
      signing out", "Show PIN pad: No" or "PIN digits: 6 digits" depending on the change. If only the minutes
      change and the business asks "Until signing out", it says "Ask again after inactivity: Until signing out",
-     which is what it will still say here (BASE-F97).
+     which is what it will still say here.
 In: how the business asks for the PIN.
 Out: whether it asks and when it asks again, for every till of the business. Turning it off and on again goes
 back to asking per shift.
@@ -2111,17 +2105,17 @@ inactivity" without its minutes does not reach the card: it goes back to the ass
 Involved: BASE-F55, BASE-F59, BASE-F97, BASE-F98
 
 ### BASE-F68 See the devices someone has entered on
-<!-- from WORKBOOK.md sha256:c1c40d93e2a3 -->
+<!-- from WORKBOOK.md sha256:23371c4da102 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
   1. In **Settings**, under "Devices": "The devices someone has entered on. If you lose one, remove it here: its
      session closes at once and it can no longer enter with a PIN.".
-  2. A row per device, the last used first: the name the business gave it (or "Unnamed device" and what it is,
-     for example Chrome · Android), "The one you are using" on the current one, the mode ("Asks for a PIN" or
-     "Stays open"), "In use right now" or "Last used {when}", "Its session stays open until {when}" and "Last
-     entered: {who}". Never its identifier.
+  2. A row per device, the last used first: the name the business gave it (or "Unnamed device" and what it is, for
+     example Chrome · Android), "The one you are using" on the current one, the mode ("Asks for a PIN" or "Stays open"),
+     "In use right now" or "Last used Nov 24, 2026, 10:30 AM", "Its session stays open until Nov 24, 2026, 10:00 PM" and
+     "Last entered: Ana". Never its identifier.
   3. It updates by itself when someone changes, names or removes a device.
 In: the business's devices.
 Out: nothing saved.
@@ -2146,7 +2140,7 @@ a shorter one and save again.".
 Involved: BASE-F68
 
 ### BASE-F70 Remove a device that was lost
-<!-- from WORKBOOK.md sha256:169ee9584f66 -->
+<!-- from WORKBOOK.md sha256:f2438077c242 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2157,7 +2151,7 @@ Steps:
      using: removing it will close your session and you will have to enter again.".
   3. They confirm with "Remove this device" (or "Leave it"). The row disappears and its session closes at once.
      If it was theirs, they leave the business.
-  4. From the assistant ("remove the phone I lost this afternoon"), the card asks to type CONFIRM (BASE-F98) and,
+  4. From the assistant ("remove the phone I lost this afternoon"), the card asks to type CONFIRM and,
      under "What will happen", says when it was last used ("Last used: Nov 22, 2026, 4:18 PM"): two devices
      without a name are called the same ("Chrome · Linux") and only their last use tells them apart.
 In: the device.
@@ -2168,29 +2162,29 @@ registered here. Refresh the list."; what was refused never stays as done.
 Involved: BASE-F58, BASE-F68, BASE-F98
 
 ### BASE-F71 Remove at once the devices nobody uses
-<!-- from WORKBOOK.md sha256:bfe672ece425 -->
+<!-- from WORKBOOK.md sha256:c6c12cce7727 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
   1. If there are devices nobody has used in 30 days (never the one in hand), "Remove the device unused for 30
-     days" or "Remove the {n} devices unused for 30 days" shows.
-  2. On tapping it, "Remove {n} devices nobody has used for 30 days?" (or "Remove the device nobody has used for
+     days" or "Remove the 3 devices unused for 30 days" shows.
+  2. On tapping it, "Remove 3 devices nobody has used for 30 days?" (or "Remove the device nobody has used for
      30 days?") with "They stop showing here and, to use one again, someone will have to enter on it with their
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
-  4. From the assistant ("clear out the old devices nobody uses any more"), the card asks to type CONFIRM
-     (BASE-F98) and, under "What will happen", says how many it will remove and which, by their name, the last used
-     first ("Devices to remove: 2" and "Which: Chrome · Linux, Bar"); the one in use is never among them. If none
-     has gone 30 days without being used, no card shows and the assistant says so: "No device has gone 30 days
-     without being used, so there is nothing to remove.".
+  4. From the assistant ("clear out the old devices nobody uses any more"), the card asks to type CONFIRM and, under
+     "What will happen", says how many it will remove and which, by their name, the last used first ("Devices to remove:
+     2" and "Which: Chrome · Linux, Bar"); the one in use is never among them. If none has gone 30 days without being
+     used, no card shows and the assistant says so: "No device has gone 30 days without being used, so there is nothing
+     to remove.".
 In: which devices nobody has used for 30 days.
 Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
 Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
-<!-- from WORKBOOK.md sha256:18495725379e -->
+<!-- from WORKBOOK.md sha256:efc654bc9574 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
@@ -2198,11 +2192,11 @@ Steps:
   1. Tap "Files" in the side menu. While it loads: "Loading files…".
   2. See the tree of folders on the left (on a narrow screen, the "Folders" selector), the open folder's path, what
      it holds in "Grid" (what shows first) or in "List", and "Space": what the business's files and its apps' take,
-     against the plan's limit ("{used} of {limit}") or, if it has none, "{used} used · No limit".
+     against the plan's limit ("1.2 GB of 5 GB") or, if it has none, "1.2 GB used · No limit".
   3. Go into a folder by tapping it in the tree, in the grid or in the selector, and come back through the path. The
      open folder stays in the address, so it can be shared with the team.
   4. Search by name in "Search files…", only inside the open folder; with no results, "No file in this folder
-     matches “{search}”.".
+     matches “invoice”.".
   5. An empty folder says "No files" (to whoever administers the business, also "Upload a file or drag it here.").
   6. The folder brings itself up to date when someone on the team uploads, moves, renames or deletes something, from
      any device.
@@ -2214,35 +2208,35 @@ moment." or "Check the connection and try again.") and "Retry"; a failure never 
 Involved: BASE-F40
 
 ### BASE-F73 Upload files and make folders
-<!-- from WORKBOOK.md sha256:0b029538bf19 -->
+<!-- from WORKBOOK.md sha256:66add13d9bb6 -->
 Status: done
 Actor: owner, administrator
 Screen: Files
 Steps:
   1. In the open folder, tap "Upload file" and choose one or several, or drag them onto the manager ("Drop the files
-     to upload them here"). While they upload: "Uploading {done} of {total}…".
+     to upload them here"). While they upload: "Uploading 2 of 5…".
   2. "Files uploaded." shows and they appear in the folder. If there was already one with the same name, it is not
-     overwritten: the new one is kept as "name (1).ext" and "Uploaded as “{name}”: there was already one with that
+     overwritten: the new one is kept as "menu (1).pdf" and "Uploaded as “menu (1).pdf”: there was already one with that
      name." shows.
   3. For a new folder, tap "New folder", type the "Folder name" (up to 100 characters) and tap "Create folder".
      "Folder created." shows and the folder appears in the tree and in the open folder.
   4. From the assistant, a file attached in the chat is kept the same way: the person asks it to keep it in a folder,
      the assistant uploads it with its card, which says it by its name, and after the "yes" it is in the folder, with
-     the same rules (BASE-F94).
+     the same rules.
 In: the files, up to 25 MB each, or the folder's name; the open folder.
 Out: the file or the folder, in the business's files (`base.file.uploaded`, `base.file.folder_created`).
-If it fails: each refused file says why, without stopping the others: "Could not upload “{name}”: {reason}", with
-"That file weighs more than 25 MB, the most Files takes.", "Programs (.{extension}) can't be kept in Files: they
-could harm whoever opens them.", "There is no space left for that file: your plan includes {space}." or "The file did
-not arrive whole. Upload it again.". What was uploaded and what was refused show in a single notice: one notice shows
-at a time and the new one closes the one before, never one on top of another. When making a folder, the dialog stays open with the reason: "That name is not
-valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
-Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
-administrator can change the files.".
+If it fails: each refused file says why, without stopping the others: "Could not upload “menu.pdf”:" and the reason,
+"That file weighs more than 25 MB, the most Files takes.", "Programs (.exe) can't be kept in Files: they could harm
+whoever opens them.", "There is no space left for that file: your plan includes 5 GB." or "The file did not arrive
+whole. Upload it again.". What was uploaded and what was refused show in a single notice: one notice shows at a time and
+the new one closes the one before, never one on top of another. When making a folder, the dialog stays open with the
+reason: "That name is not valid. Use a name without slashes or lone dots." or "There is already a file or folder with
+that name here.". Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only
+an administrator can change the files.".
 Involved: BASE-F40, BASE-F94
 
 ### BASE-F74 Preview and download a file
-<!-- from WORKBOOK.md sha256:f2b225123734 -->
+<!-- from WORKBOOK.md sha256:9fba0b1d1a58 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
@@ -2250,14 +2244,14 @@ Steps:
   1. Tap a file, or "Open" in its ⋮. A large viewer opens inside the hub, with the name as its title, "Download" and
      "Close".
   2. It shows images (whole in the viewer, never larger than the original, with "Zoom in" and "Zoom out"), PDFs (the
-     first 30 pages; if it is longer, "Showing the first {shown} of {total} pages. Download the file to read it
+     first 30 pages; if it is longer, "Showing the first 30 of 48 pages. Download the file to read it
      all."), text, logs and code, CSV and TSV as a table (a CSV in its own columns, whether separated by commas or by
      semicolons, as Spanish Excel saves it), audio and video. Of a very long text, "Showing the beginning
-     of the file. Download it to read it all."; of a table of more than 500 rows, "Showing the first {shown} rows.
+     of the file. Download it to read it all."; of a table of more than 500 rows, "Showing the first 500 rows.
      Download the file to see them all.".
   3. A data file (.json) is shown as a tree that folds and unfolds by parts, like the browsers' JSON viewer: the first
      two levels open and each object or list with what it holds ("6 fields", "2 items"); of an open branch with more
-     than 500 entries, "{count} more. Download the file to see them all.". One that is not valid JSON is shown as it
+     than 500 entries, "120 more. Download the file to see them all.". One that is not valid JSON is shown as it
      is, with "This file is not valid JSON: it is shown as it is.".
   4. An Excel sheet (.xlsx or .xlsm) is shown as a table, with one tab per sheet if it has several, like Excel: the
      first row as the header, numbers and dates as the sheet shows them, in the person's language, and the first 500
@@ -2276,58 +2270,58 @@ again.", never a blank viewer; if it arrived but could not be read (damaged or s
 could not be read" with "It may be damaged or saved in another format. Download it to open it with an app on your
 device."; a sheet or a document over 10 MB (or one that would take too much once opened) is not even fetched: "Too
 large to preview" with "The preview opens files of up to 10 MB. Download it to open it with an app on your device.".
-"Download" is always at the top. If it could not be downloaded, "Could not download “{name}”: {reason}".
+"Download" is always at the top. If it could not be downloaded, "Could not download “menu.pdf”:" and the reason.
 Involved: BASE-F112 (inside the app)
 
 ### BASE-F75 Move and rename a file or a folder
-<!-- from WORKBOOK.md sha256:7ce92779ba75 -->
+<!-- from WORKBOOK.md sha256:f9982b93331f -->
 Status: done
 Actor: owner, administrator
 Screen: Files
 Steps:
   1. To rename, choose "Rename" (or "Rename folder") in the ⋮: a dialog with the current name already typed (up to
      255 characters). Tap "Rename" and "Renamed." shows.
-  2. To move, choose "Move to…": "Move “{name}”" with the business's folders as a tree, starting at "Files"; choose
+  2. To move, choose "Move to…": "Move “menu.pdf”" with the business's folders as a tree, starting at "Files"; choose
      one and tap "Move". The file or the folder can also be dragged onto a folder of the tree or of the grid. "Moved
-     to “{folder}”." shows (to the very top, "Moved to “Files”.").
+     to “Invoices”." shows (to the very top, "Moved to “Files”.").
   3. A folder is moved or renamed with everything in it. If it is the open folder (its ⋮, beside the path), the
      screen follows it to its new place. It is never offered as a destination of itself or of its own folders.
 In: the file or the folder and the new name, or the destination folder.
 Out: the change, in the business's files (`base.file.renamed`, `base.file.moved`).
 If it fails: the dialog stays open with the reason: "There is already a file or folder with that name here.", "It is
-already in that folder.", "A folder can't be moved inside itself.", "That name is not valid. Use a name without
-slashes or lone dots." or "That file or folder no longer exists. Refresh the list."; when dragging, "Could not move:
-{reason}". Whoever does not administer the business does not see "Rename" or "Move to…" and, if they try anyway,
-reads "Only an administrator can change the files.".
+already in that folder.", "A folder can't be moved inside itself.", "That name is not valid. Use a name without slashes
+or lone dots." or "That file or folder no longer exists. Refresh the list."; when dragging, "Could not move:" and the
+reason. Whoever does not administer the business does not see "Rename" or "Move to…" and, if they try anyway, reads
+"Only an administrator can change the files.".
 Involved: none
 
 ### BASE-F76 Delete a file or a folder
-<!-- from WORKBOOK.md sha256:39cd05d2591f -->
+<!-- from WORKBOOK.md sha256:391b4ad55eb5 -->
 Status: done
 Actor: owner, administrator
 Screen: Files
 Steps:
   1. Choose "Delete" (or "Delete folder") in the ⋮ of a file, of a folder or of the open folder.
-  2. The screen asks: "Delete file" with "You are about to delete “{name}”. This cannot be undone.", or "Delete
-     folder" with "You are about to delete “{name}” and everything in it. This cannot be undone.".
+  2. The screen asks: "Delete file" with "You are about to delete “menu.pdf”. This cannot be undone.", or "Delete
+     folder" with "You are about to delete “Invoices” and everything in it. This cannot be undone.".
   3. Tap "Delete" (or "Cancel"). "File deleted." or "Folder deleted." shows. If the open folder was deleted, the
      screen goes up to the one above.
 In: the file or the folder.
 Out: the file or the folder, with everything it held, out of the business's files; there is no bin
 (`base.file.deleted`).
-If it fails: "Could not delete: {reason}", with "That file or folder no longer exists. Refresh the list." or "Your
+If it fails: "Could not delete:" and the reason, "That file or folder no longer exists. Refresh the list." or "Your
 session has expired. Sign in again and try once more.". Whoever does not administer the business does not see
 "Delete" and, if they try anyway, reads "Only an administrator can change the files.".
 Involved: none
 
 ### BASE-F77 Reach the plan's limit of people
-<!-- from WORKBOOK.md sha256:c748e49f2144 -->
+<!-- from WORKBOOK.md sha256:1f393ea46e21 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Staff
 Steps:
-  1. In **Employees › Staff**, above the table, how many of the plan's places are taken: "{used} of {limit} places
-     taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people". The accountancy
+  1. In **Employees › Staff**, above the table, how many of the plan's places are taken: "3 of 5 places
+     taken", "3 people · no limit" or, if erplora.com has not said the plan, "3 people". The accountancy
      firm takes no place: it is on the list, but it does not count here nor in "Usage and plan" of System.
   2. With every place taken, "Every place of your plan is taken" shows with "Remove on erplora.com someone who no
      longer works here, or move to a plan with more places."; on the web, and for the owner, with "Upgrade plan".
@@ -2340,14 +2334,14 @@ yet.".
 Involved: BASE-F81, BASE-F83
 
 ### BASE-F78 Remove a person's PIN
-<!-- from WORKBOOK.md sha256:9555147ca661 -->
+<!-- from WORKBOOK.md sha256:ad0ea33f76da -->
 Status: done
 Actor: owner, administrator
 Screen: A person's page
 Steps:
   1. In **Employees › Staff**, they tap the person: their page opens.
-  2. Under "PIN", "Has a PIN since {when}." and "Remove the PIN".
-  3. They tap it: "Remove the PIN" with "{name} will stop entering the tills with their PIN. With their erplora.com
+  2. Under "PIN", "Has a PIN since Nov 24, 2026, 10:30 AM." and "Remove the PIN".
+  3. They tap it: "Remove the PIN" with "Ana will stop entering the tills with their PIN. With their erplora.com
      account they still get in.". They confirm with "Remove the PIN".
   4. "PIN removed." shows and the page says "No PIN: the person chooses it in “My profile” or the first time they
      enter a till.".
@@ -2358,7 +2352,7 @@ the owner's way in.".
 Involved: BASE-F81, BASE-F55
 
 ### BASE-F79 Give a person a badge or take it away
-<!-- from WORKBOOK.md sha256:6a0450d8a9d0 -->
+<!-- from WORKBOOK.md sha256:4a552876a64d -->
 Status: done
 Actor: owner, administrator
 Screen: A person's page
@@ -2366,7 +2360,7 @@ Steps:
   1. On the person's page, under "Badge": "Pass the card and it fills itself: no need to click here first. You can
      also type the number, for a key fob or an engraved tag.".
   2. They pass the card over the reader (or type the number) and tap "Save badge": "Badge saved." and "Has a badge
-     since {when}.".
+     since Nov 24, 2026, 10:30 AM.".
   3. To take it away, "Remove the badge": "Badge removed." and "No badge.".
 In: the person and their badge.
 Out: the person's badge, kept without its number (only what lets it be recognised). Events `base.person.badge_set`
@@ -2394,18 +2388,18 @@ If it fails: until they accept, they show as "Not in yet".
 Involved: BASE-F77, BASE-F81
 
 ### BASE-F81 Understand how each person gets in
-<!-- from WORKBOOK.md sha256:481c06c6304a -->
+<!-- from WORKBOOK.md sha256:58cb08c8f9c7 -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff
 Steps:
-  1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own; in a row, a
-     name that does not fit is cut and shows whole on hovering over it), "Email" (only for whoever sees the team's
-     contact details: owner, administrator and manager; BASE-F119), "Role" (the accountancy firm, the last one),
-     "Access" and "Status".
-  2. "Access" says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
+  1. In **Employees › Staff**, a row per person (on a phone, a card): **User** (with "You" on one's own; in a row, a
+     name that does not fit is cut and shows whole on hovering over it), **Email** (only for whoever sees the team's
+     contact details: owner, administrator and manager), **Role** (the accountancy firm, the last one), **Access** and
+     **Status**.
+  2. **Access** says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
      "Account + PIN + Badge").
-  3. "Status" says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
+  3. **Status** says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
   4. They search with "Search person…". Whoever runs the business taps a row to open the person's page.
 In: the people of the business.
 Out: nothing saved. It updates by itself when somebody chooses or loses their PIN or their badge.
@@ -2413,7 +2407,7 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles and what each one allows
-<!-- from WORKBOOK.md sha256:cd9c70187deb -->
+<!-- from WORKBOOK.md sha256:986be0c21bab -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles; Employees · Roles · What it allows
@@ -2423,17 +2417,17 @@ Steps:
   2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
      available", how many people have it and how many permissions it gives. They are erplora.com's basic roles:
      each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
-     features call for it. Below them, by their name, the business's own roles (BASE-F127), with "Custom": whoever
+     features call for it. Below them, by their name, the business's own roles, with "Custom": whoever
      has one counts in it and not in the one of their invitation, save the owner, who is always the owner.
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
-     change any setting, and it takes no place of the plan (BASE-F77).
+     change any setting, and it takes no place of the plan.
   4. Tapping a role opens "What it allows", with the role's name at the top, "What this role lets a person do in this
      business, app by app. It is given on erplora.com and is not changed here." and "People with this role: 2".
      Below, a panel per app: "The business" first, then each app that is on by its name and "Sensitive data" last.
      In each panel, the phrase of each permission and its state: "Allowed", "With approval" (the person does it if a
-     manager approves it with their PIN there and then, BASE-F84) or "No". For example, the employee sees in "Sales
+     manager approves it with their PIN there and then) or "No". For example, the employee sees in "Sales
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
      changed here. A role of the business's own says "What this role lets a person do in this business, app by app."
      and shows what the business saved; what no role of the business can give, owning the business, does not show.
@@ -2443,10 +2437,10 @@ Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry"; in "What it allows", "Could not load what this role
 allows." with "Retry", and a role that is not one of the five nor one of the business's own, "This role does not exist
 in this business.".
-Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131
+Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131, BASE-F77
 
 ### BASE-F83 Give a person a role
-<!-- from WORKBOOK.md sha256:e0c7ae2348e6 -->
+<!-- from WORKBOOK.md sha256:189c96bdb8bb -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles
@@ -2456,7 +2450,7 @@ Steps:
      them).
   2. There they change the role.
   3. Back here, the person shows with their new role. If they have the hub open, what they see and what
-     they may do change at once, without ending their session (BASE-F13).
+     they may do change at once, without ending their session.
 In: the role chosen on erplora.com.
 Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
@@ -2575,7 +2569,7 @@ the last it knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
-<!-- from WORKBOOK.md sha256:f5aca9f7e571 -->
+<!-- from WORKBOOK.md sha256:e79b94167921 -->
 Status: done
 Actor: employee, manager
 Screen: An approval is needed
@@ -2596,11 +2590,13 @@ Steps:
      it through, nor an approval they had already been given. If the role changes, it counts from the next action on,
      without closing the session (BASE-F13). An app turned on after the role was saved asks as the basic role it came
      from; a permission an app added later is "No" until it is reviewed (BASE-F131). The owner is never asked.
+  6. Whoever may do it by their role does not see the question: they do it and it is recorded as done by them, with
+     nobody's approval (BASE-F85).
   From the assistant too: the "yes" of its card opens the same dialog, with the figures of what it was asked.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
-**Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
-action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
+**Employees › Approvals** (BASE-F85). Events `base.approval.granted` and `base.approval.used`; that of an action done by
+whoever may do it, `base.approval.noted`. The approval is spent together with the action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
 within those two minutes, goes through with it; if it went through, it is not repeated; two at once with the same one,
 only one goes through. What the approved action does on the way in other apps (the rectifying invoice of a void, the
 voucher sessions it gives back) goes with the approval, as when the manager does it themselves; nothing more: not what
@@ -2615,31 +2611,38 @@ with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the a
 Involved: BASE-F85, BASE-F55, BASE-F56, BASE-F100, BASE-F128, BASE-F130, SALE-F30, SALE-F31
 
 ### BASE-F85 Look up who approved what
-<!-- from WORKBOOK.md sha256:a356799e6ecb -->
+<!-- from WORKBOOK.md sha256:2122ee4e3222 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Approvals
 Steps:
-  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that needed a
-     manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or
+  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that can need a
+     manager's approval: who did it, who approved it and with what. Nobody, not even an administrator, can edit or
      delete it.".
-  2. A row per approval, the latest first: "When", "Action" (in words and in their language; with the figures of
-     what was done with it, when the app gives them: an unused approval did nothing and has no figures), "Approved
-     by", "Asked by", "With" ("PIN" or "Badge") and "State" ("Used" or "Not used").
-  3. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
+  2. A row per action, the latest first: "When", "Action" (in words and in their language; with the figures of what was
+     done, when the app gives them: an approval nobody used did nothing and has no figures), "Approved by", "Who" (who
+     did it, or asked to), "With" ("PIN", "Badge" or "Their role") and "State" ("Done", or "Not done" if the approval
+     was not used).
+  3. Those done by somebody whose role allows it, by themselves, show too: the manager who voids a sale or gives a
+     discount above the maximum, the owner, whoever has it "Allowed" in a role of the business's own, and the same
+     asked of the assistant, with whoever said yes. They say "Their role" in "With" and leave "Approved by"
+     empty. A row per action: one that was refused or failed does not show, nor the retry of one already done, nor one
+     that changed nothing, nor what the system or an automation does.
+  4. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
      "When" (a day or a few days in a row), "Action" (the ones on the record, each once and without figures), "With"
      and "State".
-  4. "Export CSV" downloads a file with the approvals the search and the filters keep, also the older ones the list
-     no longer shows, with the same columns in their language; meanwhile it says "Exporting…".
+  5. "Export CSV" downloads a file with the actions the search and the filters keep, also the older ones the list no
+     longer shows (the last 500), with the same columns in their language; meanwhile it says "Exporting…".
 In: the record of approvals.
-Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval.
-If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
-anything in this business yet." (and the exported file brings its header alone). If it cannot export, a notice says
-so with its reason and nothing is downloaded.
-Involved: BASE-F84, BASE-F112 (inside the app)
+Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval and each
+action.
+If it fails: "Could not load the record of approvals." with "Retry"; with none, "There is no action of this kind in this
+business yet." (and the exported file brings its header alone). If it cannot export, a notice says so with its reason
+and nothing is downloaded.
+Involved: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
-<!-- from WORKBOOK.md sha256:344d74567f12 -->
+<!-- from WORKBOOK.md sha256:22135d71b36c -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2661,19 +2664,19 @@ Steps:
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
 (BASE-F125). Event `base.api_key.created`.
-If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
-app does not publish what the key would do on it.", "A key may not do more than you may do yourself." (403
-`base.api_key_beyond_maker`) or "It could not be copied to the clipboard.".
+If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That app
+does not publish what the key would do on it.", "A key may not do more than you may do yourself." or "It could not be
+copied to the clipboard.".
 Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
-<!-- from WORKBOOK.md sha256:3b83ac4d580c -->
+<!-- from WORKBOOK.md sha256:0d53f808c07f -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
   1. On the key's row, "Rotate".
-  2. "Rotate the API key" with "“{name}” gets a new token. The current one stops working at once."; they confirm
+  2. "Rotate the API key" with "“Online shop” gets a new token. The current one stops working at once."; they confirm
      with "Rotate".
   3. The new token shows, only once, with "Copy".
 In: the key.
@@ -2683,22 +2686,22 @@ longer exists. Refresh the list and try again.".
 Involved: BASE-F86, BASE-F89
 
 ### BASE-F88 Revoke an API key
-<!-- from WORKBOOK.md sha256:42b0d5b61a05 -->
+<!-- from WORKBOOK.md sha256:458a37f36d18 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
   1. On the key's row, "Revoke".
-  2. "Revoke the API key" with "You are about to revoke “{name}”. Any system using this token loses access at
+  2. "Revoke the API key" with "You are about to revoke “Online shop”. Any system using this token loses access at
      once. This cannot be undone."; they confirm with "Revoke".
-  3. "“{name}” revoked." shows and the row stays as "Revoked", without "Rotate" or "Revoke".
+  3. "“Online shop” revoked." shows and the row stays as "Revoked", without "Rotate" or "Revoke".
 In: the key.
 Out: the key revoked for good; it is kept on the list. Event `base.api_key.revoked`.
 If it fails: "The API key could not be revoked.".
 Involved: BASE-F89
 
 ### BASE-F89 See the API keys and what each one may do
-<!-- from WORKBOOK.md sha256:07e6020cc165 -->
+<!-- from WORKBOOK.md sha256:6a048ed2a1f5 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2708,7 +2711,7 @@ Steps:
      unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so on every
      app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U (update) and
      D (delete), as "Online shop R/C · Taxes R".
-  2. They search with "Search API key…". At the bottom, "API documentation" leads to the documentation.
+  2. They search with "Search API key…". At the bottom, a link leads to the API documentation.
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
@@ -2736,13 +2739,13 @@ nothing published, "None of this business’s apps publishes its API yet.".
 Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation
-<!-- from WORKBOOK.md sha256:00fe8590da8a -->
+<!-- from WORKBOOK.md sha256:9c9353b5fec2 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
-  1. In **Settings › General**, under "API documentation", the switch "Show the API documentation" ("Adds a page
-     with the documentation of the API, for whoever connects another system."). It comes off.
+  1. In **Settings › General**, on the card of the API documentation, the switch "Show the API documentation" ("Adds a
+     page with the documentation of the API, for whoever connects another system."). It comes off.
   2. Turning it on saves it at once and "Open the API documentation" shows and, in the side menu, "API" (between
      "System" and "Settings"), without reloading; turning it off, both go away.
 In: the switch.
@@ -3092,7 +3095,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-<!-- from WORKBOOK.md sha256:10089937bc9a -->
+<!-- from WORKBOOK.md sha256:6782ed15c886 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3119,11 +3122,12 @@ Steps:
   5. What the assistant tells (lists, figures) is what that person may read.
 In: the session of whoever asks, which signs each action; for what a manager approves, their PIN or their badge.
 Out: the action done with that person as its author. The approval is good for that action of that conversation, once
-and for two minutes, and it is spent together with the action (BASE-F84).
+and for two minutes, and it is spent together with the action (BASE-F84). One a manager could approve and the person may
+do by their role is recorded too, in their name (BASE-F85).
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
 says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
 failed: …" and the assistant tells it.
-Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
+Involved: BASE-F13, BASE-F84, BASE-F85, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
 <!-- from WORKBOOK.md sha256:b63066914a0f -->
@@ -3277,10 +3281,11 @@ If it fails: a failure with nothing written leaves no empty bubble: only the sen
 Involved: BASE-F93, BASE-F102, BASE-F104
 
 ### BASE-F107 Pass the master QA of the Hub
-<!-- from WORKBOOK.md sha256:b261e41b4306 -->
+<!-- from WORKBOOK.md sha256:94bcd34257d5 -->
 Status: done
 Actor: ERPlora's QA team
 Screen: every screen of the hub's platform
+Operations: none
 Steps:
   1. The team creates on erplora.com, with a new account, a business of its kind (a restaurant): the hub receives it
      with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
@@ -3373,10 +3378,11 @@ Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, 
 (each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
-<!-- from WORKBOOK.md sha256:70c3053e9c2d -->
+<!-- from WORKBOOK.md sha256:6525baba0e5d -->
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
 Actor: anyone, without an account
 Screen: The business's public page (WEBSITE-F10), on its domain
+Operations: none
 Steps:
   1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
   2. The business's published page shows, with its photos, in the browser's language.
@@ -3391,10 +3397,11 @@ published page, the domain says there is nothing there. A business being prepare
 Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
-<!-- from WORKBOOK.md sha256:1fae342a6c05 -->
+<!-- from WORKBOOK.md sha256:391a10311b47 -->
 Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
+Operations: none
 Steps:
   1. The person opens a screen or saves something while the database is cut for a few seconds: a restart, an AWS
      maintenance or the change of version.
@@ -3426,31 +3433,31 @@ Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes 
 business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
 
 ### BASE-F112 Save a downloaded file inside the app
-<!-- from WORKBOOK.md sha256:61e01340cee3 -->
+<!-- from WORKBOOK.md sha256:1042602d77fa -->
 Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
-Settings · Data and copies › Export, Files, Employees › Approvals, the API documentation, Attendance, Inventory
+Settings · Data and backups (Export), Files, Employees · Approvals, the API documentation, Attendance, Inventory
 (Products and Categories), Customers, the website's "Share and QR" and the assistant (the export it is asked for)
 Steps:
   1. The person presses download: the authorisation's form, an export, a file, a CSV, the OpenAPI file or the QR.
   2. In a browser, the file goes with its name to the browser's downloads, which already say so.
   3. Inside the ERPlora app (computer, or Android 10 or later), the Hub hands the file to the app, which saves it in the
-     Downloads folder, and "Saved to {path}" appears (on Android, "Saved to Download/<name>"): inside the app there is
-     no downloads bar nor any other notice.
-  4. In the assistant, when asked for an export ("Give me the whole menu as a CSV"), "Download <name>" comes under its
-     answer: the same file the export button of that screen gives, which comes down as in steps 2 and 3. The assistant
-     says it is there, without pasting its content into the chat.
+     Downloads folder, and "Saved to" appears with the file's path (on Android, "Saved to Download/menu.pdf"): inside
+     the app there is no downloads bar nor any other notice.
+  4. In the assistant, when asked for an export ("Give me the whole menu as a CSV"), "Download" with the file's name
+     comes under its answer: the same file the export button of that screen gives, which comes down as in the two steps
+     before. The assistant says it is there, without pasting its content into the chat.
 In: the file the screen already holds, with its name.
 Out: the file in Downloads and, inside the app, the notice with its path. Nothing is kept in the Hub.
 If it fails: inside the app the button is never left without an answer. With no downloads folder the person can open
 (Android 9 or earlier, iOS): "This app cannot save files on a phone or tablet. Open your business in a browser to
 download it."; with the app linked to another business: "The file could not be saved: this app is linked to another
-business."; a version of the app without this feature: "This version of the ERPlora app cannot save files. Update it
-to download."; any other failure (a name the app refuses, no space left): "The file could not be downloaded.". In
-those cases the screen does not say it was downloaded. The file the assistant gave lives in that tab: after the page
-reloads, in its place it says "The file «<name>» is no longer here: ask for it again to download it.". The copies ERPlora keeps (Data and copies › Copies) come down
-through a signed link and do not go through here.
+business."; a version of the app without this feature: "This version of the ERPlora app cannot save files. Update it to
+download."; any other failure (a name the app refuses, no space left): "The file could not be downloaded.". In those
+cases the screen does not say it was downloaded. The file the assistant gave lives in that tab: after the page reloads,
+in its place it says "The file «menu.csv» is no longer here: ask for it again to download it.". The copies ERPlora keeps
+(Data and backups › Copies) come down through a signed link and do not go through here.
 Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
@@ -3765,7 +3772,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of the screen in view
-<!-- from WORKBOOK.md sha256:e6318599c755 -->
+<!-- from WORKBOOK.md sha256:c36cfdd53265 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
@@ -3784,13 +3791,14 @@ Steps:
   4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module (on a screen of
      the Hub, of what the Hub always brings), and "On this screen · <tab>", marked "You are here", with the summary of
      what the tab the person is on shows: short and whole, with no "See more".
-  5. "How to" brings each finished task of the module, grouped by tab, those of the tab the person is on first. Each
-     task is a folded row that opens with its steps and its "If something goes wrong", one at a time. A task with a
+  5. "How to" brings each finished task of the module, grouped by tab, those of the tab the person is on first; on a
+     screen of the Hub, those of the Hub's screens the person can see, and only the ones their role does: an employee is
+     not shown how to turn an app on. Each task is a folded row that opens with its steps and its "If something goes
+     wrong", one at a time. A task with a
      short video shows it when it opens, before its steps, in the same player as the module's and in the person's
      language or, if there is none, in Spanish; with several, one below the other. Opening the help or a task asks
      nothing of YouTube until the video is tapped. With more than eight tasks, "Search tasks…" appears on top, filtering by the title and the steps regardless of accents and
-     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again. The
-     help of a screen of the Hub brings no tasks.
+     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
   6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
      each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
   7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
@@ -3807,12 +3815,12 @@ behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
-<!-- from WORKBOOK.md sha256:73eed8448b68 -->
+<!-- from WORKBOOK.md sha256:a8f87874c9dd -->
 Status: done
 Actor: owner, administrator; through the assistant, anyone of the business
 Screen: System · Updates
 Steps:
-  1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
+  1. In the "Updates" tab, below the version and its date, comes "What's new": what has changed in ERPlora
      that the business notices, the most recent first. While it loads: "Reading what's new…".
   2. Each item says its day, whether it is something new, an improvement or a fix ("New", "Improved" or "Fixed"), a
      short title and one or two sentences on what can be done now, just as they were written. They are notes written
@@ -3820,12 +3828,12 @@ Steps:
   3. The 20 most recent are shown, with no pages.
   4. With none, it says "Nothing new yet.".
   5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
-     in the person's language. That is how whoever does not run the business, who has no System (BASE-F39), reads them
+     in the person's language. That is how whoever does not run the business, who has no System, reads them
      too: they say nothing about the business.
 In: what is new in the version running: it travels with it, so it is always its own.
 Out: nothing saved: what is new is only read.
 If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
-Involved: BASE-F41
+Involved: BASE-F41, BASE-F39
 
 ### BASE-F117 See in the bell that the plan has an unpaid invoice
 <!-- from WORKBOOK.md sha256:51c6d2d30239 -->
@@ -3882,7 +3890,7 @@ only spares a screen of errors.
 Involved: BASE-F26, HUBS-F26 (erplora.com)
 
 ### BASE-F119 What each person sees by their data permissions
-<!-- from WORKBOOK.md sha256:161d81320fe2 -->
+<!-- from WORKBOOK.md sha256:606be0e0f566 -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff, Home · Summary, Sales · Sales, Customers
@@ -3898,7 +3906,7 @@ Steps:
      what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
-  5. An API key sees the data whoever made it sees today (BASE-F125): a key of the owner or of an administrator, who
+  5. An API key sees the data whoever made it sees today: a key of the owner or of an administrator, who
      see all of it, reads and writes a product's cost as before.
   6. The business totals are the figures of the whole business, beyond what each one does: with everyone's sales,
      the figures of **Sales** and its Home panels are the whole business's; without them, those of the person's own
@@ -3906,8 +3914,7 @@ Steps:
 In: the person's role in this business.
 Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
-not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
-nothing.
+not see is refused as if they had no permission, doing nothing.
 Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, BASE-F125, SALE-F28, CUSTOMER-F31
 
 ### BASE-F125 A key stops working when whoever made it no longer may
@@ -3941,16 +3948,17 @@ do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_
 Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
-<!-- from WORKBOOK.md sha256:ae3493013f65 -->
+<!-- from WORKBOOK.md sha256:3c20dd6a4110 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · General
+Operations: none
 Steps:
   1. In the ERPlora app on a computer, **Settings › General** carries under "This device" the switch "Start on
      login" ("Open ERPlora when you sign in to this computer, so tickets always have somewhere to print."), off
      from the factory. In a browser and in the Android app it does not show.
-  2. When it is moved, the Hub asks the app, which records it in the system and reads back what the system says
-     (HUB_APP-F27); meanwhile the switch waits.
+  2. When it is moved, the Hub asks the app, which records it in the system and reads back what the system says;
+     meanwhile the switch waits.
   3. The switch stays where the system says, not where it was moved.
 In: the switch, on the computer itself.
 Out: the system's start-up of this computer, not of the business. Nothing is saved in the Hub.
@@ -3959,7 +3967,7 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:8c48efdd08cf -->
+<!-- from WORKBOOK.md sha256:63af2ec5f10c -->
 Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
@@ -3967,7 +3975,7 @@ Steps:
   1. When the business wants ERPlora's support staff to come in and help set it up (loading the products, adjusting
      its apps), the owner or an administrator turns on "Let ERPlora support in" in the "Support access" card, the last
      one of Settings › General. It comes off. It is also turned on and off through the API or by asking the
-     assistant, which confirms it before changing it (BASE-F97).
+     assistant, which confirms it before changing it.
   2. The change is saved at once, with who made it and when, and a notice confirms it: "Support access is on: ERPlora
      support can come in." or "Support access is off: ERPlora support can no longer come in.". It does not expire: it
      stays on until someone of the business turns it off, because getting started can take several days.
@@ -3977,11 +3985,11 @@ Steps:
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
   4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
-     admin, with their own account (HUBS-F38 of erplora.com), and arrives as an administrator: they may do everything
+     admin, with their own account, and arrives as an administrator: they may do everything
      but what only the owner does (buying for the business, resetting it, its copies). They are not in Employees nor
      among who can give access, do not enter the tills with a PIN or a badge, take no place and do not count in the
      plan's use, and their browser does not stay as a device of the business: it neither ends another device's session
-     nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest entries at once,
+     nor has its own ended by another one's entry. Each entry joins the list of the latest entries at once,
      and what they do stays in the records under their name.
   5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
      administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
@@ -3991,7 +3999,7 @@ Steps:
 In: on or off; the support account erplora.com vouches for.
 Out: the business's setting, with who changed it and when. Event `base.support_access.changed`. Each entry of
 support, with who and when. Event `base.support_access.entered`.
-If it fails: whoever does not run the business has the change refused (403 `permission_denied`) and the setting stays
+If it fails: whoever does not run the business has the change refused and the setting stays
 as it was; reading it, they see they cannot change it. If the change cannot be saved, "Could not save the change."
 shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
 support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step

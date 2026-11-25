@@ -1,11 +1,11 @@
 """``manage.py migrate_hubs``: the ``hub-migrate`` task of every deploy.
 
-1. The control database, under its lock (``base.tenancy.migrator.migrate_control``).
+1. The control database, under its lock (``base.tenancy.migrator.control_database.migrate_control``).
 2. The templates, as canaries, on every server the hubs live on (``clusters_to_migrate``: ``CREATE DATABASE …
    TEMPLATE`` clones only within one): ``hub_template`` and one ``hub_template_<vertical>`` per vertical, created if
    missing and brought up to date, never rebuilt. One that fails stops the run before any hub.
 3. Every hub behind (``Hub.schema_apps``), through its own server: ERPlora's own first, then at most
-   ``migrator.HUB_WORKERS`` at once. One that fails is marked ``behind`` and the others go on.
+   ``migrator.hubs_pass.HUB_WORKERS`` at once. One that fails is marked ``behind`` and the others go on.
 
 Any failure is logged with its traceback and exits non-zero, which the infra's ``task_failed`` rule reports.
 
@@ -51,7 +51,7 @@ class Command(BaseCommand):
             return
         self.refuse_if_frozen()
         try:
-            applied = migrator.migrate_control(stdout=self.stdout, verbosity=verbosity)
+            applied = migrator.control_database.migrate_control(stdout=self.stdout, verbosity=verbosity)
         except Exception as error:
             logger.exception("migrate_hubs: the control database was not migrated.")
             raise CommandError(f"migrate_hubs: the control database was not migrated: {error}") from error
@@ -80,15 +80,15 @@ class Command(BaseCommand):
         try:
             plan = [
                 (target, template)
-                for target in migrator.clusters_to_migrate()
-                for template in migrator.templates(target.control)
+                for target in migrator.servers.clusters_to_migrate()
+                for template in migrator.hub_templates.templates(target.control)
             ]
         except Exception as error:
             logger.exception("migrate_hubs: the clusters and their templates could not be read.")
             raise CommandError(f"migrate_hubs: the clusters and their templates could not be read: {error}") from error
         for target, template in plan:
             try:
-                applied = migrator.ensure_template(template, target=target)
+                applied = migrator.hub_templates.ensure_template(template, target=target)
             except Exception as error:
                 logger.exception("migrate_hubs: the template %s%s was not migrated.", template.db_name, _on(target))
                 raise CommandError(
@@ -109,7 +109,7 @@ class Command(BaseCommand):
 
     def migrate_hubs(self) -> None:
         try:
-            result = migrator.migrate_hubs_behind()
+            result = migrator.hubs_pass.migrate_hubs_behind()
         except Exception as error:
             logger.exception("migrate_hubs: the hubs' pass did not run.")
             raise CommandError(f"migrate_hubs: the hubs' pass did not run: {error}") from error
@@ -123,19 +123,19 @@ class Command(BaseCommand):
 
     def check_pending(self) -> None:
         try:
-            pending = migrator.pending_control()
+            pending = migrator.control_database.pending_control()
             templates = [
-                (template, target, migrator.database_exists(template.db_name, target=target))
-                for target in migrator.clusters_to_migrate()
-                for template in migrator.templates(target.control)
+                (template, target, migrator.hub_templates.database_exists(template.db_name, target=target))
+                for target in migrator.servers.clusters_to_migrate()
+                for template in migrator.hub_templates.templates(target.control)
             ]
             templates = [
-                (template, target, exists, migrator.pending_template(template, target=target))
+                (template, target, exists, migrator.hub_templates.pending_template(template, target=target))
                 for template, target, exists in templates
             ]
-            every = migrator.hubs_with_a_database()
-            code = migrator.code_migrations()
-            behind = [hub for hub in every if migrator.is_behind(hub, code)]
+            every = migrator.hubs_pass.hubs_with_a_database()
+            code = migrator.app_sets.code_migrations()
+            behind = [hub for hub in every if migrator.hubs_pass.is_behind(hub, code)]
         except Exception as error:
             logger.exception("migrate_hubs --check: the databases could not be read.")
             raise CommandError(f"migrate_hubs --check: the databases could not be read: {error}") from error
@@ -148,7 +148,7 @@ class Command(BaseCommand):
             if exists:
                 lines += [f"migrate_hubs: unapplied migrations in {template.db_name}{_on(target)}:", *missing]
             elif template.source is None:
-                where = migrator.server_of(target)
+                where = migrator.servers.server_of(target)
                 lines.append(f"migrate_hubs: {template.db_name} does not exist on {where}: run db-bootstrap there.")
             else:
                 clones = f"a run clones it from {template.source} and applies:"

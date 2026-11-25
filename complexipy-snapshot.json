@@ -128,20 +128,6 @@
     ]
   },
   {
-    "path": "apps/inventory/services/imports.py",
-    "file_name": "imports.py",
-    "functions": [
-      {
-        "name": "_check_product_row",
-        "complexity": 17
-      },
-      {
-        "name": "bulk_create_products",
-        "complexity": 19
-      }
-    ]
-  },
-  {
     "path": "apps/inventory/tests/test_workbook.py",
     "file_name": "test_workbook.py",
     "functions": [
@@ -158,16 +144,6 @@
       {
         "name": "_recipient",
         "complexity": 26
-      }
-    ]
-  },
-  {
-    "path": "apps/invoice/services/series.py",
-    "file_name": "series.py",
-    "functions": [
-      {
-        "name": "update_series",
-        "complexity": 17
       }
     ]
   },
@@ -480,16 +456,12 @@
       {
         "name": "_customer_load",
         "complexity": 17
-      },
-      {
-        "name": "_inventory_product_load",
-        "complexity": 39
       }
     ]
   },
   {
-    "path": "base/catalog.py",
-    "file_name": "catalog.py",
+    "path": "base/catalog/workbooks.py",
+    "file_name": "workbooks.py",
     "functions": [
       {
         "name": "_uncommented_lines",
@@ -630,8 +602,8 @@
     ]
   },
   {
-    "path": "base/ws_print.py",
-    "file_name": "ws_print.py",
+    "path": "base/ws_print/protocol.py",
+    "file_name": "protocol.py",
     "functions": [
       {
         "name": "PrintSocket::_on_stream",

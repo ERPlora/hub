@@ -16,6 +16,8 @@ from live.meta import Help, all_live_app_configs
 from live.operations import AI, get
 
 from base import workbook_help
+from base.models import Membership
+from base.permissions import permissions_of_role
 from base.queries import app_help
 from base.schemas.app_help import AppHelpIn
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
@@ -37,6 +39,10 @@ def ask(app: str = "table", language: str = "es", *also: str) -> dict:
 
 def titles(answer: dict) -> list[str]:
     return [screen["title"] for screen in answer["screens"]]
+
+
+def tasks(answer: dict) -> list[str]:
+    return [flow["id"] for flow in answer["flows"]]
 
 
 @pytest.fixture
@@ -114,8 +120,43 @@ class TestTheHubsOwnScreens:
         assert (answer["language"], answer["name"]) == ("en", "ERPlora")
         assert titles(answer) == ["Home · Summary", "Files", "System · Logs"]
 
-    def test_its_tasks_are_not_published(self, platform):
-        assert ask("base", "es", "*")["flows"] == []
+    def test_its_tasks_are_those_done_on_a_screen_as_a_module_s_are(self, platform):
+        answer = ask("base", "es", "*")
+        assert tasks(answer) == ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F04", "BASE-F05", "BASE-F06", "BASE-F08"]
+        assert answer["flows"][5] == {
+            "id": "BASE-F06",
+            "title": "Descargar un archivo",
+            "screens": ["system_logs", "files"],
+            "steps": "1. Pulsa «Descargar».",
+            "failure": "Lo dice un aviso.",
+            "videos": [],
+        }
+
+    @pytest.mark.parametrize("language", ["es", "en"])
+    @pytest.mark.parametrize(
+        ("role", "seen"),
+        [
+            (Membership.Role.ACCOUNTANT, ["BASE-F01", "BASE-F05"]),
+            (Membership.Role.EMPLOYEE, ["BASE-F01", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.Role.MANAGER, ["BASE-F01", "BASE-F02", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.Role.ADMIN, ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.SUPPORT, ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.Role.OWNER, ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F04", "BASE-F05", "BASE-F06", "BASE-F08"]),
+        ],
+    )
+    def test_a_task_goes_only_to_the_roles_that_do_it_and_those_above_them(self, platform, language, role, seen):
+        assert tasks(ask("base", language, *permissions_of_role(role))) == seen
+
+    def test_a_role_of_the_business_gets_the_tasks_of_what_it_may_do(self, platform):
+        assert tasks(ask("base", "es", "base.administer_hub")) == ["BASE-F01", "BASE-F03", "BASE-F05", "BASE-F06"]
+
+    def test_a_task_done_on_several_screens_names_those_the_person_sees(self, platform):
+        def screens(*also: str) -> list[str]:
+            return next(flow["screens"] for flow in ask("base", "es", *also)["flows"] if flow["id"] == "BASE-F06")
+
+        assert screens("base.view_files") == ["files"]
+        assert screens("base.administer_hub") == ["system_logs"]
+        assert screens("base.*") == ["system_logs", "files"]
 
     @pytest.mark.parametrize(
         ("also", "seen"),
@@ -133,6 +174,7 @@ class TestTheHubsOwnScreens:
         assert titles(ask("base")) == ["Inicio · Resumen"]
         assert titles(ask("base", "es", "base.*")) == ["Inicio · Resumen", "Archivos", "Sistema · Registros"]
         assert titles(ask("base")) == ["Inicio · Resumen"]
+        assert tasks(ask("base")) == ["BASE-F01", "BASE-F05"]
 
 
 class TestTheRealScreens:
@@ -205,6 +247,31 @@ class TestTheRealScreens:
 
     def test_an_accountant_gets_the_screens_everyone_has(self):
         assert titles(ask("base")) == self.EVERYONES_ES
+
+    #: What each role may do on the screens it sees, over what the roles below it may.
+    TASKS = (
+        (
+            Membership.Role.ACCOUNTANT,
+            "F01 F02 F04 F05 F06 F07 F08 F09 F12 F14 F15 F16 F17 F20 F48 F49 F50 F64 F65 F81 F82 F119 F120",
+        ),
+        (Membership.Role.EMPLOYEE, "F72 F74 F112"),
+        (Membership.Role.MANAGER, "F03"),
+        (
+            Membership.Role.ADMIN,
+            "F18 F19 F21 F22 F23 F24 F25 F29 F30 F31 F32 F33 F34 F35 F36 F38 F39 F40 F41 F42 F43 F44 F45 F46 F51 F62 "
+            "F66 F67 F68 F69 F70 F71 F73 F75 F76 F77 F78 F79 F80 F83 F85 F86 F87 F88 F89 F91 F116 F126",
+        ),
+        (Membership.Role.OWNER, "F37"),
+    )
+
+    @pytest.mark.parametrize("language", ["es", "en"])
+    def test_each_role_gets_every_task_it_may_do_and_no_other(self, language):
+        expected: set[str] = set()
+        for role, more in self.TASKS:
+            expected |= {f"BASE-{flow}" for flow in more.split()}
+            seen = tasks(ask("base", language, *permissions_of_role(role)))
+            assert (role, set(seen)) == (role, expected)
+            assert len(seen) == len(expected)
 
     @pytest.mark.parametrize(
         ("permission", "more"),

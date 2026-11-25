@@ -708,7 +708,7 @@ A line already sent to the kitchen has no note button.
 Involved: none
 
 ### SALE-F14 Apply a discount to a line or to the check
-<!-- from WORKBOOK.md sha256:16e938b33b1d -->
+<!-- from WORKBOOK.md sha256:d71ed1a11dec -->
 Status: done
 Vertical: common
 Actor: employee, manager; above the maximum, the cashier with a manager's approval
@@ -729,7 +729,8 @@ Steps:
    with their PIN (or their badge) on that same device. The check keeps who authorized it and it is not
    asked again when charging; if, when charging, the discount goes over the maximum without
    authorization, it asks just the same, with "Approving: Charge with a discount above the maximum".
-   Employees › Approvals keeps what was approved with its figure.
+   Employees › Approvals keeps what was approved with its figure, and also what is given by whoever may give
+   it by themselves.
 In: "Allow discounts" and the maximum discount of the settings. The assistant only sets one on a check it is
 told about (its table or its name): the discount a product or a category gets on every sale is a rule of Price
 Lists (PRICING-F11).
@@ -1235,7 +1236,7 @@ cannot be read, "Its VeriFactu record could not be read, and its paper never pri
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
-<!-- from WORKBOOK.md sha256:4b57436eacba -->
+<!-- from WORKBOOK.md sha256:f0831c2c8ad4 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1264,12 +1265,12 @@ at the same time, "This sale is already voided.". A refusal is read inside the w
 If "Cancel" is pressed in "An approval is needed", nothing is voided and the window says "This needs a
 manager's approval.". The approved void does the same as the manager's, only once: the corrective
 invoice in the same void, the voucher sessions that go back, the stock and the customer's record; who
-approved it stays in **Employees › Approvals**. If the role becomes "No" with the window open, the void is refused and
-nothing is voided, even if a manager had already approved it.
-Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
+approved it, or that whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role
+becomes "No" with the window open, the void is refused and nothing is voided, even if a manager had already approved it.
+Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Refund a sale (all of it, part of it or through another method)
-<!-- from WORKBOOK.md sha256:cf834b29ea28 -->
+<!-- from WORKBOOK.md sha256:a78b311b17a5 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1306,10 +1307,10 @@ another refund takes the last of a marked line at the same time: "One of the lin
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
 pressing again does not refund twice. If "Cancel" is pressed in "An approval is needed",
 nothing is refunded and the window says "This needs a manager's approval.". The approved refund is the
-same, only once, with its corrective invoice and the voucher sessions that go back; who approved it stays
-in **Employees › Approvals**. If the role becomes "No" with the window open, the refund is refused and nothing is
-refunded, even if a manager had already approved it.
-Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
+same, only once, with its corrective invoice and the voucher sessions that go back; who approved it, or that
+whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role becomes "No" with the
+window open, the refund is refused and nothing is refunded, even if a manager had already approved it.
+Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Customers takes what was refunded off the record's spending on hearing "sale refunded" (CUSTOMER-F22)
 and Inventory puts back the units that go back (INVENTORY-F24), once per refund.
 
@@ -1645,7 +1646,7 @@ and refunding) only reaches the sales the person sees: without "See all sales", 
 the ones attributed to them. One they do not see does not exist for them (404 `sale.sale_not_found`).
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:a52fac486ff1 -->
+<!-- from WORKBOOK.md sha256:a82dbcf5d08c -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -1660,7 +1661,7 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The steps the apps turned on add to the charge, those whoever charges sees and in their order: which app each one is of and which part of it paints it; with none, the charge takes nothing added | charge | F39 | `sale.checkout.steps` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
-| A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
+| A check with its uncharged lines | see sales | F17, F19, F40 | `sale.order.get` |
 | The active payment methods, with the ones the business allows today | see payment methods | F02, F03 | `sale.payment_method.list` |
 | The POS settings (to edit them) | settings | F34 | `sale.settings.get` |
 | The settings the POS needs to sell | see sales | F01–F05 | `sale.pos_settings.get` |
@@ -1677,7 +1678,7 @@ The sales, the figures, the checks, the charge preview, the payment methods, the
 the quick notes and what is refundable can be followed live.
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:ff9716022a8c -->
+<!-- from WORKBOOK.md sha256:521328cbfe57 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -1688,9 +1689,9 @@ the quick notes and what is refundable can be followed live.
 | Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if none takes it (or its fiscal document is pending, or its QR cannot be read), it fails and says why, and the screen prints it on the device | see sales | F29 | `sale.sale.print` |
 | Refunds money from a sale per payment, and the lines that go back (the ones paid with a voucher give back their session); with its corrective invoice in the same refund | refund | F31, F32 | `sale.sale.refund` |
 | Opens a check, with or without lines (articles, services —at their booked price or at the professional's— or open price); that of an appointment that already has an open one returns that one (`already`) | build the check | F01, F17, F26, F38 | `sale.order.open` |
-| Adds a catalog article to a check | build the check | F01, F10 | `sale.order.add_line` |
+| Adds a catalog article to a check | build the check | F01, F10, F11, F40 | `sale.order.add_line` |
 | Adds a service from Services to a check | build the check | F38 | `sale.order.add_service_line` |
-| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12 | `sale.order.add_combo_line` |
+| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12, F40, F42 | `sale.order.add_combo_line` |
 | Pays a service line with one of the client's vouchers (holds the session) | build the check and spend sessions | F27 | `sale.order.apply_voucher` |
 | Undoes a line's voucher (releases the session) | build the check and spend sessions | F27 | `sale.order.remove_voucher` |
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
@@ -1700,12 +1701,12 @@ the quick notes and what is refundable can be followed live.
 | Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |
-| Voids a line already sent to the kitchen, with a reason | void | F20 | `sale.order.void_line` |
+| Voids a line already sent to the kitchen, with a reason | void | F20, KITCHEN-F29 | `sale.order.void_line` |
 | Sends the pending lines to the kitchen | build the check | F20 | `sale.order.fire` |
 | Splits a check | build the check | F23 | `sale.order.split` |
 | Merges two checks | build the check | F24 | `sale.order.merge` |
-| Voids an open check (an empty one, with no live lines or payments, with just building the check) | void; empty: build the check | F18 | `sale.order.void` |
-| The same void of a check with something ordered or charged, the one a manager approves with their PIN | void | F18 | `sale.order.void_ordered` |
+| Voids an open check (an empty one, with no live lines or payments, with just building the check) | void; empty: build the check | F18, TABLE-F20 | `sale.order.void` |
+| The same void of a check with something ordered or charged, the one a manager approves with their PIN | void | F18, TABLE-F20 | `sale.order.void_ordered` |
 | Sets the check's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_discount`, `sale.order.set_discount_over_limit` |
 | Sets a line's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Sets a check's title (parking) | build the check | F17 | `sale.order.set_label` |
@@ -1750,7 +1751,7 @@ the quick notes and what is refundable can be followed live.
 | Document issued (`invoice.invoice.issued`) | Invoicing | Links by its source (`source = {type, sale_id, refund_id, void}`) a document that was left pending: a refund's corrective invoice goes back to that refund, a void's to the sale, the charge's ticket or invoice to the sale; the rest (manual invoice, F3 that replaces, corrective invoice of an invoice) belongs to Invoicing (F29) | `sale.sale.record_invoice` |
 
 ### What it needs from other apps
-<!-- from WORKBOOK.md sha256:629c4df7f2c2 -->
+<!-- from WORKBOOK.md sha256:272d015e0c61 -->
 
 - **Taxes** (required): the rule and the VAT calculation of each line when charging.
 - **Customers** (required): the sale's customer record and its search by name or, for whoever sees the
@@ -1783,6 +1784,14 @@ the quick notes and what is refundable can be followed live.
 - **Appointments** (optional): a check's appointment and what it booked, to charge its booked price
   (`appointment.appointment.get`).
 
+| From | What for | Flows | Service |
+|---|---|---|---|
+| Inventory | The articles that are tapped or searched for, with what is sold out, those with no VAT and their allergens | F07, F40 | `inventory.product.list` |
+| Inventory | The allergens of a menu's dishes | F40 | `inventory.product.get` |
+| Modifiers | The groups and options of an article, or of a dish in a menu | F11, F42 | `modifier.group.for_target` |
+| Menus and combos | The menus that can be sold, with their courses and choices | F12, F42 | `combo.combo.for_sale` |
+| VeriFactu | Whether tickets and invoices can be issued now, and if not, why | F07 | `verifactu.config.get` |
+
 ### Who uses it
 <!-- from WORKBOOK.md sha256:4722b9a4a381 -->
 
@@ -1798,7 +1807,7 @@ the quick notes and what is refundable can be followed live.
 | Kitchen | Opens the kitchen order of each round sent and brings it up to date when the check is charged in full, voided or one of its lines is voided (KITCHEN-F05, KITCHEN-F27 to KITCHEN-F29) | `sale.order.fired`, `sale.order.completed`, `sale.order.voided`, `sale.order.line_voided` |
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:6eeabb1c220e -->
+<!-- from WORKBOOK.md sha256:bbb3ec1467dc -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
@@ -1827,8 +1836,8 @@ their PIN or their badge ("An approval is needed", BASE-F84), once and for that 
 refunding a sale, voiding a line sent to the kitchen, deleting a check with something ordered, selling at
 an open price and discounts above the maximum. The approved action does everything the manager's does
 (also what Invoicing and Services move: the corrective invoice and the voucher sessions that go back) and
-stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the whole business's figures, the
-settings and creating payment methods are not approved.
+stays in **Employees › Approvals**, like the one the manager does by themselves (BASE-F85). Seeing everyone's
+sales, the whole business's figures, the settings and creating payment methods are not approved.
 
 The accountancy firm (`hub_accountant`) only reads: "See sales, checks, POS settings, sections and quick notes",
 "See the payment methods" and "See everyone's sales". It does not build checks, charge, void or refund, nobody

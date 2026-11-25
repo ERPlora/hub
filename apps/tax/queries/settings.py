@@ -6,7 +6,8 @@ from live.operations import operation
 
 from apps.tax.models import TaxSettings
 from apps.tax.queries.jurisdiction import business_jurisdiction, tax_kind_of
-from apps.tax.schemas import TAX_REGIONS, SettingsGetIn, TaxSettingsOut
+from apps.tax.schemas.jurisdiction import TAX_REGIONS
+from apps.tax.schemas.settings import SettingsGetIn, TaxSettingsOut
 
 
 def settings_row(settings: TaxSettings | None) -> dict:

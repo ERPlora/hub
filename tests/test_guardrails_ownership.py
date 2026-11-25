@@ -124,7 +124,7 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "Which repeating appointments of a separate copy the business lacks, asked only by the platform when it "
         "recovers the business.",
     ),
-    ("apps/online_booking/queries.py", "load_detail"): (
+    ("apps/online_booking/queries/bookings.py", "load_detail"): (
         PART_OF_THE_WORK,
         "The online booking the caller has just confirmed, completed, marked as not shown or cancelled, answered back "
         "to them.",
@@ -348,7 +348,7 @@ def test_a_planted_read_of_an_appointment_or_a_series_is_caught_with_the_real_de
         "def peek():\n    return Appointment.objects.all()\n\n\n"
         "def peek_series():\n    return Recurring.objects.all()\n"
     )
-    inbox = "apps/online_booking/queries.py"
+    inbox = "apps/online_booking/queries/bookings.py"
     root = tree_with(tmp_path, {"apps/appointment/queries/ownership.py": declared, inbox: peek})
     assert unscoped_reads(root) == {(inbox, "peek"), (inbox, "peek_series")}
 

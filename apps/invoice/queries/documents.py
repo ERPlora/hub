@@ -26,6 +26,7 @@ TAX_EXEMPT = pgettext_lazy("invoice", "Exempt")
 TAX_EXEMPT_CAUSE = _("Exempt (%(cause)s)")
 TAX_NOT_SUBJECT = pgettext_lazy("invoice", "Not subject")
 TAX_REVERSE_CHARGE = _("Reverse charge")
+WITHHOLDING = pgettext_lazy("invoice", "IRPF withholding %(rate)s")
 RECTIFIES_NOTE = _("Rectifies invoice %(number)s. Reason: %(reason)s")
 RECTIFIES_NOTE_NO_REASON = _("Rectifies invoice %(number)s.")
 
@@ -69,6 +70,17 @@ def _tax_label(item: dict, language: str) -> list[tuple[str, int, int]]:
             )
         )
     return rows
+
+
+def _withholding(invoice: Invoice, language: str) -> dict | None:
+    """What an invoice prints after its total: what is withheld of it and what is left to collect."""
+    if invoice.withholding_rate is None:
+        return None
+    return {
+        "label": WITHHOLDING % {"rate": _percent(invoice.withholding_rate, language)},
+        "amount": _money(-invoice.withholding_amount, invoice.currency, language),
+        "payable": _money(invoice.payable_amount, invoice.currency, language),
+    }
 
 
 def document_note(invoice: Invoice) -> str:
@@ -129,6 +141,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
         ],
         "base": money(invoice.base_amount),
         "total": money(invoice.total_amount),
+        "withholding": _withholding(invoice, language),
         "note": document_note(invoice),
         "qr": qr,
     }

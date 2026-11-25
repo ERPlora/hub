@@ -11,7 +11,7 @@ ready (``base.hub.by_slugs``): the e2e's global setup asks it before the first s
 Each has a database of its own (``<control>_<hex>``; there is no shared database), made here at once from
 ``<control>_template`` with every app's tables and every app on, under its ``hub_due`` lease (``migrate_hubs`` makes the
 template first); a local hub still on control's database gets its own the same way. ``a`` and ``b`` turn every
-app on, so while some app cannot live in a hub's own database (``base.tenancy.migrator.portable_apps``: its tables
+app on, so while some app cannot live in a hub's own database (``base.tenancy.migrator.app_sets.portable_apps``: its tables
 refer to control's users) it refuses and writes nothing. A local hub that already has its own keeps it.
 """
 
@@ -60,8 +60,8 @@ class Command(BaseCommand):
             for hub in found:
                 self.stdout.write(f"{hub.slug}: ready")
             return
-        every_app = migrator.hub_apps()
-        blocked = sorted(every_app - set(migrator.portable_apps()))
+        every_app = migrator.app_sets.hub_apps()
+        blocked = sorted(every_app - set(migrator.app_sets.portable_apps()))
         if blocked:
             raise CommandError(
                 f"{', '.join(blocked)} cannot have their tables in a hub's own database (they refer to control's "

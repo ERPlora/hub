@@ -5,19 +5,18 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.appointment.models import Appointment, AppointmentService, History
-from apps.appointment.schemas import (
-    AppointmentListIn,
+from apps.appointment.schemas.agenda import AppointmentListIn, AppointmentPage
+from apps.appointment.schemas.appointments import (
     AppointmentOut,
-    AppointmentPage,
     AppointmentRefIn,
     CountForServiceIn,
     CountOut,
     ForCustomerIn,
     HistoryIn,
     HistoryPage,
-    NoIn,
     VisitPage,
 )
+from apps.appointment.schemas.fields import NoIn
 from apps.customer.queries.reads import find_customer
 from apps.service.queries import catalog
 from apps.staff.queries.reads import resolve_member

@@ -317,8 +317,9 @@ EO_WORDS = Words(
 )
 
 
-#: The made-up WORKBOOK of the Hub's own screens: three of its screens, a section that is no screen (the bell) and a flow
-#: that is done on one of them, with a note for whoever maintains it.
+#: The made-up WORKBOOK of the Hub's own screens: three of its screens, a section that is no screen (the bell) and the
+#: tasks done on them: anyone's, those of some roles, the system's, one on a screen for everyone and on one that is not,
+#: and one that is not done.
 PLATFORM_ES = """\
 # Base
 Prefijo: BASE
@@ -353,9 +354,61 @@ Lo que ha pasado.
 
 ### BASE-F01 Ver el negocio de un vistazo
 Estado: hecho
+Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-1. Entra en el Inicio (BASE-F02).
+1. Entra en el Inicio.
+Implicados: BASE-F02
+
+### BASE-F02 Configurar lo que falta
+Estado: hecho
+Actor: propietario, administrador, responsable (el de guardia)
+Pantalla: Inicio · Resumen
+Pasos:
+1. Pulsa «Configurar».
+
+### BASE-F03 Empezar con una plantilla
+Estado: hecho
+Actor: propietario, administrador, personal de soporte
+Pantalla: Inicio · Resumen
+Pasos:
+1. Elige la plantilla.
+
+### BASE-F04 Vaciar el negocio
+Estado: hecho
+Actor: propietario
+Pantalla: Inicio · Resumen
+Pasos:
+1. Escribe el nombre del negocio.
+
+### BASE-F05 Mantener los paneles al día
+Estado: hecho
+Actor: sistema
+Pantalla: Inicio · Resumen
+Pasos:
+1. El panel cambia solo.
+
+### BASE-F06 Descargar un archivo
+Estado: hecho
+Actor: cualquier persona del negocio
+Pantalla: Sistema · Registros, Archivos
+Pasos:
+1. Pulsa «Descargar».
+Si falla: lo dice un aviso.
+
+### BASE-F07 Ver las cuentas de la gestoría
+Estado: parcial — falta la pantalla
+Actor: gestoría
+Pantalla: Archivos
+Pasos:
+1. Aún no se puede.
+
+### BASE-F08 Ver los archivos
+Estado: hecho
+Actor: empleado, gestoría
+Pantalla: Archivos
+Pasos:
+1. Abre la carpeta.
 
 ## Para quien lo mantiene
 
@@ -391,9 +444,61 @@ What has happened.
 
 ### BASE-F01 See the business at a glance
 Status: done
+Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-1. Go to the Home (BASE-F02).
+1. Go to the Home.
+Involved: BASE-F02
+
+### BASE-F02 Set up what is missing
+Status: done
+Actor: owner, administrator, manager (the one on duty)
+Screen: Home · Summary
+Steps:
+1. Tap "Set up".
+
+### BASE-F03 Start with a template
+Status: done
+Actor: owner, administrator, support staff
+Screen: Home · Summary
+Steps:
+1. Choose the template.
+
+### BASE-F04 Empty the business
+Status: done
+Actor: owner
+Screen: Home · Summary
+Steps:
+1. Write the business's name.
+
+### BASE-F05 Keep the panels up to date
+Status: done
+Actor: system
+Screen: Home · Summary
+Steps:
+1. The panel changes by itself.
+
+### BASE-F06 Download a file
+Status: done
+Actor: anyone of the business
+Screen: System · Logs, Files
+Steps:
+1. Tap "Download".
+If it fails: a notice says so.
+
+### BASE-F07 See the accountancy firm's accounts
+Status: partial — the screen is missing
+Actor: accountancy firm
+Screen: Files
+Steps:
+1. Not possible yet.
+
+### BASE-F08 See the files
+Status: done
+Actor: employee, accountancy firm
+Screen: Files
+Steps:
+1. Open the folder.
 """
 
 
@@ -430,7 +535,7 @@ def write_workbooks(root: Path, translations: dict[str, str], source: str = ES) 
     """``WORKBOOK.md`` in ``root`` and, for each language, its ``WORKBOOK.<language>.md`` current with it."""
     (root / "WORKBOOK.md").write_text(source, encoding="utf-8")
     for language, body in translations.items():
-        text = marked(catalog.user_part(source), body)
+        text = marked(catalog.workbooks.user_part(source), body)
         assert text is not None, f"the made-up {language} has other headings than its source"
         (root / f"WORKBOOK.{language}.md").write_text(text, encoding="utf-8")
     return root

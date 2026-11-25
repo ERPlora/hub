@@ -8,7 +8,7 @@ the Hub speaks today.
 import pytest
 from django.utils import translation
 
-from base.catalog import user_part
+from base.catalog.workbooks import user_part
 from base.tests.help_workbooks import (
     EN,
     EN_TABS,
@@ -163,6 +163,11 @@ class TestFlows:
         by_id = {flow.id: flow for flow in spanish().flows}
         assert by_id["TABLE-F03"].screens == ("floor_plan", "zones")
 
+    def test_a_tab_named_by_itself_and_by_its_window_is_one(self):
+        written = user_part(ES).replace("Pantalla: Cobrar mesa, Zonas", "Pantalla: Cobrar mesa, Plano de sala, Zonas")
+        by_id = {flow.id: flow for flow in parse(written, ES_TABS, ES_WORDS).flows}
+        assert by_id["TABLE-F03"].screens == ("floor_plan", "zones")
+
     def test_a_flow_without_what_happens_if_it_fails_has_it_empty(self):
         by_id = {flow.id: flow for flow in spanish().flows}
         assert (by_id["TABLE-F02"].steps, by_id["TABLE-F02"].failure) == ("1. Toca la mesa ocupada.\n2. Pulsa «Cobrar».", "")
@@ -200,6 +205,28 @@ class TestFlows:
         for internal in ("table.zone.created", "el nombre y el color", "responsable", "restaurante", "cobra la mesa 4"):
             assert internal not in published
 
+    def test_who_does_each_flow_published_or_not_goes_aside_as_the_file_names_them(self):
+        assert spanish().actors == {
+            "TABLE-F01": ("responsable",),
+            "TABLE-F02": ("empleado",),
+            "TABLE-F03": ("empleado",),
+            "TABLE-F04": ("responsable",),
+            "TABLE-F05": ("el sistema",),
+        }
+
+    @pytest.mark.parametrize(
+        ("actor", "named"),
+        [
+            ("Actor: propietario, administrador\n", ("propietario", "administrador")),
+            ("Actor: Empleado (la caja, a solas); por el asistente, todos\n", ("empleado", "por el asistente", "todos")),
+            ("Actor: propietario,\n  empleado\n", ("propietario", "empleado")),
+            ("", ()),
+        ],
+        ids=["several", "parentheses", "wrapped", "none"],
+    )
+    def test_it_is_cut_on_its_commas_without_what_goes_in_parentheses(self, actor, named):
+        flow = f"## Flujos\n\n### TABLE-F01 Crear una zona\nEstado: hecho\n{actor}Pantalla: Zonas\nPasos:\n1. Pulsa «+».\n"
+        assert parse(flow, ES_TABS, ES_WORDS).actors == {"TABLE-F01": named}
 
     @pytest.mark.parametrize(
         ("language", "key", "tab"), [("es", "Operaciones: ninguna", "Zonas"), ("en", "Operations: none", "Zones")]

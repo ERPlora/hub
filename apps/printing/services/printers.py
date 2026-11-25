@@ -15,8 +15,10 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import Printer, PrintJob, Settings
-from apps.printing.queries import DEFAULT_FIELDS, actor, current_settings, find_printer, printer_row
 from apps.printing.queries.job_printer import job_printer
+from apps.printing.queries.jobs import actor
+from apps.printing.queries.printers import find_printer, printer_row
+from apps.printing.queries.settings import DEFAULT_FIELDS, current_settings
 from apps.printing.schemas import PrinterIn, PrinterOut, PrinterUpdateIn
 from apps.printing.services.writes import _queued
 

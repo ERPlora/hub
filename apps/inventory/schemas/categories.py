@@ -7,7 +7,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints
 
 from apps.inventory.schemas.fields import MAX_BATCH, TAX_RATE, CategoryRefIn, Description, Page, PageIn, TaxKey, _text
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 
 CategorySort = Literal[
     "name",

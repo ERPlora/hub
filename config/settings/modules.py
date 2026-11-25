@@ -25,6 +25,9 @@ LIVE = {
     # Where live.operations.atomic() opens (a services.py's savepoint): the active use_hub's alias, inside an operation
     # its transaction's; without a context HubContextMissing, never control's by omission.
     "current_database": "base.tenancy.context.current_alias",
+    # Inside each command's own transaction, once it ran: what a manager may approve, done by whoever may do it
+    # themselves, goes on the record of approvals.
+    "after_command": "base.approval_note.note",
     # A cut of the database (a restart, AWS's maintenance, the Blue/Green switchover;
     # BASE-F111): a read, and what was not applied, waits and tries again up to this long in the whole request, far below
     # the 120 s of the load balancer. What tries again on its own gets its 503 at once: the SaaS's /internal, and
@@ -86,6 +89,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "kitchen",
     "modifier",
     "online_booking",
+    "online_order",
     "payment",
     "pricing",
     "printing",

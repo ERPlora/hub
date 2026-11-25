@@ -26,7 +26,7 @@ from live.outbox import record_event
 from apps.appointment.models import Appointment
 from apps.appointment.queries.booking import bookable_members
 from apps.appointment.queries.business import now
-from apps.appointment.schemas import AppointmentCreateIn, CancelIn as AppointmentCancelIn, SettingsIn as RulesIn
+from apps.appointment.schemas import booking as diary_booking, changes as diary_changes, settings as diary_settings
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries.reads import business_country
@@ -34,23 +34,11 @@ from apps.customer.schemas.cards import CustomerIn
 from apps.customer.search import normalize
 from apps.online_booking.events import BOOKING_CREATED, SETTINGS_UPDATED
 from apps.online_booking.models import Booking, Settings
-from apps.online_booking.queries import (
-    ONLINE,
-    PUBLIC,
-    RULE_FIELDS,
-    S,
-    chosen_member,
-    delegated,
-    find_booking,
-    find_by_token,
-    hash_token,
-    load_detail,
-    page_settings,
-    public_booking_out,
-    services_to_book,
-    settings_out,
-    visitor_key,
-)
+from apps.online_booking.queries.bookings import ONLINE, S, find_booking, load_detail
+from apps.online_booking.queries.links import find_by_token, public_booking_out
+from apps.online_booking.queries.offer import chosen_member, services_to_book
+from apps.online_booking.queries.settings import RULE_FIELDS, page_settings, settings_out
+from apps.online_booking.queries.visitors import PUBLIC, delegated, hash_token, visitor_key
 from apps.online_booking.schemas import (
     BookedOut,
     BookingOut,
@@ -329,7 +317,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
         record_event(ctx, SETTINGS_UPDATED, {})
     if rules:
         # The diary's own operation, with the caller's right to change its settings: all or nothing.
-        get("appointment.settings.update")(ctx, RulesIn(**rules))
+        get("appointment.settings.update")(ctx, diary_settings.SettingsIn(**rules))
     return settings_out(ctx, settings)
 
 
@@ -407,7 +395,7 @@ def _book(
     create = get("appointment.appointment.create")
     refusals: list[Conflict] = []
     for person in [member] if member else bookable_members(services):
-        booking = AppointmentCreateIn.model_validate(
+        booking = diary_booking.AppointmentCreateIn.model_validate(
             {
                 "customer_id": str(card.id),
                 "services": [{"service_id": str(service.id)} for service in services],
@@ -531,7 +519,7 @@ def public_cancel(ctx: OperationContext, data: PublicCancelIn) -> dict:
     cancel = get("appointment.appointment.cancel")
     cancel(
         delegated(ctx),
-        AppointmentCancelIn(
+        diary_changes.CancelIn(
             id=appointment.id,
             on_behalf_of_customer=True,
             customer_id=appointment.customer_id,

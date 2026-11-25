@@ -22,6 +22,7 @@ from django.utils import translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
+from pydantic import ValidationError
 
 from apps.invoice.tests.conftest import catalog_of
 from apps.sale.tests.conftest import db_dsn, make_user
@@ -70,6 +71,15 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
+
+
+def errors(schema, data) -> dict[str, str]:
+    with pytest.raises(ValidationError) as caught:
+        schema.model_validate(data)
+    return {
+        ".".join(str(p) for p in e["loc"]) or "__root__": e["msg"]
+        for e in caught.value.errors()
+    }
 
 
 def pin_clock(monkeypatch, instant: dt.datetime) -> None:

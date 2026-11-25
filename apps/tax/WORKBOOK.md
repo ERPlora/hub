@@ -642,7 +642,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `test_a_component_stays_right_under_its_root_in_a_descending_list`.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
-  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries/`, `services.py`, `events.py`,
+  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas/`, `queries/`, `services.py`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero, y las páginas
   (`frontend/`: Categorías, Reglas, Alias y Ajustes, con sus diálogos) con su Vitest y su e2e por flujo en
   tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules`, `tax-employee`,
@@ -695,7 +695,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Ninguna otra app lo republica con una operación propia. En la SPA, `useTaxKind()` y `useTaxName()` de `frontend/composables/useTaxName.ts` lo leen
   con una sola suscripción por pestaña y dan la familia y su nombre corto («IVA», «IGIC», «IPSI»,
   `tax.common.taxName.*`); `taxNameKey(familia)` nombra cualquier otra (la que declararon las ventas de un
-  periodo). En el servidor, `schemas.TAX_KIND_NAMES` da el mismo nombre corto a un mensaje («Falta configurar
+  periodo). En el servidor, `schemas.jurisdiction.TAX_KIND_NAMES` da el mismo nombre corto a un mensaje («Falta configurar
   su IGIC.», el 409 `sale.tax_category_missing` de Ventas). Todo rol que vende o factura tiene `tax.view`.
 - **Solape**: crear, reactivar, poner fecha de fin y el lote bloquean la fila de la categoría
   (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
@@ -721,7 +721,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   de alias acepta Origen y la de categoría, `is_system` (solo por la API). `expose_api`: `tax.category.list`/`get`, `tax.rule.list`, `tax.alias.list`/`resolve`, `tax.rule.end` y
   `tax.rule.activate`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en las de
-  reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas.py` su
+  reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas/` su
   `description` (el JSON Schema de la herramienta). La tarjeta de confirmación nombra cada dato por el
   `verbose_name` del modelo; el que ningún modelo nombra (`tax_category_key`) lleva un `title` en inglés con
   `gettext_noop` y su español en el catálogo de Impuestos, la palabra de las pantallas («Categoría»). Lo
@@ -749,7 +749,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   (`tests/test_assistant_rate_rule.py`). Con una palabra propia para «regla» en «el IVA de…» subiría la regla de
   descuento de Tarifas, que también es una regla.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
-  con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
+  con la marca `refers` de `schemas/references.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
   (`ai=INTERNAL`, sin API ni consulta viva): solo nombra la regla en la tarjeta; el modelo encuentra las reglas en
   su lista. Su `label` dice la categoría (su nombre en el idioma de quien pregunta), la etiqueta de un componente, el
   país por su nombre (y la región por su código, como la columna Región) y el tipo como lo escribe ese idioma

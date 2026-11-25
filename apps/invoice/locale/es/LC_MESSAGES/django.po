@@ -332,6 +332,16 @@ msgctxt "invoice"
 msgid "due date"
 msgstr "vencimiento"
 
+#: models.py
+msgctxt "invoice"
+msgid "IRPF withholding (%)"
+msgstr "retención de IRPF (%)"
+
+#: models.py
+msgctxt "invoice"
+msgid "IRPF withholding"
+msgstr "retención de IRPF"
+
 #: models.py:236
 msgid "issued at"
 msgstr "emitida el"
@@ -646,6 +656,18 @@ msgstr ""
 "El registro de VeriFactu admite como mucho %(max)s caracteres aquí: acórtalo"
 " (en la ficha del cliente)."
 
+#: platform_series.py:20
+msgid "erplora.com numbers the ERP and ERPR series: use another series."
+msgstr "Las series ERP y ERPR las numera erplora.com: usa otra serie."
+
+#: platform_series.py:24
+msgid ""
+"erplora.com issued this invoice and corrects it, in its ERPR series: it "
+"cannot be corrected by hand here."
+msgstr ""
+"Esta factura la emitió erplora.com y allí se corrige, en su serie ERPR: aquí "
+"no se puede corregir a mano."
+
 #: services/manual.py:27
 msgid "This series is not active: activate it or choose another one."
 msgstr "Esta serie no está activa: actívala o elige otra."
@@ -701,6 +723,22 @@ msgstr ""
 #: services/manual.py
 msgid "The due date cannot be before the invoice's date."
 msgstr "El vencimiento no puede ser anterior a la fecha de la factura."
+
+#: services/manual.py
+msgid ""
+"IRPF withholding is a Spanish tax: a business outside Spain does not "
+"withhold it."
+msgstr ""
+"La retención de IRPF es un impuesto español: un negocio de fuera de España no "
+"la practica."
+
+#: services/manual.py
+msgid ""
+"A ticket carries no IRPF withholding: issue an invoice (F1) with the "
+"customer's details."
+msgstr ""
+"Un tique no lleva retención de IRPF: emite una factura (F1) con los datos del "
+"cliente."
 
 #: services/manual.py:40
 #, python-format
@@ -893,6 +931,17 @@ msgstr "Fecha de operación"
 msgctxt "invoice"
 msgid "Due date"
 msgstr "Vencimiento"
+
+#: queries/documents.py
+#, python-format
+msgctxt "invoice"
+msgid "IRPF withholding %(rate)s"
+msgstr "Retención IRPF %(rate)s"
+
+#: templates/invoice/invoice.html
+msgctxt "invoice"
+msgid "Amount due"
+msgstr "Total a pagar"
 
 #: templates/invoice/invoice.html:79
 msgid "Bill to"
@@ -1117,3 +1166,18 @@ msgstr "Cuota de recargo"
 msgctxt "invoice export"
 msgid "Total"
 msgstr "Total"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Withholding %"
+msgstr "Retención %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Withholding"
+msgstr "Retención"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Amount due"
+msgstr "Total a pagar"

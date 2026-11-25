@@ -95,3 +95,19 @@ def make_product(
 def make_category(name: str = "Mains"):
     """A category of the real Inventory app, made through its own operation."""
     return run("inventory.category.create", {"name": name})
+
+
+def group(name, **fields):
+    return run("modifier.group.create", {"name": name, **fields})
+
+
+def option(group_name, name, **fields):
+    return run("modifier.option.create", {"group": group_name, "name": name, "price_delta": 0, **fields})
+
+
+def link(group_name, **target):
+    return run("modifier.link.attach", {"group": group_name, **target})
+
+
+def names(page) -> list[str]:
+    return [row.name for row in page.rows]

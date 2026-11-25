@@ -31,7 +31,8 @@ from apps.invoice.schemas.fields import (
     _text,
     check_tax_id,
 )
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.invoice.withholding import RATES
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.schemas.assistant import IN_OWN_WORDS
 
 RATE_OR_CATEGORY = _("Enter the VAT % of the line, or its tax category.")
@@ -45,6 +46,7 @@ VERIFACTU_STATUS = (
 #: What the list's status filter takes: the statuses an invoice keeps, and those past their due date.
 StatusFilter = Literal[*Invoice.Status.values, "overdue"]
 SourceType = Literal[*Invoice.Source.values]
+WithholdingRate = Literal[*RATES]
 
 
 # ── Inputs: invoices ────────────────────────────────────────────────────────────────────────────
@@ -197,6 +199,11 @@ class InvoiceCreateIn(RecipientIn):
     due_date: dt.date | None = Field(
         None, description="The day it has to be paid by (YYYY-MM-DD), if it says one: never before its date."
     )
+    withholding_rate: WithholdingRate | None = Field(
+        None,
+        description="IRPF the customer withholds, % of the taxable base, if any: 15, 7, 1 or 19. It only takes from what is "
+        "collected. Never on a ticket.",
+    )
     notes: _text(2000) = Field("", description="Free notes printed on the invoice.")
     lines: list[ManualLineIn] = Field(
         min_length=1,
@@ -318,7 +325,20 @@ class InvoiceRowOut(Schema):
     can_substitute: bool
 
 
-class InvoiceOut(InvoiceRowOut, DocumentIssuerOut):
+class WithholdingOut(Schema):
+    """What the customer withholds of a document, and what is left to collect."""
+
+    withholding_rate: Decimal | None = Field(description="IRPF withheld, % of the base; none if nothing is withheld.")
+    withholding_amount: int = Field(
+        description="IRPF withheld, cents, with the document's sign: it takes from what is collected, never from the total.",
+        json_schema_extra={"money": True},
+    )
+    payable_amount: int = Field(
+        description="What is collected: the total without what is withheld, cents.", json_schema_extra={"money": True}
+    )
+
+
+class InvoiceOut(InvoiceRowOut, DocumentIssuerOut, WithholdingOut):
     series_id: UUID
     sequence: int
     operation_date: dt.date

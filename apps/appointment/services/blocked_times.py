@@ -12,12 +12,8 @@ from apps.appointment import engine, events
 from apps.appointment.models import BlockedTime
 from apps.appointment.queries.blocked_times import BLOCK_NOT_FOUND, blocked_out
 from apps.appointment.queries.business import read_moment
-from apps.appointment.schemas import (
-    BlockedTimeCreateIn,
-    BlockedTimeOut,
-    BlockedTimeRefIn,
-    DeletedOut,
-)
+from apps.appointment.schemas.blocked_times import BlockedTimeCreateIn, BlockedTimeOut, BlockedTimeRefIn
+from apps.appointment.schemas.fields import DeletedOut
 from apps.appointment.services.writes import _actor
 from apps.staff.queries.reads import resolve_member
 from base.business import business_zone
