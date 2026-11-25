@@ -11,18 +11,18 @@ from django.db.models import F, Func, Value
 ADDRESS = r"^[^@\s]+@[^@\s]+$"
 
 
-def _cut(rows, field: str) -> None:
-    rows.filter(**{f"{field}__regex": ADDRESS}).update(**{field: Func(F(field), Value("@"), Value(1), function="split_part")})
+def _cut(schema_editor, model, field: str) -> None:
+    rows = model.objects.using(schema_editor.connection.alias).filter(**{f"{field}__regex": ADDRESS})
+    rows.update(**{field: Func(F(field), Value("@"), Value(1), function="split_part")})
 
 
 def accounts_without_address(apps, schema_editor):
-    _cut(apps.get_model("auth", "User").objects.using(schema_editor.connection.alias), "first_name")
+    _cut(schema_editor, apps.get_model("auth", "User"), "first_name")
 
 
 def people_without_address(apps, schema_editor):
-    alias = schema_editor.connection.alias
-    _cut(apps.get_model("base", "HubUser").objects.using(alias), "name")
-    _cut(apps.get_model("base", "Profile").objects.using(alias), "first_name")
+    _cut(schema_editor, apps.get_model("base", "HubUser"), "name")
+    _cut(schema_editor, apps.get_model("base", "Profile"), "first_name")
 
 
 class Migration(migrations.Migration):
