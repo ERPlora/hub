@@ -21,20 +21,10 @@ from live.outbox import channel_for
 
 from apps.tax import events
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
-from apps.tax.schemas import (
-    AliasIn,
-    AliasOut,
-    CategoryIn,
-    CategoryOut,
-    RuleBulkIn,
-    RuleBulkOut,
-    RuleEndIn,
-    RuleIn,
-    RuleOut,
-    RuleRefIn,
-    TaxSettingsIn,
-    TaxSettingsOut,
-)
+from apps.tax.schemas.aliases import AliasIn, AliasOut
+from apps.tax.schemas.categories import CategoryIn, CategoryOut
+from apps.tax.schemas.rules import RuleBulkIn, RuleBulkOut, RuleEndIn, RuleIn, RuleOut, RuleRefIn
+from apps.tax.schemas.settings import TaxSettingsIn, TaxSettingsOut
 
 from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import in_a_thread

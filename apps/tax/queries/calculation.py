@@ -13,7 +13,7 @@ from apps.tax.models import TaxRule
 from apps.tax.queries.jurisdiction import _jurisdiction, asked_jurisdiction, business_today, tax_kind_of
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.resolution import GENERAL_REGIME, resolve_tax
-from apps.tax.schemas import CalculateIn, CalculationOut
+from apps.tax.schemas.calculation import CalculateIn, CalculationOut
 
 NO_RATE = _("No tax rule applies to this category in this country.")
 

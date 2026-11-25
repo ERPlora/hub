@@ -149,7 +149,7 @@ def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
     assert {app["id"]: (app["state"], app["chosen"]) for app in document["apps"]} == {
         label: ("on", label in roots) for label in graph
     }
-    assert (document["max_apps"], document["enabled"]) == (None, 17)
+    assert (document["max_apps"], document["enabled"]) == (None, 18)
 
 
 @HUB_DB
@@ -544,18 +544,18 @@ def test_a_lower_plan_turns_nothing_off_and_only_refuses_one_more():
     graph = activation.module_graph()
     before = by_id(app_list())
 
-    with_limit(A.key, 5)  # bought down: 17 chosen, 5 allowed
+    with_limit(A.key, 5)  # bought down: 18 chosen, 5 allowed
 
     after = by_id(app_list())
     assert {label: (app["state"], app["chosen"]) for label, app in after.items()} == {
         label: (app["state"], app["chosen"]) for label, app in before.items()
     }
-    assert app_list()["enabled"] == 17 and app_list()["max_apps"] == 5
+    assert app_list()["enabled"] == 18 and app_list()["max_apps"] == 5
     disable("task")
     with pytest.raises(OperationError) as refused:
         enable("task")
     assert refused.value.code == "base.app_limit_reached"
-    assert refused.value.envelope()["error"]["enabled"] == 16
+    assert refused.value.envelope()["error"]["enabled"] == 17
     assert len(graph) == len(after)
 
 
@@ -901,5 +901,5 @@ def test_an_owner_turns_one_off_over_http_and_a_cashier_is_refused(client, make_
     assert {key: over.json()["error"][key] for key in ("code", "max_apps", "enabled")} == {
         "code": "base.app_limit_reached",
         "max_apps": 1,
-        "enabled": 16,
+        "enabled": 17,
     }

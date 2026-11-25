@@ -58,7 +58,7 @@ WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/spa/assets/"
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    "base.catalog.AppImagesFinder",
+    "base.catalog.static_files.AppImagesFinder",
 ]
 
 # The hub's file store (base.storage): the S3 bucket Terraform names, with the task role's

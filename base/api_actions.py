@@ -26,10 +26,10 @@ UPDATE_VERBS = frozenset(
         "initiate", "link", "link_customer", "link_order", "mark_abandoned", "mark_completed", "mark_no_show",
         "mark_paid", "mark_read", "mark_sent", "materialize", "merge", "move", "no_show", "note_bill", "notify", "open",
         "park", "place", "print", "print_bill", "print_label", "publish", "ready", "recall", "receive", "redeem",
-        "register", "release", "release_unconfirmed", "remove_voucher", "rename", "reorder", "reprint", "reschedule",
-        "restore", "retire", "retry", "save", "seat", "send", "serve", "set", "set_active", "set_guests", "set_image",
-        "set_rush", "set_sold_out", "set_status", "split", "start", "test", "transfer", "unpublish", "update",
-        "upload_image", "upload_logo", "void", "write_off",
+        "regenerate", "register", "release", "release_unconfirmed", "remove_voucher", "rename", "reorder", "reprint",
+        "reschedule", "restore", "retire", "retry", "save", "seat", "send", "serve", "set", "set_active", "set_guests",
+        "set_image", "set_rush", "set_sold_out", "set_status", "split", "start", "test", "transfer", "unpublish",
+        "update", "upload_image", "upload_logo", "void", "write_off",
     }
 )
 _BY_VERB = {

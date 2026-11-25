@@ -17,7 +17,7 @@ reading (``Bundle.dropped``).
   copies the photo under a new name through the app's own upload, and a row whose image cannot be set loads without
   it and is told (:func:`photos._load_image`).
 - The catalogue (``seeds``): the seeds of ``base/seeds/<vertical>.<language>.json``, one per vertical and language;
-  what a seed turns on is its vertical's apps (``base.catalog.template_apps``), what it brings is its own data.
+  what a seed turns on is its vertical's apps (``base.catalog.verticals.template_apps``), what it brings is its own data.
 - :func:`loading.apply` loads a blueprint app by app, each part on its own: a row an app refuses fails alone and is
   told, the rest loads, and loading again duplicates nothing (each dataset skips what is already there). Personal
   data (the customers) travels only in a backup, never in a template. Before it, ``base.blueprint.import`` turns on

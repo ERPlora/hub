@@ -18,7 +18,7 @@ from apps.tax.queries.calculation import _HUNDRED
 from apps.tax.queries.jurisdiction import business_jurisdiction, business_today
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.resolution import _in_force
-from apps.tax.schemas import (
+from apps.tax.schemas.rules import (
     FACTORY_COUNTRIES,
     RuleCountriesIn,
     RuleCountriesOut,
@@ -83,8 +83,8 @@ def rule_label(rule: TaxRule) -> str:
     ai=INTERNAL,
 )
 def get_rule(ctx: OperationContext, params: RuleGetIn) -> dict:
-    """One rule, active or deactivated, with its name: what names a rule on the assistant's card (``schemas.A_RULE``);
-    the model and the screens read the rules by their list."""
+    """One rule, active or deactivated, with its name: what names a rule on the assistant's card
+    (``schemas.references.A_RULE``); the model and the screens read the rules by their list."""
     rule = load_rule(params.id)
     if rule is None:
         raise NotFound(RULE_NOT_FOUND)

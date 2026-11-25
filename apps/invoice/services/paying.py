@@ -9,6 +9,7 @@ from live.outbox import record_event
 
 from apps.invoice import events
 from apps.invoice.models import Invoice
+from apps.invoice.queries.platform_reading import status_of
 from apps.invoice.queries.rows import find_invoice
 from apps.invoice.schemas.invoices import InvoiceOut, MarkPaidIn
 from apps.invoice.services.writes import _detail, _now
@@ -46,7 +47,7 @@ CANNOT_MARK_PAID = _(
 )
 def mark_paid(ctx: OperationContext, data: MarkPaidIn) -> dict:
     invoice = find_invoice(ctx, data.invoice_id, data.number, lock=True)
-    if invoice.is_rectification or invoice.status != Invoice.Status.ISSUED:
+    if invoice.is_rectification or status_of(invoice) != Invoice.Status.ISSUED:
         raise Conflict(str(CANNOT_MARK_PAID), code="invoice.cannot_mark_paid")
     invoice.status = Invoice.Status.PAID
     invoice.paid_at = _now()

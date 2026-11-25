@@ -25,7 +25,7 @@ from live.operations import get
 
 from apps.verifactu.queries.app_hooks import enable_refusal
 from base import activation, apps_on, blueprint, events as base_events, registry, services
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 from base.models.activation import AppActivation
 from base.models import Hub, Membership
 from base.models.blueprints import ImportBatch

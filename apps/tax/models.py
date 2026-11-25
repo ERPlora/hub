@@ -247,7 +247,7 @@ class TaxAlias(UUIDModel):
         SHIPPED = "shipped", _("Shipped")
         LEARNED = "learned", _("Learned")
 
-    # Normalised: lowercase, single spaces, no spaces at the ends (schemas.normalize_text).
+    # Normalised: lowercase, single spaces, no spaces at the ends (schemas.aliases.normalize_text).
     alias = models.CharField(_("alias"), max_length=200, unique=True)
     category = models.ForeignKey(
         TaxCategory,

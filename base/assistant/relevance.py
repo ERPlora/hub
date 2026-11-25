@@ -15,11 +15,10 @@ DOCS_SEARCH = "base.docs.search"
 #: Always offered when the person may read them: the checklist, the business's own data and the documentation (a
 #: how-to question, «¿cómo abro la caja?», shares no word with its tool).
 ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH)
-#: The assistant's own search of the person's whole catalogue, last in every turn: a turn offers only the tools its
-#: words name best, so the model looks for the one it lacks and the next round offers what it found.
+#: The assistant's own search of the person's whole catalogue, last in every turn (``live.assistant.offered``): a turn
+#: offers only the tools its words name best, so the model looks for the one it lacks and the next round offers what it
+#: found.
 FIND_TOOLS = "base.assistant.find_tools"
-#: The tools a search finds at most.
-FOUND = 10
 #: The places a turn gives the tools before the search: what is always at hand, what the model searched for and the
 #: ones the person's words name best. Fewer leave out tools the QA's requests need; more only send tools nobody asked
 #: for, and every tool sent costs tokens in every call of the request.
@@ -108,21 +107,15 @@ def ranking(tools: dict[str, Operation]) -> MappingProxyType:
 
 
 def found(tools: dict[str, Operation], query: str, language: str) -> list[Operation]:
-    """The tools of ``tools`` that do the task ``query`` describes, best first, at most ``FOUND``: ranked as a turn
-    ranks the person's words, without what every turn offers anyway (``ALWAYS``)."""
-    ranked = shared.relevant(tools, [query], language, **{**ranking(tools), "always": ()})
-    return [op for op in ranked if op.name not in ALWAYS][:FOUND]
+    """The tools of ``tools`` that do the task ``query`` describes, as a turn ranks the person's words, without
+    ``ALWAYS`` (``live.assistant.found``)."""
+    return shared.found(tools, query, language, **ranking(tools))
 
 
 def relevant(
     tools: dict[str, Operation], texts: Iterable[str], language: str, *, searched: Iterable[str] = ()
 ) -> list[Operation]:
-    """The tools of what ``texts`` ask, best first, in ``PLACES`` (``live.assistant.relevant``), as ``ranking`` says,
-    with the search of the rest last (``FIND_TOOLS``: it never ranks, so no tool loses its place to it); what the
-    model ``searched`` for goes right after ``ALWAYS``, the latest search first, so the tool it found is never left
-    out."""
-    ranked = shared.relevant(tools, texts, language, **ranking(tools))
-    searches = [op for query in reversed(list(searched)) for op in found(tools, query, language)]
-    first = [op for op in ranked if op.name in ALWAYS]
-    kept = list({op.name: op for op in [*first, *searches, *ranked]}.values())[:PLACES]
-    return [*kept, get(FIND_TOOLS)]
+    """The tools of what ``texts`` ask, best first, in ``PLACES``, as ``ranking`` says, with the search of the rest last
+    (``FIND_TOOLS``); what the model ``searched`` for goes right after ``ALWAYS`` (``live.assistant.offered``)."""
+    search = shared.ToolSearch(get(FIND_TOOLS), PLACES)
+    return shared.offered(tools, texts, language, search=search, searched=searched, **ranking(tools))
