@@ -15,7 +15,7 @@ const PLAN_URL = 'http://localhost:8001/store/plans?business=0199a1b2-0000-7000-
 
 const FIGURES: PlanUsage = {
   known: true,
-  demo: false,
+  demo: false, platform: false,
   plan_slug: 'starter',
   people: { used: 3, limit: 5 },
   devices: { used: 1, limit: 3 },
