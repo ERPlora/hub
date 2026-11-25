@@ -125,6 +125,16 @@ describe('InvoiceDetailPage: what it shows', () => {
     expect(s.find('invoice-detail-due-date').element.previousElementSibling?.textContent).toBe('Due date');
   });
 
+  it.each([
+    ['en', 'Paid'],
+    ['es', 'Pagada'],
+  ] as const)('one erplora.com issued says it comes from there, already paid, with nothing left to do (%s)', async (locale, paid) => {
+    const s = await setup({ locale });
+    await s.show({ ...INVOICE, source_type: 'platform', status: 'paid', can_mark_paid: false, can_rectify: false });
+    expect([s.field('source'), s.field('status')]).toEqual(['erplora.com', paid]);
+    expect(s.wrapper.find('.invoice-detail__actions').findAll('ion-button')).toHaveLength(0);
+  });
+
   it('names the issuer with the tax ID its document prints: the EU VAT number of one in the ROI', async () => {
     const s = await setup();
     await s.show({ ...INVOICE, issuer_vat_number: 'ESB12345674' });

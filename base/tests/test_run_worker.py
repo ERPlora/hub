@@ -24,7 +24,7 @@ from django.core.management import CommandError, call_command
 from django.db import connections
 
 from base import catalog, worker
-from base.catalog import SharedSchemaNotReady
+from base.catalog.errors import SharedSchemaNotReady
 from shared.models import App, AppDoc
 
 HUB_DIR = Path(__file__).resolve().parent.parent.parent
@@ -120,7 +120,7 @@ def test_a_sigterm_while_it_waits_for_the_shared_schema_exits_0(monkeypatch, gua
         sigterm.start()
         raise SharedSchemaNotReady(["shared.app", "shared.app_doc"])
 
-    monkeypatch.setattr(catalog, "register_apps", register_apps)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", register_apps)
     started = time.monotonic()
     try:
         out = run_worker()  # no CommandError: exit code 0

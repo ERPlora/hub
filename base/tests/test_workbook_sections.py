@@ -4,7 +4,7 @@ import hashlib
 
 import pytest
 
-from base.tests.test_catalog import NOT_CLOSING
+from base.tests.apps_on_disk import NOT_CLOSING
 from base.workbook_sections import behind, current_body, mark, marked, prose_lines, sections
 
 SOURCE = """\

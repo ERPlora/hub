@@ -26,23 +26,11 @@ from apps.tax.queries.jurisdiction import business_jurisdiction, business_today,
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.rules import RULE_NOT_FOUND, load_rule, parent_candidates, rule_row
 from apps.tax.queries.settings import settings_row
-from apps.tax.schemas import (
-    REGION_NOT_AVAILABLE,
-    TAX_REGIONS,
-    AliasIn,
-    AliasOut,
-    CategoryIn,
-    CategoryOut,
-    RuleBulkIn,
-    RuleBulkOut,
-    RuleEndIn,
-    RuleFields,
-    RuleIn,
-    RuleOut,
-    RuleRefIn,
-    TaxSettingsIn,
-    TaxSettingsOut,
-)
+from apps.tax.schemas.aliases import AliasIn, AliasOut
+from apps.tax.schemas.categories import CategoryIn, CategoryOut
+from apps.tax.schemas.jurisdiction import TAX_REGIONS
+from apps.tax.schemas.rules import RuleBulkIn, RuleBulkOut, RuleEndIn, RuleFields, RuleIn, RuleOut, RuleRefIn
+from apps.tax.schemas.settings import REGION_NOT_AVAILABLE, TaxSettingsIn, TaxSettingsOut
 
 CENTS = Decimal("0.01")
 

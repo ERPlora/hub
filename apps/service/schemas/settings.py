@@ -7,7 +7,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 
 from apps.service.schemas.fields import Buffer, Code, In, Minutes
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 
 
 class SettingsIn(In):

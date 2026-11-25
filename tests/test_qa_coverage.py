@@ -16,7 +16,7 @@ from django.core.management.base import CommandError
 from live.operations import registry
 
 from base import qa_assistant, qa_coverage
-from base.catalog import known_verticals
+from base.catalog.verticals import known_verticals
 from base.qa_coverage import Walk
 
 REPO = Path(__file__).resolve().parent.parent

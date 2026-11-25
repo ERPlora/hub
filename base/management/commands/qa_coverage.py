@@ -37,7 +37,7 @@ class Command(BaseCommand):
         root = Path(settings.BASE_DIR)
         walks = _walks(Path(ledger)) if ledger else None
         flows = qa_coverage.workbook_flows(root)
-        journeys = qa_coverage.read_journeys(root, catalog.known_verticals())
+        journeys = qa_coverage.read_journeys(root, catalog.verticals.known_verticals())
         problems = [f"{journey.name}: {problem}" for journey in journeys for problem in journey.problems]
         for problem in [*problems, *qa_coverage.citation_problems(flows, journeys)]:
             self.stdout.write(f"! {problem}")

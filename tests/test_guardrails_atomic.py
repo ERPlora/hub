@@ -69,7 +69,7 @@ CONTROL_LOGIN = (
 
 #: ``<path>::<function>`` → why Django's atomic (or the rest of its transactions) on its alias is the one meant there.
 DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
-    "base/catalog.py::register_apps": (
+    "base/catalog/register_apps.py::register_apps": (
         "It writes shared.app and shared.app_doc on the `shared` alias, which it names (SHARED_CATALOG_REASON of "
         "tests/test_guardrails.py): no hub's database and no operation."
     ),
@@ -345,7 +345,7 @@ def test_the_scanner_lets_lives_atomic_and_the_rest_of_transaction_be():
 def test_the_scan_reads_the_apps_and_base_but_not_the_tenancy_the_migrations_nor_the_tests():
     files = {str(path) for path in scanned_files()}
 
-    assert {"apps/sale/services/checkout.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog.py"} <= files
+    assert {"apps/sale/services/checkout.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog/register_apps.py"} <= files
     assert not any(path.startswith("base/tenancy/") for path in files)
     assert not any("/migrations/" in path or "/tests/" in path for path in files)
 

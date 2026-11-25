@@ -259,9 +259,9 @@ def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a,
 
 def run_the_loop_once(monkeypatch) -> None:
     from base import catalog
-    from base.catalog import RegisterResult
+    from base.catalog.register_apps import RegisterResult
 
-    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
     monkeypatch.setattr(worker_data, "_measured", None)
     stop = threading.Event()
     assert worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set()) == 0

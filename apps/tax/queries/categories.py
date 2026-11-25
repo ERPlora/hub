@@ -14,7 +14,7 @@ from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxCategory
 from apps.tax.queries.jurisdiction import asked_jurisdiction, business_today
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.resolution import current_rates
-from apps.tax.schemas import CategoryGetIn, CategoryListIn, CategoryOut, CategoryPage
+from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn, CategoryOut, CategoryPage
 from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")

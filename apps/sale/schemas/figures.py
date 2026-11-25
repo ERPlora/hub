@@ -6,7 +6,7 @@ from uuid import UUID
 
 from ninja import Field, Schema
 
-from apps.tax.schemas import TerritoryTaxKind
+from apps.tax.schemas.jurisdiction import TerritoryTaxKind
 
 
 class PeriodIn(Schema):

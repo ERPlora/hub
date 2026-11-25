@@ -74,7 +74,7 @@ def test_every_module_of_the_deployment_from_its_own_config():
 def test_each_app_shows_the_icon_the_shell_paints_for_it():
     """The icon of an app is its first menu entry's, as the launcher and «My apps» paint it (registered in the shell:
     frontend/icons.test.ts); without a menu, the shell's own for an app. The module's ``icon`` is the store's, baked
-    apart for erplora.com (base/catalog.py), and HubIcon refuses a name the shell does not know: the whole screen went
+    apart for erplora.com (base/catalog/app_registry.py), and HubIcon refuses a name the shell does not know: the whole screen went
     blank on Staff's ``ion:id-card-outline``."""
     document = by_id(app_list())
     for config in module_configs():

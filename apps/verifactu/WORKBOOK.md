@@ -1582,7 +1582,7 @@ necesitan para el soporte». Por eso:
 17. **Ninguna plantilla la enciende, tampoco en España** (hub#998): una app que ata al
     negocio con la AEAT hasta fin de año y no se apaga (decisión 16) la activa el dueño, de forma explícita, como en
     Square, Odoo, Holded o Sage 50. La app no lista ningún sector en `verticals` (`apps.py`), así que
-    `base.catalog.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
+    `base.catalog.verticals.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
     la anuncia ni la carga la activa. En erplora.com, `verticals` es también lo que la tienda pública usa para
     «Pensada para» y para las apps de cada sector (`public/industries.py` del SaaS), así que VeriFactu no sale en las
     páginas de restaurante ni de peluquería, como Pagos, que tampoco viene en ninguna plantilla.

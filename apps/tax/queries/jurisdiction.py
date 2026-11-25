@@ -8,7 +8,7 @@ from django.utils import timezone
 from live.errors import InvalidPayload
 
 from apps.tax.models import TaxRule, TaxSettings
-from apps.tax.schemas import REGION_OF_ANOTHER_COUNTRY, REGION_TAX_KINDS, TAX_REGIONS
+from apps.tax.schemas.jurisdiction import REGION_OF_ANOTHER_COUNTRY, REGION_TAX_KINDS, TAX_REGIONS
 from base import operations as platform
 from base.business import business_zone, country_or_market
 

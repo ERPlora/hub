@@ -16,7 +16,7 @@ import time
 import pytest
 
 from base import catalog, metrics, worker
-from base.catalog import CatalogError
+from base.catalog.errors import CatalogError
 from base.metrics import Metric
 from base.tests.test_metrics import FakeCloudWatch
 from base.tests.test_worker import (
@@ -57,7 +57,7 @@ START = dt.datetime(2026, 11, 1, 10, 0, tzinfo=dt.UTC)
 
 @pytest.fixture
 def registered(monkeypatch) -> None:
-    monkeypatch.setattr(catalog, "register_apps", lambda: WRITTEN)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: WRITTEN)
     monkeypatch.setattr(worker, "close_old_connections", lambda: None)
 
 
@@ -182,7 +182,7 @@ def test_a_worker_that_never_registered_its_apps_measures_nothing(monkeypatch):
     def failing():
         raise CatalogError("contract gap")
 
-    monkeypatch.setattr(catalog, "register_apps", failing)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", failing)
     monkeypatch.setattr(metrics, "emitter", lambda stop: pytest.fail("no metrics without the apps registered"))
 
     assert worker.run(threading.Event()) == 1

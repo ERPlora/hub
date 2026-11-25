@@ -134,6 +134,19 @@ describe('BusinessPanel', () => {
     expect(value(m.wrapper, 'country')).toBe('—');
   });
 
+  it.each([
+    ['es', 'Este es el negocio de ERPlora: estos datos los pone ERPlora en su servidor y no se cambian aquí ni en erplora.com.'],
+    ['en', 'This is ERPlora’s business: ERPlora sets these details on its server, and they are changed neither here nor on erplora.com.'],
+  ] as const)('ERPlora’s own business says who sets them, to everyone and with no link (%s)', async (locale, said) => {
+    for (const session of [withInvoice(OWNER), EMPLOYEE]) {
+      const m = await panel({ locale, session, business: { ...BUSINESS, name: 'ERPLORA CLOUD SL', settings_url: '' } });
+      expect(m.wrapper.get('[data-testid="business-where"]').text()).toBe(said);
+      expect(m.wrapper.find('[data-testid="business-change"]').exists()).toBe(false);
+      expect(value(m.wrapper, 'name')).toBe('ERPLORA CLOUD SL');
+      m.wrapper.unmount();
+    }
+  });
+
   it('in English, the same rows with their English names', async () => {
     const m = await panel({ locale: 'en', business: { ...BUSINESS, country_name: 'Spain', language_name: 'Spanish' } });
     expect(m.wrapper.get('h2').text()).toBe('Your business');

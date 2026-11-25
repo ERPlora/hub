@@ -32,7 +32,7 @@ from apps.invoice.schemas.fields import (
     check_tax_id,
 )
 from apps.invoice.withholding import RATES
-from apps.tax.schemas import A_TAX_CATEGORY
+from apps.tax.schemas.references import A_TAX_CATEGORY
 
 RATE_OR_CATEGORY = _("Enter the VAT % of the line, or its tax category.")
 
