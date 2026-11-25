@@ -36,6 +36,8 @@ Pantalla: Lista
 
 ### SAMPLE-F02 Hecho con una nota
 Estado: hecho — también por la API
+Actor: responsable,
+  asistente
 Pantalla: Lista, Ficha
 
 ### SAMPLE-F03 Parcial
@@ -193,6 +195,11 @@ class TestTheWorkbooks:
         flows = qa_coverage.workbook_flows(tree)
         assert flows["BASE-F01"].app == "base"
         assert flows["SAMPLE-F01"].app == "sample"
+
+    def test_each_flow_says_who_does_it_and_where_on_one_line(self, tree):
+        flows = qa_coverage.workbook_flows(tree)
+        assert (flows["SAMPLE-F02"].actor, flows["SAMPLE-F02"].screen) == ("responsable, asistente", "Lista, Ficha")
+        assert (flows["SAMPLE-F01"].actor, flows["SAMPLE-F01"].screen) == ("", "Lista")
 
     def test_only_the_customers_part_of_the_source_is_read(self, tree):
         flows = qa_coverage.workbook_flows(tree)
