@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A toolbar button that downloads a file the server writes with the rows a list shows: `load` asks for it, the Hub's
-// `saveFile` hands it over, and a refusal is told with its reason.
+// A button that downloads a file the server writes (the rows a list shows, an invoice's PDF): `load` asks for it, the
+// Hub's `saveFile` hands it over, and a refusal is told with its reason.
 import { HubIcon, toastError } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { ref } from 'vue';
@@ -16,6 +16,8 @@ const props = defineProps<{
   failed: (reason: string) => string;
   load: () => Promise<{ filename: string; blob: Blob }>;
   disabled?: boolean;
+  /** As tall as the other buttons of a page, not a list's toolbar's. */
+  regular?: boolean;
 }>();
 
 const { t } = useBaseI18n();
@@ -38,7 +40,7 @@ async function exportFile(): Promise<void> {
 <template>
   <ion-button
     class="ion-no-margin"
-    size="small"
+    :size="regular ? undefined : 'small'"
     fill="outline"
     :data-testid="testid"
     :disabled="disabled || pending"

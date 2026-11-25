@@ -384,7 +384,7 @@ def test_a_photo_for_a_product_that_is_not_there_keeps_nothing(hub_files):  # no
 
     from base import files
 
-    assert files.used_bytes(hub_files, hub_a()) == 0
+    assert files.space.used_bytes(hub_files, hub_a()) == 0
 
 
 def test_an_employee_may_not_upload_a_photo(hub_files):  # noqa: F811

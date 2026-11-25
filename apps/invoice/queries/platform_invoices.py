@@ -11,7 +11,7 @@ from live.operations import UnknownOperation, operation
 from live.operations import get as get_operation
 
 from apps.invoice.models import Invoice, Issuer
-from apps.invoice.queries.documents import render_document
+from apps.invoice.queries.documents import VERIFACTU_BY_INVOICE, render_document
 from apps.invoice.schemas.platform import (
     PlatformDocumentOut,
     PlatformHealthIn,
@@ -26,7 +26,6 @@ PLATFORM_VERIFACTU_MISSING = _("VeriFactu does not answer in the platform hub.")
 PLATFORM_REAL_FILING_CLOSED = _(
     "Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it."
 )
-VERIFACTU_BY_INVOICE = "verifactu.record.by_invoice"
 VERIFACTU_RECORD = "verifactu.record.get"
 VERIFACTU_CONFIG = "verifactu.config.get"
 #: The record's statuses the SaaS reads as «issued»: sealed, on its way to the AEAT.

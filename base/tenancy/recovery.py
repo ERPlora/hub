@@ -65,7 +65,7 @@ from control.models import CopyRecovery, Hub
 logger = logging.getLogger(__name__)
 
 #: The worker's lease of a recovery: the moves', renewed before each record it creates.
-LEASE = move.LEASE
+LEASE = move.moving.LEASE
 
 
 class RecoveryFailed(Exception):
@@ -120,7 +120,7 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
         try:
             control_services.still_recovering(row.pk, LEASE, owner)
         except control_services.MoveTaken as taken:
-            raise move.MoveStopped(str(taken)) from taken
+            raise move.exceptions.MoveStopped(str(taken)) from taken
 
     results: list[dict] = []
     try:
@@ -132,7 +132,7 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
             for label, declared, records, refused in read:
                 _give_back(row, hub, results, label, declared, records, refused, ours)
         control_services.recovery_done(row.pk, results, now, owner)
-    except (move.MoveStopped, control_services.MoveTaken) as stopped:
+    except (move.exceptions.MoveStopped, control_services.MoveTaken) as stopped:
         logger.info("base.tenancy.recovery.stopped copy=%s: %s; left to whoever holds it now.", copy, stopped)
         return True
     except Exception as error:

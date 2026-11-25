@@ -35,12 +35,12 @@ router = Router(tags=["reservation"])
 
 @bind(router, "reservation.reservation.list", "/reservation/reservations")
 async def reservation_list(request, params: Query[ReservationListIn]):
-    return await run_operation(request, queries.list_reservations, params)
+    return await run_operation(request, queries.reservations.list_reservations, params)
 
 
 @bind(router, "reservation.reservation.get", "/reservation/reservations/detail")
 async def reservation_get(request, params: Query[ReservationRefIn]):
-    return await run_operation(request, queries.get_reservation, params)
+    return await run_operation(request, queries.reservations.get_reservation, params)
 
 
 @bind(router, "reservation.reservation.create", "/reservation/reservations", status=201)
@@ -97,12 +97,12 @@ async def reservation_release_unconfirmed(request):
 
 @bind(router, "reservation.availability.day", "/reservation/availability/day")
 async def availability_day(request, params: Query[DayIn]):
-    return await run_operation(request, queries.day_availability, params)
+    return await run_operation(request, queries.availability.day_availability, params)
 
 
 @bind(router, "reservation.availability.tables", "/reservation/availability/tables")
 async def availability_tables(request, params: Query[TablesIn]):
-    return await run_operation(request, queries.free_tables, params)
+    return await run_operation(request, queries.availability.free_tables, params)
 
 
 # Slots
@@ -110,7 +110,7 @@ async def availability_tables(request, params: Query[TablesIn]):
 
 @bind(router, "reservation.time_slot.list", "/reservation/time_slots")
 async def time_slot_list(request, params: Query[TimeSlotListIn]):
-    return await run_operation(request, queries.list_slots, params)
+    return await run_operation(request, queries.slots.list_slots, params)
 
 
 @bind(router, "reservation.time_slot.create", "/reservation/time_slots", status=201)
@@ -120,7 +120,7 @@ async def time_slot_create(request, data: TimeSlotIn):
 
 @bind(router, "reservation.time_slot.get", "/reservation/time_slots/detail")
 async def time_slot_get(request, params: Query[TimeSlotRefIn]):
-    return await run_operation(request, queries.get_slot, params)
+    return await run_operation(request, queries.slots.get_slot, params)
 
 
 @bind(router, "reservation.time_slot.delete", "/reservation/time_slots/delete")
@@ -133,7 +133,7 @@ async def time_slot_delete(request, data: TimeSlotRefIn):
 
 @bind(router, "reservation.blocked_date.list", "/reservation/blocked_dates")
 async def blocked_date_list(request, params: Query[BlockedDateListIn]):
-    return await run_operation(request, queries.list_blocked, params)
+    return await run_operation(request, queries.blocked_dates.list_blocked, params)
 
 
 @bind(
@@ -145,7 +145,7 @@ async def blocked_date_create(request, data: BlockedDateIn):
 
 @bind(router, "reservation.blocked_date.get", "/reservation/blocked_dates/detail")
 async def blocked_date_get(request, params: Query[BlockedDateRefIn]):
-    return await run_operation(request, queries.get_blocked, params)
+    return await run_operation(request, queries.blocked_dates.get_blocked, params)
 
 
 @bind(router, "reservation.blocked_date.delete", "/reservation/blocked_dates/delete")
@@ -158,12 +158,12 @@ async def blocked_date_delete(request, data: BlockedDateRefIn):
 
 @bind(router, "reservation.waitlist.list", "/reservation/waitlist")
 async def waitlist_list(request, params: Query[WaitlistListIn]):
-    return await run_operation(request, queries.list_waitlist, params)
+    return await run_operation(request, queries.waitlist.list_waitlist, params)
 
 
 @bind(router, "reservation.waitlist.get", "/reservation/waitlist/detail")
 async def waitlist_get(request, params: Query[WaitlistRefIn]):
-    return await run_operation(request, queries.get_entry, params)
+    return await run_operation(request, queries.waitlist.get_entry, params)
 
 
 @bind(router, "reservation.waitlist.create", "/reservation/waitlist", status=201)
@@ -191,7 +191,7 @@ async def waitlist_delete(request, data: WaitlistRefIn):
 
 @bind(router, "reservation.settings.get", "/reservation/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "reservation.settings.update", "/reservation/settings")

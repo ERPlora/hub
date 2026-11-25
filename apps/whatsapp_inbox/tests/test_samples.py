@@ -6,7 +6,7 @@ import uuid
 import pytest
 
 from apps.whatsapp_inbox import samples
-from base.files import MAX_FILE_BYTES
+from base.files.create import MAX_FILE_BYTES
 
 JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00"
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"

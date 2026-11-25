@@ -661,5 +661,5 @@ def test_a_declaration_restores_only_what_it_reads_deleted_and_both_come_togethe
 def test_the_lease_is_the_moves():
     from base.tenancy import move
 
-    assert recovery.LEASE == move.LEASE
+    assert recovery.LEASE == move.moving.LEASE
     assert provisioning.LEASE_OWNER

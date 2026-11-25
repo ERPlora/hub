@@ -131,6 +131,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.get",
         "invoice.invoice.by_source",
         "invoice.invoice.document",
+        "invoice.invoice.pdf",
         "invoice.invoice.print",
         "invoice.invoice.line_defaults",
         "invoice.invoice.create",
@@ -180,8 +181,8 @@ def test_every_operation_is_described_for_the_assistant():
         )
         if op.kind == "command":
             assert op.ai.get("risk") == ("high" if name in high else "normal"), name
-        elif name == "invoice.invoice.export":
-            # A file with every customer's name and tax ID, for a person to download: no automation runs it alone.
+        elif name in ("invoice.invoice.export", "invoice.invoice.pdf"):
+            # A file with customers' names and tax IDs, for a person to download: no automation runs it alone.
             assert op.ai.get("risk") == "high"
         else:
             assert "risk" not in op.ai, name

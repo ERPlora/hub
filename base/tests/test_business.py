@@ -132,3 +132,26 @@ def test_a_fraction_of_a_minor_unit_keeps_its_decimals():
     assert business.money_text(Decimal("82.64"), "EUR", language="es") == "0,8264\xa0€"
     assert business.money_text(Decimal("82.64"), "PLN", language="en") == "PLN\xa00.8264"
     assert business.money_text(Decimal("8200"), "EUR", language="en") == "€82.00"
+
+
+@pytest.mark.parametrize(
+    ("percent", "language", "text"),
+    [
+        ("21.00", "es", "21\xa0%"),
+        ("21.00", "en", "21%"),
+        ("20", "es-es", "20\xa0%"),
+        ("100.00", "en", "100%"),
+        ("5.20", "es", "5,2\xa0%"),
+        ("0.62", "en", "0.62%"),
+        ("0.00", "es", "0\xa0%"),
+    ],
+)
+def test_a_percentage_is_written_as_the_browser_writes_it(percent, language, text):
+    assert business.percent_text(Decimal(percent), language=language) == text
+
+
+def test_a_percentage_is_written_in_the_active_language_by_default():
+    with translation.override("en"):
+        assert business.percent_text(Decimal("5.20")) == "5.2%"
+    with translation.override("es"):
+        assert business.percent_text(Decimal("5.20")) == "5,2\xa0%"

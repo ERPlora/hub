@@ -57,6 +57,13 @@ describe('ExportButton', () => {
     expect(load).toHaveBeenCalledTimes(2);
   });
 
+  it('is small in a list’s toolbar, and as tall as the others of a page that says so', async () => {
+    const load = vi.fn();
+    const sizeOf = async (over?: Record<string, unknown>) => (await mount(load as never, over)).wrapper.getComponent(IonButton).props('size');
+    expect(await sizeOf()).toBe('small');
+    expect(await sizeOf({ regular: true })).not.toBe('small');
+  });
+
   it('does nothing while disabled', async () => {
     const load = vi.fn();
     const m = await mount(load as never, { disabled: true });

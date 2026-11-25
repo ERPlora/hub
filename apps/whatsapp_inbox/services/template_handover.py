@@ -28,7 +28,7 @@ from apps.whatsapp_inbox.schemas.template_handover import (
 )
 from apps.whatsapp_inbox.schemas.templates import TemplateRefIn, template_variables
 from base import outbound
-from base.files import STORE_ERRORS
+from base.files.store import STORE_ERRORS
 
 from .writes import RECEIVE
 

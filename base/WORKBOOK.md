@@ -2803,7 +2803,7 @@ Pasos:
      fecha o unos registros por su nombre); cada dato detrás, y una cifra, un importe o un sí o un no en primer lugar,
      lleva delante el nombre de su dato, el mismo que en su pantalla, porque suelto no dice qué es: «Cambiar en
      Servicios: Mechas · Precio mínimo: 65,00 €», nunca «Mechas · 65,00 €», que se lee igual que su precio; «Crear en
-     Ventas / TPV: Varios · Categoría fiscal: Producto — general · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
+     Ventas / TPV: Varios · Categoría fiscal: Producto — general · 21 % · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
      3». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
@@ -2828,8 +2828,8 @@ Pasos:
      Facturación»), también cuando no se elige ninguna y carga todas las suyas («Control horario, Caja, Menús y combos
      y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
      como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
-     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una y por su nombre
-     («Categoría fiscal: Restauración — comida»);
+     nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una, por su nombre y su tipo
+     de hoy («Categoría fiscal: Restauración — comida · 10 %»);
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
@@ -2862,7 +2862,11 @@ Pasos:
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno),
      también el de un dato que su app no llama como el campo que lo nombra («Rectificativa: resto de causas (R4)», no «R4»); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     no lo pone, nunca por su código. Una categoría fiscal lleva además el tipo que cobra hoy en el país y la región
+     del negocio, como la pantalla **Secciones** («Categoría fiscal: Producto — general · 21 %»); sin una regla en
+     vigor, solo su nombre, y también solo su nombre en una regla de Impuestos, que lleva su propio país y su propio
+     tipo. El alta de un producto la dice en su línea, tras el nombre y el precio («Crear en Inventario: Cuchara · Precio:
+     2,50 € · Categoría fiscal: Producto — general · 21 %»). Un registro que se dijo con palabras se busca como lo buscará la acción, también
      dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
      «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron; y si la acción no las usa
      porque llega el identificador de su registro, ni se leen ni salen. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
@@ -2905,7 +2909,7 @@ asistente oye que no hay nada que cambiar y sigue con lo que se le pidió, con l
 quiere cambiar; si el registro no está, oye eso. «Ejecutar» vale solo
 para lo que enseña la tarjeta: si antes de pulsarlo cambia —la acción encuentra por su nombre otro registro, porque
 alguien ha creado uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4»), el registro cambia de
-nombre o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
+nombre, el tipo de su categoría fiscal cambia o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
 confirmarla otra vez; si lo que encontró ya no está, no sale tarjeta y el asistente lo cuenta como su error.
 «Cancelar» y lo escrito que no coincide valen igual aunque haya cambiado. Si se recarga la página con la tarjeta
 abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
@@ -4512,7 +4516,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `tests/e2e/base-access.spec.ts` (dos personas, dos dispositivos, plan Gratis, una cuenta de Ventas abierta durante
   el cambio de usuario).
 - Archivos (BASE-F72…F76) no tiene modelo ni tabla: lista el almacén `STORAGES["hub_files"]` (`base/storage.py`: S3
-  con bucket, si no disco bajo `MEDIA_ROOT`) bajo `hub-<hex>/files/<ruta>` con `base/files.py` (sin ORM: nombres y
+  con bucket, si no disco bajo `MEDIA_ROOT`) bajo `hub-<hex>/files/<ruta>` con `base/files/` (sin ORM: nombres y
   rutas, el `.keep` de una carpeta vacía, listar, subir, carpeta, renombrar, mover, borrar y `file_response`). Las
   operaciones, todas con `ai=`: `base.file.list` y `base.file.read` (`queries.py`, `base.view_files`), y en
   `services.py` `base.file.upload`, `create_folder` y `rename` (`base.upload_files`), `move` (`base.delete_files` y
@@ -4532,12 +4536,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
   `base.queries.files.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
-  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app.
+  409 `base.file_no_space` y su frase viven solo en `base.files.space.refuse_past_the_space`, nunca copiados en una app.
   Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A) y
   `tests/e2e/fix-base-plan-space-check.spec.ts` (el tope en español: Archivos y la web dicen la misma frase).
-- Al purgar un hub, `base.files.delete_hub_files` borra su prefijo entero (`base.storage.hub_prefix`) y ningún otro: lo
+- Al purgar un hub, `base.files.delete_hub.delete_hub_files` borra su prefijo entero (`base.storage.hub_prefix`) y ningún otro: lo
   llaman `base.services.demos.purge_demo_data` (demo, PUBLIC-F34) y `base.tenancy.offboarding` (baja, BASE-F109), siempre tras el
   `DROP` (PLAN-DB §6 «Baja», paso 4), fuera de toda transacción y antes de la fila. Un fallo es `HubFilesNotDeleted`, también
   las claves que `DeleteObjects` rechaza dentro de un 200: el hub sigue `dropping` con el error en `last_error`
@@ -4547,7 +4551,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `test_provision_demos.py`.
 - Lo que dejaron las purgas de antes de hub#781 (una fila `purged` no vuelve a pasar por la purga) se borra una vez con
   `manage.py delete_leftover_hub_files` (hub#785): busca en el almacén las carpetas de arriba con forma de prefijo de hub
-  (`base.files.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.demos.gone_hubs`): solo
+  (`base.files.delete_hub.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.demos.gone_hubs`): solo
   cuenta un hub `purged` o sin fila (la lápida de una demo, olvidada a los `DEMO_TOMBSTONE_DAYS`) cuyo prefijo aún guarda
   claves. Cualquier otro estado conserva sus ficheros, `shared/`, `_inventory/` y lo que no es un prefijo de hub no se
   miran, y no abre la base de datos de ningún hub. Sin `--delete` solo lista (prefijo, motivo, claves y bytes); con él
@@ -5071,8 +5075,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   sigue abierto: la lista de Hubs lo dice en la columna del clúster, con la hora en su reloj. La franja acota el
   arranque, no el final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del
   negocio; Business Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o
-  «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.run_due` (`launch_due`), con el
-  arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
+  «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.worker_pass.run_due`
+  (`launch_due`), con el arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
   (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
   cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
   cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
@@ -5111,10 +5115,10 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
 - **Cuánto puede estar cerrado el negocio** (hub#1527): las páginas de «Mover a otro clúster…» y «Restaurar desde una
   copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
-  petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.longest_closure`: las dos mitades de la copia a
-  `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un tamaño que
-  no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada uno se cierra
-  al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
+  petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.bucket.longest_closure`: las dos mitades de la
+  copia a `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un
+  tamaño que no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada
+  uno se cierra al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
   `base/tenancy/tests/test_move_closure.py` y `control/tests/test_admin_closure.py`.
 - **Un negocio de cualquier tamaño se restaura o se copia aparte** (hub#1524): la copia del clúster temporal pasa por el
   bucket de volcados como la de un traslado, nunca por el disco del worker: `pg_dump` la sube según la hace

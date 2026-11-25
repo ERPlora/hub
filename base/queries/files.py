@@ -21,15 +21,15 @@ DELETE_FILES = "base.delete_files"
 
 def space_limit(ctx: OperationContext) -> int | None:
     """The space for files of the plan in the SaaS's last photo of the hub of ``ctx``; ``None``: no limit."""
-    return files.space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
+    return files.space.space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
 
 
 def refuse_past_the_plans_space(ctx: OperationContext, store: Storage, size: int) -> None:
-    """Files' 409 ``base.file_no_space`` (``base.files.refuse_past_the_space``) when ``size`` more bytes go past the
+    """Files' 409 ``base.file_no_space`` (``base.files.space.refuse_past_the_space``) when ``size`` more bytes go past the
     space the plan of ``ctx``'s hub includes, said in the caller's language (an API key's or the assistant's call has
     no request). For the apps that keep a file in the hub file store: it takes the plan's space as Files does."""
     with translation.override(ctx.language):
-        files.refuse_past_the_space(store, hub_id(ctx.scope), size, limit_bytes=space_limit(ctx))
+        files.space.refuse_past_the_space(store, hub_id(ctx.scope), size, limit_bytes=space_limit(ctx))
 
 
 @operation(
@@ -54,7 +54,7 @@ def refuse_past_the_plans_space(ctx: OperationContext, store: Storage, size: int
 def file_list(ctx: OperationContext, data: FileListIn) -> dict:
     """The tree, the folder's files, the space used and what this person may do with them."""
     with translation.override(ctx.language):
-        listing = files.listing(storages["hub_files"], hub_id(ctx.scope), data.folder)
+        listing = files.listing.listing(storages["hub_files"], hub_id(ctx.scope), data.folder)
     used = listing.pop("used_bytes")
     return {
         **listing,
@@ -92,4 +92,4 @@ def file_list(ctx: OperationContext, data: FileListIn) -> dict:
 def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
     """The file, described; ``base.api`` streams its bytes to the person who asked."""
     with translation.override(ctx.language):
-        return files.describe(storages["hub_files"], hub_id(ctx.scope), data.path)
+        return files.read.describe(storages["hub_files"], hub_id(ctx.scope), data.path)

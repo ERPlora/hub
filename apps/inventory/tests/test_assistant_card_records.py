@@ -172,6 +172,24 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
 
 
 @HUB_DB
+@pytest.mark.parametrize(
+    ("language", "vat"), [("es", "Producto — general · 21\xa0%"), ("en", "Product — generic · 21%")]
+)
+def test_a_new_product_says_first_its_name_its_price_and_the_vat_it_charges(language, vat):
+    """The line of a normal card shows its first three data, and a new product always carries its SKU too."""
+    arguments = {
+        "allergens": ["gluten"], "name": "Vino tinto", "sku": "VT-75", "price": 1250, "tax_category_key": "product.generic",
+    }  # fmt: skip
+    card = assistant.cards.card(get("inventory.product.create"), arguments, language, dataclasses.replace(ctx_for(), language=language))
+    assert [(field["name"], field["value"]) for field in card["fields"]][:3] == [
+        ("name", "Vino tinto"),
+        ("price", 1250),
+        ("tax_category_key", vat),
+    ]
+    assert {field["name"] for field in card["fields"]} == set(arguments)
+
+
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PRODUCT)
 def test_a_product_is_left_out_for_whoever_may_not_see_the_products(write, datum):
     """Whoever may not see the products (``inventory.view_product``) is told no product, never its id."""

@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from babel import Locale, UnknownLocaleError
 from babel.numbers import (
     format_currency,
+    format_percent,
     get_currency_name,
     get_currency_precision,
     get_currency_symbol,
@@ -117,6 +118,13 @@ def money_text(cents: int | Decimal, currency: str, *, language: str | None = No
         decimal_quantization=whole,
     )
     return _spaced(text, get_currency_symbol(currency, locale=locale))
+
+
+def percent_text(percent: Decimal, *, language: str | None = None) -> str:
+    """``percent`` (21 is 21 %) as the Hub writes a percentage, the same as the browser (``Intl.NumberFormat``), in
+    ``language`` (the active one by default): «21 %», «21%», «5,2 %»."""
+    locale = babel_locale(language or translation.get_language() or settings.LANGUAGE_CODE)
+    return format_percent(percent / 100, locale=locale, decimal_quantization=False)
 
 
 def _spaced(text: str, symbol: str) -> str:

@@ -1638,7 +1638,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     pone un `catalog:` que exista en el manifiesto o vacía; un `file:` solo lo escribe la subida, así nadie
     apunta un artículo a otro archivo del negocio), `inventory.product.upload_image` (acción, cambiar
     productos: ≤ 2 MB, Pillow a WebP 512×512 recortada al centro, el espacio del plan con
-    `base.files.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
+    `base.files.space.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
     en `base`, `base.catalog_image.search` (consulta: título y `tags` del manifiesto en `es` y `en`; título en
     el idioma de quien pregunta, el de la petición). Reutilizan `inventory.product.updated`.
   - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs

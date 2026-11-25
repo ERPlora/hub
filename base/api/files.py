@@ -48,7 +48,7 @@ async def file_read(request, params: Query[FileReadIn]):
     described = await run_operation(request, queries.files.file_read, params)
     if request.headers.get("Accept", "").strip() == "application/json":
         return described
-    return await sync_to_async(files.file_response)(
+    return await sync_to_async(files.read.file_response)(
         storages["hub_files"], request.hub.id, described.model_dump(), inline=params.inline
     )
 

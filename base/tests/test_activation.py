@@ -44,13 +44,12 @@ def test_the_roots_are_the_modules_on_that_no_other_module_on_needs():
     assert activation.roots(["tax", "customer"], GRAPH) == {"tax", "customer"}
 
 
-def test_every_module_on_has_18_roots_of_28_on_main():
+def test_every_module_on_has_18_roots_of_29_on_main():
     graph = activation.module_graph()
-    assert len(graph) == 28
+    assert len(graph) == 29
     assert sorted(activation.roots(graph, graph)) == [
-        "attendance", "cart_checkout", "cash_register", "combo", "demo", "flow", "kitchen", "modifier",
-        "online_booking", "online_order", "payment", "pricing", "printing", "reservation", "task", "verifactu",
-        "website", "whatsapp_inbox",
+        "attendance", "cart_checkout", "combo", "demo", "flow", "kitchen", "modifier", "online_booking", "online_order",
+        "payment", "pricing", "printing", "reservation", "task", "tip", "verifactu", "website", "whatsapp_inbox",
     ]  # fmt: skip
 
 

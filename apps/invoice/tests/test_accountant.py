@@ -49,6 +49,8 @@ def test_it_lists_opens_and_downloads_the_invoices_of_everyone(gema, invoices):
     for invoice in invoices:
         assert get(gema, "/invoice/invoices/detail", invoice_id=invoice["id"]).json()["id"] == invoice["id"]
         assert invoice["number"] in get(gema, "/invoice/invoices/document", invoice_id=invoice["id"]).json()["html"]
+        downloaded = get(gema, "/invoice/invoices/pdf", invoice_id=invoice["id"])
+        assert (downloaded.status_code, downloaded.json()["filename"]) == (200, f"{invoice['number']}.pdf")
 
 
 def test_it_reads_each_invoice_s_verifactu_record_the_series_the_issuer_and_the_taxes(gema, invoices):

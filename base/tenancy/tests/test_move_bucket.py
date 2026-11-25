@@ -1,5 +1,5 @@
-"""The copy of a move goes through the dumps bucket, never a file of the worker, and ``move._run`` feeds the restore
-what it reads from there. The hubs and the passes are ``test_move.py``'s; their databases, ``conftest.py``'s."""
+"""The copy of a move goes through the dumps bucket, never a file of the worker, and ``move.bucket._run`` feeds the
+restore what it reads from there. The hubs and the passes are ``test_move.py``'s; their databases, ``conftest.py``'s."""
 
 import re
 import time
@@ -124,7 +124,7 @@ class TestTheCopyGoesThroughTheBucket:
 
     def test_a_move_has_an_hour_for_each_half_of_its_copy(self, moves, monkeypatch):
         seen = []
-        real_stream, real_run = dumps.stream_to_bucket, move._run
+        real_stream, real_run = dumps.stream_to_bucket, move.bucket._run
 
         def streamed(source, key, **kwargs):
             seen.append(("dump", kwargs["timeout"]))
@@ -135,12 +135,12 @@ class TestTheCopyGoesThroughTheBucket:
             return real_run(command, *args, **kwargs)
 
         monkeypatch.setattr(dumps, "stream_to_bucket", streamed)
-        monkeypatch.setattr(move, "_run", ran)
+        monkeypatch.setattr(move.bucket, "_run", ran)
         hub = moves.hub(to=moves.cluster())
 
         run()
 
-        assert fresh(hub).last_error == "" and move.COPY_TIMEOUT_SECONDS == 60 * 60
+        assert fresh(hub).last_error == "" and move.bucket.COPY_TIMEOUT_SECONDS == 60 * 60
         # The dump, then the restore's listing and the restore itself.
         assert seen == [("dump", 3600), ("restore", 3600), ("restore", 3600)]
 
@@ -204,13 +204,13 @@ def feeding(*chunks: bytes):
 
 
 class TestFeedingAProgram:
-    """``move._run`` with a ``feed``: what it reads from the bucket goes to the program's input as it comes, while the
-    stop, the heartbeat and the time limit are heard as when it waits."""
+    """``move.bucket._run`` with a ``feed``: what it reads from the bucket goes to the program's input as it comes,
+    while the stop, the heartbeat and the time limit are heard as when it waits."""
 
     def test_everything_reaches_the_program_in_order(self, tmp_path):
         out = tmp_path / "out"
 
-        move._run(
+        move.bucket._run(
             ["sh", "-c", f"cat > {out}"],
             "",
             tmp_path / "err",
@@ -224,7 +224,7 @@ class TestFeedingAProgram:
         assert out.read_bytes() == b"".join(FEED)
 
     def test_a_program_that_ends_well_before_reading_it_all_is_done(self, tmp_path):
-        move._run(
+        move.bucket._run(
             ["sh", "-c", "head -c 10 > /dev/null"],
             "",
             tmp_path / "err",
@@ -236,8 +236,8 @@ class TestFeedingAProgram:
         )
 
     def test_a_program_that_fails_says_why_even_before_reading_it_all(self, tmp_path):
-        with pytest.raises(move.MoveFailed) as failed:
-            move._run(
+        with pytest.raises(move.exceptions.MoveFailed) as failed:
+            move.bucket._run(
                 ["sh", "-c", "echo 'pg_restore: error: not an archive' >&2; exit 3"],
                 "",
                 tmp_path / "err",
@@ -253,8 +253,8 @@ class TestFeedingAProgram:
     def test_a_program_that_never_reads_is_stopped_past_its_time(self, tmp_path):
         started = time.monotonic()
 
-        with pytest.raises(move.MoveFailed) as failed:
-            move._run(
+        with pytest.raises(move.exceptions.MoveFailed) as failed:
+            move.bucket._run(
                 ["sleep", "60"],
                 "",
                 tmp_path / "err",
@@ -271,8 +271,8 @@ class TestFeedingAProgram:
     def test_a_stop_is_heard_while_it_feeds(self, tmp_path):
         asked = time.monotonic()
 
-        with pytest.raises(move.MoveStopped):
-            move._run(
+        with pytest.raises(move.exceptions.MoveStopped):
+            move.bucket._run(
                 ["sleep", "60"],
                 "",
                 tmp_path / "err",
@@ -289,7 +289,7 @@ class TestFeedingAProgram:
         monkeypatch.setattr(dumps, "STOP_CHECK_SECONDS", 0.05)
         beats = []
 
-        move._run(
+        move.bucket._run(
             ["sh", "-c", "sleep 1; cat > /dev/null"],
             "",
             tmp_path / "err",
@@ -305,7 +305,7 @@ class TestFeedingAProgram:
     def test_a_program_slow_to_read_is_waited_for_not_spun_on(self, tmp_path):
         checks = []
 
-        move._run(
+        move.bucket._run(
             ["sh", "-c", "sleep 1.5; cat > /dev/null"],
             "",
             tmp_path / "err",
@@ -327,8 +327,8 @@ class TestFeedingAProgram:
             finally:
                 closed.append(True)
 
-        with pytest.raises(move.MoveFailed) as failed:
-            move._run(
+        with pytest.raises(move.exceptions.MoveFailed) as failed:
+            move.bucket._run(
                 ["sh", "-c", "exit 3"], "", tmp_path / "err", lambda: None, None, what="sh", feed=tracked(), timeout=30
             )
 
@@ -338,12 +338,12 @@ class TestFeedingAProgram:
     def test_what_the_feed_raises_stops_the_program_and_reaches_the_caller(self, tmp_path):
         def broken():
             yield FEED[0]
-            raise move.MoveFailed("move_restore_failed", "its copy could not be read from the bucket: gone")
+            raise move.exceptions.MoveFailed("move_restore_failed", "its copy could not be read from the bucket: gone")
 
         started = time.monotonic()
 
-        with pytest.raises(move.MoveFailed) as failed:
-            move._run(
+        with pytest.raises(move.exceptions.MoveFailed) as failed:
+            move.bucket._run(
                 ["sh", "-c", "cat > /dev/null; sleep 60"],
                 "",
                 tmp_path / "err",
@@ -356,3 +356,24 @@ class TestFeedingAProgram:
 
         assert "could not be read from the bucket" in str(failed.value)
         assert time.monotonic() - started < 10
+
+
+def test_the_restore_leaves_out_the_extensions_and_the_public_schema_of_the_copy():
+    # On Aurora only the master makes ``vector``: the destination's template has it, and the restore must neither drop
+    # nor make it (nor the public schema, which holds its objects). The tests' superuser would not notice.
+    listing = """;
+; Archive created at 2026-10-31 18:00:00 UTC
+3; 2615 2200 SCHEMA - public pg_database_owner
+4; 0 0 COMMENT - SCHEMA public pg_database_owner
+2; 3079 16385 EXTENSION - vector
+5; 0 0 COMMENT - EXTENSION vector
+230; 1259 16500 TABLE public base_hub_identity hub_migrator
+4012; 0 16500 TABLE DATA public base_hub_identity hub_migrator
+"""
+
+    kept = move.bucket._kept_entries(listing)
+
+    assert [line for line in kept if not line.startswith(";")] == [
+        "230; 1259 16500 TABLE public base_hub_identity hub_migrator",
+        "4012; 0 16500 TABLE DATA public base_hub_identity hub_migrator",
+    ]
