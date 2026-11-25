@@ -330,7 +330,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await pushPhoto(GRATIS);
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {
-      await expect(testid(page, 'apps-counter')).toHaveText('28 apps activadas · 18 de 20 de tu plan');
+      // Online orders needs Tables too: off, Reservations is the only app on that needs it.
+      expect((await api(context, A, 'POST', '/apps/disable', { app: 'online_order' })).status).toBe(200);
+      await page.reload();
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['Reservas', 'Mesas']));
       await search(page, 'Reservas');
 
@@ -347,13 +350,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toastSaying(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation')).toHaveCount(0);
       // Both go off (two fewer turned on); only Reservations was chosen (one fewer of the plan's).
-      await expect(testid(page, 'apps-counter')).toHaveText('26 apps activadas · 17 de 20 de tu plan');
+      await expect(testid(page, 'apps-counter')).toHaveText('25 apps activadas · 16 de 20 de tu plan');
       expect([stored('reservation'), stored('table')]).toEqual(['off:false', 'off:false']);
-      await expect
-        .poll(async () => (await menuApps(page)).filter((name) => name === 'Reservas' || name === 'Mesas'), {
-          message: 'both leave the menu without a reload',
-        })
-        .toEqual([]);
+      const both = async () => (await menuApps(page)).filter((name) => name === 'Reservas' || name === 'Mesas');
+      await expect.poll(both, { message: 'both leave the menu without a reload' }).toEqual([]);
 
       // BASE-F19 and BASE-F24 — «Activar» asks first, naming what turns on with it; the notice names it again.
       await page.goto(`${A}/apps#all`);
@@ -369,7 +369,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await askOn.getByRole('button', { name: 'Activar' }).click();
       await expect(toastSaying(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Activa');
-      await expect(testid(page, 'apps-counter')).toHaveText('28 apps activadas · 18 de 20 de tu plan');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       // Reservations chosen; Tables came along with it, so it does not count.
       expect([stored('reservation'), stored('table')]).toEqual(['on:true', 'on:false']);
       await expect
@@ -394,7 +394,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // No question: it cannot go off. The notice says why and what to do, and stays past a toast's time.
       const refused = testid(page, 'apps-refused');
       await expect(refused).toContainText('No se ha cambiado nada');
-      await expect(refused).toContainText('Desactiva antes Reservas.');
+      await expect(refused).toContainText('Desactiva antes Pedidos online y Reservas.');
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
       await page.waitForTimeout(5_500); // longer than the 5 s of an error toast
       await expect(refused).toBeVisible();
@@ -413,7 +413,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         { app: 'table' },
       );
       expect(direct.status).toBe(409);
-      expect(direct.data.error).toMatchObject({ code: 'base.app_required', message: 'Desactiva antes Reservas.', required_by: ['reservation'] });
+      expect(direct.data.error).toMatchObject({ code: 'base.app_required', message: 'Desactiva antes Pedidos online y Reservas.', required_by: ['online_order', 'reservation'] });
       expect(await menuApps(page)).toContain('Mesas');
 
       // Closed, it goes; nothing else changed.
