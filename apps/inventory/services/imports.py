@@ -22,15 +22,15 @@ from live.operations import get, operation
 from live.outbox import record_event
 
 from apps.inventory import events, import_card
-from apps.inventory.models import Category, fits_unit, Product, QUANTITY, Settings, StockMovement, Unit
+from apps.inventory.models import Category, fits_unit, measure_alike, Product, QUANTITY, Settings, StockMovement, Unit
 from apps.inventory.queries.exports import FORMULA_STARTS
 from apps.inventory.queries.reads import held
 from apps.inventory.queries.settings import current_settings
 from apps.inventory.schemas.fields import MAX_CENTS
 from apps.inventory.schemas.imports import CategoryImportIn, ImportReportOut, ProductImportIn, ProductImportRowIn
 from apps.inventory.services.movements import _move
-from apps.inventory.services.products import EAN13_TAKEN, _created_payload, _save
-from apps.inventory.services.writes import _actor
+from apps.inventory.services.products import EAN13_TAKEN, PRICING_UNIT_MISMATCH, _created_payload, _save
+from apps.inventory.services.writes import SERVICE_HAS_NO_STOCK, _actor
 from apps.tax.models import TaxCategory
 from base import allergens
 from base import operations as platform
@@ -41,6 +41,7 @@ ROW_TOO_LONG = _("A text is longer than its column allows")
 ROW_PRICE_NOT_NUMERIC = _("Price is not a number")
 ROW_SKU_REPEATED = _("SKU repeated in the file")
 ROW_UNIT_UNKNOWN = _("Unit of measure not recognized: %(text)s")
+ROW_TYPE_UNKNOWN = _("Product type not recognized: %(text)s")
 ROW_QUANTITY_NOT_NUMERIC = _("Quantity is not a number")
 ROW_AMOUNT_TOO_LARGE = _("Price or cost too large")
 ROW_QUANTITY_TOO_LARGE = _("Quantity too large")
@@ -86,8 +87,9 @@ _QUANTITY_RE = re.compile(r"^\d+(\.\d{1,3})?$")
 def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
     """Each row is checked on its own and reported; a row whose SKU a live product has is skipped untouched.
 
-    Created rows are active «physical» products that follow the business's stock control, without
-    categories; their stock leaves an «initial» movement. The rehearsal (``dry_run``) writes nothing.
+    Created rows are active products that follow the business's stock control, without categories, «physical» and
+    priced by one of their unit unless the row says otherwise; their stock leaves an «initial» movement. The rehearsal
+    (``dry_run``) writes nothing.
     """
     settings = current_settings()
     currency = platform.business_currency(ctx.scope)
@@ -242,7 +244,29 @@ def _read_stock(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> di
         else Decimal(file.settings.low_stock_threshold)
     )
     refusal = _quantity_refusal(unit, stock, threshold)
-    return refusal or {**fields, "stock": stock, "low_stock_threshold": threshold, "unit": unit, "pricing_unit": unit}
+    return refusal or {**fields, "stock": stock, "low_stock_threshold": threshold, "unit": unit}
+
+
+def _read_price_per(row: ProductImportRowIn, fields: dict, _file: _ProductFile) -> dict | str:
+    """What its price refers to: one of its unit, unless the row says another quantity or another unit."""
+    unit = row.pricing_unit.strip().lower() or fields["unit"]
+    if unit not in Unit.values:
+        return str(ROW_UNIT_UNKNOWN) % {"text": row.pricing_unit.strip()}
+    if not measure_alike(unit, fields["unit"]):
+        return str(PRICING_UNIT_MISMATCH)
+    # No price is per nothing: a zero is refused like a negative.
+    quantity = (parse_quantity(row.price_quantity) or None) if row.price_quantity.strip() else Decimal("1")
+    refusal = _quantity_refusal(unit, quantity)
+    return refusal or {**fields, "price_quantity": quantity, "pricing_unit": unit}
+
+
+def _read_type(row: ProductImportRowIn, fields: dict, _file: _ProductFile) -> dict | str:
+    product_type = row.product_type.strip().lower() or Product.Type.PHYSICAL
+    if product_type not in Product.Type.values:
+        return str(ROW_TYPE_UNKNOWN) % {"text": row.product_type.strip()}
+    if product_type == Product.Type.SERVICE and fields["stock"]:
+        return str(SERVICE_HAS_NO_STOCK)
+    return {**fields, "product_type": product_type}
 
 
 def _read_tax_category(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> dict | str:
@@ -269,7 +293,7 @@ def _take_ean13(_row: ProductImportRowIn, fields: dict, file: _ProductFile) -> d
 #: What reads a row, each adding to the fields or saying why the row fails. A row with several reasons tells the first;
 #: the EAN-13 is taken last, by a row that goes in.
 _READ_IN_ORDER: tuple[Callable[[ProductImportRowIn, dict, _ProductFile], dict | str], ...] = (
-    _read_texts, _read_amounts, _read_stock, _read_tax_category, _read_allergens, _take_ean13,
+    _read_texts, _read_amounts, _read_stock, _read_price_per, _read_type, _read_tax_category, _read_allergens, _take_ean13,
 )  # fmt: skip
 
 
