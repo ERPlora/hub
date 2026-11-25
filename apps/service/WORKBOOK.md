@@ -176,7 +176,7 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
   Vacía: «Nadie ha comprado este bono todavía.».
   - **Gastar una sesión** abre su ventana: «Da por entregada una sesión del bono «<bono>» de <clienta>, fuera
     del cobro.», el saldo «Quedan {n} sesiones · {after} después de esta» («Queda 1 sesión · 0 después de
-    esta»; «Sin límite de sesiones» en uno sin límite), **Servicio** («Elige el servicio», solo los que cubre
+    esta»; «Sin límite de sesiones» en uno sin límite), **Servicio** (solo los que cubre
     el bono; con uno solo, ya elegido), **Profesional** (el equipo de Personal; «Quién la hizo: lo que vale la
     sesión cuenta en su producción en Ventas. Opcional.»), **Nota** y los botones **Cancelar** y **Gastar
     sesión**. Mientras comprueba el bono, «Comprobando el bono…».
