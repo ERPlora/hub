@@ -7,7 +7,14 @@ import { computed, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import type { AppHelp } from '../operations-help';
-import { assistantQuestion, createHelpStore, resolveScreen, writeAssistantQuestion } from '../lib/help';
+import {
+  assistantQuestion,
+  createHelpStore,
+  PLATFORM,
+  resolvePlatformScreen,
+  resolveScreen,
+  writeAssistantQuestion,
+} from '../lib/help';
 import { useBaseI18n } from '../lib/i18n';
 import HelpContent from './HelpContent.vue';
 
@@ -25,7 +32,12 @@ const failed = shallowRef(false);
 const lastFlow = shallowRef<string>();
 const titleElement = shallowRef<HTMLElement | null>(null);
 const assistantAllowed = computed(() => session.can('base.view_home'));
-const current = computed(() => (help.value ? resolveScreen(help.value.screens, route.path) : undefined));
+const current = computed(() => {
+  const screens = help.value?.screens ?? [];
+  return props.app === PLATFORM
+    ? resolvePlatformScreen(screens, route.matched.at(-1)?.path ?? '', route.hash)
+    : resolveScreen(screens, route.path);
+});
 const title = computed(() => t('base.help.title', { app: help.value?.name ?? props.appName }));
 let generation = 0;
 let askAfterDismiss = false;
