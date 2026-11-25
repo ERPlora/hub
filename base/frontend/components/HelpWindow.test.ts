@@ -13,13 +13,14 @@ interface SetupOptions {
   answer?: AppHelp;
   onApi?: () => Response | Promise<Response>;
   session?: typeof EMPLOYEE;
+  path?: string;
 }
 
 async function setup(options: SetupOptions = {}) {
   const app = options.app ?? 'table';
   const answer = options.answer ?? help;
   const m = await mountBase(HelpWindow, {
-    path: '/table/floor-plan', routes: ['/table/floor-plan', '/table/settings'],
+    path: options.path ?? '/table/floor-plan', routes: ['/table/floor-plan', '/table/floor-plan/:table', '/table/settings'],
     props: { open: true, app, appName: answer.name, icon: 'ion:grid-outline' },
     session: options.session,
     onApi: options.onApi ?? (() => Response.json(answer)),
@@ -62,6 +63,11 @@ describe('HelpWindow', () => {
     expect(modal.props()).toMatchObject({ size: 'lg', readonly: true, phoneLayout: 'sheet', title: 'Help · Tables' });
     expect(m.el('help-current-screen')?.textContent).toContain('Floor plan');
     expect(m.el('help-content')?.getAttribute('lang')).toBe('en');
+  });
+
+  it("is on a module's screen also at an address below it", async () => {
+    const m = await setup({ path: '/table/floor-plan/0190' });
+    expect(m.el('help-current-screen')?.textContent).toContain('Floor plan');
   });
 
   it('puts the app icon before a left-aligned title in the newest dialog', async () => {
@@ -189,5 +195,71 @@ describe('HelpWindow', () => {
     expect(second.el('help-content')).not.toBeNull();
     expect(second.el('help-error')).toBeNull();
     expect(requests).toBe(1);
+  });
+});
+
+describe('HelpWindow on the screens of the Hub itself', () => {
+  const platform: AppHelp = {
+    ...help,
+    app: 'base',
+    name: 'ERPlora',
+    screens: [
+      { id: 'settings_general', title: 'Settings · General', path: '/settings#general', text: 'The general settings.' },
+      { id: 'settings_data', title: 'Settings · Data and backups', path: '/settings#data', text: 'The copies.' },
+      { id: 'role', title: 'What it allows', path: '/employees/roles/:role', text: 'What a role allows.' },
+    ],
+    flows: [],
+  };
+
+  async function at(path: string, routes: string[], onApi = () => Response.json(platform)) {
+    const m = await mountBase(HelpWindow, {
+      path, routes, props: { open: true, app: 'base', appName: 'ERPlora', icon: 'ion:help-circle-outline' }, onApi,
+    });
+    await flush();
+    const el = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+    return { ...m, el };
+  }
+
+  it('says the tab in view is where the person is, and the rest are the other screens', async () => {
+    const m = await at('/settings#data', ['/settings']);
+    expect(m.el('help-current-screen')?.textContent).toContain('Settings · Data and backups');
+    expect(m.el('help-current-screen')?.textContent).toContain('The copies.');
+    expect(m.el('help-other-screen-settings_general')).not.toBeNull();
+    expect(m.el('help-other-screen-settings_data')).toBeNull();
+  });
+
+  it('follows the tab the person moves to', async () => {
+    const m = await at('/settings', ['/settings']);
+    expect(m.el('help-current-screen')?.textContent).toContain('Settings · General');
+    await m.router.push('/settings#data');
+    await flush();
+    expect(m.el('help-current-screen')?.textContent).toContain('Settings · Data and backups');
+  });
+
+  it('is on a screen whose address carries an id', async () => {
+    const m = await at('/employees/roles/0190', ['/employees/roles/:role']);
+    expect(m.el('help-current-screen')?.textContent).toContain('What it allows');
+  });
+
+  it('titles the other screens without naming a module', async () => {
+    const m = await at('/settings', ['/settings']);
+    expect(document.querySelector('[data-help-section="screens"] .help-section__title')?.textContent?.trim()).toBe('Other screens');
+    expect(document.querySelector('[data-help-section="flows"]')).toBeNull();
+    expect(m.el('help-content')).not.toBeNull();
+  });
+
+  it('is titled ERPlora while it is read and when it cannot be read, and can be asked for again', async () => {
+    const m = await at('/settings', ['/settings'], () =>
+      Response.json({ error: { code: 'offline', message: 'Offline' } }, { status: 503 }));
+    expect(m.wrapper.getComponent({ name: 'FormModal' }).props('title')).toBe('Help · ERPlora');
+    expect(m.el('help-error')?.textContent).toContain('Could not load the help.');
+    expect(m.el('help-retry')).not.toBeNull();
+  });
+
+  it('asks the assistant about the screen of ERPlora in view', async () => {
+    const m = await at('/settings#data', ['/settings']);
+    m.el('help-ask-assistant')!.click();
+    await flush();
+    expect(useAssistant().state.draft).toBe('How do I use ERPlora on Settings · Data and backups?');
   });
 });

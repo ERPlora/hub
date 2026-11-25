@@ -473,7 +473,7 @@ En la pantalla Archivos:
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
-| BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
+| BASE-F115 | Ver la ayuda de la pantalla en la que se está | hecho |
 | BASE-F116 | Leer las novedades de ERPlora | hecho |
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
@@ -2638,8 +2638,8 @@ Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
      pulsarlos lo cierra. En un móvil, los destellos y «Mis apps» van en «⋮» («Más acciones»), para que el título
-     siga centrado, y la campana se queda a la vista: ahí, «Asistente» abre el panel en cuanto el menú termina de
-     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía.
+     se lea entero, y la campana y el «?» de la ayuda se quedan a la vista: ahí, «Asistente» abre el panel en cuanto el
+     menú termina de cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -3612,41 +3612,47 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
-### BASE-F115 Ver la ayuda de la pantalla de un módulo
+### BASE-F115 Ver la ayuda de la pantalla en la que se está
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: la barra de arriba de un módulo con la ayuda lista (botón «?», «Ayuda») y la ventana de ayuda
+Pantalla: la barra de arriba de un módulo con la ayuda lista o de una pantalla del Hub (botón «?», «Ayuda») y la ventana
+de ayuda
 Pasos:
-  1. En un módulo con la ayuda lista, arriba a la derecha, junto al asistente, está el botón «?» («Ayuda»). Un módulo
-     cuya ayuda aún no está lista no lo enseña.
-  2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo, centrada en una tableta o un ordenador
-     y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a otro módulo.
+  1. En un módulo con la ayuda lista y en las pantallas propias del Hub (Inicio, Empleados, la ficha de una persona, lo
+     que permite un rol, Archivos, Apps, Sistema, Ajustes y Mi perfil), arriba a la derecha, junto al asistente, está el
+     botón «?» («Ayuda»), también al volver atrás. No sale en un módulo cuya ayuda aún no está lista, en una pantalla sin
+     ayuda (la documentación de la API), en la de «Sin acceso» ni a quien no puede ver el Inicio.
+  2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo («Ayuda · ERPlora» en una pantalla del
+     Hub), centrada en una tableta o un ordenador y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a
+     otro módulo.
   3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
      nada a YouTube hasta que se pulsa, y se ve dentro de la ventana, a todo su ancho, con el reproductor de YouTube
      completo: pantalla completa, subtítulos encendidos en el idioma de la ayuda y su logotipo, que abre el vídeo en
      YouTube en otra pestaña.
-  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo, y «En esta
-     pantalla · <pestaña>», marcado «Estás aquí», con el resumen de lo que enseña la pestaña en la que se está: corto
-     y entero, sin «Ver más».
+  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo (en una pantalla
+     del Hub, de lo que trae el Hub siempre), y «En esta pantalla · <pestaña>», marcado «Estás aquí», con el resumen de
+     lo que enseña la pestaña en la que se está: corto y entero, sin «Ver más».
   5. «Cómo se hace» trae cada tarea terminada del módulo, agrupada por pestaña, primero las de la pestaña en la que se
      está. Cada tarea es una fila plegada que se abre con sus pasos y su «Si algo falla», una a la vez. Una tarea con
      vídeo corto lo enseña al abrirse, antes de sus pasos, con el mismo reproductor que el del módulo y en el idioma de
      la persona o, si no lo hay, en español; con varios, uno debajo de otro. Abrir la ayuda o una tarea no pide nada a
      YouTube hasta que se pulsa el vídeo. Con más de ocho tareas, arriba sale «Buscar tareas…», que filtra por el título y los pasos sin mirar acentos ni mayúsculas;
-     si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas.
-  6. «Otras pantallas del módulo» trae las demás pestañas, plegadas, cada una con su resumen corto. Un enlace de la
-     ayuda a una pantalla del Hub lleva a ella y cierra la ayuda.
+     si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas. La ayuda de
+     una pantalla del Hub no trae tareas.
+  6. «Otras pantallas» trae las demás pestañas del módulo, o las demás pantallas del Hub que la persona puede ver,
+     plegadas, cada una con su resumen corto. Un enlace de la ayuda a una pantalla del Hub lleva a ella y cierra la
+     ayuda.
   7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
      esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
      <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
-Entra: el módulo y la pestaña en la que se está.
-Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo que lee el cliente, en el idioma de la
-persona.
+Entra: el módulo, o la pantalla del Hub, y la pestaña en la que se está.
+Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo, o de las pantallas del Hub, que lee el
+cliente, en el idioma de la persona.
 Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, dice «No se ha podido cargar la
 ayuda.» y «Reintentar» la vuelve a pedir. La ayuda ya leída se queda guardada hasta que se recarga la página: sin
-conexión se vuelve a abrir, también desde otra pestaña del módulo, y cada vídeo dice «Sin conexión: el vídeo no está
-disponible», con el texto a la vista. Si el manual no está traducido al idioma de la persona, o su traducción se
-quedó atrás, la ayuda sale en español.
+conexión se vuelve a abrir, también desde otra pestaña del módulo u otra pantalla del Hub, y cada vídeo dice «Sin
+conexión: el vídeo no está disponible», con el texto a la vista. Si el manual no está traducido al idioma de la persona,
+o su traducción se quedó atrás, la ayuda sale en español.
 Implicados: BASE-F92, BASE-F93
 
 ### BASE-F116 Leer las novedades de ERPlora
@@ -4782,10 +4788,13 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   permiso que pide su página. Quien no tiene ese permiso no recibe su ayuda: el filtro se aplica en cada llamada, fuera
   de lo guardado en `_READ`. Un `###` que no es una de esas pantallas (la campana, el menú lateral, el asistente) se
   queda en el fichero, y de los flujos de `base` todavía no se publica ninguno: sus pasos llevan ids, referencias y
-  marcadores para quien los mantiene. Ninguna pantalla la enseña todavía: las rutas de `base` no llevan `meta.app`, así
-  que el «?» sigue saliendo solo en los módulos. `tests/test_help_workbooks.py` exige de cada pantalla su `###`, una
-  sola vez, y las mismas reglas de texto que a un módulo; `base/tests/test_platform_screens.py`, que cada dirección
-  exista en la SPA y que su permiso sea el de la operación que lee.
+  marcadores para quien los mantiene. Las rutas de `base` no llevan `meta.app`: las que tienen ayuda llevan `help: true`
+  en su `meta` (`base/frontend/routes.ts`), así que ni una pantalla sin ayuda ni la de «Sin acceso» enseñan el «?», y la
+  ventana sabe en cuál está por la ruta del router y el `#` (`resolvePlatformScreen`, en `base/frontend/lib/help.ts`).
+  `tests/test_help_workbooks.py` exige de cada pantalla su `###`, una sola vez, y las mismas reglas de texto que a un
+  módulo; `base/tests/test_platform_screens.py`, que cada dirección exista en la SPA, que las rutas con `help: true` sean
+  justo las de esas pantallas y que su permiso sea el de la operación que lee; `tests/e2e/base-help-platform.spec.ts` la
+  recorre en tres tamaños y en los dos idiomas.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
