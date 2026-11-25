@@ -168,8 +168,8 @@
     ]
   },
   {
-    "path": "apps/pricing/schemas/__init__.py",
-    "file_name": "__init__.py",
+    "path": "apps/pricing/schemas/rules.py",
+    "file_name": "rules.py",
     "functions": [
       {
         "name": "rule_problems",

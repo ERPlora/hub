@@ -1279,6 +1279,14 @@
     "method": "get",
     "path": "/api/invoice/invoices/pdf"
   },
+  "invoice.email.list": {
+    "method": "get",
+    "path": "/api/invoice/emails"
+  },
+  "invoice.email.send": {
+    "method": "post",
+    "path": "/api/invoice/emails/send"
+  },
   "invoice.invoice.print": {
     "method": "post",
     "path": "/api/invoice/invoices/print"

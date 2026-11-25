@@ -15,7 +15,15 @@ from apps.pricing.models import DiscountRule
 from apps.pricing.queries.other_apps import call_service
 from apps.pricing.queries.reads import find_rule
 from apps.pricing.queries.rows import rule_row, snapshot_values
-from apps.pricing.schemas import SCOPE_TARGETS, TYPE_VALUES, RuleIn, RuleOut, RulePatchIn, RuleRefIn, rule_problems
+from apps.pricing.schemas.rules import (
+    SCOPE_TARGETS,
+    TYPE_VALUES,
+    RuleIn,
+    RuleOut,
+    RulePatchIn,
+    RuleRefIn,
+    rule_problems,
+)
 from apps.pricing.services.writes import _actor, _constraint, _field_error, _group_held, _group_id, _held_product
 from base import operations as platform
 

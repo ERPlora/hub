@@ -7,7 +7,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { A, EMPLOYEE, login, settled, shown } from './helpers';
-import { cleanInvoices, flowShots, issueByHand, readyToInvoice } from './invoice-helpers';
+import { cleanInvoices, flowShots, issueByHand, openInvoice, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 
 const CUSTOMER = `e2e PDF ${stamp()}`;
@@ -48,10 +48,7 @@ async function downloaded(page: Page): Promise<{ name: string; words: string; ti
   };
 }
 
-async function open(page: Page): Promise<void> {
-  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
-  await expect(shown(page).locator('[data-testid=invoice-detail-title]')).toContainText(invoice.number);
-}
+const open = (page: Page): Promise<void> => openInvoice(page, invoice);
 
 test('«Download PDF» saves the invoice as a real PDF under its number, with what the screen shows', async ({ page }) => {
   await login(page, A, '/invoice/invoices');
@@ -71,7 +68,7 @@ test('«Download PDF» saves the invoice as a real PDF under its number, with wh
   });
 });
 
-const ACTIONS = ['print', 'pdf', 'back'].map((name) => `[data-testid=invoice-detail-${name}]`);
+const ACTIONS = ['print', 'pdf', 'email', 'back'].map((name) => `[data-testid=invoice-detail-${name}]`);
 
 test('the buttons of the invoice fit in the three sizes, as tall as each other', async ({ page }) => {
   await login(page, A, '/invoice/invoices');
@@ -80,7 +77,7 @@ test('the buttons of the invoice fit in the three sizes, as tall as each other',
     await page.setViewportSize({ width, height });
     await settled(page);
     const boxes = await Promise.all(ACTIONS.map(async (one) => (await shown(page).locator(one).boundingBox())!));
-    expect(boxes.map((box) => Math.round(box.height))).toEqual([44, 44, 44]);
+    expect(boxes.map((box) => Math.round(box.height))).toEqual([44, 44, 44, 44]);
     for (const box of boxes) {
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);

@@ -279,6 +279,20 @@ class TestUpdate:
 
         assert answer["to_review"] is False
 
+    def test_saving_all_it_shows_keeps_what_it_had_of_an_app_that_is_off(self, client, olga, monkeypatch):
+        role = a_role(sale__view_sale=ON, inventory__view_product=ON, inventory__delete_product=OFF)
+        client.force_login(olga)
+        monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: frozenset({"base", "sale"}))
+        shown = detail(client, role)
+        assert "sale.view_sale" in shown
+        assert "inventory.view_product" not in shown
+
+        response = post(client, "/roles/update", {"role": str(role.pk), "states": shown})
+
+        assert response.status_code == 200, response.content
+        role.refresh_from_db()
+        assert role.states == {**shown, "inventory.view_product": ON, "inventory.delete_product": OFF}
+
     def test_its_name_and_description_change_alone(self, client, olga):
         role = a_role(sale__view_sale=ON)
         client.force_login(olga)

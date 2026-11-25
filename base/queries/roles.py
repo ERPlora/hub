@@ -6,7 +6,7 @@ approvable (``approvals``): a manager approves it on the spot with their PIN (BA
 """
 
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from typing import Any
 from uuid import UUID
 
@@ -99,7 +99,8 @@ def role_detail(ctx: OperationContext, data: RoleIn) -> dict:
         if basic is not None:
             return {**_basic_out(basic, members), "apps": _panels(on, states_of(RoleHeld(basic.value, None), on))}
         role = business_role(data.role)
-        return {**_own_out(role, members, on), "apps": _panels(on, states_of(RoleHeld(role.origin, role), on))}
+        review = to_review(role.states, grantable(on))
+        return {**_own_out(role, members, on), "apps": _panels(on, states_of(RoleHeld(role.origin, role), on), review)}
 
 
 def states_of(held: RoleHeld, configs: list[LiveAppConfig]) -> dict[str, str]:
@@ -199,13 +200,20 @@ def _own_out(role: BusinessRole, members: Counter[str], on: list[LiveAppConfig])
     }
 
 
-def _panels(on: list[LiveAppConfig], states: dict[str, str]) -> list[dict[str, Any]]:
+def _panels(on: list[LiveAppConfig], states: dict[str, str], review: Collection[str] = ()) -> list[dict[str, Any]]:
     """«What it allows», a panel per app: the business first, each module by its name, the sensitive data last; each
-    permission ``states`` says, with its phrase."""
+    permission ``states`` says, with its phrase, whether a manager can approve it and whether it is left to ``review``."""
+    approvable = approvable_permissions(on)
 
     def lines(permissions: Iterable[tuple[str, object]]) -> list[dict]:
         return [
-            {"permission": permission, "phrase": str(phrase), "state": states[permission]}
+            {
+                "permission": permission,
+                "phrase": str(phrase),
+                "state": states[permission],
+                "approvable": permission in approvable,
+                "to_review": permission in review,
+            }
             for permission, phrase in permissions
             if permission in states
         ]

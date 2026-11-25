@@ -272,12 +272,16 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cinco roles de erplora.com y, debajo, los propios del negocio, con de dónde vienen, cuántas personas tienen y
-cuántos permisos dan. Tocar uno abre «Qué permite».
+Los cinco roles de erplora.com y, debajo, los propios del negocio, con «Básico» o «Propio», cuántas personas los
+tienen y cuántos permisos dan; uno propio con permisos nuevos lleva «Por revisar». Tocar uno abre «Qué permite». Quien
+gestiona los roles tiene «Nuevo rol» arriba y, en cada fila, «Duplicar»; en los propios, también «Editar» y «Borrar»
+en «⋮».
 
 ### Empleados · Roles · Qué permite
-Un rol, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
-y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
+Un rol: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
+y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»). Es de solo
+lectura, salvo uno propio para quien gestiona los roles, que ahí mismo le cambia el nombre, la descripción y lo que
+permite, y pulsa «Guardar».
 
 ### Empleados · API keys
 Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie, el
@@ -442,7 +446,7 @@ En la pantalla Archivos:
 | BASE-F80 | Reincorporar a una persona que salió del negocio | hecho |
 | BASE-F81 | Entender cómo entra cada persona | hecho |
 | BASE-F82 | Ver los roles del negocio y lo que permite cada uno | hecho |
-| BASE-F83 | Asignar un rol a una persona | hecho |
+| BASE-F83 | Asignar un rol básico a una persona | hecho |
 | BASE-F84 | Aprobar con el PIN de un responsable | hecho |
 | BASE-F85 | Consultar quién aprobó qué | hecho |
 | BASE-F86 | Crear una llave de API y copiar su token | hecho |
@@ -481,11 +485,11 @@ En la pantalla Archivos:
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
 | BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | hecho |
-| BASE-F127 | Crear un rol propio a partir de otro | parcial |
-| BASE-F128 | Ajustar lo que permite un rol propio | parcial |
-| BASE-F129 | Borrar un rol propio | parcial |
+| BASE-F127 | Crear un rol propio a partir de otro | hecho |
+| BASE-F128 | Ajustar lo que permite un rol propio | hecho |
+| BASE-F129 | Borrar un rol propio | hecho |
 | BASE-F130 | Dar un rol propio a una persona | parcial |
-| BASE-F131 | Ver en la campana los roles por revisar | parcial |
+| BASE-F131 | Ver en la campana los roles por revisar | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -2305,11 +2309,12 @@ Pantalla: Empleados · Roles; Empleados · Roles · Qué permite
 Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
-  2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
-     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son los roles básicos de erplora.com:
+  2. Una fila por rol (en el móvil, una tarjeta): «Propietario», «Administrador», «Encargado», «Empleado» y
+     «Gestoría», con «Básico», cuántas personas lo tienen y cuántos permisos da. Son los roles básicos de erplora.com:
      cada app aporta lo que da a cada rol básico en ella, y una app puede traer un rol básico propio cuando su
      funcionalidad lo pida. Debajo, por su nombre, los roles propios del negocio, con «Propio»: quien
-     tiene uno cuenta en él y no en el de su invitación, salvo el propietario, que siempre es el propietario.
+     tiene uno cuenta en él y no en el de su invitación, salvo el propietario, que siempre es el propietario. Uno propio
+     con permisos que aún no lleva dice además «Por revisar».
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
@@ -2321,16 +2326,18 @@ Pasos:
      momento) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con aprobación». Una app
      apagada no sale. Es solo lectura: aquí no se cambia nada. En un rol propio pone «Lo que este rol deja hacer en este
      negocio, app por app.» y sale lo que el negocio guardó; lo que no se puede dar en un rol propio, ser el propietario
-     del negocio, no sale.
-  5. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
+     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo.
+  5. Quien gestiona los roles (el propietario y el administrador, o quien lo tenga en su rol propio) crea uno con
+     «Nuevo rol» o «Duplicar» y, en «⋮», edita o borra los propios.
+  6. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles, las personas del negocio, las apps encendidas y lo que cada app da a cada rol.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; en «Qué permite», «No se pudo cargar lo que
 permite este rol.» con «Reintentar», y un rol que no es de los cinco ni de los propios, «Este rol no existe en este
 negocio.».
-Implicados: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131, BASE-F77
+Implicados: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F129, BASE-F130, BASE-F131, BASE-F77
 
-### BASE-F83 Asignar un rol a una persona
+### BASE-F83 Asignar un rol básico a una persona
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Roles
@@ -2340,46 +2347,58 @@ Pasos:
      Google Play no están).
   2. Allí le cambia el rol.
   3. Al volver, la persona sale con su rol nuevo. Si tiene el hub abierto, lo que ve y lo que puede hacer
-     cambian al momento, sin cerrar su sesión.
+     cambian al momento, sin cerrar su sesión. Si el negocio le dio un rol propio, ese sigue mandando.
 Entra: el rol que se elige en erplora.com.
 Sale: la persona con su rol nuevo, como lo manda erplora.com, y su sesión abierta.
 Si falla: lo que diga erplora.com.
-Implicados: BASE-F82, BASE-F13
+Implicados: BASE-F82, BASE-F13, BASE-F130
 
 ### BASE-F127 Crear un rol propio a partir de otro
-Estado: parcial — se crea pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: Asistente
+Pantalla: Empleados · Roles; Asistente
 Pasos:
-  1. Pide al asistente un rol a partir de otro, con su nombre: «crea el rol Cajero a partir de Empleado». Puede partir
-     de uno básico o de uno propio, y llevar una descripción.
-  2. La tarjeta dice «A partir de: Empleado» y «Nombre: Cajero» (BASE-F97). Al aceptarla, el rol queda creado con lo
-     mismo que permite el otro, app por app, menos ser el propietario del negocio, que ningún rol propio da.
-  3. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él. Lo que permite se ve al tocarlo (BASE-F82) y
-     se cambia con BASE-F128; se da a una persona con BASE-F130. Desde entonces no cambia con el rol del que salió.
+  1. En **Empleados › Roles**, «Duplicar» en la fila de un rol, básico o propio, o «Nuevo rol» arriba, que parte del
+     de empleado.
+  2. En «Nuevo rol» escribe el «Nombre» y, si quiere otro, elige «A partir de» entre todos los roles: «Permitirá lo
+     mismo que ese rol. Después ajustas lo que permite.».
+  3. «Crear rol»: el rol queda creado con lo mismo que permite el otro, app por app, menos ser el propietario del
+     negocio, que ningún rol propio da. Sale «Rol Cajero creado» y se abre para ajustarlo.
+  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona pidiéndoselo al asistente.
+     Desde entonces no cambia con el rol del que salió.
+  5. También se pide al asistente: «crea el rol Cajero a partir de Empleado», con una descripción si se quiere. La
+     tarjeta dice «A partir de: Empleado» y «Nombre: Cajero», y al aceptarla queda creado igual.
 Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
 Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
-Si falla: sin nombre, «Ponle nombre al rol.»; con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
+Si falla: sin nombre, «Crear rol» no se puede pulsar (el asistente y la API: «Ponle nombre al rol.»); con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
 con ese nombre. Elige otro.»; un rol que no está, «Este rol no existe en este negocio.». Nadie da lo que no tiene: si
 el rol del que parte permite algo que quien lo crea no puede hacer, o deja «Con aprobación» algo a lo que su propio rol
-le dice «No», «Un rol no puede permitir más de lo que puedes hacer tú.» y no se crea. A quien no gestiona roles el
-asistente no se lo ofrece, y la API contesta 403.
+le dice «No», «Un rol no puede permitir más de lo que puedes hacer tú.» y no se crea. Lo que se rechaza se dice en
+la propia ventana, que sigue abierta. A quien no gestiona roles no le salen «Nuevo rol» ni «Duplicar», el asistente no
+se lo ofrece y la API contesta 403.
 Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Ajustar lo que permite un rol propio
-Estado: parcial — se ajusta pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: Asistente
+Pantalla: Empleados · Roles · Qué permite; Asistente
 Pasos:
-  1. Pide el cambio al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
-  2. La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
-     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR
-     (BASE-F98).
-  3. Al aceptarla solo cambia lo que se pidió. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian
-     al momento en sus dispositivos, sin cerrar su sesión (BASE-F13).
-  4. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
+  1. En **Empleados › Roles**, toca un rol propio, o «Editar» en su «⋮». Arriba, «Lo que este rol deja hacer en este
+     negocio, app por app. Al guardar, quien lo tiene lo nota al momento.», cuántas personas lo tienen y su «Nombre» y
+     «Descripción», que se cambian ahí. Debajo, los mismos paneles de «Qué permite»: cada permiso con su frase
+     y un interruptor o, en lo que un responsable puede aprobar con su PIN, «Permitido», «Con aprobación» o «No».
+  2. Cambia lo que quiera y pulsa «Guardar» al final: «Rol guardado.». Sin nada cambiado, «Guardar» no se puede pulsar.
+  3. Si otra persona lo guarda mientras tanto, lo que aquí no se ha tocado se pone al día.
+  4. También se pide al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
+     La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
+     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR,
+     y al aceptarla solo cambia lo que se pidió.
+  5. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian al momento en sus dispositivos, sin cerrar su
+     sesión.
+  6. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
      añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos, y la campana
-     lo dice (BASE-F131).
+     lo dice. Al abrirlo, «Permisos nuevos por revisar» arriba y «Por revisar» en cada uno: «Guardar», cambiando algo o
+     sin cambiar nada, los da por revisados.
 Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
 Sale: el rol cambiado. Evento `base.role.updated`.
 Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
@@ -2387,22 +2406,25 @@ tiene, tampoco «Con aprobación» lo que su propio rol le niega: «Un rol no pu
 tú.»; y ser el propietario no se da a nadie: «Eso es solo del propietario del negocio: ningún rol lo da.». Un permiso que
 no es de una app encendida, «Ese permiso no es de ninguna app encendida de este negocio.»; «Con aprobación» en algo que
 un responsable no puede aprobar con su PIN, «Eso no se puede aprobar con un PIN: elige permitido o no.». El nombre, como
-al crearlo.
+al crearlo. Lo que se rechaza en la pantalla se dice junto a «Guardar», con «No se pudo guardar el rol», o bajo el
+nombre, y lo que se estaba cambiando sigue puesto. Quien no gestiona los roles lo ve de solo lectura.
 Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Borrar un rol propio
-Estado: parcial — se borra pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: Asistente
+Pantalla: Empleados · Roles; Asistente
 Pasos:
-  1. Pide al asistente «borra el rol Cajero».
-  2. La tarjeta dice el rol y, bajo «Lo que va a pasar», cuántas personas lo tienen, y pide escribir CONFIRMAR
-     (BASE-F98). Al aceptarla, el rol desaparece de **Empleados › Roles**.
-  3. Quien salió del negocio con ese rol, si vuelve, entra con el de su invitación.
+  1. En **Empleados › Roles**, «Borrar» en el «⋮» de un rol propio.
+  2. «¿Borrar el rol Cajero? No se puede deshacer.»: al confirmarlo, «Rol Cajero borrado», y desaparece de la lista.
+  3. También se pide al asistente: «borra el rol Cajero». La tarjeta dice el rol y, bajo «Lo que va a pasar», cuántas
+     personas lo tienen, y pide escribir CONFIRMAR.
+  4. Quien salió del negocio con ese rol, si vuelve, entra con el de su invitación.
 Entra: el rol.
 Sale: el rol borrado. Evento `base.role.deleted`.
-Si falla: si alguien del negocio lo tiene, no se borra: «2 personas tienen este rol. Dales otro antes de borrarlo.». Un
-rol básico no se borra: «Este rol es de erplora.com. Duplícalo y cambia la copia.».
+Si falla: si alguien del negocio lo tiene, no se borra: «2 personas tienen este rol. Dales otro antes de borrarlo.», en
+la misma pregunta, que sigue abierta. Un rol básico no tiene «Borrar»; al asistente y a la API se les contesta «Este rol
+es de erplora.com. Duplícalo y cambia la copia.».
 Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
 
 ### BASE-F130 Dar un rol propio a una persona
@@ -2432,20 +2454,21 @@ este rol. Dales otro antes de borrarlo.».
 Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
 
 ### BASE-F131 Ver en la campana los roles por revisar
-Estado: parcial — la campana los cuenta y lleva a los roles; falta la pantalla donde se revisan
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: La campana
+Pantalla: La campana; Empleados · Roles; Empleados · Roles · Qué permite
 Pasos:
-  1. Se enciende una app, o una app gana un permiso, después de guardar un rol propio: ese rol queda por revisar
-     (BASE-F128).
+  1. Se enciende una app, o una app gana un permiso, después de guardar un rol propio: ese rol queda por revisar.
   2. La campana de quien gestiona los roles sube sin recargar con el aviso «2 roles por revisar» y su frase: «Hay una
      app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol.».
-  3. «Revisar los roles» abre **Empleados › Roles**.
-  4. Al guardar un rol con lo que le faltaba (BASE-F128), deja de contar; sin ninguno, el aviso desaparece.
+  3. «Revisar los roles» abre **Empleados › Roles**, donde ese rol lleva «Por revisar».
+  4. Al abrirlo, «Permisos nuevos por revisar» y cada uno marcado con «Por revisar». Elige qué hace el rol con cada uno y
+     pulsa «Guardar», aunque no cambie nada.
+  5. Al guardarlo deja de llevar la marca y de contar; sin ninguno, el aviso desaparece.
 Entra: los roles propios del negocio y las apps encendidas.
 Sale: nada guardado.
 Si falla: quien no gestiona los roles no ve el aviso. Si no se pueden leer los avisos, la campana se queda con lo último
-que supo, como en BASE-F10.
+que supo, como con los demás avisos.
 Implicados: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Aprobar con el PIN de un responsable
@@ -2529,23 +2552,26 @@ Pasos:
   1. En **Empleados › API keys**: «Una llave deja que otro sistema (el de tu gestoría, tu tienda online) lea o
      escriba datos de este negocio por su API.» y «Nueva API key».
   2. En «Nueva API key», el «Nombre» («Gestoría — facturas»), las «Peticiones por minuto» («De 1 a 10.000.») y
-     «Qué puede hacer esta key»: «Acceso total», «Solo lectura», «Solo escritura» o «Por app», marcando en cada app
-     «Lectura» y «Escritura»; solo sale la casilla de lo que quien la crea puede hacer en esa app.
+     «Qué puede hacer esta key»: «Elegir apps» o «Todas las apps», con las casillas «Leer», «Crear», «Modificar» y
+     «Borrar» de cada app o, en «Todas las apps», una sola vez para todas («Todas las apps de tu negocio, también las
+     que añadas después.»). Solo sale la casilla de lo que quien la crea puede dar: en lo demás hay un guion, y la app
+     en la que no puede dar nada no sale, ni «Todas las apps» si no puede dar nada en todas. Con «Crear key» vale lo
+     marcado en la opción elegida.
   3. Pulsa «Crear key»: sale «API key creada» con «Copia el token ahora», «Este es el único momento en que se
      muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
      dice «Copiado»). «Hecho» la cierra.
   4. Lo que puede hacer una llave son cuatro acciones, en todas las apps (también las que se añadan después) o app
-     por app: leer, crear, modificar y borrar. «Lectura» es leer y «Escritura», crear, modificar y borrar de lo que
-     quien la crea puede dar; «Acceso total», las cuatro en todas las apps. Por la API se elige cada acción por
-     separado: una llave que solo lee y crea en Inventario.
+     por app: leer, crear, modificar y borrar, cada una por separado. Una llave con «Leer» en Inventario lee sus
+     productos; crear, modificar o borrar uno, o abrir otra app, se le niega.
   5. Una llave nunca recibe más de lo que puede hacer quien la crea: en una app, una acción que no puede hacer en
      ninguna de sus llamadas; en todas las apps, una acción que no puede hacer en alguna app que la publica.
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla, y quién la creó, que pone su techo
 (BASE-F125). Evento `base.api_key.created`.
-Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.», «Una key no puede hacer más de lo que puedes hacer tú.» o «No se pudo copiar al
-portapapeles.».
+Si falla: sin nombre o sin ninguna casilla marcada, «Crear key» no se puede pulsar; sin ninguna app en la que dar
+nada, «No hay ninguna app a la que puedas dar acceso.». «No se pudo crear la API key.», «Elige al menos una app y qué
+puede hacer la key en ella.», «Esa app no publica lo que la key haría en ella.», «Una key no puede hacer más de lo que
+puedes hacer tú.» o «No se pudo copiar al portapapeles.».
 Implicados: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotar una llave de API
@@ -2583,16 +2609,17 @@ Actor: propietario, administrador
 Pantalla: Empleados · API keys
 Pasos:
   1. En **Empleados › API keys** (la pestaña solo existe para quien administra), una fila por llave: «Nombre»,
-     «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada», «Último uso» («Nunca» si
-     no se ha usado) y «Límite». «Permisos» dice «Acceso total», «Solo lectura» o «Solo escritura» si la llave lo es
-     en todas las apps; si no, sus acciones en «Todas las apps» y app por app, con su inicial: L (leer), C (crear),
-     M (modificar) y B (borrar), como «Tienda online L/C · Impuestos L».
+     «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada por», «Creada», «Último uso»
+     («Nunca» si no se ha usado) y «Límite». «Permisos» dice «Acceso total», «Solo lectura» o «Solo escritura» si la
+     llave lo es en todas las apps; si no, sus acciones en «Todas las apps» y app por app, con su inicial: L (leer),
+     C (crear), M (modificar) y B (borrar), como «Tienda online L/C · Impuestos L». «Creada por» dice el nombre de
+     quien la creó, nunca su dirección de correo.
   2. Busca con «Buscar API key…». Al pie, un enlace lleva a la documentación de la API.
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
 Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
 que un sistema externo pueda leer o escribir datos de tu negocio.».
-Implicados: BASE-F86, BASE-F87, BASE-F88
+Implicados: BASE-F86, BASE-F87, BASE-F88, BASE-F125
 
 ### BASE-F90 Consultar la documentación de la API
 Estado: hecho
@@ -2834,12 +2861,23 @@ Pasos:
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
      porque no sabe cuál es («Servicios: Tinte»; si manda el servicio y además un nombre, dice el servicio que se
-     reserva); una lista de líneas que llevan su registro y, al lado, solo cifras —las de una recepción de mercancía
-     (producto y cantidad) o los servicios de un bono (servicio y sesiones)—, por el nombre del registro seguido de sus
-     cifras, la cantidad como se escribe en el idioma de la persona y un importe como dinero («Productos: Vino tinto · 6;
-     Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; si una línea no se puede nombrar, la lista dice
-     cuántas lleva: se leería como una cifra suelta); y cualquier otra, como una línea con dos registros (el empleado y
-     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; un cobro,
+     reserva); una lista de lo que escribió la persona, como las opciones de un campo de selección, por cada una tal
+     cual («Opciones: Terraza, Dentro»); una lista de líneas que llevan en palabras su registro, el nombre que dijo la
+     persona, lo que escribió o una hora o una fecha y, al lado, solo cifras —una recepción de mercancía (producto y
+     cantidad), los servicios de un bono (servicio y sesiones), los platos de una comanda hecha a mano, los tramos de
+     un horario o las líneas de una factura hecha a mano—, por sus palabras seguidas de sus cifras, la cantidad como se
+     escribe en el idioma de la persona, un importe como dinero y el IVA escrito a mano como porcentaje («Productos:
+     Vino tinto · 6; Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; «Platos: Espresso · 2, Café con
+     leche · 1»; «Tramos horarios: 9:00 · 14:00»; «Líneas: Menús de cumpleaños privado · 10 % · 1 · 681,82 €»; si una
+     línea no se puede nombrar, la lista dice cuántas lleva: se leería como una cifra suelta); los campos
+     personalizados de una ficha, cada uno por su nombre y su valor como lo enseña la ficha: un sí o un no en el idioma
+     de la persona, una fecha como se escribe en él y un campo que se vacía, con una raya («Campos personalizados:
+     Preferencia de mesa · Terraza, VIP · Sí»; «VIP · —»); los días especiales que se cargan de golpe, por su fecha y
+     su nombre y, si ese día abre, sus horas («1 ene 2027 · Año Nuevo, 6 ene 2027 · Epifanía del Señor, 26 mar 2027 ·
+     Viernes Santo y 7 más»); una línea con dos registros que la tarjeta nombra, por los dos (el producto y quien lo
+     atiende en una venta, «Champú · Bea Ruiz · 2»); y cualquier otra, como una línea con un registro que la tarjeta
+     no puede nombrar, una con un sí o un no o una lista dentro o una lista de códigos, por cuántos elementos lleva;
+     un cobro,
      por su total y cómo se paga, como el botón de la hoja **Cobro**: el total, tal como lo calcula el TPV para quien
      pregunta («Total: 12,50 €»), y cada forma de pago con lo que paga («Pagos: Efectivo · 12,50 €»; la que va sin
      importe paga lo que dejan las otras y, si no se dice ninguna, todo en efectivo, como cobra la acción), nunca
@@ -4891,14 +4929,18 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   (`base/tests/test_role_assign_race.py`). `base.permissions.role_held` dice el rol de la invitación y el propio que
   manda: lo leen `access_for`, `base.session.me` (el nombre del rol y los permisos que un responsable puede aprobar),
   la huella de `base.session.access` y el asistente. Los «Roles por revisar» los cuenta
-  `base.queries.roles.roles_to_review` en `base.bell.counters`.
+  `base.queries.roles.roles_to_review` en `base.bell.counters`. `base.role.detail` dice de cada permiso si un responsable
+  puede aprobarlo (`approvable`) y si queda por revisar (`to_review`). En la SPA, `RolesList.vue` es la lista, `NewRoleModal.vue`
+  el alta y `RolePage.vue` la página de un rol, que pinta `RoleEditor.vue` (con `useSettingsForm`) en uno propio para
+  quien tiene `base.manage_roles`; al cambiar algo de lo que permite manda todos los permisos que enseña, y así queda revisado.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
   por dirección (`KEY_ADDRESS_LIMIT`). La llave vive en la BD del negocio, así que la de uno nunca abre otro (test
   A≠B en `base/tests/test_api_keys.py`); un negocio sin BD propia no se sirve y su dirección responde 503
   `base.hub_maintenance`, con llave o sin ella. Crear una llave con más de lo que puede quien la crea (BASE-F86) responde
-  403 `base.api_key_beyond_maker`.
+  403 `base.api_key_beyond_maker`. «Nueva API key» solo ofrece lo que dice `grantable` de `base.api_key.list` y manda lo
+  marcado que siga ahí (`askedScopes`, `base/frontend/lib/api-key-scopes.ts`).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
@@ -4996,7 +5038,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts` y `tests/e2e/base-api-keys.spec.ts` (crear, copiar, usar, rotar y revocar una
-  llave en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
+  llave que solo lee Inventario en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
 - La QA maestra del Hub (BASE-F107 = BASE-G152) es una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`,
   contra el SaaS de la pila
   (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
@@ -5061,14 +5103,14 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 - **«Mover a otro clúster…» de madrugada** (hub#1508, parte de hub#931) es `control.admin.HubAdmin.move_to_cluster`
   con «Cuándo»: «En su próxima madrugada» (marcada de entrada, como la «próxima ventana de mantenimiento» de RDS) o
   «Ahora» (lo de siempre; también lo que hace `control.hub.move` sin `when`). La de madrugada deja en el hub
-  `move_scheduled_to` y `move_scheduled_for` (`control.services.night_start`: arranca entre las 03:00 y las 05:00 de
+  `move_scheduled_to` y `move_scheduled_for` (`control.services.move.night_start`: arranca entre las 03:00 y las 05:00 de
   su `Hub.timezone`, o de la del despliegue si no tiene una válida; dentro de esa franja, en el acto) y el negocio
   sigue abierto: la lista de Hubs lo dice en la columna del clúster, con la hora en su reloj. La franja acota el
   arranque, no el final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del
   negocio; Business Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o
   «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.worker_pass.run_due`
   (`launch_due`), con el arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
-  (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
+  (`control.services.worker_move.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
   cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
   cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
   (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
@@ -5129,7 +5171,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `control/tests/test_services_restore_any_size.py::test_a_copy_of_any_size_is_asked`.
 - **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
   formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
-  `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
+  `control.hub.restore` (`control.services.restore._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
   `<control>_copy_<hex de la fila>` (`base.tenancy.names.copy_db_name`). El worker la hace en el hilo de los traslados
   (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: vuelca la
   copia al bucket, clona sin conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore` desde el bucket,
@@ -5239,10 +5281,10 @@ usa ningún flujo del Hub dicen quién las llama.
 | `base.person.detail` | F78, F79 |
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
-| `base.role.list` | F82, F83, F127, F129, F130 |
-| `base.role.detail` | F82, F97, F128, F129, F130 |
+| `base.role.list` | F82, F83, F127, F129, F130, F131 |
+| `base.role.detail` | F82, F97, F128, F129, F130, F131 |
 | `base.role.create` | F127 |
-| `base.role.update` | F128 |
+| `base.role.update` | F128, F131 |
 | `base.role.delete` | F129 |
 | `base.role.assign` | F130 |
 | `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |

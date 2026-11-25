@@ -76,7 +76,7 @@ class ClusterSizesOut(Schema):
 
 #: A move asked now: its business closes from now until the worker is done.
 MOVE_NOW = "now"
-#: A move asked for the business's next night (``control.services.night_start``): open until the worker starts it.
+#: A move asked for the business's next night (``control.services.move.night_start``): open until the worker starts it.
 MOVE_AT_NIGHT = "at_night"
 
 

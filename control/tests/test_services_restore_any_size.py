@@ -1,6 +1,6 @@
 """A copy of any size is asked from a temporary cluster, to put the business back as it was at a moment
 (``control.hub.restore``) or to make it aside (``control.hub.restore_aside``): the worker copies it through the dumps
-bucket, never through its own disk, so its size stops nothing (``control.services._copy_to_restore`` only checks the
+bucket, never through its own disk, so its size stops nothing (``control.services.restore._copy_to_restore`` only checks the
 copy is there). What both refuse is in ``test_services_restore.py``'s ``AskedFromATemporaryCluster``."""
 
 import datetime as dt
@@ -29,7 +29,7 @@ def copied_aside(hub: Hub) -> bool:
 
 @pytest.mark.parametrize(
     ("operation", "asked"),
-    [(services.hub_restore, restoring), (services.hub_restore_aside, copied_aside)],
+    [(services.restore.hub_restore, restoring), (services.restore.hub_restore_aside, copied_aside)],
     ids=["in-place", "aside"],
 )
 def test_a_copy_of_any_size_is_asked(admin_ctx, monkeypatch, operation, asked):

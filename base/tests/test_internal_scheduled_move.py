@@ -45,7 +45,7 @@ def ask_for_tonight(target: Cluster) -> None:
     Hub.objects.filter(pk=HUB_ID).update(timezone="Europe/Madrid", state_version=7)
     with pytest.MonkeyPatch.context() as clock:
         clock.setattr(timezone, "now", lambda: NOON)
-        control_services.hub_move(
+        control_services.move.hub_move(
             system_context(REGISTRY_SCOPE), HubMoveIn(hub=HUB_ID, cluster=target.pk, when="at_night")
         )
 
@@ -75,7 +75,7 @@ def test_a_move_asked_for_the_night_says_when_it_starts_in_utc_and_nothing_else(
 
 def test_it_says_the_move_next_to_the_platform_freeze(client, db, target):
     from control.schemas import FreezeIn
-    from control.services import freeze_set
+    from control.services.freeze import freeze_set
 
     ask_for_tonight(target)
     freeze_set(system_context(REGISTRY_SCOPE), FreezeIn(frozen=True, reason="Aurora upgrade"))
@@ -90,7 +90,7 @@ def test_once_the_worker_starts_the_move_it_says_none(client, db, target):
     ask_for_tonight(target)
     with use_control():
         assert provisioning.claim_hub(HUB_ID, TONIGHT, move.moving.LEASE, owner="a:1") is not None
-        assert control_services.start_scheduled_move(HUB_ID, TONIGHT, owner="a:1") is True
+        assert control_services.worker_move.start_scheduled_move(HUB_ID, TONIGHT, owner="a:1") is True
 
     assert poll(client)["move_scheduled_for"] is None
 
@@ -99,6 +99,6 @@ def test_once_the_move_is_cancelled_it_says_none(client, db, target):
     ask_for_tonight(target)
     assert poll(client)["move_scheduled_for"] == "2026-11-17T02:00:00Z"
 
-    control_services.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=HUB_ID))
+    control_services.move.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=HUB_ID))
 
     assert poll(client)["move_scheduled_for"] is None

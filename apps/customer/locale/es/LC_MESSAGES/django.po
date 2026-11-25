@@ -631,3 +631,11 @@ msgstr "Borrar los datos personales de un cliente"
 
 msgid "Note in a customer's activity what other apps bring"
 msgstr "Anotar en la actividad de un cliente lo que traen otras apps"
+
+msgctxt "custom field value"
+msgid "Yes"
+msgstr "Sí"
+
+msgctxt "custom field value"
+msgid "No"
+msgstr "No"

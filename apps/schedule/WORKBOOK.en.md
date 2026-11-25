@@ -264,7 +264,7 @@ reached from the screen: the notice only shows when there is a week).
 Involved: BASE-F01, BASE-F12
 
 ### SCHEDULE-F04 Add a special day
-<!-- from WORKBOOK.md sha256:9ec4d12bd6cd -->
+<!-- from WORKBOOK.md sha256:fcea507009e8 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
@@ -277,7 +277,9 @@ Steps:
    **Notes**.
 5. Tap **Add day**: the form closes and the day shows in the list.
 In: date (a real one: 31 February is not valid), name (up to 200), closed or intervals, yearly and notes
-(up to 1000).
+(up to 1000). Through the assistant, the card says on its line the name, the date and its hours, or that it is
+closed ("Create in Schedules: Christmas Eve · Date: Dec 24, 2027 · Opening intervals: 10:00 AM · 2:00 PM"; closed,
+"Closed: Yes"): intervals of a day left closed are not saved, and the card does not say them.
 Out: the special day (`schedule.special_day.created`). It beats everything else that day (SCHEDULE-F10,
 F11). A yearly day applies **every year**, also the ones before its date; the one on 29 February only
 exists in leap years.
@@ -287,7 +289,7 @@ name or one of only spaces, under the name. A date that had a deleted special da
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F05 Add a temporary change
-<!-- from WORKBOOK.md sha256:c7687ba6b532 -->
+<!-- from WORKBOOK.md sha256:65cdd7daaa65 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
@@ -298,7 +300,9 @@ Steps:
    intervals that apply on those dates (summer hours).
 4. Tap **Add override**.
 In: the two dates (both included), the reason (up to 200) and closed or intervals: the change applies to
-every day of the range with the same hours.
+every day of the range with the same hours. Through the assistant, the card says on its line the reason, its dates
+together and its hours, or that it is closed ("Create in Schedules: Summer hours · When: Jul 1 – Aug 31, 2027 ·
+Opening intervals: 8:00 AM · 3:00 PM").
 Out: the temporary change (`schedule.override.created`). It beats the week, but loses against a special
 day on that date (there is no warning that it overrides it: precedence settles it).
 If it fails: "The end date cannot be before the start date." under To; "Those dates overlap the temporary

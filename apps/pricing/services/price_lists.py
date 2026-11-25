@@ -13,10 +13,10 @@ from apps.pricing import events
 from apps.pricing.models import PriceList
 from apps.pricing.queries.reads import find_list
 from apps.pricing.queries.rows import list_row
-from apps.pricing.schemas import (
+from apps.pricing.schemas.fields import RANGE_BACKWARDS
+from apps.pricing.schemas.price_lists import (
     DEFAULT_CURRENCY,
     DEFAULT_HAS_GROUP,
-    RANGE_BACKWARDS,
     PriceListDefaultIn,
     PriceListIn,
     PriceListOut,

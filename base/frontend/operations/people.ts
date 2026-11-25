@@ -67,6 +67,10 @@ export interface RolePermission {
   permission: string;
   phrase: string;
   state: RoleState;
+  /** A manager can approve it there and then, so a role may leave it to approval. */
+  approvable: boolean;
+  /** An own one: the role was saved before this permission was there to look at. */
+  to_review: boolean;
 }
 
 /** `base.RoleAppOut`: one panel of «What it allows»: the business, an app that is on, or the sensitive data. */

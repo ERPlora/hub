@@ -25,4 +25,5 @@ from . import (
     fields as fields,
     writes as writes,
     field_values as field_values,
+    assistant_cards as assistant_cards,
 )

@@ -17,7 +17,7 @@ from apps.pricing.models import PriceItem
 from apps.pricing.queries.other_apps import call_service
 from apps.pricing.queries.reads import ITEM_NOT_FOUND, find_list, live_items
 from apps.pricing.queries.rows import item_row, load_item, removed_row
-from apps.pricing.schemas import PriceItemIn, PriceItemOut, PriceItemPatchIn, PriceItemRefIn
+from apps.pricing.schemas.prices import PriceItemIn, PriceItemOut, PriceItemPatchIn, PriceItemRefIn
 from apps.pricing.schemas.price_removed import PriceRemovedOut
 from apps.pricing.services.writes import _actor, _constraint, _held_product
 
