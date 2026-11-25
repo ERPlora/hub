@@ -787,7 +787,7 @@ knew: "Could not load notifications" with "Retry".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-<!-- from WORKBOOK.md sha256:9fbc88603bd0 -->
+<!-- from WORKBOOK.md sha256:62130c1d1cce -->
 Status: done
 Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
@@ -816,6 +816,7 @@ that address. With the pass spent or the minute gone, erplora.com says so and of
 account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com". Whoever is not the owner has no
 "Upgrade plan" anywhere in the Hub, nor erplora.com's Store: the administrator, the manager and the employee do not buy.
+In ERPlora's own business, which has no plan and buys nothing, its owner has neither; "Manage on erplora.com", yes.
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -1481,7 +1482,7 @@ of the tab goes on; a card that does not load is left out and the others show.
 Involved: BASE-F40, BASE-F118, PRINTING-F21
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
-<!-- from WORKBOOK.md sha256:f19c17ea973b -->
+<!-- from WORKBOOK.md sha256:0328535c675e -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -1541,7 +1542,8 @@ been counted for less than their period, they say "Since {day}". The assistant i
 not answer, its row says "Not available right now", with no figure, and the screen goes on; the same if WhatsApp cannot be
 read. In a demo, instead of everything: "Use is not measured in a demo: its data is deleted when it ends.". While the hub
 does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends it." and, under
-"What you use", the figures with no limit, bar, pill or line at the top.
+"What you use", the figures with no limit, bar, pill or line at the top. ERPlora's own business will never have one:
+instead it says "This is ERPlora's own business: it has no plan.", with the same figures.
 Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Know which version is running and when it was updated
@@ -3116,21 +3118,22 @@ failed: …" and the assistant tells it.
 Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
-<!-- from WORKBOOK.md sha256:d13d6abe2da3 -->
+<!-- from WORKBOOK.md sha256:b63066914a0f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
-  2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
-     goes on. All it says goes to the same bubble, and what each round says in its own paragraph: never glued to the
-     previous one.
-  3. Each action that changes something asks for its own card (BASE-F97), one after the other: accepting the first
-     does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
-     those left.
+  2. The assistant solves it in rounds: it reads what it needs without asking (several things in the same round, if it
+     needs them), asks for an action, it is done and it goes on. All it says goes to the same bubble, and what each
+     round says in its own paragraph: never glued to the previous one.
+  3. Each action that changes something asks for its own card (BASE-F97), one after the other, also those it asks for
+     in the same round: accepting or cancelling the first does not answer for the next ones. If more wait behind it,
+     the card carries "Cancel all", which cancels this one and those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows twenty rounds at most, and each action is one: it is a brake against loops, not an allowance,
-     and a read and a change for each day of the week fit easily. On the twentieth the assistant can do nothing more
+  5. A request allows twenty rounds at most, each with all the assistant asks for at once: it is a brake against
+     loops, not an allowance, and a read and a change for each day of the week fit easily even if it asks for them one
+     by one. On the twentieth the assistant can do nothing more
      and answers with what it has done and what is left, to ask for it in another message; if it still asks for an
      action, it is not done and its card does not appear, and it is told to answer. If it keeps trying, "I stopped:
      this needed too many steps. Ask for it in parts.".

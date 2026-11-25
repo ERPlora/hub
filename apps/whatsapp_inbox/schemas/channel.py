@@ -104,7 +104,7 @@ class ChannelOut(Schema):
     )
     plans_url: str = Field(
         description="Where the plan is upgraded for more WhatsApp messages: erplora.com's plans; empty when "
-        "this server is not linked to erplora.com."
+        "this server is not linked to erplora.com and in ERPlora's own business, which has no plan."
     )
 
 
