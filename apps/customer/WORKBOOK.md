@@ -584,11 +584,12 @@ Servicios, Citas, Reservas, Reservas online y Mesas para vaciar sus copias, y Au
 las ejecuciones que aún podían seguir con sus datos (esperando, preguntando o reanudables) y les hace
 olvidar lo que leyeron: ninguna le manda ya nada; y toda ejecución que nombra su ficha, también una ya
 terminada, olvida los textos libres de su historial que pueden llevar su nombre (FLOW-F16). Ventas y
-Facturación conservan su copia fiscal (es un documento fiscal).
+Facturación conservan su copia fiscal (es un documento fiscal); Facturación quita la dirección de los correos con que
+envió sus facturas (INVOICE-F26).
 Si falla: «Este cliente ya no está disponible.» si no existe. Repetirlo no cambia los datos ni
 duplica la auditoría, pero vuelve a avisar.
 Implicados: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F16, FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24, INVOICE-F26
 
 ### CUSTOMER-F17 Asignar un cliente a la venta en el TPV
 Estado: hecho — el buscador es `CustomerSearch` (ver «Buscador de cliente del TPV · API»); lo monta Venta en su pantalla

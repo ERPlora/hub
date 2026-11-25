@@ -28,8 +28,8 @@ Sirve igual al restaurante y a la peluquería.
 - **Consultar, imprimir y cobrar** (F16–F20): lista paginada viva con búsqueda y filtros (también las vencidas), ficha con el
   «Justificante VeriFactu», A4 por la impresora del sistema o el diálogo del navegador (nunca sin su QR), «Marcar
   pagada» y la factura vigente de una venta para otras apps.
-- **Descargar** (F24, F25): las facturas emitidas en Excel y cada una en PDF, el mismo A4 con su QR, que imprime el
-  servidor.
+- **Descargar y enviar** (F24–F26): las facturas emitidas en Excel y cada una en PDF, el mismo A4 con su QR, que imprime el
+  servidor; y cada una por correo, con ese PDF adjunto y las respuestas al propietario del negocio.
 - **El emisor** (F21): la identidad fiscal del negocio, obligatoria para emitir; el paso «Los datos de tu negocio»
   del Inicio y el aviso «Todavía no puedes facturar» de la campana hasta que está.
 - **Hub de plataforma** (F23, parte de Facturación): `invoice.invoice.issue_platform` y sus consultas emiten las
