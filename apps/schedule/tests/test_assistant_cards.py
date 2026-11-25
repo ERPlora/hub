@@ -102,6 +102,8 @@ def test_a_special_day_open_says_its_name_its_day_and_its_hours(language):
         ("date", words["eve"]),
         ("intervals", [{"open_time": words["eight"], "close_time": words["three"]}]),
     ]
+    # Its hours say it is open: «Closed: No» is not said again behind them.
+    assert [field["name"] for field in drawn("schedule.special_day.create", arguments, language)] == ["name", "date", "intervals"]
 
 
 @HUB_DB
