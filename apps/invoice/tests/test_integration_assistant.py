@@ -488,7 +488,7 @@ NAMED = {
     "invoice.invoice.rectify": ("invoice_id",),
     "invoice.invoice.rectify_from_refund": ("refund_id",),
     "invoice.invoice.rectify_from_void": ("sale_id",),
-    "invoice.invoice.send_email": ("invoice_id",),
+    "invoice.email.send": ("invoice_id",),
     "invoice.invoice.substitute": ("customer_id", "invoice_id"),
     "invoice.series.update": ("series_id",),
 }

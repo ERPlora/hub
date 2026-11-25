@@ -12,7 +12,7 @@ from apps.invoice.tests.conftest import A, run
 from base.models import Hub
 from base.tenancy.context import current_alias
 
-SEND = "invoice.invoice.send_email"
+SEND = "invoice.email.send"
 LIST = "invoice.email.list"
 OWNER = "olga@example.com"
 ANA = "ana@example.com"

@@ -68,13 +68,13 @@ async def invoice_print(request, data: DocumentIn):
     return await run_operation(request, services.paper.print_invoice, data)
 
 
-@bind(router, "invoice.email.list", "/invoice/invoices/emails")
+@bind(router, "invoice.email.list", "/invoice/emails")
 async def email_list(request, params: Query[EmailListIn]):
     return await run_operation(request, queries.emails.list_emails, params)
 
 
-@bind(router, "invoice.invoice.send_email", "/invoice/invoices/send_email")
-async def invoice_send_email(request, data: SendEmailIn):
+@bind(router, "invoice.email.send", "/invoice/emails/send")
+async def email_send(request, data: SendEmailIn):
     return await run_operation(request, services.emails.send_email, data)
 
 

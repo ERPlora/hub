@@ -73,7 +73,7 @@ def _tell(ctx: OperationContext, name: str, email: InvoiceEmail) -> None:
 
 
 @operation(
-    "invoice.invoice.send_email",
+    "invoice.email.send",
     kind="command",
     permission="invoice.add_invoice",
     input=SendEmailIn,
@@ -82,8 +82,8 @@ def _tell(ctx: OperationContext, name: str, email: InvoiceEmail) -> None:
     ai={
         "asks": {
             "en": (
-                "email FACT-2025-000317 to Carpintería Lema",
-                "drop FACT-2025-000317 into Carpintería Lema's inbox",
+                "email Carpintería Lema theirs",
+                "drop it into Carpintería Lema's inbox",
             ),
             "es": (
                 "mándale por correo la FACT-2025-000317 a Carpintería Lema",

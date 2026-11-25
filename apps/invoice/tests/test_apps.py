@@ -133,7 +133,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.document",
         "invoice.invoice.pdf",
         "invoice.invoice.print",
-        "invoice.invoice.send_email",
+        "invoice.email.send",
         "invoice.email.list",
         "invoice.email.claim",
         "invoice.email.record",
@@ -178,7 +178,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.issuer.sync",
         "invoice.invoice.issue_platform",
         "invoice.public.substitute",
-        "invoice.invoice.send_email",
+        "invoice.email.send",
     }
     # The ticket's public page's read is the page's own, never an assistant tool.
     assert ops.pop("invoice.public.ticket").ai is INTERNAL
