@@ -86,8 +86,8 @@ def _tell(ctx: OperationContext, name: str, email: InvoiceEmail) -> None:
                 "drop it into Carpintería Lema's inbox",
             ),
             "es": (
-                "mándale por correo la FACT-2025-000317 a Carpintería Lema",
-                "envía por correo la FACT-2025-000317 a nuria@example.com",
+                "mándale la suya por correo a Carpintería Lema",
+                "envíasela por correo a Nuria, a nuria@example.com",
             ),
         },
         "description": "Emails one invoice, with its PDF, to its customer: to the address given, or else to the one on "
