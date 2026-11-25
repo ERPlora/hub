@@ -13,7 +13,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.inventory import events
-from apps.inventory.models import Category, Product, ProductCategory, StockMovement, UNIT_SPECS
+from apps.inventory.models import Category, measure_alike, Product, ProductCategory, StockMovement
 from apps.inventory.queries.products import load_product
 from apps.inventory.queries.reads import find_product, held
 from apps.inventory.queries.settings import current_settings
@@ -343,14 +343,14 @@ def _live_categories(category_ids: list[UUID]) -> list[Category]:
 
 
 def _check_pricing_unit(unit: str, pricing_unit: str) -> None:
-    if UNIT_SPECS[unit].category != UNIT_SPECS[pricing_unit].category:
+    if not measure_alike(unit, pricing_unit):
         message = str(PRICING_UNIT_MISMATCH)
         raise InvalidPayload(message, code="invalid_field", fields={"pricing_unit": message})
 
 
 def _same_kind(pricing_unit: str, unit: str) -> str:
     """The pricing unit to keep when the unit changes: the same one if it measures alike, else the new unit."""
-    return pricing_unit if UNIT_SPECS[pricing_unit].category == UNIT_SPECS[unit].category else unit
+    return pricing_unit if measure_alike(pricing_unit, unit) else unit
 
 
 def _save(product: Product, **options) -> None:
