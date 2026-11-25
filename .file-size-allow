@@ -29,7 +29,6 @@
 553 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
 597 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
-699 apps/pricing/schemas/__init__.py ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -50,13 +49,10 @@
 600 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
-893 apps/table/queries/__init__.py ERPlora/erplora-next#74
 825 apps/table/schemas/__init__.py ERPlora/erplora-next#74
 612 apps/task/queries.py ERPlora/erplora-next#74
 645 apps/task/services.py ERPlora/erplora-next#74
 311 apps/tax/frontend/operations.d.ts ERPlora/erplora-next#74
-607 apps/tax/services.py ERPlora/erplora-next#74
-1021 apps/tax/tests/test_services.py ERPlora/erplora-next#74
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
 401 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -73,7 +69,6 @@
 616 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
 625 control/models.py ERPlora/erplora-next#74
-1017 control/services.py ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74

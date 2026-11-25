@@ -1,28 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { mayTick, modeOf, scopesOfApps, scopesOfMode } from './api-key-scopes';
+import { askedScopes, modeOf } from './api-key-scopes';
 
 const GRANTABLE = { '*': ['read', 'create', 'update'], shop: ['read', 'create', 'update', 'delete'], tax: ['read'] } as const;
 
 describe('api-key-scopes', () => {
-  it('a general mode is its actions on every app', () => {
-    expect(scopesOfMode('full')).toEqual({ '*': ['read', 'create', 'update', 'delete'] });
-    expect(scopesOfMode('read')).toEqual({ '*': ['read'] });
-    expect(scopesOfMode('write')).toEqual({ '*': ['create', 'update', 'delete'] });
+  it('on every app, what is ticked there and nothing of what is ticked app by app', () => {
+    expect(askedScopes({ '*': ['read', 'update'], shop: ['delete'] }, GRANTABLE, true)).toEqual({ '*': ['read', 'update'] });
   });
 
-  it('per app, «Write» is the creating, changing and deleting who asks may give there', () => {
-    const perApp = { shop: ['read', 'write'], tax: ['read'], gone: [] } as const;
-    expect(scopesOfApps(perApp, { ...GRANTABLE, shop: ['read', 'create', 'update'] })).toEqual({
-      shop: ['read', 'create', 'update'],
-      tax: ['read'],
+  it('on chosen apps, what is ticked on each and nothing on every app; an app with nothing ticked is left out', () => {
+    expect(askedScopes({ '*': ['read'], shop: ['read', 'delete'], tax: [] }, GRANTABLE, false)).toEqual({ shop: ['read', 'delete'] });
+  });
+
+  it('never what who asks may not give there (any more)', () => {
+    expect(askedScopes({ shop: ['read', 'delete'], tax: ['update'], gone: ['read'] }, { ...GRANTABLE, shop: ['read'] }, false)).toEqual({
+      shop: ['read'],
     });
-  });
-
-  it('a box is there only for what who asks may give on that app', () => {
-    expect([mayTick(GRANTABLE, 'shop', 'read'), mayTick(GRANTABLE, 'shop', 'write')]).toEqual([true, true]);
-    expect([mayTick(GRANTABLE, 'tax', 'read'), mayTick(GRANTABLE, 'tax', 'write')]).toEqual([true, false]);
-    expect(mayTick(GRANTABLE, 'other', 'read')).toBe(false);
+    expect(askedScopes({ '*': ['read', 'delete'] }, GRANTABLE, true)).toEqual({ '*': ['read'] });
+    expect(askedScopes({ '*': ['read'] }, {}, true)).toEqual({});
   });
 
   it('a key on every app reads as its general mode; any other, as none', () => {

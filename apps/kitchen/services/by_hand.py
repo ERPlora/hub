@@ -15,6 +15,7 @@ from apps.kitchen.services.catalog import find_product
 from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out
 from apps.kitchen.services.writes import _ticket_event, actor, take_number, write_log
+from base.assistant import card_order
 from base.queries.people import actor_name
 
 
@@ -39,6 +40,7 @@ from base.queries.people import actor_name
         "description": "Make a kitchen ticket by hand, with no check (a staff meal, a dish to remake): its type, "
         "where it goes, notes and its dishes (products of the catalogue by name, or free text), each to its station.",
         "risk": "normal",
+        "summary": card_order.said_first("label", "items"),
     },
 )
 def create_ticket(ctx: OperationContext, data: TicketCreateIn) -> dict:

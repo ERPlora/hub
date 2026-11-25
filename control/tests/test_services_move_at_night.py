@@ -34,10 +34,10 @@ class TestTheNight:
         ],
     )
     def test_it_starts_within_the_window_of_the_business_s_own_clock(self, now, starts):
-        assert services.night_start(dt.datetime.fromisoformat(now), self.MADRID) == dt.datetime.fromisoformat(starts)
+        assert services.move.night_start(dt.datetime.fromisoformat(now), self.MADRID) == dt.datetime.fromisoformat(starts)
 
     def test_the_window_is_from_three_to_five(self):
-        assert (services.NIGHT_STARTS, services.NIGHT_ENDS) == (dt.time(3), dt.time(5))
+        assert (services.move.NIGHT_STARTS, services.move.NIGHT_ENDS) == (dt.time(3), dt.time(5))
 
 
 class TestMoveAtNight:
@@ -61,8 +61,8 @@ class TestMoveAtNight:
         madrid = a_ready_hub(cluster=old, timezone="Europe/Madrid", last_error="schema_failed: an old one")
         york = a_ready_hub(slug="bistro", cluster=old, timezone="America/New_York")
 
-        out = services.hub_move(admin_ctx, HubMoveIn(hub=madrid.pk, cluster=new.pk, when="at_night"))
-        services.hub_move(admin_ctx, HubMoveIn(hub=york.pk, cluster=new.pk, when="at_night"))
+        out = services.move.hub_move(admin_ctx, HubMoveIn(hub=madrid.pk, cluster=new.pk, when="at_night"))
+        services.move.hub_move(admin_ctx, HubMoveIn(hub=york.pk, cluster=new.pk, when="at_night"))
 
         madrid.refresh_from_db()
         york.refresh_from_db()
@@ -88,7 +88,7 @@ class TestMoveAtNight:
         new = a_cluster()
         hub = a_ready_hub(timezone=zone)
 
-        services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when="at_night"))
+        services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when="at_night"))
 
         hub.refresh_from_db()
         assert hub.move_scheduled_for == dt.datetime(2026, 11, 17, 8, 0, tzinfo=dt.UTC)
@@ -99,7 +99,7 @@ class TestMoveAtNight:
         new = a_cluster()
         hub = a_ready_hub(timezone="Europe/Madrid")
 
-        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+        out = services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
         hub.refresh_from_db()
         assert (hub.moving_to_id, hub.move_scheduled_to_id, hub.move_scheduled_for) == (new.pk, None, None)
@@ -115,7 +115,7 @@ class TestMoveAtNight:
 
         for cluster, code in ((closed, "control.cluster_closed"), (new, "control.hub_database_missing")):
             with pytest.raises(Conflict) as refused:
-                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk, when="at_night"))
+                services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk, when="at_night"))
             assert refused.value.code == code
         hub.refresh_from_db()
         assert (hub.move_scheduled_to_id, hub.move_scheduled_for) == (None, None)
@@ -125,11 +125,11 @@ class TestMoveAtNight:
 
         new, other = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
         hub = a_ready_hub()
-        services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when="at_night"))
+        services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when="at_night"))
 
         for when, cluster in (("now", new), ("at_night", other)):
             with pytest.raises(Conflict) as refused:
-                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk, when=when))
+                services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk, when=when))
             assert refused.value.code == "control.hub_move_scheduled"
         hub.refresh_from_db()
         assert (hub.moving_to_id, hub.move_scheduled_to_id) == (None, new.pk)
@@ -144,7 +144,7 @@ class TestMoveAtNight:
 
         for when in ("now", "at_night"):
             with pytest.raises(Conflict) as refused:
-                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk, when=when))
+                services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk, when=when))
             assert refused.value.code == "control.cluster_full"
 
     def test_a_cluster_a_move_is_asked_to_for_the_night_is_never_deleted(self, admin_ctx):
@@ -152,7 +152,7 @@ class TestMoveAtNight:
         a_ready_hub(move_scheduled_to=target, move_scheduled_for=self.NOW + dt.timedelta(hours=14))
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_delete(admin_ctx, ClusterIdIn(id=target.pk))
+            services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=target.pk))
 
         assert refused.value.code == "control.cluster_holds_hubs"
         assert Cluster.objects.filter(pk=target.pk).exists()
@@ -162,9 +162,9 @@ class TestMoveAtNight:
 
         new = a_cluster()
         hub = a_ready_hub()
-        services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when="at_night"))
+        services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when="at_night"))
 
-        out = services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+        out = services.move.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
 
         hub.refresh_from_db()
         assert (hub.moving_to_id, hub.move_scheduled_to_id, hub.move_scheduled_for) == (None, None, None)
@@ -173,5 +173,5 @@ class TestMoveAtNight:
         assert events("control.hub.scheduled_move_cancelled") == [{"id": str(hub.pk), "slug": "acme", "to": str(new.pk)}]
         assert events("control.hub.move_cancel_requested") == []
         with pytest.raises(Conflict) as refused:
-            services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+            services.move.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
         assert refused.value.code == "control.hub_not_moving"

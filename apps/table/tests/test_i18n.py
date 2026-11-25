@@ -116,7 +116,7 @@ def test_spanish_texts_of_the_workbook():
         assert (
             str(services.tables.NUMBER_TAKEN) == "Ya hay una mesa con ese número en esta zona."
         )
-        assert str(queries.TABLE_NOT_FOUND) == "Esa mesa no existe en este negocio."
+        assert str(queries.lookups.TABLE_NOT_FOUND) == "Esa mesa no existe en este negocio."
         assert [str(label) for label in TableSession.Status.labels] == [
             "Abierta",
             "Cerrada",

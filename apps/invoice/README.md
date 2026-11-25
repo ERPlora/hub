@@ -6,7 +6,7 @@ sustituye a un tique (F3) y la rectificativa (R1–R5) de cada devolución, anul
 entre Ventas y VeriFactu en la cadena fiscal española: aquí nace el número de serie que luego viaja a la AEAT.
 Sirve igual al restaurante y a la peluquería.
 
-- **Estado**: completa (2026-10-31): sus 21 flujos están `hecho`; lo que no entra, con su issue, en «Qué queda
+- **Estado**: completa (2026-10-31): sus 24 flujos están `hecho`; lo que no entra, con su issue, en «Qué queda
   fuera».
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
@@ -28,6 +28,8 @@ Sirve igual al restaurante y a la peluquería.
 - **Consultar, imprimir y cobrar** (F16–F20): lista paginada viva con búsqueda y filtros (también las vencidas), ficha con el
   «Justificante VeriFactu», A4 por la impresora del sistema o el diálogo del navegador (nunca sin su QR), «Marcar
   pagada» y la factura vigente de una venta para otras apps.
+- **Descargar y enviar** (F24–F26): las facturas emitidas en Excel y cada una en PDF, el mismo A4 con su QR, que imprime el
+  servidor; y cada una por correo, con ese PDF adjunto y las respuestas al propietario del negocio.
 - **El emisor** (F21): la identidad fiscal del negocio, obligatoria para emitir; el paso «Los datos de tu negocio»
   del Inicio y el aviso «Todavía no puedes facturar» de la campana hasta que está.
 - **Hub de plataforma** (F23, parte de Facturación): `invoice.invoice.issue_platform` y sus consultas emiten las
@@ -48,7 +50,7 @@ Sirve igual al restaurante y a la peluquería.
 | Quién la lee | VeriFactu (el aviso `invoice.invoice.issued` y la factura; `invoice.invoice.create` para su factura de prueba), Ventas (emite dentro de su cobro, anulación y devolución), Ventas e Impresión (`invoice.issuer.get`), la plataforma (los dos pasos del Inicio) |
 | Pantallas | `/invoice/invoices` (y la ficha `/invoice/invoices/<id>`), `/invoice/series` y `/invoice/issuer` |
 | Inicio | los pasos «Los datos de tu negocio» (`invoice.issuer.get`, `required=True`) y «Tu numeración de facturas» (`invoice.numbering.status`, recomendado) |
-| Operaciones | 19 consultas (`queries/`) y 14 acciones (`services/`), todas con `ai=`; 26 con ruta en `/api/invoice/…` (`invoice.issuer.sync` y las cuatro del hub de plataforma no tienen ruta: solo el sistema; las dos de la página pública del tique, `invoice.public.ticket` e `invoice.public.substitute`, tampoco: se llaman por la puerta pública de `base`, sin sesión) |
+| Operaciones | 21 consultas (`queries/`) y 19 acciones (`services/`), todas con `ai=`; 29 con ruta en `/api/invoice/…` (`invoice.issuer.sync`, las cuatro del hub de plataforma y las cuatro de la entrega de los correos no tienen ruta: solo el sistema; las dos de la página pública del tique, `invoice.public.ticket` e `invoice.public.substitute`, tampoco: se llaman por la puerta pública de `base`, sin sesión) |
 | Eventos | 6, `invoice.invoice.{issued,rectified,paid}`, `invoice.series.{created,updated}` e `invoice.issuer.updated` (`events.py`); reacciona a `sale.sale.completed`, `sale.sale.refunded` y `sale.sale.voided` |
 | Migraciones | `0001_initial` … `0009_withholding` |
 | Admin | Django admin en `hubs.erplora.com`: series y emisor editables; facturas y líneas en solo lectura, sin alta ni borrado (solo las notas) |

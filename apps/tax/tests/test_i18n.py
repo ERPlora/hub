@@ -39,14 +39,14 @@ MESSAGES = [
     schemas.rules.RANGE_BACKWARDS,
     schemas.rules.WHICH_RULE,
     *schemas.jurisdiction.TAX_KIND_NAMES.values(),
-    services.CATEGORY_EXISTS,
-    services.ALIAS_EXISTS,
-    services.RULE_OVERLAPS,
-    services.RULE_INCOHERENT,
-    services.RULE_END_INVALID,
-    services.RULE_EXISTS,
-    services.RULE_ALREADY_ACTIVE,
-    services.RULE_ALREADY_INACTIVE,
+    services.categories.CATEGORY_EXISTS,
+    services.aliases.ALIAS_EXISTS,
+    services.overlaps.RULE_OVERLAPS,
+    services.rules.RULE_INCOHERENT,
+    services.rule_lifecycle.RULE_END_INVALID,
+    services.rules.RULE_EXISTS,
+    services.rule_lifecycle.RULE_ALREADY_ACTIVE,
+    services.rule_lifecycle.RULE_ALREADY_INACTIVE,
     tax_admin.CHOOSE_A_HUB,
 ]
 
@@ -104,7 +104,7 @@ def test_spanish_texts():
         assert str(TaxRule.TaxType.IGIC.label) == "IGIC (Canarias)"
         assert str(TaxAlias.Source.SHIPPED.label) == "De fábrica"
         assert str(queries.calculation.NO_RATE) == "Ninguna regla fiscal se aplica a esta categoría en este país."
-        assert str(services.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
+        assert str(services.rule_lifecycle.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
         assert str(apps.get_app_config("tax").verbose_name) == "Impuestos"
 
 

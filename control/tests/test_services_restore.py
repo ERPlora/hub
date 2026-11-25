@@ -18,7 +18,7 @@ pytestmark = SERVICES_MARKS
 
 class AskedFromATemporaryCluster:
     """What a restore in place (``control.hub.restore``) and a separate copy (``control.hub.restore_aside``) both
-    refuse, nothing asked (``control.services._restorable``): a hub that is not ready or has no database of its own, a
+    refuse, nothing asked (``control.services.restore._restorable``): a hub that is not ready or has no database of its own, a
     demo, one moving or being restored, a copy from a cluster open to new hubs, with hubs on it or the hub's own, a
     moment still to come, a copy missing; support, and unknown hubs or clusters (a copy of any size is asked:
     ``test_services_restore_any_size.py``)."""
@@ -127,7 +127,7 @@ class TestRestore(AskedFromATemporaryCluster):
     database has a production VeriFactu record the copy lacks or has otherwise: the worker refuses that one, nothing
     changed (``base/tenancy/tests/test_restore.py``), for it reads both databases with the migrator."""
 
-    operation = staticmethod(services.hub_restore)
+    operation = staticmethod(services.restore.hub_restore)
 
     def nothing_asked(self, hub: Hub) -> bool:
         hub.refresh_from_db()
@@ -171,7 +171,7 @@ class TestRestore(AskedFromATemporaryCluster):
         hub = self.a_hub(restoring_from=self.temporary(), restore_point=self.MOMENT)
 
         with pytest.raises(Conflict) as refused:
-            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=a_cluster().pk))
+            services.move.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=a_cluster().pk))
 
         assert refused.value.code == "control.hub_restoring"
 
@@ -191,7 +191,7 @@ class TestRestore(AskedFromATemporaryCluster):
         self.a_hub(restoring_from=source, restore_point=self.MOMENT)
 
         with pytest.raises(Conflict) as refused:
-            services.cluster_delete(admin_ctx, ClusterIdIn(id=source.pk))
+            services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=source.pk))
 
         assert refused.value.code == "control.cluster_holds_hubs"
         assert Cluster.objects.filter(pk=source.pk).exists()
@@ -205,7 +205,7 @@ class TestRestore(AskedFromATemporaryCluster):
             "command",
             "control",
             INTERNAL,
-            "control.services",
+            "control.services.restore",
         )
 
 
@@ -216,7 +216,7 @@ class TestRestoreAside(AskedFromATemporaryCluster):
     data back this way. The copy is a ``RestoredCopy`` row named ``<control>_copy_<its hex>``; it is asked under the
     same conditions as a restore in place (``control.hub.restore``)."""
 
-    operation = staticmethod(services.hub_restore_aside)
+    operation = staticmethod(services.restore.hub_restore_aside)
 
     def nothing_asked(self, hub: Hub) -> bool:
         from control.models import RestoredCopy
@@ -295,14 +295,14 @@ class TestRestoreAside(AskedFromATemporaryCluster):
         Hub.objects.filter(pk=hub.pk).update(cluster=a_cluster(name="cluster-2", host="writer-2.example"))
         for cluster in (source, own):
             with pytest.raises(Conflict) as refused:
-                services.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
+                services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
             assert refused.value.code == "control.cluster_holds_hubs"
         # Made, the copy no longer needs the temporary cluster: it may go; the hub's old one still holds the copy.
         RestoredCopy.objects.update(status=RestoredCopy.Status.MADE, made_at=timezone.now(), source=None)
-        services.cluster_delete(admin_ctx, ClusterIdIn(id=source.pk))
+        services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=source.pk))
         assert not Cluster.objects.filter(pk=source.pk).exists()
         with pytest.raises(Conflict) as refused:
-            services.cluster_delete(admin_ctx, ClusterIdIn(id=own.pk))
+            services.clusters.cluster_delete(admin_ctx, ClusterIdIn(id=own.pk))
         assert refused.value.code == "control.cluster_holds_hubs"
 
     def test_the_copy_aside_is_an_internal_command_of_control(self):
@@ -314,5 +314,5 @@ class TestRestoreAside(AskedFromATemporaryCluster):
             "command",
             "control",
             INTERNAL,
-            "control.services",
+            "control.services.restore",
         )

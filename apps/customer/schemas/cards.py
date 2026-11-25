@@ -31,6 +31,7 @@ from apps.customer.schemas.fields import (
     _text,
 )
 from apps.customer.schemas.health import NOT_FOR_HEALTH_DATA
+from base.schemas.assistant import IN_OWN_WORDS
 from base.sensitive import BUSINESS_TOTALS, CUSTOMER_CONTACT
 
 CustomerSort = Literal[
@@ -152,7 +153,8 @@ class FieldValueIn(Schema):
     field_id: UUID = Field(title=CUSTOM_FIELD, description="The custom field's id.", json_schema_extra=A_FIELD)
     value: _text(10000) = Field(
         description="The value as text: a number, a date YYYY-MM-DD, true/false, one of a select's options, "
-        "or empty to clear it."
+        "or empty to clear it.",
+        json_schema_extra=IN_OWN_WORDS,
     )
 
 

@@ -13,7 +13,8 @@ from live.errors import Conflict, NotFound
 from live.operations import get
 
 from apps.pricing import queries
-from apps.pricing.schemas import PriceItemDetailOut, PriceItemOut, RuleOut
+from apps.pricing.schemas.prices import PriceItemDetailOut, PriceItemOut
+from apps.pricing.schemas.rules import RuleOut
 from base.tenancy.context import use_hub
 from base.tests.typed_operations import ts_fields
 

@@ -7,6 +7,7 @@ from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
 from apps.customer.schemas.fields import INT4_MAX, OPTIONS_MISSING, FieldRefIn, FieldType, Page, PageIn, _text
+from base.schemas.assistant import IN_OWN_WORDS
 
 
 class FieldListIn(PageIn):
@@ -40,7 +41,8 @@ def _options(value: list[str], info: ValidationInfo) -> list[str]:
 
 
 Options = Annotated[
-    list[Annotated[str, StringConstraints(max_length=100)]], Field(max_length=100)
+    list[Annotated[str, StringConstraints(max_length=100), Field(json_schema_extra=IN_OWN_WORDS)]],
+    Field(max_length=100),
 ]
 
 

@@ -11,7 +11,7 @@ from django.contrib import admin
 from django.core.exceptions import ValidationError
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
-from apps.pricing.schemas import MAX_TIERS, TIERS_RISING, TOO_MANY_TIERS, Tier
+from apps.pricing.schemas.rules import MAX_TIERS, TIERS_RISING, TOO_MANY_TIERS, Tier
 
 
 class PriceItemInline(admin.TabularInline):
@@ -50,7 +50,7 @@ class PriceItemAdmin(admin.ModelAdmin):
 
 
 class DiscountRuleForm(forms.ModelForm):
-    """The rule's raw columns, with its tiers read as the API reads them (``schemas.Tier``, rising)."""
+    """The rule's raw columns, with its tiers read as the API reads them (``schemas.rules.Tier``, rising)."""
 
     class Meta:
         model = DiscountRule

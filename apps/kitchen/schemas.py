@@ -22,7 +22,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.allergens import Allergy, AllergyInDish
-from base.schemas.assistant import names
+from base.schemas.assistant import IN_OWN_WORDS, names
 
 T = TypeVar("T")
 
@@ -506,13 +506,13 @@ class SyncOut(Schema):
 class ManualItemIn(In):
     product_id: UUID | None = Field(None, description="A product of the catalogue.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None, description="A product of the catalogue by its name."
+        None, description="A product of the catalogue by its name.", json_schema_extra={"name_of": "product_id"}
     )
     name: _text(200) = Field(
-        "", description="What to cook, when it is not a product of the catalogue."
+        "", description="What to cook, when it is not a product of the catalogue.", json_schema_extra=IN_OWN_WORDS
     )
     quantity: Quantity = Field(Decimal("1"), description="How many.")
-    notes: Note = Field("", description="A note for the cook.")
+    notes: Note = Field("", description="A note for the cook.", json_schema_extra=IN_OWN_WORDS)
 
     @model_validator(mode="after")
     def _dish_named(self):

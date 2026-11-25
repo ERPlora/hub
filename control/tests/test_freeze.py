@@ -44,11 +44,11 @@ def support_ctx():
 
 
 def freeze(ctx, reason: str = "Aurora upgrade with Blue/Green"):
-    return services.freeze_set(ctx, FreezeIn(frozen=True, reason=reason))
+    return services.freeze.freeze_set(ctx, FreezeIn(frozen=True, reason=reason))
 
 
 def lift(ctx):
-    return services.freeze_set(ctx, FreezeIn(frozen=False))
+    return services.freeze.freeze_set(ctx, FreezeIn(frozen=False))
 
 
 class TestGet:

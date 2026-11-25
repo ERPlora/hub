@@ -443,3 +443,12 @@ def test_every_kind_of_document_a_charge_takes_has_its_word():
         "",
         *ID_TYPES,
     ]
+
+
+@HUB_DB
+def test_the_lines_of_a_sale_are_said_by_their_product_and_who_serves_it(shampoo):
+    """A line with two records the card names is said by both and its quantity, never «1 item»."""
+    bea = setup("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"})
+    lines = [{"product_id": str(shampoo.id), "staff_id": str(bea.id), "quantity": "2"}]
+    said = fields_of("sale.sale.complete", {"idempotency_key": KEY, "lines": lines})["lines"]
+    assert (said["value"], said.get(NAMED)) == ([{"product_id": "Shampoo", "staff_id": "Bea Ruiz", "quantity": "2"}], True)

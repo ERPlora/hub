@@ -58,6 +58,12 @@ def pin_clock(monkeypatch, instant: dt.datetime) -> None:
     monkeypatch.setattr("django.utils.timezone.now", lambda: instant)
 
 
+@pytest.fixture
+def noon(monkeypatch):
+    """The floor reads the business's «today»: these tests read it at a fixed noon, never across midnight."""
+    pin_clock(monkeypatch, NOON)
+
+
 def run(name: str, data: dict | None = None, ctx: OperationContext | None = None):
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
@@ -130,6 +136,13 @@ def make_hold(
 def open_check(label: str = "", ctx=None, **more):
     """An open check of Sales, opened by Sales."""
     return run("sale.order.open", {"label": label, **more}, ctx or system_context(A))
+
+
+def end_order(order_id, status: str = "completed"):
+    """Sales ended the check (charged it whole or voided it): what its own operations leave behind."""
+    from apps.sale.models import Order
+
+    Order.objects.filter(pk=order_id).update(status=status, closed_at=timezone.now())
 
 
 def make_customer(name: str = "Ana García", **more):

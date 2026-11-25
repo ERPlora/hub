@@ -48,6 +48,9 @@ dev = [
     "complexipy>=9.0.0",
     # Opens in the tests the Excel files the Hub writes.
     "openpyxl>=3.1.5",
+    # Open in the tests the PDFs the Hub prints and read the QR on them.
+    "pypdfium2>=5.15.2",
+    "zxing-cpp>=3.2.0",
 ]
 
 # ruff checks how big and how branchy each function is, and the common mistakes of the rule families E4, E7, E9, F, B
@@ -98,7 +101,6 @@ max-statements = 50
 "apps/payment/tests/test_queries.py" = ["E731"]
 "apps/pricing/admin.py" = ["DJ007"]
 "apps/pricing/queries/other_apps.py" = ["B035"]
-"apps/pricing/schemas/__init__.py" = ["F402"]
 "apps/pricing/tests/test_relay.py" = ["F841"]
 "apps/sale/tests/conftest.py" = ["F401"]
 "apps/sale/tests/test_concurrency.py" = ["E731"]

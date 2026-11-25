@@ -13,7 +13,7 @@ from apps.reservation.models import Settings
 from apps.reservation.queries.business import business_now, rules_of
 from apps.reservation.queries.gate import blocks_of, engine_blocks, hours_of, slots_of, table_facts
 from apps.table.models import Table
-from apps.table.queries import find_table
+from apps.table.queries.lookups import find_table
 from base.business import business_zone
 
 #: The gate's refusals, by code: their message and the field of the form they belong to.

@@ -7,7 +7,8 @@ from live.operations import operation
 
 from apps.pricing.queries.reads import _page, find_list
 from apps.pricing.queries.rows import _lists, _status, list_row
-from apps.pricing.schemas import Page, PriceListListIn, PriceListOut, PriceListRefIn
+from apps.pricing.schemas.fields import Page
+from apps.pricing.schemas.price_lists import PriceListListIn, PriceListOut, PriceListRefIn
 from base.ordering import list_order
 
 

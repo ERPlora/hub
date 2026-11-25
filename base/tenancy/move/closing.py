@@ -18,7 +18,7 @@ def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names, ours)
     try:
         with ops.connect_ops(cluster=origin) as conn:
             present = databases._present(conn, name, copy_name)
-            if control_services.pending_copy(hub.id) is not None and copy_name in present:
+            if control_services.worker_move.pending_copy(hub.id) is not None and copy_name in present:
                 ours()
                 databases._close(conn, copy_name, roles)
                 return
@@ -29,8 +29,8 @@ def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names, ours)
             if copy_name in present:
                 # An older copy of this hub, from an earlier move off this server: the newer one replaces it.
                 conn.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(databases._identifier(copy_name)))
-                control_services.forget_copy(origin_id, copy_name)
-            control_services.copy_pending(
+                control_services.worker_move.forget_copy(origin_id, copy_name)
+            control_services.worker_move.copy_pending(
                 hub.id, origin_id, copy_name, schema_state=hub.schema_state, schema_apps=hub.schema_apps
             )
             ours()

@@ -16,7 +16,9 @@ from live.outbox import record_event
 
 from apps.sale.models import Order
 from apps.table.models import ACTOR_MAX_LENGTH, Hold, SessionMove, Table, TableSession
-from apps.table.queries import check_label, find_session, find_table, order_is_open, seatable
+from apps.table.queries.lookups import find_session, find_table
+from apps.table.queries.sessions import check_label, order_is_open
+from apps.table.queries.tables import seatable
 from apps.table.queries.floor import ended_orders, reserving_holds
 from base.queries.people import actor_name
 

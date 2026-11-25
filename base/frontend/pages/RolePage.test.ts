@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { errorFrame, flush, mountBase, OWNER, subId } from '../__tests__/mount-base';
 import type { RoleDetail } from '../operations/people';
 import RolePage from './RolePage.vue';
 
@@ -16,21 +16,21 @@ function employee(fields: Partial<RoleDetail> = {}): RoleDetail {
       {
         app: 'base',
         name: 'El negocio',
-        permissions: [{ permission: 'base.view_home', phrase: 'Ver el Inicio y sus paneles', state: 'on' }],
+        permissions: [{ permission: 'base.view_home', phrase: 'Ver el Inicio y sus paneles', state: 'on', approvable: false, to_review: false }],
       },
       {
         app: 'sale',
         name: 'Ventas / TPV',
         permissions: [
-          { permission: 'sale.take_payment', phrase: 'Cobrar', state: 'on' },
-          { permission: 'sale.void_sale', phrase: 'Anular una venta', state: 'approval' },
-          { permission: 'sale.view_all_sales', phrase: 'Ver las ventas de todos', state: 'off' },
+          { permission: 'sale.take_payment', phrase: 'Cobrar', state: 'on', approvable: false, to_review: false },
+          { permission: 'sale.void_sale', phrase: 'Anular una venta', state: 'approval', approvable: true, to_review: false },
+          { permission: 'sale.view_all_sales', phrase: 'Ver las ventas de todos', state: 'off', approvable: false, to_review: false },
         ],
       },
       {
         app: 'sensitive',
         name: 'Datos sensibles',
-        permissions: [{ permission: 'base.view_costs', phrase: 'Ver costes', state: 'off' }],
+        permissions: [{ permission: 'base.view_costs', phrase: 'Ver costes', state: 'off', approvable: false, to_review: false }],
       },
     ],
     ...fields,
@@ -109,6 +109,28 @@ describe('RolePage', () => {
     expect(m.wrapper.findAll('ion-toggle, ion-checkbox, ion-select, ion-input')).toHaveLength(0);
     // The only button is the bar's «Back»; the panels have none.
     expect(m.wrapper.findAll('[data-testid^="role-app-"] ion-button, [data-testid^="role-app-"] button')).toHaveLength(0);
+  });
+
+  it('the business’s own is adjusted there by who manages the roles, and only read by anyone else', async () => {
+    const own = employee({ key: '0199aaaa-0000-7000-8000-000000000001', label: 'Cajero', origin: 'own' });
+    const manages = { ...OWNER, permissions: [...OWNER.permissions, 'base.manage_roles'] };
+    const m = await open({ locale: 'es', session: manages });
+    await m.result(m.call, 'base.role.detail', own);
+    expect(m.wrapper.find('[data-testid="role-switch-sale.take_payment"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="role-save"]').exists()).toBe(true);
+    expect(m.wrapper.text()).toContain('Al guardar, quien lo tiene lo nota al momento.');
+
+    const other = await open({ locale: 'es' });
+    await other.result(other.call, 'base.role.detail', own);
+    expect(other.wrapper.find('[data-testid="role-save"]').exists()).toBe(false);
+    expect(line(other, 'sale.take_payment').text()).toContain('Permitido');
+  });
+
+  it('a basic role is only read, also by who manages the roles', async () => {
+    const m = await open({ session: { ...OWNER, permissions: [...OWNER.permissions, 'base.manage_roles'] } });
+    await m.result(m.call, 'base.role.detail', employee());
+    expect(m.wrapper.find('[data-testid="role-save"]').exists()).toBe(false);
+    expect(m.wrapper.findAll('ion-toggle')).toHaveLength(0);
   });
 
   it('a role that is not one of the five, or a page that cannot be read, says so', async () => {

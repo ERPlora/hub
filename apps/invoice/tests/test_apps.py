@@ -131,7 +131,14 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.get",
         "invoice.invoice.by_source",
         "invoice.invoice.document",
+        "invoice.invoice.pdf",
         "invoice.invoice.print",
+        "invoice.email.send",
+        "invoice.email.list",
+        "invoice.email.claim",
+        "invoice.email.record",
+        "invoice.email.resume",
+        "invoice.email.forget_customer",
         "invoice.invoice.line_defaults",
         "invoice.invoice.create",
         "invoice.invoice.create_from_sale",
@@ -171,6 +178,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.issuer.sync",
         "invoice.invoice.issue_platform",
         "invoice.public.substitute",
+        "invoice.email.send",
     }
     # The ticket's public page's read is the page's own, never an assistant tool.
     assert ops.pop("invoice.public.ticket").ai is INTERNAL
@@ -180,8 +188,8 @@ def test_every_operation_is_described_for_the_assistant():
         )
         if op.kind == "command":
             assert op.ai.get("risk") == ("high" if name in high else "normal"), name
-        elif name == "invoice.invoice.export":
-            # A file with every customer's name and tax ID, for a person to download: no automation runs it alone.
+        elif name in ("invoice.invoice.export", "invoice.invoice.pdf"):
+            # A file with customers' names and tax IDs, for a person to download: no automation runs it alone.
             assert op.ai.get("risk") == "high"
         else:
             assert "risk" not in op.ai, name

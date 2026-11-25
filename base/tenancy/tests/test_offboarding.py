@@ -952,7 +952,7 @@ def test_a_tombstone_does_not_keep_its_cluster_from_being_deleted(business):
         Hub.objects.filter(pk=hub.pk).update(cluster=cluster)
 
         services.offboarding.hub_purge(internal(), HubGetIn(id=hub.pk))
-        control_services.cluster_delete(internal(), ClusterIdIn(id=cluster.pk))
+        control_services.clusters.cluster_delete(internal(), ClusterIdIn(id=cluster.pk))
 
         assert not Cluster.objects.filter(pk=cluster.pk).exists()
     finally:

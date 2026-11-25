@@ -421,11 +421,11 @@ class TestTheCopyGoesThroughTheBucket:
         def the_other_made_meanwhile(*args, **kwargs):
             # The first one dumped; before it reads its copy back, another worker makes the second one whole.
             if not meanwhile:
-                meanwhile.append(control_services.claim_copy(second.pk, timezone.now(), restore.LEASE, OTHER_WORKER))
+                meanwhile.append(control_services.worker_copy.claim_copy(second.pk, timezone.now(), restore.LEASE, OTHER_WORKER))
                 with monkeypatch.context() as patched:
                     patched.setattr(provisioning, "LEASE_OWNER", OTHER_WORKER)
                     restore.make_aside(meanwhile[0], now=AT, source=lambda copied: other_moment)
-                control_services.release_copy(second.pk, OTHER_WORKER)
+                control_services.worker_copy.release_copy(second.pk, OTHER_WORKER)
             return real(*args, **kwargs)
 
         monkeypatch.setattr(move.destination, "_clone_emptied", the_other_made_meanwhile)

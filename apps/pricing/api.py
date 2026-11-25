@@ -9,24 +9,17 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.pricing import queries, services
-from apps.pricing.schemas import (
-    CatalogRefIn,
-    PriceItemIdIn,
-    PriceItemIn,
-    PriceItemListIn,
-    PriceItemPatchIn,
-    PriceItemRefIn,
+from apps.pricing.schemas.catalog import CatalogRefIn
+from apps.pricing.schemas.price_lists import (
     PriceListDefaultIn,
     PriceListIn,
     PriceListListIn,
     PriceListPatchIn,
     PriceListRefIn,
-    ResolveIn,
-    RuleIn,
-    RuleListIn,
-    RulePatchIn,
-    RuleRefIn,
 )
+from apps.pricing.schemas.prices import PriceItemIdIn, PriceItemIn, PriceItemListIn, PriceItemPatchIn, PriceItemRefIn
+from apps.pricing.schemas.resolution import ResolveIn
+from apps.pricing.schemas.rules import RuleIn, RuleListIn, RulePatchIn, RuleRefIn
 
 router = Router(tags=["pricing"])
 

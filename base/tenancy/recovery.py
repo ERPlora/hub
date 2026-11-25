@@ -90,17 +90,17 @@ def run_due(now: dt.datetime | None = None, *, cancelled: Callable[[], bool] | N
     on. One whose business is being moved or restored is left for a later pass. ``cancelled``: whether the worker is
     stopping (then it takes none)."""
     now = now or timezone.now()
-    for recovery_id in control_services.recoveries_due():
+    for recovery_id in control_services.worker_recovery.recoveries_due():
         if cancelled is not None and cancelled():
             return 0
         # By the clock, never ``now``: a move before it in the same tick may have taken longer than the lease.
-        row = control_services.claim_recovery(recovery_id, timezone.now(), LEASE, provisioning.LEASE_OWNER)
+        row = control_services.worker_recovery.claim_recovery(recovery_id, timezone.now(), LEASE, provisioning.LEASE_OWNER)
         if row is None:
             continue
         try:
             worked = recover(row, now=now)
         finally:
-            control_services.release_recovery(recovery_id, provisioning.LEASE_OWNER)
+            control_services.worker_recovery.release_recovery(recovery_id, provisioning.LEASE_OWNER)
         if worked:
             return 1
     return 0
@@ -118,8 +118,8 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
 
     def ours() -> None:
         try:
-            control_services.still_recovering(row.pk, LEASE, owner)
-        except control_services.MoveTaken as taken:
+            control_services.worker_recovery.still_recovering(row.pk, LEASE, owner)
+        except control_services.worker_move.MoveTaken as taken:
             raise move.exceptions.MoveStopped(str(taken)) from taken
 
     results: list[dict] = []
@@ -131,8 +131,8 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
         with translation.override(row.language), use_hub(hub), giving_back(actor_of(row.pk), carrying_on=failed):
             for label, declared, records, refused in read:
                 _give_back(row, hub, results, label, declared, records, refused, ours)
-        control_services.recovery_done(row.pk, results, now, owner)
-    except (move.exceptions.MoveStopped, control_services.MoveTaken) as stopped:
+        control_services.worker_recovery.recovery_done(row.pk, results, now, owner)
+    except (move.exceptions.MoveStopped, control_services.worker_move.MoveTaken) as stopped:
         logger.info("base.tenancy.recovery.stopped copy=%s: %s; left to whoever holds it now.", copy, stopped)
         return True
     except Exception as error:
@@ -141,8 +141,8 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
             reason = f"recover_unexpected: {type(error).__name__}: {error}"
         logger.warning("base.tenancy.recovery.failed hub=%s copy=%s: %s", hub.slug, copy.db_name, reason)
         try:
-            control_services.recovery_failed(row.pk, reason, results, now, owner)
-        except control_services.MoveTaken as taken:
+            control_services.worker_recovery.recovery_failed(row.pk, reason, results, now, owner)
+        except control_services.worker_move.MoveTaken as taken:
             logger.info("base.tenancy.recovery.stopped copy=%s: %s; left to whoever holds it now.", copy, taken)
         return True
     logger.info("base.tenancy.recovery.done hub=%s copy=%s results=%s", hub.slug, copy.db_name, results)

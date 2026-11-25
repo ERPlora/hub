@@ -196,3 +196,7 @@ msgstr "Borrar días especiales y cambios temporales"
 
 msgid "Change the settings"
 msgstr "Cambiar los ajustes"
+
+msgctxt "schedule card"
+msgid "When"
+msgstr "Cuándo"

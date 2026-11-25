@@ -117,9 +117,9 @@ CARD_ONLY = {
     "customer.field.detail",
     "customer.order.get",
 }
-#: The writes whose card says their data by a summary of their own (the rows of a file by their names): a dict, since
-#: ``AI`` holds no summary.
-CARD_SUMMARY = {"customer.customer.import"}
+#: The writes whose card says their data by a summary of their own (the rows of a file by their names, the custom
+#: fields by their values): a dict, since ``AI`` holds no summary.
+CARD_SUMMARY = {"customer.customer.import", "customer.customer.update"}
 
 
 def customer():

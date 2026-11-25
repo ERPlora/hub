@@ -585,7 +585,7 @@ manage cards sees the status without buttons.
 Involved: none
 
 ### CUSTOMER-F16 Erase a customer's personal data (GDPR)
-<!-- from WORKBOOK.md sha256:216b6ef1d609 -->
+<!-- from WORKBOOK.md sha256:a1ed2bfacbbf -->
 Status: done
 Actor: owner, administrator
 Screen: Customer card
@@ -610,11 +610,11 @@ Online booking and Tables to empty their copies, and by Automations, which cance
 go on with her data (waiting, asking or resumable) and makes them forget what they read: none sends her
 anything any more; and every run that names her card, also one that has already ended, forgets the free
 texts of its history that may carry her name (FLOW-F16). Sales & POS and Invoicing keep their tax copy (it
-is a tax document).
+is a tax document); Invoicing takes the address off the emails it sent their invoices in (INVOICE-F26).
 If it fails: "This customer is no longer available." if it does not exist. Repeating it does not change
 the data or duplicate the audit, but notifies again.
 Involved: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F16, FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24, INVOICE-F26
 
 ### CUSTOMER-F17 Assign a customer to the sale at the till
 <!-- from WORKBOOK.md sha256:4c936d0dc73c -->

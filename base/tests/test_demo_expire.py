@@ -41,7 +41,7 @@ from base.tenancy.tests.business import HUB_DB
 from base.tests.test_services_demo import open_session
 from control.models import HubDue
 from control.schemas import FreezeIn
-from control.services import freeze_set
+from control.services.freeze import freeze_set
 
 pytestmark = HUB_DB
 

@@ -171,7 +171,7 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
-<!-- from WORKBOOK.md sha256:02cbc992d758 -->
+<!-- from WORKBOOK.md sha256:f1cb172614fc -->
 Status: done
 Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: Booking page (`/p/<business>/book`; in development, the preview too)
@@ -183,9 +183,10 @@ Steps:
    and their duration if Services shows them ("Show prices", "Show duration").
 3. If the business allows it, she picks a professional among those who do all those services, or "No
    preference".
-4. She picks the day: the **free times** the diary would give the customer show (business hours, the
-   professional's shift and absences, blocks and other appointments; never inside the minimum notice,
-   beyond the maximum, in the past or on top of another appointment).
+4. She taps the day in the calendar, which opens whole in the middle of the screen, and it is chosen with nothing
+   more to press: the **free times** the diary would give the customer show (business hours, the professional's
+   shift and absences, blocks and other appointments; never inside the minimum notice, beyond the maximum, in
+   the past or on top of another appointment).
 5. She writes her name, her **mobile** (required), her email (if the business asks for it) and, if allowed,
    a note.
 6. She presses **Book**: the appointment goes into the diary with the origin "Online booking", **Confirmed**

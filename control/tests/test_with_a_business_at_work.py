@@ -80,8 +80,8 @@ def test_an_operation_of_control_called_inside_a_business_runs_on_control(hub_a,
     cluster = a_cluster()
 
     with use_hub(hub_a):
-        services.freeze_set(admin_ctx, FreezeIn(frozen=True, reason="Aurora upgrade"))
-        services.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
+        services.freeze.freeze_set(admin_ctx, FreezeIn(frozen=True, reason="Aurora upgrade"))
+        services.clusters.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
 
     cluster.refresh_from_db()
     assert (Freeze.objects.get().frozen, cluster.is_open) == (True, False)

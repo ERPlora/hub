@@ -696,7 +696,10 @@ Pasos:
    quieres, y añade sus platos (producto del catálogo, cantidad y nota).
 2. «Crear comanda»: el panel se cierra y la comanda sale arriba de la lista (aunque estuvieras en
    otra página, la lista vuelve a la primera) y en la pantalla.
-Entra: el tipo, el destino, las notas y los platos.
+Entra: el tipo, el destino, las notas y los platos. Por el asistente, cada plato va por un producto del
+catálogo, por su nombre o por lo que se cocina, y su tarjeta dice en su línea el destino y los platos, cada uno
+por lo que se dijo, su nota y cuántos («Crear en Cocina: Staff · Platos: Espresso · 2, Café con leche · 1»); el
+tipo y las notas van detrás.
 Sale: una comanda Por preparar, ronda 1, sin cuenta, con el nombre de quien la crea (avisa: comanda
 creada; Historial «Creada»); sus platos van a su estación como los de una ronda.
 Si falla: dentro del panel, y lo escrito se queda. Una comanda sin platos se rechaza («Añade al menos un

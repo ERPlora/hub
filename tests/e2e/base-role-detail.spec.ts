@@ -1,5 +1,5 @@
-// «What it allows» of a role, basic or the business's own: opened from Employees › Roles, read only, app by app; and it
-// follows live what the business changes in its own.
+// «What it allows» of a role, basic or the business's own: opened from Employees › Roles, app by app, and read only for
+// whoever does not manage the roles; it follows live what the business changes in its own.
 // flow: BASE-F82
 import { type Browser, type BrowserContext, expect, type Page, test, type ViewportSize } from '@playwright/test';
 
@@ -84,12 +84,16 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await rows.nth(5).click();
       await expect(page).toHaveURL(new RegExp(`/employees/roles/${key}$`));
       await expect(testid(page, 'role-members')).toContainText('0');
-      await expectLine(page, 'sale.take_payment', 'Take payments', 'success');
+      await expect(testid(page, 'role-permission-base.own_business')).toHaveCount(0);
+
+      const reader = await hostPage(browser, A, { viewport, next: `/employees/roles/${key}`, credentials: EMPLOYEE });
+      await expectLine(reader.page, 'sale.take_payment', 'Take payments', 'success');
       const changed = { role: key, states: { 'sale.take_payment': 'off' } };
       expect((await api(context, A, 'POST', '/roles/update', changed)).status).toBe(200);
-      await expectLine(page, 'sale.take_payment', 'Take payments', 'neutral');
-      await expect(testid(page, 'role-permission-base.own_business')).toHaveCount(0);
-      await snap(page, 'own', width);
+      await expectLine(reader.page, 'sale.take_payment', 'Take payments', 'neutral');
+      await expect(shown(reader.page).locator('ion-toggle')).toHaveCount(0);
+      await snap(reader.page, 'own', width);
+      await reader.context.close();
     });
     const seen = await problems();
     expect(seen.console).toEqual([]);

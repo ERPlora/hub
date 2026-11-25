@@ -15,6 +15,7 @@ from . import (
     invoices as invoices,
     issuer as issuer,
     numbering as numbering,
+    pdf as pdf,
     platform as platform,
     public as public,
     rectifying as rectifying,
