@@ -34,23 +34,11 @@ from apps.customer.schemas.cards import CustomerIn
 from apps.customer.search import normalize
 from apps.online_booking.events import BOOKING_CREATED, SETTINGS_UPDATED
 from apps.online_booking.models import Booking, Settings
-from apps.online_booking.queries import (
-    ONLINE,
-    PUBLIC,
-    RULE_FIELDS,
-    S,
-    chosen_member,
-    delegated,
-    find_booking,
-    find_by_token,
-    hash_token,
-    load_detail,
-    page_settings,
-    public_booking_out,
-    services_to_book,
-    settings_out,
-    visitor_key,
-)
+from apps.online_booking.queries.bookings import ONLINE, S, find_booking, load_detail
+from apps.online_booking.queries.links import find_by_token, public_booking_out
+from apps.online_booking.queries.offer import chosen_member, services_to_book
+from apps.online_booking.queries.settings import RULE_FIELDS, page_settings, settings_out
+from apps.online_booking.queries.visitors import PUBLIC, delegated, hash_token, visitor_key
 from apps.online_booking.schemas import (
     BookedOut,
     BookingOut,

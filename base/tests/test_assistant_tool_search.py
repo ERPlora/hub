@@ -97,7 +97,7 @@ def test_a_search_finds_the_tools_of_the_task_described_with_what_each_does(make
     found = searched(owner_of_a(make_user, "en"), "list the products of a category")
     assert "inventory__product__list" in names(found)
     assert all(tool["description"] for tool in found)
-    assert len(found) <= assistant.relevance.FOUND
+    assert len(found) <= shared.FOUND
 
 
 def test_a_search_never_finds_what_the_person_may_not_use():

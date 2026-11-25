@@ -60,6 +60,8 @@ async function cardSays(page: Page, tool: string, app: string, line: string, key
 test('BASE-F23 BASE-F24 — the cards of turning an app off and on name what goes with it, as Apps asks', async ({ browser }) => {
   const [context, page] = await ownerIn(browser, 'es');
   try {
+    // Online orders needs Tables too: off, Reservations is the only app on that needs it.
+    expect((await api(context, A, 'POST', '/apps/disable', { app: 'online_order' })).status).toBe(200);
     expect(await appsAsks(page, 'reservation', 'Reservas', 'off')).toContain(OFF_WITH);
     expect(await cardSays(page, 'base__app__disable', 'reservation', `Otras apps: ${OFF_WITH}`, 'off')).toBe(OFF_WITH);
 
@@ -73,6 +75,7 @@ test('BASE-F23 BASE-F24 — the cards of turning an app off and on name what goe
     expect(await cardSays(page, 'base__app__enable', 'reservation', ON_WITH, 'on')).toBe(ON_WITH);
   } finally {
     await api(context, A, 'POST', '/apps/enable', { app: 'reservation' });
+    await api(context, A, 'POST', '/apps/enable', { app: 'online_order' });
     await context.close();
   }
 });

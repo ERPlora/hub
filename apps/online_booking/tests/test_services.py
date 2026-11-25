@@ -23,7 +23,7 @@ from apps.appointment.models import Settings as Rules
 from apps.customer.models import Customer
 from apps.online_booking import services
 from apps.online_booking.models import Booking, Settings
-from apps.online_booking.queries import hash_token, visitor_key
+from apps.online_booking.queries.visitors import hash_token, visitor_key
 from base.tenancy.context import use_hub
 
 from .conftest import (
