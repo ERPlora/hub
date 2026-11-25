@@ -201,5 +201,5 @@ def test_the_printed_document_says_when_it_falls_due_only_if_it_does(at, languag
     at(NOON)
 
     html = page(manual(due_date="2026-12-24"), language)
-    assert f'<span class="k">{label}</span><span class="v">{day}</span>' in html
+    assert f'<td class="k">{label}</td><td class="v">{day}</td>' in html
     assert label not in page(manual(), language)

@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 
-import { A, api, EMPLOYEE, login, shown } from './helpers';
-import { cleanInvoices, flowShots, issuedIds, readyToInvoice } from './invoice-helpers';
+import { A, EMPLOYEE, login, shown } from './helpers';
+import { cleanInvoices, flowShots, issueByHand, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 
 const CUSTOMER = `e2e Export ${stamp()}`;
@@ -19,9 +19,7 @@ const LINES = [
 
 test.beforeAll(async ({ browser }) => {
   const context = await readyToInvoice(browser);
-  const issued = await api<{ id: string; number: string }>(context, A, 'POST', '/invoice/invoices', { ...RECIPIENT, lines: LINES });
-  expect(issued.status, JSON.stringify(issued.data)).toBe(201);
-  issuedIds.add(issued.data.id);
+  await issueByHand(context, { ...RECIPIENT, lines: LINES });
   await context.close();
 });
 

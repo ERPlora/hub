@@ -9,7 +9,7 @@ import pytest
 from django.apps import apps
 from django.core import checks
 from live import assistant as shared
-from live.meta import all_live_app_configs
+from live.meta import all_live_app_configs, module_configs
 from live.operations import registry
 
 from base import assistant
@@ -131,11 +131,14 @@ def test_an_app_out_of_the_store_says_its_words_only_where_its_tools_are_offered
 
 def test_the_words_of_an_app_in_the_store_count_in_every_turn(demo):
     """A listed app's words also name what other apps share: Appointments' «bloqueo» is a reservation's blocked date
-    too, so a turn without any of its tools still reads them."""
+    too, so a turn without any of its tools still reads them; those of an app out of the store (the reference app, and
+    any other not listed yet) do not."""
     reservations = tools_of("reservation")
     assert reservations and not any(op.app_label == "appointment" for op in reservations.values())
     counted = assistant.relevance.ranking(reservations)["synonyms"]
-    assert set(counted) == set(assistant.relevance.synonyms()) - set(said_by(demo))
+    unlisted = [config for config in module_configs() if not config.listed]
+    assert demo in unlisted
+    assert set(counted) == set(assistant.relevance.synonyms()) - {group for config in unlisted for group in said_by(config)}
     assert any(stems_of("blocked") <= concept for concept in concepts("¿qué bloqueos hay en Navidad?", counted))
 
 

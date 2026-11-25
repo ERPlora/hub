@@ -78,6 +78,7 @@ def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
             "es": (
                 "¿falta algún número entre las facturas?",
                 "¿la numeración de las facturas es correlativa?",
+                "¿queda algún hueco al numerar?",
             ),
         },
         "description": "The gaps of the invoice numbering: one row per missing stretch inside a series and year (after "

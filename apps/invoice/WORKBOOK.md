@@ -27,13 +27,13 @@ peluquería: no hay nada propio de un vertical.
 
 ### Quién la usa y qué hace cada uno
 
-- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, emite una
+- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, las descarga en PDF, emite una
   factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
 - El **responsable**, además, ve las facturas de todos, las descarga en Excel, rectifica y lleva las series de
   numeración.
 - El **propietario** y el **administrador**, además, configuran el **emisor** (la identidad fiscal del
   negocio que sale en cada factura).
-- La **gestoría** ve y descarga en Excel las facturas de todos, sin emitir ni cambiar nada.
+- La **gestoría** ve las facturas de todos y las descarga, en Excel o una a una en PDF, sin emitir ni cambiar nada.
 - El **sistema**, sin nadie delante, factura cada cobro y rectifica cada devolución y cada anulación.
 
 No cobra ni devuelve dinero (eso es Ventas), no envía nada a la AEAT ni calcula la huella (eso es
@@ -101,7 +101,7 @@ Configuración inicial, paso a paso:
 ### Facturas
 Todas las facturas del negocio: los tiques de cada cobro, las facturas completas y las rectificativas, lo último
 emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado (también las vencidas sin cobrar), tipo, serie, fecha o total, y ábrelas para
-verlas, imprimirlas o guardarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
+verlas, imprimirlas o descargarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
 completa; con **+** emites una factura a mano. Un empleado ve solo las suyas: las que emitió, las de sus ventas
 (las que cobró y las que se le atribuyeron) y lo que rectifica o sustituye a una de ellas; el responsable, el
 propietario y el administrador ven las de todos.
@@ -127,7 +127,7 @@ una acción de fila sale como aviso encima de la tabla.
 
 #### Ficha de factura
 Se abre desde una fila de **Facturas** (`/invoice/invoices/<id>`). Arriba, «Factura {número}» con la
-etiqueta de estado y los botones «Imprimir / PDF» y «← Volver». Si es una factura completa o una
+etiqueta de estado y los botones «Imprimir / PDF», «Descargar PDF» y «← Volver». Si es una factura completa o una
 rectificativa de una factura completa sin NIF del cliente, el aviso «Esta factura no tiene el NIF del
 cliente: la impresora de tiques no puede sacarla como factura completa.». Debajo, «Tipo», «Serie»,
 «Fecha de emisión», «Fecha de operación» (si es otra), «Vencimiento» (si lo tiene), «Cliente», «NIF cliente», «Dirección», «Emisor»,
@@ -267,6 +267,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F21 | Configurar el emisor | hecho |
 | INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
 | INVOICE-F24 | Descargar en Excel las facturas emitidas | hecho |
+| INVOICE-F25 | Descargar en PDF una factura | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 Estado: hecho — Ventas lo pide dentro del mismo cobro
@@ -771,7 +772,7 @@ se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al a
 del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
 impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
 registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
-Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
@@ -915,6 +916,33 @@ Si falla: un empleado no tiene el botón y la API le responde que no tiene permi
 fallo lo impide, un aviso dice que no se han podido descargar las facturas y por qué, y se puede volver a pulsar.
 Implicados: INVOICE-F16, BASE-F112
 
+### INVOICE-F25 Descargar en PDF una factura
+Estado: hecho
+Actor: empleado (sus facturas), responsable, administrador, propietario y gestoría (las de todos), asistente
+Pantalla: Ficha de factura
+Pasos:
+1. En **Facturas**, abre la factura y pulsa «Descargar PDF».
+2. Se descarga un fichero que se llama como la factura, por ejemplo «FACT-2026-000003.pdf»; si el número lleva una barra
+   u otro signo que un fichero no admite, en su lugar va un guion. En la app instalada queda en Descargas y un aviso
+   dice dónde.
+3. Es el A4 que saca «Imprimir / PDF» y dice lo mismo: emisor, fecha y, si lo tiene, «Vencimiento», «Facturar a», las
+   líneas con sus descuentos, el desglose por tipo con su recargo, los totales, la retención y «Total a pagar» si la
+   lleva, lo que rectifica y las notas. Con VeriFactu, arriba va el QR del registro, con «QR tributario:» y
+   «VERI*FACTU», que se puede escanear. El texto se puede seleccionar y buscar. Una factura larga sigue en más páginas,
+   con la cabecera de las líneas en cada una y los totales al final.
+4. Sale en el idioma de quien la descarga, como su papel; la que emitió la cuenta de ERPlora, en el de su
+   pagador. Un documento de una venta sale como «Copia», igual que al imprimirlo desde la ficha.
+5. Lo mismo se puede pedir al asistente («descárgame el PDF de la FACT-2026-000003»): el fichero queda bajo su
+   respuesta, con «Descargar» y su nombre.
+Entra: la factura, sus líneas y, con VeriFactu, el QR de su registro.
+Sale: el fichero; la factura no cambia y el fichero no se guarda en el Hub. Mientras se hace, el botón dice
+«Preparando…».
+Si falla: un aviso dice «No se ha podido descargar el PDF» y por qué, y se puede volver a pulsar. Si no se puede leer el
+registro de VeriFactu de una factura que lo tiene, «No se pudo leer su registro de VeriFactu, y una factura nunca se
+imprime sin su QR.»; si el servidor no puede hacerlo, «El PDF no se puede hacer ahora mismo. Inténtalo más tarde.». La
+de otro, para un empleado, no se descarga, tampoco por la API ni con el asistente: «Factura no encontrada.».
+Implicados: INVOICE-F17, INVOICE-F18, INVOICE-F23, VERIFACTU-F19, BASE-F112
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
@@ -922,7 +950,7 @@ persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la 
 nombra por su número (`FACT-2026-000012`), una venta por su número del día (`20261014-0003`), un
 cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie por su código.
 
-Lo que lee o toca una factura ya emitida (la lista, la factura, su documento y su papel, pasarla a completa,
+Lo que lee o toca una factura ya emitida (la lista, la factura, su documento, su PDF y su papel, pasarla a completa,
 marcarla pagada y rectificarla) y la factura de una venta solo alcanzan las que la persona ve: sin «Ver todas
 las facturas», las que emitió, las de sus ventas y lo que rectifica o sustituye a una de ellas. Una que no ve no
 existe para ella (404 `invoice.not_found`;
@@ -940,6 +968,7 @@ entera.
 | El tique que abre su código (número, fecha y total) y, si ya la tiene, su factura completa con su QR de VeriFactu | la página pública | F04 | `invoice.public.ticket` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
+| El PDF de una factura, con el QR de VeriFactu, en un fichero | ver | F25 | `invoice.invoice.pdf` |
 | La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación y dentro de ella) | rectificar | F08 | `invoice.invoice.rectification_preview` |
 | El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
@@ -954,7 +983,7 @@ entera.
 | El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
 | Si el hub de plataforma puede emitir ahora (en producción, solo con el envío real a la AEAT abierto) | solo el sistema | F23 | `invoice.invoice.platform_health` |
 
-Todas menos el Excel se pueden seguir en vivo.
+Todas menos el Excel y el PDF se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1050,7 +1079,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver facturas, series, numeración y emisor; imprimir | sí | sí | sí | sí | `invoice.view_invoice` |
+| Ver facturas, series, numeración y emisor; imprimir y descargar en PDF una factura | sí | sí | sí | sí | `invoice.view_invoice` |
 | Ver las facturas de todos (sin él, solo las suyas: las que emitió, las de sus ventas y lo que las rectifica o sustituye) | sí | sí | sí | no | `invoice.view_all_invoices` |
 | Descargar en Excel las facturas emitidas | sí | sí | sí | no | `invoice.view_all_invoices` |
 | Emitir a mano, facturar una venta, sustituir un tique, marcar pagada | sí | sí | sí | sí | `invoice.add_invoice` |
@@ -1064,8 +1093,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 quien abre la página pública del tique, sin sesión y sin ningún otro permiso; ninguna automatización emite desde ella
 sola (riesgo alto, como sustituir un tique en el mostrador).
 
-La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir» y «Ver las facturas de
-todos»: abre, imprime y descarga en Excel (INVOICE-F24) las facturas emitidas de todos, sin emitir, rectificar ni
+La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir y descargar en PDF una factura» y «Ver las facturas de
+todos»: abre, imprime y descarga en PDF (INVOICE-F25) y en Excel (INVOICE-F24) las facturas emitidas de todos, sin emitir, rectificar ni
 configurar nada.
 
 ## Para quien lo mantiene
@@ -1608,13 +1637,52 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     | Zoho (foro) | una factura de alquiler con retención del 19 % vuelve de la AEAT con «El campo ImporteTotal tiene un valor incorrecto» | https://help.zoho.com/portal/en/community/topic/error-al-enviar-factura-verifactu-a-aeat-con-retenci%C3%B3n-del-19-en-factura-de-alquiler |
     | TaxDown | la rectificativa por diferencias lleva la retención en positivo y el total a cobrar en negativo | https://taxdown.es/informacion-autonomos/factura-rectificativa |
 
+27. **El PDF de una factura** (INVOICE-F25):
+    - **Un botón propio, «Descargar PDF», junto a «Imprimir / PDF»**: descargar e imprimir son dos acciones en Square,
+      Wix y QuickBooks; Holded y TeamSystem Facturas también descargan desde la factura. El diálogo de impresión sigue
+      como está.
+    - **Es el A4 que ya imprime el servidor**: la plantilla del papel (`templates/invoice/invoice.html`) pasada a PDF, la
+      misma del archivo fiscal de una baja y de las facturas de ERPlora. Una segunda maqueta acabaría diciendo otra cosa.
+      Por eso también tiene PDF un tique (Quipu no lo hace: sin cliente no genera PDF).
+    - **Se llama como la factura**: `queries/pdf.py::file_name`; lo que Windows, macOS o Android no admiten en un nombre
+      pasa a guion, como en Odoo, donde la barra del número se cambia.
+    - **El idioma es el del papel**: el de quien lo pide; una factura de la cuenta de ERPlora guarda el de su pagador, y en
+      Stripe el PDF va en el idioma del cliente. El cliente de un negocio no tiene idioma guardado.
+    - **El QR es el del registro, tal cual** (`verifactu.record.by_invoice`): no se recalcula nada. Lo lleva aunque quien
+      descarga no tenga permiso para ver los registros de VeriFactu: es parte de la factura. Un registro que no se puede
+      leer no deja hacer el PDF (`qr_of` de `queries/documents.py`, la misma regla que el papel).
+    - **Una función, dos puertas**: `printed(ctx, factura)` devuelve los bytes; la usan la descarga y el archivo fiscal, y
+      es la que llama quien adjunte la factura a un correo.
+    - **Con WeasyPrint, que ya estaba en la imagen** (0 MB más): fpdf2 (1,5 MB) y ReportLab (5 MB) obligan a escribir otra
+      maqueta. Medido en la imagen arm64 con medio procesador: 0,2 s una factura de 10 líneas y 1,3 s una de 200 (con el
+      equipo muy cargado, de 0,4 a 2,5 s y de 3,2 a 4,3 s); la primera de cada proceso carga la librería y tarda 1,6 s, con
+      unos 60 MB de memoria que se quedan. Se hace en la petición, dentro de la lectura, como el Excel: mientras tanto
+      ocupa una de las transacciones a la vez del plan. Quien imprima muchas, o antes de esperar un envío, lo hace fuera de
+      la transacción (`base/pdf.py`).
+    - **Fuera de Automatizaciones**: es un fichero con el nombre y el NIF de un cliente, para que lo baje una persona.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | Square | en la factura, «More»: imprimir y descargar el PDF son dos acciones | https://squareup.com/help/us/en/article/5137 |
+    | Wix | «Más acciones» › «Descargar PDF», aparte de «Imprimir» | https://support.wix.com/es/article/wix-invoices-administrar-las-facturas |
+    | QuickBooks | «Imprimir o descargar» › «Descargar» en la factura abierta | https://quickbooks.intuit.com/learn-support/es-global/help-article/customer-statements/descarga-guarda-extractos-formularios-de-ventas-en/L6pyi04NN_ROW_es |
+    | Holded | menú de los tres puntos de la factura › «Descargar» | https://intercom.help/holded/es/articles/6877413-gestionar-tus-facturas |
+    | TeamSystem Facturas (Billin) | se descarga en PDF desde la vista de cada factura | https://www.billin.net/crear-enviar-facturas/ |
+    | Odoo | «Send» › «Download»; en su foro, el nombre del fichero es el número sin las barras | https://www.odoo.com/documentation/18.0/applications/finance/accounting/customer_invoices.html · https://www.odoo.com/forum/help-1/change-pdf-file-name-in-invoice-report-definition-odoo-10-121429 |
+    | Cegedim | «Descargar» en la línea de la factura emitida | https://cegedim.helpjuice.com/es_ES/what-does-the-download-function-on-lines-in-sent-invoices-table-do |
+    | Stripe | el PDF sale en el idioma preferido del cliente | https://docs.stripe.com/invoicing/customize |
+    | Shopify | una vista previa de impresión desde la que se imprime o se guarda | https://help.shopify.com/en/manual/fulfillment/managing-orders/printing-orders/printing-documents |
+    | Sage 200 | al imprimir se elige la salida «Fichero pdf» | https://communityhub.sage.com/es/sage-200/f/gestion-comercial/257513/generar-pdf |
+    | Quipu | la factura simplificada no genera PDF | https://intercom.help/quipu/es/articles/7182269-crear-una-factura-o-ticket-de-ingreso |
+
+    De Contasimple, Anfix y FacturaDirecta no hay documentación pública de este paso.
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
 - No cobra ni devuelve dinero: «Marcar pagada» no toca la caja y «Rectificar» no devuelve dinero.
 - No guarda la forma de pago: vive en la venta.
-- No envía facturas por correo ni por WhatsApp, ni genera un PDF propio (el PDF es el del diálogo de
-  impresión del navegador).
+- No envía facturas por correo ni por WhatsApp.
 - No hace presupuestos, proformas, borradores ni albaranes.
 - No lleva cobros parciales, plazos ni recordatorios de impago.
 - No recuerda la retención de un cliente ni la pone sola: se elige en cada factura. Tampoco lleva las retenciones de las

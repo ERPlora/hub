@@ -604,6 +604,7 @@ TITLED_IN_SPANISH = {
     **{f"task.project.{action}:id": "Proyecto" for action in ("delete", "update")},
     **{f"task.task.{action}:id": "Tarea" for action in ("assign", "complete", "delete", "set_status", "update")},
     **{f"tax.rule.{action}:id": "Regla" for action in ("activate", "deactivate", "end")},
+    **{f"tip.tip.{action}:id": "Propina" for action in ("update", "void")},
     **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
         "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
     )},
