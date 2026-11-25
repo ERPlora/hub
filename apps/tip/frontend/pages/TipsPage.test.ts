@@ -119,11 +119,11 @@ describe('TipsPage: the list', () => {
   it('says «There are no tips yet.» with nothing, and «No tips match» when searched or filtered', async () => {
     const s = await setup();
     await s.show(EMPTY);
-    const empty = () => s.wrapper.findComponent(EmptyState as unknown as Component);
-    expect(empty().props('heading')).toBe('There are no tips yet.');
+    const heading = () => (s.wrapper.findComponent(EmptyState as unknown as Component).props() as Record<string, unknown>).heading;
+    expect(heading()).toBe('There are no tips yet.');
     await s.emit('update:search', 'zz');
     await s.show(EMPTY);
-    expect(empty().props('heading')).toBe('No tips match');
+    expect(heading()).toBe('No tips match');
   });
 
   it('a read that fails is the table’s error; reconnecting and an app turned off are said above it', async () => {
