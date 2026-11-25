@@ -89,6 +89,12 @@ MIGRATOR_ALIAS_REASON = (
     "The schema migrator opens hub_<hex>__ddl itself and takes the session "
     "pg_advisory_lock of the schema."
 )
+#: Files, a package: each of its modules that writes or deletes the business's files in the store.
+FILES_STORE_REASON = (
+    "The Files module writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
+    "delete) under the hub's prefix: no model and no database (it imports neither, "
+    "base/tests/test_files.py::test_files_touches_no_model_nor_database); only base.file.* operations reach it."
+)
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
         "The context builder reads Membership, the role the business gave the person and a fresh copy of the user "
@@ -129,11 +135,11 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "The hub file store's save keeps an image a business shows to anyone (storages, not the ORM): no model and no "
         "database; the app that uploads it keeps its own row or name."
     ),
-    "base/files.py": (
-        "The Files module writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
-        "delete) under the hub's prefix: no model and no database (it imports neither, "
-        "base/tests/test_files.py::test_files_touches_no_model_nor_database); only base.file.* operations reach it."
-    ),
+    "base/files/create.py": FILES_STORE_REASON,
+    "base/files/delete.py": FILES_STORE_REASON,
+    "base/files/delete_hub.py": FILES_STORE_REASON,
+    "base/files/relocate.py": FILES_STORE_REASON,
+    "base/files/store.py": FILES_STORE_REASON,
 }
 
 #: Attributes that are a model's manager: ``Model.objects…`` is always the ORM.

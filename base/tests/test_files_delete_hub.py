@@ -1,4 +1,4 @@
-"""``files.delete_hub_files``: a hub's whole prefix leaves the store and nothing of anyone else's does (hub#613).
+"""``files.delete_hub.delete_hub_files``: a hub's whole prefix leaves the store and nothing of anyone else's does (hub#613).
 
 What purges a demo (``base.services.demos.purge_demo_data``) and a business past its 90 days
 (``base.tenancy.offboarding``) calls it, once its database went. On S3 (a real server, moto's, with the bucket versioned
@@ -45,14 +45,14 @@ def keep(store, hub: uuid.UUID, *names: str) -> None:
 
 
 def held(store, hub: uuid.UUID) -> set[str]:
-    return {item.key for item in files.scan(store, hub_prefix(hub))}
+    return {item.key for item in files.store.scan(store, hub_prefix(hub))}
 
 
 def test_everything_under_the_hub_s_prefix_goes(store):
     keep(store, HUB, *KEPT)
     assert held(store, HUB) == set(KEPT)
 
-    files.delete_hub_files(store, HUB)
+    files.delete_hub.delete_hub_files(store, HUB)
 
     assert held(store, HUB) == set()
     assert not store.exists(hub_prefix(HUB)), "no folder left behind on disk"
@@ -65,7 +65,7 @@ def test_nothing_of_anyone_else_goes(store):
     store.save(f"{hub_prefix(HUB)}0/files/contract.pdf", ContentFile(b"bytes"))
     store.save("shared/catalog/img/coffee.webp", ContentFile(b"bytes"))
 
-    files.delete_hub_files(store, HUB)
+    files.delete_hub.delete_hub_files(store, HUB)
 
     assert held(store, NEIGHBOUR) == set(KEPT)
     assert store.exists(f"{hub_prefix(HUB)}0/files/contract.pdf")
@@ -73,17 +73,17 @@ def test_nothing_of_anyone_else_goes(store):
 
 
 def test_a_hub_with_nothing_kept_is_no_failure_and_a_second_pass_neither(store):
-    files.delete_hub_files(store, HUB)
+    files.delete_hub.delete_hub_files(store, HUB)
     keep(store, HUB, *KEPT)
-    files.delete_hub_files(store, HUB)
-    files.delete_hub_files(store, HUB)
+    files.delete_hub.delete_hub_files(store, HUB)
+    files.delete_hub.delete_hub_files(store, HUB)
     assert held(store, HUB) == set()
 
 
 def test_more_keys_than_one_request_takes_go_all_the_same(on_s3, moto_s3, hub_files_bucket, monkeypatch):
     # S3 refuses a DeleteObjects of more than 1000 keys; moto does not, so what is sent is what the test reads.
     s3 = client(moto_s3)
-    many = files.S3_DELETE_BATCH + 1
+    many = files.delete_hub.S3_DELETE_BATCH + 1
     for number in range(many):
         s3.put_object(Bucket=hub_files_bucket, Key=f"{hub_prefix(HUB)}/files/{number}.txt", Body=b"")
     keep(on_s3, NEIGHBOUR, "files/contract.pdf")
@@ -96,10 +96,10 @@ def test_more_keys_than_one_request_takes_go_all_the_same(on_s3, moto_s3, hub_fi
 
     monkeypatch.setattr(deleting, "delete_objects", counted)
 
-    files.delete_hub_files(on_s3, HUB)
+    files.delete_hub.delete_hub_files(on_s3, HUB)
 
-    assert sent == [files.S3_DELETE_BATCH, 1]
-    assert files.S3_DELETE_BATCH == 1000
+    assert sent == [files.delete_hub.S3_DELETE_BATCH, 1]
+    assert files.delete_hub.S3_DELETE_BATCH == 1000
     assert set(objects(moto_s3, hub_files_bucket)) == {f"{hub_prefix(NEIGHBOUR)}/files/contract.pdf"}
 
 
@@ -107,8 +107,8 @@ def test_a_bucket_that_cannot_be_listed_is_a_failure_not_an_empty_prefix(on_s3, 
     keep(on_s3, HUB, "files/contract.pdf")
     on_s3.bucket_name = "erplora-test-no-such-bucket"
 
-    with pytest.raises(files.HubFilesNotDeleted, match=hub_prefix(HUB)):
-        files.delete_hub_files(on_s3, HUB)
+    with pytest.raises(files.delete_hub.HubFilesNotDeleted, match=hub_prefix(HUB)):
+        files.delete_hub.delete_hub_files(on_s3, HUB)
 
     assert set(objects(moto_s3, hub_files_bucket)) == {f"{hub_prefix(HUB)}/files/contract.pdf"}
 
@@ -123,8 +123,8 @@ def test_keys_s3_refuses_inside_a_200_are_a_failure(on_s3, monkeypatch):
 
     monkeypatch.setattr(s3, "delete_objects", refusing)
 
-    with pytest.raises(files.HubFilesNotDeleted) as refused:
-        files.delete_hub_files(on_s3, HUB)
+    with pytest.raises(files.delete_hub.HubFilesNotDeleted) as refused:
+        files.delete_hub.delete_hub_files(on_s3, HUB)
 
     assert "AccessDenied" in str(refused.value)
     assert hub_prefix(HUB) in str(refused.value)
@@ -140,5 +140,5 @@ def test_a_disk_that_fails_is_a_failure(on_disk, monkeypatch, step):
 
     monkeypatch.setattr(on_disk, step, refusing)
 
-    with pytest.raises(files.HubFilesNotDeleted, match=hub_prefix(HUB)):
-        files.delete_hub_files(on_disk, HUB)
+    with pytest.raises(files.delete_hub.HubFilesNotDeleted, match=hub_prefix(HUB)):
+        files.delete_hub.delete_hub_files(on_disk, HUB)

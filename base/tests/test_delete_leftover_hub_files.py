@@ -1,6 +1,6 @@
 """``manage.py delete_leftover_hub_files``: what the hubs gone before hub#781 left in the store, deleted once (hub#785).
 
-Since hub#781 a purge deletes the hub's files after its database (``base.files.delete_hub_files``), but a row already
+Since hub#781 a purge deletes the hub's files after its database (``base.files.delete_hub.delete_hub_files``), but a row already
 ``purged`` never goes through the purge again, so its prefix stayed. The command finds those prefixes in the hub file
 store (a real S3, moto's, versioned as prod's, and the disk of local development) and only lists them unless
 ``--delete``; a hub that is not gone, ``shared/``, the inventory's ``_inventory/`` and anything that is not a hub's
@@ -48,7 +48,7 @@ def keep(store, hub_id: uuid.UUID) -> None:
 
 
 def held(store, hub_id: uuid.UUID) -> set[str]:
-    return {item.key for item in files.scan(store, hub_prefix(hub_id))}
+    return {item.key for item in files.store.scan(store, hub_prefix(hub_id))}
 
 
 def registry_row(status: str, **fields) -> Hub:
@@ -129,7 +129,7 @@ def test_an_empty_store_is_no_failure(store):
 def test_a_hub_made_while_the_store_is_listed_keeps_its_files(store, leftovers, monkeypatch):
     # The store is listed before the registry is read: a hub's row exists before its first file, so a hub made in
     # between is either not listed or found in the registry, never taken for gone.
-    real, made = files.hubs_in_store, []
+    real, made = files.delete_hub.hubs_in_store, []
 
     def listed_while_a_hub_is_made(store_):
         hub = registry_row(Hub.Status.READY)
@@ -137,7 +137,7 @@ def test_a_hub_made_while_the_store_is_listed_keeps_its_files(store, leftovers, 
         made.append(hub.pk)
         return real(store_)
 
-    monkeypatch.setattr(files, "hubs_in_store", listed_while_a_hub_is_made)
+    monkeypatch.setattr(files.delete_hub, "hubs_in_store", listed_while_a_hub_is_made)
 
     run("--delete")
 
@@ -159,14 +159,14 @@ def test_a_store_that_cannot_be_listed_deletes_nothing_and_fails(hub_files_bucke
 
 
 def test_a_prefix_that_fails_does_not_stop_the_others_and_the_run_fails(store, leftovers, monkeypatch):
-    refused, real = leftovers[1], files.delete_hub_files
+    refused, real = leftovers[1], files.delete_hub.delete_hub_files
 
     def refusing(store_, hub_id):
         if hub_id == refused:
-            raise files.HubFilesNotDeleted(f"{hub_prefix(hub_id)}: AccessDenied")
+            raise files.delete_hub.HubFilesNotDeleted(f"{hub_prefix(hub_id)}: AccessDenied")
         return real(store_, hub_id)
 
-    monkeypatch.setattr(files, "delete_hub_files", refusing)
+    monkeypatch.setattr(files.delete_hub, "delete_hub_files", refusing)
 
     with pytest.raises(CommandError, match=hub_prefix(refused)):
         run("--delete")

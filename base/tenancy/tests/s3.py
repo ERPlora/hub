@@ -152,7 +152,7 @@ def spy_on_the_purge(monkeypatch, status_of) -> list:
     from base import files
     from base.tenancy import ops
 
-    real_drop, real_delete, seen = ops.drop_database, files.delete_hub_files, []
+    real_drop, real_delete, seen = ops.drop_database, files.delete_hub.delete_hub_files, []
 
     def spied_drop(name, **kwargs):
         seen.append("drop")
@@ -163,7 +163,7 @@ def spy_on_the_purge(monkeypatch, status_of) -> list:
         return real_delete(store, hub_id)
 
     monkeypatch.setattr(ops, "drop_database", spied_drop)
-    monkeypatch.setattr(files, "delete_hub_files", spied_delete)
+    monkeypatch.setattr(files.delete_hub, "delete_hub_files", spied_delete)
     return seen
 
 
