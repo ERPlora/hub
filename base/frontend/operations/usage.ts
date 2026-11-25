@@ -64,7 +64,7 @@ export interface ActivityUsage {
   day: string | null;
 }
 
-/** `base.PlanMeterOut`: what an app on says its plan includes this month (`base.home.plan_meters.plan_meters`). */
+/** `base.PlanMeterOut`: what an app on says its plan includes this month (`base.home.plan_meters`). */
 export interface PlanMeter {
   /** The app it is of. */
   key: string;
