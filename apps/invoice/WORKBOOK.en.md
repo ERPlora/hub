@@ -18,16 +18,17 @@ the link between Sales and VeriFactu in the Spanish fiscal chain (sale → invoi
 restaurant and the hair salon alike: nothing in it belongs to one vertical.
 
 ### Who uses it and what each one does
-<!-- from WORKBOOK.md sha256:17cb5816dcf1 -->
+<!-- from WORKBOOK.md sha256:21f62b3d7cfa -->
 
-- The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them,
-  issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
+- The **employee** looks at their invoices (the ones they issued and the ones of their sales), prints them, downloads
+  them in PDF, issues an invoice by hand, turns one of their tickets into a full invoice and marks one of their invoices as
   paid.
 - The **manager**, besides, sees everyone's invoices, downloads them in Excel, rectifies and keeps the numbering
   series.
 - The **owner** and the **administrator**, besides, set up the **issuer** (the business's tax identity
   that appears on every invoice).
-- The **accountancy firm** sees and downloads in Excel everyone's invoices, without issuing or changing anything.
+- The **accountancy firm** sees everyone's invoices and downloads them, in Excel or one by one in PDF, without issuing or
+  changing anything.
 - The **system**, with nobody in front, invoices every charge and rectifies every refund and every void.
 
 It does not charge or refund money (that is Sales), it sends nothing to the AEAT and does not compute the
@@ -98,10 +99,10 @@ Initial setup, step by step:
 <!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Invoices
-<!-- from WORKBOOK.md sha256:0265dcefd1e0 -->
+<!-- from WORKBOOK.md sha256:8fb16efbe94e -->
 All the business's invoices: the tickets of every charge, the full invoices and the rectifying ones, the latest
 issued on top. Search them by number, customer or tax ID, filter them by status (also the overdue ones not paid),
-type, series, date or total, and open them to view, print or save them as a PDF. From each one you mark it paid, rectify it or turn a ticket into a
+type, series, date or total, and open them to view, print or download them in PDF. From each one you mark it paid, rectify it or turn a ticket into a
 full invoice; **+** issues an invoice by hand. An employee sees only theirs: the ones they issued, the ones of their
 sales (the ones they charged and the ones attributed to them) and what rectifies or replaces one of them; the manager,
 the owner and the administrator see everyone's.
@@ -127,9 +128,9 @@ Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry
 action shows as a notice above the table.
 
 #### Invoice detail
-<!-- from WORKBOOK.md sha256:1bf2c3450237 -->
+<!-- from WORKBOOK.md sha256:5f98286bc86f -->
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
-tag and the buttons "Print / PDF" and "← Back". If it is a full invoice, or a rectifying invoice of a full
+tag and the buttons "Print / PDF", "Download PDF" and "← Back". If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
 printer cannot print it as a full invoice.". Below, "Type", "Series", "Issue date", "Operation date" (if
 it is another), "Due date" (if it has one), "Customer", "Customer tax ID", "Address", "Issuer", "Source" ("POS sale", "Manual",
@@ -252,7 +253,7 @@ the series the window picks by itself on opening and the rate that comes from th
 rectifying invoice already issued: Back closes its result (BASE-F05).
 
 ## Flows
-<!-- from WORKBOOK.md sha256:befff8affd2f -->
+<!-- from WORKBOOK.md sha256:990869bb921a -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -279,6 +280,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F21 | Set up the issuer | done |
 | INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
 | INVOICE-F24 | Download the issued invoices in Excel | done |
+| INVOICE-F25 | Download an invoice in PDF | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
 <!-- from WORKBOOK.md sha256:420fc999d774 -->
@@ -777,7 +779,7 @@ or replaces one of theirs is theirs, so its links open.
 Involved: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
-<!-- from WORKBOOK.md sha256:a50d7309f192 -->
+<!-- from WORKBOOK.md sha256:9b7526e4de98 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -805,7 +807,7 @@ assistant say "Invoice not found.". Asked of the assistant, it is only done if a
 its receipt says "Not done, it failed: Print in Invoicing." with the reason, "No system printer takes this invoice:
 open it to print it or save it as PDF." or, if its record cannot be read, "Its VeriFactu record could not be read,
 and an invoice never prints without its QR.".
-Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21
+Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Mark an invoice as paid
 <!-- from WORKBOOK.md sha256:d3f2db5041b0 -->
@@ -949,15 +951,43 @@ busy or another failure prevents it, a notice says that the invoices could not b
 tapped again.
 Involved: INVOICE-F16, BASE-F112
 
+### INVOICE-F25 Download an invoice in PDF
+<!-- from WORKBOOK.md sha256:93d690dcb305 -->
+Status: done
+Actor: employee (their invoices), manager, administrator, owner and accountancy firm (everyone's), assistant
+Screen: Invoice detail
+Steps:
+1. In **Invoices**, open the invoice and tap "Download PDF".
+2. A file called as the invoice is downloaded, for example "FACT-2026-000003.pdf"; if the number has a slash or another
+   sign a file does not take, a dash goes in its place. In the installed app it stays in Downloads and a notice says
+   where.
+3. It is the A4 that "Print / PDF" prints and it says the same: issuer, date and, if it has one, "Due date", "Bill to",
+   the lines with their discounts, the breakdown per rate with its surcharge, the totals, the withholding and "Amount
+   due" if it carries one, what it rectifies and the notes. With VeriFactu, on top goes the record's QR, with "QR
+   tributario:" and "VERI*FACTU", which can be scanned. The text can be selected and searched. A long invoice goes on
+   in more pages, with the header of the lines on each one and the totals at the end.
+4. It comes out in the language of whoever downloads it, as its paper; the one the ERPlora account issued, in its
+   payer's. A document of a sale comes out as "Copy", as when it is printed from the detail.
+5. The same can be asked of the assistant ("download FACT-2026-000003 as a PDF"): the file stays under its answer, with
+   "Download" and its name.
+In: the invoice, its lines and, with VeriFactu, the QR of its record.
+Out: the file; the invoice does not change and the file is not kept in the Hub. While it is made, the button says
+"Preparing…".
+If it fails: a notice says "The PDF could not be downloaded" and why, and it can be tapped again. If the VeriFactu record
+of an invoice that has one cannot be read, "Its VeriFactu record could not be read, and an invoice never prints without
+its QR."; if the server cannot make it, "The PDF cannot be made right now. Try again later.". Someone else's, for an
+employee, is not downloaded, through the API or with the assistant either: "Invoice not found.".
+Involved: INVOICE-F17, INVOICE-F18, INVOICE-F23, VERIFACTU-F19, BASE-F112
+
 ## Services: what goes in and what comes out
-<!-- from WORKBOOK.md sha256:5a80ba0458db -->
+<!-- from WORKBOOK.md sha256:50a8ee8c4963 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
 session) and the API, with the same rules and the same permissions. Designed for voice: an invoice is named
 by its number (`FACT-2026-000012`), a sale by its number of the day (`20261014-0003`), a customer by their
 name, their phone or their email (as in Customers) and a series by its code.
 
-What reads or touches an issued invoice (the list, the invoice, its document and its paper, turning it into a full
+What reads or touches an issued invoice (the list, the invoice, its document, its PDF and its paper, turning it into a full
 invoice, marking it paid and rectifying it) and the invoice of a sale only reach the ones the person sees: without
 "See all invoices", the ones they issued, the ones of their sales and what rectifies or replaces one of them. One
 they do not see does not exist for them
@@ -966,7 +996,7 @@ not a person, reach all the ones their permission opens. The numbering (its gaps
 whole series'.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:d56c74420dc1 -->
+<!-- from WORKBOOK.md sha256:ee3b9b2de468 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -976,6 +1006,7 @@ whole series'.
 | The ticket its code opens (number, date and total) and, if it has one, its full invoice with its VeriFactu QR | the public page | F04 | `invoice.public.ticket` |
 | The current invoice of a sale | view | F20 | `invoice.invoice.by_source` |
 | The printable document (A4 HTML) of an invoice | view | F18 | `invoice.invoice.document` |
+| The PDF of an invoice, with the VeriFactu QR, in a file | view | F25 | `invoice.invoice.pdf` |
 | The rectifying invoice that rectifying an invoice would issue, without issuing it or using a number (what the assistant shows before its confirmation and inside it) | rectify | F08 | `invoice.invoice.rectification_preview` |
 | The rate a typed line starts with: the territory's general rate, from its own rule in Taxes (empty without it) | issue | F03 | `invoice.invoice.line_defaults` |
 | The series, with search, filters and pages | view | F12, F13 | `invoice.series.list` |
@@ -990,7 +1021,7 @@ whole series'.
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
 | Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
 
-All of them but the Excel can be followed live.
+All of them but the Excel and the PDF can be followed live.
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:a5b29af08060 -->
@@ -1090,11 +1121,11 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 | Platform (Home) | The steps "Your business details" (F21) and "Your invoice numbering" (F14) of "Finish setting up your business" | `invoice.issuer.get`, `invoice.numbering.status` |
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:acb895da0cd7 -->
+<!-- from WORKBOOK.md sha256:5873dadd6e31 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
-| View invoices, series, numbering and issuer; print | yes | yes | yes | yes | `invoice.view_invoice` |
+| View invoices, series, numbering and issuer; print and download an invoice in PDF | yes | yes | yes | yes | `invoice.view_invoice` |
 | View everyone's invoices (without it, only theirs: the ones they issued, the ones of their sales and what rectifies or replaces them) | yes | yes | yes | no | `invoice.view_all_invoices` |
 | Download the issued invoices in Excel | yes | yes | yes | no | `invoice.view_all_invoices` |
 | Issue by hand, invoice a sale, replace a ticket, mark as paid | yes | yes | yes | yes | `invoice.add_invoice` |
@@ -1108,6 +1139,6 @@ Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: o
 the ticket's public page holds `invoice.public`, without a session and without any other permission; no automation
 issues from it alone (high risk, as replacing a ticket at the counter).
 
-The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print" and "View
-everyone's invoices": it opens, prints and downloads in Excel (INVOICE-F24) everyone's invoices issued, without
+The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print and download an invoice in PDF" and "View
+everyone's invoices": it opens, prints and downloads in PDF (INVOICE-F25) and in Excel (INVOICE-F24) everyone's invoices issued, without
 issuing, rectifying or setting up anything.
