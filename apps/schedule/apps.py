@@ -89,4 +89,13 @@ class ScheduleConfig(LiveAppConfig):
             refresh_on=[WEEK_UPDATED],
         )
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "50id_wAk79k", "en": "JXIPtMHdgpk"},
+        flow_videos={
+            "SCHEDULE-F02": {"es": ["v58AKat9mNQ"], "en": ["U78Ugos-G1A"]},
+            "SCHEDULE-F04": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
+            "SCHEDULE-F05": {"es": ["-ULk0OHUpfk"], "en": ["RxKp9XMuNQM"]},
+            "SCHEDULE-F06": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
+            "SCHEDULE-F13": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
+        },
+    )

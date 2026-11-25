@@ -108,7 +108,19 @@ class AppointmentConfig(LiveAppConfig):
             permission="appointment.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "iDYOJPslKLo", "en": "T9O2qIaHX38"},
+        flow_videos={
+            "APPOINTMENT-F01": {"es": ["7k8rDOavPPQ"], "en": ["jqE5frTxwIs"]},
+            "APPOINTMENT-F02": {"es": ["7k8rDOavPPQ"], "en": ["jqE5frTxwIs"]},
+            "APPOINTMENT-F03": {"es": ["JEZ7xwTUQRg"], "en": ["_IJqA5Llo58"]},
+            "APPOINTMENT-F04": {"es": ["3iicsBB4OJU"], "en": ["vti0BeNrB0A"]},
+            "APPOINTMENT-F07": {"es": ["SCCcOjjX0-Q"], "en": ["5RkcBExG2Sc"]},
+            "APPOINTMENT-F08": {"es": ["SCCcOjjX0-Q"], "en": ["5RkcBExG2Sc"]},
+            "APPOINTMENT-F09": {"es": ["lyPRKIKNyzE"], "en": ["_7B2JQ7NPCM"]},
+            "APPOINTMENT-F22": {"es": ["3iicsBB4OJU"], "en": ["vti0BeNrB0A"]},
+        },
+    )
     # The bell counts the customers' own bookings waiting for confirmation, on the query the agenda's «N to
     # confirm» reads (whoever sees an agenda counts her own, or everybody's when she sees them all).
     bell = [
