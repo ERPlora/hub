@@ -27,7 +27,7 @@ from apps.appointment.models import Appointment, AppointmentService
 from apps.appointment.queries.booking import bookable_members, check_member
 from apps.appointment.queries.business import current_settings as current_rules, day_bounds, now
 from apps.appointment.queries.ownership import APPOINTMENTS
-from apps.appointment.schemas import SlotsIn
+from apps.appointment.schemas.availability import SlotsIn
 from apps.customer.models import Customer
 from apps.customer.phones import candidates
 from apps.customer.queries.reads import business_country

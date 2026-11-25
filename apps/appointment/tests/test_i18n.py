@@ -19,6 +19,7 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
+from apps.appointment.schemas import references
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -168,8 +169,8 @@ def test_spanish_says_citas_own_words_not_an_earlier_apps():
             "BlockedTime.updated_at": "actualizado el",
             "BlockedTime.created_by": "creado por",
         }
-        assert str(schemas.SAY_WHICH_STAFF) == "Di qué profesional: su id o su nombre."
-        assert str(schemas.SAY_WHICH_SERVICE) == "Di qué servicio: su id o su nombre."
+        assert str(references.SAY_WHICH_STAFF) == "Di qué profesional: su id o su nombre."
+        assert str(references.SAY_WHICH_SERVICE) == "Di qué servicio: su id o su nombre."
 
 
 @HUB_DB

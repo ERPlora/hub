@@ -28,7 +28,8 @@ from apps.appointment.queries.recovery import (
     series_in_copy,
     series_not_in_business,
 )
-from apps.appointment.schemas import AppointmentCreateIn, RecurringCreateIn
+from apps.appointment.schemas.booking import AppointmentCreateIn
+from apps.appointment.schemas.series import RecurringCreateIn
 from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_customer, make_series, make_service
 from apps.service import queries as service_queries
 from apps.service.models import Service
