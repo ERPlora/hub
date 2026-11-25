@@ -12,6 +12,8 @@ import zxingcpp
 
 #: A4 in points, as a page of the file measures it.
 A4 = (595, 842)
+#: The margin of the A4 page (14 mm), in points.
+MARGIN = 39.7
 
 
 class _Shown(HTMLParser):
@@ -71,6 +73,16 @@ def qr_urls(out) -> list[str]:
     return [
         code.text for page in opened(out) for code in zxingcpp.read_barcodes(page.render(scale=3).to_pil())
     ]
+
+
+def out_of_the_margins(out) -> list[tuple[float, float]]:
+    """Where each of its texts begins and ends, across the page, when it goes past the page's margins."""
+    ends = [
+        (shown.get_bounds()[0], shown.get_bounds()[2])
+        for page in opened(out)
+        for shown in page.get_objects(filter=[pdfium.FPDF_PAGEOBJ_TEXT])
+    ]
+    return [(left, right) for left, right in ends if left < MARGIN - 1 or right > A4[0] - MARGIN + 1]
 
 
 def fonts_not_embedded(out) -> int:

@@ -24,6 +24,7 @@ from apps.invoice.tests.printed import (
     fonts_not_embedded,
     language,
     opened,
+    out_of_the_margins,
     qr_urls,
     sizes,
     text,
@@ -254,6 +255,29 @@ def test_a_long_invoice_repeats_its_headers_and_ends_with_its_totals(issuer):
     assert [n for n, said in enumerate(pages) if "TOTAL" in said] == [len(pages) - 1]
     assert [f"Service {n}" for n in range(1, 101) if f"Service {n}" not in "".join(pages)] == []
     assert "€12,100.00" in pages[-1]
+
+
+@pytest.mark.parametrize("language_", ["en", "es"])
+def test_nothing_goes_past_its_margins_whatever_the_number_and_the_dates(issuer, at, language_):
+    at(NOON)
+    data = {"code": "LONG", "prefix": "SERIE-DE-FACTURAS-X", "invoice_type": "F1", "year": 2026}
+    run("invoice.series.create", {**data, "format": "{prefix}/{year}/{seq:09d}/ABCDEFGHIJKL"})
+
+    for invoice in (manual(due_date="2026-12-24"), manual(series_code="LONG", due_date="2026-12-24")):
+        out = downloaded(invoice, ctx_for(language=language_))
+        assert out_of_the_margins(out) == [], invoice.number
+        assert invoice.number in "".join(on_paper(out).split())
+
+
+@pytest.mark.parametrize("where", ["customer_name", "customer_address", "notes", "description"])
+def test_a_word_longer_than_the_paper_goes_on_in_the_next_line(issuer, where):
+    endless = "W" * 120
+    invoice = manual(lines=[{**LINE, "description": endless}]) if where == "description" else manual(**{where: endless})
+
+    out = downloaded(invoice)
+
+    assert out_of_the_margins(out) == []
+    assert endless in "".join(on_paper(out).split())
 
 
 def test_it_is_marked_as_a_copy_only_when_it_is_asked_for_as_one(issuer):
