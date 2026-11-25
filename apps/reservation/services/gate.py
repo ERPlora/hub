@@ -21,7 +21,7 @@ from apps.reservation.queries import (
     table_facts,
 )
 from apps.table.models import Table
-from apps.table.queries import find_table
+from apps.table.queries.lookups import find_table
 
 #: The gate's refusals, by code: their message and the field of the form they belong to.
 REFUSALS = {

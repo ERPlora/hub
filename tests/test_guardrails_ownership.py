@@ -69,7 +69,7 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "Where the sale lines that fell in no shift start: when the last closed session opened and closed, whoever's "
         "it was, never shown.",
     ),
-    ("apps/table/queries/__init__.py", "sessions_now"): (
+    ("apps/table/queries/sessions.py", "sessions_now"): (
         PART_OF_THE_WORK,
         "What the check of each table of the room charged, to say whether it is paid.",
     ),

@@ -11,7 +11,8 @@ from live.outbox import record_event
 
 from apps.table import events
 from apps.table.models import Table, Zone
-from apps.table.queries import find_zone, zone_rows, zones_now
+from apps.table.queries.lookups import find_zone
+from apps.table.queries.zones import zone_rows, zones_now
 from apps.table.schemas import DeletedOut, ZoneIn, ZoneOut, ZonePatchIn, ZoneRefIn
 from apps.table.services.writes import _stamp
 

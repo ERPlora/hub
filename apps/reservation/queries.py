@@ -52,7 +52,7 @@ from apps.reservation.schemas.waitlist import WaitlistDetailOut, WaitlistListIn,
 from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table
-from apps.table.queries import floor, natural_key
+from apps.table.queries import floor, tables as table_reads
 from base.business import babel_locale, business_zone, zone_name
 from base.ordering import list_order_for
 
@@ -762,7 +762,7 @@ def free_tables(ctx: OperationContext, params: TablesIn) -> dict:
             | Q(zone__name__icontains=said)
         )
     out = []
-    for table in tables.order_by(natural_key("number"), "id"):
+    for table in tables.order_by(table_reads.natural_key("number"), "id"):
         clash = booked_windows(table.pk, window, exclude)
         fits = params.party_size is None or table.capacity >= params.party_size
         out.append(
