@@ -124,7 +124,7 @@ def percent_text(percent: Decimal, *, language: str | None = None) -> str:
     """``percent`` (21 is 21 %) as the Hub writes a percentage, the same as the browser (``Intl.NumberFormat``), in
     ``language`` (the active one by default): «21 %», «21%», «5,2 %»."""
     locale = babel_locale(language or translation.get_language() or settings.LANGUAGE_CODE)
-    return format_percent(percent.normalize() / 100, locale=locale, decimal_quantization=False)
+    return format_percent(percent / 100, locale=locale, decimal_quantization=False)
 
 
 def _spaced(text: str, symbol: str) -> str:
