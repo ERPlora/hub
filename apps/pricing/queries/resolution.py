@@ -28,7 +28,7 @@ from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.queries.other_apps import call_service
 from apps.pricing.queries.reads import find_list
-from apps.pricing.schemas import ResolveIn, ResolveOut
+from apps.pricing.schemas.resolution import ResolveIn, ResolveOut
 from base import operations as platform
 from base.business import business_zone
 

@@ -145,7 +145,7 @@ def test_refusals_come_in_the_envelope_with_their_field(admin_client):
     # drops unknown query keys before the schema sees them (the gap of packages/live task reported).
     from pydantic import ValidationError
 
-    from apps.pricing.schemas import PriceListListIn
+    from apps.pricing.schemas.price_lists import PriceListListIn
 
     with pytest.raises(ValidationError):
         PriceListListIn.model_validate({"colour": "red"})
