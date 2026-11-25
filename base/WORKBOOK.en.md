@@ -2411,7 +2411,7 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles and what each one allows
-<!-- from WORKBOOK.md sha256:687b08f9c093 -->
+<!-- from WORKBOOK.md sha256:3e9bff34693d -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles; Employees · Roles · What it allows
@@ -2423,7 +2423,7 @@ Steps:
      each app brings what it gives each basic role in it, and an app may bring a basic role of its own when its
      features call for it. Below them, by their name, the business's own roles, with "Custom": whoever
      has one counts in it and not in the one of their invitation, save the owner, who is always the owner. One of the
-     business's own with permissions it does not carry yet also says "To review" (BASE-F131).
+     business's own with permissions it does not carry yet also says "To review".
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
@@ -2436,10 +2436,9 @@ Steps:
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
      changed here. A role of the business's own says "What this role lets a person do in this business, app by app."
      and shows what the business saved; what no role of the business can give, owning the business, does not show.
-     Whoever manages the roles adjusts it right there (BASE-F128).
+     Whoever manages the roles adjusts it right there.
   5. Whoever manages the roles (the owner and the administrator, or whoever has it in a role of the business's own)
-     makes one with "New role" or "Duplicate" (BASE-F127) and, in "⋮", edits or deletes the business's own (BASE-F128,
-     BASE-F129).
+     makes one with "New role" or "Duplicate" and, in "⋮", edits or deletes the business's own.
   6. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles, the people of the business, the apps that are on and what each app gives each role.
 Out: nothing saved.
@@ -2449,7 +2448,7 @@ in this business.".
 Involved: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F129, BASE-F130, BASE-F131, BASE-F77
 
 ### BASE-F83 Give a person a basic role
-<!-- from WORKBOOK.md sha256:280fbcdf3bfc -->
+<!-- from WORKBOOK.md sha256:45776a5fe453 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles
@@ -2460,14 +2459,14 @@ Steps:
   2. There they change the role.
   3. Back here, the person shows with their new role. If they have the hub open, what they see and what
      they may do change at once, without ending their session. If the business gave them a role of its own, that one
-     still rules (BASE-F130).
+     still rules.
 In: the role chosen on erplora.com.
 Out: the person with their new role, as erplora.com sends it, and their session open.
 If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13, BASE-F130
 
 ### BASE-F127 Make a role of your own from another
-<!-- from WORKBOOK.md sha256:c4c63f1acf2c -->
+<!-- from WORKBOOK.md sha256:3de28f523a3f -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles; Assistant
@@ -2477,11 +2476,11 @@ Steps:
   2. In "New role" they type the "Name" and, if they want another, choose "Based on" among all the roles: "It will allow
      the same as that role. Then adjust what it allows.".
   3. "Create role": the role is made with the same the other one allows, app by app, save owning the business, which no
-     role of your own gives. "Role Cashier created" shows and it opens to adjust it (BASE-F128).
-  4. It shows at once in **Employees › Roles**, with "Custom" and nobody in it; it is given to a person with BASE-F130.
-     From then on it does not change with the role it came from.
+     role of your own gives. "Role Cashier created" shows and it opens to adjust it.
+  4. It shows at once in **Employees › Roles**, with "Custom" and nobody in it; it is given to a person by asking the
+     assistant. From then on it does not change with the role it came from.
   5. It is also asked of the assistant: "create the role Cashier from Employee", with a description if wanted. The card
-     says "Based on: Employee" and "Name: Cashier" (BASE-F97), and once accepted it is made the same way.
+     says "Based on: Employee" and "Name: Cashier", and once accepted it is made the same way.
 In: the role it comes from, the name (up to 80 letters) and, if wanted, the description.
 Out: the business's own role. Event `base.role.created`. It never leaves the business: erplora.com does not know it.
 If it fails: without a name, "Create role" cannot be pressed (the assistant and the API: "Give the role a name."); with
@@ -2494,27 +2493,27 @@ it is not made. What is refused is said in the window itself, which stays open. 
 Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
-<!-- from WORKBOOK.md sha256:c86c8921d7a2 -->
+<!-- from WORKBOOK.md sha256:784762e39360 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles · What it allows; Assistant
 Steps:
   1. In **Employees › Roles**, tap a role of your own, or "Edit" in its "⋮". At the top, "What this role lets a person do
      in this business, app by app. Whoever has it notices as soon as it is saved.", how many people have it and its
-     "Name" and "Description", changed right there. Below, the same panels of "What it allows" (BASE-F82): each permission
+     "Name" and "Description", changed right there. Below, the same panels of "What it allows": each permission
      with its phrase and a switch or, for what a manager can approve with their PIN, "Allowed", "With approval" or "No".
   2. They change what they want and press "Save" at the end: "Role saved.". With nothing changed, "Save" cannot be pressed.
   3. If another person saves it meanwhile, what was not touched here is brought up to date.
   4. It is also asked of the assistant: "the Cashier role can't void sales", "call the Cashier role Evening till".
      The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
-     "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM
-     (BASE-F98), and once accepted only what was asked for changes.
+     "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM,
+     and once accepted only what was asked for changes.
   5. If somebody has the role, what they see and what they may do change at once on their devices, without ending their
-     session (BASE-F13).
+     session.
   6. An app turned on after the role was saved gives what it gives the basic role it came from; a permission an app adds
      later comes in as "No". In both cases the role is left to review until it is saved with them, and the bell says so.
      Opened, it says "New permissions to review" at the top and "To review" on each: "Save", changing something or
-     nothing, leaves them reviewed (BASE-F131).
+     nothing, leaves them reviewed.
 In: the role and what changes: the name, the description or the state of each permission.
 Out: the role changed. Event `base.role.updated`.
 If it fails: a basic role is not changed: "This is one of erplora.com's roles. Duplicate it and change the copy.".
@@ -2528,7 +2527,7 @@ changed stays. Whoever does not manage the roles sees it read only.
 Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
 
 ### BASE-F129 Delete a role of your own
-<!-- from WORKBOOK.md sha256:5d9c119b9454 -->
+<!-- from WORKBOOK.md sha256:b4f8224d9655 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles; Assistant
@@ -2536,7 +2535,7 @@ Steps:
   1. In **Employees › Roles**, "Delete" in the "⋮" of a role of your own.
   2. "Delete the role Cashier? This cannot be undone.": once confirmed, "Role Cashier deleted", and it leaves the list.
   3. It is also asked of the assistant: "delete the Cashier role". The card says the role and, under "What will happen",
-     how many people have it, and asks to type CONFIRM (BASE-F98).
+     how many people have it, and asks to type CONFIRM.
   4. Whoever left the business with that role, if they come back, enters with the one of their invitation.
 In: the role.
 Out: the role deleted. Event `base.role.deleted`.
@@ -2576,23 +2575,22 @@ people have this role. Give them another before deleting it.".
 Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
 
 ### BASE-F131 See in the bell the roles to review
-<!-- from WORKBOOK.md sha256:d57e1d48df4b -->
+<!-- from WORKBOOK.md sha256:a1822b65cbe1 -->
 Status: done
 Actor: owner, administrator
 Screen: The bell; Employees · Roles; Employees · Roles · What it allows
 Steps:
-  1. An app is turned on, or an app gains a permission, after a role of your own was saved: that role is left to review
-     (BASE-F128).
+  1. An app is turned on, or an app gains a permission, after a role of your own was saved: that role is left to review.
   2. The bell of whoever manages the roles goes up without reloading with the notice "2 roles to review" and its
      sentence: "An app turned on or a new permission is not in them yet: look at what each role allows.".
   3. "Review the roles" opens **Employees › Roles**, where that role carries "To review".
   4. Opened, "New permissions to review" and each one marked "To review". They choose what the role does with each one
-     and press "Save", even if nothing changes (BASE-F128).
+     and press "Save", even if nothing changes.
   5. Once saved it no longer carries the mark nor counts; with none left, the notice goes away.
 In: the business's own roles and the apps that are on.
 Out: nothing is saved.
 If it fails: whoever does not manage the roles does not see the notice. If the notices cannot be read, the bell keeps
-the last it knew, as in BASE-F10.
+the last it knew, as with the other notices.
 Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN

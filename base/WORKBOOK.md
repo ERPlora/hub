@@ -2314,7 +2314,7 @@ Pasos:
      cada app aporta lo que da a cada rol básico en ella, y una app puede traer un rol básico propio cuando su
      funcionalidad lo pida. Debajo, por su nombre, los roles propios del negocio, con «Propio»: quien
      tiene uno cuenta en él y no en el de su invitación, salvo el propietario, que siempre es el propietario. Uno propio
-     con permisos que aún no lleva dice además «Por revisar» (BASE-F131).
+     con permisos que aún no lleva dice además «Por revisar».
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
@@ -2326,9 +2326,9 @@ Pasos:
      momento) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con aprobación». Una app
      apagada no sale. Es solo lectura: aquí no se cambia nada. En un rol propio pone «Lo que este rol deja hacer en este
      negocio, app por app.» y sale lo que el negocio guardó; lo que no se puede dar en un rol propio, ser el propietario
-     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo (BASE-F128).
+     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo.
   5. Quien gestiona los roles (el propietario y el administrador, o quien lo tenga en su rol propio) crea uno con
-     «Nuevo rol» o «Duplicar» (BASE-F127) y, en «⋮», edita o borra los propios (BASE-F128, BASE-F129).
+     «Nuevo rol» o «Duplicar» y, en «⋮», edita o borra los propios.
   6. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles, las personas del negocio, las apps encendidas y lo que cada app da a cada rol.
 Sale: nada guardado.
@@ -2347,7 +2347,7 @@ Pasos:
      Google Play no están).
   2. Allí le cambia el rol.
   3. Al volver, la persona sale con su rol nuevo. Si tiene el hub abierto, lo que ve y lo que puede hacer
-     cambian al momento, sin cerrar su sesión. Si el negocio le dio un rol propio, ese sigue mandando (BASE-F130).
+     cambian al momento, sin cerrar su sesión. Si el negocio le dio un rol propio, ese sigue mandando.
 Entra: el rol que se elige en erplora.com.
 Sale: la persona con su rol nuevo, como lo manda erplora.com, y su sesión abierta.
 Si falla: lo que diga erplora.com.
@@ -2363,11 +2363,11 @@ Pasos:
   2. En «Nuevo rol» escribe el «Nombre» y, si quiere otro, elige «A partir de» entre todos los roles: «Permitirá lo
      mismo que ese rol. Después ajustas lo que permite.».
   3. «Crear rol»: el rol queda creado con lo mismo que permite el otro, app por app, menos ser el propietario del
-     negocio, que ningún rol propio da. Sale «Rol Cajero creado» y se abre para ajustarlo (BASE-F128).
-  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona con BASE-F130. Desde
-     entonces no cambia con el rol del que salió.
+     negocio, que ningún rol propio da. Sale «Rol Cajero creado» y se abre para ajustarlo.
+  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona pidiéndoselo al asistente.
+     Desde entonces no cambia con el rol del que salió.
   5. También se pide al asistente: «crea el rol Cajero a partir de Empleado», con una descripción si se quiere. La
-     tarjeta dice «A partir de: Empleado» y «Nombre: Cajero» (BASE-F97), y al aceptarla queda creado igual.
+     tarjeta dice «A partir de: Empleado» y «Nombre: Cajero», y al aceptarla queda creado igual.
 Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
 Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
 Si falla: sin nombre, «Crear rol» no se puede pulsar (el asistente y la API: «Ponle nombre al rol.»); con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
@@ -2385,20 +2385,20 @@ Pantalla: Empleados · Roles · Qué permite; Asistente
 Pasos:
   1. En **Empleados › Roles**, toca un rol propio, o «Editar» en su «⋮». Arriba, «Lo que este rol deja hacer en este
      negocio, app por app. Al guardar, quien lo tiene lo nota al momento.», cuántas personas lo tienen y su «Nombre» y
-     «Descripción», que se cambian ahí. Debajo, los mismos paneles de «Qué permite» (BASE-F82): cada permiso con su frase
+     «Descripción», que se cambian ahí. Debajo, los mismos paneles de «Qué permite»: cada permiso con su frase
      y un interruptor o, en lo que un responsable puede aprobar con su PIN, «Permitido», «Con aprobación» o «No».
   2. Cambia lo que quiera y pulsa «Guardar» al final: «Rol guardado.». Sin nada cambiado, «Guardar» no se puede pulsar.
   3. Si otra persona lo guarda mientras tanto, lo que aquí no se ha tocado se pone al día.
   4. También se pide al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
      La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
-     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR
-     (BASE-F98), y al aceptarla solo cambia lo que se pidió.
+     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR,
+     y al aceptarla solo cambia lo que se pidió.
   5. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian al momento en sus dispositivos, sin cerrar su
-     sesión (BASE-F13).
+     sesión.
   6. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
      añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos, y la campana
      lo dice. Al abrirlo, «Permisos nuevos por revisar» arriba y «Por revisar» en cada uno: «Guardar», cambiando algo o
-     sin cambiar nada, los da por revisados (BASE-F131).
+     sin cambiar nada, los da por revisados.
 Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
 Sale: el rol cambiado. Evento `base.role.updated`.
 Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
@@ -2418,7 +2418,7 @@ Pasos:
   1. En **Empleados › Roles**, «Borrar» en el «⋮» de un rol propio.
   2. «¿Borrar el rol Cajero? No se puede deshacer.»: al confirmarlo, «Rol Cajero borrado», y desaparece de la lista.
   3. También se pide al asistente: «borra el rol Cajero». La tarjeta dice el rol y, bajo «Lo que va a pasar», cuántas
-     personas lo tienen, y pide escribir CONFIRMAR (BASE-F98).
+     personas lo tienen, y pide escribir CONFIRMAR.
   4. Quien salió del negocio con ese rol, si vuelve, entra con el de su invitación.
 Entra: el rol.
 Sale: el rol borrado. Evento `base.role.deleted`.
@@ -2458,18 +2458,17 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: La campana; Empleados · Roles; Empleados · Roles · Qué permite
 Pasos:
-  1. Se enciende una app, o una app gana un permiso, después de guardar un rol propio: ese rol queda por revisar
-     (BASE-F128).
+  1. Se enciende una app, o una app gana un permiso, después de guardar un rol propio: ese rol queda por revisar.
   2. La campana de quien gestiona los roles sube sin recargar con el aviso «2 roles por revisar» y su frase: «Hay una
      app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol.».
   3. «Revisar los roles» abre **Empleados › Roles**, donde ese rol lleva «Por revisar».
   4. Al abrirlo, «Permisos nuevos por revisar» y cada uno marcado con «Por revisar». Elige qué hace el rol con cada uno y
-     pulsa «Guardar», aunque no cambie nada (BASE-F128).
+     pulsa «Guardar», aunque no cambie nada.
   5. Al guardarlo deja de llevar la marca y de contar; sin ninguno, el aviso desaparece.
 Entra: los roles propios del negocio y las apps encendidas.
 Sale: nada guardado.
 Si falla: quien no gestiona los roles no ve el aviso. Si no se pueden leer los avisos, la campana se queda con lo último
-que supo, como en BASE-F10.
+que supo, como con los demás avisos.
 Implicados: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Aprobar con el PIN de un responsable
