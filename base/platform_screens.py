@@ -1,5 +1,5 @@
-"""The Hub's own screens, as its help serves them (``base.help.get``): each one is a section of base's WORKBOOK. And what
-a person holds to get a task done on them, from who does it there."""
+"""The Hub's own screens, as its help serves them (``base.help.get``): each one is a section of base's WORKBOOK. Also, the
+permission a task done on them asks for, by who does it."""
 
 from collections.abc import Collection
 

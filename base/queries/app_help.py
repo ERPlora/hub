@@ -84,7 +84,7 @@ def _language(code: str) -> str:
 def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     """An app's help in the person's language while its file is current, else in its base language's, else in the
     source's (``language`` says which); its video and each task's short videos likewise. Without the screens whose
-    permission the person does not hold, nor the tasks done only on them or whose own they do not."""
+    permission the person does not hold, nor the tasks that are only done there or that their role does not do."""
     config = _ready(data.app)
     if config is None:
         with translation.override(ctx.language):
