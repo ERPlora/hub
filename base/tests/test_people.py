@@ -172,6 +172,15 @@ class TestWhoIsInTheBusiness:
         client.force_login(olga)
         assert row(people(client), "saas:3")["name"] == "Eva María Ruiz"
 
+    def test_a_name_of_my_profile_holding_an_address_reaches_an_employee_without_it(self, client, olga, eva):
+        from base.models.profile import Profile
+
+        Profile.objects.create(username="saas:1", first_name="olga.ruiz+bar@example.com")
+        client.force_login(eva)
+        answer = people(client)
+        assert row(answer, "saas:1")["name"] == "olga.ruiz+bar"
+        assert "@" not in json.dumps(answer)
+
     def test_nobody_without_a_session(self, client, olga):
         assert get(client, "/people").status_code in (401, 403)
 
