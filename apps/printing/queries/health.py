@@ -6,7 +6,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.printing.models import PrintJob
-from apps.printing.schemas import CoverageIn
+from apps.printing.schemas.devices import CoverageIn
 from apps.printing.schemas.health import DeviceHealthOut
 
 from . import device_reads, waiting

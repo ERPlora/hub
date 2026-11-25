@@ -11,25 +11,11 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.printing import queries, services
-from apps.printing.schemas import (
-    CoverageIn,
-    DeviceListIn,
-    DeviceRefIn,
-    DeviceRegisterIn,
-    DeviceUpdateIn,
-    JobCancelIn,
-    JobClaimIn,
-    JobCompleteIn,
-    JobCreateIn,
-    JobFailIn,
-    JobListIn,
-    JobRefIn,
-    PrinterIn,
-    PrinterListIn,
-    PrinterRefIn,
-    PrinterUpdateIn,
-    SettingsPatchIn,
-)
+from apps.printing.schemas.claims import JobClaimIn, JobCompleteIn, JobFailIn
+from apps.printing.schemas.devices import CoverageIn, DeviceListIn, DeviceRefIn, DeviceRegisterIn, DeviceUpdateIn
+from apps.printing.schemas.jobs import JobCancelIn, JobCreateIn, JobListIn, JobRefIn
+from apps.printing.schemas.printers import PrinterIn, PrinterListIn, PrinterRefIn, PrinterUpdateIn
+from apps.printing.schemas.settings import SettingsPatchIn
 
 router = Router(tags=["printing"])
 

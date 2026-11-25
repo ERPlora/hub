@@ -4,7 +4,7 @@ import pytest
 from live.errors import PermissionDenied
 
 from apps.printing.queries.settings import get_settings
-from apps.printing.schemas import EmptyIn
+from apps.printing.schemas.fields import EmptyIn
 from apps.printing.tests.conftest import HUB_DB, ctx_for, printer, run
 
 pytestmark = HUB_DB

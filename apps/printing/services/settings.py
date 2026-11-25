@@ -13,7 +13,7 @@ from apps.printing.models import Printer, Settings
 from apps.printing.queries.jobs import actor
 from apps.printing.queries.printers import find_printer
 from apps.printing.queries.settings import DEFAULT_FIELDS, settings_row
-from apps.printing.schemas import SettingsOut, SettingsPatchIn
+from apps.printing.schemas.settings import SettingsOut, SettingsPatchIn
 
 NOT_ITS_FUNCTION = _("That printer does not have this role.")
 DEFAULT_INACTIVE = _("That printer is inactive.")
