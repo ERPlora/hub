@@ -914,18 +914,34 @@
       "intro": "Estos son los roles de este negocio. Cada persona recibe uno al invitarla en erplora.com, y allí se cambia.",
       "columns": {
         "role": "Rol",
-        "origin": "Viene de",
-        "available": "Disponible",
-        "members": "Miembros",
+        "origin": "Tipo",
+        "members": "Personas",
         "permissions": "Permisos"
       },
       "basic": "Básico",
       "own": "Propio",
-      "always": "Siempre disponible",
       "search": "Buscar rol…",
       "empty": "Este negocio no tiene roles.",
       "error": "No se pudo cargar el catálogo de roles.",
-      "change": "Cambiar roles en erplora.com"
+      "change": "Cambiar roles en erplora.com",
+      "toReview": "Por revisar",
+      "new": "Nuevo rol",
+      "duplicate": "Duplicar",
+      "edit": "Editar",
+      "delete": "Borrar",
+      "add": {
+        "title": "Nuevo rol",
+        "name": "Nombre",
+        "basedOn": "A partir de",
+        "help": "Permitirá lo mismo que ese rol. Después ajustas lo que permite.",
+        "create": "Crear rol",
+        "created": "Rol {name} creado"
+      },
+      "remove": {
+        "title": "Borrar rol",
+        "message": "¿Borrar el rol {name}? No se puede deshacer.",
+        "done": "Rol {name} borrado"
+      }
     },
     "role": {
       "title": "Qué permite",
@@ -940,7 +956,17 @@
         "on": "Permitido",
         "approval": "Con aprobación",
         "off": "No"
-      }
+      },
+      "introEdit": "Lo que este rol deja hacer en este negocio, app por app. Al guardar, quien lo tiene lo nota al momento.",
+      "name": "Nombre",
+      "description": "Descripción",
+      "review": {
+        "title": "Permisos nuevos por revisar",
+        "text": "Llevan la marca «Por revisar». Elige qué hace el rol con cada uno y guarda."
+      },
+      "save": "Guardar",
+      "saved": "Rol guardado.",
+      "saveError": "No se pudo guardar el rol"
     },
     "person": {
       "title": "Persona",

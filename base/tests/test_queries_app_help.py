@@ -259,7 +259,8 @@ class TestTheRealScreens:
         (
             Membership.Role.ADMIN,
             "F18 F19 F21 F22 F23 F24 F25 F29 F30 F31 F32 F33 F34 F35 F36 F38 F39 F40 F41 F42 F43 F44 F45 F46 F51 F62 "
-            "F66 F67 F68 F69 F70 F71 F73 F75 F76 F77 F78 F79 F80 F83 F85 F86 F87 F88 F89 F91 F116 F126",
+            "F66 F67 F68 F69 F70 F71 F73 F75 F76 F77 F78 F79 F80 F83 F85 F86 F87 F88 F89 F91 F116 F126 F127 "
+            "F128 F129 F131",
         ),
         (Membership.Role.OWNER, "F37"),
     )

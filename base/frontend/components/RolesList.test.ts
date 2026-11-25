@@ -1,9 +1,14 @@
+import { toastSuccess } from '@erplora/ui/shell';
+import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
+import { click, EMPLOYEE, errorFrame, flush, installedApp, ionValue, leaveInstalledApp, mountBase, OWNER, settle, subId, tap } from '../__tests__/mount-base';
 import type { HubRoleRow } from '../operations/people';
 import RolesList from './RolesList.vue';
 
+/** Who manages the roles: the owner and whoever runs the business. */
+const MANAGES = { ...OWNER, permissions: [...OWNER.permissions, 'base.manage_roles'] };
+const OWN = '0199aaaa-0000-7000-8000-000000000001';
 const MEMBERS_URL = 'http://localhost:8001/businesses/0199a1b2-0000-7000-8000-000000000001/members';
 
 function basic(key: string, label: string, members: number, permissions: number): HubRoleRow {
@@ -28,6 +33,15 @@ async function open(options: Parameters<typeof mountBase>[1] = {}) {
   return { ...m, call };
 }
 
+const cashier = (fields: Partial<HubRoleRow> = {}): HubRoleRow => ({ ...basic(OWN, 'Cajero', 0, 12), origin: 'own', ...fields });
+
+/** The list as who manages the roles opens it, with a role of the business's own. */
+async function managed(own = cashier()) {
+  const m = await open({ session: MANAGES, locale: 'es', routes: ['/employees', '/employees/roles/:role'] });
+  await m.result(m.call, 'base.role.list', { roles: [...ROLES, own] });
+  return m;
+}
+
 afterEach(() => {
   leaveInstalledApp();
   document.head.innerHTML = '';
@@ -49,14 +63,13 @@ describe('RolesList', () => {
     expect(rows[0].text()).toContain('Propietario');
     expect(rows[2].text()).toContain('Encargado');
     expect(rows[2].text()).toContain('Básico');
-    expect(rows[2].text()).toContain('Siempre disponible');
     expect(rows[3].find('[data-testid="roles-members"]').text()).toBe('5');
     expect(rows[3].find('[data-testid="roles-permissions"]').text()).toBe('43');
     expect(rows[4].text()).toContain('Gestoría');
   });
 
   it('a role the business made goes by its own name, as its own', async () => {
-    const own: HubRoleRow = { ...basic('0199aaaa-0000-7000-8000-000000000001', 'Cajero', 3, 12), origin: 'own' };
+    const own = cashier({ members: 3 });
     const m = await open({ locale: 'es', routes: ['/employees', '/employees/roles/:role'] });
     await m.result(m.call, 'base.role.list', { roles: [...ROLES, own] });
     const row = m.wrapper.findAll('[data-testid="roles-row"]')[5];
@@ -105,6 +118,91 @@ describe('RolesList', () => {
     await m.wrapper.findAll('[data-testid="roles-row"]')[3].trigger('click');
     await flush();
     expect(m.router.currentRoute.value.path).toBe('/employees/roles/hub_employee');
+  });
+
+  it('marks the one left to review, and no other', async () => {
+    const m = await managed(cashier({ to_review: true }));
+    const marked = m.wrapper.findAll('[data-testid="roles-row"]').map((row) => row.find('[data-testid="roles-to-review"]').exists());
+    expect(marked).toEqual([false, false, false, false, false, true]);
+    expect(m.wrapper.get('[data-testid="roles-to-review"]').text()).toBe('Por revisar');
+  });
+
+  it('who manages the roles duplicates any, and edits or deletes the business’s own', async () => {
+    const m = await managed();
+    expect(offeredRowActions(m.wrapper, 'hub_employee')).toEqual(['duplicate']);
+    expect(offeredRowActions(m.wrapper, OWN)).toEqual(['duplicate', 'edit', 'delete']);
+    expect(m.wrapper.find('[data-testid="roles-add"]').text()).toContain('Nuevo rol');
+  });
+
+  it('whoever does not manage them is only shown them', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.role.list', { roles: [...ROLES, cashier()] });
+    expect(offeredRowActions(m.wrapper, 'hub_employee')).toEqual([]);
+    expect(offeredRowActions(m.wrapper, OWN)).toEqual([]);
+    expect(m.wrapper.find('[data-testid="roles-add"]').exists()).toBe(false);
+  });
+
+  it('«Duplicate» starts the new role from that one; «New role», from the employee’s', async () => {
+    const m = await managed();
+    const chosen = () => (m.inDoc('role-new-based-on') as unknown as { value: string }).value;
+    await pressRowAction(m.wrapper, OWN, 'duplicate');
+    await settle();
+    expect(chosen()).toBe(OWN);
+    await click(m.inDoc('role-new-cancel'));
+    await m.wrapper.get('[data-testid="roles-add"]').trigger('click');
+    await settle();
+    expect(chosen()).toBe('hub_employee');
+  });
+
+  it('the role just made opens to adjust it', async () => {
+    const m = await managed();
+    const made = '0199aaaa-0000-7000-8000-000000000002';
+    m.answerBy({ '/api/roles': [200, cashier({ key: made, label: 'Caja de tarde' })] });
+    await pressRowAction(m.wrapper, 'hub_employee', 'duplicate');
+    await settle();
+    await ionValue(m.inDoc('role-new-name'), 'Caja de tarde', 'ionInput');
+    await click(m.inDoc('role-new-submit'));
+    await flush();
+    expect(m.router.currentRoute.value.path).toBe(`/employees/roles/${made}`);
+  });
+
+  it('«Edit» opens the role, as its row does', async () => {
+    const m = await managed();
+    await pressRowAction(m.wrapper, OWN, 'edit');
+    await flush();
+    expect(m.router.currentRoute.value.path).toBe(`/employees/roles/${OWN}`);
+  });
+
+  it('«Delete» asks first, deletes it and says so', async () => {
+    const m = await managed();
+    m.answerBy({ '/api/roles/delete': [200, { key: OWN }] });
+    await pressRowAction(m.wrapper, OWN, 'delete');
+    await settle();
+    expect(m.inDoc('role-delete')?.textContent).toContain('¿Borrar el rol Cajero? No se puede deshacer.');
+    expect(m.sent()).toEqual([]);
+    await click(m.inDoc('role-delete-submit'));
+    await flush();
+
+    expect(m.sent().map((call) => [call.path, call.body])).toEqual([['/api/roles/delete', { role: OWN }]]);
+    expect(toastSuccess).toHaveBeenCalledWith('Rol Cajero borrado');
+    expect(m.inDoc('role-delete-submit')).toBeNull();
+  });
+
+  it('one somebody has is refused in the question, which stays; asked again, it is clean', async () => {
+    const m = await managed(cashier({ members: 2 }));
+    const message = '2 personas tienen este rol. Dales otro antes de borrarlo.';
+    m.answerBy({ '/api/roles/delete': [409, { error: { code: 'base.role_in_use', message } }] });
+    await pressRowAction(m.wrapper, OWN, 'delete');
+    await settle();
+    await click(m.inDoc('role-delete-submit'));
+    await flush();
+    expect(m.inDoc('role-delete')?.textContent).toContain(message);
+    expect(toastSuccess).not.toHaveBeenCalled();
+
+    await click(m.inDoc('role-delete-cancel'));
+    await pressRowAction(m.wrapper, OWN, 'delete');
+    await settle();
+    expect(m.inDoc('role-delete')?.textContent).not.toContain(message);
   });
 
   it('a catalogue that cannot be read says so', async () => {
