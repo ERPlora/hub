@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SessionMe } from '@erplora/ui/shell';
 import type { RouteMeta } from 'vue-router';
@@ -8,7 +8,10 @@ import { embedHubHome, forgetHubHome } from '../__tests__/hub-home';
 import HelpEntry from './HelpEntry.vue';
 import HelpWindow from './HelpWindow.vue';
 
-afterEach(forgetHubHome);
+afterEach(() => {
+  forgetHubHome();
+  document.body.innerHTML = '';
+});
 
 function topbar(): void {
   document.body.insertAdjacentHTML('beforeend', '<div class="app-topbar"><div slot="end"></div></div>');
@@ -23,9 +26,21 @@ async function setup(app = 'table', locale: 'en' | 'es' = 'en', session: Session
   });
 }
 
-async function setupPlatform(path: string, meta: RouteMeta, options: { helpApps?: string[]; locale?: 'en' | 'es' } = {}) {
-  embedHubHome({ help_apps: options.helpApps ?? ['base'] });
+interface PlatformOptions {
+  helpApps?: string[];
+  locale?: 'en' | 'es';
+}
+
+async function setupPlatform(path: string, meta: RouteMeta, options: PlatformOptions = {}) {
   topbar();
+  return mountPlatform(path, meta, options);
+}
+
+/** On a screen of the Hub, in the pages the test put in the document. */
+const setupOn = (path: string) => mountPlatform(path, { auth: true, help: true });
+
+async function mountPlatform(path: string, meta: RouteMeta, options: PlatformOptions = {}) {
+  embedHubHome({ help_apps: options.helpApps ?? ['base'] });
   return mountBase(HelpEntry, {
     path, routes: [path], meta, locale: options.locale,
     onApi: () => Response.json({ ...help, app: 'base', name: 'ERPlora' }),
@@ -100,3 +115,37 @@ describe('HelpEntry on the screens of the Hub itself', () => {
     expect(accessibleName(buttonInDoc())).toBe('Ayuda');
   });
 });
+
+describe('HelpEntry in the bar of the page in view', () => {
+  const page = (id: string) => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      `<div id="${id}" class="ion-page"><div class="app-topbar"><div slot="end"></div></div></div>`,
+    );
+    return document.getElementById(id)!;
+  };
+  const enters = async (entered: HTMLElement) => {
+    entered.dispatchEvent(new CustomEvent('ionViewDidEnter'));
+    await flush();
+  };
+
+  it('goes back to the page under the one that leaves, which is still the last in the document', async () => {
+    const under = page('under');
+    const leaving = page('leaving');
+    await setupOn('/settings');
+    expect(leaving.contains(buttonInDoc())).toBe(true);
+    await enters(under);
+    expect(under.contains(buttonInDoc())).toBe(true);
+    leaving.remove();
+    expect(buttonInDoc()).not.toBeNull();
+  });
+
+  it('stops following the pages once it is gone', async () => {
+    const m = await setupOn('/settings');
+    const removed = vi.spyOn(document, 'removeEventListener');
+    m.wrapper.unmount();
+    expect(removed).toHaveBeenCalledWith('ionViewDidEnter', expect.any(Function), true);
+    removed.mockRestore();
+  });
+});
+
