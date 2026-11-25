@@ -5,10 +5,15 @@ with the permission its page asks.
 import re
 
 import pytest
+from django.apps import apps
 from django.conf import settings
+from django.utils import translation
 from live.operations import get
 
-from base.platform_screens import SCREENS
+from base.models import Membership
+from base.permissions import permissions_of_role
+from base.platform_screens import ROLES, SCREENS, permission_of
+from base.queries import app_help
 
 FRONTEND = settings.BASE_DIR / "base" / "frontend"
 ROUTE = re.compile(r"path: '([^']+)'")
@@ -83,3 +88,49 @@ def test_a_screen_is_for_whoever_the_operation_it_reads_lets_in(screen):
 def test_every_screen_but_the_tabs_of_settings_that_read_nothing_else_names_its_operation():
     assert {screen.id for screen in SCREENS} - set(READS) == {"settings_general", "settings_business", "settings_printing"}
     assert set(READS) <= {screen.id for screen in SCREENS}
+
+
+@pytest.mark.parametrize(
+    ("role", "above"),
+    [
+        ("accountancy firm", [*Membership.Role]),
+        ("employee", [*Membership.Role]),
+        ("manager", [Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.MANAGER]),
+        ("administrator", [Membership.Role.OWNER, Membership.Role.ADMIN]),
+        ("owner", [Membership.Role.OWNER]),
+    ],
+)
+def test_what_a_task_of_a_role_asks_is_what_that_role_and_those_above_it_hold(role, above):
+    with translation.override("en"):
+        assert [r for r in Membership.Role if permission_of((role,)) in permissions_of_role(r)] == above
+
+
+def test_every_role_of_the_business_is_one_a_manual_may_name():
+    assert len(ROLES) == len(Membership.Role)
+
+
+@pytest.mark.parametrize(
+    ("actors", "permission"),
+    [
+        (("owner", "administrator", "manager", "employee"), "base.view_home"),
+        (("administrator", "owner"), "base.administer_hub"),
+        (("owner", "administrator", "ERPlora's support staff"), "base.administer_hub"),
+        (("system",), "base.view_home"),
+        ((), "base.view_home"),
+    ],
+)
+def test_a_task_of_several_asks_what_the_least_of_its_roles_holds_and_one_of_no_role_is_anyone_s(actors, permission):
+    with translation.override("en"):
+        assert permission_of(actors) == permission
+
+
+def test_the_manual_asks_the_same_of_a_person_for_a_task_in_every_language():
+    def asked(language: str) -> dict[str, str]:
+        served, read = app_help.help_of(apps.get_app_config("base"), language)
+        assert served == language
+        with translation.override(language):
+            return {flow.id: permission_of(read.actors[flow.id]) for flow in read.flows}
+
+    by_language = {language: asked(language) for language, _name in settings.LANGUAGES}
+    assert by_language["es"]
+    assert [language for language, read in by_language.items() if read != by_language["es"]] == []

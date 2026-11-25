@@ -2495,6 +2495,31 @@ msgctxt "workbook"
 msgid "My profile"
 msgstr "Mi perfil"
 
+#: platform_screens.py
+msgctxt "workbook"
+msgid "accountancy firm"
+msgstr "gestoría"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "employee"
+msgstr "empleado"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "manager"
+msgstr "responsable"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "administrator"
+msgstr "administrador"
+
+#: platform_screens.py
+msgctxt "workbook"
+msgid "owner"
+msgstr "propietario"
+
 #: queries/app_help.py
 msgctxt "workbook"
 msgid "Settings"
