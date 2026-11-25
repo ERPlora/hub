@@ -6,7 +6,7 @@ from live.context import OperationContext
 from live.operations import INTERNAL, operation
 
 from apps.printing.models import PrintDevice, Printer
-from apps.printing.schemas import (
+from apps.printing.schemas.devices import (
     CoverageIn,
     CoverageOut,
     DeviceGetIn,
@@ -14,8 +14,8 @@ from apps.printing.schemas import (
     DeviceListIn,
     DeviceOut,
     DeviceRefIn,
-    Page,
 )
+from apps.printing.schemas.fields import Page
 
 from .device_reads import active_devices, device_row, find_device, this_device_key
 from .waiting import coverage, stalled
