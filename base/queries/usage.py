@@ -50,7 +50,8 @@ BUSY_WINDOW_DAYS = 7
             "in the last 7 days); the requests served this month, the people active now and in 30 days, and the size of "
             "its database. A figure that is null has not been measured yet: say so, never read it as a zero. The "
             "assistant's own messages of the month are read with base.assistant.usage. Files and the database are "
-            "measured every night."
+            "measured every night. With platform true it is ERPlora's own business, which has no plan: never say one is "
+            "coming nor that it should upgrade."
         ),
         asks={
             "en": (
@@ -95,6 +96,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     return {
         "known": known,
         "demo": demo,
+        "platform": _is_platform(hub),
         "plan_slug": _plan_slug(plan) if known else None,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
         "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
@@ -116,6 +118,10 @@ def _plan_of(hub: Hub | None) -> tuple[dict, dict | None, bool]:
     state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
     plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
     return state, plan, plan is not None and all(_is_count(plan.get(field)) for field in ("max_users", "max_devices"))
+
+
+def _is_platform(hub: Hub | None) -> bool:
+    return hub is not None and hub.is_platform
 
 
 def _plan_slug(plan: dict) -> str | None:
@@ -195,8 +201,7 @@ def _connections_usage(hub: Hub | None, known: bool, counted: _Counted) -> dict:
     plan whose photo lacks its limits gets Free's, so the screen says that, never «no limit», and ERPlora's own hub, with no
     plan to know, what its row gives it. And the times it fell short: with limits of 1, 3 or 6 a percentage says nothing, a
     Free plan's first operation of the day is its 100 %."""
-    platform = hub is not None and hub.is_platform
-    limits = (tenancy_limits.hub_limits(hub) or tenancy_limits.FREE) if known or platform else None
+    limits = (tenancy_limits.hub_limits(hub) or tenancy_limits.FREE) if known or _is_platform(hub) else None
     return {
         "peak_today": counted.peak_today,
         "limit": limits.max_transactions if limits else None,

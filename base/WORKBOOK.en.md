@@ -392,7 +392,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:9f7a132fa582 -->
+<!-- from WORKBOOK.md sha256:3ed52f8f4208 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -515,7 +515,7 @@ On the Employees screens and the API documentation:
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
-| BASE-F126 | Turn ERPlora's support access on or off | partial |
+| BASE-F126 | Turn ERPlora's support access on or off | done |
 | BASE-F127 | Make a role of your own from another | partial |
 | BASE-F128 | Adjust what a role of your own allows | partial |
 | BASE-F129 | Delete a role of your own | partial |
@@ -787,7 +787,7 @@ knew: "Could not load notifications" with "Retry".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-<!-- from WORKBOOK.md sha256:9fbc88603bd0 -->
+<!-- from WORKBOOK.md sha256:62130c1d1cce -->
 Status: done
 Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
@@ -816,6 +816,7 @@ that address. With the pass spent or the minute gone, erplora.com says so and of
 account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com". Whoever is not the owner has no
 "Upgrade plan" anywhere in the Hub, nor erplora.com's Store: the administrator, the manager and the employee do not buy.
+In ERPlora's own business, which has no plan and buys nothing, its owner has neither; "Manage on erplora.com", yes.
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -1481,7 +1482,7 @@ of the tab goes on; a card that does not load is left out and the others show.
 Involved: BASE-F40, BASE-F118, PRINTING-F21
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
-<!-- from WORKBOOK.md sha256:f19c17ea973b -->
+<!-- from WORKBOOK.md sha256:0328535c675e -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -1541,7 +1542,8 @@ been counted for less than their period, they say "Since {day}". The assistant i
 not answer, its row says "Not available right now", with no figure, and the screen goes on; the same if WhatsApp cannot be
 read. In a demo, instead of everything: "Use is not measured in a demo: its data is deleted when it ends.". While the hub
 does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends it." and, under
-"What you use", the figures with no limit, bar, pill or line at the top.
+"What you use", the figures with no limit, bar, pill or line at the top. ERPlora's own business will never have one:
+instead it says "This is ERPlora's own business: it has no plan.", with the same figures.
 Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Know which version is running and when it was updated
@@ -3116,21 +3118,22 @@ failed: …" and the assistant tells it.
 Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
-<!-- from WORKBOOK.md sha256:d13d6abe2da3 -->
+<!-- from WORKBOOK.md sha256:b63066914a0f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
-  2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
-     goes on. All it says goes to the same bubble, and what each round says in its own paragraph: never glued to the
-     previous one.
-  3. Each action that changes something asks for its own card (BASE-F97), one after the other: accepting the first
-     does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
-     those left.
+  2. The assistant solves it in rounds: it reads what it needs without asking (several things in the same round, if it
+     needs them), asks for an action, it is done and it goes on. All it says goes to the same bubble, and what each
+     round says in its own paragraph: never glued to the previous one.
+  3. Each action that changes something asks for its own card (BASE-F97), one after the other, also those it asks for
+     in the same round: accepting or cancelling the first does not answer for the next ones. If more wait behind it,
+     the card carries "Cancel all", which cancels this one and those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows twenty rounds at most, and each action is one: it is a brake against loops, not an allowance,
-     and a read and a change for each day of the week fit easily. On the twentieth the assistant can do nothing more
+  5. A request allows twenty rounds at most, each with all the assistant asks for at once: it is a brake against
+     loops, not an allowance, and a read and a change for each day of the week fit easily even if it asks for them one
+     by one. On the twentieth the assistant can do nothing more
      and answers with what it has done and what is left, to ask for it in another message; if it still asks for an
      action, it is not done and its card does not appear, and it is told to answer. If it keeps trying, "I stopped:
      this needed too many steps. Ask for it in parts.".
@@ -3948,10 +3951,8 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:a939d641b5a9 -->
-Status: partial — it is changed and read in Settings › General, through the API and with the assistant, and the
-business already lets support in or refuses it as it says; erplora.com giving the support staff their code to come in
-is still missing
+<!-- from WORKBOOK.md sha256:8c48efdd08cf -->
+Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
 Steps:
@@ -3967,13 +3968,13 @@ Steps:
      most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
-  4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
-     and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
-     resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
-     a PIN or a badge, take no place and do not count in the plan's use, and their browser does not stay as a device
-     of the business: it neither ends another device's session nor has its own ended by another one's entry
-     (BASE-F57). Each entry joins the list of the latest entries at once, and what they do stays in the records under
-     their name.
+  4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
+     admin, with their own account (HUBS-F38 of erplora.com), and arrives as an administrator: they may do everything
+     but what only the owner does (buying for the business, resetting it, its copies). They are not in Employees nor
+     among who can give access, do not enter the tills with a PIN or a badge, take no place and do not count in the
+     plan's use, and their browser does not stay as a device of the business: it neither ends another device's session
+     nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest entries at once,
+     and what they do stays in the records under their name.
   5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
      administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
      try again." with "Try again".
@@ -3987,4 +3988,4 @@ as it was; reading it, they see they cannot change it. If the change cannot be s
 shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
 support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step
 5).
-Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
