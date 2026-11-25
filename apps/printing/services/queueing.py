@@ -20,7 +20,8 @@ from apps.printing.queries.job_printer import job_printer
 from apps.printing.queries.jobs import actor, job_row
 from apps.printing.queries.printers import find_printer
 from apps.printing.queries.settings import current_settings
-from apps.printing.schemas import JobCreateIn, JobCreateOut, JobOut, PrinterRefIn
+from apps.printing.schemas.jobs import JobCreateIn, JobCreateOut, JobOut
+from apps.printing.schemas.printers import PrinterRefIn
 from base import operations as platform
 from base.business import business_zone
 from apps.printing.services.writes import _queued

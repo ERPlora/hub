@@ -14,7 +14,8 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.printing.models import PrintJob
-from apps.printing.schemas import JobDetailOut, JobListIn, JobOut, JobRefIn, Page
+from apps.printing.schemas.fields import Page
+from apps.printing.schemas.jobs import JobDetailOut, JobListIn, JobOut, JobRefIn
 from base.ordering import list_order
 from base.queries.people import actor_name
 
