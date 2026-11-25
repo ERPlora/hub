@@ -336,7 +336,7 @@ same, in the browser too (hub#1023).
 All the flows are common to both verticals (restaurant and hair salon).
 
 ### INVENTORY-F01 Create a product
-<!-- from WORKBOOK.md sha256:ecab663116f7 -->
+<!-- from WORKBOOK.md sha256:95d688133d98 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -368,7 +368,8 @@ whole or nothing is saved. If initial stock was given, it stays in **Movements**
 Inventory tells the other apps there is a new product: Sales offers it on the till's grid and the
 setup step "Your catalog" is done (INVENTORY-F28). Through the assistant or the API it can be created
 already inactive, out of the till until it is activated (INVENTORY-F03), as one that was inactive comes
-back when it is recovered from a separate copy (BASE-F114).
+back when it is recovered from a separate copy (BASE-F114). A backup or a template of "Data and backups" (BASE-F35)
+keeps which products are a "Service", and when it is loaded (BASE-F31) they still are.
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
 as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -382,7 +383,7 @@ tax category that is no longer in Taxes is refused, also if it arrives through t
 API. Every refusal shows inside the panel and nothing is saved. Only whoever sees the costs writes the cost: a
 creation with a cost by someone who does not see them, through the assistant or the API, is refused as an
 operation they may not run and nothing is saved; without a cost, the product is created with cost 0.
-Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (the ERPlora staff bring back from a separate copy
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F31, BASE-F35, BASE-F119, BASE-F114 (the ERPlora staff bring back from a separate copy
 the products the business no longer has at all, each by this same creation; a deleted one comes back the same,
 INVENTORY-F34)
 
@@ -546,7 +547,7 @@ A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Import products from a CSV
-<!-- from WORKBOOK.md sha256:e2aa442fe923 -->
+<!-- from WORKBOOK.md sha256:2c0df1a759f2 -->
 Status: done
 Actor: administrator, manager
 Screen: Import products
@@ -571,7 +572,8 @@ Steps:
 In: the file; the tax categories, their names (the translated ones too) and the learnt texts, from
 Taxes; the units.
 Out: an active "Physical" product per ready row, which follows the business's stock control and carries
-no till categories; Inventory tells of each new product. The stock each row brings stays in
+no till categories; Inventory tells of each new product. Through the assistant or the API, a row can also say that it
+is a "Service" and which quantity and unit its price refers to (INVENTORY-F26). The stock each row brings stays in
 **Movements** as "Initial". In Taxes, the learnt texts and the categories created from the tax window.
 A row with a SKU that a live product already has counts as skipped and that product is not touched,
 whatever its other cells say (so the export itself imports back without failures, also with a negative
@@ -580,13 +582,15 @@ If it fails: row reasons: "Name or SKU missing", "Price is not a number" (also f
 cost too large", "SKU repeated in the file", "Quantity is not a number", "Quantity too large", "The
 quantity does not respect the step allowed for this unit", "Unit of measure not recognized", "A text is
 longer than its column allows", "Another product of the catalog already has that EAN-13" and "The tax
-category is missing" or "Tax category not recognized". If Taxes cannot save a learnt text or a created
+category is missing" or "Tax category not recognized"; through the assistant or the API, also "Product type not
+recognized", "A service has no stock." and "The price must refer to a unit of the same kind as the product's unit.". If
+Taxes cannot save a learnt text or a created
 category, the report says so and its rows stay as failed with that reason. "Cancel" in the tax window
 imports nothing. "Stop" keeps what was already created and the report says "The import was stopped
 halfway. What had already been created is counted below; the rest of the file was left untouched.". Only whoever
 sees the costs imports costs: a file with costs from someone who does not see them is refused whole as an operation
 they may not run and nothing is created.
-Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119
+Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119, INVENTORY-F26
 
 ### INVENTORY-F10 Import categories from a CSV
 <!-- from WORKBOOK.md sha256:7aa64b34ec09 -->
@@ -989,7 +993,7 @@ barcode: use letters without accents, digits and signs.". Any other refusal show
 Involved: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Sell by weight or by measure: units and step
-<!-- from WORKBOOK.md sha256:50b564d6f144 -->
+<!-- from WORKBOOK.md sha256:f3e0ff751be0 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -1005,11 +1009,12 @@ Steps:
 In: the business's units, which arrive when Inventory is turned on.
 Out: the product with its unit. Sales reads it for the line; the price is per 1 of the unit. Through the
 assistant or the API, the price can refer to another quantity (per 100 g, or per kilo with the stock in
-grams).
+grams). A backup or a template of "Data and backups" (BASE-F35) keeps which quantity and unit it refers to, and the
+product that comes in when it is loaded (BASE-F31) is charged at the same price.
 If it fails: "The quantity does not respect the step allowed for this unit" on screen; "The quantity
 does not respect the step allowed for this unit: use multiples of …" through the assistant or the API.
 The unit of a product with stock is not changed.
-Involved: SALE-F10
+Involved: SALE-F10, INVENTORY-F09, BASE-F31, BASE-F35
 
 ### INVENTORY-F27 Hand the catalog to the till, to Kitchen and to Menus
 <!-- from WORKBOOK.md sha256:be8537894c61 -->
@@ -1371,12 +1376,12 @@ assistant says which one is not there (in a goods receipt, on which line) or ask
 | Up to five library images for a product's photo, by its name and titled in the language of whoever asks; it sets none | view products | F30 | `inventory.product.suggest_image` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:eee28c6eb191 -->
+<!-- from WORKBOOK.md sha256:cf3be781420c -->
 
 | What it does | Who can | Confirmation in the assistant | Flows | Service |
 |---|---|---|---|---|
 | Creates a product, with its categories, its allergens and its initial stock | create products | one tap | F01, F20, F26, F35, F36 | `inventory.product.create` |
-| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F12, F33, F35 | `inventory.product.bulk_create` |
+| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F12, F26, F33, F35 | `inventory.product.bulk_create` |
 | Changes a product: data, allergens, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F12, F20, F35, F36 | `inventory.product.update` |
 | Deletes a product | delete products | type to confirm | F04 | `inventory.product.delete` |
 | Gives a deleted product back to the catalog, as it was (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F34 | `inventory.product.restore` |

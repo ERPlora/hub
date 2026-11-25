@@ -403,6 +403,10 @@ msgstr "SKU duplicado en el fichero"
 msgid "Unit of measure not recognized: %(text)s"
 msgstr "Unidad de medida no reconocida: %(text)s"
 
+#, python-format
+msgid "Product type not recognized: %(text)s"
+msgstr "Tipo de producto no reconocido: %(text)s"
+
 msgid "Quantity is not a number"
 msgstr "Cantidad no numérica"
 
