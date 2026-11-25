@@ -1,5 +1,5 @@
-"""The tips app: the tip a customer leaves when paying, by card or in cash, kept apart from the sale with whom it belongs
-to, and entered in the open drawer as its own line (WORKBOOK.md)."""
+"""The tips app: the tip a customer leaves when paying, by card or in cash, kept apart from the sale with who it
+belongs to, and entered in the open drawer as its own line (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig

@@ -53,7 +53,9 @@ class Tip(UUIDModel):
     member = models.ForeignKey(
         Member, on_delete=models.PROTECT, null=True, blank=True, related_name="+", verbose_name=_("for")
     )
-    method = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="+", verbose_name=_("payment method"))
+    method = models.ForeignKey(
+        PaymentMethod, on_delete=models.PROTECT, related_name="+", verbose_name=_("payment method")
+    )
     method_name = models.CharField(_("payment method name"), max_length=60)
     method_type = models.CharField(_("payment method type"), max_length=16, choices=PaymentMethod.Type.choices)
     amount = models.PositiveBigIntegerField(_("amount"))

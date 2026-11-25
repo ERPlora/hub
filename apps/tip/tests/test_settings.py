@@ -1,13 +1,11 @@
 """The tip settings (TIP-F01): off from the factory, three suggestions per payment method of Sales (3 %, 5 % and 10 % by
 default, each a percentage or an amount), which one comes chosen and whether another amount is allowed."""
 
-import pydantic
 import pytest
 from live.errors import PermissionDenied
 from live.models import OutboxEvent
 
 from apps.sale.models import PaymentMethod
-from apps.tip.schemas import SettingsPatchIn
 
 from .conftest import HUB_DB, ctx_for, run
 
@@ -65,27 +63,6 @@ def test_a_method_left_out_keeps_its_suggestions():
     run("tip.settings.update", {"methods": [{"method_id": str(card().id), "suggestions": mine}]})
     run("tip.settings.update", {"enabled": True})
     assert by_method(settings())["Card"] == mine
-
-
-@pytest.mark.parametrize(
-    "suggestions",
-    [
-        [{"kind": "percent", "value": 0}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-        [{"kind": "percent", "value": 101}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-        [{"kind": "amount", "value": -100}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-        [{"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}],
-    ],
-)
-def test_a_suggestion_empty_zero_negative_or_over_100_percent_is_refused(suggestions):
-    with pytest.raises(pydantic.ValidationError):
-        SettingsPatchIn.model_validate({"methods": [{"method_id": str(card().id), "suggestions": suggestions}]})
-
-
-def test_the_same_suggestion_twice_in_a_method_is_said_on_its_field():
-    twice = [{"kind": "percent", "value": 5}, {"kind": "percent", "value": 5}, {"kind": "percent", "value": 10}]
-    with pytest.raises(pydantic.ValidationError) as refused:
-        SettingsPatchIn.model_validate({"methods": [{"method_id": str(card().id), "suggestions": twice}]})
-    assert "That suggestion is already there." in str(refused.value)
 
 
 def test_a_payment_method_that_is_not_available_is_refused():

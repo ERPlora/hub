@@ -36,7 +36,7 @@ def _suggestions(settings: Settings, data: SettingsPatchIn) -> dict | None:
     expose_api=True,
     ai={
         "asks": {
-            "en": ("ask for a tip at the charge", "suggest 1 €, 2 € and 5 € as tips when paying by card"),
+            "en": ("change the tip suggestions to 5 %, 10 % and 15 %", "suggest 1 €, 2 € and 5 € as tips when paying by card"),
             "es": ("pide propina al cobrar", "con tarjeta sugiere de propina 1 €, 2 € y 5 €"),
         },
         "description": "Change the tip settings, only in what is sent: whether a tip is asked for at the charge, which "
@@ -48,7 +48,8 @@ def _suggestions(settings: Settings, data: SettingsPatchIn) -> dict | None:
 )
 def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
     settings = Settings.objects.select_for_update().first() or Settings()
-    changed = [field for field in FLAGS if getattr(data, field) is not None and getattr(data, field) != getattr(settings, field)]
+    sent = {field: getattr(data, field) for field in FLAGS if getattr(data, field) is not None}
+    changed = [field for field, value in sent.items() if value != getattr(settings, field)]
     for field in changed:
         setattr(settings, field, getattr(data, field))
     suggestions = _suggestions(settings, data)

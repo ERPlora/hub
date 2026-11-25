@@ -59,8 +59,8 @@ def settings_row(settings: Settings) -> dict:
     expose_api=True,
     ai={
         "asks": {
-            "en": ("are tips asked for at the charge?", "which tip suggestions does the card payment offer?"),
-            "es": ("¿se pide propina al cobrar?", "¿qué propinas sugiere el cobro con tarjeta?"),
+            "en": ("show me the tip settings", "which tip suggestions does the card payment offer?"),
+            "es": ("enséñame los ajustes de las propinas", "¿qué propinas sugiere el cobro con tarjeta?"),
         },
         "description": "The tip settings: whether a tip is asked for at the charge (off from the factory), which of the "
         "three suggestions comes chosen (0: «No tip»), whether another amount is allowed, and each active payment "

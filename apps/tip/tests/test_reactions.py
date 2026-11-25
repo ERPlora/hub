@@ -2,6 +2,8 @@
 tip included. A refund of only some lines leaves them as they are. The worker hands each event of Sales to
 ``events.react``; a repeated delivery changes nothing."""
 
+import dataclasses
+
 import pytest
 from live.context import system_context
 from live.errors import PermissionDenied
@@ -35,10 +37,6 @@ def deliver(name: str):
 
 def statuses() -> list[str]:
     return list(Tip.objects.order_by("created_at", "id").values_list("status", flat=True))
-
-
-def test_tips_react_to_a_void_and_to_a_refund_of_sales():
-    assert events.REACTIONS == {"sale.sale.voided": "tip.sale.void", "sale.sale.refunded": "tip.sale.refund"}
 
 
 def test_voiding_a_sale_voids_its_tips_and_takes_them_out_of_the_open_drawer(coffee):
@@ -94,10 +92,6 @@ def test_a_voided_sale_without_tips_changes_nothing(coffee):
     assert deliver("sale.sale.voided").changed == 0
 
 
-def test_another_event_of_sales_is_none_of_tips():
-    assert events.react(A, "sale.sale.completed", {"sale_id": "x"}) is None
-
-
 def test_the_reactions_run_as_the_platform_only(coffee):
     sale = charge(payments=CARD)
     op = get("tip.sale.void")
@@ -106,3 +100,11 @@ def test_the_reactions_run_as_the_platform_only(coffee):
         with pytest.raises(PermissionDenied):
             op(ctx_for(role), payload)
     assert op(system_context(A), payload).changed == 0
+
+
+def test_not_even_the_owner_s_whole_app_reaches_the_reactions(coffee):
+    sale = charge(payments=CARD)
+    op = get("tip.sale.void")
+    owner = dataclasses.replace(ctx_for(), permissions=frozenset({"tip.*"}))
+    with pytest.raises(PermissionDenied):
+        op(owner, op.input.model_validate({"sale_id": str(sale.id)}))

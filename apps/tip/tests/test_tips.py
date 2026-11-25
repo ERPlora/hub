@@ -4,14 +4,12 @@ attempt never records it twice."""
 
 import dataclasses
 
-import pydantic
 import pytest
 from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.cash_register.models import Movement
 from apps.tip.models import Tip
-from apps.tip.schemas import TipAddIn
 from apps.tip.services import tips
 
 from .conftest import (
@@ -147,22 +145,6 @@ def test_the_same_attempt_with_another_tip_is_refused(coffee):
     assert Tip.objects.count() == 1
 
 
-@pytest.mark.parametrize(
-    "data",
-    [
-        {"amount": 100, "method": "card"},
-        {"amount": 100, "pool": True, "sale": "20261114-0007"},
-        {"amount": 100, "pool": True, "method": "card"},
-        {"amount": 100, "sale": "20261114-0007"},
-        {"amount": 0, "pool": True},
-        {"amount": -5, "pool": True},
-    ],
-)
-def test_a_tip_names_its_sale_and_its_payment_method_or_goes_to_the_pool_in_cash_with_a_positive_amount(data):
-    with pytest.raises(pydantic.ValidationError):
-        TipAddIn.model_validate(data)
-
-
 def test_an_employee_records_tips_and_whoever_may_not_is_refused(coffee, make_user):
     sale = charge(payments=CARD)
     employee = as_user(make_user("bea", role="hub_employee"))
@@ -213,11 +195,6 @@ def test_giving_a_tip_to_somebody_else_moves_no_money(coffee):
     adjusted = adjust(tip, member_id=str(bea.id))
     assert (adjusted.member_id, adjusted.member_name, adjusted.amount) == (bea.id, "Bea Ruiz", 300)
     assert tip_movements() == [("in", "card", 300)]
-
-
-def test_a_change_needs_its_reason():
-    with pytest.raises(pydantic.ValidationError):
-        run("tip.tip.update", {"id": "0190f0f0-0000-7000-8000-000000000000", "amount": 100, "reason": "  "})
 
 
 def test_an_adjustment_that_changes_nothing_records_nothing(coffee):

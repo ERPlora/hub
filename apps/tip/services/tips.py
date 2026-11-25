@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict
-from live.operations import atomic, operation
+from live.operations import operation
 from live.outbox import record_event
 
 from apps.sale.models import PaymentMethod, Sale
@@ -104,8 +104,7 @@ def add_tip(ctx: OperationContext, data: TipAddIn) -> dict:
     )
     tip.session_id = drawer.move(ctx, tip, "in", tip.amount, strict=True)
     try:
-        with atomic():
-            tip.save()
+        tip.save()
     except IntegrityError:
         raise Conflict(str(ATTEMPT_IN_PROGRESS), code="tip.attempt_in_progress") from None
     record_event(
@@ -204,8 +203,8 @@ def void_one(ctx: OperationContext, tip: Tip, by: str, reason: str) -> None:
     expose_api=True,
     ai={
         "asks": {
-            "en": ("void the tip of sale 20261114-0007, it went on the wrong sale",),
-            "es": ("anula la propina de la venta 20261114-0007, era de otra mesa",),
+            "en": ("void the tip of sale 20261114-0007, it went on the wrong sale", "cancel the 3 € tip I recorded by mistake"),
+            "es": ("anula la propina de la venta 20261114-0007, era de otra mesa", "quita la propina de 3 € que apunté sin querer"),
         },
         "description": "Void a tip, by its id or its sale's number, with the reason. What it put in a drawer goes out of "
         "the open one in its payment method; a closed session is never touched. It cannot be undone.",

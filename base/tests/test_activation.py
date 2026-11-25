@@ -44,19 +44,18 @@ def test_the_roots_are_the_modules_on_that_no_other_module_on_needs():
     assert activation.roots(["tax", "customer"], GRAPH) == {"tax", "customer"}
 
 
-def test_every_module_on_has_17_roots_of_27_on_main():
+def test_every_module_on_has_17_roots_of_28_on_main():
     graph = activation.module_graph()
-    assert len(graph) == 27
+    assert len(graph) == 28
     assert sorted(activation.roots(graph, graph)) == [
-        "attendance", "cart_checkout", "cash_register", "combo", "demo", "flow", "kitchen", "modifier",
-        "online_booking", "payment", "pricing", "printing", "reservation", "task", "verifactu", "website",
-        "whatsapp_inbox",
+        "attendance", "cart_checkout", "combo", "demo", "flow", "kitchen", "modifier", "online_booking", "payment",
+        "pricing", "printing", "reservation", "task", "tip", "verifactu", "website", "whatsapp_inbox",
     ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("vertical", "modules", "chosen"), [("restaurant", 20, 13), ("hair_salon", 18, 10)])
+@pytest.mark.parametrize(("vertical", "modules", "chosen"), [("restaurant", 21, 13), ("hair_salon", 19, 10)])
 def test_a_vertical_template_counts_only_its_roots_as_chosen(vertical, modules, chosen):
-    """The restaurant's template has 20 modules and 13 roots; the hair salon's, 18 and 10. VeriFactu is in no template
+    """The restaurant's template has 21 modules and 13 roots; the hair salon's, 19 and 10. VeriFactu is in no template
     (hub#998), so Invoicing is a root in its place."""
     graph = activation.module_graph()
     apps = template_apps(vertical)
