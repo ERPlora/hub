@@ -501,7 +501,7 @@ cliente o a un compañero).
 
 ## Para quien lo mantiene
 
-- Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries.py`, `services.py`,
+- Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries.py`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_staff.py` con Personal de verdad y `tests/test_relay.py`, la baja
   en Personal entregada por el relay real del worker (TASK-F15, con dos negocios).

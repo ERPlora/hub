@@ -1,6 +1,6 @@
 """Events of the task app (``task.<entity>.<fact>``) and its reaction to Staff's.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that
+services/ records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. They carry ids (and a task's number or a project's code), never a title, a
 description or a comment: free text that may name a customer or a colleague.
 
