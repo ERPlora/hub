@@ -560,7 +560,8 @@ aprendidos, de Impuestos; las unidades.
 Sale: un producto activo y «Físico» por fila lista, que sigue el control de stock del negocio y no
 lleva categorías de TPV; Inventario avisa de cada producto nuevo. Por el asistente o la API, una fila puede decir
 además que es un «Servicio» y a qué cantidad y unidad se refiere su precio (INVENTORY-F26). El stock que trae cada
-fila queda en **Movimientos** como «Inicial». En Impuestos, los textos aprendidos y las categorías creadas
+fila queda en **Movimientos** como «Inicial», también uno por debajo de cero (-3, el de un negocio que
+vende sin stock), tal como viene. En Impuestos, los textos aprendidos y las categorías creadas
 desde la ventana fiscal. Una fila con un SKU que ya tiene un producto vivo se cuenta como omitida y
 ese producto no se toca, digan lo que digan sus otras celdas (así el propio export se vuelve a importar
 sin fallos, también con un stock negativo); un SKU de un producto eliminado crea uno nuevo.

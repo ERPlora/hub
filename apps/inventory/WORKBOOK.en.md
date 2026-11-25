@@ -547,7 +547,7 @@ A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Import products from a CSV
-<!-- from WORKBOOK.md sha256:2c0df1a759f2 -->
+<!-- from WORKBOOK.md sha256:162443c90a4c -->
 Status: done
 Actor: administrator, manager
 Screen: Import products
@@ -574,7 +574,8 @@ Taxes; the units.
 Out: an active "Physical" product per ready row, which follows the business's stock control and carries
 no till categories; Inventory tells of each new product. Through the assistant or the API, a row can also say that it
 is a "Service" and which quantity and unit its price refers to (INVENTORY-F26). The stock each row brings stays in
-**Movements** as "Initial". In Taxes, the learnt texts and the categories created from the tax window.
+**Movements** as "Initial", also one below zero (-3, that of a business that sells without
+stock), as it comes. In Taxes, the learnt texts and the categories created from the tax window.
 A row with a SKU that a live product already has counts as skipped and that product is not touched,
 whatever its other cells say (so the export itself imports back without failures, also with a negative
 stock); a SKU of a deleted product creates a new one.

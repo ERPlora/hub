@@ -417,3 +417,38 @@ def test_an_exported_catalog_imports_into_an_empty_one_as_it_was():
         "kg",
         "8412345678905",
     )
+
+
+def test_a_stock_sold_below_zero_imports_into_an_empty_catalog_as_it_was():
+    configure(allow_sell_without_stock=True)
+    wine = create("Wine", "WIN", initial_stock="5")
+    write_off(wine.id, "8")
+    rows = exported_rows()
+    run("inventory.product.delete", ProductRefIn(product="WIN"))
+
+    report = import_products(*rows)
+
+    assert (report.created, report.failed) == (1, 0)
+    again = Product.objects.get(is_deleted=False)
+    assert (again.stock, movements(again.id)) == (Decimal("-3"), [("initial", Decimal("-3"), Decimal("-3"))])
+
+
+@pytest.mark.parametrize(
+    ("cells", "reason"),
+    [
+        ({"stock": "-2,5", "unit": "kg"}, ""),
+        ({"stock": "many"}, "Quantity is not a number"),
+        ({"stock": "-"}, "Quantity is not a number"),
+        ({"stock": "--3"}, "Quantity is not a number"),
+        ({"stock": "3-"}, "Quantity is not a number"),
+        ({"stock": "-1,5,0"}, "Quantity is not a number"),
+        ({"stock": "-0.0001", "unit": "kg"}, "Quantity is not a number"),
+        ({"stock": "-9999999999999"}, "Quantity too large"),
+        ({"stock": "-2.5"}, "The quantity does not respect the step allowed for this unit"),
+        ({"low_stock_threshold": "-3"}, "Quantity is not a number"),
+    ],
+)
+def test_only_the_stock_may_be_below_zero_and_what_is_not_a_number_still_fails(cells, reason):
+    [outcome] = import_products(row("NEG", **cells), dry_run=True).rows
+
+    assert (outcome.status, outcome.reason) == ("ready" if not reason else "failed", reason)
