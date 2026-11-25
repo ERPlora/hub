@@ -1192,7 +1192,7 @@ puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
 por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
 preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
-Implicados: BASE-F22, INVENTORY-F12, VERIFACTU-F01, BASE-F32
+Implicados: BASE-F22, INVENTORY-F12, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Leer el informe de la importación
 Estado: hecho
@@ -1291,7 +1291,7 @@ Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un no
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
 exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
 restablecer.
-Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33, BASE-F36
+Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33, INVENTORY-F36, BASE-F36
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho
