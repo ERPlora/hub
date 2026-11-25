@@ -8,13 +8,13 @@
 // screen too short for the whole pad (a laptop's browser) the dialog stays on screen and its content scrolls. The
 // owner's PIN exists only while this file runs, after the cashier has entered (a PIN in hub `a` turns every browser's
 // way in into the PIN pad: base-access.spec.ts), and everything this file creates goes with it (`afterAll`).
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
-import { usernameOf } from './business';
+import { approvalDialog, forgetThePin, forgetThePinAndTheApprovalsSince, ownerChoosesPin, type Side } from './approval-helpers';
+import { A, api, psql, shot, untilStill } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
-import { snapshotSeries } from './invoice-helpers';
-import { cashiersTill, chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { findSale, leaveTheTill, ownerAtSales } from './sale-approval-helpers';
+import { cashiersTill, chargeByApi, cleanSales, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -37,14 +37,11 @@ const WRONG = 'wrong';
 
 test.describe.configure({ mode: 'serial' });
 
-let owner: { context: BrowserContext; page: Page };
-let cashier: { context: BrowserContext; page: Page };
+let owner: Side;
+let cashier: Side;
 let started = '';
 let ownerName = '';
 const tickets = new Map<string, SaleOut>();
-
-/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => usernamesOf(email);
 
 /** The owner's approvals of a void spent since this file started. */
 const spentVoids = (): number =>
@@ -54,22 +51,12 @@ const spentVoids = (): number =>
     ),
   );
 
-/** No PIN of the owner's left behind, in any of their accounts: the business's way in stays erplora.com's. */
-function forgetThePin(): void {
-  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${accountsOf(OWNER.email)})`);
-}
-
 test.beforeAll(async ({ browser }) => {
   started = psql('SELECT now()::text');
-  // Card charges issue tickets when the hub has an issuer, and a void its rectifying invoice: the cleanup gives
-  // their numbers back.
-  snapshotSeries();
-  const context = await browser.newContext({ baseURL: A });
-  owner = { context, page: await context.newPage() };
-  await login(owner.page, A, '/sale/sales');
-  ownerName = await usernameOf(context);
-  await drawerOff(context);
-  await createProduct(context, { name: 'E2E Base approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
+  const side = await ownerAtSales(browser);
+  owner = side;
+  ownerName = side.name;
+  await createProduct(owner.context, { name: 'E2E Base approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   // The cashier enters while nobody of the business has a PIN: the way in is erplora.com's, as every spec's.
   cashier = await cashiersTill(browser);
   const till = cashier.context;
@@ -80,35 +67,16 @@ test.beforeAll(async ({ browser }) => {
   await till.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   // Only now the owner chooses a PIN («My profile»): who may approve, on the cashier's device.
   forgetThePin();
-  const pin = await api<{ set: boolean }>(context, A, 'POST', '/me/pin', { pin: OWNER_PIN });
-  expect(pin.status, JSON.stringify(pin.data)).toBe(200);
+  await ownerChoosesPin(owner.context, OWNER_PIN);
 });
 
 test.afterAll(async () => {
-  forgetThePin();
-  if (started) {
-    psql(
-      `DELETE FROM base_approval WHERE requested_by IN (${accountsOf(EMPLOYEE.email)}) AND operation = 'sale.sale.void' AND created_at >= '${started}'`,
-    );
-  }
+  forgetThePinAndTheApprovalsSince(started, 'sale.sale.void');
   cleanSales();
   cleanInventory();
   restoreDrawer();
-  // The cashier's session, for a sweep of what they see (as sale-approval.spec.ts saves it).
-  if (process.env.E2E_SAVE_STORAGE_STATE) await cashier?.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  await cashier?.context.close();
-  await owner?.context.close();
+  await leaveTheTill(cashier, owner);
 });
-
-const row = (page: Page, sale: SaleOut) => shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
-
-/** Sales, searched for `sale`'s number, with its row painted (a row on a desk, a card on a phone). */
-async function find(page: Page, sale: SaleOut): Promise<void> {
-  await page.goto(`${A}/sale/sales`);
-  await shown(page).locator('[data-testid=sales-table-row], [data-testid=sales-empty]').first().waitFor({ state: 'visible' });
-  await shown(page).locator('[data-testid=sales-table-search] input').fill(sale.number);
-  await expect(row(page, sale)).toBeVisible();
-}
 
 /** «Void» on `sale`: its own button where the row has room, otherwise in its «⋮» menu. */
 async function askToVoid(page: Page, sale: SaleOut): Promise<void> {
@@ -119,15 +87,12 @@ async function askToVoid(page: Page, sale: SaleOut): Promise<void> {
   await modal.locator('[data-testid=sale-void-submit]').click();
 }
 
-/** «An approval is needed», over the window that asked. */
-const approval = (page: Page) => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
-
 /** The dialog open on `sale`'s void at `viewport`, on the owner's pad. */
 async function openOnThePad(page: Page, sale: SaleOut, viewport: { width: number; height: number }): Promise<Locator> {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
-  await find(page, sale);
+  await findSale(page, sale);
   await askToVoid(page, sale);
-  const dialog = approval(page);
+  const dialog = approvalDialog(page);
   await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Void a sale|Se aprueba: Anular una venta)$/);
   // The owner's face, when there is a choice; with one person the pad is already theirs.
   await expect(dialog.getByTestId('pinpad').or(dialog.getByTestId('pin-face').first())).toBeVisible();

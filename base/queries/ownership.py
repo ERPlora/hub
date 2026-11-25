@@ -13,9 +13,9 @@ from live.meta import all_live_app_configs
 
 from base.api_keys import KeyCaller
 from base.apps_on import active_apps
+from base.permissions import is_a_person
 from base.sensitive import VIEW_BUSINESS_TOTALS
 
-from .people import is_a_person
 
 #: Every «see everyone's» permission an ``Owned`` names: of them, an API key holds those its maker holds (BASE-F125).
 _SEE_ALL: set[str] = set()

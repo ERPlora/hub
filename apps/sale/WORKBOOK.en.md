@@ -1235,17 +1235,20 @@ cannot be read, "Its VeriFactu record could not be read, and its paper never pri
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
-<!-- from WORKBOOK.md sha256:a0ac88098d8f -->
+<!-- from WORKBOOK.md sha256:4b57436eacba -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
 Screen: Sales, Void sale, An approval is needed
 Steps:
-1. In **Sales**, on a Completed sale with no refunds, press "Void".
+1. In **Sales**, on a Completed sale with no refunds, press "Void". Before starting one knows whether it will be
+   possible: if your role does it "With approval", "A manager will have to approve this void." shows; if your own role
+   says "No", "Your role does not let you void a sale. Ask a manager to do it." shows and nothing opens.
 2. "Void sale 20261121-0007" opens. Write the "Reason (required)" and press "Void", or "Cancel".
-3. If you do not have the permission to void, "An approval is needed" opens on top with "Approving: Void
+3. If your role voids "With approval", "An approval is needed" opens on top with "Approving: Void
    a sale": a manager taps their face and types their PIN (or swipes their badge) on that same device.
-   Whoever has the permission does not see this question.
+   Whoever has the permission does not see this question, nor does whoever their role says "No" to: no PIN lets them
+   void.
 4. "Sale voided" shows, the window closes, the row changes to Voided and the "Voided" figure goes up.
 In: the chosen sale.
 Out: the sale marked as voided with time, who and reason; it is not deleted (announces: sale voided).
@@ -1261,17 +1264,20 @@ at the same time, "This sale is already voided.". A refusal is read inside the w
 If "Cancel" is pressed in "An approval is needed", nothing is voided and the window says "This needs a
 manager's approval.". The approved void does the same as the manager's, only once: the corrective
 invoice in the same void, the voucher sessions that go back, the stock and the customer's record; who
-approved it stays in **Employees › Approvals**.
+approved it stays in **Employees › Approvals**. If the role becomes "No" with the window open, the void is refused and
+nothing is voided, even if a manager had already approved it.
 Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
 
 ### SALE-F31 Refund a sale (all of it, part of it or through another method)
-<!-- from WORKBOOK.md sha256:0930810e1d1e -->
+<!-- from WORKBOOK.md sha256:cf834b29ea28 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
 Screen: Refund, An approval is needed
 Steps:
-1. In **Sales**, on a Completed sale (also with an invoice), press "Refund".
+1. In **Sales**, on a Completed sale (also with an invoice), press "Refund". Before starting one knows whether it will be
+   possible: if your role does it "With approval", "A manager will have to approve this refund." shows; if your own role
+   says "No", "Your role does not let you refund a sale. Ask a manager to do it." shows and nothing opens.
 2. "Refund sale 20261121-0007" shows one card for each way it was paid: "Charged", "Already refunded" and
    "Refundable", with a proposal for a full refund already shared out ("Refund everything" puts it back).
 3. If the customer returns articles, mark them in "What goes back": the amount is proposed by itself (the
@@ -1281,9 +1287,10 @@ Steps:
    money is refunded.
 4. Change the "Refund amount" of each method if only part goes back. If the original method is no longer
    available, choose another in "Give it back through".
-5. Write the "Reason" and press "Refund €12.00". If you do not have the permission to refund, "An
+5. Write the "Reason" and press "Refund €12.00". If your role refunds "With approval", "An
    approval is needed" opens on top with "Approving: Refund a sale": a manager approves it with their PIN
-   (or their badge) on that same device. Whoever has the permission does not see this question.
+   (or their badge) on that same device. Whoever has the permission does not see this question, nor does whoever their
+   role says "No" to: no PIN lets them refund.
 6. "Refund recorded." shows; if nothing is left to refund, the sale changes to Refunded; if something is
    left, the row says "€6.00 left to refund".
 In: what was charged and what was already refunded for each payment method; the sale's lines and the ones
@@ -1300,7 +1307,8 @@ back with another refund. Open the refund again to see what is left.". If the Hu
 pressing again does not refund twice. If "Cancel" is pressed in "An approval is needed",
 nothing is refunded and the window says "This needs a manager's approval.". The approved refund is the
 same, only once, with its corrective invoice and the voucher sessions that go back; who approved it stays
-in **Employees › Approvals**.
+in **Employees › Approvals**. If the role becomes "No" with the window open, the refund is refused and nothing is
+refunded, even if a manager had already approved it.
 Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
 Customers takes what was refunded off the record's spending on hearing "sale refunded" (CUSTOMER-F22)
 and Inventory puts back the units that go back (INVENTORY-F24), once per refund.

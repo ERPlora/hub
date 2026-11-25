@@ -11,7 +11,7 @@ from base import access, people as people_rules
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
-from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, VIEW_HOME, is_a_person
 from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
@@ -109,11 +109,6 @@ def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
         "entered": person["entered"],
         "me": signed_in_username(ctx) == person["id"],
     }
-
-
-def is_a_person(actor: Any) -> bool:
-    """Whether ``actor`` is a signed-in person (a control user), not the platform, an API key or nobody."""
-    return hasattr(actor, "get_username") and bool(getattr(actor, "is_authenticated", False))
 
 
 def hub_user_of(ctx: OperationContext) -> HubUser | None:
