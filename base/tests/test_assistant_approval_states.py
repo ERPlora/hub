@@ -2,8 +2,11 @@
 the approval as the screen does, or the tool is not theirs: not offered, not found and not run, whatever pass comes with
 its yes."""
 
+import dataclasses
+
 import pytest
 from live.context import OperationContext
+from live.operations import get
 
 from base import activation, assistant
 from base.models import Membership
@@ -12,6 +15,7 @@ from base.models.access import Credential
 from base.models.roles import BusinessRole
 from base.permissions import access_for
 from base.roles import APPROVAL, OFF, ON
+from base.services.assistant import _assistant_approved
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HUB_DB, in_business_a
 from base.tests.fake_gateway import gateway, signed
@@ -113,8 +117,6 @@ class TestTheTools:
         assert "sale.sale.void" in basic
 
     def test_the_search_of_the_rest_does_not_find_what_the_role_says_no_to(self, eva):
-        from live.operations import get
-
         find = get(assistant.relevance.FIND_TOOLS)
         role = given(eva, APPROVAL)
 
@@ -168,6 +170,17 @@ class TestItsYes:
         assert (response.status_code, response.json()["error"]["code"]) == (403, "requires_elevation")
         assert answered(client, gateway, body, HTTP_X_ELEVATION_TOKEN=approved(client, body))["outcome"] == "ok"
         assert _items() == 1
+
+    @pytest.mark.parametrize(("state", "asked"), [(ON, False), (APPROVAL, True), (OFF, False), (None, False)])
+    def test_is_put_to_a_manager_only_as_the_role_says(self, rf, eva, approvable_create, state, asked):
+        """The yes of a tool the role says no to never carries a pass, were the model to reach it."""
+        given(eva, state)
+        ctx = dataclasses.replace(asks(eva), request=rf.post("/api/assistant/turn", HTTP_X_ELEVATION_TOKEN="elev_x"))
+
+        run_as = _assistant_approved(ctx, get("demo.item.create"), '{"name": "Mesa 4"}')
+
+        assert hasattr(ctx.request, "approved") is asked
+        assert (run_as is not ctx) is asked
 
     def test_runs_nothing_the_role_says_no_to_and_asks_nobody(self, client, eva, gateway, approvable_create):
         given(eva, OFF)

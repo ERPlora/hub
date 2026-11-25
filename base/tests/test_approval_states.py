@@ -7,6 +7,7 @@ request, so a change counts from the next one on. The owner is never asked.
 """
 
 import pytest
+from django.apps import apps
 
 from base.models import Membership
 from base.models.access import AccessSettings
@@ -102,6 +103,12 @@ class TestTheDoor:
         client.force_login(olga)
 
         assert post(client, SETTINGS, CHANGE).status_code == 200
+
+    def test_what_is_the_owners_alone_is_a_no_in_every_role_of_the_business(self, client, adam, eva, monkeypatch):
+        monkeypatch.setattr(apps.get_app_config("base"), "approvals", {"base.hub.reset": "Reset the business"}, raising=False)
+        given(eva, APPROVAL)
+
+        assert code(post(client, "/settings/data/reset", {"dry_run": True})) == "permission_denied"
 
     def test_whoever_left_the_business_is_refused_as_ever(self, client, adam, eva):
         given(eva, APPROVAL)
