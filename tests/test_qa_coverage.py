@@ -33,7 +33,7 @@ Un ejemplo.
 ### SAMPLE-F01 Hecho en una pantalla
 Estado: hecho
 Pantalla: Lista
-Operaciones: las de la lista
+Operaciones: las de la lista, ninguna más
 
 ### SAMPLE-F02 Hecho con una nota
 Estado: hecho — también por la API
