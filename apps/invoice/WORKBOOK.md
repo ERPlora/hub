@@ -138,7 +138,8 @@ corrigen), «Pagada el» y «Notas». Las líneas: «#», «Descripción», «Ca
 nombre del impuesto que declara la factura («IVA %», «IGIC %» o «IPSI %»; «Imp. %» si mezcla impuestos),
 «Base», «Impuesto», «Total» (en el móvil, cada línea en bloque); sin líneas, «Sin líneas de detalle.». El
 desglose por tipo («IVA 21 %», «Recargo de equivalencia 5,2 %», «Exento (E1)», «No sujeto»,
-«Inversión del sujeto pasivo») con su base y su cuota, y los totales «Base», «Impuestos» y «Total». Los
+«Inversión del sujeto pasivo») con su base y su cuota, y los totales «Base», «Impuestos» y «Total»; si la factura lleva
+retención, detrás, «Retención IRPF 15 %» (en negativo) y «A cobrar». Los
 botones «Marcar pagada», «Rectificar» y «Factura completa» (solo en un tique que no se ha sustituido)
 con la misma regla que en la fila. Un rechazo sale justo encima de esos botones. Con **VeriFactu** activa y
 permiso para ver sus registros, debajo, la tarjeta «Justificante VeriFactu»: el estado del registro en la AEAT
@@ -184,7 +185,9 @@ líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio�
 cifra no cuentan, como en 12,50 zł) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
 Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
-si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
+si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. Debajo, la «Retención de
+IRPF» («Sin retención» de entrada; 15 %, 7 %, 1 % o 19 %), que no sale en una serie de tiques ni en un negocio de
+fuera de España. «Emitir
 factura» (con una rueda que gira mientras va) está en gris hasta que el negocio ha dicho su moneda y cada línea tiene
 descripción, cantidad, precio y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
 
@@ -340,14 +343,20 @@ Pasos:
    de Impuestos (en Canarias, el de la regla de Canarias); si el territorio aún no tiene regla de su
    impuesto, está vacío: escríbelo tú. «+ Línea» añade otra, con el mismo tipo de entrada, y la cruz la
    quita.
-6. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
+6. Si el cliente te retiene IRPF, elige la «Retención de IRPF»: 15 %, 7 %, 1 % o 19 %. Se calcula sobre la base
+   imponible de la factura entera y solo resta de lo que cobras: el IVA y el total no cambian.
+7. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
    cada línea tiene descripción, cantidad, precio y tipo. La ventana se cierra y la factura aparece en la lista
    con su número, «Emitida» y «Origen» «Alta manual».
-7. El vencimiento se ve en la ficha y en el papel. Desde el día siguiente, si no se ha cobrado, la lista y la ficha
+8. El vencimiento se ve en la ficha y en el papel. Desde el día siguiente, si no se ha cobrado, la lista y la ficha
    dicen «Vencida», y al marcarla pagada, «Pagada».
-Entra: lo que escribe la persona; el emisor configurado. La fecha y el vencimiento se pueden decir también al
-asistente («hazle una factura a Carpintería Lema con fecha de ayer y vencimiento a 30 días») y por la API; sin fecha,
-la factura es de hoy. Por la API o el asistente una línea puede
+9. La retención se ve en la ficha y en el papel, después del total: en una factura de 100 € más el 21 % de IVA con
+   retención del 15 %, «Total» 121,00 €, «Retención IRPF 15 %» -15,00 € y «A cobrar» 106,00 €. La lista enseña el
+   total de la factura.
+Entra: lo que escribe la persona; el emisor configurado. La fecha, el vencimiento y la retención se pueden decir
+también al asistente («hazle una factura a Carpintería Lema con fecha de ayer y vencimiento a 30 días», «hazle una
+factura a Carpintería Lema con retención del 15») y por la API; sin fecha, la factura es de hoy, y sin retención, se
+cobra su total. Por la API o el asistente una línea puede
 llevar además la categoría fiscal de Impuestos: entonces su tipo y su calificación son los de la regla
 vigente el día de la factura, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
 (Impuestos → Ajustes, TAX-F11): en Canarias se declara como IGIC y en Ceuta y Melilla como IPSI.
@@ -355,14 +364,16 @@ Sale: la factura (F1 en una serie de facturas, F2 en una de tiques), numerada en
 esa misma fecha como fecha de operación y con el impuesto calculado encima del
 precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (los conceptos suman el
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
-500 caracteres); avisa `invoice.invoice.issued`. El vencimiento no se declara en VeriFactu.
+500 caracteres); avisa `invoice.invoice.issued`. El vencimiento no se declara en VeriFactu, y la retención tampoco: el
+registro de la factura, su huella y su QR son los mismos con ella que sin ella.
 Si falla: dentro de la ventana, encima de los botones: «Una factura completa necesita el nombre, el NIF y
 la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea 2: el precio no es un
 importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año que la fecha
 («Esa serie numera otro año…»), una fecha posterior a hoy («La fecha de una factura no puede ser posterior a hoy.») o
 anterior a la de la última factura de su serie («La fecha de una factura no puede ser anterior a la de la última de su
 serie, que es del 24/11/2026.»), un vencimiento anterior a la fecha («El vencimiento no puede ser anterior a la fecha
-de la factura.»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
+de la factura.»), una retención en un tique, pedida por la API o el asistente («Un tique no lleva retención de IRPF:
+emite una factura (F1) con los datos del cliente.»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
 puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. Una línea con categoría fiscal (por la API o
 el asistente) sin regla vigente en el territorio del negocio se rechaza en el campo de esa línea, con la
 categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general») y
@@ -495,8 +506,9 @@ Pasos:
 4. Con el asistente, antes de emitir nada te enseña la rectificativa que va a nacer: la factura que
    rectifica (número, fecha y cliente), el tipo (R1 de entrada, R5 si es un tique), el motivo, el
    siguiente número de la serie «RECT» del año (no queda reservado: lo toma al emitirse), la fecha de
-   hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
-   por diferencias, también lo que queda por rectificar de ella.
+   hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura llevaba retención, también lo que se
+   deja de retener y lo que se devuelve, y si ya tenía rectificativas por diferencias, lo que queda por rectificar de
+   ella.
 5. En esa misma respuesta, sin que tengas que volver a pedírselo, sale «¿Ejecutar esta acción?» con el
    «Número» de la factura y el «Motivo» y, en «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa» por su nombre, nunca solo
    por su código («Rectificativa: resto de causas (R4)»; también si el asistente lo pide al rectificar), el
@@ -508,7 +520,8 @@ Pasos:
 Entra: la factura elegida, el tipo y el motivo, en la ventana o dichos al asistente. La fecha la pone el
 servidor: el día del negocio.
 Sale: la rectificativa numerada en la serie «RECT» del año, con el emisor y el cliente de la original,
-su desglose en negativo y sus líneas en negativo (la cantidad lleva el signo; el precio no); la
+su desglose en negativo y sus líneas en negativo (la cantidad lleva el signo; el precio no); si la original llevaba
+retención, la misma en sentido contrario («A cobrar» en negativo es lo que se cobró); la
 original pasa a «Cancelada» (avisa `invoice.invoice.issued` y `invoice.invoice.rectified`). No mueve
 dinero ni caja. Si la original ya tenía rectificativas por diferencias (devoluciones parciales), esta
 rectifica exactamente lo que queda, con una línea por clave fiscal a su propio tipo.
@@ -711,7 +724,8 @@ Pantalla: Ficha de factura
 Pasos:
 1. En **Facturas**, abre la factura.
 2. Lee la cabecera (con el «Vencimiento», si lo tiene), las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
-   columna «Dto.» con el descuento sin IVA), el desglose y los totales.
+   columna «Dto.» con el descuento sin IVA), el desglose y los totales (y, si lleva retención, lo retenido y lo que se
+   cobra).
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
    cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
    app instalada, en el navegador del dispositivo).
@@ -741,7 +755,7 @@ Pasos:
    instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
    trabajo llamado, por ejemplo, «Factura FACT-2026-000003») con la factura en A4 (con VeriFactu, arriba el QR del registro con
    «QR tributario:» y
-   «VERI*FACTU»; emisor, con su NIF-IVA si está inscrito en el ROI, fecha y, si lo tiene, «Vencimiento», «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
+   «VERI*FACTU»; emisor, con su NIF-IVA si está inscrito en el ROI, fecha y, si lo tiene, «Vencimiento», «Facturar a», líneas, desglose por tipo, totales, si lleva retención lo retenido y lo que se cobra, y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
    nunca sale sin su QR.
 4. Siempre en el idioma de quien imprime. Un documento de una venta sale como «Copia» (el original fue
@@ -773,7 +787,8 @@ Pasos:
    «Pagada» igual que desde la pantalla, o «Cancelar» y no cambia nada.
 Entra: la factura elegida.
 Sale: el estado «Pagada» y la fecha de pago (avisa `invoice.invoice.paid`). Ningún importe cambia y la
-caja no se toca.
+caja no se toca. Con retención, la factura se da por pagada con lo que dice «A cobrar»: lo retenido lo ingresa el
+cliente en Hacienda.
 Si falla: si mientras tanto alguien la pagó o la rectificó, «Esta factura no se puede marcar como
 pagada: solo se puede con una factura emitida que aún no esté pagada. No se ha cambiado nada.». La de
 otro, para un empleado, «Factura no encontrada.», sin cambiar nada. Las
@@ -870,7 +885,9 @@ Pasos:
    «Fecha», «Cliente», «NIF», «Base imponible», «Tipo %», «Cuota» y «Total». Una factura con tres tipos tiene tres
    filas, cada una con su parte; en la columna «Total», la suma de las filas de una factura es su total, y la suma de
    toda la columna es el total de lo descargado. Si alguna lleva recargo de equivalencia, salen también «Tipo de
-   recargo %» y «Cuota de recargo». La moneda es la del negocio y las cifras son números.
+   recargo %» y «Cuota de recargo»; si alguna lleva retención de IRPF, «Retención %», «Retención» (en negativo, repartida
+   por la base entre las filas de la factura) y «A cobrar», que en las demás es su total. La moneda es la del negocio y
+   las cifras son números.
 4. La rectificativa sale con su importe en negativo y la factura que corrige, con el suyo, tal como las cuenta la lista.
 5. Lo mismo se puede pedir al asistente («descárgame en Excel las facturas de octubre para la gestoría»): el fichero
    queda bajo su respuesta, con «Descargar» y su nombre.
@@ -925,7 +942,7 @@ Todas menos el Excel se pueden seguir en vivo.
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Emite una factura a mano, con su fecha y, si se quiere, su vencimiento | emitir | F03 | `invoice.invoice.create` |
+| Emite una factura a mano, con su fecha y, si se quiere, su vencimiento y su retención de IRPF | emitir | F03 | `invoice.invoice.create` |
 | Emite la factura de una venta cobrada (también la reacción a su cobro) | emitir | F01, F02, F06 | `invoice.invoice.create_from_sale` |
 | Sustituye un tique por una factura completa | emitir | F04, F05 | `invoice.invoice.substitute` |
 | Emite, con el código del tique y los datos del cliente, la factura completa que lo sustituye, y la devuelve con su QR de VeriFactu | la página pública | F04 | `invoice.public.substitute` |
@@ -1211,6 +1228,13 @@ configurar nada.
 - **Vencimiento** (`due_date`, opcional, solo el alta manual y la F3 que sustituye un tique que lo tenía): «vencida» no
   es un estado que se guarde. `queries/overdue.py` dice cuándo lo está una factura (emitida, sin sustituir y con el
   vencimiento antes del día del negocio) y da el filtro de la lista, que es también el del Excel.
+- **Retención de IRPF** (`withholding_rate`, vacío sin ella, y `withholding_amount`, con el signo del documento; solo el
+  alta manual de una F1 y su rectificativa): `withholding.py` da la lista cerrada de tipos y lo retenido, el tipo sobre
+  `base_amount` entera, redondeado una vez. `payable_amount` es `total_amount` menos lo retenido y no se guarda. Ningún
+  otro importe de la factura depende de ella: base, cuota, total y desglose se cierran antes, y VeriFactu lee solo esos
+  (`tests/test_manual_withholding.py` emite la misma factura con ella y sin ella, en el mismo número y a la misma hora, y
+  compara el registro entero: columnas, XML, huella y QR; igual con su rectificativa). Un tique no la lleva (409
+  `invoice.withholding_on_ticket`), así que la F3 que lo sustituye tampoco.
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
   con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual
   que la guardada se ignora), pero nadie lo llama: la foto del SaaS (`PUT /internal/hubs/{id}/state`) no lleva un
@@ -1507,6 +1531,46 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     | Square | lo pendiente junta lo no cobrado y lo vencido; «vencida» no se guarda, se calcula con el vencimiento | https://squareup.com/help/au/en/article/6105 · https://developer.squareup.com/forums/t/overdue-in-invoice-status/8143 |
     | Clear Books | el vencimiento tiene que ser posterior a la fecha | https://secure.clearbooks.co.uk/community/problems/17945/likes |
 
+26. **La retención de IRPF de la factura manual** (INVOICE-F03, INVOICE-F08, INVOICE-F17, INVOICE-F18, INVOICE-F24):
+    - **No entra en VeriFactu**: la AEAT lo dice sin dudas. La retención no afecta a la base, a la cuota ni al importe
+      total, altera solo lo que se paga y no se incluye en el registro de facturación; recomienda que la factura enseñe los
+      dos importes, el total y lo que se paga, bien diferenciados. Por eso «Total» sigue siendo el total de la factura y
+      debajo van la retención y «A cobrar».
+    - **Los tipos son los habituales de su cuadro vigente** (desde el 10 de septiembre de 2026): 15 % el general de los
+      profesionales, 7 % los que empiezan, 1 % las actividades en módulos y 19 % los alquileres. El 2 % agrícola y forestal
+      y los tipos reducidos un 60 % de Ceuta, Melilla y La Palma no los ha pedido nadie.
+    - **Es una para toda la factura, sobre toda la base**: es como la llevan Sage 200, Sage 50, Quipu y Chift. Holded la
+      deja poner por línea; es más que elegir una vez, y quien facture algo sin retención hace otra factura, como en
+      Sage 200.
+    - **El recargo de equivalencia no se retiene** (se calcula sobre la base) **y se cobra entero**; el descuento de una
+      línea ya está restado de la base; se redondea una vez, sobre la base entera, y no por línea ni por tipo.
+    - **Se elige en cada factura, «Sin retención» de entrada**: Sage 50 y Holded la recuerdan en la ficha del cliente y
+      TeamSystem Facturas en los ajustes, pero depende de a quién y qué se factura, y recordarla pediría un dato nuevo en
+      Clientes que nadie ha pedido.
+    - **La rectificativa la lleva en sentido contrario**, como el ejemplo de TaxDown (base −100 €, IVA −21 €, retención
+      +15 €, a cobrar −106 €).
+    - **Se cobra el líquido**: «Marcar pagada» no guarda importes, así que la factura queda pagada con lo que dice «A
+      cobrar»; no hay un cobro pendiente por lo retenido.
+    - **En el Excel, con su signo y por filas**: «Retención» en negativo y «A cobrar», repartida por la base entre las filas
+      de una factura con varios tipos, para que las columnas sumen; solo en un fichero que tenga alguna.
+    - **Solo en un negocio español**, como en Teamleader: el IRPF no existe fuera.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | AEAT (aclaraciones a los desarrolladores, apartado 20) | la retención no afecta a la base, la cuota ni el importe total, y no se incluye en el registro; recomienda «Total factura», las retenciones y «Total a pagar» | https://sede.agenciatributaria.gob.es/static_files/AEAT_Desarrolladores/EEDD/IVA/VERI-FACTU/FAQs-Desarrolladores.pdf |
+    | AEAT (cuadro de tipos desde el 10 de septiembre de 2026) | 15 % general de los profesionales, 7 % de inicio, 1 % en estimación objetiva, 19 % del arrendamiento | https://sede.agenciatributaria.gob.es/static_files/Sede/Programas_ayuda/Retenciones/2026/CUADRO_TIPOS_RETENCION_IRPF_2026_10sept.pdf |
+    | Holded | un porcentaje de retención, también por línea, que reduce el total; los impuestos se rellenan con los del contacto | https://www.holded.com/developers/api-reference/invoices/create-an-invoice · https://help.holded.com/en/articles/6834950-create-an-invoice |
+    | Quipu | un apartado aparte para el IRPF; base, IVA, «IRPF (15 %)» y «Total a pagar» | https://getquipu.com/blog/factura-con-retencion/ |
+    | Odoo | una retención se resta de lo que se paga | https://www.odoo.com/documentation/19.0/applications/finance/accounting/taxes/retention.html |
+    | Sage 200 | en la cabecera, para todas las líneas; en el foro, quien necesita dos casos hace dos albaranes | https://communityhub.sage.com/es/sage-200/f/gestion-comercial/226584/factura-con-irpf-pero-solo-en-determinadas-lineas/552868 |
+    | Sage 50 | el porcentaje está en la ficha del cliente y sale en el pie de la factura; en el foro, quien la ve calculada sobre la base más el IVA avisa de que va sobre la base | https://communityhub.sage.com/es/sage-50/f/discusion-general/257926/hacer-un-descuento-irpf-15 · https://communityhub.sage.com/es/sage-50/f/discusion-general/258605/factura-con-retencion |
+    | Chift (API única de contabilidades) | en la cabecera, no por línea, y reduce lo que se paga | https://docs.chift.eu/unified-apis/accounting/concepts/spanish-withholding-taxes.md |
+    | TeamSystem Facturas (Billin) | la misma retención, por defecto, en todas las facturas | https://www.billin.net/blog/ejemplo-factura-profesional-irpf |
+    | SumUp | sobre la base imponible; nunca a un particular | https://www.sumup.com/es-es/facturas/esenciales-de-facturacion/facturas-con-retencion-de-irpf/ |
+    | Teamleader | se ofrece si la empresa es de España o de Italia | https://support.focus.teamleader.eu/hc/en-150/articles/25691994541073-Can-I-add-IRPF-Withhold-taxes-on-my-invoice |
+    | Zoho (foro) | una factura de alquiler con retención del 19 % vuelve de la AEAT con «El campo ImporteTotal tiene un valor incorrecto» | https://help.zoho.com/portal/en/community/topic/error-al-enviar-factura-verifactu-a-aeat-con-retenci%C3%B3n-del-19-en-factura-de-alquiler |
+    | TaxDown | la rectificativa por diferencias lleva la retención en positivo y el total a cobrar en negativo | https://taxdown.es/informacion-autonomos/factura-rectificativa |
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
@@ -1516,6 +1580,8 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
   impresión del navegador).
 - No hace presupuestos, proformas, borradores ni albaranes.
 - No lleva cobros parciales, plazos ni recordatorios de impago.
+- No recuerda la retención de un cliente ni la pone sola: se elige en cada factura. Tampoco lleva las retenciones de las
+  compras ni hace los modelos 111, 115, 180 y 190.
 - No exporta el libro registro de facturas expedidas en el formato oficial de la AEAT; el Excel de las facturas emitidas
   es una hoja sencilla para la gestoría (INVOICE-F24).
 - No vigila el techo de la factura simplificada: lo pide Ventas al cobrar.
