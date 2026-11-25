@@ -80,7 +80,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     to a business. For who runs the business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state, plan, known = _plan_of(hub)
-    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).exclude(role__in=FREE_ROLES).count()
+    people = Membership.objects.team(ctx.scope.key).exclude(role__in=FREE_ROLES).count()
     devices = (
         SessionOwner.objects.filter(host=ctx.scope.key, session__expire_date__gt=timezone.now())
         .exclude(device_id=None)
