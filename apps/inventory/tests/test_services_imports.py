@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 
+import pytest
 from live.errors import PermissionDenied
 from live.operations import get
 
@@ -180,6 +181,54 @@ def test_an_imported_product_is_active_physical_follows_the_business_and_has_no_
     ) == (True, "physical", None, 0)
     assert movements(product.id) == [("initial", Decimal("4.000"), Decimal("4.000"))]
     assert event_names() == [events.PRODUCT_CREATED, events.STOCK_CHANGED]
+
+
+def test_a_row_says_its_type_and_what_its_price_refers_to():
+    report = import_products(
+        row("CUT", product_type=" Service "),
+        row("HAM", price="2,50", unit="g", price_quantity="100", stock="500"),
+        row("SAF", price="9", unit="g", pricing_unit="KG"),
+        row("OIL", unit="ml", price_quantity="0,5", pricing_unit="l", product_type="physical"),
+    )
+
+    assert [row.reason for row in report.rows] == [""] * 4
+    assert {
+        product.sku: (product.product_type, product.unit, product.price_quantity, product.pricing_unit)
+        for product in Product.objects.all()
+    } == {
+        "CUT": ("service", "ud", 1, "ud"),
+        "HAM": ("physical", "g", 100, "g"),
+        "SAF": ("physical", "g", 1, "kg"),
+        "OIL": ("physical", "ml", Decimal("0.5"), "l"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("cells", "reason"),
+    [
+        ({"product_type": "combo"}, "Product type not recognized: combo"),
+        ({"product_type": "service", "stock": "2"}, "A service has no stock."),
+        ({"price_quantity": "many"}, "Quantity is not a number"),
+        ({"price_quantity": "0"}, "Quantity is not a number"),
+        ({"price_quantity": "-100"}, "Quantity is not a number"),
+        ({"price_quantity": "1000000000000"}, "Quantity too large"),
+        ({"price_quantity": "0.5"}, "The quantity does not respect the step allowed for this unit"),
+        (
+            {"unit": "kg", "pricing_unit": "g", "price_quantity": "0.5"},
+            "The quantity does not respect the step allowed for this unit",
+        ),
+        ({"pricing_unit": "lb"}, "Unit of measure not recognized: lb"),
+        ({"unit": "g", "pricing_unit": "l"}, "The price must refer to a unit of the same kind as the product's unit."),
+    ],
+)
+def test_a_row_whose_type_or_price_quantity_cannot_be_fails_alone_and_the_rehearsal_says_the_same(cells, reason):
+    rows = (row("BAD", **cells), row("GOOD"))
+
+    rehearsal, real = import_products(*rows, dry_run=True), import_products(*rows)
+
+    assert [(row.key, row.status, row.reason) for row in rehearsal.rows] == [("BAD", "failed", reason), ("GOOD", "ready", "")]
+    assert [(row.key, row.status, row.reason) for row in real.rows] == [("BAD", "failed", reason), ("GOOD", "created", "")]
+    assert Product.objects.get().sku == "GOOD"
 
 
 def test_the_import_report_says_why_each_row_did_not_go_in():
