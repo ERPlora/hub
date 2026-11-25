@@ -28,7 +28,7 @@ from apps.tax.admin import (
     TaxSettingsAdmin,
 )
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
-from apps.tax.schemas import TAX_REGIONS
+from apps.tax.schemas.jurisdiction import TAX_REGIONS
 
 from .conftest import HUB_DB, A
 

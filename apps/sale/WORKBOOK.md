@@ -1964,7 +1964,7 @@ es una línea.
 - **El impuesto del territorio no es de Ventas** (TAX-F11): lo publica solo
   `tax.settings.get` (`tax_kind`). Las pantallas lo nombran con `useTaxName()` de Impuestos
   (`apps/tax/frontend/composables/useTaxName.ts`) y el 409 `sale.tax_category_missing` con
-  `TAX_KIND_NAMES` de `apps/tax/schemas.py`; Ventas no tiene operación propia que lo repita
+  `TAX_KIND_NAMES` de `apps/tax/schemas/jurisdiction.py`; Ventas no tiene operación propia que lo repita
   (`test_api.py` vigila que no haya una `sale.sale.tax_kind`). En los tests de la SPA, `mount-sale`
   carga el catálogo de Impuestos y `taxSettings(familia)` da la respuesta de `tax.settings.get`.
 - **La cifra del impuesto de un periodo** (SALE-F28): `sale.sale.stats` devuelve `tax_kind`, de
