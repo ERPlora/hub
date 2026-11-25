@@ -68,8 +68,11 @@ describe('PersonRoleCard', () => {
     expect(m.inDoc('person-role')?.querySelector('h2')?.textContent).toContain('Rol en este negocio');
     expect(options(m)).toEqual(['El de la invitación (Empleado)', 'Cajero', 'Jefe de turno']);
     expect(chosen(m)).toBe(CASHIER);
-    expect(select(m)?.getAttribute('mode')).toBe('md');
-    expect(select(m)?.getAttribute('fill')).toBe('outline');
+    const field = select(m) as unknown as { mode?: string; fill?: string };
+    expect([field.mode ?? select(m)?.getAttribute('mode'), field.fill ?? select(m)?.getAttribute('fill')]).toEqual([
+      'md',
+      'outline',
+    ]);
   });
 
   it('without a role of the business, the one of their invitation is chosen', async () => {
