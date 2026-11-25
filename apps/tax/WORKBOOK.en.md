@@ -368,7 +368,7 @@ active."; restoring one that now overlaps another active one, the overlap notice
 Involved: SALE-F01
 
 ### TAX-F11 Set up a business in the Canary Islands, Ceuta or Melilla
-<!-- from WORKBOOK.md sha256:ca8a5c0fb9ef -->
+<!-- from WORKBOOK.md sha256:639c670b3cdf -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Settings, Rules
@@ -545,7 +545,7 @@ field. If the rules cannot be read, the calculation stops without guessing.
 Involved: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
 
 ### TAX-F19 Hand the rules and the categories to Sales, Invoicing, Inventory and Services
-<!-- from WORKBOOK.md sha256:d51001138966 -->
+<!-- from WORKBOOK.md sha256:e0745fee1c73 -->
 Status: done
 Actor: system
 Screen: none
