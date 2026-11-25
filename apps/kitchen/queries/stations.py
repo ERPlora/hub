@@ -14,7 +14,9 @@ from apps.kitchen.queries.reads import COOKING, current_settings
 from apps.kitchen.queries.routing import category_routes, product_routes
 from apps.kitchen.queries.scope import ALL, find_scope, find_station
 from apps.kitchen.queries.state import in_flight_views
-from apps.kitchen.schemas import RoutingListIn, RoutingPage, StationListIn, StationOut, StationPage, StationRefIn
+from apps.kitchen.schemas.fields import StationRefIn
+from apps.kitchen.schemas.routing import RoutingListIn, RoutingPage
+from apps.kitchen.schemas.stations import StationListIn, StationOut, StationPage
 
 
 def in_progress_by_station(settings: KitchenSettings) -> dict[UUID | None, int]:

@@ -15,7 +15,7 @@ import pytest
 from live.assistant import tool_spec
 from live.operations import registry
 
-from apps.kitchen.schemas import StationOut
+from apps.kitchen.schemas.stations import StationOut
 
 LOCALE = Path(__file__).resolve().parents[1] / "frontend" / "locale"
 SWITCHED_ON = "Switched on: it gets only the products and categories routed to it."

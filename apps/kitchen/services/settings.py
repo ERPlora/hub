@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.kitchen import events
 from apps.kitchen.queries.reads import settings_out
-from apps.kitchen.schemas import SettingsOut, SettingsPatchIn
+from apps.kitchen.schemas.settings import SettingsOut, SettingsPatchIn
 from apps.kitchen.services.settling import settle
 from apps.kitchen.services.writes import actor, locked_settings
 

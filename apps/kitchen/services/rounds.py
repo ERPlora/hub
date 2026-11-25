@@ -10,7 +10,8 @@ from live.operations import get, operation
 from apps.kitchen import events
 from apps.kitchen.models import ACTOR_MAX_LENGTH, Ticket, TicketItem
 from apps.kitchen.queries.reads import COOKING
-from apps.kitchen.schemas import ReceivedOut, SyncOut, TicketOut, TicketReceiveIn, TicketSendIn, TicketSyncIn
+from apps.kitchen.schemas.rounds import ReceivedOut, SyncOut, TicketReceiveIn, TicketSendIn, TicketSyncIn
+from apps.kitchen.schemas.tickets import TicketOut
 from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out, settle
 from apps.kitchen.services.writes import _ticket_event, locked_row, locked_settings

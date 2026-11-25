@@ -1004,7 +1004,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
   alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
-  `schemas.py`, `queries/` (un módulo por tema),
+  `schemas/`, `queries/` (un módulo por tema),
   `services/` (un módulo por tema), `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
@@ -1090,7 +1090,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   frase por grupo de sinónimos que sin él no llega. Marcar platos «listos» (F11, F12) necesita además que live lea
   «listo» y «listos» como terminado y no como la acción de listar (ERPlora/live#54, en `packages/live`).
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#671): nombra el registro que una escritura señala por su
-  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: la comanda por su `number` con
+  id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: la comanda por su `number` con
   `kitchen.ticket.get` (`A_TICKET`: el `ticket_id` de `TicketRefIn`, en todas las escrituras de comandas y platos),
   cada plato por su `name` con `kitchen.item.get` (`A_DISH`: cada elemento de `item_ids`; lo busca en su comanda
   guardada y, si aún no lo está, en las rondas por recibir), la estación por su `name` con `kitchen.station.get`
