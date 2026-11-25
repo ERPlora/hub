@@ -7,7 +7,12 @@ from live.errors import NotFound
 from live.operations import INTERNAL, operation
 
 from apps.appointment.models import BlockedTime
-from apps.appointment.schemas import BlockedTimeListIn, BlockedTimeNamedOut, BlockedTimePage, BlockedTimeRefIn
+from apps.appointment.schemas.blocked_times import (
+    BlockedTimeListIn,
+    BlockedTimeNamedOut,
+    BlockedTimePage,
+    BlockedTimeRefIn,
+)
 from base.business import business_zone
 
 from .business import day_bounds

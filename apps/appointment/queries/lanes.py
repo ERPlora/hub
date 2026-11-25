@@ -3,7 +3,7 @@
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.appointment.schemas import LanesIn, LanesOut
+from apps.appointment.schemas.agenda import LanesIn, LanesOut
 from apps.staff.models import Member
 from base.business import zone_name
 

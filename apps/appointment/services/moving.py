@@ -14,7 +14,8 @@ from apps.appointment.queries.access import CHANGE_OWN, may_change
 from apps.appointment.queries.booking import check_member, lines_for, resolve_services
 from apps.appointment.queries.business import read_moment
 from apps.appointment.queries.reads import APPOINTMENT_NOT_FOUND, MOVABLE, find_appointment, load_detail
-from apps.appointment.schemas import AppointmentOut, RescheduleIn, UpdateIn
+from apps.appointment.schemas.appointments import AppointmentOut
+from apps.appointment.schemas.changes import RescheduleIn, UpdateIn
 from apps.appointment.services.writes import (
     CANNOT,
     CHANGE_OWN_ONLY,

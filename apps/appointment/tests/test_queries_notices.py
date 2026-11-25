@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.appointment.models import Appointment
 from apps.appointment.queries.notices import notices
-from apps.appointment.schemas import NoticesIn
+from apps.appointment.schemas.appointments import NoticesIn
 
 from .conftest import (
     HUB_DB,
