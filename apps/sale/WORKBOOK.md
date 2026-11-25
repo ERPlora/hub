@@ -1185,12 +1185,15 @@ Vertical: común
 Actor: responsable; cajero, con la aprobación de un responsable
 Pantalla: Ventas, Anular venta, Hace falta una aprobación
 Pasos:
-1. En **Ventas**, en una venta Completada sin devoluciones, pulsa «Anular».
+1. En **Ventas**, en una venta Completada sin devoluciones, pulsa «Anular». Antes de empezar se sabe si se podrá: si
+   tu rol lo hace «Con aprobación», sale «Un encargado tendrá que aprobar esta anulación.»; si tu rol propio dice «No»,
+   sale «Tu rol no permite anular una venta. Pídeselo a un encargado.» y no se abre nada.
 2. Se abre «Anular la venta 20261121-0007». Escribe el «Motivo (obligatorio)» y pulsa «Anular», o
    «Cancelar».
-3. Si no tienes el permiso de anular, sale encima «Hace falta una aprobación» con «Se aprueba: Anular
+3. Si tu rol anula «Con aprobación», sale encima «Hace falta una aprobación» con «Se aprueba: Anular
    una venta»: un responsable toca su cara y teclea su PIN (o pasa su placa) en ese mismo dispositivo.
-   Quien tiene el permiso no ve esta pregunta.
+   Quien tiene el permiso no ve esta pregunta, y a quien su rol le dice «No» tampoco le sale: no hay PIN que lo
+   deje anular (BASE-F84).
 4. Sale «Venta anulada», la ventana se cierra, la fila pasa a Anulada y la cifra «Anuladas» sube.
 Entra: la venta elegida.
 Sale: la venta marcada como anulada con hora, quién y motivo; no se borra (avisa: venta anulada).
@@ -1206,7 +1209,8 @@ anularla.»; anulada desde otro dispositivo a la vez, «Esta venta ya está anul
 dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se pulsa «Cancelar», no se
 anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
 lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
-bono que vuelven, el stock y la ficha del cliente; quién la aprobó queda en **Empleados › Aprobaciones**.
+bono que vuelven, el stock y la ficha del cliente; quién la aprobó queda en **Empleados › Aprobaciones**. Si el rol pasa
+a «No» con la ventana abierta, la anulación se rechaza y no se anula nada, aunque un responsable ya la hubiera aprobado.
 Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
@@ -1215,7 +1219,9 @@ Vertical: común
 Actor: responsable; cajero, con la aprobación de un responsable
 Pantalla: Devolver, Hace falta una aprobación
 Pasos:
-1. En **Ventas**, en una venta Completada (también con factura), pulsa «Devolver».
+1. En **Ventas**, en una venta Completada (también con factura), pulsa «Devolver». Antes de empezar se sabe si se podrá:
+   si tu rol lo hace «Con aprobación», sale «Un encargado tendrá que aprobar esta devolución.»; si tu rol propio dice
+   «No», sale «Tu rol no permite devolver una venta. Pídeselo a un encargado.» y no se abre nada.
 2. «Devolver la venta 20261121-0007» enseña una tarjeta por cada forma en que se pagó: «Cobrado», «Ya
    devuelto» y «Devolvible», con una propuesta de devolución total ya repartida («Devolver todo» la
    repone).
@@ -1226,9 +1232,10 @@ Pasos:
    devuelve dinero.
 4. Cambia el «Importe a devolver» de cada forma si solo vuelve una parte. Si el medio original ya no
    está disponible, elige otro en «Devolver por».
-5. Escribe el «Motivo» y pulsa «Devolver 12,00 €». Si no tienes el permiso de devolver, sale encima
+5. Escribe el «Motivo» y pulsa «Devolver 12,00 €». Si tu rol devuelve «Con aprobación», sale encima
    «Hace falta una aprobación» con «Se aprueba: Devolver una venta»: un responsable la aprueba con su PIN
-   (o su placa) en ese mismo dispositivo. Quien tiene el permiso no ve esta pregunta.
+   (o su placa) en ese mismo dispositivo. Quien tiene el permiso no ve esta pregunta, y a quien su rol le dice «No»
+   tampoco le sale: no hay PIN que lo deje devolver (BASE-F84).
 6. Sale «Devolución registrada.»; si ya no queda nada por devolver, la venta pasa a Devuelta; si
    queda, la fila dice «Por devolver 6,00 €».
 Entra: lo cobrado y lo ya devuelto por cada forma de pago; las líneas de la venta y las que ya
@@ -1245,7 +1252,8 @@ marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para
 el Hub no contesta, volver a pulsar no devuelve dos veces. Si en «Hace falta una aprobación»
 se pulsa «Cancelar», no se devuelve nada y la ventana dice «Esto necesita la aprobación de un
 encargado.». La devolución aprobada es la misma, una sola vez, con su rectificativa y las sesiones de
-bono que vuelven; quién la aprobó queda en **Empleados › Aprobaciones**.
+bono que vuelven; quién la aprobó queda en **Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la
+devolución se rechaza y no se devuelve nada, aunque un responsable ya la hubiera aprobado.
 Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
 Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUSTOMER-F22) e Inventario
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
