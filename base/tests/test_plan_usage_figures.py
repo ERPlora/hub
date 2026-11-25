@@ -383,7 +383,7 @@ def test_without_the_plan_the_figures_have_no_limit_status_or_notice(hub_a):
 
 
 def as_platform(hub) -> None:
-    """ERPlora's own hub: ``is_platform`` on its row, whatever its photo says (it has none: the SaaS does not know it)."""
+    """ERPlora's own hub: ``is_platform`` on its row, whatever its photo says (it names its people and no plan)."""
     Hub.objects.filter(pk=hub.pk).update(is_platform=True)
     hub.refresh_from_db()
 

@@ -130,7 +130,7 @@ class TestItsPeople:
         answer = signed(client, "put", f"/internal/hubs/{erp.pk}/state", body)
 
         assert answer.json() == {"applied": True, "version": 1}
-        assert (roles_at(erp), alive(ana)) == ({ANA: "hub_employee"}, True)
+        assert (roles_at(erp), alive(ana), row(erp)["state"]) == ({ANA: "hub_employee"}, True, {})
 
     def test_its_sessions_of_one_account_end_on_their_own(self, client, erp, hub_a):
         there, elsewhere, olga = login(ANA, erp), login(ANA, hub_a), login(OLGA, erp)

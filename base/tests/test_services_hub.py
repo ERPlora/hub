@@ -59,7 +59,8 @@ def a_user_context():
 
 
 class TestErplorasOwnHub:
-    """ERPlora's own hub (``is_platform``) is no business of erplora.com's: nobody makes it, takes it or closes it."""
+    """ERPlora's own hub (``is_platform``) is no business of erplora.com's: nobody makes it, takes it, closes it or
+    restores it."""
 
     @pytest.mark.parametrize("slug", ["erp", "erplora"])
     def test_nobody_can_make_a_business_with_its_name(self, slug):

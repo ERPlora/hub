@@ -4073,7 +4073,8 @@ Implicados: BASE-F97, BASE-F100
   índice, sin descodificar ninguna sesión: las del negocio y las que no anotaron host (de antes de la regla),
   o sin `hub_id` todas, las del admin incluidas; idempotente, un negocio desconocido responde `{ended: 0}` y
   un cuerpo fuera de contrato, 422 `internal.payload_invalid`. La foto (`base.hub.state_apply`) aplica
-  `members` en su transacción, sin crear copias locales. Una baja borra la `Membership` y cierra las sesiones de
+  `members` en su transacción, sin crear copias locales; de la del negocio propio de ERPlora, nada más que eso
+  (`base/tests/test_platform_hub_people.py`). Una baja borra la `Membership` y cierra las sesiones de
   ese negocio; tras el COMMIT se despierta el host (`_wake_open_apps`): el stream vivo re-ejecuta,
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Un rol nuevo cambia la `Membership` y no cierra nada: tras el COMMIT también se
@@ -4178,11 +4179,11 @@ Implicados: BASE-F97, BASE-F100
   (`HubBusy.reached_client`, gancho de `live`): nunca un reintento del ejecutor vivo. Solo lo arranca `config/asgi.py`: lo
   que hace el worker no es la petición de nadie. Una lectura suma lo que su proceso aún no ha volcado (`meter.unflushed`).
   El tope es el efectivo (`PGBOUNCER_MAX_DB_CONNECTIONS`, `limits.plan_limits`), también en el semáforo. El hub de
-  ERPlora (`Hub.is_platform`) no tiene plan ni foto, y no la tendrá porque el SaaS no lo conoce: es su fila la que le da
+  ERPlora (`Hub.is_platform`) no tiene plan y su foto solo trae a sus personas: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`), donde nadie tiene acceso
-  todavía: queda por decidir qué enseña aquí, porque el aviso de plan desconocido le prometería uno que nunca llega.
+  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`) para esas personas: queda
+  por decidir qué les enseña aquí, porque el aviso de plan desconocido les promete uno que nunca llega.
   Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
   `test_plan_usage_figures.py`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
