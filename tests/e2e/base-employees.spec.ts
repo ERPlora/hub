@@ -121,6 +121,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     // BASE-F85: «Export CSV» downloads what the search and the filters keep, in the person's language: here, a search
     // nothing answers, its header alone. What it keeps when something does is base-approvals-record.spec.ts's.
     await shown(page).locator('[data-testid=approvals-search] input').fill('e2e nothing on the record says this');
+    await expect(shown(page).locator('.data-table__empty')).toBeVisible();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       shown(page).locator('[data-testid=approvals-export]').click(),
