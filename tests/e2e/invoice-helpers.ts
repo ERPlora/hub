@@ -230,6 +230,7 @@ export function cleanInvoices(): void {
         where r.issuer_nif = c.issuer_nif and r.environment = c.environment and c.last_record_id is null`,
       ...(hadVerifactuConfig ? [] : ['delete from verifactu_config where not exists (select 1 from verifactu_record)']),
       'delete from invoice_invoiceline where invoice_id in (select id from e2e_inv)',
+      'delete from invoice_invoiceemail where invoice_id in (select id from e2e_inv)',
       // A document goes once nothing points at it (a rectifying one is always linked): from the last link back.
       ...Array.from({ length: 4 }, () => UNREFERENCED),
       `delete from invoice_invoiceseries where code like 'E2E%'`,

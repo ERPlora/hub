@@ -71,7 +71,7 @@ test('«Download PDF» saves the invoice as a real PDF under its number, with wh
   });
 });
 
-const ACTIONS = ['print', 'pdf', 'back'].map((name) => `[data-testid=invoice-detail-${name}]`);
+const ACTIONS = ['print', 'pdf', 'email', 'back'].map((name) => `[data-testid=invoice-detail-${name}]`);
 
 test('the buttons of the invoice fit in the three sizes, as tall as each other', async ({ page }) => {
   await login(page, A, '/invoice/invoices');
@@ -80,7 +80,7 @@ test('the buttons of the invoice fit in the three sizes, as tall as each other',
     await page.setViewportSize({ width, height });
     await settled(page);
     const boxes = await Promise.all(ACTIONS.map(async (one) => (await shown(page).locator(one).boundingBox())!));
-    expect(boxes.map((box) => Math.round(box.height))).toEqual([44, 44, 44]);
+    expect(boxes.map((box) => Math.round(box.height))).toEqual([44, 44, 44, 44]);
     for (const box of boxes) {
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
