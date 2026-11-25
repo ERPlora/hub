@@ -392,7 +392,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a8ada64d0106 -->
+<!-- from WORKBOOK.md sha256:ef37ec93db36 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -515,7 +515,7 @@ On the Employees screens and the API documentation:
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
-| BASE-F126 | Turn ERPlora's support access on or off | partial |
+| BASE-F126 | Turn ERPlora's support access on or off | done |
 | BASE-F127 | Make a role of your own from another | partial |
 | BASE-F128 | Adjust what a role of your own allows | partial |
 | BASE-F129 | Delete a role of your own | partial |
@@ -3955,10 +3955,8 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:a939d641b5a9 -->
-Status: partial — it is changed and read in Settings › General, through the API and with the assistant, and the
-business already lets support in or refuses it as it says; erplora.com giving the support staff their code to come in
-is still missing
+<!-- from WORKBOOK.md sha256:8c48efdd08cf -->
+Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
 Steps:
@@ -3974,13 +3972,13 @@ Steps:
      most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
-  4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
-     and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
-     resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
-     a PIN or a badge, take no place and do not count in the plan's use, and their browser does not stay as a device
-     of the business: it neither ends another device's session nor has its own ended by another one's entry
-     (BASE-F57). Each entry joins the list of the latest entries at once, and what they do stays in the records under
-     their name.
+  4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
+     admin, with their own account (HUBS-F38 of erplora.com), and arrives as an administrator: they may do everything
+     but what only the owner does (buying for the business, resetting it, its copies). They are not in Employees nor
+     among who can give access, do not enter the tills with a PIN or a badge, take no place and do not count in the
+     plan's use, and their browser does not stay as a device of the business: it neither ends another device's session
+     nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest entries at once,
+     and what they do stays in the records under their name.
   5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
      administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
      try again." with "Try again".
@@ -3994,4 +3992,4 @@ as it was; reading it, they see they cannot change it. If the change cannot be s
 shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
 support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step
 5).
-Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)

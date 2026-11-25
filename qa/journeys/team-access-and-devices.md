@@ -10,6 +10,7 @@ Para qué: que cada persona entre como le toca (cuenta, PIN o placa), con su rol
 
 - Un negocio con tres personas en Empleados: el propietario, Marta y Javi.
 - La tableta de la barra y el móvil del propietario.
+- Una persona del soporte de ERPlora, con su cuenta del personal en erplora.com.
 
 ## Recorrido
 
@@ -37,4 +38,5 @@ Para qué: que cada persona entre como le toca (cuenta, PIN o placa), con su rol
 22. BASE-F71 — se quitan de golpe los que nadie usa.
 23. BASE-F13 — Javi sale del negocio y pierde el acceso.
 24. BASE-F80 — Javi vuelve al negocio.
-25. BASE-F61 — el propietario cierra la sesión.
+25. BASE-F126 — el propietario deja entrar al soporte de ERPlora para que le ayude a configurar el negocio y, al acabar, lo apaga.
+26. BASE-F61 — el propietario cierra la sesión.
