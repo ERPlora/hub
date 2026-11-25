@@ -391,6 +391,36 @@ class TestTheReport:
     def test_the_tools_no_flow_cites_leave_out_what_is_no_tool_and_what_a_flow_out_of_reach_cites(self, report):
         assert report.uncited_tools == ("sample.item.rebuild",)
 
+    @pytest.mark.parametrize(
+        ("flows", "service", "broken"),
+        [
+            ("SAMPLE-F01, SAMPLE-F99", "`sample.item.list`", ("SAMPLE-F99 is in no WORKBOOK",)),
+            ("HUBS-F18", "`sample.item.list`", ("HUBS-F18 is in no WORKBOOK",)),
+            ("SAMPLE-F99", "a screen of its own", ("SAMPLE-F99 is in no WORKBOOK",)),
+            ("SAMPLE-F01", "`sample.item.lst`", ("SAMPLE-F01 cites sample.item.lst, which is no operation",)),
+            ("SAMPLE-F01", "the model `sample.Item`", ("SAMPLE-F01 cites sample.Item, which is no operation",)),
+            ("SAMPLE-F06", "`sample.item.lst`", ("SAMPLE-F06 cites sample.item.lst, which is no operation",)),
+            ("SAMPLE-F07", "`sample.item.lst`", ()),
+            ("ninguno: erplora.com, al cerrarlo", "`sample.item.lst`", ()),
+        ],
+        ids=[
+            "a-flow",
+            "a-flow-of-another-product",
+            "a-flow-of-a-row-with-no-operation",
+            "an-operation",
+            "a-model",
+            "an-operation-of-a-flow-with-no-screen",
+            "an-operation-of-a-flow-not-done",
+            "an-operation-no-flow-uses",
+        ],
+    )
+    def test_a_flow_or_an_operation_cited_that_does_not_exist_is_reported(self, tmp_path, flows, service, broken):
+        manual(tmp_path, MANUAL)
+        table = f"| Servicios | Flujos |\n|---|---|\n| {service} | {flows} |\n"
+        manual(tmp_path, f"# Workbook — Otro\n\n## Para qué sirve\n\nOtro.\n\n## Para quien lo mantiene\n\n{table}", app="other")
+        report = qa_assistant.report(tmp_path, qa_coverage.workbook_flows(tmp_path), OPERATIONS)
+        assert report.broken_citations == broken
+
     def test_a_tool_only_a_flow_of_no_manual_cites_is_cited_by_none(self, tmp_path):
         manual(tmp_path, MANUAL.replace("| F08 |", "| HUBS-F18 |"))
         report = qa_assistant.report(tmp_path, qa_coverage.workbook_flows(tmp_path), OPERATIONS)
@@ -400,7 +430,7 @@ class TestTheReport:
 class TestTheCommand:
     @pytest.fixture
     def lines(self, tmp_path, settings, monkeypatch, capsys):
-        settings.BASE_DIR = manual(tmp_path, MANUAL)
+        settings.BASE_DIR = manual(tmp_path, MANUAL.replace("| F06 |", "| F06, F99 |"))
         monkeypatch.setattr("base.management.commands.qa_coverage.registry", OPERATIONS)
 
         def run(**options):
@@ -409,7 +439,7 @@ class TestTheCommand:
 
         return run
 
-    def test_it_gives_each_flow_its_group_what_to_expect_and_its_operations_and_then_the_three_lists(self, lines):
+    def test_it_gives_each_flow_its_group_what_to_expect_and_its_operations_and_then_the_four_lists(self, lines):
         written = lines(assistant=True)
         assert written[written.index("assistant: 3 can, 1 assistant only, 2 cannot, 1 undecided") : -1] == [
             "assistant: 3 can, 1 assistant only, 2 cannot, 1 undecided",
@@ -427,6 +457,8 @@ class TestTheCommand:
             "  SAMPLE-F04",
             "tools no flow cites: 1",
             "  sample.item.rebuild",
+            "cited and does not exist: 1",
+            "  SAMPLE-F99 is in no WORKBOOK",
         ]
         assert written[-1].startswith("total: ")
 
