@@ -32,7 +32,7 @@ from apps.schedule.engine import (
     parse_when,
 )
 from base import weekdays
-from base.schemas.assistant import names
+from base.schemas.assistant import IN_OWN_WORDS, names
 
 T = TypeVar("T")
 
@@ -331,7 +331,7 @@ class SpecialDayFields(Schema):
     model_config = ConfigDict(extra="forbid")
 
     date: dt.date = Field(description="The date, YYYY-MM-DD (a real calendar date).")
-    name: Name = Field(description="Its name (Christmas, Local holiday).")
+    name: Name = Field(description="Its name (Christmas, Local holiday).", json_schema_extra=IN_OWN_WORDS)
     is_closed: bool = Field(True, description=D_IS_CLOSED + " Closed by default.")
     # The bulk checks the 12-interval cap day by day (a day over it is skipped, `invalid_hours`); this
     # bound only stops an absurd payload, refused whole.

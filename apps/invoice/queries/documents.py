@@ -46,7 +46,7 @@ def _money(cents: int | Decimal, currency: str, language: str) -> str:
     return money_text(cents, currency, language=language)
 
 
-def _percent(rate, language: str) -> str:
+def percent(rate, language: str) -> str:
     return format_percent(
         Decimal(str(rate)) / 100, locale=language, decimal_quantization=False
     )
@@ -68,12 +68,12 @@ def _tax_label(item: dict, language: str) -> list[tuple[str, int, int]]:
         label = gettext(TAX_REVERSE_CHARGE)
     else:
         name = gettext(TAX_VAT) if item["tax"] == "vat" else item["tax"].upper()
-        label = f"{name} {_percent(item['rate'], language)}"
+        label = f"{name} {percent(item['rate'], language)}"
     rows = [(label, item["base"], item["quota"])]
     if Decimal(str(item.get("surcharge_rate", "0"))):
         rows.append(
             (
-                f"{gettext(TAX_SURCHARGE)} {_percent(item['surcharge_rate'], language)}",
+                f"{gettext(TAX_SURCHARGE)} {percent(item['surcharge_rate'], language)}",
                 item["base"],
                 item["surcharge_quota"],
             )
@@ -86,7 +86,7 @@ def _withholding(invoice: Invoice, language: str) -> dict | None:
     if invoice.withholding_rate is None:
         return None
     return {
-        "label": WITHHOLDING % {"rate": _percent(invoice.withholding_rate, language)},
+        "label": WITHHOLDING % {"rate": percent(invoice.withholding_rate, language)},
         "amount": _money(-invoice.withholding_amount, invoice.currency, language),
         "payable": _money(invoice.payable_amount, invoice.currency, language),
     }
@@ -155,7 +155,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
                 "quantity": format_decimal(line.quantity.normalize(), locale=language),
                 "unit_price": _money(line.unit_price, invoice.currency, language),
                 "discount": money(line.discount_amount) if line.discount_amount else "",
-                "tax_rate": _percent(line.tax_rate, language),
+                "tax_rate": percent(line.tax_rate, language),
                 "amount": money(line.base_amount),
             }
             for line in lines

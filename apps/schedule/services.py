@@ -17,7 +17,7 @@ from live.errors import Conflict, InvalidPayload
 from live.operations import atomic, operation
 from live.outbox import record_event
 
-from apps.schedule import events
+from apps.schedule import assistant_cards, events
 from apps.schedule.models import (
     Override,
     OverrideInterval,
@@ -258,7 +258,7 @@ def confirm_week(ctx: OperationContext, data: NoParamsIn) -> dict:
     output=SpecialDayOut,
     ai={
         "description": "Adds a special day: a date closed (a holiday) or with other opening hours, once or every year.",
-        "risk": "normal",
+        "risk": "normal", "summary": assistant_cards.special_day,
         "asks": {
             "en": (
                 "the 15th of August is a local holiday, we stay closed",
@@ -297,7 +297,7 @@ def create_special_day(ctx: OperationContext, data: SpecialDayIn) -> dict:
     ai={
         "description": "Adds several special days at once (up to 366, such as the year's holidays); a day whose date "
         "is taken or whose hours are not valid is skipped with its reason and the rest go in.",
-        "risk": "normal",
+        "risk": "normal", "summary": assistant_cards.special_days,
         "asks": {
             "en": (
                 "load all the national holidays of next year at once",
@@ -458,7 +458,7 @@ def delete_special_day(ctx: OperationContext, data: SpecialDayRefIn) -> dict:
     ai={
         "description": "Adds a temporary change of the opening hours for a range of dates (holidays, summer hours, "
         "works): closed, or the same intervals every day of the range.",
-        "risk": "normal",
+        "risk": "normal", "summary": assistant_cards.override,
         "asks": {
             "en": (
                 "we close from 1 to 15 August for the holidays",
