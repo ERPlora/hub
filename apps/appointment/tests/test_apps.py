@@ -1,11 +1,13 @@
 """The appointment app declares its module metadata, its menu, its permissions and what each role gets."""
 
-
+import pytest
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import BellCounter, Category, Help, LiveAppConfig, Nav, module_configs
+from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs
 
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.roles import grants_by_role
 from base.tests.shell_icons import shell_icon_registry
 
@@ -223,5 +225,21 @@ def test_citas_has_no_setup_steps_nor_panels():
     assert (appointment().setup, appointment().widgets) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert appointment().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert appointment().help.videos == {"es": "iDYOJPslKLo", "en": "T9O2qIaHX38"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("APPOINTMENT-F01", "APPOINTMENT-F02"), "7k8rDOavPPQ", "jqE5frTxwIs"),
+    (("APPOINTMENT-F03",), "JEZ7xwTUQRg", "_IJqA5Llo58"),
+    (("APPOINTMENT-F04", "APPOINTMENT-F22"), "3iicsBB4OJU", "vti0BeNrB0A"),
+    (("APPOINTMENT-F07", "APPOINTMENT-F08"), "SCCcOjjX0-Q", "5RkcBExG2Sc"),
+    (("APPOINTMENT-F09",), "lyPRKIKNyzE", "_7B2JQ7NPCM"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("appointment", language) == help_videos.by_task(TASK_VIDEOS, language)
