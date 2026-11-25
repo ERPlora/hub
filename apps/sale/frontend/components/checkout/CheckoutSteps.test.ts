@@ -59,6 +59,13 @@ describe('CheckoutSteps: the steps of the apps on', () => {
     expect(s.added()).toEqual({ amount: 80, label: 'Tip, Round', issue: '' });
   });
 
+  it('a step whose app is turned off with the sheet open goes, and what it added with it', async () => {
+    const s = await setup([TIP, ROUND]);
+    await s.result(OP, { steps: [ROUND] });
+    expect(s.find('step-Tip').exists()).toBe(false);
+    expect(s.added()).toEqual({ amount: 30, label: 'Round', issue: '' });
+  });
+
   it('none while their list loads, and nothing added', async () => {
     const s = await setup(null);
     expect(s.find('sale-checkout-steps').exists()).toBe(false);

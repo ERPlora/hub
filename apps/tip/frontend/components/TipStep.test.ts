@@ -119,6 +119,23 @@ describe('TipStep: choosing the tip', () => {
     expect([s.pressed(), s.added()?.amount]).toEqual([['tip-step-custom'], 200]);
   });
 
+  it('the same method’s suggestions read again keep what was chosen, with the tip it comes to now', async () => {
+    const s = await setup();
+    await click(s.choice('tip-step-suggestion-0'));
+    await s.result(OP, { ...ON, suggestions: [{ percent: 3, amount: 60 }, { percent: 5, amount: 100 }, { percent: null, amount: 200 }] });
+    expect([s.pressed(), s.added()?.amount]).toEqual([['tip-step-suggestion-0'], 60]);
+  });
+
+  it('tips turned off with the sheet open: the row goes and what was typed is not added', async () => {
+    const s = await setup();
+    await click(s.choice('tip-step-custom'));
+    await ionValue(s.find('tip-step-amount').element, '2,50', 'ionInput');
+    expect(s.added()?.amount).toBe(250);
+    await s.result(OP, { ...ON, enabled: false, suggestions: [] });
+    expect(s.find('tip-step').exists()).toBe(false);
+    expect(s.added()).toEqual({ amount: 0, label: 'Tip', issue: '' });
+  });
+
   it('once the sale is charged nothing changes', async () => {
     const s = await setup(ON, { locked: true });
     const disabled = (testid: string) => (s.choice(testid) as HTMLElement & { disabled?: boolean }).disabled;
@@ -158,5 +175,11 @@ describe('TipStep: once the sale is charged', () => {
     const s = await setup();
     s.answer(409, { error: { code: 'tip.cash_register_closed', message: 'The cash register is closed.' } });
     await expect(s.record()).rejects.toThrow('The sale is charged, but the tip has not been saved. The cash register is closed.');
+  });
+
+  it('an answer that is lost says only that it was not saved: what a server that fails says is not for the till', async () => {
+    const s = await setup();
+    s.answer(503, { error: { code: 'unavailable', message: 'Upstream is restarting.' } });
+    await expect(s.record()).rejects.toThrow(/^The sale is charged, but the tip has not been saved\.$/);
   });
 });
