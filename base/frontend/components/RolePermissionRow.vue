@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // One permission in the editor of a role: a switch, or the three states when a manager can approve it.
-import { StatusPill } from '@erplora/ui/components';
 import { IonItem, IonLabel, IonSegment, IonSegmentButton, IonToggle } from '@ionic/vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import type { RolePermission, RoleState } from '../operations/people';
+import RolePhrase from './RolePhrase.vue';
 import '../settings.css';
 
 const STATES: readonly RoleState[] = ['on', 'approval', 'off'];
@@ -37,16 +37,10 @@ function pick(value: unknown): void {
       :checked="state === 'on'"
       @ion-change="pick($event.detail.checked ? 'on' : 'off')"
     >
-      <span class="ion-text-wrap">
-        {{ line.phrase }}
-        <StatusPill
-          v-if="line.to_review"
-          size="sm"
-          tone="warning"
-          data-testid="role-to-review"
-          :label="t('base.roles.toReview')"
-        />
-      </span>
+      <RolePhrase
+        :phrase="line.phrase"
+        :review="line.to_review"
+      />
     </ion-toggle>
   </ion-item>
   <div
@@ -55,16 +49,10 @@ function pick(value: unknown): void {
     :data-testid="`role-permission-${line.permission}`"
   >
     <ion-item lines="none">
-      <span class="ion-text-wrap">
-        {{ line.phrase }}
-        <StatusPill
-          v-if="line.to_review"
-          size="sm"
-          tone="warning"
-          data-testid="role-to-review"
-          :label="t('base.roles.toReview')"
-        />
-      </span>
+      <RolePhrase
+        :phrase="line.phrase"
+        :review="line.to_review"
+      />
     </ion-item>
     <ion-segment
       scrollable
