@@ -742,8 +742,8 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas/`,
   `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero (los de las lecturas, `test_queries_<módulo>.py`, y los de las escrituras,
-  `test_services_<módulo>.py`). Las páginas viven en `frontend/` («Cómo son las páginas», abajo), `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui` y `README.md` es
-  la ficha de la app.
+  `test_services_<módulo>.py`). Las páginas viven en `frontend/` («Cómo son las páginas», abajo), `UI-REQUESTS.md`
+  lista lo que se pide a `@erplora/ui` y `README.md` es la ficha de la app.
 - Modelos: `Role` (el rol de catálogo), `Member` (la ficha), `Schedule` y `ScheduleDay` (el horario y
   sus días, lunes = 0; un día que no está es libre), `TimeOff` (la ausencia) y `StaffSettings` (una
   sola fila, restricción `staff_settings_singleton`). UUIDv7, sin `hub_id`.
