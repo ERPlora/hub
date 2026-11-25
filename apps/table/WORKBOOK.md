@@ -1019,11 +1019,11 @@ Ningún aviso lleva nombres ni notas libres: solo ids y números.
 
 ### A qué reacciona
 
-| Aviso | De | Qué hace | Servicio |
-|---|---|---|---|
-| `sale.order.completed` | Ventas | Cierra las cuentas de mesa de esa cuenta (F18) | `table.session.close_by_order` |
-| `sale.order.voided` | Ventas | Cierra las cuentas de mesa de esa cuenta (F20) | `table.session.close_by_order` |
-| `customer.customer.erased` | Clientes | Borra el nombre de sus retenciones (F31) | `table.hold.forget_customer` |
+| Aviso | De | Qué hace | Flujos | Servicio |
+|---|---|---|---|---|
+| `sale.order.completed` | Ventas | Cierra las cuentas de mesa de esa cuenta | F18 | `table.session.close_by_order` |
+| `sale.order.voided` | Ventas | Cierra las cuentas de mesa de esa cuenta (F20) | — | `table.session.close_by_order` |
+| `customer.customer.erased` | Clientes | Borra el nombre de sus retenciones | F31 | `table.hold.forget_customer` |
 
 Las reacciones llegan en segundo plano, poco después, y repetirlas no cambia nada. Lo que dice Ventas se lee
 además en cada lectura y en cada escritura: una cuenta de mesa cuya cuenta de Ventas está cobrada o anulada

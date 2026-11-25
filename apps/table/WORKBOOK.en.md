@@ -1082,13 +1082,13 @@ For the platform only (without a route in the API, as the system): `table.sessio
 No notice carries names or free notes: only ids and numbers.
 
 ### What it reacts to
-<!-- from WORKBOOK.md sha256:8ccba51a5db3 -->
+<!-- from WORKBOOK.md sha256:43ef4766b347 -->
 
-| Notice | From | What it does | Service |
-|---|---|---|---|
-| `sale.order.completed` | Sales | Closes the table checks of that check (F18) | `table.session.close_by_order` |
-| `sale.order.voided` | Sales | Closes the table checks of that check (F20) | `table.session.close_by_order` |
-| `customer.customer.erased` | Customers | Erases the name from their holds (F31) | `table.hold.forget_customer` |
+| Notice | From | What it does | Flows | Service |
+|---|---|---|---|---|
+| `sale.order.completed` | Sales | Closes the table checks of that check | F18 | `table.session.close_by_order` |
+| `sale.order.voided` | Sales | Closes the table checks of that check (F20) | — | `table.session.close_by_order` |
+| `customer.customer.erased` | Customers | Erases the name from their holds | F31 | `table.hold.forget_customer` |
 
 The reactions arrive in the background, shortly after, and repeating them changes nothing. What Sales
 says is also read on every read and on every write: a table check whose Sales check is charged or voided
