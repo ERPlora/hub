@@ -161,10 +161,10 @@ def test_a_business_sees_only_its_own_payment(hub_a, hub_b):
 
 @pytest.fixture
 def apps_ask(monkeypatch):
-    """What the apps on ask of the bell's clock (``base.home.bell_refresh_every``), fixed for the test."""
+    """What the apps on ask of the bell's clock (``base.home.bell_counters.bell_refresh_every``), fixed for the test."""
 
     def ask(seconds):
-        monkeypatch.setattr("base.home.bell_refresh_every", lambda ctx, configs: seconds)
+        monkeypatch.setattr("base.home.bell_counters.bell_refresh_every", lambda ctx, configs: seconds)
 
     return ask
 

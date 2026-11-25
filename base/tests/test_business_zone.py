@@ -17,7 +17,7 @@ from live.context import OperationContext
 from live.operations import get
 
 from base import assistant, business
-from base.home import moment
+from base.home.device_notices import moment
 from base.models import Hub
 from base.permissions import VIEW_HOME
 from base.tenancy.context import HubContextMissing, use_control, use_hub
@@ -100,7 +100,7 @@ def test_a_card_says_the_businesss_hour_also_with_no_person_at_hand(hub_a):
 
 @HUB_DB
 def test_an_instant_of_a_notice_is_read_on_the_businesss_clock(hub_a):
-    """``base.home.moment``: a notice of the Home's (``{at:%H:%M}``) and the words of an automation (``words_for``)."""
+    """``base.home.device_notices.moment``: a notice of the Home's (``{at:%H:%M}``) and the words of an automation (``words_for``)."""
     with in_hub(CANARY, hub_a):
         assert moment(INSTANT).hour == 9
     with in_hub("Europe/Madrid", hub_a):

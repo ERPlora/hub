@@ -1310,7 +1310,7 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
+| Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29, F32, F33, F36 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
 | El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste (vacío para quien no ve los costes), categoría fiscal, unidad, alérgenos, descripción, foto y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
@@ -1330,17 +1330,17 @@ el asistente dice cuál no está (en una recepción, en qué línea) o pregunta 
 
 | Qué hace | Quién puede | Confirmación en el asistente | Flujos | Servicio |
 |---|---|---|---|---|
-| Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35 | `inventory.product.create` |
-| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F35 | `inventory.product.bulk_create` |
-| Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
+| Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35, F36 | `inventory.product.create` |
+| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F12, F33, F35 | `inventory.product.bulk_create` |
+| Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F12, F20, F35, F36 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
 | Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
-| Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F30 | `inventory.product.set_image` |
-| Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31 | `inventory.product.upload_image` |
+| Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F12, F30, F33 | `inventory.product.set_image` |
+| Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31, F33 | `inventory.product.upload_image` |
 | Añade un producto a una categoría (también la plataforma, al recuperar desde una copia aparte una categoría eliminada con los productos que el negocio conserva) | cambiar productos | un clic | F08, F07 | `inventory.product_category.add` |
 | Quita un producto de una categoría | cambiar productos | un clic | F08 | `inventory.product_category.remove` |
-| Crea una categoría | crear categorías | un clic | F06 | `inventory.category.create` |
+| Crea una categoría | crear categorías | un clic | F06, F12 | `inventory.category.create` |
 | Crea muchas categorías de una vez, con informe por fila | crear categorías | un clic | F10 | `inventory.category.bulk_create` |
 | Cambia una categoría | cambiar categorías | un clic | F06 | `inventory.category.update` |
 | Elimina una categoría y desvincula sus productos | eliminar categorías | escribir para confirmar | F07 | `inventory.category.delete` |

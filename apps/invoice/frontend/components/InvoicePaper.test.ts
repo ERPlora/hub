@@ -85,6 +85,17 @@ describe('InvoicePaper', () => {
     expect((await setup({ invoice: erplora }, 'es')).text('invoice-paper-issuer')).toContain('NIF: ESB27593136');
   });
 
+  it('prints when it falls due, only if it does', async () => {
+    expect((await setup()).find('invoice-paper-due-date').exists()).toBe(false);
+    const due = { ...INVOICE, due_date: '2026-11-13' };
+    const s = await setup({ invoice: due });
+    expect(s.text('invoice-paper-due-date')).toBe('11/13/2026');
+    expect(s.find('invoice-paper-due-date').element.previousElementSibling?.textContent).toBe('Due date');
+    const es = await setup({ invoice: due }, 'es');
+    expect(es.text('invoice-paper-due-date')).toBe('13/11/2026');
+    expect(es.find('invoice-paper-due-date').element.previousElementSibling?.textContent).toBe('Vencimiento');
+  });
+
   it('a ticket is a simplified invoice without «Bill to»; a reprint says «Copy»', async () => {
     const s = await setup({ invoice: { ...INVOICE, invoice_type: 'F2', customer_name: '', customer_tax_id: '' }, duplicate: true });
     expect(s.text('invoice-paper-title')).toBe('Simplified invoice');

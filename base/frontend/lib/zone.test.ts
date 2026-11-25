@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { business, BYE, errorFrame, flush, HELLO, mountBase } from '../__tests__/mount-base';
-import { useBusinessClock, useBusinessZone } from './zone';
+import { todayIn, useBusinessClock, useBusinessZone } from './zone';
 
 const Probe = defineComponent({
   setup() {
@@ -16,6 +16,19 @@ const Probe = defineComponent({
 
 afterEach(() => {
   document.body.innerHTML = '';
+});
+
+describe('todayIn', () => {
+  const NIGHT = new Date('2026-11-24T23:30:00Z');
+
+  it('is the day it is in the zone', () => {
+    expect([todayIn('Atlantic/Canary', NIGHT), todayIn('Europe/Madrid', NIGHT)]).toEqual(['2026-11-24', '2026-11-25']);
+  });
+
+  it('is the device’s day while the zone is not known, or is none the browser knows', () => {
+    const device = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(NIGHT);
+    expect([todayIn(undefined, NIGHT), todayIn('Mars/Olympus', NIGHT)]).toEqual([device, device]);
+  });
 });
 
 describe('useBusinessZone', () => {

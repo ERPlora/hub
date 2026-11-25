@@ -308,12 +308,12 @@ msgstr "Tus apps"
 msgid "Turn on at least one business app so your till has something to sell."
 msgstr "Activa al menos una app de negocio para que el TPV tenga algo que vender."
 
-#: home.py
+#: home/mandatory_apps.py
 #, python-format
 msgid "Turn on %(app)s"
 msgstr "Activa %(app)s"
 
-#: home.py
+#: home/mandatory_apps.py
 #, python-format
 msgid "It is mandatory for businesses in %(country)s."
 msgstr "Es obligatoria para los negocios de %(country)s."
@@ -2360,6 +2360,11 @@ msgstr "Actor"
 msgctxt "workbook"
 msgid "Screen"
 msgstr "Pantalla"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Operations"
+msgstr "Operaciones"
 
 #: workbook_help.py
 msgctxt "workbook"

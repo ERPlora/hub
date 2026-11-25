@@ -58,7 +58,7 @@ def answers(monkeypatch, row_or_error):
             raise row_or_error
         return row_or_error
 
-    monkeypatch.setattr(home, "run_hook", run_hook)
+    monkeypatch.setattr(home.module_hooks, "run_hook", run_hook)
     return asked
 
 
@@ -128,7 +128,7 @@ def test_one_app_failing_leaves_the_others_as_they_are(monkeypatch):
             raise RuntimeError("its query failed")
         return {"state": "ok"}
 
-    monkeypatch.setattr(home, "run_hook", run_hook)
+    monkeypatch.setattr(home.module_hooks, "run_hook", run_hook)
     apps = [app("broken", health=declared(operation="broken.thing.health", permission=None)), app(health=declared())]
 
     states = [(item["key"], item["state"]) for item in home_health.health_items(person(ADMIN, "things.view"), apps)]

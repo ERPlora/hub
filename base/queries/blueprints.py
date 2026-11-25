@@ -100,7 +100,7 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = active_apps(ctx.scope)
-        shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
+        shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         registered = list(dict.fromkeys(data.apps))
         missing = [app for app in registered if app not in shown or app not in on]
         if missing:
@@ -224,7 +224,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
                     for part in blueprint.datasets.datasets_of(config.label)
                 ],
             }
-            for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))
+            for config in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))
             if config.label in on
         ]
         return {"apps": sorted(apps, key=lambda app: app["label"])}

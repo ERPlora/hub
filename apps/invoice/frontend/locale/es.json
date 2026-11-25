@@ -37,6 +37,7 @@
     },
     "status": {
       "issued": "Emitida",
+      "overdue": "Vencida",
       "paid": "Pagada",
       "cancelled": "Cancelada"
     },
@@ -112,6 +113,7 @@
         "series": "Serie",
         "issueDate": "Fecha de emisión",
         "operationDate": "Fecha de operación",
+        "dueDate": "Vencimiento",
         "customer": "Cliente",
         "customerTaxId": "NIF cliente",
         "address": "Dirección",
@@ -231,6 +233,8 @@
     "create": {
       "title": "Nueva factura manual",
       "series": "Serie",
+      "issueDate": "Fecha",
+      "dueDate": "Vencimiento",
       "customer": "Cliente",
       "taxId": "NIF cliente",
       "address": "Dirección",
@@ -330,6 +334,7 @@
       "number": "Nº",
       "date": "Fecha",
       "operationDate": "Fecha de operación",
+      "dueDate": "Vencimiento",
       "billTo": "Facturar a",
       "taxId": "NIF",
       "description": "Descripción",

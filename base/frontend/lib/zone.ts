@@ -8,6 +8,17 @@ export function useBusinessZone(): ComputedRef<string | undefined> {
   return useBusinessClock().zone;
 }
 
+/** The day it is now in `zone` (`2026-11-24`): the device's while the zone is not known, or when the browser knows none
+ *  by that name. */
+export function todayIn(zone: string | undefined, now: Date = new Date()): string {
+  const parts = { year: 'numeric', month: '2-digit', day: '2-digit' } as const;
+  try {
+    return new Intl.DateTimeFormat('en-CA', { ...parts, timeZone: zone }).format(now);
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', parts).format(now);
+  }
+}
+
 /** The same zone, and whether it could not be read: the screen that cannot go on without it has to say so. */
 export function useBusinessClock(): { zone: ComputedRef<string | undefined>; unread: ComputedRef<boolean> } {
   const { data, status } = useLive('base.business.get', {});

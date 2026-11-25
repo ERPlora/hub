@@ -1447,7 +1447,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.values.words_for`
   es el de lo que lee una persona — el título y los detalles de un paso `ask` (`_ask` y «Probar») y los datos de
   `PERSON_PARAMS` (`whatsapp_inbox.message.notify`: `text` y `template`, en `map_params`) —: un `bool` como «Sí»/«No»
-  (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.moment`, a la hora del negocio)
+  (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.device_notices.moment`, a la hora del negocio)
   como CLDR en `flow.language` (en «Probar», el de quien prueba), y un `int` de una ruta `steps.<id>.<campo>` cuyo
   esquema de salida (`step_fields`: el de la acción, la primera fila de una consulta) lo marca como dinero
   (`json_schema_extra={"money": True}`, `live.assistant.MONEY`, la marca de la tarjeta de base) con
