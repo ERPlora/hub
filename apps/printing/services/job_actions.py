@@ -10,8 +10,9 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import Printer, PrintJob
-from apps.printing.queries import actor, cancellable, current_settings, find_job, job_row, retryable
 from apps.printing.queries.job_printer import job_printer
+from apps.printing.queries.jobs import actor, cancellable, find_job, job_row, retryable
+from apps.printing.queries.settings import current_settings
 from apps.printing.schemas import JobCancelIn, JobOut, JobRefIn
 from apps.printing.services.writes import _queued
 

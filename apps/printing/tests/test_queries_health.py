@@ -9,8 +9,7 @@ from django.utils import timezone
 from live.errors import PermissionDenied
 
 from apps.printing.models import PrintDevice
-from apps.printing.tests.conftest import HUB_DB, ctx_for, printer, run
-from apps.printing.tests.test_queries import reaches
+from apps.printing.tests.conftest import HUB_DB, ctx_for, printer, reaches, run
 
 pytestmark = HUB_DB
 
