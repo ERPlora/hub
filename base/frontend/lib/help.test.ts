@@ -88,6 +88,8 @@ describe('resolvePlatformScreen', () => {
   it('is none of them outside the routes the help covers', () => {
     expect(at('/api-docs')).toBeUndefined();
     expect(at('/settings-old')).toBeUndefined();
+    const onlyRole = platform.filter((screen) => screen.id === 'role');
+    expect(resolvePlatformScreen(onlyRole, '/employees', '')).toBeUndefined();
   });
 });
 
