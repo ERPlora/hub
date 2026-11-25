@@ -1236,7 +1236,7 @@ cannot be read, "Its VeriFactu record could not be read, and its paper never pri
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
-<!-- from WORKBOOK.md sha256:96a1365c215c -->
+<!-- from WORKBOOK.md sha256:f0831c2c8ad4 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1265,12 +1265,12 @@ at the same time, "This sale is already voided.". A refusal is read inside the w
 If "Cancel" is pressed in "An approval is needed", nothing is voided and the window says "This needs a
 manager's approval.". The approved void does the same as the manager's, only once: the corrective
 invoice in the same void, the voucher sessions that go back, the stock and the customer's record; who
-approved it, or that whoever may do it did it by themselves, stays in **Employees › Approvals** (BASE-F85). If the role
+approved it, or that whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role
 becomes "No" with the window open, the void is refused and nothing is voided, even if a manager had already approved it.
 Involved: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Refund a sale (all of it, part of it or through another method)
-<!-- from WORKBOOK.md sha256:42b2a23df424 -->
+<!-- from WORKBOOK.md sha256:a78b311b17a5 -->
 Status: done
 Vertical: common
 Actor: manager; cashier, with a manager's approval
@@ -1308,7 +1308,7 @@ back with another refund. Open the refund again to see what is left.". If the Hu
 pressing again does not refund twice. If "Cancel" is pressed in "An approval is needed",
 nothing is refunded and the window says "This needs a manager's approval.". The approved refund is the
 same, only once, with its corrective invoice and the voucher sessions that go back; who approved it, or that
-whoever may do it did it by themselves, stays in **Employees › Approvals** (BASE-F85). If the role becomes "No" with the
+whoever may do it did it by themselves, stays in **Employees › Approvals**. If the role becomes "No" with the
 window open, the refund is refused and nothing is refunded, even if a manager had already approved it.
 Involved: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Customers takes what was refunded off the record's spending on hearing "sale refunded" (CUSTOMER-F22)

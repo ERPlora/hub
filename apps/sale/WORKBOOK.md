@@ -1211,7 +1211,7 @@ dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se
 anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
 lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
 bono que vuelven, el stock y la ficha del cliente; quién la aprobó, o que la hizo por su cuenta quien puede, queda en
-**Empleados › Aprobaciones** (BASE-F85). Si el rol pasa a «No» con la ventana abierta, la anulación se rechaza y no se
+**Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la anulación se rechaza y no se
 anula nada, aunque un responsable ya la hubiera aprobado.
 Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
@@ -1254,8 +1254,8 @@ marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para
 el Hub no contesta, volver a pulsar no devuelve dos veces. Si en «Hace falta una aprobación»
 se pulsa «Cancelar», no se devuelve nada y la ventana dice «Esto necesita la aprobación de un
 encargado.». La devolución aprobada es la misma, una sola vez, con su rectificativa y las sesiones de
-bono que vuelven; quién la aprobó, o que la hizo por su cuenta quien puede, queda en **Empleados › Aprobaciones**
-(BASE-F85). Si el rol pasa a «No» con la ventana abierta, la devolución se rechaza y no se devuelve nada, aunque un
+bono que vuelven; quién la aprobó, o que la hizo por su cuenta quien puede, queda en **Empleados › Aprobaciones**.
+Si el rol pasa a «No» con la ventana abierta, la devolución se rechaza y no se devuelve nada, aunque un
 responsable ya la hubiera aprobado.
 Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUSTOMER-F22) e Inventario
