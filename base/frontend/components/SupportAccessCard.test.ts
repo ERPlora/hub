@@ -2,7 +2,8 @@ import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, subId } from '../__tests__/mount-base';
+import { openSettingsCard, posted, switchOf } from '../__tests__/settings-card';
 import type { SupportAccess } from '../operations/access';
 import SupportAccessCard from './SupportAccessCard.vue';
 
@@ -10,21 +11,11 @@ const OP = 'base.support_access.get';
 const OFF: SupportAccess = { enabled: false, can_change: true, updated_by: '', updated_at: null, visits: [] };
 const ON: SupportAccess = { ...OFF, enabled: true, updated_by: 'Ana', updated_at: '2026-11-24T09:30:00Z' };
 
-async function open(options: Parameters<typeof mountBase>[1] = {}) {
-  const m = await mountBase(SupportAccessCard, { path: '/settings', routes: ['/settings'], ...options });
-  const call = await m.live();
-  return { ...m, call };
-}
-
-const toggle = (m: { wrapper: { get: (s: string) => { element: Element } } }) =>
-  m.wrapper.get('[data-testid="support-access-toggle"]').element as HTMLElement & { checked: boolean; disabled: boolean };
+const open = (options: Parameters<typeof openSettingsCard>[1] = {}) => openSettingsCard(SupportAccessCard, options);
+const toggle = (m: Parameters<typeof switchOf>[0]) => switchOf(m, 'support-access-toggle');
 
 function switchTo(m: Parameters<typeof toggle>[0], checked: boolean): void {
   toggle(m).dispatchEvent(new CustomEvent('ionChange', { detail: { checked } }));
-}
-
-function posted(m: { net: { api: { url: string; init: RequestInit }[] } }) {
-  return m.net.api.map((call) => [new URL(call.url, 'http://a.localhost').pathname, JSON.parse(String(call.init.body))]);
 }
 
 afterEach(() => {
