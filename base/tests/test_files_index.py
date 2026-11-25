@@ -74,9 +74,11 @@ def test_a_walk_a_write_came_during_is_never_kept(store, monkeypatch):
         files.create.create_folder(store, A, "", "Nueva")
         return found
 
-    monkeypatch.setattr(files.index, "scan", another_device_writes)
+    for walker in (files.index, files.space):
+        monkeypatch.setattr(walker, "scan", another_device_writes)
     assert tree(files.listing.listing(store, A, "")["folders"]) == []
-    monkeypatch.setattr(files.index, "scan", real)
+    for walker in (files.index, files.space):
+        monkeypatch.setattr(walker, "scan", real)
     assert tree(files.listing.listing(store, A, "")["folders"]) == [("Nueva", [])]
 
 
