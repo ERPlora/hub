@@ -98,7 +98,6 @@ defineExpose({ afterCharge });
 <template>
   <div
     v-if="steps.length || failures.length || (read.error.value && !read.data.value)"
-    class="checkout-steps"
     data-testid="sale-checkout-steps"
   >
     <InlineFeedback
@@ -135,13 +134,7 @@ defineExpose({ afterCharge });
       role="alert"
       data-testid="sale-checkout-steps-failed"
     >
-      <p
-        v-for="failure in failures"
-        :key="failure.key"
-        class="checkout-steps__failure"
-      >
-        {{ failure.message }}
-      </p>
+      {{ failures.map((failure) => failure.message).join(' ') }}
       <template #actions>
         <ion-button
           fill="clear"
@@ -166,9 +159,3 @@ defineExpose({ afterCharge });
     </InlineFeedback>
   </div>
 </template>
-
-<style scoped>
-.checkout-steps__failure {
-  margin: 0;
-}
-</style>

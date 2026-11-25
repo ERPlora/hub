@@ -38,12 +38,12 @@ async function setup(read: SuggestionOut | null = ON, props: Record<string, unkn
   if (read) await m.result(OP, read);
   const added = () => m.wrapper.emitted<[Added]>('update:added')?.at(-1)?.[0];
   const choice = (testid: string) => m.find(testid).element as HTMLElement;
-  const lines = (testid: string) => m.find(testid).findAll('.tip-step__lines > span').map((line) => plain(line.text()));
+  const said = (testid: string) => plain(m.find(testid).text());
   const pressed = () =>
     m.wrapper.findAll('[aria-pressed="true"]').map((button) => button.attributes('data-testid'));
   const record = (sale: SaleOut = SALE) =>
     (m.wrapper.vm as unknown as { afterCharge: (s: SaleOut, k: string) => Promise<void> }).afterCharge(sale, 'sale-key');
-  return { ...m, added, choice, lines, pressed, record };
+  return { ...m, added, choice, said, pressed, record };
 }
 
 describe('TipStep: what it reads', () => {
@@ -80,7 +80,7 @@ describe('TipStep: choosing the tip', () => {
   it('offers «No tip», each suggestion with the tip it comes to and «Other amount», opening on the one marked', async () => {
     const s = await setup();
     expect(s.find('tip-step-none').text()).toBe('No tip');
-    expect(s.lines('tip-step-suggestion-0')).toEqual(['3%', '€0.30']);
+    expect(s.said('tip-step-suggestion-0')).toBe('3% · €0.30');
     expect(s.find('tip-step-suggestion-2').text()).toBe('€2.00');
     expect(s.find('tip-step-custom').text()).toBe('Other amount');
     expect(s.pressed()).toEqual(['tip-step-suggestion-1']);
@@ -128,7 +128,7 @@ describe('TipStep: choosing the tip', () => {
   it('in Spanish', async () => {
     const s = await setup(ON, {}, 'es');
     expect(s.find('tip-step-none').text()).toBe('Sin propina');
-    expect(s.lines('tip-step-suggestion-0')).toEqual(['3 %', '0,30 €']);
+    expect(s.said('tip-step-suggestion-0')).toBe('3 % · 0,30 €');
     expect(s.added()?.label).toBe('Propina');
   });
 });

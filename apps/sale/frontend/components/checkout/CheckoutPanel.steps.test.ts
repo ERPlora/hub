@@ -2,40 +2,24 @@
 // amount and the tenders, what it adds is charged with the sale on its one payment but apart from it, and the sheet
 // hands the sale to the till once the step has recorded its part.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, shallowRef, watch } from 'vue';
+import { shallowRef } from 'vue';
 
 import { appComponent } from '../../../../../base/frontend/lib/app-components';
 import { click, flush } from '../../__tests__/mount-sale';
-import type { SaleOut } from '../../operations';
 import { SALE, setup as setupPanel } from './__tests__/checkout-panel';
+import { fakeStep, type Recorder } from './__tests__/fake-step';
 
-vi.mock('../../../../../base/frontend/lib/app-components', async (actual) => ({
-  ...(await actual<typeof import('../../../../../base/frontend/lib/app-components')>()),
-  appComponent: vi.fn(),
-}));
+// The real loader, spied on: each test says which component a step's name brings.
+vi.mock('../../../../../base/frontend/lib/app-components', { spy: true });
 
 const STEPS_OP = 'sale.checkout.steps';
 const TIP = { key: 'tip.tip', app: 'tip', component: 'TipStep' };
 
 /** What the step adds now, and its record of a charged sale. */
 const adding = shallowRef({ amount: 50, label: 'Tip', issue: '' });
-const record = vi.fn<(sale: SaleOut, key: string) => Promise<void>>(() => Promise.resolve());
+const record = vi.fn<Recorder>(() => Promise.resolve());
 
-const Step = defineComponent({
-  props: {
-    total: { type: Number, required: true },
-    discount: { type: Number, required: true },
-    method: { type: Object, required: true },
-    locked: { type: Boolean, required: true },
-  },
-  emits: ['update:added'],
-  setup(props, { emit, expose }) {
-    watch(adding, (now) => emit('update:added', now), { immediate: true });
-    expose({ afterCharge: record });
-    return () =>
-      h('p', { 'data-testid': 'tip-row' }, `${props.total}/${props.discount}/${(props.method as { id: string }).id}/${props.locked}`);
-  },
-});
+const Step = fakeStep('tip-row', () => adding.value, record);
 
 afterEach(() => {
   adding.value = { amount: 50, label: 'Tip', issue: '' };
@@ -47,6 +31,15 @@ async function setup(options: Parameters<typeof setupPanel>[0] = {}) {
   const s = await setupPanel(options);
   await s.push(STEPS_OP, { steps: [TIP] });
   await vi.waitFor(() => expect(s.find('tip-row').exists()).toBe(true));
+  return s;
+}
+
+/** The sheet with the step, charged by card: the server records the sale. */
+async function chargedByCard() {
+  const s = await setup();
+  s.replies({ '/api/sale/sales': [Response.json(SALE)] });
+  await click(s.find('sale-checkout-method-m-card').element);
+  await click(s.confirm());
   return s;
 }
 
@@ -110,10 +103,7 @@ describe('CheckoutPanel: a step of another app (SALE-F39)', () => {
   it('once charged the step records its part with the sale and this attempt’s key, and then the till gets the sale', async () => {
     let recorded!: () => void;
     record.mockImplementation(() => new Promise<void>((resolve) => (recorded = resolve)));
-    const s = await setup();
-    s.replies({ '/api/sale/sales': [Response.json(SALE)] });
-    await click(s.find('sale-checkout-method-m-card').element);
-    await click(s.confirm());
+    const s = await chargedByCard();
     expect(record).toHaveBeenCalledWith(SALE, s.body().idempotency_key);
     expect(s.find('tip-row').text()).toBe('4250/0/m-card/true');
     expect(s.wrapper.emitted('charged')).toBeUndefined();
@@ -126,10 +116,7 @@ describe('CheckoutPanel: a step of another app (SALE-F39)', () => {
 
   it('a step that cannot record keeps the sheet with its words and nothing to charge; «Close» hands the sale to the till', async () => {
     record.mockRejectedValue(new Error('The sale is charged, but the tip has not been saved.'));
-    const s = await setup();
-    s.replies({ '/api/sale/sales': [Response.json(SALE)] });
-    await click(s.find('sale-checkout-method-m-card').element);
-    await click(s.confirm());
+    const s = await chargedByCard();
     expect(s.find('sale-checkout-steps-failed').text()).toContain('The sale is charged, but the tip has not been saved.');
     expect(s.find('sale-checkout-confirm').exists()).toBe(false);
     expect(s.wrapper.emitted('charged')).toBeUndefined();

@@ -5,18 +5,9 @@ import { HubIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import { click, mountSale } from '../../__tests__/mount-sale';
-import type { PaymentMethodOut } from '../../operations';
 import MethodPicker from './MethodPicker.vue';
+import { method } from './__tests__/methods';
 
-const method = (id: string, type: PaymentMethodOut['type'], display_name: string): PaymentMethodOut => ({
-  id,
-  name: id,
-  display_name,
-  type,
-  sort_order: 0,
-  requires_change: type === 'cash',
-  allowed: true,
-});
 const METHODS = [method('m-cash', 'cash', 'Efectivo'), method('m-card', 'card', 'Tarjeta'), method('m-bizum', 'other', 'Bizum')];
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {

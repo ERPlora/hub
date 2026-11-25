@@ -80,7 +80,9 @@ test('TIP-F02: the Charge sheet proposes the tips of the payment method, and the
   await sheet.locator(`[data-testid=sale-checkout-method-${card.id}]`).click();
 
   // The settings mark the second suggestion: 5 % of €10.00.
-  await expect(step.locator('[data-testid=tip-step-suggestion-1]')).toHaveAttribute('aria-pressed', 'true');
+  // Ionic hands aria-pressed to the native button inside each ion-button.
+  await expect(step.locator('[data-testid=tip-step-suggestion-1] button')).toHaveAttribute('aria-pressed', 'true');
+  await expect(step.locator('[data-testid=tip-step-none] button')).toHaveAttribute('aria-pressed', 'false');
   await expect(step.locator('[data-testid=tip-step-suggestion-1]')).toContainText(/0[.,]50/);
   await expect(step.locator('[data-testid=tip-step-none]')).toBeVisible();
   await expect(sheet.locator('[data-testid=sale-checkout-added]')).toContainText(/\+ .*0[.,]50.* (tip|de propina)/);

@@ -2,18 +2,16 @@
 // their component's name, without Sales knowing them: what they add is added up for the charge, and once the sale is
 // charged each records its part; one that cannot is said with «Retry» and «Close».
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, onMounted } from 'vue';
 
 import { appComponent, type ComponentLoader } from '../../../../../base/frontend/lib/app-components';
 import { click, errorFrame, flush, mountSale } from '../../__tests__/mount-sale';
 import type { Added } from '../../lib/checkout/steps';
 import type { SaleOut } from '../../operations';
 import CheckoutSteps from './CheckoutSteps.vue';
+import { fakeStep, type Recorder } from './__tests__/fake-step';
 
-vi.mock('../../../../../base/frontend/lib/app-components', async (actual) => ({
-  ...(await actual<typeof import('../../../../../base/frontend/lib/app-components')>()),
-  appComponent: vi.fn(),
-}));
+// The real loader, spied on: each test says which component a step's name brings.
+vi.mock('../../../../../base/frontend/lib/app-components', { spy: true });
 
 const OP = 'sale.checkout.steps';
 const CARD = { id: 'm-card', display_name: 'Card', type: 'card' as const, requires_change: false };
@@ -21,31 +19,11 @@ const SALE = { id: 's1', number: '20261125-0001' } as SaleOut;
 const TIP = { key: 'tip.tip', app: 'tip', component: 'TipStep' };
 const ROUND = { key: 'round.round', app: 'round', component: 'RoundStep' };
 
-type Recorder = (sale: SaleOut, key: string) => Promise<void>;
-
-/** A step as Sales sees it: what it is given, what it adds as it mounts and its record of a charged sale. */
-function step(name: string, amount: number, record: Recorder) {
-  return defineComponent({
-    props: {
-      total: { type: Number, required: true },
-      discount: { type: Number, required: true },
-      method: { type: Object, required: true },
-      locked: { type: Boolean, required: true },
-    },
-    emits: ['update:added'],
-    setup(props, { emit, expose }) {
-      onMounted(() => emit('update:added', { amount, label: name, issue: '' }));
-      expose({ afterCharge: record });
-      return () => h('p', { 'data-testid': `step-${name}` }, `${props.total}/${props.discount}/${props.locked}`);
-    },
-  });
-}
-
 const recordTip = vi.fn<Recorder>(() => Promise.resolve());
 const recordRound = vi.fn<Recorder>(() => Promise.resolve());
 const LOADERS: Record<string, ComponentLoader> = {
-  TipStep: () => Promise.resolve({ default: step('Tip', 50, recordTip) }),
-  RoundStep: () => Promise.resolve({ default: step('Round', 30, recordRound) }),
+  TipStep: () => Promise.resolve({ default: fakeStep('step-Tip', () => ({ amount: 50, label: 'Tip', issue: '' }), recordTip) }),
+  RoundStep: () => Promise.resolve({ default: fakeStep('step-Round', () => ({ amount: 30, label: 'Round', issue: '' }), recordRound) }),
   Broken: () => Promise.reject(new Error('the chunk did not arrive')),
 };
 
@@ -73,7 +51,7 @@ describe('CheckoutSteps: the steps of the apps on', () => {
   it('mounts each by its app and its name, with the charge’s total, its discounts and whether it is charged', async () => {
     const s = await setup([TIP]);
     expect(appComponent).toHaveBeenCalledWith('tip', 'TipStep');
-    expect(s.find('step-Tip').text()).toBe('900/100/false');
+    expect(s.find('step-Tip').text()).toBe('900/100/m-card/false');
   });
 
   it('adds up what they add', async () => {

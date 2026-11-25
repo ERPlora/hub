@@ -5,6 +5,7 @@ import { click, flush, type MountOptions, mountSale, resultFrame } from '../../.
 import { plain } from '../../../lib/format';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut, SettingsOut } from '../../../operations';
 import CheckoutPanel from '../CheckoutPanel.vue';
+import { method } from './methods';
 
 export const PREVIEW_OP = 'sale.checkout.preview';
 export const METHODS_OP = 'sale.payment_method.list';
@@ -31,15 +32,6 @@ export const preview = (over: Partial<PreviewOut> = {}): PreviewOut => ({
   operation_total: over.operation_total ?? over.total ?? 4250,
 });
 
-export const method = (id: string, type: PaymentMethodOut['type'], display_name: string): PaymentMethodOut => ({
-  id,
-  name: id,
-  display_name,
-  type,
-  sort_order: 0,
-  requires_change: type === 'cash',
-  allowed: true,
-});
 export const CARD = method('m-card', 'card', 'Card');
 export const CASH = method('m-cash', 'cash', 'Cash');
 export const TRANSFER: PaymentMethodOut = { ...method('m-transfer', 'transfer', 'Transfer'), allowed: false };

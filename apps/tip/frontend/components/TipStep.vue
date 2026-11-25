@@ -76,8 +76,9 @@ function pick(next: Choice): void {
   choice.value = next;
 }
 
+/** «5 % · 0,50 €», or the amount alone when it is one. */
 function nameOf(suggestion: SuggestedTip): string {
-  return suggestion.percent === null ? money(suggestion.amount) : percent(suggestion.percent);
+  return suggestion.percent === null ? money(suggestion.amount) : `${percent(suggestion.percent)} · ${money(suggestion.amount)}`;
 }
 
 /** Records the tip chosen with `sale`, charged under `attemptKey`; throws with what to say when it is not saved. */
@@ -105,13 +106,13 @@ defineExpose({ afterCharge });
 <template>
   <section
     v-if="shown"
-    class="tip-step"
+   
     data-testid="tip-step"
     :aria-label="$t('tip.step.title')"
   >
     <p
       v-if="loading"
-      class="tip-step__note"
+     
       role="status"
       data-testid="tip-step-loading"
     >
@@ -140,12 +141,11 @@ defineExpose({ afterCharge });
     </InlineFeedback>
     <template v-else-if="offered">
       <div
-        class="tip-step__choices"
+       
         role="group"
         :aria-label="$t('tip.step.title')"
       >
         <ion-button
-          class="tip-step__choice"
           data-testid="tip-step-none"
           :fill="pressed('none') === 'true' ? 'solid' : 'outline'"
           :aria-pressed="pressed('none')"
@@ -157,24 +157,16 @@ defineExpose({ afterCharge });
         <ion-button
           v-for="(suggestion, index) in offered.suggestions"
           :key="index"
-          class="tip-step__choice"
           :data-testid="`tip-step-suggestion-${index}`"
           :fill="pressed('suggestion', index) === 'true' ? 'solid' : 'outline'"
           :aria-pressed="pressed('suggestion', index)"
           :disabled="locked"
           @click="pick({ kind: 'suggestion', index })"
         >
-          <span class="tip-step__lines">
-            <span>{{ nameOf(suggestion) }}</span>
-            <span
-              v-if="suggestion.percent !== null"
-              class="tip-step__amount"
-            >{{ money(suggestion.amount) }}</span>
-          </span>
+          {{ nameOf(suggestion) }}
         </ion-button>
         <ion-button
           v-if="offered.allow_custom"
-          class="tip-step__choice"
           data-testid="tip-step-custom"
           :fill="pressed('custom') === 'true' ? 'solid' : 'outline'"
           :aria-pressed="pressed('custom')"
@@ -187,7 +179,6 @@ defineExpose({ afterCharge });
       <MoneyInput
         v-if="choice.kind === 'custom'"
         v-model="customText"
-        class="tip-step__amount-field"
         testid="tip-step-amount"
         :label="$t('tip.step.amount')"
         :money="business"
@@ -197,47 +188,3 @@ defineExpose({ afterCharge });
     </template>
   </section>
 </template>
-
-<style scoped>
-.tip-step {
-  margin: 0.1rem 0 0.6rem;
-}
-
-.tip-step__choices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
-  gap: 0.4rem;
-}
-
-.tip-step__choice {
-  --border-radius: 12px;
-  min-height: var(--ep-touch-lg, 56px);
-  height: auto;
-  margin: 0;
-  font-weight: 700;
-}
-
-.tip-step__lines {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.2;
-}
-
-.tip-step__amount {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.tip-step__amount-field {
-  margin-top: 0.5rem;
-}
-
-.tip-step__note {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  color: var(--ion-color-medium, #8b897f);
-}
-</style>
