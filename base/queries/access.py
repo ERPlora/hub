@@ -40,7 +40,7 @@ def pin_people(slug: str, *, exclude: str = "") -> list[tuple[Credential, Any]]:
     Two reads, never a join: who is a member is control's (``Membership``) and the PINs are the hub's."""
     users = {
         membership.user.get_username(): membership.user
-        for membership in Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+        for membership in Membership.objects.team(slug).select_related("user")
     }
     users.pop(exclude, None)
     credentials = Credential.objects.filter(username__in=list(users)).exclude(pin_hash="")
@@ -58,7 +58,7 @@ def pin_owner(slug: str, person: str, pin: str) -> Any | None:
     if credential is None:
         return None
     membership = (
-        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        Membership.objects.team(slug).filter(user__username=credential.username)
         .select_related("user")
         .first()
     )
