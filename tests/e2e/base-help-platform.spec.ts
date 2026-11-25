@@ -1,5 +1,6 @@
 // The help on the Hub's own screens (BASE-F115): the same «?» and window of the modules, with the help of the screen and
-// tab in view, at three sizes and in both languages; and no «?» where there is no help to show.
+// tab in view and how its tasks are done, only those the person's role does, at three sizes and in both languages; and no
+// «?» where there is no help to show.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, EMPLOYEE, horizontalOverflow, hostPage, saveSessionForTheSweep, settled, signedInSpanish, testid } from './helpers';
@@ -18,6 +19,9 @@ const SCREENS = [
 
 const help = (page: Page) => testid(page, 'help-button');
 const current = (page: Page) => page.getByTestId('help-current-screen');
+/** The titles of the groups of tasks, and a task of one of them, folded. */
+const taskGroups = (page: Page) => page.locator('[data-help-section="flows"] .help-flow-group__title');
+const task = (page: Page, screen: string, flow: string) => page.getByTestId(`help-flow-${screen}-${flow}`);
 
 async function openHelp(page: Page): Promise<void> {
   await help(page).click();
@@ -45,11 +49,10 @@ async function inSpanish(browser: Browser, next: string): Promise<{ context: Bro
   return signedInSpanish(browser, DESK, next);
 }
 
-test('each screen of the Hub opens its own help, at three sizes', async ({ browser }) => {
-  const { context, page } = await inSpanish(browser, '/');
-  await saveSessionForTheSweep(context);
-  for (const [path, name, title] of SCREENS) {
-    await page.goto(`${A}${path}`);
+for (const [path, name, title] of SCREENS) {
+  test(`${name} opens its own help with its tasks, at three sizes`, async ({ browser }) => {
+    const { context, page } = await inSpanish(browser, path);
+    await saveSessionForTheSweep(context);
     for (const size of [DESK, TABLET, PHONE]) {
       await page.setViewportSize(size);
       await inTheBar(page);
@@ -60,11 +63,18 @@ test('each screen of the Hub opens its own help, at three sizes', async ({ brows
       await expect(page.getByTestId('help-content')).toHaveAttribute('lang', 'es');
       await expect(page.locator('[data-help-section="screens"] .help-section__title')).toHaveText('Otras pantallas');
       await capture(page, `base-help-platform-${name}-open-${size.width}x${size.height}`);
+      await expect(page.locator('[data-help-section="flows"] .help-section__title')).toHaveText('Cómo se hace');
+      await expect(taskGroups(page).first()).toHaveText(title);
+      const first = page.locator('.help-flow-header').first();
+      await first.click();
+      await expect(first).toHaveAttribute('aria-expanded', 'true');
+      await settled(page);
+      await capture(page, `base-help-platform-${name}-task-${size.width}x${size.height}`);
       await closeHelp(page);
     }
-  }
-  await context.close();
-});
+    await context.close();
+  });
+}
 
 test('the help follows the tab in view and the screen the person moves to, back included', async ({ browser }) => {
   const { context, page } = await inSpanish(browser, '/');
@@ -98,6 +108,33 @@ test('the help follows the tab in view and the screen the person moves to, back 
   await context.close();
 });
 
+test('a task of Settings opens with its steps, and a search finds one of another screen', async ({ browser }) => {
+  const { context, page } = await inSpanish(browser, '/settings#data');
+  await openHelp(page);
+  await expect(taskGroups(page).first()).toHaveText('Ajustes · Datos y copias');
+  await task(page, 'settings_data', 'BASE-F34').click();
+  const steps = page.getByTestId('help-flow-content-settings_data-BASE-F34');
+  await expect(steps).toContainText('En «Restablecer», «Deshacer una importación»');
+  await expect(steps).not.toContainText('BASE-');
+  await page.getByTestId('help-flow-search').locator('input').fill('activar una app');
+  await expect(task(page, 'apps', 'BASE-F18')).toBeVisible();
+  await context.close();
+});
+
+test('a person is shown only the tasks their role does', async ({ browser }) => {
+  const owner = await inSpanish(browser, '/apps');
+  await openHelp(owner.page);
+  await expect(task(owner.page, 'apps', 'BASE-F18')).toBeVisible();
+  await owner.context.close();
+
+  const employee = await hostPage(browser, A, { next: '/apps', viewport: DESK, credentials: EMPLOYEE });
+  await openHelp(employee.page);
+  await expect(task(employee.page, 'apps', 'BASE-F15')).toBeVisible();
+  await expect(task(employee.page, 'apps', 'BASE-F18')).toHaveCount(0);
+  await expect(task(employee.page, 'settings_general', 'BASE-F66')).toHaveCount(0);
+  await employee.context.close();
+});
+
 test('the help comes in English to whoever reads English', async ({ browser }) => {
   const { context, page } = await hostPage(browser, A, { next: '/settings', viewport: DESK });
   await context.addCookies([{ name: 'django_language', value: 'en', domain: new URL(A).hostname, path: '/' }]);
@@ -106,6 +143,9 @@ test('the help comes in English to whoever reads English', async ({ browser }) =
   await expect(page.locator('.help-window__title-text').last()).toHaveText('Help · ERPlora');
   await expect(page.getByTestId('help-content')).toHaveAttribute('lang', 'en');
   await expect(current(page)).toContainText('On this screen · Settings · General');
+  await expect(page.locator('[data-help-section="flows"] .help-section__title')).toHaveText('How to');
+  await expect(taskGroups(page).first()).toHaveText('Settings · General');
+  await expect(task(page, 'settings_general', 'BASE-F69')).toHaveText('Name a device');
   await capture(page, 'base-help-platform-settings-open-en');
   await context.close();
 });

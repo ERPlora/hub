@@ -35,6 +35,21 @@ QUOTA = pgettext_lazy("invoice export", "Tax")
 SURCHARGE_RATE = pgettext_lazy("invoice export", "Surcharge rate %")
 SURCHARGE = pgettext_lazy("invoice export", "Surcharge")
 TOTAL = pgettext_lazy("invoice export", "Total")
+WITHHOLDING_RATE = pgettext_lazy("invoice export", "Withholding %")
+WITHHOLDING = pgettext_lazy("invoice export", "Withholding")
+PAYABLE = pgettext_lazy("invoice export", "Amount due")
+
+#: What the file reads of an invoice, all in one query.
+EXPORTED = (
+    "number",
+    "issue_date",
+    "customer_name",
+    "customer_tax_id",
+    "currency",
+    "tax_breakdown",
+    "withholding_rate",
+    "withholding_amount",
+)
 
 #: What a column holds, which says how its cells are written.
 TEXT, DAY, AMOUNT, PERCENT = "text", "day", "amount", "percent"
@@ -64,19 +79,21 @@ TEXT, DAY, AMOUNT, PERCENT = "text", "day", "amount", "percent"
         },
         "description": "Writes an Excel file of the issued invoices for the accountant, as the invoice list shows them "
         "for the same search and filters (issue dates, status, type, series, source), cancelled and rectifying ones "
-        "included: a row per invoice and tax rate with its number, date, customer, tax ID, taxable base, rate, tax and "
-        "equivalence surcharge if any.",
+        "included: a row per invoice and tax rate with its number, date, customer, tax ID, taxable base, rate, tax and, "
+        "if any, equivalence surcharge and IRPF withholding.",
     },
 )
 def export_invoices(ctx: OperationContext, params: InvoiceExportIn) -> dict:
     invoices = list(
         filter_invoices(ctx, params)
         .order_by("issue_date", "series_code", "year", "sequence", "id")
-        .only("number", "issue_date", "customer_name", "customer_tax_id", "currency", "tax_breakdown")
+        .only(*EXPORTED)
     )
     with translation.override(ctx.language):
         rows = list(_rows(invoices))
-        columns = _columns(any("surcharge" in row for row in rows))
+        columns = _columns(
+            surcharged=any("surcharge" in row for row in rows), withheld=any("withholding" in row for row in rows)
+        )
         return {
             "filename": _filename(params.issue_date_from, params.issue_date_to),
             "content_type": CONTENT_TYPE,
@@ -85,9 +102,14 @@ def export_invoices(ctx: OperationContext, params: InvoiceExportIn) -> dict:
         }
 
 
-def _columns(surcharged: bool) -> list[tuple[str, object, str]]:
-    """``(key, header, kind)`` of every column; the surcharge's two only in a file that has one."""
+def _columns(*, surcharged: bool, withheld: bool) -> list[tuple[str, object, str]]:
+    """``(key, header, kind)`` of every column; the surcharge's and the withholding's only in a file that has one."""
     surcharge = [("surcharge_rate", SURCHARGE_RATE, PERCENT), ("surcharge", SURCHARGE, AMOUNT)]
+    withholding = [
+        ("withholding_rate", WITHHOLDING_RATE, PERCENT),
+        ("withholding", WITHHOLDING, AMOUNT),
+        ("payable", PAYABLE, AMOUNT),
+    ]
     return [
         ("number", NUMBER, TEXT),
         ("date", DATE, DAY),
@@ -98,6 +120,7 @@ def _columns(surcharged: bool) -> list[tuple[str, object, str]]:
         ("quota", QUOTA, AMOUNT),
         *(surcharge if surcharged else []),
         ("total", TOTAL, AMOUNT),
+        *(withholding if withheld else []),
     ]
 
 
@@ -105,7 +128,9 @@ def _rows(invoices: Iterable[Invoice]) -> Iterator[dict]:
     """A row per entry of each invoice's breakdown; the money in the units of its currency."""
     for invoice in invoices:
         decimals = get_currency_precision(invoice.currency)
-        for entry in invoice.tax_breakdown:
+        # Shared out by the base of each entry, so the column adds up to what is withheld.
+        shares = fiscal.allocate(invoice.withholding_amount, [abs(entry["base"]) for entry in invoice.tax_breakdown])
+        for entry, withheld in zip(invoice.tax_breakdown, shares, strict=True):
             key = fiscal.key_of(entry)
             surcharge = entry.get("surcharge_quota", 0)
             row = {
@@ -117,11 +142,15 @@ def _rows(invoices: Iterable[Invoice]) -> Iterator[dict]:
                 "rate": float(key.rate),
                 "quota": _amount(entry["quota"], decimals),
                 "total": _amount(fiscal.gross_of(entry), decimals),
+                "payable": _amount(fiscal.gross_of(entry) - withheld, decimals),
                 "decimals": decimals,
             }
             if surcharge or key.surcharge_rate:
                 row["surcharge_rate"] = float(key.surcharge_rate)
                 row["surcharge"] = _amount(surcharge, decimals)
+            if invoice.withholding_rate is not None:
+                row["withholding_rate"] = float(invoice.withholding_rate)
+                row["withholding"] = _amount(-withheld, decimals)
             yield row
 
 

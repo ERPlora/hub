@@ -84,7 +84,7 @@ def _language(code: str) -> str:
 def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     """An app's help in the person's language while its file is current, else in its base language's, else in the
     source's (``language`` says which); its video and each task's short videos likewise. Without the screens whose
-    permission the person does not hold."""
+    permission the person does not hold, nor the tasks that are only done there or that their role does not do."""
     config = _ready(data.app)
     if config is None:
         with translation.override(ctx.language):
@@ -96,35 +96,40 @@ def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
         **read,
         "screens": [screen for screen in read["screens"] if screen["id"] not in closed],
         "video": _in_language(config.help.videos, language),
-        "flows": [{**flow, "videos": _flow_videos(config.help, flow["id"], language)} for flow in read["flows"]],
+        "flows": [
+            {**flow, "screens": screens, "videos": _flow_videos(config.help, flow["id"], language)}
+            for flow in read["flows"]
+            if ctx.has(flow["permission"]) and (screens := [tab for tab in flow["screens"] if tab not in closed])
+        ],
     }
 
 
 def _read(config: LiveAppConfig, language: str) -> dict:
-    """The help of ``config`` for ``language`` (``_READ``), with the name of the app in the language served."""
+    """The help of ``config`` for ``language`` (``_READ``), with the name of the app in the language served and the
+    permission each task asks for (none in a module: whoever opens it)."""
     key = (config.label, language)
     if key not in _READ or settings.DEBUG:
         served, read = help_of(config, language)
+        platform = config.kind == "platform"
         with translation.override(served):
-            name = platform_screens.NAME if config.kind == "platform" else str(config.verbose_name)
+            name = platform_screens.NAME if platform else str(config.verbose_name)
+            asked = {flow.id: platform_screens.permission_of(read.actors[flow.id]) for flow in read.flows if platform}
         _READ[key] = {
             "app": config.label,
             "name": name,
             "language": served,
             "purpose": read.purpose,
             "screens": [asdict(screen) for screen in read.screens],
-            "flows": [asdict(flow) for flow in read.flows],
+            "flows": [{**asdict(flow), "permission": asked.get(flow.id)} for flow in read.flows],
         }
     return _READ[key]
 
 
 def help_of(config: LiveAppConfig, language: str) -> tuple[str, workbook_help.Help]:
-    """The language ``config``'s help is served in for ``language`` and what its window reads there. The platform's is
-    its screens alone: its tasks are written with notes for whoever maintains it."""
+    """The language ``config``'s help is served in for ``language`` and what its window reads there."""
     served, markdown = workbook_help.workbook(Path(config.path), language)
     with translation.override(served):
-        read = workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
-    return served, replace(read, flows=()) if config.kind == "platform" else read
+        return served, workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
 
 
 def _flow_videos(declared: Help, flow: str, language: str) -> list[str]:

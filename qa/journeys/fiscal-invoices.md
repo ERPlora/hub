@@ -18,13 +18,13 @@ Para qué: las facturas que pide un cliente o se hacen a mano, sus rectificacion
 4. SALE-F05 — en un negocio que exige cliente, un cobro sin él.
 5. INVOICE-F05 — un tique de ayer pasa a factura completa en el mostrador.
 6. INVOICE-F04 — otro cliente la pide él mismo desde su tique.
-7. INVOICE-F03 — en la serie del primer paso, una factura a mano por un evento privado, de ayer y con vencimiento a 30 días, y otra de ayer que vencía ayer mismo.
+7. INVOICE-F03 — en la serie del primer paso, una factura a mano a una empresa por un evento privado, de ayer, con vencimiento a 30 días y retención del 15 %, y otra de ayer que vencía ayer mismo.
 8. INVOICE-F16, INVOICE-F17 — las dos, buscadas y abiertas; entre las vencidas sale solo la segunda.
-9. INVOICE-F18 — la primera, en PDF.
+9. INVOICE-F18 — la primera, en PDF: lo retenido y lo que se cobra, además de su total.
 10. INVOICE-F16, INVOICE-F17, INVOICE-F18 — una empleada solo ve, abre e imprime sus facturas: la de su compañero no le sale en la lista ni se abre por su número.
 11. INVOICE-F19 — la vencida, pagada por transferencia: ya no sale entre las vencidas.
 12. INVOICE-F08 — rectificada a mano.
-13. INVOICE-F24 — la gestoría descarga el mes en Excel: la factura, su rectificativa y los tiques.
+13. INVOICE-F24 — la gestoría descarga el mes en Excel: la factura con su retención, la rectificativa y los tiques.
 14. VERIFACTU-F16, VERIFACTU-F17 — los registros de la factura y de la rectificativa.
 15. VERIFACTU-F20 — sin conexión a internet, un cobro entra en la cola y sale al volver.
 16. VERIFACTU-F21, VERIFACTU-F22 — la cola, a mano y entrada a entrada.

@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- the stubs of the children the test drives */
 // «New manual invoice» (INVOICE-F03; the old create panel): the series, the recipient (a card of Customers
 // or typed), «Notes» and the lines. «Issue invoice» stays grey until every line has a description, a
 // quantity and a price and, for an invoice series (F1), until the recipient has name, tax ID and address;
@@ -12,66 +11,14 @@
 import { DateField } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h } from 'vue';
 
 import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations/business';
-import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, POLISH } from '../__tests__/mount-invoice';
-import InvoiceCreateModal from './InvoiceCreateModal.vue';
+import { CREATED, DEFAULTS, RECIPIENT, SETTINGS, settingsOf, setup } from '../__tests__/invoice-create';
+import { business, click, errorFrame, flush, ionValue, JAPANESE, POLISH } from '../__tests__/mount-invoice';
 import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
 import RecipientFields from './RecipientFields.vue';
-
-/** The series select, as a stub the test drives (its own test follows the live list). */
-const SeriesSelectStub = defineComponent({
-  name: 'SeriesSelect',
-  props: { modelValue: { type: String, default: '' }, invoiceType: { type: String, default: undefined } },
-  emits: ['update:modelValue', 'update:invoiceType'],
-  setup: () => () => h('div', { 'data-testid': 'series-select-stub' }),
-});
-const CustomerSearchStub = defineComponent({ name: 'CustomerSearch', setup: () => () => h('div') });
-
-const DEFAULTS = 'invoice.invoice.line_defaults';
-const SETTINGS = 'tax.settings.get';
-const REGIONS: Record<string, string | null> = { vat: null, igic: 'ES-CN', ipsi: 'ES-CE' };
-/** Taxes' settings of a business whose territory declares `tax`. */
-const settingsOf = (tax: string) => ({ country_code: 'ES', region_code: REGIONS[tax], regions: ['ES-CN', 'ES-CE', 'ES-ML'], tax_kind: tax, updated_at: null });
-const RECIPIENT = { customerId: null, name: 'Talleres Pérez SL', taxId: 'B12345674', address: 'Calle Luna 3', country: 'ES', idType: '' };
-const CREATED = { id: 'i9', number: 'FACT-2026-000009' };
-
-/** The window open (unless `open` is false: the page mounts it closed), its stream live and the business answered
- *  (`base.business.get`: in Spain, in euros, unless `company` says another; `null` = not answered yet). */
-async function setup(locale: 'en' | 'es' = 'en', company: Partial<Business> | null = {}, open = true) {
-  const m = await mountInvoice(InvoiceCreateModal, {
-    props: { open },
-    locale,
-    stubs: { SeriesSelect: SeriesSelectStub, CustomerSearch: CustomerSearchStub },
-  });
-  const series = () => m.wrapper.findComponent(SeriesSelectStub);
-  async function choose(code: string, type: string) {
-    series().vm.$emit('update:modelValue', code);
-    series().vm.$emit('update:invoiceType', type);
-    await m.wrapper.vm.$nextTick();
-  }
-  async function recipient(value = RECIPIENT) {
-    m.wrapper.findComponent(RecipientFields).vm.$emit('update:modelValue', value);
-    await m.wrapper.vm.$nextTick();
-  }
-  async function line(description: string, price: string, quantity = '1', taxRate = '21') {
-    m.wrapper.findComponent(InvoiceLinesEditor).vm.$emit('update:modelValue', [{ uid: 1, description, quantity, price, taxRate }]);
-    await m.wrapper.vm.$nextTick();
-  }
-  const submit = () => m.inDoc('invoice-create-submit') as HTMLElement & { disabled: boolean };
-  const editor = () => m.wrapper.findComponent(InvoiceLinesEditor);
-  const call = await m.live();
-  if (company) await m.result('base.business.get', business(company));
-  /** The business's territory (its tax, from Taxes) and the rate a typed line starts with there. */
-  async function territory(tax: string, rate: string | null) {
-    await m.result(SETTINGS, settingsOf(tax));
-    await m.result(DEFAULTS, { tax_rate: rate });
-  }
-  return { ...m, call, choose, recipient, line, submit, editor, territory };
-}
 
 describe('InvoiceCreateModal', () => {
   it('is «New manual invoice», with the series, the recipient, the notes and one blank line', async () => {
@@ -101,7 +48,7 @@ describe('InvoiceCreateModal', () => {
     const s = await setup();
     await s.choose('FACT', 'F1');
     await s.recipient();
-    await s.line('Course', '12,50', '2', '21');
+    await s.line('Course', '12,50', { quantity: '2' });
     await ionValue(s.inDoc('invoice-create-notes'), ' Thanks ', 'ionInput');
     s.answer(201, CREATED);
     await click(s.submit());
@@ -298,7 +245,7 @@ describe('InvoiceCreateModal', () => {
   it('opened again, a fresh line starts at the territory’s rate already known', async () => {
     const s = await setup();
     await s.territory('igic', '7.00');
-    await s.line('Course', '10', '1', '3');
+    await s.line('Course', '10', { taxRate: '3' });
     await s.wrapper.setProps({ open: false });
     await s.wrapper.setProps({ open: true });
     expect(s.editor().props('modelValue')).toEqual([{ uid: 1, description: '', quantity: '1', price: '', taxRate: '7' }]);
@@ -309,18 +256,18 @@ describe('InvoiceCreateModal', () => {
     await s.territory('ipsi', null);
     expect(s.editor().props('modelValue')[0].taxRate).toBe('');
     await s.choose('TICKET', 'F2');
-    await s.line('Coffee', '1,50', '1', '');
+    await s.line('Coffee', '1,50', { taxRate: '' });
     expect(s.submit().disabled).toBe(true);
-    await s.line('Coffee', '1,50', '1', '4');
+    await s.line('Coffee', '1,50', { taxRate: '4' });
     expect(s.submit().disabled).toBe(false);
   });
 
   it('a rate already typed is kept when the territory’s answer arrives or changes', async () => {
     const s = await setup();
-    await s.line('Course', '10', '1', '3');
+    await s.line('Course', '10', { taxRate: '3' });
     await s.territory('igic', '7.00');
     expect(s.editor().props('modelValue')[0].taxRate).toBe('3');
-    await s.line('Course', '10', '1', '7');
+    await s.line('Course', '10', { taxRate: '7' });
     await s.result(DEFAULTS, { tax_rate: '9.50' }, {}, 2);
     expect(s.editor().props('modelValue')[0].taxRate).toBe('9.5');
   });
@@ -332,7 +279,7 @@ describe('InvoiceCreateModal', () => {
     expect(s.inDoc('invoice-create-error')?.textContent).toContain('Could not read the business’s tax territory: type the rate of each line.');
     expect(s.editor().props('tax')).toBeUndefined();
     await s.choose('TICKET', 'F2');
-    await s.line('Coffee', '1,50', '1', '7');
+    await s.line('Coffee', '1,50', { taxRate: '7' });
     expect(s.submit().disabled).toBe(false);
   });
 
@@ -421,11 +368,9 @@ describe('InvoiceCreateModal: the day it is dated and the day it falls due', () 
 
   it('Android Back asks once a date is chosen, and no more once it is as it was', async () => {
     const s = await dates();
-    await s.line('', '', '1', '');
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    const overlay = () => s.inDoc('invoice-create');
-    await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.issued(), '2026-11-23'), restore: () => pick(s.issued(), '2026-11-24') });
-    await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.due(), '2026-12-23'), restore: () => pick(s.due(), '') });
+    await s.line('', '', { taxRate: '' });
+    await s.asksBeforeClosing(() => pick(s.issued(), '2026-11-23'), () => pick(s.issued(), '2026-11-24'));
+    await s.asksBeforeClosing(() => pick(s.due(), '2026-12-23'), () => pick(s.due(), ''));
   });
 
   it('speaks Spanish', async () => {
@@ -457,27 +402,14 @@ describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-
   it('as opened closes, also once the default rate arrives; notes or a line written ask; restored as opened closes again', async () => {
     const s = await setup();
     await s.territory('vat', '21.00');
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => ionValue(s.inDoc('invoice-create-notes'), 'Paid by transfer', 'ionInput'),
-      restore: () => ionValue(s.inDoc('invoice-create-notes'), '', 'ionInput'),
-    });
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => s.line('Course', '100', '1', '21'),
-      restore: () => s.line('', '', '1', '21'),
-    });
+    const notes = (text: string) => ionValue(s.inDoc('invoice-create-notes'), text, 'ionInput');
+    await s.asksBeforeClosing(() => notes('Paid by transfer'), () => notes(''));
+    await s.asksBeforeClosing(() => s.line('Course', '100'), () => s.line('', ''));
   });
 
   it('the series the select picks on opening is no change; another series chosen asks', async () => {
     const s = await setup();
     await s.choose('FACT', 'F1');
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => s.choose('TICKET', 'F2'),
-      restore: () => s.choose('FACT', 'F1'),
-    });
+    await s.asksBeforeClosing(() => s.choose('TICKET', 'F2'), () => s.choose('FACT', 'F1'));
   });
 });
