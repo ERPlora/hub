@@ -20,7 +20,7 @@ from base.services import address_change, platform_hub
 from base.tenancy.context import current, use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_session_revoke import ANA, OLGA, alive, login
-from control.models import HubVisit
+from control.models.usage import HubVisit
 from control.tests.conftest import events
 
 pytestmark = HUB_DB

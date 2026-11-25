@@ -12,7 +12,8 @@ from base.registry import REGISTRY_SCOPE
 from base.tenancy import credentials
 from base.tenancy.context import use_control
 from base.tenancy.tests.concurrency import hub_staff
-from control.models import Cluster, Hub, RestoredCopy
+from control.models.copies import RestoredCopy
+from control.models.hubs import Cluster, Hub
 
 __all__ = [
     "COPY_MOMENT",

@@ -8,7 +8,8 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.concurrency import PLATFORM_HOST
 from control import services
-from control.models import Cluster, Freeze, Hub
+from control.models.freeze import Freeze
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterIdIn, FreezeIn
 from control.tests.conftest import events
 

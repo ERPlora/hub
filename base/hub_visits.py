@@ -34,7 +34,7 @@ from base import apps_on, queries, relay, scheduler, services
 from base.hub_listener import Listener
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 

@@ -14,7 +14,7 @@ from live.outbox import notify
 from base import events
 from base.models import Hub
 from base.services.provisioning import SERVED_STATUSES, _control_transaction
-from control.models import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
+from control.models.usage import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
 
 
 def usage_run_claim(day: dt.date, now: dt.datetime, takeover: dt.timedelta) -> bool:

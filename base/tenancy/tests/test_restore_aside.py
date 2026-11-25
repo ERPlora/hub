@@ -42,7 +42,8 @@ from base.tenancy.tests import hubs, s3
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
 from base.tenancy.tests.test_restore import AFTER, AS_THEN, SINCE, THEN, Restores, a_record, write
 from control import services as control_services
-from control.models import Cluster, Hub, MovedCopy, RestoredCopy
+from control.models.copies import MovedCopy, RestoredCopy
+from control.models.hubs import Cluster, Hub
 
 AT = dt.datetime(2026, 11, 12, 9, 0, tzinfo=dt.UTC)
 #: What a copy of the business at another moment holds besides ``AS_THEN``.

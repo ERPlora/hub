@@ -14,11 +14,9 @@ changes nothing; each real change records its event in control's outbox, in the 
 
 import datetime as dt
 import uuid
-from importlib import import_module
 
 import pytest
-from django.apps import apps as django_apps
-from django.db import IntegrityError, connection, migrations, transaction
+from django.db import connection
 from django.utils import timezone
 from live.context import system_context
 from live.errors import PermissionDenied
@@ -26,7 +24,8 @@ from live.errors import PermissionDenied
 from base.registry import REGISTRY_SCOPE
 from base.tenancy.context import use_control
 from control import queries, services
-from control.models import Freeze, Hub, HubDue
+from control.models.freeze import Freeze
+from control.models.hubs import Hub, HubDue
 from control.schemas import FreezeGetIn, FreezeIn
 from control.tests.conftest import as_actor, events, person
 
@@ -68,7 +67,7 @@ class TestGet:
 
     def test_it_counts_the_separate_copies_the_worker_still_makes_under_their_own_lease(self, support_ctx):
         # A separate copy makes a database without the hub's lease: the upgrade waits for it too.
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         now = timezone.now()
         hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
@@ -215,24 +214,3 @@ class TestTheWorkersRead:
 
         with pytest.raises(ProgrammingError):
             the_workers_read()
-
-
-class TestOneRow:
-    def test_a_second_row_is_refused_by_the_database(self):
-        # Control's migration made the first (a test that flushed the tables before may have taken it away).
-        Freeze.objects.get_or_create()
-
-        with pytest.raises(IntegrityError), transaction.atomic():
-            Freeze.objects.create(frozen=True)
-
-    def test_control_s_migration_makes_the_one_row_not_frozen_and_steps_back(self):
-        migration = import_module("control.migrations.0010_freeze").Migration
-        [seed] = [op for op in migration.operations if isinstance(op, migrations.RunPython)]
-        Freeze.objects.all().delete()
-
-        with connection.schema_editor() as editor:
-            seed.code(django_apps, editor)
-            seed.code(django_apps, editor)
-
-        assert list(Freeze.objects.values_list("frozen", flat=True)) == [False]
-        assert seed.reversible

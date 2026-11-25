@@ -24,7 +24,8 @@ from base.services.apps import _business_hub, _locked_states, _write_states, app
 from base.services.blueprints import _load_what_waited
 from base.services.photo import _sync_photo_blocks
 from base.services.provisioning import LAST_ERROR_MAX, _control_transaction, offboarding_due
-from control.models import HubDue, HubVisit
+from control.models.hubs import HubDue
+from control.models.usage import HubVisit
 
 logger = logging.getLogger(__name__)
 

@@ -32,7 +32,7 @@ from base.models.support_access import SupportAccess, SupportVisit
 from base.permissions import permissions_of_role
 from base.tenancy.context import use_hub
 from base.tests.test_auth_views import A, B, B_HOST, HOST, ON_HUB_A, callback, me
-from control.models import HubVisit
+from control.models.usage import HubVisit
 
 pytestmark = ON_HUB_A
 

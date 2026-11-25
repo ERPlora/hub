@@ -37,7 +37,7 @@ from base.tenancy import names
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, HUB_DB
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 #: The door opens no database context of its own: each test enters a business's database only to read it.
 pytestmark = [HUB_DB]

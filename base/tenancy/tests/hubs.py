@@ -31,7 +31,7 @@ from psycopg import sql
 
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, inventory, migrator, names
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 
 HUB_A_ID = uuid.UUID("01a16000-0000-7000-8000-00000000000a")
 HUB_B_ID = uuid.UUID("01a16000-0000-7000-8000-00000000000b")
@@ -149,7 +149,7 @@ def committed_database(django_db_setup, django_db_blocker):
     that name is what makes pytest-django set up the test database for any selection of those tests, which never
     reach the developer's own database (``default`` is checked to be the test database).
     """
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     with django_db_blocker.unblock():
         _assert_on_the_test_database()

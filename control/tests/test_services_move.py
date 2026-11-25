@@ -6,7 +6,7 @@ import pytest
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from control import services
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterIdIn
 from control.tests.conftest import SERVICES_MARKS, a_cluster, a_ready_hub, as_actor, events, person
 
@@ -168,7 +168,7 @@ class TestMove:
 
 
 def test_a_cluster_a_hub_is_moving_to_or_that_keeps_a_moved_copy_or_a_leftover_is_never_deleted(admin_ctx):
-    from control.models import LeftoverDatabase, MovedCopy
+    from control.models.copies import LeftoverDatabase, MovedCopy
 
     target, old = a_cluster(), a_cluster(name="old", host="writer-old.example")
     dead = a_cluster(name="dead", host="writer-dead.example")
@@ -197,7 +197,7 @@ class TestCancelAMove:
     taken for its data. The worker puts the hub back on its origin on its next pass (``base.tenancy.move``)."""
 
     def test_a_move_is_marked_to_be_undone_and_no_copy_is_touched(self, admin_ctx):
-        from control.models import MovedCopy
+        from control.models.copies import MovedCopy
         from control.schemas import HubIdIn
 
         old, new = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")

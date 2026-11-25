@@ -23,7 +23,8 @@ from base.tenancy.tests.test_recovery import (
     run,
     run_in,
 )
-from control.models import CopyRecovery, Hub
+from control.models.copies import CopyRecovery
+from control.models.hubs import Hub
 
 
 def created_events(hub: Hub) -> int:

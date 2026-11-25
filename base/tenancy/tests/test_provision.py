@@ -33,7 +33,7 @@ from base.models.locations import Location
 from base.tenancy import connections as tenancy_connections, identity, ops, provision
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub, HubDue
+from control.models.hubs import Hub, HubDue
 
 
 def databases() -> set[str]:

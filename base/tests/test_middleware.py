@@ -482,7 +482,7 @@ class TestTheRegistryGate:
     # A hub moving to another cluster (control.hub.move): closed for the few seconds its database is copied, then back
     # on its new cluster.
     def test_a_hub_moving_to_another_cluster_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         hub(moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
         page = browse(client, "/")
@@ -496,7 +496,7 @@ class TestTheRegistryGate:
 
     # A hub put back as it was at a moment (hub#1198; control.hub.restore): closed while its copy is restored.
     def test_a_hub_being_restored_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         hub(restoring_from=Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False))
         page = browse(client, "/")
@@ -506,7 +506,7 @@ class TestTheRegistryGate:
         assert (api.status_code, api.json()["error"]["code"]) == (503, "base.hub_maintenance")
 
     def test_a_hub_under_maintenance_says_so_in_spanish(self, client, hub):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         hub(moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
         page = client.get("/", HTTP_HOST=HOST, HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")

@@ -34,7 +34,7 @@ from base.tenancy import identity, migrator, names
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import opened_at  # noqa: F401 (a fixture)
-from control.models import Hub, HubDue
+from control.models.hubs import Hub, HubDue
 
 #: An app without ``requires``, with migrations of its own.
 APP = "printing"
@@ -53,7 +53,7 @@ def no_visit_outlives_its_test(django_db_setup, django_db_blocker):
     on a reused test database, where the nightly measurement's tests count it (hub#874). Set up before ``business``,
     this is checked after it took its rows back: its visits and no other (a visit to a host of none of its businesses,
     noted before, is still there)."""
-    from control.models import HubVisit
+    from control.models.usage import HubVisit
 
     with django_db_blocker.unblock():
         before = set(HubVisit.objects.values_list("pk", flat=True))
@@ -88,7 +88,7 @@ def business(platform_template, django_db_blocker):
     """``business(name, **hub fields)``: a ready business with its own database cloned from the platform's template,
     its identity written and every app off; its database and its rows dropped after the test, the visits to it too
     (``visited``: a row by host, which deleting the hub leaves)."""
-    from control.models import HubVisit
+    from control.models.usage import HubVisit
 
     made: list[Hub] = []
     control = tenancy_connections.control_name()
@@ -489,7 +489,7 @@ def activation_reads(sent: dict[str, list[str]], hub: Hub) -> int:
 
 
 def visited(hub: Hub, day) -> None:
-    from control.models import HubVisit
+    from control.models.usage import HubVisit
 
     HubVisit.objects.create(host=hub.slug, day=day, saas_user_id="saas:1")
 
@@ -762,7 +762,7 @@ def test_each_app_is_made_alone_with_what_it_requires_on_the_platforms_template(
 def test_a_hub_whose_database_is_copied_is_not_entered_until_its_copy_ends(business, copying):
     """Its database is being copied (``base.tenancy.move``, or ``base.tenancy.restore``, hub#1198): tables made
     meanwhile would stay behind in the database it leaves. Its ring waits; once the copy ends, the app is set up."""
-    from control.models import Cluster
+    from control.models.hubs import Cluster
 
     a = business("a")
     turn_on(a)

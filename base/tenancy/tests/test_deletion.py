@@ -41,7 +41,7 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
     nothing_checked_yet,
     platform_template,
 )
-from control.models import Hub
+from control.models.hubs import Hub
 
 
 @pytest.fixture

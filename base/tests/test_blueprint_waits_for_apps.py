@@ -41,7 +41,7 @@ from base.tests.test_worker_activations import (  # noqa: F401 (the fixtures)
     turn_off,
     turn_on,
 )
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 SALON = "hair_salon.en"
 #: In the seed: 8 services in 4 categories, and 5 products in 1.

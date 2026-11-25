@@ -8,7 +8,8 @@ import datetime as dt
 import pytest
 
 from control import queries, services
-from control.models import Hub, RestoredCopy
+from control.models.copies import RestoredCopy
+from control.models.hubs import Hub
 from control.schemas import HubRestoreIn
 from control.tests.conftest import a_cluster, a_ready_hub
 

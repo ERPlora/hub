@@ -37,7 +37,8 @@ from base.tenancy.tests.s3 import (  # noqa: F401
     objects,
     spy_on_the_purge,
 )
-from control.models import Cluster, Hub, HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Cluster, Hub, HubDue
 
 
 def databases() -> set[str]:

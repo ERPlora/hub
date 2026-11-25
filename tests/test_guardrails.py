@@ -877,7 +877,7 @@ def test_control_links_finds_every_kind_of_link_from_a_hub_model_to_a_control_on
     from base.models import Membership
     from base.models.profile import Profile
     from base.tenancy import inventory
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     offender = _made_up_hub_model(
         "staff.offender",

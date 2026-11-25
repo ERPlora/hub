@@ -39,7 +39,8 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import names, recovery
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import CopyRecovery, Hub, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
+from control.models.hubs import Hub
 
 AT = dt.datetime(2026, 11, 12, 9, 0, tzinfo=dt.UTC)
 THEN = AT - dt.timedelta(days=2)

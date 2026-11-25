@@ -8,7 +8,7 @@ from django.utils import timezone
 from live.errors import Conflict
 
 from control import services
-from control.models import Cluster
+from control.models.hubs import Cluster
 from control.schemas import ClusterIdIn
 from control.tests.conftest import SERVICES_MARKS, a_cluster, a_ready_hub, events
 

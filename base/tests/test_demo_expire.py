@@ -39,7 +39,7 @@ from base.tenancy import provision
 from base.tenancy.context import use_control
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_services_demo import open_session
-from control.models import HubDue
+from control.models.hubs import HubDue
 from control.schemas import FreezeIn
 from control.services.freeze import freeze_set
 

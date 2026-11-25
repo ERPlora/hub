@@ -23,7 +23,8 @@ const FILTER_UNDER_UP_TO = 1024;
 const LANGUAGES = ['en', 'es'];
 /** Drops the separate copies of `a` this spec made. */
 const DROP = [
-  'from control.models import Hub, RestoredCopy',
+  'from control.models.copies import RestoredCopy',
+  'from control.models.hubs import Hub',
   'hub = Hub.objects.get(slug="a")',
   `RestoredCopy.objects.filter(hub=hub, asked_by="${ROOT}").delete()`,
 ];

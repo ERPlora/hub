@@ -65,7 +65,9 @@ from control.admin_hub_actions import (
 )
 from control.admin_recoveries import CopyRecoveryAdmin, RecoverForm, recoverable_names
 from control.admin_shared import SizedChangeList, copy_said, is_platform_admin, sizes_of, staff_context, utc
-from control.models import Cluster, CopyRecovery, Freeze, Hub, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
+from control.models.freeze import Freeze
+from control.models.hubs import Cluster, Hub
 from control.schemas import (
     CopyRecoverIn,
     HubIdIn,

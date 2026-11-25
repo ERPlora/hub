@@ -60,7 +60,8 @@ from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
 from control import queries as control_queries
 from control import services as control_services
-from control.models import CopyRecovery, Hub
+from control.models.copies import CopyRecovery
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 

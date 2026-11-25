@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from base.tenancy.tests.business import HOST, HUB_DB, A
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3
-from control.models import HubDump
+from control.models.dumps import HubDump
 
 #: The S3 fixtures a downloaded copy needs, taken from where they live.
 __all__ = ["aws_test_credentials", "dumps_bucket", "moto_s3"]

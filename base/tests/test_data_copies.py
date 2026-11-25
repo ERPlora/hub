@@ -32,7 +32,8 @@ from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket  # noqa: F401
 from base.tests.test_internal import signed
-from control.models import Hub, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub
 
 pytestmark = pytest.mark.django_db
 
