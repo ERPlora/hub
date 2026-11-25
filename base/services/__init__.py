@@ -28,5 +28,6 @@ from . import (
     single_row as single_row,
     support as support,
     support_access as support_access,
+    support_entry as support_entry,
     usage as usage,
 )

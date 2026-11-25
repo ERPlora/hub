@@ -3768,10 +3768,11 @@ dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
-Estado: parcial — se cambia y se consulta por la API y con el asistente; falta su tarjeta en Ajustes › General y que
-el personal de soporte pueda entrar en el negocio con el acceso encendido
-Actor: propietario, administrador
-Pantalla: Ajustes · General
+Estado: parcial — se cambia y se consulta por la API y con el asistente, y el negocio ya deja entrar o rechaza a
+soporte según esté; falta su tarjeta en Ajustes › General y que erplora.com dé al personal de soporte su código para
+entrar
+Actor: propietario, administrador, personal de soporte de ERPlora
+Pantalla: Ajustes · General, la página «Este negocio no deja entrar a soporte»
 Pasos:
   1. Cuando el negocio quiere que el personal de soporte de ERPlora entre para ayudarle a configurarlo (cargar los
      productos, ajustar sus apps), el propietario o un administrador enciende el acceso de soporte. Viene apagado.
@@ -3781,11 +3782,24 @@ Pasos:
   3. Cualquiera del negocio puede consultar si está encendido, quién lo cambió por última vez y cuándo, si él mismo
      puede cambiarlo y las 10 últimas entradas de soporte (quién y cuándo), la más reciente primero. Mientras nadie de
      soporte haya entrado, la lista está vacía.
-Entra: encendido o apagado.
-Sale: el ajuste del negocio, con quién lo cambió y cuándo. Evento `base.support_access.changed`.
+  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
+     cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
+     negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
+     con PIN ni con tarjeta, no ocupa plaza ni cuenta en el uso del plan y su navegador no se queda como dispositivo
+     del negocio: ni cierra la sesión de otro dispositivo ni se la cierra la entrada de otro (BASE-F57). Cada entrada
+     se suma al momento a la lista de las últimas entradas, y lo que hace queda a su nombre en los registros.
+  5. Con el acceso apagado no entra: ve «Este negocio no deja entrar a soporte» — «El propietario o un administrador
+     de este negocio tiene que encender el acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a
+     intentarlo.» con «Volver a intentarlo».
+  6. Cuando alguien del negocio lo apaga, las sesiones de soporte abiertas en el negocio se cierran al momento y lo
+     que tienen abierto se entera; las del resto del equipo siguen.
+Entra: encendido o apagado; la cuenta de soporte que comprueba erplora.com.
+Sale: el ajuste del negocio, con quién lo cambió y cuándo. Evento `base.support_access.changed`. Cada entrada de
+soporte, con quién y cuándo. Evento `base.support_access.entered`.
 Si falla: a quien no administra el negocio se le rechaza el cambio (403 `permission_denied`) y el ajuste se queda como
-estaba; al consultarlo, le sale que no puede cambiarlo.
-Implicados: BASE-F97, BASE-F100
+estaba; al consultarlo, le sale que no puede cambiarlo. Con el acceso apagado, soporte no abre sesión ni deja entrada
+(la página del paso 5).
+Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 
 ## Para quien lo mantiene
 
@@ -4875,7 +4889,13 @@ Implicados: BASE-F97, BASE-F100
   quien pregunta puede cambiarlo y las 10 últimas entradas, y se sigue en vivo con `base.support_access.changed`;
   `base.support_access.update` (`base/services/support_access.py`, con `base.administer_hub`) lo guarda y deja ese
   evento en el outbox en la misma transacción. Rutas en `base/api/access.py`; tests en
-  `base/tests/test_support_access.py`.
+  `base/tests/test_support_access.py`. La entrada de soporte (`base/services/support_entry.py`, tests en
+  `base/tests/test_support_entry.py`): erplora.com manda el rol `hub_support`, un valor de `Membership` que no es un rol
+  del negocio (`Membership.Role` no lo lleva); `/auth/callback` abre la sesión en la copia `saas-support:<id>` con la
+  forma de entrar `support`, y la operación interna `base.support_access.enter` anota la visita
+  (`base.support_access.entered`) o, apagado, la rechaza con `base/templates/base/support_access_off.html`. El equipo del
+  negocio es `Membership.objects.team(host)`, que deja fuera a soporte: quien liste personas lo usa. Al apagar, el mismo
+  `base.support_access.update` cierra sus sesiones.
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
   además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección
