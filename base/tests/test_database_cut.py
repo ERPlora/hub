@@ -622,7 +622,7 @@ NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.payment.services._number": "numbers a payment",
     "apps.sale.services.checkout._number": "numbers a sale",
     "apps.table.services.tables._next_number": "numbers a table",
-    "apps.task.services._next_number": "numbers a task",
+    "apps.task.services.tasks._next_number": "numbers a task",
     "base.images.keep_photo": "keeps a file under a new name",
     "base.throttle.AttemptLimit.failed": "counts a try in the cache",
 }

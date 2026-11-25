@@ -85,6 +85,19 @@ def make_user(db):
     return make
 
 
+@pytest.fixture
+def team(make_user):
+    boss = make_user("boss", role="hub_manager", first_name="Marta", last_name="Jefa")
+    worker = make_user("bea", role="hub_employee", first_name="Bea", last_name="Ruiz")
+    return {
+        "boss": boss,
+        "worker": worker,
+        "boss_member": make_member("Marta", "Jefa", user=boss.person),
+        "worker_member": make_member("Bea", "Ruiz", user=worker.person),
+        "ana": make_member("Ana", "López"),
+    }
+
+
 # Builders
 
 
