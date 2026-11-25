@@ -6,7 +6,7 @@ import { shallowRef } from 'vue';
 
 import { appComponent } from '../../../../../base/frontend/lib/app-components';
 import { click, flush } from '../../__tests__/mount-sale';
-import { SALE, setup as setupPanel } from './__tests__/checkout-panel';
+import { preview, SALE, setup as setupPanel } from './__tests__/checkout-panel';
 import { fakeStep, type Recorder } from './__tests__/fake-step';
 
 // The real loader, spied on: each test says which component a step's name brings.
@@ -45,11 +45,11 @@ async function chargedByCard() {
 
 describe('CheckoutPanel: a step of another app (SALE-F39)', () => {
   it('sits between the amount and the tenders with the charge’s total, its discounts and the method chosen', async () => {
-    const s = await setup({ preview: undefined });
+    const s = await setup({ preview: preview({ discount_amount: 300 }) });
     expect(s.params(STEPS_OP)).toEqual([{}]);
-    expect(s.find('tip-row').text()).toBe('4250/0/m-cash/false');
+    expect(s.find('tip-row').text()).toBe('4250/300/m-cash/false');
     await click(s.find('sale-checkout-method-m-card').element);
-    expect(s.find('tip-row').text()).toBe('4250/0/m-card/false');
+    expect(s.find('tip-row').text()).toBe('4250/300/m-card/false');
   });
 
   it('what it adds is said under the amount and charged on the card with the sale, apart from it and named', async () => {
