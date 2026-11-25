@@ -1141,7 +1141,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   solo `status` y `paid_at` (pagar, cancelar al rectificar entera). Se corrige con una rectificativa
   por diferencias (importes negativos, `rectification_kind = "I"`); nunca se borra.
 - **Dinero**: céntimos enteros con signo (las R en negativo); `Decimal` y mitad hacia arriba
-  (`apps.tax.queries.round_half_up`); cantidades con tres decimales, como Ventas.
+  (`apps.tax.queries.calculation.round_half_up`); cantidades con tres decimales, como Ventas.
 - **El desglose** (`tax_breakdown`) es una lista, una entrada por clave fiscal, en orden estable:
   `{"tax", "regime", "qualification", "exempt_reason", "rate", "surcharge_rate", "base", "quota",
   "surcharge_quota"}` (sin recargo, `"surcharge_rate": "0.00"` y `"surcharge_quota": 0`); los tipos como

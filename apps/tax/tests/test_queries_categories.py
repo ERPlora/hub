@@ -1,19 +1,17 @@
-"""The tax categories and the texts that name them: ``tax.category.list``, ``tax.category.get``,
-``tax.alias.list`` and ``tax.alias.resolve``.
+"""The tax categories: ``tax.category.list`` and ``tax.category.get``.
 
 The lists are those of the current product's SQL batteries.
 """
 
-import uuid
 from decimal import Decimal
 
 import pytest
 from live.errors import NotFound
 
-from apps.tax.models import TaxAlias, TaxCategory
+from apps.tax.models import TaxCategory
 from apps.tax.schemas import CategoryGetIn
 
-from .conftest import HUB_DB, aliases, categories, category, food_and_book_aliases, resolved, rule, run
+from .conftest import HUB_DB, categories, category, rule, run
 
 pytestmark = HUB_DB
 
@@ -158,67 +156,3 @@ def test_get_a_missing_category(no_seed):
     with pytest.raises(NotFound) as excinfo:
         run("tax.category.get", CategoryGetIn(key="product.books"))
     assert str(excinfo.value.message) == "This tax category does not exist."
-
-
-# tax.alias.list (TAX-F13)
-
-
-def test_the_seeded_aliases():
-    page = aliases(limit=100)
-    assert page.total == 18
-    assert [row.alias for row in page.rows] == sorted(row.alias for row in page.rows)
-    beer = next(row for row in page.rows if row.alias == "beer")
-    assert (beer.tax_category_key, beer.tax_category_name, beer.source) == (
-        "restaurant.alcohol",
-        "Restaurant — alcohol",
-        "shipped",
-    )
-
-
-def test_alias_search_and_filters(no_seed):
-    food_and_book_aliases()
-    names = lambda **where: [row.alias for row in aliases(**where).rows]  # noqa: E731
-    assert names(search="COMIDA") == ["comida casera"]
-    assert names(search="books") == ["libros"]  # the category key
-    assert names(tax_category_key="restaurant.food") == ["comida casera", "meal"]
-    assert names(source="learned") == ["comida casera", "libros"]
-
-
-# tax.alias.resolve (TAX-F15): key, then name (in both languages), then alias
-
-
-def test_resolve_by_key_name_or_alias():
-    assert resolved(" Restaurant.Food ") == (
-        "restaurant.food",
-        "restaurant.food",
-        "key",
-    )
-    assert resolved("Restaurant — food") == (
-        "restaurant — food",
-        "restaurant.food",
-        "name",
-    )
-    # The translated name is recognised whatever the language of the reader (a CSV in Spanish).
-    assert resolved("restauración — comida", language="en")[1:] == (
-        "restaurant.food",
-        "name",
-    )
-    assert resolved("BEER") == ("beer", "restaurant.alcohol", "alias")
-    assert resolved("cerveza artesana") == ("cerveza artesana", None, None)
-
-
-def test_an_own_category_is_recognised_by_its_name(no_seed):
-    category("product.books", "Libros  y Revistas")
-    assert resolved("libros y revistas")[1:] == ("product.books", "name")
-
-
-def test_the_key_wins_over_an_alias_with_the_same_text(no_seed):
-    generic, food = category("product.generic"), category("restaurant.food")
-    TaxAlias.objects.create(alias="product.generic", category=food)
-    assert resolved("product.generic")[1:] == (generic.key, "key")
-
-
-def test_a_text_that_matches_nothing_is_never_a_similar_category(no_seed):
-    category("restaurant.food", "Restaurant — food", system=True)
-    assert resolved("restaurant")[1:] == (None, None)
-    assert resolved(str(uuid.uuid7()))[1:] == (None, None)

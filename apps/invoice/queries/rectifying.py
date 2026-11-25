@@ -14,7 +14,7 @@ from apps.invoice.models import Invoice
 from apps.invoice.queries.rows import find_invoice, remaining_of
 from apps.invoice.queries.series import RECTIFYING, next_number_of
 from apps.invoice.schemas.rectifying import RectificationPreviewIn, RectificationPreviewOut
-from apps.tax.queries import business_today
+from apps.tax.queries.jurisdiction import business_today
 
 CANNOT_RECTIFY_RECTIFICATION = _("A rectifying invoice cannot be rectified.")
 ALREADY_CANCELLED = _("The invoice is already cancelled.")

@@ -105,7 +105,7 @@ NewCategoryKey = Annotated[
         pattern=CATEGORY_KEY_RE,
     ),
 ]
-#: An existing category, by its key, its name or an alias (``queries.resolve_category_text``).
+#: An existing category, by its key, its name or an alias (``queries.naming.resolve_category_text``).
 CategoryRef = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
 ]

@@ -21,7 +21,7 @@ from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.tax import queries
-from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import AliasListIn, AliasResolveIn, CalculateIn, CategoryListIn, RuleListIn
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
@@ -133,7 +133,7 @@ def rule(cat, rate="21", country="ES", region="", **fields):
 
 
 def resolve(key="product.generic", country="ES", region=None, on=TODAY):
-    return queries.resolve_tax(
+    return queries.resolution.resolve_tax(
         category_key=key, country_code=country, region_code=region, on=on
     )
 
@@ -169,3 +169,7 @@ def food_and_book_aliases():
     TaxAlias.objects.create(alias="comida casera", category=food)
     TaxAlias.objects.create(alias="libros", category=books)
     return books
+
+
+def keep_region(region):
+    TaxSettings.objects.update_or_create(singleton=True, defaults={"region_code": region})

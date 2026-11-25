@@ -67,9 +67,8 @@
 612 apps/task/queries.py ERPlora/erplora-next#74
 645 apps/task/services.py ERPlora/erplora-next#74
 311 apps/tax/frontend/operations.d.ts ERPlora/erplora-next#74
-977 apps/tax/queries.py ERPlora/erplora-next#74
 696 apps/tax/schemas.py ERPlora/erplora-next#74
-627 apps/tax/services.py ERPlora/erplora-next#74
+619 apps/tax/services.py ERPlora/erplora-next#74
 1031 apps/tax/tests/test_services.py ERPlora/erplora-next#74
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74

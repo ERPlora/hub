@@ -20,7 +20,7 @@ from apps.sale.schemas.vouchers import (
     VoucherSoldIn,
     VoucherUnsoldIn,
 )
-from apps.tax.queries import business_today
+from apps.tax.queries.jurisdiction import business_today
 
 SALE_LINE_NOT_FOUND = _("That line is not in that sale.")
 VOUCHER_LINE_REQUIRED = _("That sale charged several lines: say which one paid for the voucher: %(lines)s.")

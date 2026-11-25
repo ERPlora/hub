@@ -19,7 +19,7 @@ from apps.sale.pricing import (
     value,
 )
 from apps.sale.tests.conftest import HUB_DB
-from apps.tax.queries import split_amount
+from apps.tax.queries.calculation import split_amount
 
 RATES = {
     "product.generic": [Decimal("21")],
