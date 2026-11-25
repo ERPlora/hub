@@ -778,7 +778,7 @@ Si falla: si mientras tanto alguien la pagó o la rectificó, «Esta factura no 
 pagada: solo se puede con una factura emitida que aún no esté pagada. No se ha cambiado nada.». La de
 otro, para un empleado, «Factura no encontrada.», sin cambiar nada. Las
 facturas que nacen de una venta ya nacen pagadas y una rectificativa no se paga: no ofrecen la acción.
-Implicados: ninguno
+Implicados: INVOICE-F23
 
 ### INVOICE-F20 Dar a otras apps la factura de una venta
 Estado: hecho
@@ -851,6 +851,12 @@ Pasos:
    por la numeración (INVOICE-F14). Las ventas y las facturas hechas a mano van en las series del negocio («TICKET»,
    «FACT», «RECT» o las que cree), en la misma cadena de VeriFactu. Una factura de la cuenta se corrige en la cuenta,
    con su abono: aquí no se ofrece «Rectificar» (INVOICE-F08) ni «Factura completa» (INVOICE-F05).
+7. En **Facturas** y en su ficha (INVOICE-F16, INVOICE-F17), una factura de la cuenta sale como lo que es: «Origen»
+   «erplora.com» y «Pagada», porque la cuenta solo la manda cuando el cliente ha pagado; abonada entera, «Cancelada».
+   Su abono dice también «erplora.com» y, como toda rectificativa, «Emitida». Ninguna ofrece «Marcar pagada»
+   (INVOICE-F19). La lista filtra y ordena por ese mismo estado, y el filtro «Origen» no las da por hechas a mano: se
+   buscan por su serie.
+8. Quién entra en ese negocio y cómo es HUBS-F39 (erplora.com); que no tiene plan ni compra nada, BASE-F11 y BASE-F40.
 Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas
 (cada una con su descuento) y, en un abono, la factura que corrige.
 Sale: la factura, con la referencia de la cuenta (avisa `invoice.invoice.issued`; un abono, además,
@@ -863,8 +869,10 @@ este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra
 asistente o una automatización, elegir, crear o cambiar una de esas dos series, o dar a otra un prefijo o un formato
 que imprima sus números (`ERP-2026-00123`), «Las series ERP y ERPR las numera erplora.com: usa otra serie.»;
 rectificar o sustituir una factura de la cuenta, «Esta factura la emitió erplora.com y allí se corrige, en su serie
-ERPR: aquí no se puede corregir a mano.». No se escribe nada ni se gasta número.
-Implicados: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14
+ERPR: aquí no se puede corregir a mano.»; marcar pagada una factura de la cuenta o su abono, el rechazo de INVOICE-F19.
+No se escribe nada ni se gasta número.
+Implicados: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14, INVOICE-F16,
+INVOICE-F17, INVOICE-F19, HUBS-F39 (erplora.com), BASE-F11, BASE-F40
 
 ### INVOICE-F24 Descargar en Excel las facturas emitidas
 Estado: hecho
@@ -1152,8 +1160,17 @@ configurar nada.
     negocio: la lista, el estado de la numeración y la predeterminada leen de ahí. Lo emitido por la cuenta
     (`platform_ref`) no se rectifica ni se sustituye a mano: 409 `invoice.platform_invoice_closed`, y `can_rectify` y
     `can_substitute` son falsos. TICKET, FACT y RECT no son códigos de la cuenta, así que el TPV, el canje de un tique y las
-    devoluciones no cambian. La numeración y la emisión de la cuenta no se tocan. En el admin de la plataforma la
-    serie se puede editar, pero lo emitido a mano no la usa.
+    devoluciones no cambian. La numeración y la emisión de la cuenta no se tocan. El admin de la plataforma no
+    pasa por las operaciones: ahí `ERP` y `ERPR` se pueden editar, y lo emitido a mano no usa ninguna de las dos, pero sí
+    usaría otra serie hecha ahí que imprima números como los de la cuenta.
+  - **Cómo se leen** (`queries/platform_reading.py`): la emisión guarda `source_type` `manual` (`rectification` en un
+    abono), `status` `issued` y sin `paid_at`, y ni eso cambia ni se migra. Al leer, `platform_ref` dice lo demás:
+    `source_of` da `platform` y `status_of`, `paid`, salvo en un abono o en una abonada entera. De ahí salen la lista, la
+    ficha, los enlaces, `can_mark_paid`, el rechazo de `invoice.invoice.mark_paid` (409 `invoice.cannot_mark_paid`), el
+    filtro y el orden por estado y el filtro por origen, también en el Excel. `platform` solo sale en la respuesta: no es
+    un valor del filtro `source_type`, que Automatizaciones enseña en cualquier negocio. El día del cobro lo tiene la
+    cuenta, así que «Pagada el» no sale. El aviso `invoice.invoice.issued`, VeriFactu y el admin de la plataforma leen lo
+    guardado. Test: `tests/test_platform_reading.py`.
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
     producción; `pre` → pruebas; `verifactu.queries.route.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).

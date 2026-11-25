@@ -4359,7 +4359,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   propio de ERPlora (`PLATFORM_HUB_SLUG`; una fila del registro con BD propia, de `create_platform_hub`)
   contesta el negocio de ERPlora, su emisor:
   `PLATFORM_ISSUER_LEGAL_NAME` y `PLATFORM_ISSUER_COUNTRY` con la moneda de ese país, la zona y el idioma del despliegue,
-  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host es el de
+  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com, y `BusinessPanel` dice en todos los roles que
+  esos datos los pone ERPlora en su servidor, sin enlace), con fila o sin ella; su host es el de
   `PLATFORM_HUB_SLUG` (`erp`), el único nombre reservado que se sirve (`base/tests/test_platform_hub_host.py`). La moneda
   que cobra cada app es
   `base.operations.business_currency(scope)`: la de `base.business.get` leída como la plataforma (`system_context`;
