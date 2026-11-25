@@ -1246,11 +1246,12 @@ with the session of whoever sells, as it does with Inventory.
   session of whoever asks, `sale.sale.get` (the sale's number), `sale.record.get` (a line of the sale with
   `sale_line_id`, one of the check with `line_id` and a refund with `refund_id`, "Refund of sale …") and
   `appointment.appointment.get` (the appointment's `label`). A `reference` that is no refund is the sale voided.
-- **What a voucher's movements say of Sales** (F19): `service.movement.list` calls by its name, with the session of
-  whoever looks, `sale.sale.get`, once for each sale of the page: its `number` and who served the session's line, the
-  one of its `order_line_id` (its `staff_id` or, empty, the sale's, as Sales counts production). Nothing is copied
-  into Services. Without Sales, without permission to see sales or with a sale that is not theirs, `sale_number` is
-  null and the list comes all the same.
+- **What the sold vouchers and their movements say of Sales** (F16, F19): `service.grant.list` and
+  `service.movement.list` call by its name, with the session of whoever looks, `sale.sale.get`, once for each sale of
+  the page (`queries/sale_numbers.py`): its `number`; the movements, besides, who served the session's line, the one of
+  its `order_line_id` (its `staff_id` or, empty, the sale's, as Sales counts production). Nothing is copied into
+  Services. Without Sales, without permission to see sales or with a sale that is not theirs, `sale_number` is null and
+  the list comes all the same. The voucher's writes answer `GrantOut`, without `sale_number`: only the list asks for it.
 
 ### Who can do what
 <!-- from WORKBOOK.md sha256:84571fb5682e -->
