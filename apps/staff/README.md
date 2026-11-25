@@ -38,7 +38,7 @@ sus ausencias (las pide el empleado y las aprueba un responsable) y lo que ha ga
 | Usa de otras apps | Ventas, opcional y por nombre (`sale.sale.by_staff` con `live.operations.get`, y sus avisos `sale.sale.completed`, `voided` y `refunded`); sin Ventas, Comisiones lo dice. De la plataforma, las cuentas con acceso (`base.Membership`) y la zona horaria (`timezone.localdate()`, en la fase 1 `settings.TIME_ZONE`) |
 | La usan | Citas, Servicios, Control horario, Tareas y Reservas online (la requieren: importan `Member`, `resolve_member` y, según la app, `member_availability`, `own_member` o los nombres de `events.py`); reaccionan a `staff.member.terminated` Citas (`appointment.staff.release`), Servicios (`service.assignment.release_member`), Control horario (`attendance.record.close_for_terminated`) y Tareas (`task.task.release_member`). Ventas lee el directorio en el TPV y Automatizaciones tiene una plantilla sobre `staff.member.created` |
 | Pantallas | `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`, `/staff/commissions` (cada persona su fila; quien ve la compensación y los totales del negocio, las de todos) y `/staff/settings` (quien guarda los ajustes) |
-| Operaciones | 21 consultas (`queries/`, en vivo todas menos `staff.account.list`, `staff.member.current`, `staff.role.detail`, `staff.role.resolve` y `staff.time_off.get`) y 17 acciones (`services.py`), todas con `ai=`; 35 rutas en `/api/staff/…`; 11 abiertas a las API keys (`expose_api`) |
+| Operaciones | 21 consultas (`queries/`, en vivo todas menos `staff.account.list`, `staff.member.current`, `staff.role.detail`, `staff.role.resolve` y `staff.time_off.get`) y 17 acciones (`services/`), todas con `ai=`; 35 rutas en `/api/staff/…`; 11 abiertas a las API keys (`expose_api`) |
 | Eventos | 14, `staff.<entidad>.<hecho>` (`events.py`), solo con identificadores; no reacciona a ninguno |
 | Permisos | 10 (`staff.view` … `staff.request_time_off`), repartidos entre propietario, administrador, responsable y empleado en `role_permissions` |
 | Tareas programadas | ninguna |
@@ -58,9 +58,10 @@ pnpm test apps/staff
 pnpm e2e tests/e2e/staff-flows.spec.ts tests/e2e/staff-members.spec.ts tests/e2e/staff-commissions.spec.ts
 ```
 
-- Las carreras, con hilos y bloqueos reales: en `test_services.py`, dos vínculos de una cuenta y dos
-  ausencias o dos aprobaciones que se solapan, a la vez; en `test_concurrency.py`, el borrado del admin
-  contra cada escritura sobre la persona (hub#66). `test_integration_sale.py`: Comisiones contra Ventas
+- Las carreras, con hilos y bloqueos reales: en `test_services_members.py`, dos vínculos de una cuenta; en
+  `test_services_time_off.py`, dos ausencias o dos aprobaciones que se solapan, a la vez; en
+  `test_services_locks.py`, una escritura sobre una persona que se da de baja a la vez; en `test_concurrency.py`, el
+  borrado del admin contra cada escritura sobre la persona (hub#66). `test_integration_sale.py`: Comisiones contra Ventas
   real (cobros, devoluciones, sin Ventas).
 - Lo que leen las otras apps se prueba contra Personal real en su `tests/test_integration_staff.py` (Citas,
   Servicios, Control horario, Tareas) y, por el relay del outbox, en su `tests/test_relay.py` (Citas,
