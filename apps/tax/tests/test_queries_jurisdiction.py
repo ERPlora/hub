@@ -65,15 +65,15 @@ def test_the_calculation_and_the_rate_column_default_to_the_business_jurisdictio
 
 def test_each_territory_tax_has_its_short_name(no_seed):
     # What a message names a territory's tax by (the till's «Its IGIC is missing»), in the reader's language.
-    assert set(schemas.TAX_KIND_NAMES) == {"vat", "igic", "ipsi"}
+    assert set(schemas.jurisdiction.TAX_KIND_NAMES) == {"vat", "igic", "ipsi"}
     with translation.override("en"):
-        assert {kind: str(name) for kind, name in schemas.TAX_KIND_NAMES.items()} == {
+        assert {kind: str(name) for kind, name in schemas.jurisdiction.TAX_KIND_NAMES.items()} == {
             "vat": "VAT",
             "igic": "IGIC",
             "ipsi": "IPSI",
         }
     with translation.override("es"):
-        assert str(schemas.TAX_KIND_NAMES["vat"]) == "IVA"
+        assert str(schemas.jurisdiction.TAX_KIND_NAMES["vat"]) == "IVA"
 
 
 def test_a_region_of_another_country_than_the_business_is_a_422_never_the_national_rate(no_seed):
