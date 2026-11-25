@@ -96,11 +96,12 @@ def _broken_citations(
 
 
 def _is_model(name: str) -> bool:
+    """Whether ``name`` is a model as written, ``inventory.Product``: Django also finds it in lower case, which is how an
+    operation that lost its action reads."""
     try:
-        apps.get_model(name)
+        return apps.get_model(name)._meta.label == name
     except (LookupError, ValueError):
         return False
-    return True
 
 
 def asked(flow: WorkbookFlow, operations: Sequence[Operation]) -> Asked:
