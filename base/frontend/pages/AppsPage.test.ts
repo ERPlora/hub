@@ -127,6 +127,12 @@ describe('AppsPage', () => {
     expect(await appActionLabel(m, 'tax', 'plans')).toBeUndefined();
   });
 
+  it('where the Store’s address does not come (ERPlora’s own business buys nothing) not even the owner is offered it', async () => {
+    const m = await open('/apps#all');
+    await m.result(m.call, 'base.app.list', { ...LIST, store_url: '', plan_url: '' });
+    expect(await appActionLabel(m, 'stock', 'plans')).toBeUndefined();
+  });
+
   it('an administrator runs the business but does not buy: why and where it is bought, without the link', async () => {
     const m = await open('/apps#all', { session: ADMIN });
     await m.result(m.call, 'base.app.list', LIST);

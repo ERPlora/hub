@@ -628,6 +628,7 @@
         },
         "demo": "En una demo no se mide el uso: sus datos se borran al terminar.",
         "unknown": "Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.",
+        "platform": "Este es el negocio de ERPlora: no tiene plan.",
         "managed": "Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com."
       }
     },
@@ -1296,7 +1297,7 @@
       "current": "En esta pantalla",
       "here": "Estás aquí",
       "how": "Cómo se hace",
-      "others": "Otras pantallas del módulo",
+      "others": "Otras pantallas",
       "failure": "Si algo falla",
       "search": "Buscar tareas…",
       "empty": "Nada coincide con tu búsqueda",

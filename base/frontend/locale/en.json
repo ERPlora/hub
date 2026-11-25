@@ -628,6 +628,7 @@
         },
         "demo": "Use is not measured in a demo: its data is deleted when it ends.",
         "unknown": "We do not know this business's plan yet: it shows up as soon as erplora.com sends it.",
+        "platform": "This is ERPlora's own business: it has no plan.",
         "managed": "Plans are managed from your ERPlora account, on erplora.com."
       }
     },
@@ -1296,7 +1297,7 @@
       "current": "On this screen",
       "here": "You are here",
       "how": "How to",
-      "others": "Other screens of this module",
+      "others": "Other screens",
       "failure": "If something goes wrong",
       "search": "Search tasks…",
       "empty": "Nothing matches your search",

@@ -215,6 +215,21 @@ test('an answer with a web address that nothing of the turn looked up is flagged
   await shots(page, 'BASE-G153');
 });
 
+test('two reads asked for in one answer run in the same round: the model hears each by its own call and answers (BASE-F101)', async ({ page }) => {
+  await panelAtTheDesk(page);
+  const before = chats(provider()).length;
+  await ask(page, 'E2E-READS');
+  await expect(lastAnswer(page)).toHaveText(/^Listed \d+ items; \d+ open\.$/);
+  await expect(card(page)).toBeHidden();
+  // One call asked for both and the next one heard both results: one round, not one per read.
+  type Said = { role: string; tool_call_id?: string; tool_calls?: { id: string }[] };
+  const turns = chats(provider()).slice(before).map((seen) => (seen.body as { messages: Said[] }).messages);
+  expect(turns).toHaveLength(2);
+  const heard = turns[1].slice(turns[1].findLastIndex((message) => message.role === 'user') + 1);
+  expect(heard.map((message) => message.role)).toEqual(['assistant', 'tool', 'tool']);
+  expect(heard.slice(1).map((message) => message.tool_call_id)).toEqual(heard[0].tool_calls?.map((call) => call.id));
+});
+
 test('the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
   await panelAtTheDesk(page);
   await ask(page, 'Hola');

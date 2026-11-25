@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useMyApps } from '@erplora/ui/shell';
-import { HubIcon } from '@erplora/ui/shell';
+import { HubIcon, useMyApps, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, nextTick, onMounted, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
+import { PLATFORM, PLATFORM_NAME } from '../lib/help';
 import { readJsonBlock, type HubHome } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 
@@ -13,13 +13,14 @@ import HelpWindow from './HelpWindow.vue';
 const { t } = useBaseI18n();
 const route = useRoute();
 const apps = useMyApps();
+const session = useSession();
 const open = shallowRef(false);
 const ready = readJsonBlock<HubHome & { help_apps?: string[] }>('hub-home')?.help_apps ?? [];
-const app = computed(() => route.meta.app as string | undefined);
-const available = computed(() => !!app.value && ready.includes(app.value));
+const app = computed(() => route.meta.app ?? (route.meta.help ? PLATFORM : undefined));
+const available = computed(() => !!app.value && ready.includes(app.value) && session.can('base.view_home'));
 const current = computed(() => apps.value.find((candidate) => candidate.id === app.value));
 const icon = computed(() => current.value?.icon ?? 'ion:help-circle-outline');
-const appName = computed(() => current.value?.name ?? app.value ?? '');
+const appName = computed(() => current.value?.name ?? (app.value === PLATFORM ? PLATFORM_NAME : (app.value ?? '')));
 const triggerTarget = shallowRef<HTMLElement | null>(null);
 
 // Mounted beside the pane, the entry paints into the visible page's topbar instead of the shell's folded project piece.
@@ -30,8 +31,19 @@ function placeTrigger(): void {
   triggerTarget.value = headers.at(-1)?.querySelector<HTMLElement>('[slot="end"]') ?? null;
 }
 
+// Going back, the page that leaves is still the last in the document until Ionic's transition ends. A window enters too,
+// without a bar.
+function placeInEntered(event: Event): void {
+  const bar = (event.target as HTMLElement).querySelector<HTMLElement>('.app-topbar [slot="end"]');
+  if (bar) triggerTarget.value = bar;
+}
+
 watch(() => route.fullPath, () => void nextTick(placeTrigger));
-onMounted(placeTrigger);
+onMounted(() => {
+  placeTrigger();
+  document.addEventListener('ionViewDidEnter', placeInEntered, true);
+});
+onBeforeUnmount(() => document.removeEventListener('ionViewDidEnter', placeInEntered, true));
 
 watch(app, () => {
   open.value = false;

@@ -473,13 +473,13 @@ En la pantalla Archivos:
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
-| BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
+| BASE-F115 | Ver la ayuda de la pantalla en la que se está | hecho |
 | BASE-F116 | Leer las novedades de ERPlora | hecho |
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
-| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
+| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | hecho |
 | BASE-F127 | Crear un rol propio a partir de otro | parcial |
 | BASE-F128 | Ajustar lo que permite un rol propio | parcial |
 | BASE-F129 | Borrar un rol propio | parcial |
@@ -769,7 +769,8 @@ entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pe
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
 que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
 y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
-ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran.
+ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran. En el negocio
+propio de ERPlora, que no tiene plan ni compra nada, tampoco los tiene su propietario; «Gestionar en erplora.com», sí.
 Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -1467,7 +1468,8 @@ las veces que se quedó corta llevan contándose menos que su periodo, dicen «D
 erplora.com aparte: si no contesta, su fila dice «No disponible ahora», sin cifra, y la pantalla sigue; lo mismo si no
 se puede leer WhatsApp. En una demo, en lugar de todo: «En una demo no se mide el uso: sus datos se borran al
 terminar.». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en cuanto
-erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba.
+erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba. El negocio propio de
+ERPlora no lo tendrá nunca: en su lugar dice «Este es el negocio de ERPlora: no tiene plan.», con las mismas cifras.
 Implicados: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Saber qué versión corre y cuándo se actualizó
@@ -2632,8 +2634,8 @@ Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
      pulsarlos lo cierra. En un móvil, los destellos y «Mis apps» van en «⋮» («Más acciones»), para que el título
-     siga centrado, y la campana se queda a la vista: ahí, «Asistente» abre el panel en cuanto el menú termina de
-     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía.
+     se lea entero, y la campana y el «?» de la ayuda se quedan a la vista: ahí, «Asistente» abre el panel en cuanto el
+     menú termina de cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -2984,13 +2986,16 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. La persona pide una cadena («crea la categoría Bebidas y el producto Caña a 2,50 €»).
-  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar, pide una acción, se hace y sigue. Todo lo
-     que dice va a la misma burbuja, y lo de cada ronda en su propio párrafo: nunca pegado a lo de la anterior.
-  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra: aceptar la primera no acepta
-     las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
+  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar (varias cosas en la misma ronda, si le
+     hacen falta), pide una acción, se hace y sigue. Todo lo que dice va a la misma burbuja, y lo de cada ronda en su
+     propio párrafo: nunca pegado a lo de la anterior.
+  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra, también las que pide en la
+     misma ronda: aceptar o cancelar la primera no responde por las siguientes. Si detrás esperan más, la tarjeta lleva
+     «Cancelar todo», que cancela esta y las que faltan.
   4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
-  5. Una petición admite como mucho veinte rondas, y cada acción es una: es un freno contra los bucles, no un cupo, y
-     una lectura y un cambio por cada día de la semana caben de sobra. En la vigésima el asistente ya no puede hacer
+  5. Una petición admite como mucho veinte rondas, cada una con todo lo que el asistente pide de una vez: es un freno
+     contra los bucles, no un cupo, y una lectura y un cambio por cada día de la semana caben de sobra aunque los pida
+     de uno en uno. En la vigésima el asistente ya no puede hacer
      nada más y contesta con lo que ha hecho y lo que falta, para pedirlo en otro mensaje; si aun así pide una acción,
      no se hace ni sale su tarjeta, y se le dice que conteste. Si sigue intentándolo, «He parado: esto necesitaba
      demasiados pasos. Pídelo por partes.».
@@ -3600,41 +3605,47 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
-### BASE-F115 Ver la ayuda de la pantalla de un módulo
+### BASE-F115 Ver la ayuda de la pantalla en la que se está
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: la barra de arriba de un módulo con la ayuda lista (botón «?», «Ayuda») y la ventana de ayuda
+Pantalla: la barra de arriba de un módulo con la ayuda lista o de una pantalla del Hub (botón «?», «Ayuda») y la ventana
+de ayuda
 Pasos:
-  1. En un módulo con la ayuda lista, arriba a la derecha, junto al asistente, está el botón «?» («Ayuda»). Un módulo
-     cuya ayuda aún no está lista no lo enseña.
-  2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo, centrada en una tableta o un ordenador
-     y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a otro módulo.
+  1. En un módulo con la ayuda lista y en las pantallas propias del Hub (Inicio, Empleados, la ficha de una persona, lo
+     que permite un rol, Archivos, Apps, Sistema, Ajustes y Mi perfil), arriba a la derecha, junto al asistente, está el
+     botón «?» («Ayuda»), también al volver atrás. No sale en un módulo cuya ayuda aún no está lista, en una pantalla sin
+     ayuda (la documentación de la API), en la de «Sin acceso» ni a quien no puede ver el Inicio.
+  2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo («Ayuda · ERPlora» en una pantalla del
+     Hub), centrada en una tableta o un ordenador y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a
+     otro módulo.
   3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
      nada a YouTube hasta que se pulsa, y se ve dentro de la ventana, a todo su ancho, con el reproductor de YouTube
      completo: pantalla completa, subtítulos encendidos en el idioma de la ayuda y su logotipo, que abre el vídeo en
      YouTube en otra pestaña.
-  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo, y «En esta
-     pantalla · <pestaña>», marcado «Estás aquí», con el resumen de lo que enseña la pestaña en la que se está: corto
-     y entero, sin «Ver más».
+  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo (en una pantalla
+     del Hub, de lo que trae el Hub siempre), y «En esta pantalla · <pestaña>», marcado «Estás aquí», con el resumen de
+     lo que enseña la pestaña en la que se está: corto y entero, sin «Ver más».
   5. «Cómo se hace» trae cada tarea terminada del módulo, agrupada por pestaña, primero las de la pestaña en la que se
      está. Cada tarea es una fila plegada que se abre con sus pasos y su «Si algo falla», una a la vez. Una tarea con
      vídeo corto lo enseña al abrirse, antes de sus pasos, con el mismo reproductor que el del módulo y en el idioma de
      la persona o, si no lo hay, en español; con varios, uno debajo de otro. Abrir la ayuda o una tarea no pide nada a
      YouTube hasta que se pulsa el vídeo. Con más de ocho tareas, arriba sale «Buscar tareas…», que filtra por el título y los pasos sin mirar acentos ni mayúsculas;
-     si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas.
-  6. «Otras pantallas del módulo» trae las demás pestañas, plegadas, cada una con su resumen corto. Un enlace de la
-     ayuda a una pantalla del Hub lleva a ella y cierra la ayuda.
+     si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas. La ayuda de
+     una pantalla del Hub no trae tareas.
+  6. «Otras pantallas» trae las demás pestañas del módulo, o las demás pantallas del Hub que la persona puede ver,
+     plegadas, cada una con su resumen corto. Un enlace de la ayuda a una pantalla del Hub lleva a ella y cierra la
+     ayuda.
   7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
      esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
      <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
-Entra: el módulo y la pestaña en la que se está.
-Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo que lee el cliente, en el idioma de la
-persona.
+Entra: el módulo, o la pantalla del Hub, y la pestaña en la que se está.
+Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo, o de las pantallas del Hub, que lee el
+cliente, en el idioma de la persona.
 Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, dice «No se ha podido cargar la
 ayuda.» y «Reintentar» la vuelve a pedir. La ayuda ya leída se queda guardada hasta que se recarga la página: sin
-conexión se vuelve a abrir, también desde otra pestaña del módulo, y cada vídeo dice «Sin conexión: el vídeo no está
-disponible», con el texto a la vista. Si el manual no está traducido al idioma de la persona, o su traducción se
-quedó atrás, la ayuda sale en español.
+conexión se vuelve a abrir, también desde otra pestaña del módulo u otra pantalla del Hub, y cada vídeo dice «Sin
+conexión: el vídeo no está disponible», con el texto a la vista. Si el manual no está traducido al idioma de la persona,
+o su traducción se quedó atrás, la ayuda sale en español.
 Implicados: BASE-F92, BASE-F93
 
 ### BASE-F116 Leer las novedades de ERPlora
@@ -3779,8 +3790,7 @@ dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
-Estado: parcial — se cambia y se consulta en Ajustes › General, por la API y con el asistente, y el negocio ya deja
-entrar o rechaza a soporte según esté; falta que erplora.com dé al personal de soporte su código para entrar
+Estado: hecho
 Actor: propietario, administrador, personal de soporte de ERPlora
 Pantalla: Ajustes · General, la página «Este negocio no deja entrar a soporte»
 Pasos:
@@ -3797,12 +3807,13 @@ Pasos:
      cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
      soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
      «Solo quien administra el negocio puede cambiarlo.».
-  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
-     cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
-     negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
-     con PIN ni con tarjeta, no ocupa plaza ni cuenta en el uso del plan y su navegador no se queda como dispositivo
-     del negocio: ni cierra la sesión de otro dispositivo ni se la cierra la entrada de otro (BASE-F57). Cada entrada
-     se suma al momento a la lista de las últimas entradas, y lo que hace queda a su nombre en los registros.
+  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio con «Entrar como soporte», en el
+     admin de erplora.com, con su propia cuenta (HUBS-F38 de erplora.com), y llega como un administrador: puede hacer
+     todo menos lo que solo hace el propietario (comprar para el negocio, reiniciarlo, sus copias). No sale en Empleados
+     ni entre quienes pueden dar acceso, no entra en las cajas con PIN ni con tarjeta, no ocupa plaza ni cuenta en el
+     uso del plan y su navegador no se queda como dispositivo del negocio: ni cierra la sesión de otro dispositivo ni se
+     la cierra la entrada de otro (BASE-F57). Cada entrada se suma al momento a la lista de las últimas entradas, y lo
+     que hace queda a su nombre en los registros.
   5. Con el acceso apagado no entra: ve «Este negocio no deja entrar a soporte» — «El propietario o un administrador
      de este negocio tiene que encender el acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a
      intentarlo.» con «Volver a intentarlo».
@@ -3816,7 +3827,7 @@ estaba; al consultarlo, le sale que no puede cambiarlo. Si el cambio no se puede
 guardar el cambio.» y el interruptor vuelve a lo guardado; si la tarjeta no puede leer el ajuste, «No se pudo cargar
 el acceso de soporte.» con «Reintentar». Con el acceso apagado, soporte no abre sesión ni deja entrada (la página del
 paso 5).
-Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 
 ## Para quien lo mantiene
 
@@ -4213,10 +4224,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   ERPlora (`Hub.is_platform`) no tiene plan y su foto solo trae a sus personas: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`) para esas personas: queda
-  por decidir qué les enseña aquí, porque el aviso de plan desconocido les promete uno que nunca llega.
-  Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
-  `test_plan_usage_figures.py`.
+  en falso porque no hay plan que leer, y `platform` dice que no lo habrá: la pantalla lo cuenta en vez de prometer uno.
+  Tests: `base/tests/test_meter.py`, `test_meter_requests.py`, `test_plan_usage_figures.py` y
+  `test_platform_hub_no_plan.py`, y `SystemUsage.platform.test.ts`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
   `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
@@ -4413,7 +4423,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   caducaría en un minuto y lo leería cualquier script: `signing.dumps({user, hub, next, nonce}, key=INTERNAL_SHARED_SECRET,
   salt="erplora.hub-pass.v1")`, y devuelve `SAAS_URL/hub-pass/?pass=…`. Solo en una sesión abierta con la cuenta
   (`_session_account`; si no, `base.saas_pass_needs_account`: nunca PIN, placa ni demo); `next=business`, además, con
-  `base.open_management` (`base.saas_pass_needs_management`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
+  `base.open_management` (`base.saas_pass_needs_management`); `next=plan`, nunca en el hub de ERPlora (409
+  `base.saas_pass_no_plan`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
   firmante de Django caería en `SECRET_KEY`. No se consulta al SaaS (PLAN-SAAS §2) y el pase no va a ningún log.
   `base/frontend/lib/saas-pass.ts` (`useSaasPass`) es la segunda puerta de salida del Hub: abre `about:blank` dentro del
   clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
@@ -4423,7 +4434,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   que su sitio le pone dentro, y quien la coloca decide su clase y `data-testid`. Si sale lo decide una sola regla,
   `useMayBuy` de `base/frontend/lib/plan-link.ts`: en la web y con `base.own_business`, porque en erplora.com solo el
   propietario compra (`usePlanLink` la aplica a la dirección de `hub-home`; `canUpgrade` del asistente y los enlaces a
-  la Tienda de `AppsPage` y `AppBlockedPage`, también). La colocan
+  la Tienda de `AppsPage` y `AppBlockedPage`, también). Las direcciones de los planes y de la Tienda las da
+  `base/saas_store.py`, vacías en el hub de ERPlora (`platform_hub.is_platform_slug`): sin dirección no sale ninguno
+  (`base/tests/test_saas_store.py`, `test_platform_hub_no_plan.py`). La colocan
   `UpgradePlanLink` (pie del menú, con su icono), `SystemUsage`, `PeopleList`, `AppsPage` y la Bandeja de WhatsApp
   (`InboxPage`, `MessageComposer`, `ChannelSettings`, con su «Mejorar el plan»); su test prohíbe que un `.vue` vuelva a
   escribir a mano `openSaasPass('plan', …)`. Además usan `useSaasPass` `ManageLink` (`business`) y `openPlan` de
@@ -4675,8 +4688,11 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   todas las herramientas del Hub, sin excepciones (hub#1175 arregló las nueve que quedaban en Control horario,
   Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
-  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; la ronda que llega
-  a `MAX_ROUNDS` = 20 (de live: una herramienta por ronda) va a la pasarela sin herramientas y con `LAST_ROUND` en las
+  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; una respuesta del
+  modelo puede pedir varias herramientas y es una sola ronda (`rounds` de live): sus lecturas corren seguidas en la
+  misma vuelta y cada escritura espera su tarjeta, de una en una, con un sí o un no que vale solo para la llamada que
+  nombra (`base/tests/test_services_assistant.py`, `…_in_one_answer_…`); la ronda que llega
+  a `MAX_ROUNDS` = 20 (de live) va a la pasarela sin herramientas y con `LAST_ROUND` en las
   instrucciones, para que el modelo conteste con lo hecho y lo que falta; lo que pide después no corre ni saca tarjeta
   ni recibo, y vuelve con `base.assistant_out_of_steps` (`OUT_OF_STEPS`) para que conteste, y si aun así pide otra
   cosa, corta con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
@@ -4764,10 +4780,13 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   permiso que pide su página. Quien no tiene ese permiso no recibe su ayuda: el filtro se aplica en cada llamada, fuera
   de lo guardado en `_READ`. Un `###` que no es una de esas pantallas (la campana, el menú lateral, el asistente) se
   queda en el fichero, y de los flujos de `base` todavía no se publica ninguno: sus pasos llevan ids, referencias y
-  marcadores para quien los mantiene. Ninguna pantalla la enseña todavía: las rutas de `base` no llevan `meta.app`, así
-  que el «?» sigue saliendo solo en los módulos. `tests/test_help_workbooks.py` exige de cada pantalla su `###`, una
-  sola vez, y las mismas reglas de texto que a un módulo; `base/tests/test_platform_screens.py`, que cada dirección
-  exista en la SPA y que su permiso sea el de la operación que lee.
+  marcadores para quien los mantiene. Las rutas de `base` no llevan `meta.app`: las que tienen ayuda llevan `help: true`
+  en su `meta` (`base/frontend/routes.ts`), así que ni una pantalla sin ayuda ni la de «Sin acceso» enseñan el «?», y la
+  ventana sabe en cuál está por la ruta del router y el `#` (`resolvePlatformScreen`, en `base/frontend/lib/help.ts`).
+  `tests/test_help_workbooks.py` exige de cada pantalla su `###`, una sola vez, y las mismas reglas de texto que a un
+  módulo; `base/tests/test_platform_screens.py`, que cada dirección exista en la SPA, que las rutas con `help: true` sean
+  justo las de esas pantallas y que su permiso sea el de la operación que lee; `tests/e2e/base-help-platform.spec.ts` la
+  recorre en tres tamaños y en los dos idiomas.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
