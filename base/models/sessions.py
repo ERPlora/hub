@@ -18,6 +18,8 @@ class SessionOwner(UUIDModel):
         ACCOUNT = "account", pgettext_lazy("way in", "Account")
         PIN = "pin", pgettext_lazy("way in", "PIN")
         BADGE = "badge", pgettext_lazy("way in", "Badge")
+        #: ERPlora's support, in a business that lets it in (``base.services.support_entry``).
+        SUPPORT = "support", pgettext_lazy("way in", "ERPlora support")
 
     session = models.OneToOneField(
         "sessions.Session", on_delete=models.CASCADE, related_name="owner", verbose_name=_("session")

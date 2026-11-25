@@ -11,6 +11,11 @@ from base.schemas.support_access import SupportAccessIn, SupportAccessOut
 RECENT_VISITS = 10
 
 
+def support_may_enter() -> bool:
+    """Whether the active business lets ERPlora's support in now; without its row, it does not."""
+    return SupportAccess.objects.filter(enabled=True).exists()
+
+
 @operation(
     "base.support_access.get",
     kind="query",

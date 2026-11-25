@@ -117,6 +117,7 @@ live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS, 
 live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
 # The API's documentation: shown or hidden. The document itself is asked once (far bigger than a live result may be).
 live("base.api_doc.settings", on=[events.API_DOC_SETTINGS_CHANGED])
-live("base.support_access.get", on=[events.SUPPORT_ACCESS_CHANGED])
+# Support access: turned on or off, and each entry of support.
+live("base.support_access.get", on=sorted({events.SUPPORT_ACCESS_CHANGED, events.SUPPORT_ACCESS_ENTERED}))
 _APPROVERS = {events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS, *events.ROLE_EVENTS}
 live("base.approval.approvers", on=sorted(_APPROVERS))

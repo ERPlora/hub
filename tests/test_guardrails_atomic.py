@@ -79,6 +79,7 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
     ),
     "base/services/sessions.py::open_session_from_saas": CONTROL_LOGIN,
     "base/services/devices.py::open_session_on_device": CONTROL_LOGIN,
+    "base/services/support_entry.py::open_support_session": CONTROL_LOGIN,
     "base/services/sessions.py::open_admin_session_from_saas": (
         "Only control's models (the staff copy, its groups, Django's session), on the platform host: control's "
         "transaction."
