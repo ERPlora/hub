@@ -11,7 +11,7 @@ from live.outbox import record_event
 
 from apps.reservation import engine, events
 from apps.reservation.models import Reservation
-from apps.reservation.queries import find_reservation, reservation_out
+from apps.reservation.queries.reservations import find_reservation, reservation_out
 from apps.reservation.schemas.reservations import ReservationIn, ReservationOut, ReservationPatchIn, ReservationRefIn
 from apps.reservation.services.gate import choose_table, judge, lock_book
 from apps.reservation.services.guests import CARD_SOURCES, _guest_contact, card_for_phone, typed_phone
