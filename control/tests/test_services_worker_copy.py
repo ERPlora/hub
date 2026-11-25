@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 from django.utils import timezone
 
-from control.models import RestoredCopy
+from control.models.copies import RestoredCopy
 from control.services import worker_copy, worker_move
 from control.tests.conftest import COPY_MOMENT, a_cluster, a_ready_hub, a_separate_copy
 

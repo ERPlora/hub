@@ -10,7 +10,7 @@ import pytest
 from django.utils import timezone
 
 from control import admin as control_admin
-from control.models import Hub
+from control.models.hubs import Hub
 from control.tests.conftest import events
 from control.tests.test_admin import HUBS, PLATFORM, a_cluster, cluster_cell, nothing_kept, page, root, row_of, support
 
@@ -134,7 +134,7 @@ class TestCancelTheMove:
     """«Cancel the move»: the worker puts each chosen hub back on its origin (``control.hub.move_cancel``)."""
 
     def test_asks_the_worker_to_undo_the_chosen_moves_and_says_which_were_not_moving(self, client, root):
-        from control.models import MovedCopy
+        from control.models.copies import MovedCopy
 
         target = a_cluster(name="cluster-2", host="writer-2.example")
         moving = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=target)

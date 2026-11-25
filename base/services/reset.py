@@ -29,7 +29,7 @@ from base.schemas.reset import HubResetApplyIn, HubResetApplyOut, HubResetIn, Hu
 from base.services.blueprints import _stop_waiting, _waiting_loads, _who
 from base.services.platform_hub import refuse_platform_hub
 from base.services.provisioning import LEASE_OWNER, ProvisioningStopped, _control_transaction, _leased, ring
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 
 def same_name(typed: str, name: str) -> bool:

@@ -25,7 +25,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_api_keys import CARTS, bearer, create, get, host
 from base.tests.test_internal import signed
-from control.models import Hub
+from control.models.hubs import Hub
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)

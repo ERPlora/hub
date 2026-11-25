@@ -22,7 +22,7 @@ from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
 from base.schemas.usage import PlanUsageIn, PlanUsageOut, UsageListIn, UsageListOut
 from base.tenancy import limits as tenancy_limits
-from control.models import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
+from control.models.usage import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
 
 from .apps import app_limit
 

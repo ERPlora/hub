@@ -28,7 +28,7 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import names
 from base.tenancy.tests import hubs
 from base.tenancy.tests.before_the_cut import hub_tables, hub_tables_sql, make_hub_tables
-from control.models import Hub
+from control.models.hubs import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
 BEFORE = "0006_hub_activity"

@@ -11,7 +11,7 @@ from psycopg import errors as pg_errors
 
 from base import registry
 from base.tenancy.migrator import app_sets, schema
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger("base.tenancy.migrator")  # logged as the migrator, whose steps these are
 

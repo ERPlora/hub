@@ -20,7 +20,7 @@ from base import activation
 from base.schemas.home import SetupStatusIn
 from base.tenancy import context
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 STEP = "base.mandatory.verifactu"
 

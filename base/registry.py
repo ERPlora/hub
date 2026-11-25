@@ -19,7 +19,7 @@ from live.errors import PermissionDenied
 
 from base import platform_hub
 from base.schemas.hub_registry import HubOut
-from control.models import Hub
+from control.models.hubs import Hub
 
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.
 REGISTRY_SCOPE = Scope("platform", "registry")

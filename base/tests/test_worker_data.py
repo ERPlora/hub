@@ -32,7 +32,8 @@ from base.tenancy import dumps, provision
 from base.tenancy.context import HubWithoutDatabase, use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
-from control.models import Hub, HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub, HubDue
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),

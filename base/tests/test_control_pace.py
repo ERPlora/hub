@@ -35,7 +35,7 @@ from base.tenancy import provision
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_worker import Inline
-from control.models import Hub, HubDue
+from control.models.hubs import Hub, HubDue
 
 pytestmark = [pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)]
 
@@ -287,7 +287,7 @@ def test_a_moves_pass_that_could_not_start_starts_at_the_next_pass(db):
 
 
 def test_a_move_asked_for_its_night_starts_the_moves_pass_then(hub_a):
-    from control.models import Cluster
+    from control.models.hubs import Cluster
 
     pace = control_pace.ControlPace(Deaf())
     pace.due(START)

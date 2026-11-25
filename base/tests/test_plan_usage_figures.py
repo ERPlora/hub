@@ -21,7 +21,8 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import limits
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub, HubActivityDaily, HubUsageDaily, HubVisit
+from control.models.hubs import Hub
+from control.models.usage import HubActivityDaily, HubUsageDaily, HubVisit
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 

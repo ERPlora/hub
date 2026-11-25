@@ -26,7 +26,7 @@ class TestRecover:
     def a_copy(self, status: str = "made", **fields):
         from base.tenancy import names
         from base.tenancy.connections import control_name
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         copy_id = uuid.uuid7()
         values = {
@@ -46,7 +46,7 @@ class TestRecover:
         return services.recover.copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=list(apps or ["customer"])))
 
     def test_asks_the_worker_to_bring_back_the_customers_and_says_who_asked(self, admin_ctx):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.a_copy()
         in_spanish = OperationContext(
@@ -78,7 +78,7 @@ class TestRecover:
 
     @pytest.mark.parametrize("status", ["copying", "failed"])
     def test_only_a_made_copy_gives_anything_back(self, admin_ctx, status):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.a_copy(status)
 
@@ -89,7 +89,7 @@ class TestRecover:
         assert not CopyRecovery.objects.exists()
 
     def test_only_apps_that_say_what_they_give_back_are_asked(self, admin_ctx):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.a_copy()
 
@@ -109,7 +109,7 @@ class TestRecover:
             CopyRecoverIn(copy_id=uuid.uuid7(), apps=[])
 
     def test_one_recovery_of_a_copy_at_a_time_and_a_done_one_does_not_stop_the_next(self, admin_ctx):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.a_copy()
         first = self.ask(admin_ctx, copy)
@@ -123,7 +123,7 @@ class TestRecover:
         assert CopyRecovery.objects.filter(copy=copy).count() == 2
 
     def test_support_may_not_and_an_unknown_copy_is_not_found(self, admin_ctx):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
         from control.schemas import CopyRecoverIn
 
         copy = self.a_copy()

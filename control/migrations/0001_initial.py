@@ -11,7 +11,7 @@ import uuid
 import django.db.models.deletion
 from django.db import migrations, models
 
-import control.models
+import control.models.hubs
 
 
 class Migration(migrations.Migration):
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                     name="Hub",
                     fields=[
                         ("id", models.UUIDField(default=uuid.uuid7, editable=False, primary_key=True, serialize=False)),
-                        ("slug", models.CharField(max_length=63, unique=True, validators=[control.models.registry_slug_validator], verbose_name="slug")),
+                        ("slug", models.CharField(max_length=63, unique=True, validators=[control.models.hubs.registry_slug_validator], verbose_name="slug")),
                         ("name", models.CharField(blank=True, max_length=120, verbose_name="name")),
                         ("country", models.CharField(blank=True, max_length=2, verbose_name="country")),
                         ("timezone", models.CharField(blank=True, max_length=64, verbose_name="time zone")),
@@ -97,7 +97,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="hub",
             name="db_name",
-            field=models.CharField(blank=True, db_default="", default="", max_length=63, validators=[control.models.db_name_validator], verbose_name="database"),
+            field=models.CharField(blank=True, db_default="", default="", max_length=63, validators=[control.models.hubs.db_name_validator], verbose_name="database"),
         ),
         migrations.AddField(
             model_name="hub",

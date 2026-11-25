@@ -47,7 +47,7 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
     run_pass,
     turn_on,
 )
-from control.models import Hub
+from control.models.hubs import Hub
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 

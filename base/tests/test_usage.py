@@ -39,7 +39,8 @@ from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.hubs import make_cluster, make_database, make_hub  # noqa: F401 (fixtures)
 from base.tests.test_internal import signed
 from base.tests.test_session_revoke import ANA, OLGA, login
-from control.models import Hub, HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
+from control.models.hubs import Hub
+from control.models.usage import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
 
 #: A night long past, never the real yesterday of a run: no row a real clock writes can be this day's.
 DAY = dt.date(2026, 3, 10)
@@ -182,7 +183,7 @@ def test_the_visits_older_than_the_window_are_forgotten(hub_a):
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_the_night_forgets_the_copies_the_bucket_no_longer_keeps(hub_a):
-    from control.models import HubDump
+    from control.models.dumps import HubDump
 
     def made(days: int) -> HubDump:
         at = NIGHT - dt.timedelta(days=days)

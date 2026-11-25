@@ -16,7 +16,8 @@ from base.tenancy.tests.hubs import control_databases as databases
 from base.tenancy.tests.hubs import marker, says_it_is
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3
 from base.tenancy.tests.test_move import AT, MARKER, fresh, nothing_checked_yet, run
-from control.models import HubDue, MovedCopy
+from control.models.copies import MovedCopy
+from control.models.hubs import HubDue
 
 #: The moves' own autouse fixture and the bucket the ``moves`` of ``conftest.py`` asks for.
 __all__ = ["aws_test_credentials", "dumps_bucket", "moto_s3", "nothing_checked_yet"]

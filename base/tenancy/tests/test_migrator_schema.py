@@ -18,7 +18,7 @@ from base.tenancy.tests.hubs import (  # noqa: F401 (fixtures)
     new_database,
 )
 from base.tenancy.tests.test_migrator import PLATFORM, leaves, migrate_to, tables_of
-from control.models import Hub
+from control.models.hubs import Hub
 
 WAIT = 120
 
