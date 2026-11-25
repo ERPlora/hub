@@ -5,7 +5,8 @@
 // messages wait on erplora.com, so they are asked apart, once the plan is known; failing touches their own row and keeps the
 // line from saying green, with «Retry».
 // «Upgrade plan» goes by BASE-F11's rule (`lib/plan-link.ts`) and is the platform's PlanUpgradeLink, with its pass. What was not measured yet says so, never with a zero; a demo
-// says it is not measured; without the plan, what is in use goes with no limit, bar, pill or verdict.
+// says it is not measured; without the plan, what is in use goes with no limit, bar, pill or verdict. ERPlora's own business
+// has none and says so, never that one will come.
 import { InlineFeedback, StatusPill, UsageMeter } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
@@ -233,6 +234,13 @@ function pillTone(row: UsageRow) {
             {{ t('base.system.retry') }}
           </ion-button>
         </template>
+      </InlineFeedback>
+      <InlineFeedback
+        v-else-if="usage.platform"
+        tone="info"
+        data-testid="system-usage-platform"
+      >
+        {{ t('base.system.usage.platform') }}
       </InlineFeedback>
       <InlineFeedback
         v-else

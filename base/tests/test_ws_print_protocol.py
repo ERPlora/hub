@@ -35,7 +35,7 @@ async def test_no_frame_works_before_hello(sockets, session, frame):
 
 
 async def test_a_socket_that_never_says_hello_is_closed(sockets, monkeypatch):
-    monkeypatch.setattr(ws_print, "HELLO_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(ws_print.protocol, "HELLO_TIMEOUT_SECONDS", 0.2)
     socket = sockets()
     await socket.connect()
 
@@ -49,7 +49,7 @@ async def test_an_oversized_frame_is_refused_before_it_is_parsed(sockets):
     socket = sockets()
     await socket.connect()
 
-    await socket.send("x" * (ws_print.MAX_FRAME_BYTES + 1))
+    await socket.send("x" * (ws_print.protocol.MAX_FRAME_BYTES + 1))
 
     frame = await socket.receive()
     assert frame["code"] == "print.frame_too_large"
@@ -68,3 +68,7 @@ async def test_a_malformed_frame_answers_invalid_payload_and_the_socket_stays(so
         assert frame["type"] == "error" and frame["code"] == "invalid_payload", bad
 
     assert (await socket.hello("till-1", [till]))["type"] == "ready", "the socket is still usable"
+
+
+def test_the_socket_logs_under_the_channels_name():
+    assert ws_print.protocol.logger.name == "base.ws_print"

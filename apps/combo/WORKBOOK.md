@@ -665,10 +665,10 @@ producto recuperado no reacciona: sus elecciones vuelven desde la copia (F15).
 
 | De | Para qué | Flujos | Servicio |
 |---|---|---|---|
-| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
+| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` (los activos, agotados o no) |
 | Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
 | Plataforma | La librería de imágenes: buscarla y nombrar por su título la imagen que se pone a un menú | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
-| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | `recoverable_from_copy` de `apps.py` |
+| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | lo que declara su módulo de app (recoverable_from_copy) |
 
 ### Contrato con Ventas
 
@@ -729,7 +729,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero (los que comparten nombre con otra puerta, `test_queries_<módulo>.py`), más
+  `tests/test_<fichero>.py` por fichero (los que comparten nombre con otra puerta, `test_queries_<módulo>.py` y
+  `test_services_<módulo>.py`), más
   `test_integration_inventory.py`,
   `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
   reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y

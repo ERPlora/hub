@@ -5,6 +5,7 @@ Every test with the database runs as production does: inside business A's own da
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it."""
 
 import datetime as dt
+import threading
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -12,7 +13,8 @@ from django.db import connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
-from live.operations import get
+from live.models import OutboxEvent
+from live.operations import atomic, get
 from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of
@@ -21,7 +23,7 @@ from apps.staff.models import Member, Role, Schedule, ScheduleDay, TimeOff
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
-from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+from base.tenancy.tests.concurrency import hub_staff, in_a_thread, plan_with_room
 
 #: The marks, scopes and fixtures of the businesses' own databases (the platform staff with business A chosen in the Hub
 #: admin, business A at night in another zone or on a plan with room for several sessions) and the assistant's catalogue
@@ -155,11 +157,21 @@ def make_time_off(member: Member, start: str, end: str | None = None, hours: tup
     )
 
 
-# What the tests of the reads share.
+# What the tests of the reads and of the writes share.
 
 TERMINATED = Member.Status.TERMINATED
 # 2026-08-18 22:30 UTC is already 2026-08-19 00:30 in Madrid (the business's zone, settings.TIME_ZONE).
 LATE_EVENING_UTC = dt.datetime(2026, 8, 18, 22, 30, tzinfo=dt.UTC)
+QUIET = 0.3
+WEEK = [
+    {
+        "weekday": 0,
+        "start_time": "09:00",
+        "end_time": "18:00",
+        "break_start": "13:00",
+        "break_end": "14:00",
+    }
+]
 
 
 def run(name, data, role="hub_admin", **ctx):
@@ -182,3 +194,58 @@ def frozen_now(monkeypatch):
 
 def today():
     return timezone.localdate()
+
+
+def outbox():
+    return list(OutboxEvent.objects.values_list("name", "scope_key", "payload"))
+
+
+def names():
+    return [name for name, _, _ in outbox()]
+
+
+# Two people at the same instant: the second waits for the first's lock, then decides on what it wrote
+
+
+def _in_thread(target):
+    """``target`` in a session of its own of the business at work; ``outcome`` says its result or its error."""
+    outcome = {}
+
+    def body():
+        try:
+            outcome["result"] = target()
+        except Exception as error:  # the outcome is asserted by the test
+            outcome["error"] = error
+
+    thread = in_a_thread(body, [None])
+    thread.start()
+    return thread, outcome
+
+
+def _race(first, second):
+    """Run ``first`` in a transaction kept open until ``second`` (another thread) is blocked on it.
+
+    Returns the outcomes of both. ``second`` must wait (a lock), never decide blind on what ``first``
+    has not committed yet. Its tests run on a plan with room for both sessions (``plan_with_room``): on Free's,
+    ``second`` would wait for its turn to open a transaction, never for the lock.
+    """
+    done, release = threading.Event(), threading.Event()
+
+    def held():
+        with atomic():
+            result = first()
+            done.set()
+            release.wait(5)
+        return result
+
+    holder, held_outcome = _in_thread(held)
+    assert done.wait(5)
+    waiter, outcome = _in_thread(second)
+    waiter.join(QUIET)
+    waited = waiter.is_alive()
+    release.set()
+    holder.join(5)
+    waiter.join(5)
+    assert "result" in held_outcome, held_outcome
+    assert waited, "the second call did not wait for the first one's lock"
+    return outcome

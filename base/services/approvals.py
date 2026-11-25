@@ -7,13 +7,13 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, OperationError, PermissionDenied, Unauthorized
-from live.operations import operation
+from live.operations import Operation, operation
 from live.outbox import record_event
 
 from base import access, events, queries
 from base import approvals as approval_rules
 from base.models.approvals import Approval
-from base.permissions import VIEW_HOME
+from base.permissions import VIEW_HOME, is_a_person
 from base.schemas.approvals import ApprovalIn, ApprovalPassOut, ApprovalSpendIn, ApprovalSpentOut
 from base.services.devices import badge_owner, too_many_message
 from base.throttle import client_key
@@ -149,3 +149,20 @@ def approval_spend(ctx: OperationContext, data: ApprovalSpendIn) -> dict:
     approval.save(update_fields=["used_at", "figures"])
     record_event(ctx, events.APPROVAL_USED, {"id": str(approval.pk), "operation": approval.operation})
     return {"spent": True, "id": str(approval.pk), "approver": approval.approved_by_name}
+
+
+def note_own_right(ctx: OperationContext, op: Operation, figures: dict) -> None:
+    """Put on the record that whoever runs ``op`` did it by themselves, in its own transaction (``base.approval_note``):
+    with no pass and nobody who approved it."""
+    actor = ctx.actor
+    by, name = (actor.get_username(), queries.people.face_name(actor)) if is_a_person(actor) else (str(actor), str(actor))
+    noted = Approval.objects.create(
+        operation=op.name,
+        permission=op.permission,
+        requested_by=by[:150],
+        requested_by_name=name[:150],
+        way=Approval.Way.ROLE,
+        used_at=timezone.now(),
+        figures=figures or None,
+    )
+    record_event(ctx, events.APPROVAL_NOTED, {"id": str(noted.pk), "operation": op.name})

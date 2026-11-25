@@ -1,10 +1,11 @@
 """``manage.py migrate_hubs``: what the ``hub-migrate`` task runs on every deploy (ERPlora/aws's README).
 
-Control (``base.tenancy.migrator.migrate_control``, its lock: ``test_migrator.py``), then the templates of every
-server the hubs live on (``clusters_to_migrate``, ``ensure_template``), then every hub behind, each through its own
-server (``ensure_schema``, ``base/tenancy/tests/test_migrator.py``). The command is thin: a summary, and any failure
-exits non-zero (a ``CommandError``), which the infra's ``task_failed`` rule reports. ``--check`` applies nothing: it
-lists what a run would apply and exits 1 if anything (the e2e's ``global-setup.ts``).
+Control (``base.tenancy.migrator.control_database.migrate_control``, its lock:
+``base/tenancy/tests/test_migrator_control_database.py``), then the templates of every server the hubs live on
+(``clusters_to_migrate``, ``ensure_template``), then every hub behind, each through its own server (``ensure_schema``,
+``base/tenancy/tests/test_migrator_schema.py``). The command is thin: a summary, and any failure exits non-zero (a
+``CommandError``), which the infra's ``task_failed`` rule reports. ``--check`` applies nothing: it lists what a run
+would apply and exits 1 if anything (the e2e's ``global-setup.ts``).
 
 The migrator registers ``<db_name>__ddl`` aliases, which a Django test case refuses, so the tests that reach a template
 or a hub run without one (``hubs.committed_database``, as ``db``), with this module's two small templates
@@ -43,7 +44,7 @@ from control.models import Hub
 
 PLATFORM = ("base", "live")
 #: The deployment's own templates, kept before the ``small`` fixture replaces them.
-REAL_TEMPLATES = migrator.templates
+REAL_TEMPLATES = migrator.hub_templates.templates
 SMALL_VERTICAL = "small"
 
 
@@ -51,11 +52,11 @@ def leaves() -> dict[str, str]:
     return dict(MigrationLoader(None, ignore_no_migrations=True).graph.leaf_nodes())
 
 
-def small_templates(control: str | None = None) -> list[migrator.Template]:
-    """The platform's template and one vertical's, with ``tax``: what ``migrator.templates`` gives in this module."""
+def small_templates(control: str | None = None) -> list[migrator.hub_templates.Template]:
+    """The platform's template and one vertical's, with ``tax``: what ``migrator.hub_templates.templates`` gives in this module."""
     control = tenancy_connections.control_name() if control is None else control
-    platform = migrator.Template(db_name=names.template_db_name(control), apps=PLATFORM)
-    vertical = migrator.Template(
+    platform = migrator.hub_templates.Template(db_name=names.template_db_name(control), apps=PLATFORM)
+    vertical = migrator.hub_templates.Template(
         db_name=names.template_db_name(control, SMALL_VERTICAL),
         apps=(*PLATFORM, "tax"),
         source=platform.db_name,
@@ -68,12 +69,12 @@ def small_templates(control: str | None = None) -> list[migrator.Template]:
 def templates_built(django_db_setup, django_db_blocker):
     """This module's templates, built once on the test database's server and dropped at its end."""
     with pytest.MonkeyPatch.context() as patch, django_db_blocker.unblock():
-        patch.setattr(migrator, "templates", small_templates)
+        patch.setattr(migrator.hub_templates, "templates", small_templates)
         before = connections.settings
         try:
             hubs.bootstrap_template(small_templates()[0].db_name)  # db-bootstrap's, never the migrator's
             for template in small_templates():
-                migrator.ensure_template(template)
+                migrator.hub_templates.ensure_template(template)
         finally:
             # Its aliases would outlive the module, and a later test case refuses an alias it was not told about.
             hubs.forget_aliases(before)
@@ -84,8 +85,8 @@ def templates_built(django_db_setup, django_db_blocker):
 
 @pytest.fixture
 def small(templates_built, monkeypatch):
-    """``migrator.templates`` is this module's two templates, already up to date."""
-    monkeypatch.setattr(migrator, "templates", small_templates)
+    """``migrator.hub_templates.templates`` is this module's two templates, already up to date."""
+    monkeypatch.setattr(migrator.hub_templates, "templates", small_templates)
     return templates_built
 
 
@@ -146,14 +147,18 @@ def test_migrates_the_control_database_and_a_second_run_applies_nothing(small, d
 def test_a_run_goes_control_then_templates_then_the_hubs_behind(small, new_database, make_hub, monkeypatch):
     hub = make_hub(new_database)
     order = []
-    for name in ("migrate_control", "ensure_template", "ensure_schema"):
-        real = getattr(migrator, name)
+    for module, name in (
+        (migrator.control_database, "migrate_control"),
+        (migrator.hub_templates, "ensure_template"),
+        (migrator.schema, "ensure_schema"),
+    ):
+        real = getattr(module, name)
 
         def spied(*args, _real=real, _name=name, **kwargs):
             order.append(_name)
             return _real(*args, **kwargs)
 
-        monkeypatch.setattr(migrator, name, spied)
+        monkeypatch.setattr(module, name, spied)
 
     out = migrate_hubs()
 
@@ -167,8 +172,8 @@ def test_a_run_goes_control_then_templates_then_the_hubs_behind(small, new_datab
 
 
 def test_a_missing_template_is_created_by_a_run(small, template_name, monkeypatch):
-    extra = migrator.Template(db_name=template_name(), apps=(*PLATFORM, "customer"), source=small[0].db_name)
-    monkeypatch.setattr(migrator, "templates", lambda control=None: [*small_templates(control), extra])
+    extra = migrator.hub_templates.Template(db_name=template_name(), apps=(*PLATFORM, "customer"), source=small[0].db_name)
+    monkeypatch.setattr(migrator.hub_templates, "templates", lambda control=None: [*small_templates(control), extra])
 
     out = migrate_hubs()
 
@@ -241,13 +246,13 @@ def test_erploras_own_hub_goes_first_then_at_most_four_at_once(small, make_hub, 
             events.append(("end", hub.slug))
         return []
 
-    monkeypatch.setattr(migrator, "ensure_schema", ensure_schema)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", ensure_schema)
 
     out = migrate_hubs()
 
     assert events[:2] == [("start", platform.slug), ("end", platform.slug)]  # alone, before any other
     assert sorted(slug for event, slug in events[2:] if event == "start") == sorted(hub.slug for hub in others)
-    assert peak[0] == migrator.HUB_WORKERS == 4
+    assert peak[0] == migrator.hubs_pass.HUB_WORKERS == 4
     assert "migrate_hubs: hubs: 8 migrated, 0 left behind, 0 up to date." in out
 
 
@@ -272,7 +277,7 @@ def test_a_lock_timeout_is_tried_again_up_to_three_times(small, make_hub, monkey
             raise lock_timeout()
         return []
 
-    monkeypatch.setattr(migrator, "ensure_schema", ensure_schema)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", ensure_schema)
 
     with pytest.raises(CommandError, match=f"1 hub\\(s\\) left behind: {stuck.slug} "):
         migrate_hubs()
@@ -283,17 +288,17 @@ def test_a_lock_timeout_is_tried_again_up_to_three_times(small, make_hub, monkey
 
 
 def test_a_missing_platform_template_stops_the_run_before_any_hub(small, template_name, make_hub, monkeypatch):
-    missing = migrator.Template(db_name=template_name(), apps=PLATFORM)
-    monkeypatch.setattr(migrator, "templates", lambda control=None: [missing, *small_templates(control)[1:]])
+    missing = migrator.hub_templates.Template(db_name=template_name(), apps=PLATFORM)
+    monkeypatch.setattr(migrator.hub_templates, "templates", lambda control=None: [missing, *small_templates(control)[1:]])
     make_hub(missing_database())
     touched = []
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: touched.append(hub))
+    monkeypatch.setattr(migrator.schema, "ensure_schema", lambda hub, **kwargs: touched.append(hub))
 
     with pytest.raises(CommandError, match=f"{missing.db_name} does not exist on the settings' server: run db-boot"):
         migrate_hubs()
 
     assert touched == []
-    assert not migrator.database_exists(missing.db_name)
+    assert not migrator.hub_templates.database_exists(missing.db_name)
 
 
 def test_a_template_that_fails_stops_the_run_before_any_hub(small, make_hub, monkeypatch):
@@ -303,8 +308,8 @@ def test_a_template_that_fails_stops_the_run_before_any_hub(small, make_hub, mon
     def broken(template, **kwargs):
         raise DatabaseError("relation already exists")
 
-    monkeypatch.setattr(migrator, "ensure_template", broken)
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: touched.append(hub))
+    monkeypatch.setattr(migrator.hub_templates, "ensure_template", broken)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", lambda hub, **kwargs: touched.append(hub))
 
     with pytest.raises(CommandError, match=f"the template {small[0].db_name} was not migrated: relation already"):
         migrate_hubs()
@@ -324,7 +329,7 @@ def test_every_server_gets_its_templates_and_each_hub_migrates_on_its_own(
     make_cluster("closed-empty", is_open=False, host="closed-empty.invalid")
     hub = make_hub(new_database, cluster=holding)
     second_control = f"{tenancy_connections.control_name()}_c2"
-    real = migrator.clusters_to_migrate
+    real = migrator.servers.clusters_to_migrate
 
     def apart(**kwargs):
         return [
@@ -332,7 +337,7 @@ def test_every_server_gets_its_templates_and_each_hub_migrates_on_its_own(
             for target in real(**kwargs)
         ]
 
-    monkeypatch.setattr(migrator, "clusters_to_migrate", apart)
+    monkeypatch.setattr(migrator.servers, "clusters_to_migrate", apart)
     made = [template.db_name for template in small_templates(second_control)]
     hubs.bootstrap_template(made[0], control=second_control)  # db-bootstrap ran on the second cluster
     try:
@@ -361,7 +366,7 @@ def test_a_failure_exits_non_zero_with_the_reason(monkeypatch, db):
     def broken_migrate_control(**kwargs):
         raise DatabaseError("could not connect to server")
 
-    monkeypatch.setattr(migrator, "migrate_control", broken_migrate_control)
+    monkeypatch.setattr(migrator.control_database, "migrate_control", broken_migrate_control)
 
     with pytest.raises(CommandError, match="could not connect to server") as raised:
         migrate_hubs()
@@ -417,11 +422,11 @@ def test_check_sees_a_new_migration_of_a_templates_app(small, db):
 
 
 def test_check_counts_a_template_without_the_portable_apps_as_behind(small, db, monkeypatch):
-    """Every template carries every portable app (``migrator.templates``): one built with the platform alone is
+    """Every template carries every portable app (``migrator.hub_templates.templates``): one built with the platform alone is
     behind, and a run gives it them."""
     platform = small[0]  # the platform alone
-    up_to_date = migrator.Template(db_name=platform.db_name, apps=REAL_TEMPLATES()[0].apps)
-    monkeypatch.setattr(migrator, "templates", lambda control=None: [up_to_date])
+    up_to_date = migrator.hub_templates.Template(db_name=platform.db_name, apps=REAL_TEMPLATES()[0].apps)
+    monkeypatch.setattr(migrator.hub_templates, "templates", lambda control=None: [up_to_date])
 
     status, out = migrate_hubs_check()
 
@@ -432,8 +437,8 @@ def test_check_counts_a_template_without_the_portable_apps_as_behind(small, db, 
 
 
 def test_check_lists_a_missing_verticals_template_and_creates_nothing(small, template_name, monkeypatch):
-    extra = migrator.Template(db_name=template_name(), apps=(*PLATFORM, "customer"), source=small[0].db_name)
-    monkeypatch.setattr(migrator, "templates", lambda control=None: [*small_templates(control), extra])
+    extra = migrator.hub_templates.Template(db_name=template_name(), apps=(*PLATFORM, "customer"), source=small[0].db_name)
+    monkeypatch.setattr(migrator.hub_templates, "templates", lambda control=None: [*small_templates(control), extra])
 
     status, out = migrate_hubs_check()
 
@@ -443,12 +448,12 @@ def test_check_lists_a_missing_verticals_template_and_creates_nothing(small, tem
         f"migrate_hubs: {extra.db_name} does not exist; a run clones it from {small[0].db_name} and applies:"
     )
     assert "customer.0001_initial" in lines[1:]
-    assert not migrator.database_exists(extra.db_name)
+    assert not migrator.hub_templates.database_exists(extra.db_name)
 
 
 def test_check_says_a_missing_platform_template_is_db_bootstraps(small, template_name, monkeypatch):
-    missing = migrator.Template(db_name=template_name(), apps=PLATFORM)
-    monkeypatch.setattr(migrator, "templates", lambda control=None: [missing, *small_templates(control)[1:]])
+    missing = migrator.hub_templates.Template(db_name=template_name(), apps=PLATFORM)
+    monkeypatch.setattr(migrator.hub_templates, "templates", lambda control=None: [missing, *small_templates(control)[1:]])
 
     status, out = migrate_hubs_check()
 
@@ -456,7 +461,7 @@ def test_check_says_a_missing_platform_template_is_db_bootstraps(small, template
     assert out.splitlines() == [
         f"migrate_hubs: {missing.db_name} does not exist on the settings' server: run db-bootstrap there.",
     ]
-    assert not migrator.database_exists(missing.db_name)
+    assert not migrator.hub_templates.database_exists(missing.db_name)
 
 
 def test_check_lists_the_hubs_behind_without_opening_them(small, make_hub):
@@ -472,7 +477,7 @@ def test_check_that_cannot_read_the_database_exits_non_zero_with_the_reason(monk
     def broken_pending_control():
         raise DatabaseError("could not connect to server")
 
-    monkeypatch.setattr(migrator, "pending_control", broken_pending_control)
+    monkeypatch.setattr(migrator.control_database, "pending_control", broken_pending_control)
 
     with pytest.raises(CommandError, match="could not connect to server") as raised:
         migrate_hubs_check()
@@ -516,9 +521,9 @@ def test_frozen_it_refuses_to_start_says_why_and_migrates_nothing(switch, monkey
     """A deploy during a database upgrade stops at its migration: nothing reaches control, a template or a hub."""
     switch.freeze()
     touched: list[str] = []
-    monkeypatch.setattr(migrator, "migrate_control", lambda **kwargs: touched.append("control") or 0)
-    monkeypatch.setattr(migrator, "clusters_to_migrate", lambda: touched.append("templates") or [])
-    monkeypatch.setattr(migrator, "migrate_hubs_behind", lambda **kwargs: touched.append("hubs"))
+    monkeypatch.setattr(migrator.control_database, "migrate_control", lambda **kwargs: touched.append("control") or 0)
+    monkeypatch.setattr(migrator.servers, "clusters_to_migrate", lambda: touched.append("templates") or [])
+    monkeypatch.setattr(migrator.hubs_pass, "migrate_hubs_behind", lambda **kwargs: touched.append("hubs"))
 
     with pytest.raises(CommandError, match="frozen") as raised:
         migrate_hubs()

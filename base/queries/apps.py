@@ -16,8 +16,7 @@ from live.errors import Conflict, NotFound
 from live.meta import Category, module_configs
 from live.operations import AI, INTERNAL, operation
 
-from base import activation, app_switch, business, entitlement, home
-from base.auth import SAAS_PANEL_PATH, saas_url
+from base import activation, app_switch, business, entitlement, home, saas_store
 from base.models.activation import AppActivation
 from base.models import Hub
 from base.permissions import VIEW_HOME
@@ -131,8 +130,8 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 for config in configs
             ],
             "country_name": business.country_name(business.country_or_market(country), ctx.language),
-            "store_url": saas_url(f"{SAAS_PANEL_PATH}/store/modules?business={hub.id}") if hub is not None else "",
-            "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if hub is not None and not demo else "",
+            "store_url": saas_store.apps_url(hub.slug, hub.id) if hub is not None else "",
+            "plan_url": saas_store.plans_url(hub.slug, hub.id) if hub is not None and not demo else "",
             "max_apps": app_limit(hub),
             "enabled": activation.chosen_on(current, among=shown),
         }

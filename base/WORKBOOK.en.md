@@ -303,8 +303,9 @@ The keys with which another system calls the business's API: "New API key", the 
 link to the API's documentation.
 
 ### Employees · Approvals
-<!-- from WORKBOOK.md sha256:5b086a34c109 -->
-The record of what was approved with a manager's PIN, read only.
+<!-- from WORKBOOK.md sha256:099748e4ae1e -->
+The read-only record of the actions that can need a manager's approval: who did it and who approved it for them, or that
+somebody whose role allows it did it by themselves.
 
 ### A person's page
 <!-- from WORKBOOK.md sha256:b88b0da10ded -->
@@ -387,12 +388,12 @@ On the Employees screens and the API documentation:
 | State | What the person sees |
 |---|---|
 | Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; "Loading what this role allows…" in "What it allows"; the faces in grey in "An approval is needed"; "Loading the documentation…". |
-| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "Nobody has had to approve anything in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
+| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "There is no action of this kind in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
 | Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load what this role allows.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a8ada64d0106 -->
+<!-- from WORKBOOK.md sha256:3ed52f8f4208 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -509,13 +510,13 @@ On the Employees screens and the API documentation:
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
-| BASE-F115 | See the help of a module's screen | done |
+| BASE-F115 | See the help of the screen in view | done |
 | BASE-F116 | Read what is new in ERPlora | done |
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
-| BASE-F126 | Turn ERPlora's support access on or off | partial |
+| BASE-F126 | Turn ERPlora's support access on or off | done |
 | BASE-F127 | Make a role of your own from another | partial |
 | BASE-F128 | Adjust what a role of your own allows | partial |
 | BASE-F129 | Delete a role of your own | partial |
@@ -787,7 +788,7 @@ knew: "Could not load notifications" with "Retry".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-<!-- from WORKBOOK.md sha256:9fbc88603bd0 -->
+<!-- from WORKBOOK.md sha256:62130c1d1cce -->
 Status: done
 Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
@@ -816,6 +817,7 @@ that address. With the pass spent or the minute gone, erplora.com says so and of
 account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com". Whoever is not the owner has no
 "Upgrade plan" anywhere in the Hub, nor erplora.com's Store: the administrator, the manager and the employee do not buy.
+In ERPlora's own business, which has no plan and buys nothing, its owner has neither; "Manage on erplora.com", yes.
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -1481,7 +1483,7 @@ of the tab goes on; a card that does not load is left out and the others show.
 Involved: BASE-F40, BASE-F118, PRINTING-F21
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
-<!-- from WORKBOOK.md sha256:f19c17ea973b -->
+<!-- from WORKBOOK.md sha256:0328535c675e -->
 Status: done
 Actor: owner, administrator
 Screen: System · Usage and plan
@@ -1541,7 +1543,8 @@ been counted for less than their period, they say "Since {day}". The assistant i
 not answer, its row says "Not available right now", with no figure, and the screen goes on; the same if WhatsApp cannot be
 read. In a demo, instead of everything: "Use is not measured in a demo: its data is deleted when it ends.". While the hub
 does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends it." and, under
-"What you use", the figures with no limit, bar, pill or line at the top.
+"What you use", the figures with no limit, bar, pill or line at the top. ERPlora's own business will never have one:
+instead it says "This is ERPlora's own business: it has no plan.", with the same figures.
 Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Know which version is running and when it was updated
@@ -1684,10 +1687,11 @@ with more than 30 reports a minute from the same person, the hub does not note i
 Involved: none
 
 ### BASE-F48 Open Settings and move through its tabs
-<!-- from WORKBOOK.md sha256:e19f0083066d -->
+<!-- from WORKBOOK.md sha256:b417d11c61dc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings, Settings · Printing
+Operations: none
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
   2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can
@@ -1792,10 +1796,11 @@ hub"); the business keeps nothing until it comes back with the person identified
 Involved: BASE-F13
 
 ### BASE-F53 Enter from the erplora.com panel without typing the password again
-<!-- from WORKBOOK.md sha256:2e95f6ff2428 -->
+<!-- from WORKBOOK.md sha256:3ff821a2583d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
+Operations: none
 Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
@@ -1951,10 +1956,11 @@ try again.".
 Involved: BASE-F55, BASE-F56
 
 ### BASE-F61 Sign out
-<!-- from WORKBOOK.md sha256:b623040eecce -->
+<!-- from WORKBOOK.md sha256:0a4ca1b69bbc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
+Operations: none
 Steps:
   1. They open the user card at the top of the side menu (on a phone, first the menu with the bar's button).
   2. They tap "Sign out".
@@ -1989,10 +1995,11 @@ connection: "Could not change this device. Check the connection and try again.".
 Involved: BASE-F55
 
 ### BASE-F63 Open a hub that is not set up yet
-<!-- from WORKBOOK.md sha256:07cd646f0aa9 -->
+<!-- from WORKBOOK.md sha256:514223787757 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
+Operations: none
 Steps:
   1. They open the address of a business erplora.com is still preparing (just created).
   2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
@@ -2573,7 +2580,7 @@ the last it knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
-<!-- from WORKBOOK.md sha256:f5aca9f7e571 -->
+<!-- from WORKBOOK.md sha256:e79b94167921 -->
 Status: done
 Actor: employee, manager
 Screen: An approval is needed
@@ -2594,11 +2601,13 @@ Steps:
      it through, nor an approval they had already been given. If the role changes, it counts from the next action on,
      without closing the session (BASE-F13). An app turned on after the role was saved asks as the basic role it came
      from; a permission an app added later is "No" until it is reviewed (BASE-F131). The owner is never asked.
+  6. Whoever may do it by their role does not see the question: they do it and it is recorded as done by them, with
+     nobody's approval (BASE-F85).
   From the assistant too: the "yes" of its card opens the same dialog, with the figures of what it was asked.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
-**Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
-action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
+**Employees › Approvals** (BASE-F85). Events `base.approval.granted` and `base.approval.used`; that of an action done by
+whoever may do it, `base.approval.noted`. The approval is spent together with the action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
 within those two minutes, goes through with it; if it went through, it is not repeated; two at once with the same one,
 only one goes through. What the approved action does on the way in other apps (the rectifying invoice of a void, the
 voucher sessions it gives back) goes with the approval, as when the manager does it themselves; nothing more: not what
@@ -2613,28 +2622,35 @@ with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the a
 Involved: BASE-F85, BASE-F55, BASE-F56, BASE-F100, BASE-F128, BASE-F130, SALE-F30, SALE-F31
 
 ### BASE-F85 Look up who approved what
-<!-- from WORKBOOK.md sha256:a356799e6ecb -->
+<!-- from WORKBOOK.md sha256:9fa5acdb0b25 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Approvals
 Steps:
-  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that needed a
-     manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or
+  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that can need a
+     manager's approval: who did it, who approved it and with what. Nobody, not even an administrator, can edit or
      delete it.".
-  2. A row per approval, the latest first: "When", "Action" (in words and in their language; with the figures of
-     what was done with it, when the app gives them: an unused approval did nothing and has no figures), "Approved
-     by", "Asked by", "With" ("PIN" or "Badge") and "State" ("Used" or "Not used").
-  3. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
+  2. A row per action, the latest first: "When", "Action" (in words and in their language; with the figures of what was
+     done, when the app gives them: an approval nobody used did nothing and has no figures), "Approved by", "Who" (who
+     did it, or asked to), "With" ("PIN", "Badge" or "Their role") and "State" ("Done", or "Not done" if the approval
+     was not used).
+  3. Those done by somebody whose role allows it, by themselves, show too: the manager who voids a sale or gives a
+     discount above the maximum, the owner, whoever has it "Allowed" in their role of your own (BASE-F128), and the same
+     asked of the assistant, with whoever said yes (BASE-F100). They say "Their role" in "With" and leave "Approved by"
+     empty. A row per action: one that was refused or failed does not show, nor the retry of one already done, nor one
+     that changed nothing, nor what the system or an automation does.
+  4. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
      "When" (a day or a few days in a row), "Action" (the ones on the record, each once and without figures), "With"
      and "State".
-  4. "Export CSV" downloads a file with the approvals the search and the filters keep, also the older ones the list
-     no longer shows, with the same columns in their language; meanwhile it says "Exporting…".
+  5. "Export CSV" downloads a file with the actions the search and the filters keep, also the older ones the list no
+     longer shows (the last 500), with the same columns in their language; meanwhile it says "Exporting…".
 In: the record of approvals.
-Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval.
-If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
-anything in this business yet." (and the exported file brings its header alone). If it cannot export, a notice says
-so with its reason and nothing is downloaded.
-Involved: BASE-F84, BASE-F112 (inside the app)
+Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval and each
+action.
+If it fails: "Could not load the record of approvals." with "Retry"; with none, "There is no action of this kind in this
+business yet." (and the exported file brings its header alone). If it cannot export, a notice says so with its reason
+and nothing is downloaded.
+Involved: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
 <!-- from WORKBOOK.md sha256:344d74567f12 -->
@@ -2734,7 +2750,7 @@ nothing published, "None of this business’s apps publishes its API yet.".
 Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation
-<!-- from WORKBOOK.md sha256:00fe8590da8a -->
+<!-- from WORKBOOK.md sha256:f12852ff479d -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2751,15 +2767,15 @@ it.".
 Involved: BASE-F90
 
 ### BASE-F92 Open and close the assistant's panel
-<!-- from WORKBOOK.md sha256:7a761cb0f856 -->
+<!-- from WORKBOOK.md sha256:0063a7a68d0c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title stays centred, and
-     the bell stays in sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what
-     they type straight away goes to the chat's box and Enter sends it.
+     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title reads whole, and the
+     bell and the help's "?" stay in sight: there, "Assistant" opens the panel as soon as the menu has finished
+     closing, so what they type straight away goes to the chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
@@ -3082,7 +3098,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-<!-- from WORKBOOK.md sha256:10089937bc9a -->
+<!-- from WORKBOOK.md sha256:6782ed15c886 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3109,11 +3125,12 @@ Steps:
   5. What the assistant tells (lists, figures) is what that person may read.
 In: the session of whoever asks, which signs each action; for what a manager approves, their PIN or their badge.
 Out: the action done with that person as its author. The approval is good for that action of that conversation, once
-and for two minutes, and it is spent together with the action (BASE-F84).
+and for two minutes, and it is spent together with the action (BASE-F84). One a manager could approve and the person may
+do by their role is recorded too, in their name (BASE-F85).
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
 says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
 failed: …" and the assistant tells it.
-Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
+Involved: BASE-F13, BASE-F84, BASE-F85, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
 <!-- from WORKBOOK.md sha256:b63066914a0f -->
@@ -3267,10 +3284,11 @@ If it fails: a failure with nothing written leaves no empty bubble: only the sen
 Involved: BASE-F93, BASE-F102, BASE-F104
 
 ### BASE-F107 Pass the master QA of the Hub
-<!-- from WORKBOOK.md sha256:b261e41b4306 -->
+<!-- from WORKBOOK.md sha256:94bcd34257d5 -->
 Status: done
 Actor: ERPlora's QA team
 Screen: every screen of the hub's platform
+Operations: none
 Steps:
   1. The team creates on erplora.com, with a new account, a business of its kind (a restaurant): the hub receives it
      with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
@@ -3363,10 +3381,11 @@ Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, 
 (each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
-<!-- from WORKBOOK.md sha256:70c3053e9c2d -->
+<!-- from WORKBOOK.md sha256:6525baba0e5d -->
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
 Actor: anyone, without an account
 Screen: The business's public page (WEBSITE-F10), on its domain
+Operations: none
 Steps:
   1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
   2. The business's published page shows, with its photos, in the browser's language.
@@ -3381,10 +3400,11 @@ published page, the domain says there is nothing there. A business being prepare
 Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
-<!-- from WORKBOOK.md sha256:1fae342a6c05 -->
+<!-- from WORKBOOK.md sha256:391a10311b47 -->
 Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
+Operations: none
 Steps:
   1. The person opens a screen or saves something while the database is cut for a few seconds: a restart, an AWS
      maintenance or the change of version.
@@ -3754,42 +3774,46 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
-### BASE-F115 See the help of a module's screen
-<!-- from WORKBOOK.md sha256:cd0e69a5291e -->
+### BASE-F115 See the help of the screen in view
+<!-- from WORKBOOK.md sha256:e6318599c755 -->
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
+Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
 Steps:
-  1. In a module whose help is ready, at the top right, next to the assistant, is the "?" button ("Help"). A module
-     whose help is not ready yet does not show it.
-  2. Tapping it opens the "Help · <module>" window, with the module's icon, centred on a tablet or a computer and from
-     the bottom on a phone. It never opens by itself, and it closes when the person moves to another module.
+  1. In a module whose help is ready and on the Hub's own screens (Home, Employees, a person's page, what a role allows,
+     Files, Apps, System, Settings and My profile), at the top right, next to the assistant, is the "?" button ("Help"),
+     going back too. It is not in a module whose help is not ready yet, on a screen without help (the API's
+     documentation), on the "No access" one, nor for whoever cannot see the Home.
+  2. Tapping it opens the "Help · <module>" window, with the module's icon ("Help · ERPlora" on a screen of the Hub),
+     centred on a tablet or a computer and from the bottom on a phone. It never opens by itself, and it closes when the
+     person moves to another module.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
      is asked of YouTube until it is tapped, and it plays inside the window, across its whole width, in YouTube's full
      player: fullscreen, captions on in the help's language and its logo, which opens the video on YouTube in another
      tab.
-  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module, and "On this
-     screen · <tab>", marked "You are here", with the summary of what the tab the person is on shows: short and whole,
-     with no "See more".
+  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module (on a screen of
+     the Hub, of what the Hub always brings), and "On this screen · <tab>", marked "You are here", with the summary of
+     what the tab the person is on shows: short and whole, with no "See more".
   5. "How to" brings each finished task of the module, grouped by tab, those of the tab the person is on first. Each
      task is a folded row that opens with its steps and its "If something goes wrong", one at a time. A task with a
      short video shows it when it opens, before its steps, in the same player as the module's and in the person's
      language or, if there is none, in Spanish; with several, one below the other. Opening the help or a task asks
      nothing of YouTube until the video is tapped. With more than eight tasks, "Search tasks…" appears on top, filtering by the title and the steps regardless of accents and
-     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
-  6. "Other screens of this module" brings the other tabs, folded, each with its short summary. A link of the help to a
-     screen of the Hub goes there and closes the help.
+     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again. The
+     help of a screen of the Hub brings no tasks.
+  6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
+     each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
   7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
      do I do this: <task>?" about the last task opened or, if none was opened, "How do I use <module> on <screen>?";
      if something was already written, the question goes below it. "Close" closes the help.
-In: the module and the tab the person is on.
-Out: nothing: the help is only read. It is the part of the module's user manual the customer reads, in the person's
-language.
+In: the module, or the screen of the Hub, and the tab the person is on.
+Out: nothing: the help is only read. It is the part of the user manual of the module, or of the Hub's own screens, the
+customer reads, in the person's language.
 If it fails: while it is read, the window shows its skeleton; if it cannot be read, it says "Could not load the help."
 and "Retry" asks for it again. The help already read stays stored until the page is reloaded: offline it opens again,
-also from another tab of the module, and each video says "Offline: the video is not available", with the text in
-view. If the manual is not translated into the person's language, or its translation fell behind, the help comes in
-Spanish.
+also from another tab of the module or another screen of the Hub, and each video says "Offline: the video is not
+available", with the text in view. If the manual is not translated into the person's language, or its translation fell
+behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
@@ -3927,10 +3951,11 @@ do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_
 Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
-<!-- from WORKBOOK.md sha256:ae3493013f65 -->
+<!-- from WORKBOOK.md sha256:f60b081b5d71 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · General
+Operations: none
 Steps:
   1. In the ERPlora app on a computer, **Settings › General** carries under "This device" the switch "Start on
      login" ("Open ERPlora when you sign in to this computer, so tickets always have somewhere to print."), off
@@ -3945,10 +3970,8 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:a939d641b5a9 -->
-Status: partial — it is changed and read in Settings › General, through the API and with the assistant, and the
-business already lets support in or refuses it as it says; erplora.com giving the support staff their code to come in
-is still missing
+<!-- from WORKBOOK.md sha256:8c48efdd08cf -->
+Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
 Steps:
@@ -3964,13 +3987,13 @@ Steps:
      most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
-  4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
-     and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
-     resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
-     a PIN or a badge, take no place and do not count in the plan's use, and their browser does not stay as a device
-     of the business: it neither ends another device's session nor has its own ended by another one's entry
-     (BASE-F57). Each entry joins the list of the latest entries at once, and what they do stays in the records under
-     their name.
+  4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
+     admin, with their own account (HUBS-F38 of erplora.com), and arrives as an administrator: they may do everything
+     but what only the owner does (buying for the business, resetting it, its copies). They are not in Employees nor
+     among who can give access, do not enter the tills with a PIN or a badge, take no place and do not count in the
+     plan's use, and their browser does not stay as a device of the business: it neither ends another device's session
+     nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest entries at once,
+     and what they do stays in the records under their name.
   5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
      administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
      try again." with "Try again".
@@ -3984,4 +4007,4 @@ as it was; reading it, they see they cannot change it. If the change cannot be s
 shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
 support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step
 5).
-Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)

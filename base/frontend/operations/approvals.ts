@@ -3,18 +3,24 @@
 
 type NoInput = Record<string, never>;
 
-/** `base.ApprovalOut`: one approval of the record (Employees › Approvals). */
+/** How an action of the record was let through: a manager's PIN or badge, or the role of whoever did it. */
+export type ApprovalWay = 'pin' | 'badge' | 'role';
+
+/** `base.ApprovalOut`: one action of the record (Employees › Approvals). */
 export interface ApprovalRow {
   id: string;
   at: string;
-  /** What was approved, in words, with the figures of what was done («Discount a line by 50 %»). */
+  /** The action, in words, with the figures of what was done («Discount a line by 50 %»). */
   action: string;
   /** What the action is called, without figures: what the «Action» filter offers. */
   operation_label: string;
   operation: string;
+  /** Who did it, or asked to. */
   requested_by: string;
+  /** Empty when whoever did it needed no approval. */
   approved_by: string;
-  way: 'pin' | 'badge';
+  way: ApprovalWay;
+  /** Whether it was done: an approval never used did nothing. */
   used: boolean;
   used_at: string | null;
 }

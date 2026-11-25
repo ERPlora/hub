@@ -92,7 +92,7 @@ async def test_a_device_set_up_in_printing_prints_the_printers_of_its_registrati
         "type": "ready",
         "deviceId": "till-1",
         "roles": ["kitchen", "receipt"],
-        "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS,
+        "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS,
     }
     await socket.send({"type": "claim", "role": "receipt"})
     assert (await socket.receive())["jobId"] == str(queued.id)
@@ -139,7 +139,7 @@ async def test_a_device_retired_while_connected_stops_at_its_next_beat(sockets, 
     await db(run, "printing.device.retire", {"device_id": registration})
     await socket.send({"type": "beat"})
 
-    assert await socket.receive() == {"type": "beat", "refreshed": 0, "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS}
+    assert await socket.receive() == {"type": "beat", "refreshed": 0, "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS}
     await db(enqueue, till)
     assert await socket.silent(), "a retired device was woken"
     await socket.send({"type": "claim", "role": "receipt"})

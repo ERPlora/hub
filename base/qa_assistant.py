@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from django.apps import apps
 from live.operations import Operation
 
 from base import qa_coverage, workbook_help
@@ -64,10 +65,12 @@ class Asked:
 class Report:
     flows: tuple[Asked, ...]
     uncited_tools: tuple[str, ...]
+    broken_citations: tuple[str, ...]
 
 
 def report(root: Path, flows: Mapping[str, WorkbookFlow], operations: Mapping[str, Operation]) -> Report:
-    """Each of ``flows`` done on a screen, as asked for by talking, and the tools of ``operations`` no flow cites."""
+    """Each of ``flows`` done on a screen, as asked for by talking, the tools of ``operations`` no flow cites, and what is
+    cited and does not exist."""
     cited = cited_operations(root)
     answers = tuple(
         asked(flow, [operations[name] for name in cited.get(flow.id, ()) if name in operations])
@@ -76,7 +79,29 @@ def report(root: Path, flows: Mapping[str, WorkbookFlow], operations: Mapping[st
     )
     used = {name for flow_id in flows for name in cited.get(flow_id, ())}
     uncited = sorted(name for name, op in operations.items() if is_tool(op) and name not in used)
-    return Report(answers, tuple(uncited))
+    return Report(answers, tuple(uncited), tuple(_broken_citations(cited, flows, operations)))
+
+
+def _broken_citations(
+    cited: Mapping[str, tuple[str, ...]], flows: Mapping[str, WorkbookFlow], operations: Mapping[str, Operation]
+) -> Iterator[str]:
+    """The flows cited that no manual has, and what a done flow cites that is neither an operation nor a model the app
+    reads: the manual of an app that is not done yet names the operations it will have."""
+    for flow_id, names in cited.items():
+        if flow_id not in flows:
+            yield f"{flow_id} is in no WORKBOOK"
+        elif flows[flow_id].done:
+            missing = (name for name in names if name not in operations and not _is_model(name))
+            yield from (f"{flow_id} cites {name}, which does not exist" for name in missing)
+
+
+def _is_model(name: str) -> bool:
+    """Whether ``name`` is a model as written, ``inventory.Product``: Django also finds it in lower case, which is how an
+    operation that lost its action reads."""
+    try:
+        return apps.get_model(name)._meta.label == name
+    except (LookupError, ValueError):
+        return False
 
 
 def asked(flow: WorkbookFlow, operations: Sequence[Operation]) -> Asked:

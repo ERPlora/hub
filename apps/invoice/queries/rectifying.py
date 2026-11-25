@@ -11,6 +11,7 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
+from apps.invoice.platform_series import refuse_platform_invoice
 from apps.invoice.queries.rows import find_invoice, remaining_of
 from apps.invoice.queries.series import RECTIFYING, next_number_of
 from apps.invoice.schemas.rectifying import RectificationPreviewIn, RectificationPreviewOut
@@ -36,7 +37,8 @@ def rectifiable(
 ) -> int:
     """What is left of ``original`` to rectify by hand, dated ``today`` (``issue_date``: the date asked, if any); a
     ``Conflict`` saying why when it cannot be: a rectifying invoice, a cancelled one, a ticket replaced by a full
-    invoice, another day than today, nothing left."""
+    invoice, another day than today, nothing left, or erplora.com's own."""
+    refuse_platform_invoice(original)
     if original.is_rectification:
         raise Conflict(
             str(CANNOT_RECTIFY_RECTIFICATION),

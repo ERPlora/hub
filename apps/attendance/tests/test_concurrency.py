@@ -11,7 +11,7 @@ from live.errors import Conflict
 
 from apps.attendance.models import Break, Correction, Record
 from apps.staff.models import Member
-from apps.staff.tests.test_services import _race
+from apps.staff.tests.conftest import _race
 from base.tenancy.tests.concurrency import HOW, admin_delete, meanwhile
 
 from .conftest import HUB_DB_COMMITTED, ctx_for, make_member, run, utc

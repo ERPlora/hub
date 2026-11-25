@@ -321,7 +321,7 @@ def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_
 
 
 def fail_the_schema():
-    return mock.patch.object(worker_activations.migrator, "ensure_schema", side_effect=RuntimeError("the schema broke"))
+    return mock.patch.object(worker_activations.migrator.schema, "ensure_schema", side_effect=RuntimeError("the schema broke"))
 
 
 def test_an_app_that_cannot_be_set_up_says_so_and_its_data_loads_when_the_worker_manages_by_itself(business):
@@ -556,7 +556,7 @@ def test_only_the_loads_of_the_apps_that_went_on_load(business):
     salon = load_template(hub)
     with use_hub(fresh(hub)):
         AppActivation.objects.filter(host=hub.slug, app="printing").update(state=CREATING)
-    migrator.ensure_schema(fresh(hub), add=["printing"])
+    migrator.schema.ensure_schema(fresh(hub), add=["printing"])
     op = get("base.app.activation_settle")
 
     with use_hub(fresh(hub)):
