@@ -1686,10 +1686,11 @@ with more than 30 reports a minute from the same person, the hub does not note i
 Involved: none
 
 ### BASE-F48 Open Settings and move through its tabs
-<!-- from WORKBOOK.md sha256:e19f0083066d -->
+<!-- from WORKBOOK.md sha256:b417d11c61dc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings, Settings · Printing
+Operations: none
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
   2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can
@@ -1794,10 +1795,11 @@ hub"); the business keeps nothing until it comes back with the person identified
 Involved: BASE-F13
 
 ### BASE-F53 Enter from the erplora.com panel without typing the password again
-<!-- from WORKBOOK.md sha256:2e95f6ff2428 -->
+<!-- from WORKBOOK.md sha256:3ff821a2583d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
+Operations: none
 Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
@@ -1953,10 +1955,11 @@ try again.".
 Involved: BASE-F55, BASE-F56
 
 ### BASE-F61 Sign out
-<!-- from WORKBOOK.md sha256:b623040eecce -->
+<!-- from WORKBOOK.md sha256:0a4ca1b69bbc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
+Operations: none
 Steps:
   1. They open the user card at the top of the side menu (on a phone, first the menu with the bar's button).
   2. They tap "Sign out".
@@ -1991,10 +1994,11 @@ connection: "Could not change this device. Check the connection and try again.".
 Involved: BASE-F55
 
 ### BASE-F63 Open a hub that is not set up yet
-<!-- from WORKBOOK.md sha256:07cd646f0aa9 -->
+<!-- from WORKBOOK.md sha256:514223787757 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
+Operations: none
 Steps:
   1. They open the address of a business erplora.com is still preparing (just created).
   2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
@@ -3269,10 +3273,11 @@ If it fails: a failure with nothing written leaves no empty bubble: only the sen
 Involved: BASE-F93, BASE-F102, BASE-F104
 
 ### BASE-F107 Pass the master QA of the Hub
-<!-- from WORKBOOK.md sha256:b261e41b4306 -->
+<!-- from WORKBOOK.md sha256:94bcd34257d5 -->
 Status: done
 Actor: ERPlora's QA team
 Screen: every screen of the hub's platform
+Operations: none
 Steps:
   1. The team creates on erplora.com, with a new account, a business of its kind (a restaurant): the hub receives it
      with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
@@ -3365,10 +3370,11 @@ Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, 
 (each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
-<!-- from WORKBOOK.md sha256:70c3053e9c2d -->
+<!-- from WORKBOOK.md sha256:6525baba0e5d -->
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
 Actor: anyone, without an account
 Screen: The business's public page (WEBSITE-F10), on its domain
+Operations: none
 Steps:
   1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
   2. The business's published page shows, with its photos, in the browser's language.
@@ -3383,10 +3389,11 @@ published page, the domain says there is nothing there. A business being prepare
 Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
-<!-- from WORKBOOK.md sha256:1fae342a6c05 -->
+<!-- from WORKBOOK.md sha256:391a10311b47 -->
 Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
+Operations: none
 Steps:
   1. The person opens a screen or saves something while the database is cut for a few seconds: a restart, an AWS
      maintenance or the change of version.
@@ -3929,10 +3936,11 @@ do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_
 Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
-<!-- from WORKBOOK.md sha256:ae3493013f65 -->
+<!-- from WORKBOOK.md sha256:f60b081b5d71 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · General
+Operations: none
 Steps:
   1. In the ERPlora app on a computer, **Settings › General** carries under "This device" the switch "Start on
      login" ("Open ERPlora when you sign in to this computer, so tickets always have somewhere to print."), off
