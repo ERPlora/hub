@@ -578,12 +578,12 @@ food in Spain": when deactivating it or setting its end date, the one in force t
 the last deactivated one).
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:ca3c83710666 -->
+<!-- from WORKBOOK.md sha256:febc7db86239 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The categories, with search, origin filter, pages (up to 100) and their rate in force today in a country and region | view | F01, F19 | `tax.category.list` |
-| A category by its key, with its translated name | view | F02, F19 | `tax.category.get` |
+| A category by its key, its name or an alias, with its translated name and with the label that says its rate today in the business's country and region ("Product — generic · 21%"; without a rule in force, its name alone): the one the assistant's card reads (BASE-F97) | view | F02, F19 | `tax.category.get` |
 | The rules, with search, filters (country, region, category, type, qualification, status) and pages | view | F03 | `tax.rule.list` |
 | How many root rules apply today in the business's country and whether taxes are set up (the notice and the step "Your taxes" of the Home) | view | F17 | `tax.rule.status` |
 | The root rules a component can hang from in a country, region and category: the same ones the creation accepts (also a root that starts in the future; one without tax, only for a component at 0 %) | view | F06 | `tax.rule.parent_candidates` |

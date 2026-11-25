@@ -101,6 +101,13 @@ class CategoryOut(Schema):
     is_active: bool = Field(description="Active.")
 
 
+class CategoryNamedOut(CategoryOut):
+    label: str = Field(
+        description="How a person names the category, in the reader's language: its name and the rate it charges today "
+        "in the business's country and region (Restaurant — food · 10%); its name alone without a rule."
+    )
+
+
 class CategoryRowOut(CategoryOut):
     rate_pct: Decimal | None = Field(
         description="The rate in force today where asked, components included; empty without a rule."

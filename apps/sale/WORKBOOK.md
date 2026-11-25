@@ -1342,7 +1342,8 @@ con que se cobró.
 Si falla: una categoría de IVA que no existe se rechaza junto a su campo. El motivo de un campo se quita
 en cuanto se corrige ese campo («IVA que cobra», al elegir otra categoría). Una sección que otro ya
 borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
-Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador; una que ya no está no sale en la tarjeta (BASE-F97).
+Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador (una que ya no está
+no sale en la tarjeta), y el IVA que cobra con su tipo de hoy, como la lista («Producto — general · 21 %») (BASE-F97).
 Implicados: TAX-F01, BASE-F97
 
 ### SALE-F36 Preparar las notas rápidas

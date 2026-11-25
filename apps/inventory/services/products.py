@@ -38,6 +38,7 @@ from apps.inventory.services.writes import (
     _tax_category,
 )
 from base import images
+from base.assistant import card_order
 
 SKU_TAKEN = _("That SKU already exists in the catalog.")
 EAN13_TAKEN = _("Another product of the catalog already has that EAN-13.")
@@ -69,6 +70,7 @@ _PRODUCT_CONSTRAINTS = {
         "description": "Create a product of the catalog with its tax category, its categories and, if given, "
         "its initial stock.",
         "risk": "normal",
+        "summary": card_order.said_first("name", "price", "tax_category_key"),
         "asks": {
             "en": (
                 "add a new product: Iced Coffee, 3.50",
