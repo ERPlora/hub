@@ -39,7 +39,7 @@ from live.operations import INTERNAL, get, operation, registry
 from apps.website import reviews
 from apps.website.catalog_items import product_item, service_item
 from apps.website.models import Image, Site
-from apps.website.qr import public_url, qr_file
+from apps.website.qr import qr_file
 from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site, reviews_view
 from apps.website.schemas import (
     DAYS,
@@ -63,6 +63,7 @@ from apps.website.schemas import (
 )
 from base.apps_on import active_apps
 from base.operations import business_currency, business_name
+from base.qr import public_url
 from base.registry import hub_by_slug
 from base.throttle import RateLimited, allow, client_address
 
@@ -217,7 +218,6 @@ def business_day(scope: Scope) -> str:
     return local_day(hub.timezone if hub else "")
 
 
-# Not an assistant tool (no ``ai=``): its answer is an image in base64; the editor downloads it.
 # Not an assistant tool: an image the screen shows and prints.
 @operation(
     "website.qr.get",

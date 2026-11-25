@@ -108,8 +108,8 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "routes, it never queries."
     ),
     "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
-    "apps/website/qr.py": (
-        "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database."
+    "base/qr.py": (
+        "Pillow's Image.save writes a QR code as a PNG into a memory buffer: no model and no database."
     ),
     "base/images.py": (
         "Pillow's Image.save writes a photo into a memory buffer, and the hub file store's save and delete keep and "
