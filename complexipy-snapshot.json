@@ -128,20 +128,6 @@
     ]
   },
   {
-    "path": "apps/inventory/services/imports.py",
-    "file_name": "imports.py",
-    "functions": [
-      {
-        "name": "_check_product_row",
-        "complexity": 17
-      },
-      {
-        "name": "bulk_create_products",
-        "complexity": 19
-      }
-    ]
-  },
-  {
     "path": "apps/inventory/tests/test_workbook.py",
     "file_name": "test_workbook.py",
     "functions": [

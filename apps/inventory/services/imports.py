@@ -3,7 +3,9 @@ every row, and the amounts and quantities as a spreadsheet or a person writes th
 
 import re
 from collections import defaultdict
+from collections.abc import Callable
 from contextlib import suppress
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import cache
 from uuid import UUID
@@ -25,7 +27,7 @@ from apps.inventory.queries.exports import FORMULA_STARTS
 from apps.inventory.queries.reads import held
 from apps.inventory.queries.settings import current_settings
 from apps.inventory.schemas.fields import MAX_CENTS
-from apps.inventory.schemas.imports import CategoryImportIn, ImportReportOut, ProductImportIn
+from apps.inventory.schemas.imports import CategoryImportIn, ImportReportOut, ProductImportIn, ProductImportRowIn
 from apps.inventory.services.movements import _move
 from apps.inventory.services.products import EAN13_TAKEN, _created_payload, _save
 from apps.inventory.services.writes import _actor
@@ -99,6 +101,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
     tax_categories = {
         tax.key: tax for tax in held(TaxCategory.objects.filter(key__in=keys, is_active=True).order_by("key"))
     }
+    file = _ProductFile(settings, currency, tax_categories, live_eans)
     seen_skus: set[str] = set()
     report = []
     for row in rows:
@@ -115,25 +118,13 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
         if sku in live_skus:
             report.append(_row(row.line, sku, "skipped"))
             continue
-        outcome = _check_product_row(row, name, sku, settings, tax_categories, currency)
-        if isinstance(outcome, str):
-            report.append(_row(row.line, sku, "failed", reason=outcome))
-            continue
-        if outcome["ean13"] and outcome["ean13"] in live_eans:
-            report.append(_row(row.line, sku, "failed", reason=str(EAN13_TAKEN)))
-            continue
-        if outcome["ean13"]:
-            live_eans.add(outcome["ean13"])
-        if data.dry_run:
+        fields = _product_fields(row, {"name": name, "sku": sku}, file)
+        if isinstance(fields, str):
+            report.append(_row(row.line, sku, "failed", reason=fields))
+        elif data.dry_run:
             report.append(_row(row.line, sku, "ready"))
-            continue
-        stock = outcome.pop("stock")
-        product = Product(**outcome, created_by=_actor(ctx), updated_by=_actor(ctx))
-        _save(product)
-        record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, []))
-        if stock:
-            _move(ctx, product, StockMovement.Type.INITIAL, stock)
-        report.append(_row(row.line, sku, "created", id=product.id))
+        else:
+            report.append(_row(row.line, sku, "created", id=_create_product(ctx, fields).id))
     return _report(report, dry_run=data.dry_run)
 
 
@@ -202,50 +193,103 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
     return _report(report, dry_run=False)
 
 
-def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
-    row, name: str, sku: str, settings: Settings, tax_categories: dict, currency: str
-) -> dict | str:
-    """The fields of a new product from one CSV row (its name and SKU already read, its amounts in the business's
-    ``currency``), or why it cannot be."""
+@dataclass(frozen=True)
+class _ProductFile:
+    """What the rows of a file of products are read with: the business's settings and currency, the tax categories
+    the rows name, and the EAN-13 codes already taken, by a live product or by an earlier row of the file."""
+
+    settings: Settings
+    currency: str
+    tax_categories: dict[str, TaxCategory]
+    taken_eans: set[str]
+
+
+def _product_fields(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> dict | str:
+    """The fields of a new product from one CSV row (``fields``: its name and SKU, already read), or why it cannot be."""
+    for read in _READ_IN_ORDER:
+        outcome = read(row, fields, file)
+        if isinstance(outcome, str):
+            return outcome
+        fields = outcome
+    return fields
+
+
+def _read_texts(row: ProductImportRowIn, fields: dict, _file: _ProductFile) -> dict | str:
     ean13 = _unguarded(row.ean13.strip())
-    if len(name) > 200 or len(sku) > 64 or len(ean13) > 13:
+    if len(fields["name"]) > 200 or len(fields["sku"]) > 64 or len(ean13) > 13:
         return str(ROW_TOO_LONG)
-    price, cost = parse_amount(row.price, currency), parse_amount(row.cost, currency)
+    return {**fields, "ean13": ean13 or None, "description": _unguarded(row.description)}
+
+
+def _read_amounts(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> dict | str:
+    price, cost = parse_amount(row.price, file.currency), parse_amount(row.cost, file.currency)
     if price is None or cost is None:
         return str(ROW_PRICE_NOT_NUMERIC)
     if max(price, cost) > MAX_CENTS:
         return str(ROW_AMOUNT_TOO_LARGE)
+    return {**fields, "price": price, "cost": cost}
+
+
+def _read_stock(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> dict | str:
+    """Its unit, its stock and its threshold, both on the unit's step."""
     unit = row.unit.strip().lower() or Unit.UNIT
     if unit not in Unit.values:
         return str(ROW_UNIT_UNKNOWN) % {"text": row.unit.strip()}
     stock = parse_quantity(row.stock) if row.stock.strip() else Decimal("0")
     threshold = (
-        parse_quantity(row.low_stock_threshold) if row.low_stock_threshold.strip() else Decimal(settings.low_stock_threshold)
+        parse_quantity(row.low_stock_threshold)
+        if row.low_stock_threshold.strip()
+        else Decimal(file.settings.low_stock_threshold)
     )
-    if stock is None or threshold is None:
-        return str(ROW_QUANTITY_NOT_NUMERIC)
-    if max(stock, threshold) >= MAX_QUANTITY:
-        return str(ROW_QUANTITY_TOO_LARGE)
-    if not fits_unit(stock, unit) or not fits_unit(threshold, unit):
-        return str(ROW_OFF_GRID)
+    refusal = _quantity_refusal(unit, stock, threshold)
+    return refusal or {**fields, "stock": stock, "low_stock_threshold": threshold, "unit": unit, "pricing_unit": unit}
+
+
+def _read_tax_category(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> dict | str:
     key = row.tax_category_key.strip()
     if not key:
         return str(ROW_TAX_CATEGORY_MISSING)
-    if key not in tax_categories:
+    if key not in file.tax_categories:
         return str(ROW_TAX_CATEGORY_UNKNOWN) % {"text": key}
-    return allergens.read_into(row.allergens, {
-        "name": name,
-        "sku": sku,
-        "ean13": ean13 or None,
-        "description": _unguarded(row.description),
-        "price": price,
-        "cost": cost,
-        "stock": stock,
-        "low_stock_threshold": threshold,
-        "unit": unit,
-        "pricing_unit": unit,
-        "tax_category": tax_categories[key],
-    })
+    return {**fields, "tax_category": file.tax_categories[key]}
+
+
+def _read_allergens(row: ProductImportRowIn, fields: dict, _file: _ProductFile) -> dict | str:
+    return allergens.read_into(row.allergens, fields)
+
+
+def _take_ean13(_row: ProductImportRowIn, fields: dict, file: _ProductFile) -> dict | str:
+    if fields["ean13"] in file.taken_eans:
+        return str(EAN13_TAKEN)
+    if fields["ean13"]:
+        file.taken_eans.add(fields["ean13"])
+    return fields
+
+
+#: What reads a row, each adding to the fields or saying why the row fails. A row with several reasons tells the first;
+#: the EAN-13 is taken last, by a row that goes in.
+_READ_IN_ORDER: tuple[Callable[[ProductImportRowIn, dict, _ProductFile], dict | str], ...] = (
+    _read_texts, _read_amounts, _read_stock, _read_tax_category, _read_allergens, _take_ean13,
+)  # fmt: skip
+
+
+def _quantity_refusal(unit: str, *quantities: Decimal | None) -> str:
+    """Why ``quantities``, as read, are not all quantities of ``unit``; empty if they are."""
+    if None in quantities:
+        return str(ROW_QUANTITY_NOT_NUMERIC)
+    if max(quantities) >= MAX_QUANTITY:
+        return str(ROW_QUANTITY_TOO_LARGE)
+    return "" if all(fits_unit(quantity, unit) for quantity in quantities) else str(ROW_OFF_GRID)
+
+
+def _create_product(ctx: OperationContext, fields: dict) -> Product:
+    stock = fields.pop("stock")
+    product = Product(**fields, created_by=_actor(ctx), updated_by=_actor(ctx))
+    _save(product)
+    record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, []))
+    if stock:
+        _move(ctx, product, StockMovement.Type.INITIAL, stock)
+    return product
 
 
 def _unguarded(text: str) -> str:
