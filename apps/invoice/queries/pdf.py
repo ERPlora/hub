@@ -57,11 +57,11 @@ def file_name(invoice: Invoice) -> str:
         "asks": {
             "en": (
                 "give me FACT-2025-000317 as a PDF",
-                "save Carpintería Lema's invoice, I have to keep it",
+                "save the Carpintería Lema one as a PDF, I have to keep it",
             ),
             "es": (
                 "dame el PDF de la FACT-2025-000317",
-                "bájame la factura de Carpintería Lema, que la tengo que guardar",
+                "bájame en PDF la de Carpintería Lema, que la tengo que guardar",
             ),
         },
         "description": "Writes the PDF file of one invoice, for the person to keep: its A4 page with its VeriFactu QR. "
