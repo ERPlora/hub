@@ -392,7 +392,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a8ada64d0106 -->
+<!-- from WORKBOOK.md sha256:9f7a132fa582 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -509,7 +509,7 @@ On the Employees screens and the API documentation:
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
-| BASE-F115 | See the help of a module's screen | done |
+| BASE-F115 | See the help of the screen in view | done |
 | BASE-F116 | Read what is new in ERPlora | done |
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
@@ -3743,42 +3743,46 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
-### BASE-F115 See the help of a module's screen
-<!-- from WORKBOOK.md sha256:cd0e69a5291e -->
+### BASE-F115 See the help of the screen in view
+<!-- from WORKBOOK.md sha256:7b42a8b07a82 -->
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
+Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
 Steps:
-  1. In a module whose help is ready, at the top right, next to the assistant, is the "?" button ("Help"). A module
-     whose help is not ready yet does not show it.
-  2. Tapping it opens the "Help · <module>" window, with the module's icon, centred on a tablet or a computer and from
-     the bottom on a phone. It never opens by itself, and it closes when the person moves to another module.
+  1. In a module whose help is ready and on the Hub's own screens (Home, Employees, a person's page, what a role allows,
+     Files, Apps, System, Settings and My profile), at the top right, next to the assistant, is the "?" button ("Help"),
+     going back too. It is not in a module whose help is not ready yet, on a screen without help (the API's
+     documentation), on one the person has no access to, nor for whoever cannot see the Home.
+  2. Tapping it opens the "Help · <module>" window, with the module's icon ("Help · ERPlora" on a screen of the Hub),
+     centred on a tablet or a computer and from the bottom on a phone. It never opens by itself, and it closes when the
+     person moves to another module.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
      is asked of YouTube until it is tapped, and it plays inside the window, across its whole width, in YouTube's full
      player: fullscreen, captions on in the help's language and its logo, which opens the video on YouTube in another
      tab.
-  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module, and "On this
-     screen · <tab>", marked "You are here", with the summary of what the tab the person is on shows: short and whole,
-     with no "See more".
+  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module (on a screen of
+     the Hub, of what the Hub always brings), and "On this screen · <tab>", marked "You are here", with the summary of
+     what the tab the person is on shows: short and whole, with no "See more".
   5. "How to" brings each finished task of the module, grouped by tab, those of the tab the person is on first. Each
      task is a folded row that opens with its steps and its "If something goes wrong", one at a time. A task with a
      short video shows it when it opens, before its steps, in the same player as the module's and in the person's
      language or, if there is none, in Spanish; with several, one below the other. Opening the help or a task asks
      nothing of YouTube until the video is tapped. With more than eight tasks, "Search tasks…" appears on top, filtering by the title and the steps regardless of accents and
-     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
-  6. "Other screens of this module" brings the other tabs, folded, each with its short summary. A link of the help to a
-     screen of the Hub goes there and closes the help.
+     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again. The
+     help of a screen of the Hub brings no tasks.
+  6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
+     each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
   7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
      do I do this: <task>?" about the last task opened or, if none was opened, "How do I use <module> on <screen>?";
      if something was already written, the question goes below it. "Close" closes the help.
-In: the module and the tab the person is on.
-Out: nothing: the help is only read. It is the part of the module's user manual the customer reads, in the person's
-language.
+In: the module, or the screen of the Hub, and the tab the person is on.
+Out: nothing: the help is only read. It is the part of the user manual of the module, or of the Hub's own screens, the
+customer reads, in the person's language.
 If it fails: while it is read, the window shows its skeleton; if it cannot be read, it says "Could not load the help."
 and "Retry" asks for it again. The help already read stays stored until the page is reloaded: offline it opens again,
-also from another tab of the module, and each video says "Offline: the video is not available", with the text in
-view. If the manual is not translated into the person's language, or its translation fell behind, the help comes in
-Spanish.
+also from another tab of the module or another screen of the Hub, and each video says "Offline: the video is not
+available", with the text in view. If the manual is not translated into the person's language, or its translation fell
+behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
