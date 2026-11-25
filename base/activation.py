@@ -399,7 +399,7 @@ def has_tables(hub: Any, label: str) -> bool:
     """Whether ``label``'s tables are in ``hub``'s own database, as far as control knows: only a module may lack them.
 
     What the row in hand lists has them, for free: this runs on every query. A row never confirmed (:data:`CONFIRMED_BY`:
-    ``migrator.is_behind`` says so too, and the next ``migrate_hubs`` confirms it) says nothing, and nothing is refused
+    ``migrator.hubs_pass.is_behind`` says so too, and the next ``migrate_hubs`` confirms it) says nothing, and nothing is refused
     on it. Only what a confirmed row does not list goes on: it may be a row read before the tables were made, so it asks
     what control says now, through the cache."""
     recorded = hub.schema_apps or ()
@@ -470,7 +470,7 @@ def changing(host: str) -> Iterator[None]:
 
 def forget(host: str) -> None:
     """Drop what is kept of ``host``'s apps from the cache: after the COMMIT of a change or the migrator's run
-    (``migrator.ensure_schema``), the next read sees it, in every process. A cache that does not answer is logged; what
+    (``migrator.schema.ensure_schema``), the next read sees it, in every process. A cache that does not answer is logged; what
     it kept ends with its timeout."""
     try:
         for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host, CREATED_APPS_CACHE + host):

@@ -8,7 +8,7 @@ from live.outbox import record_event
 
 from apps.reservation import events
 from apps.reservation.queries import settings_row
-from apps.reservation.schemas import SettingsIn, SettingsOut
+from apps.reservation.schemas.settings import SettingsIn, SettingsOut
 from apps.reservation.services.gate import lock_book
 from apps.reservation.services.writes import actor_label
 

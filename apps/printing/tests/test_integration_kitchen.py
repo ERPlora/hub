@@ -14,7 +14,7 @@ from live.errors import Conflict
 from apps.kitchen.models import Destination
 from apps.kitchen.tests.conftest import add_line, make_station, open_check, route_product
 from apps.printing.models import PrintJob
-from apps.printing.queries import STALLED_AFTER
+from apps.printing.queries.waiting import STALLED_AFTER
 from apps.printing.tests.conftest import A, B, HUB_DB, ctx_for, printer, run
 from base.tenancy.context import use_hub
 

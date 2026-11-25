@@ -1,7 +1,7 @@
 """Only ``base/catalog.py`` reaches the SaaS's ``shared`` schema.
 
 It is the single exception to «only ``services.py`` and ``queries.py`` touch the ORM», as
-``base/tenancy/migrator.py`` is for the DDL: ``register_apps`` runs for no hub and no user, so it is
+``base/tenancy/migrator/`` is for the DDL: ``register_apps`` runs for no hub and no user, so it is
 no ``@operation``. Everywhere else in the Hub's source (outside ``tests/``), nothing imports
 ``shared.models`` and nothing names the ``shared`` alias by hand (``using=``, ``.using(``,
 ``connections[``). ``base/routers.py`` returns the alias, which is a router's job, not a choice.

@@ -77,7 +77,9 @@ API_KEY_EVENTS = (API_KEY_CREATED, API_KEY_ROTATED, API_KEY_REVOKED)
 #: A manager approved one refused command with their PIN or badge, and the pass was spent on it (``base.approvals``).
 APPROVAL_GRANTED = "base.approval.granted"
 APPROVAL_USED = "base.approval.used"
-APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED)
+#: A command a manager may approve was done by whoever may do it themselves (``base.approval_note``).
+APPROVAL_NOTED = "base.approval.noted"
+APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED, APPROVAL_NOTED)
 #: Whoever runs the business showed or hid the documentation of its API.
 API_DOC_SETTINGS_CHANGED = "base.api_doc.settings_changed"
 #: Whoever runs the business turned ERPlora's support access on or off.

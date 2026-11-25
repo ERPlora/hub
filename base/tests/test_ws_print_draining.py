@@ -121,7 +121,7 @@ async def test_a_beat_counts_the_printers_the_device_still_reaches(sockets, sess
     socket = await ready_socket(sockets, cookie, [till, kitchen])
 
     await socket.send({"type": "beat"})
-    assert await socket.receive() == {"type": "beat", "refreshed": 2, "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS}
+    assert await socket.receive() == {"type": "beat", "refreshed": 2, "heartbeatSeconds": ws_print.presence.HEARTBEAT_SECONDS}
 
     for printer_id in (till, kitchen):
         await db(run, "printing.printer.update", {"printer_id": printer_id, "is_active": False})

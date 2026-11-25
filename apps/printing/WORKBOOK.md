@@ -950,7 +950,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `UNDRAINED_ALERT_SECONDS`) o más que ningún dispositivo con `last_seen_at` en los últimos `SEEN_WITHIN` (90 s,
    `HOST_TTL_SECONDS`) puede sacar; `configured` (el paso del Inicio) y `unattended` del resumen siguen mirando solo
    el alta. Como esa cifra cambia sin evento, `bell_refresh_every = {"stalled_<función>": 30}` (`base.E007`): la
-   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
+   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries_waiting.py`,
    `tests/test_services_devices.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
    `tests/test_integration_home.py`.
 7. **El cliente del canal en el dispositivo**.
@@ -982,7 +982,7 @@ fila del Inicio; si la lectura falla, `unknown`. Tests: `tests/test_apps.py`,
 llega a una impresora activa suya en papel de tique ha dado señales en los últimos `SEEN_WITHIN` (90 s), `no_signal`
 si lo hay pero ninguno ha dado señales y `not_configured` si no hay ninguno. «Dado de alta» es el `configured` de
 `printing.device.coverage` y «ha dado señales», lo que la campana llama un dispositivo que está: las tres lecturas usan
-las mismas reglas. `SEEN_WITHIN` vive en `queries/health.py`. `PrintingConfig.health` la declara con los tiques, para
+las mismas reglas. `SEEN_WITHIN` vive en `queries/device_reads.py`. `PrintingConfig.health` la declara con los tiques, para
 quien ve Impresión (`printing.view_settings`), con «Configurar la impresión» hacia `/printing/printers` (`base.E021`).
 Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 

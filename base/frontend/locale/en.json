@@ -1097,12 +1097,12 @@
       }
     },
     "approvals": {
-      "intro": "Each action that needed a manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or delete it.",
+      "intro": "Each action that can need a manager's approval: who did it, who approved it and with what. Nobody, not even an administrator, can edit or delete it.",
       "search": "Search by person or action…",
-      "empty": "Nobody has had to approve anything in this business yet.",
+      "empty": "There is no action of this kind in this business yet.",
       "error": "Could not load the record of approvals.",
-      "used": "Used",
-      "unused": "Not used",
+      "used": "Done",
+      "unused": "Not done",
       "export": {
         "button": "Export CSV",
         "pending": "Exporting…",
@@ -1110,13 +1110,14 @@
       },
       "way": {
         "pin": "PIN",
-        "badge": "Badge"
+        "badge": "Badge",
+        "role": "Their role"
       },
       "columns": {
         "at": "When",
         "action": "Action",
         "approvedBy": "Approved by",
-        "requestedBy": "Asked by",
+        "requestedBy": "Who",
         "way": "With",
         "used": "State"
       }
