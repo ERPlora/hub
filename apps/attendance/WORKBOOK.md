@@ -503,7 +503,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 ## Para quien lo mantiene
 
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
-  `queries/`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y
+  `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y
   un `tests/test_<fichero>.py` por fichero, más `test_integration_staff.py` (contra Personal real, sin
   dobles), `test_relay.py` (la baja en Personal entregada por el relay real del worker) y
   `test_concurrency.py` (hilos).
@@ -528,7 +528,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   campo.
 - La distancia al local la calcula el servidor con `geopy` (`geodesic`, WGS-84) a partir de la
   posición que manda el dispositivo; el dispositivo nunca dice si está dentro ni si es personal: eso
-  sale de `services.device_source(ctx)`, que lee el modo del dispositivo de la sesión
+  sale de `services.location.device_source(ctx)`, que lee el modo del dispositivo de la sesión
   (`base.queries.devices.device_of(ctx.request)`, el de la cookie `hub_device`; BASE-F62): `personal` solo si
   `base` lo conoce y así está marcado; un navegador desconocido o una llamada sin navegador (API key,
   sistema), compartido. La pantalla lo sigue en vivo con `base.device.current`. El radio y las

@@ -11,7 +11,9 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext, Scope
+from live.errors import Conflict
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 
 from apps.attendance.models import Break, Correction, Record
@@ -169,3 +171,51 @@ def correction(record, reason="Forgot to clock out", by=None, at=None) -> Correc
     if at:
         Correction.objects.filter(pk=trail.pk).update(created_at=utc(at))
     return trail
+
+
+WORKPLACE = (40.4168, -3.7038)  # Puerta del Sol
+NEAR = (40.4173, -3.7038)  # 55 m north
+FAR = (40.4245, -3.7038)  # 855 m north
+
+
+def outbox(prefix: str = "attendance.") -> list[tuple[str, dict]]:
+    return [
+        (e.name, e.payload)
+        for e in OutboxEvent.objects.filter(name__startswith=prefix).order_by(
+            "created_at", "id"
+        )
+    ]
+
+
+def names() -> list[str]:
+    return [name for name, _ in outbox()]
+
+
+def refused(code: str, name: str, data, ctx) -> Conflict:
+    before = (
+        Record.objects.count(),
+        Break.objects.count(),
+        Correction.objects.count(),
+        len(outbox()),
+    )
+    with pytest.raises(Conflict) as caught:
+        run(name, data, ctx)
+    assert caught.value.code == code
+    after = (
+        Record.objects.count(),
+        Break.objects.count(),
+        Correction.objects.count(),
+        len(outbox()),
+    )
+    assert after == before, "a refused command left a trace"
+    return caught.value
+
+
+def closed_day(member, start, end) -> Record:
+    return Record.objects.create(
+        member=member,
+        clock_in_at=utc(start),
+        clock_out_at=utc(end),
+        status="closed",
+        work_date=timezone.localdate(utc(start)),
+    )
