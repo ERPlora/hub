@@ -3,7 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LiveClient } from '@erplora/ui/sdk';
 
 import type { AppHelp, HelpFlow, HelpScreen } from '../operations-help';
-import { assistantQuestion, createHelpStore, flowMatches, organizeFlows, resetHelpCache, resolveScreen } from './help';
+import {
+  assistantQuestion,
+  createHelpStore,
+  flowMatches,
+  organizeFlows,
+  resetHelpCache,
+  resolvePlatformScreen,
+  resolveScreen,
+} from './help';
 
 beforeEach(resetHelpCache);
 
@@ -43,6 +51,43 @@ describe('resolveScreen', () => {
 
   it('resolves the settings tab and ignores trailing slashes', () => {
     expect(resolveScreen(screens, '/table/settings/')?.id).toBe('settings');
+  });
+});
+
+describe('resolvePlatformScreen', () => {
+  const platform: HelpScreen[] = [
+    { id: 'home', title: 'Home · Summary', path: '/', text: '' },
+    { id: 'home_activity', title: 'Home · Activity', path: '/#actividad', text: '' },
+    { id: 'employees', title: 'Employees · Staff', path: '/employees', text: '' },
+    { id: 'employees_roles', title: 'Employees · Roles', path: '/employees#roles', text: '' },
+    { id: 'role', title: 'What it allows', path: '/employees/roles/:role', text: '' },
+    { id: 'settings_general', title: 'Settings · General', path: '/settings#general', text: '' },
+    { id: 'settings_business', title: 'Settings · Business', path: '/settings#business', text: '' },
+  ];
+  const at = (pattern: string, hash = '') => resolvePlatformScreen(platform, pattern, hash)?.id;
+
+  it('is the tab the hash names', () => {
+    expect(at('/', '#actividad')).toBe('home_activity');
+    expect(at('/employees', '#roles')).toBe('employees_roles');
+    expect(at('/settings', '#business')).toBe('settings_business');
+  });
+
+  it('is the tab a page opens when the hash names none of its tabs', () => {
+    expect(at('/')).toBe('home');
+    expect(at('/employees')).toBe('employees');
+    expect(at('/employees', '#unknown')).toBe('employees');
+    expect(at('/settings')).toBe('settings_general');
+    expect(at('/settings', '#unknown')).toBe('settings_general');
+  });
+
+  it('is a route with parameters by the route itself, never the page above it', () => {
+    expect(at('/employees/roles/:role')).toBe('role');
+    expect(at('/employees/:person')).toBeUndefined();
+  });
+
+  it('is none of them outside the routes the help covers', () => {
+    expect(at('/api-docs')).toBeUndefined();
+    expect(at('/settings-old')).toBeUndefined();
   });
 });
 
