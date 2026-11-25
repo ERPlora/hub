@@ -105,9 +105,12 @@ for (const size of SIZES) {
       await expect(testid(page, 'role-review')).toHaveCount(0);
       await snap(page, 'editor-top', size.width);
 
-      await testid(page, 'role-switch-sale.take_payment').click();
+      // By keyboard, as a screen reader names it.
+      await shown(page).getByRole('switch', { name: 'Cobrar', exact: true }).focus();
+      await page.keyboard.press('Space');
       const voids = testid(page, 'role-states-sale.void_sale');
       await voids.scrollIntoViewIfNeeded();
+      await expect(shown(page).getByRole('tablist', { name: 'Anular una venta', exact: true })).toBeVisible();
       await voids.locator('ion-segment-button').filter({ hasText: /^No$/ }).click();
       await snap(page, 'editor-sale', size.width);
       await testid(page, 'role-save').scrollIntoViewIfNeeded();

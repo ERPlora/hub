@@ -1,12 +1,10 @@
+import { toastSuccess } from '@erplora/ui/shell';
 import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { click, EMPLOYEE, errorFrame, flush, installedApp, ionValue, leaveInstalledApp, mountBase, OWNER, settle, subId, tap } from '../__tests__/mount-base';
 import type { HubRoleRow } from '../operations/people';
 import RolesList from './RolesList.vue';
-
-const toasts = vi.hoisted(() => ({ toastSuccess: vi.fn() }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({ ...(await importOriginal<typeof import('@erplora/ui/shell')>()), ...toasts }));
 
 /** Who manages the roles: the owner and whoever runs the business. */
 const MANAGES = { ...OWNER, permissions: [...OWNER.permissions, 'base.manage_roles'] };
@@ -45,7 +43,6 @@ async function managed(own = cashier()) {
 }
 
 afterEach(() => {
-  toasts.toastSuccess.mockReset();
   leaveInstalledApp();
   document.head.innerHTML = '';
   document.body.innerHTML = '';
@@ -187,7 +184,7 @@ describe('RolesList', () => {
     await flush();
 
     expect(m.sent().map((call) => [call.path, call.body])).toEqual([['/api/roles/delete', { role: OWN }]]);
-    expect(toasts.toastSuccess).toHaveBeenCalledWith('Rol Cajero borrado');
+    expect(toastSuccess).toHaveBeenCalledWith('Rol Cajero borrado');
     expect(m.inDoc('role-delete-submit')).toBeNull();
   });
 
@@ -200,7 +197,7 @@ describe('RolesList', () => {
     await click(m.inDoc('role-delete-submit'));
     await flush();
     expect(m.inDoc('role-delete')?.textContent).toContain(message);
-    expect(toasts.toastSuccess).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
 
     await click(m.inDoc('role-delete-cancel'));
     await pressRowAction(m.wrapper, OWN, 'delete');

@@ -1,11 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toastSuccess } from '@erplora/ui/shell';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { click, flush, ionValue, mountBase, settle } from '../__tests__/mount-base';
 import type { HubRoleRow } from '../operations/people';
 import NewRoleModal from './NewRoleModal.vue';
-
-const toasts = vi.hoisted(() => ({ toastSuccess: vi.fn() }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({ ...(await importOriginal<typeof import('@erplora/ui/shell')>()), ...toasts }));
 
 const OWN = '0199aaaa-0000-7000-8000-000000000001';
 const row = (key: string, label: string, origin: 'basic' | 'own' = 'basic'): HubRoleRow => ({
@@ -36,7 +34,6 @@ const submit = async (m: Mounted) => {
 };
 
 afterEach(() => {
-  toasts.toastSuccess.mockReset();
   document.body.innerHTML = '';
 });
 
@@ -69,7 +66,7 @@ describe('NewRoleModal', () => {
     expect(m.sent().map((call) => [call.method, call.path, call.body])).toEqual([
       ['POST', '/api/roles', { name: 'Caja de tarde', based_on: 'hub_manager' }],
     ]);
-    expect(toasts.toastSuccess).toHaveBeenCalledWith('Rol Caja de tarde creado');
+    expect(toastSuccess).toHaveBeenCalledWith('Rol Caja de tarde creado');
     expect(m.wrapper.emitted('created')).toEqual([[OWN]]);
     expect(m.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
