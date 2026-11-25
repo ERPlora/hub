@@ -140,13 +140,13 @@ def run(
     return 0
 
 
-def _register(stop: threading.Event, wait: Callable[[float], object]) -> catalog.RegisterResult | int:
+def _register(stop: threading.Event, wait: Callable[[float], object]) -> catalog.register_apps.RegisterResult | int:
     """Register the apps, waiting while the SaaS has not migrated ``shared``; the exit code when it ends first."""
     delay = RETRY_FIRST_SECONDS
     while True:
         try:
-            return catalog.register_apps()
-        except catalog.SharedSchemaNotReady as error:
+            return catalog.register_apps.register_apps()
+        except catalog.errors.SharedSchemaNotReady as error:
             logger.warning("worker: shared schema not migrated yet; retrying in %d s (%s).", delay, error)
         except Exception:
             logger.exception("worker: register_apps failed; the worker stops (no release without its apps).")

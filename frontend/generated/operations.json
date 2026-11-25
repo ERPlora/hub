@@ -1427,6 +1427,14 @@
     "method": "post",
     "path": "/api/online_booking/public/cancel"
   },
+  "online_order.qr_code.list": {
+    "method": "get",
+    "path": "/api/online_order/qr_codes"
+  },
+  "online_order.qr_code.regenerate": {
+    "method": "post",
+    "path": "/api/online_order/qr_codes/regenerate"
+  },
   "reservation.reservation.list": {
     "method": "get",
     "path": "/api/reservation/reservations"

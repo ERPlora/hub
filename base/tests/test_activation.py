@@ -12,7 +12,7 @@ from live.meta import module_configs
 
 from base import activation
 from base.activation import OFF, ON, Activation
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 
 #: A small graph: sale needs tax and customer, invoice needs sale (and so tax and customer), verifactu needs invoice.
 GRAPH = {
@@ -44,13 +44,13 @@ def test_the_roots_are_the_modules_on_that_no_other_module_on_needs():
     assert activation.roots(["tax", "customer"], GRAPH) == {"tax", "customer"}
 
 
-def test_every_module_on_has_17_roots_of_27_on_main():
+def test_every_module_on_has_18_roots_of_28_on_main():
     graph = activation.module_graph()
-    assert len(graph) == 27
+    assert len(graph) == 28
     assert sorted(activation.roots(graph, graph)) == [
         "attendance", "cart_checkout", "cash_register", "combo", "demo", "flow", "kitchen", "modifier",
-        "online_booking", "payment", "pricing", "printing", "reservation", "task", "verifactu", "website",
-        "whatsapp_inbox",
+        "online_booking", "online_order", "payment", "pricing", "printing", "reservation", "task", "verifactu",
+        "website", "whatsapp_inbox",
     ]  # fmt: skip
 
 

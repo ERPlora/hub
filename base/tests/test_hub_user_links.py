@@ -68,7 +68,7 @@ def test_every_hub_app_fits_a_hub_s_own_database():
 def test_each_vertical_s_template_holds_its_whole_list(vertical, its_people_apps):
     """The templates ``migrate_hubs`` builds (``migrator.hub_templates.templates``): ``hub_template_<vertical>`` with every app of
     the vertical, none left out."""
-    wanted = set(catalog.template_apps(vertical))
+    wanted = set(catalog.verticals.template_apps(vertical))
     [template] = [
         template for template in migrator.hub_templates.templates("hub") if template.db_name == names.template_db_name("hub", vertical)
     ]
@@ -81,8 +81,8 @@ def test_each_vertical_s_template_holds_its_whole_list(vertical, its_people_apps
 def test_every_vertical_s_list_fits():
     portable = set(migrator.app_sets.portable_apps())
 
-    assert {vertical: set(catalog.template_apps(vertical)) - portable for vertical in catalog.known_verticals()} == {
-        vertical: set() for vertical in catalog.known_verticals()
+    assert {vertical: set(catalog.verticals.template_apps(vertical)) - portable for vertical in catalog.verticals.known_verticals()} == {
+        vertical: set() for vertical in catalog.verticals.known_verticals()
     }
 
 

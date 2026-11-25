@@ -10,7 +10,7 @@ from django.utils import translation
 from apps.website import choices, queries, schemas, services
 from apps.website.models import Image, Site
 from apps.website.tests.conftest import HOST, HUB_DB
-from base.catalog import build_registry
+from base.catalog.app_registry import build_registry
 from base.tests.po import (
     catalogue_key,
     compiled_differences,

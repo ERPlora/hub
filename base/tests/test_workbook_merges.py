@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from base.catalog import WORKBOOK, WORKBOOK_EN, user_part, workbook_translation
-from base.tests.test_catalog import translated
+from base.catalog.workbooks import WORKBOOK, WORKBOOK_EN, user_part, workbook_translation
+from base.tests.apps_on_disk import translated
 
 SPANISH = """\
 ## Flujos

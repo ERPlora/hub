@@ -49,10 +49,10 @@ def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
     assert platform.db_name == names.template_db_name(control()) and platform.source is None
     assert set(platform.apps) == set(PLATFORM) | every
     assert [template.db_name for template in verticals] == [
-        names.template_db_name(control(), vertical) for vertical in catalog.known_verticals()
+        names.template_db_name(control(), vertical) for vertical in catalog.verticals.known_verticals()
     ]
-    for vertical, template in zip(catalog.known_verticals(), verticals, strict=True):
-        wanted = set(catalog.template_apps(vertical))
+    for vertical, template in zip(catalog.verticals.known_verticals(), verticals, strict=True):
+        wanted = set(catalog.verticals.template_apps(vertical))
         assert template.source == platform.db_name
         assert set(template.apps) == set(PLATFORM) | every | (wanted & portable)
         assert set(template.left_out) == wanted - portable
