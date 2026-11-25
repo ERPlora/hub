@@ -200,8 +200,9 @@ CHECKS = {
     ),
     **dict.fromkeys(("inventory.category.update", "inventory.category.delete"), "inventory.category.get"),
 }
-#: The writes whose card says their data by a summary of their own: the rows of a file by their names.
-CARD_SUMMARY = {"inventory.product.bulk_create", "inventory.category.bulk_create"}
+#: The writes whose card says their data by a summary of their own: the rows of a file by their names, and a new
+#: product by its name, its price and the VAT it charges before the rest.
+CARD_SUMMARY = {"inventory.product.bulk_create", "inventory.category.bulk_create", "inventory.product.create"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
