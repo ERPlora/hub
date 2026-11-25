@@ -103,7 +103,8 @@ def test_a_menu_is_born_without_an_image_and_its_photos_are_served_to_anyone_as_
     assert (config.public_media, getattr(config, "members_media", [])) == ([FOLDER], [])
 
 
-def test_a_menus_photo_is_seen_by_the_hubs_sessions_and_by_a_customer_without_one(client, make_user, hub_files):  # noqa: F811
+@pytest.mark.usefixtures("hub_files")
+def test_a_menus_photo_is_seen_by_the_hubs_sessions_and_by_a_customer_without_one(client, make_user):
     combo = make_combo()
     url = upload(str(combo.id)).image_url
     client.force_login(make_user("boss", host=A.key, role="hub_admin"))
