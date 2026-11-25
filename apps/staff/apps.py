@@ -116,7 +116,21 @@ class StaffConfig(LiveAppConfig):
         ),
         Nav("settings", _("Settings"), "ion:settings-outline", "/staff/settings", permission="staff.manage_settings"),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "7taPYc-k-qs", "en": "nJ9BqRfPEjk"},
+        flow_videos={
+            "STAFF-F01": {"es": ["Gk4r1B106fg"], "en": ["nwm7h2QLwqg"]},
+            "STAFF-F02": {"es": ["Gk4r1B106fg"], "en": ["nwm7h2QLwqg"]},
+            "STAFF-F03": {"es": ["LtnOnUQgr4A"], "en": ["HJOfAE_-p5c"]},
+            "STAFF-F04": {"es": ["sLq3eX0EGo0"], "en": ["P--8qxE9jec"]},
+            "STAFF-F06": {"es": ["Gk4r1B106fg"], "en": ["nwm7h2QLwqg"]},
+            "STAFF-F08": {"es": ["wTNTqelgVUc"], "en": ["uAYP1JX9JFA"]},
+            "STAFF-F17": {"es": ["0LsycLDgSbE"], "en": ["TZviOQ5zg_o"]},
+            "STAFF-F18": {"es": ["0LsycLDgSbE"], "en": ["TZviOQ5zg_o"]},
+            "STAFF-F19": {"es": ["0LsycLDgSbE"], "en": ["TZviOQ5zg_o"]},
+            "STAFF-F24": {"es": ["I5v2868sR3w"], "en": ["XOdtwmIA5qk"]},
+        },
+    )
     # The Home's panels, on the queries Staff's own figures read (STAFF-F20, STAFF-F23), in every business. A KPI says
     # its name once, in its title. Registered icons only: the old airplane and hourglass are asked for in
     # UI-REQUESTS.md.
