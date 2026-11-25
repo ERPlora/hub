@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from django.apps import apps
 from live.operations import Operation
 
 from base import qa_coverage, workbook_help
@@ -84,13 +85,22 @@ def report(root: Path, flows: Mapping[str, WorkbookFlow], operations: Mapping[st
 def _broken_citations(
     cited: Mapping[str, tuple[str, ...]], flows: Mapping[str, WorkbookFlow], operations: Mapping[str, Operation]
 ) -> Iterator[str]:
-    """The flows cited that no manual has, and the operations a done flow cites that the registry does not have: the
-    manual of an app that is not done yet names the ones it will have."""
+    """The flows cited that no manual has, and what a done flow cites that is neither an operation nor a model the app
+    reads: the manual of an app that is not done yet names the operations it will have."""
     for flow_id, names in cited.items():
         if flow_id not in flows:
             yield f"{flow_id} is in no WORKBOOK"
         elif flows[flow_id].done:
-            yield from (f"{flow_id} cites {name}, which is no operation" for name in names if name not in operations)
+            missing = (name for name in names if name not in operations and not _is_model(name))
+            yield from (f"{flow_id} cites {name}, which does not exist" for name in missing)
+
+
+def _is_model(name: str) -> bool:
+    try:
+        apps.get_model(name)
+    except (LookupError, ValueError):
+        return False
+    return True
 
 
 def asked(flow: WorkbookFlow, operations: Sequence[Operation]) -> Asked:

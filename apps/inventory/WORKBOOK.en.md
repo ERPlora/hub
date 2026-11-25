@@ -1424,12 +1424,12 @@ data of whoever caused it.
 | Sales: sale refunded | Puts back the units of the lines that come back, once per refund | F24 | `sale.sale.refunded` |
 
 ### What it needs from other apps
-<!-- from WORKBOOK.md sha256:7cb216d494a5 -->
+<!-- from WORKBOOK.md sha256:33e66e21905e -->
 
 | From | What for | Flows | Service |
 |---|---|---|---|
 | Taxes | The tax categories with their type, for the picker (also to name the chosen one when it is not among the first ones) and to import products | F01, F02, F06, F09 | `tax.category.list` |
-| Taxes | Check when saving or importing that the chosen tax category exists and is still active, and know which products do not have it (direct reading: it is a required app) | F01, F02, F05, F06, F09, F10 | Taxes' TaxCategory model |
+| Taxes | Check when saving or importing that the chosen tax category exists and is still active, and know which products do not have it (direct reading: it is a required app) | F01, F02, F05, F06, F09, F10 | model `tax.TaxCategory` |
 | Taxes | Recognise the text of a CSV's tax column: the key, the name in any language or a learnt text | F09, F10 | `tax.alias.resolve` |
 | Taxes | Create a tax category or learn a text from the import | F09 | `tax.category.create`, `tax.alias.create` |
 | Sales | The number of a sale's ticket or invoice, for a movement's Reference | F16 | `sale.sale.get` |

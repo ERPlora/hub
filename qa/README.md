@@ -107,8 +107,8 @@ no es uno de los tres.
   WORKBOOK, y qué es herramienta lo dice el registro de operaciones. La columna cita una operación en los flujos en los
   que la ejecuta quien los hace: una escritura del sistema va en el flujo del sistema, no en la consulta que enseña lo
   que dejó. La de otra app que pide la pantalla de un flujo se cita en la fila de esa app o en una tabla del WORKBOOK del
-  flujo. La columna `Servicio` solo nombra operaciones entre comillas invertidas, y `Flujos`, solo flujos del Hub. Un
-  flujo que no usa ninguna operación lo dice con la clave `Operaciones: ninguna`, debajo de `Pantalla:`.
+  flujo. Lo que va entre comillas invertidas en `Servicio` es una operación o un modelo, y `Flujos` solo nombra flujos
+  del Hub. Un flujo que no usa ninguna operación lo dice con la clave `Operaciones: ninguna`, debajo de `Pantalla:`.
 
 | Grupo | Cuándo | Qué se espera al pedirlo hablando |
 |---|---|---|
@@ -124,8 +124,9 @@ Después da lo que queda por escribir en los WORKBOOK, en cuatro listas que tien
   ninguna` y una tabla lo cita. Que el asistente pueda hacerlo y `Actor:` no lo nombre no es una contradicción: lo dice
   su grupo;
 - las herramientas que no cita ningún flujo;
-- lo que se cita y no existe: un flujo que no está en ningún WORKBOOK o, en un flujo `hecho`, una operación que no está
-  en el registro. El WORKBOOK de una app que aún no está hecha puede nombrar las que tendrá.
+- lo que se cita y no existe: un flujo que no está en ningún WORKBOOK o, en un flujo `hecho`, algo que no es una
+  operación del registro ni un modelo. El WORKBOOK de una app que aún no está hecha puede nombrar las operaciones que
+  tendrá.
 
 ## Cómo se mantiene
 

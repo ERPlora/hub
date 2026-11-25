@@ -689,12 +689,12 @@ catalogue: the name, the price, whether it is active and whether it is sold out 
 To a recovered product it does not react: its choices come back from the copy (F15).
 
 ### What it needs from other apps
-<!-- from WORKBOOK.md sha256:672f3fbccadf -->
+<!-- from WORKBOOK.md sha256:aad2f7400714 -->
 
 | From | What for | Flows | Service |
 |---|---|---|---|
-| Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | Inventory's Product model; the screen's search box uses `inventory.product.list` (the active ones, sold out or not) |
-| Taxes (`requires`) | The tax categories of the selector and that of the menu "eaten in" | F02, F03, F09 | Taxes' TaxCategory model; the selector uses `tax.category.list` |
+| Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | model `inventory.Product`; the screen's search box uses `inventory.product.list` (the active ones, sold out or not) |
+| Taxes (`requires`) | The tax categories of the selector and that of the menu "eaten in" | F02, F03, F09 | model `tax.TaxCategory`; the selector uses `tax.category.list` |
 | Platform | The image library: searching it and naming by its title the image set on a menu | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
 | Platform | The recovery from a separate copy (BASE-F114), to which Menus says which menus, courses and choices it gives back | F15 | what its app module declares (recoverable_from_copy) |
 
