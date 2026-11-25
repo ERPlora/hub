@@ -3744,7 +3744,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of the screen in view
-<!-- from WORKBOOK.md sha256:7b42a8b07a82 -->
+<!-- from WORKBOOK.md sha256:e6318599c755 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
@@ -3752,7 +3752,7 @@ Steps:
   1. In a module whose help is ready and on the Hub's own screens (Home, Employees, a person's page, what a role allows,
      Files, Apps, System, Settings and My profile), at the top right, next to the assistant, is the "?" button ("Help"),
      going back too. It is not in a module whose help is not ready yet, on a screen without help (the API's
-     documentation), on one the person has no access to, nor for whoever cannot see the Home.
+     documentation), on the "No access" one, nor for whoever cannot see the Home.
   2. Tapping it opens the "Help · <module>" window, with the module's icon ("Help · ERPlora" on a screen of the Hub),
      centred on a tablet or a computer and from the bottom on a phone. It never opens by itself, and it closes when the
      person moves to another module.

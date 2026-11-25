@@ -3598,7 +3598,7 @@ Pasos:
   1. En un módulo con la ayuda lista y en las pantallas propias del Hub (Inicio, Empleados, la ficha de una persona, lo
      que permite un rol, Archivos, Apps, Sistema, Ajustes y Mi perfil), arriba a la derecha, junto al asistente, está el
      botón «?» («Ayuda»), también al volver atrás. No sale en un módulo cuya ayuda aún no está lista, en una pantalla sin
-     ayuda (la documentación de la API), en una a la que la persona no tiene acceso ni a quien no puede ver el Inicio.
+     ayuda (la documentación de la API), en la de «Sin acceso» ni a quien no puede ver el Inicio.
   2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo («Ayuda · ERPlora» en una pantalla del
      Hub), centrada en una tableta o un ordenador y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a
      otro módulo.

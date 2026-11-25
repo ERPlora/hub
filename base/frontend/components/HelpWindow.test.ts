@@ -13,13 +13,14 @@ interface SetupOptions {
   answer?: AppHelp;
   onApi?: () => Response | Promise<Response>;
   session?: typeof EMPLOYEE;
+  path?: string;
 }
 
 async function setup(options: SetupOptions = {}) {
   const app = options.app ?? 'table';
   const answer = options.answer ?? help;
   const m = await mountBase(HelpWindow, {
-    path: '/table/floor-plan', routes: ['/table/floor-plan', '/table/settings'],
+    path: options.path ?? '/table/floor-plan', routes: ['/table/floor-plan', '/table/floor-plan/:table', '/table/settings'],
     props: { open: true, app, appName: answer.name, icon: 'ion:grid-outline' },
     session: options.session,
     onApi: options.onApi ?? (() => Response.json(answer)),
@@ -62,6 +63,11 @@ describe('HelpWindow', () => {
     expect(modal.props()).toMatchObject({ size: 'lg', readonly: true, phoneLayout: 'sheet', title: 'Help · Tables' });
     expect(m.el('help-current-screen')?.textContent).toContain('Floor plan');
     expect(m.el('help-content')?.getAttribute('lang')).toBe('en');
+  });
+
+  it("is on a module's screen also at an address below it", async () => {
+    const m = await setup({ path: '/table/floor-plan/0190' });
+    expect(m.el('help-current-screen')?.textContent).toContain('Floor plan');
   });
 
   it('puts the app icon before a left-aligned title in the newest dialog', async () => {

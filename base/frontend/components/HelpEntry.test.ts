@@ -9,6 +9,7 @@ import HelpEntry from './HelpEntry.vue';
 import HelpWindow from './HelpWindow.vue';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   forgetHubHome();
   document.body.innerHTML = '';
 });
@@ -143,17 +144,18 @@ describe('HelpEntry in the bar of the page in view', () => {
   it('stays where it is when what enters is a window, which has no bar', async () => {
     const inView = page('in-view');
     await setupOn('/settings');
-    document.body.insertAdjacentHTML('beforeend', '<ion-modal><div id="window-content"></div></ion-modal>');
+    document.body.insertAdjacentHTML('beforeend', '<ion-modal><div id="window-content"><div slot="end"></div></div></ion-modal>');
     await enters(document.getElementById('window-content')!);
     expect(inView.contains(buttonInDoc())).toBe(true);
   });
 
   it('stops following the pages once it is gone', async () => {
-    const m = await setupOn('/settings');
+    const listened = vi.spyOn(document, 'addEventListener');
     const removed = vi.spyOn(document, 'removeEventListener');
+    const m = await setupOn('/settings');
+    const follows = listened.mock.calls.find(([event]) => event === 'ionViewDidEnter');
     m.wrapper.unmount();
-    expect(removed).toHaveBeenCalledWith('ionViewDidEnter', expect.any(Function), true);
-    removed.mockRestore();
+    expect(follows).toBeDefined();
+    expect(removed).toHaveBeenCalledWith(...follows!);
   });
 });
-
