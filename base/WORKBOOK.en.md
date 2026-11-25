@@ -2006,7 +2006,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:f5fff0f123b1 -->
+<!-- from WORKBOOK.md sha256:9d649fca38f9 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2015,6 +2015,8 @@ Steps:
      and your personal preferences in this business." and their role.
   2. In "Account details" they change "First name", "Last name" or "Email" ("Only to contact you: it is not the
      email you sign in with.") and tap "Save my details": "Profile saved", and the side menu already says the new name, without reloading.
+     If their erplora.com account has no name, "First name" brings what goes before the @ of their email, never the
+     whole address.
   3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
      ("Photo removed").
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
