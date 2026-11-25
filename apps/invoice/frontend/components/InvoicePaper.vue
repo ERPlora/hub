@@ -124,6 +124,13 @@ const note = computed(() => documentNote(props.invoice, t));
               data-testid="invoice-paper-operation-date"
             >{{ operationDate }}</span>
           </template>
+          <template v-if="invoice.due_date">
+            <span class="invoice-paper__k">{{ $t('invoice.paper.dueDate') }}</span>
+            <span
+              class="invoice-paper__v"
+              data-testid="invoice-paper-due-date"
+            >{{ formatDate(invoice.due_date, locale) }}</span>
+          </template>
         </div>
       </div>
     </div>

@@ -32,7 +32,7 @@ import { useMarkPaid } from '../composables/useMarkPaid';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { amountFilterErrors, formatDate, formatMoney, moneyOf, useBusinessMoney } from '../lib/format';
-import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
+import { shownStatus, SOURCE_CODES, STATUS_FILTERS, statusTone, TYPE_CODES } from '../lib/invoice';
 import { filterQuery, filtersInUse, reversedDates, TOTAL_ENDS } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
 import ExportButton from '../../../../base/frontend/components/ExportButton.vue';
@@ -98,8 +98,8 @@ const columns = computed<DataTableColumn<InvoiceRowOut>[]>(() => [
     sortable: true,
     cell: 'status',
     width: 'minmax(7rem, 9rem)',
-    format: (_, row) => t(`invoice.status.${row.status}`),
-    filter: { type: 'select', options: STATUS_CODES.map((code) => ({ value: code, label: t(`invoice.status.${code}`) })) },
+    format: (_, row) => t(`invoice.status.${shownStatus(row)}`),
+    filter: { type: 'select', options: STATUS_FILTERS.map((code) => ({ value: code, label: t(`invoice.status.${code}`) })) },
   },
   {
     key: 'issue_date',
@@ -232,8 +232,8 @@ function onAction({ actionId, row }: { actionId: string; row: InvoiceRowOut }): 
       <template #status="{ row }">
         <StatusPill
           size="sm"
-          :tone="statusTone(row.status)"
-          :label="$t(`invoice.status.${row.status}`)"
+          :tone="statusTone(shownStatus(row))"
+          :label="$t(`invoice.status.${shownStatus(row)}`)"
           data-testid="invoice-list-status"
         />
       </template>

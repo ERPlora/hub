@@ -327,6 +327,11 @@ msgstr "fecha de emisión"
 msgid "operation date"
 msgstr "fecha de operación"
 
+#: models.py
+msgctxt "invoice"
+msgid "due date"
+msgstr "vencimiento"
+
 #: models.py:236
 msgid "issued at"
 msgstr "emitida el"
@@ -675,10 +680,27 @@ msgstr ""
 #: services/manual.py:35
 msgid ""
 "That series numbers another year: a manual invoice is numbered in a series "
-"of this year."
+"of the year of its date."
 msgstr ""
-"Esa serie numera otro año: una factura manual se numera en una serie de este"
-" año."
+"Esa serie numera otro año: una factura manual se numera en una serie del año "
+"de su fecha."
+
+#: services/manual.py
+msgid "An invoice cannot be dated after today."
+msgstr "La fecha de una factura no puede ser posterior a hoy."
+
+#: services/manual.py
+#, python-format
+msgid ""
+"An invoice cannot be dated before the last one of its series, which is of "
+"%(date)s."
+msgstr ""
+"La fecha de una factura no puede ser anterior a la de la última de su serie, "
+"que es del %(date)s."
+
+#: services/manual.py
+msgid "The due date cannot be before the invoice's date."
+msgstr "El vencimiento no puede ser anterior a la fecha de la factura."
 
 #: services/manual.py:40
 #, python-format
@@ -802,10 +824,10 @@ msgstr "No hay ninguna categoría fiscal «%(category)s»."
 #: services/manual.py:48
 #, python-format
 msgid ""
-"No tax rule applies today to the tax category «%(category)s». Create its "
+"No tax rule applies that day to the tax category «%(category)s». Create its "
 "rule in Taxes › Rules."
 msgstr ""
-"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s». "
+"Ninguna regla fiscal se aplica ese día a la categoría fiscal «%(category)s». "
 "Crea su regla en Impuestos › Reglas."
 
 #: services/manual.py:53
@@ -866,6 +888,11 @@ msgstr "Fecha"
 #: templates/invoice/invoice.html:73
 msgid "Operation date"
 msgstr "Fecha de operación"
+
+#: templates/invoice/invoice.html
+msgctxt "invoice"
+msgid "Due date"
+msgstr "Vencimiento"
 
 #: templates/invoice/invoice.html:79
 msgid "Bill to"
