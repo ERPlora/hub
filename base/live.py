@@ -112,8 +112,8 @@ live("base.access.grantors", on=sorted({HUB_STATE_APPLIED, events.PROFILE_UPDATE
 live("base.session.access", on=[HUB_STATE_APPLIED])
 # The keys follow their own making, rotating and revoking; the apps a key may reach, the photo (a paid app comes or goes).
 live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *APP_EVENTS}))
-# Approvals follow each approval given and each pass spent; who may approve, the ways in, the photo and the business's
-# own roles (the roles).
+# Approvals follow each approval given, each pass spent and each action done without needing one; who may approve, the
+# ways in, the photo and the business's own roles (the roles).
 live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
 # The API's documentation: shown or hidden. The document itself is asked once (far bigger than a live result may be).
 live("base.api_doc.settings", on=[events.API_DOC_SETTINGS_CHANGED])

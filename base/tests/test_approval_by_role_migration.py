@@ -1,36 +1,21 @@
 """The record of approvals keeps also what was done by whoever may do it themselves (``base/0032``): with no pass and no
 limit in time. What it kept stays as it was. Going back is refused while it keeps one of those, and touches nothing:
-nobody deletes a line of the record. These run on a business's own database, cloned from the template for each test,
-through the migrator's alias as ``migrate_hubs`` runs them.
+nobody deletes a line of the record.
 """
 
 import datetime as dt
 import hashlib
-import uuid
 
 import pytest
-from django.db import DatabaseError, IntegrityError, connections, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.utils import timezone
 
-from base.tenancy import connections as tenancy_connections
-from base.tenancy import names
-from base.tenancy.tests import hubs
-from base.tests.test_api_key_actions_migration import migrate
+from base.tests.hub_migration import database, migrate
+
+__all__ = ["database"]
 
 BEFORE = [("base", "0031_support_entry")]
 AFTER = [("base", "0032_approval_by_role")]
-
-
-@pytest.fixture
-def database(hub_databases, django_db_blocker):
-    """The migrator's connection to a business's database cloned from the template for the test, dropped after it."""
-    name = names.hub_db_name(hub_databases.control, uuid.uuid7())
-    with django_db_blocker.unblock(), hubs.clone_of_the_template(hub_databases, name):
-        database = connections[tenancy_connections.register_ddl_alias(name)]
-        try:
-            yield database
-        finally:
-            database.close()
 
 
 def row(models, alias: str, who: str, **fields):
