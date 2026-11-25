@@ -141,6 +141,13 @@ class TestCreate:
         assert "token" not in listed["keys"][0] and token not in json.dumps(listed)
         assert listed["keys"][0]["created_by"] == "Olga"
 
+    def test_whoever_made_it_is_named_and_never_by_their_address(self, client, hub_a):
+        get_user_model().objects.create(username="marta@example.com")
+        client.force_login(member(hub_a.slug, username="marta@example.com"))
+        made = create(client, hub_a)["key"]
+        listed = get(client, host(hub_a), "/keys").json()["keys"]
+        assert [made["created_by"], *(key["created_by"] for key in listed)] == ["marta", "marta"]
+
     def test_its_event_carries_no_token(self, admin_on_a, hub_a):
         token = create(admin_on_a, hub_a)["token"]
         with use_hub(hub_a):

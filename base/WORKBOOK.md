@@ -2552,23 +2552,26 @@ Pasos:
   1. En **Empleados › API keys**: «Una llave deja que otro sistema (el de tu gestoría, tu tienda online) lea o
      escriba datos de este negocio por su API.» y «Nueva API key».
   2. En «Nueva API key», el «Nombre» («Gestoría — facturas»), las «Peticiones por minuto» («De 1 a 10.000.») y
-     «Qué puede hacer esta key»: «Acceso total», «Solo lectura», «Solo escritura» o «Por app», marcando en cada app
-     «Lectura» y «Escritura»; solo sale la casilla de lo que quien la crea puede hacer en esa app.
+     «Qué puede hacer esta key»: «Elegir apps» o «Todas las apps», con las casillas «Leer», «Crear», «Modificar» y
+     «Borrar» de cada app o, en «Todas las apps», una sola vez para todas («Todas las apps de tu negocio, también las
+     que añadas después.»). Solo sale la casilla de lo que quien la crea puede dar: en lo demás hay un guion, y la app
+     en la que no puede dar nada no sale, ni «Todas las apps» si no puede dar nada en todas. Con «Crear key» vale lo
+     marcado en la opción elegida.
   3. Pulsa «Crear key»: sale «API key creada» con «Copia el token ahora», «Este es el único momento en que se
      muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
      dice «Copiado»). «Hecho» la cierra.
   4. Lo que puede hacer una llave son cuatro acciones, en todas las apps (también las que se añadan después) o app
-     por app: leer, crear, modificar y borrar. «Lectura» es leer y «Escritura», crear, modificar y borrar de lo que
-     quien la crea puede dar; «Acceso total», las cuatro en todas las apps. Por la API se elige cada acción por
-     separado: una llave que solo lee y crea en Inventario.
+     por app: leer, crear, modificar y borrar, cada una por separado. Una llave con «Leer» en Inventario lee sus
+     productos; crear, modificar o borrar uno, o abrir otra app, se le niega.
   5. Una llave nunca recibe más de lo que puede hacer quien la crea: en una app, una acción que no puede hacer en
      ninguna de sus llamadas; en todas las apps, una acción que no puede hacer en alguna app que la publica.
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla, y quién la creó, que pone su techo
 (BASE-F125). Evento `base.api_key.created`.
-Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.», «Una key no puede hacer más de lo que puedes hacer tú.» o «No se pudo copiar al
-portapapeles.».
+Si falla: sin nombre o sin ninguna casilla marcada, «Crear key» no se puede pulsar; sin ninguna app en la que dar
+nada, «No hay ninguna app a la que puedas dar acceso.». «No se pudo crear la API key.», «Elige al menos una app y qué
+puede hacer la key en ella.», «Esa app no publica lo que la key haría en ella.», «Una key no puede hacer más de lo que
+puedes hacer tú.» o «No se pudo copiar al portapapeles.».
 Implicados: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotar una llave de API
@@ -2606,16 +2609,17 @@ Actor: propietario, administrador
 Pantalla: Empleados · API keys
 Pasos:
   1. En **Empleados › API keys** (la pestaña solo existe para quien administra), una fila por llave: «Nombre»,
-     «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada», «Último uso» («Nunca» si
-     no se ha usado) y «Límite». «Permisos» dice «Acceso total», «Solo lectura» o «Solo escritura» si la llave lo es
-     en todas las apps; si no, sus acciones en «Todas las apps» y app por app, con su inicial: L (leer), C (crear),
-     M (modificar) y B (borrar), como «Tienda online L/C · Impuestos L».
+     «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada por», «Creada», «Último uso»
+     («Nunca» si no se ha usado) y «Límite». «Permisos» dice «Acceso total», «Solo lectura» o «Solo escritura» si la
+     llave lo es en todas las apps; si no, sus acciones en «Todas las apps» y app por app, con su inicial: L (leer),
+     C (crear), M (modificar) y B (borrar), como «Tienda online L/C · Impuestos L». «Creada por» dice el nombre de
+     quien la creó, nunca su dirección de correo.
   2. Busca con «Buscar API key…». Al pie, un enlace lleva a la documentación de la API.
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
 Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
 que un sistema externo pueda leer o escribir datos de tu negocio.».
-Implicados: BASE-F86, BASE-F87, BASE-F88
+Implicados: BASE-F86, BASE-F87, BASE-F88, BASE-F125
 
 ### BASE-F90 Consultar la documentación de la API
 Estado: hecho
@@ -4935,7 +4939,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   por dirección (`KEY_ADDRESS_LIMIT`). La llave vive en la BD del negocio, así que la de uno nunca abre otro (test
   A≠B en `base/tests/test_api_keys.py`); un negocio sin BD propia no se sirve y su dirección responde 503
   `base.hub_maintenance`, con llave o sin ella. Crear una llave con más de lo que puede quien la crea (BASE-F86) responde
-  403 `base.api_key_beyond_maker`.
+  403 `base.api_key_beyond_maker`. «Nueva API key» solo ofrece lo que dice `grantable` de `base.api_key.list` y manda lo
+  marcado que siga ahí (`askedScopes`, `base/frontend/lib/api-key-scopes.ts`).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
@@ -5033,7 +5038,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts` y `tests/e2e/base-api-keys.spec.ts` (crear, copiar, usar, rotar y revocar una
-  llave en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
+  llave que solo lee Inventario en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
 - La QA maestra del Hub (BASE-F107 = BASE-G152) es una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`,
   contra el SaaS de la pila
   (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
