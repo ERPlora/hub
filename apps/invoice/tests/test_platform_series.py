@@ -253,6 +253,8 @@ def test_a_series_of_erplora_com_is_not_changed_by_hand(born, code, change):
         ({"prefix": "ERP", "format": "{prefix}-{year}-{seq:05d}"}, "format"),
         ({"format": "ERP-{year}-{seq:05d}"}, "format"),
         ({"prefix": "ER", "format": "{prefix}P-{year}-{seq:05d}"}, "format"),
+        ({"prefix": "erp"}, "prefix"),
+        ({"prefix": "Erpr", "format": "{prefix}-{year}-{seq:05d}"}, "format"),
     ],
 )
 def test_no_series_prints_the_numbers_of_erplora_com(platform_hub, numbering, field, today):
@@ -282,6 +284,13 @@ def test_nor_one_left_without_a_prefix(platform_hub, today):
 def test_a_prefix_that_only_resembles_them_is_the_businesss_own(platform_hub, prefix, today):
     run("invoice.series.create", {"code": "WEB", "invoice_type": "F1", "year": today.year, "prefix": prefix})
     assert manual(series_code="WEB").number == f"{prefix}-{today.year}-000001"
+
+
+@HUB_DB
+def test_a_number_that_only_starts_as_theirs_is_the_businesss_own(platform_hub, today):
+    numbering = {"prefix": "ERP", "format": "{prefix}-{year}-{seq:05d}-W"}
+    run("invoice.series.create", {"code": "WEB", "invoice_type": "F1", "year": today.year, **numbering})
+    assert manual(series_code="WEB").number == f"ERP-{today.year}-00001-W"
 
 
 @HUB_DB

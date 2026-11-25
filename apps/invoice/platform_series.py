@@ -13,8 +13,8 @@ from base.operations import is_platform_hub
 
 #: The code of each one and the type it is born with.
 PLATFORM_SERIES_TYPES = {"ERP": "F1", "ERPR": "R1"}
-#: A number as erplora.com gives it (``ERP-2026-00123``).
-_PLATFORM_NUMBER = re.compile(rf"(?:{'|'.join(PLATFORM_SERIES_TYPES)})-\d{{4}}-\d+")
+#: A number as erplora.com gives it (``ERP-2026-00123``), in any case: «erp-2026-00123» reads as the same invoice.
+_PLATFORM_NUMBER = re.compile(rf"(?:{'|'.join(PLATFORM_SERIES_TYPES)})-\d{{4}}-\d+", re.IGNORECASE)
 
 
 SERIES_CLOSED = _("erplora.com numbers the ERP and ERPR series: use another series.")
