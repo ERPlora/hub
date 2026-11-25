@@ -25,7 +25,7 @@ from apps.invoice.services import emails as service
 from apps.invoice.tests.conftest import A, B, HUB_DB, ctx_for, fields, run
 from apps.invoice.tests.emailed import ANA, OWNER, SEND, asked, emails, kept, key, mail_server_fails, owned, owner, send
 from apps.invoice.tests.manual import NOON, RECIPIENT, manual, stored, withheld
-from apps.invoice.tests.printed import text, words
+from apps.invoice.tests.printed import qr_urls, text, words
 from apps.verifactu.models import Record
 from base import outbound, pdf
 from base.models import Hub
@@ -43,8 +43,11 @@ class Attached:
         [attachment] = message.attachments
         self.name, self.content, self.kind = tuple(attachment)
 
+    def opened(self):
+        return SimpleNamespace(content_base64=base64.b64encode(self.content).decode())
+
     def words(self):
-        return words(text(SimpleNamespace(content_base64=base64.b64encode(self.content).decode())))
+        return words(text(self.opened()))
 
 
 def only_mail():
@@ -74,6 +77,13 @@ def test_the_customer_gets_the_invoice_with_its_pdf_and_replies_to_the_business(
     downloaded = run("invoice.invoice.pdf", {"invoice_id": str(invoice.id)})
     assert attached.words() == words(text(downloaded))
     assert (kept(out).status, kept(out).to_address, kept(out).requested_by) == ("sent", ANA, "tester")
+
+
+def test_its_pdf_carries_the_qr_of_its_verifactu_record(send):
+    invoice = manual()
+    send(invoice, to=ANA)
+    record = run("verifactu.record.by_invoice", {"invoice_id": str(invoice.id)}).record
+    assert qr_urls(Attached(only_mail()).opened()) == [record.qr_url]
 
 
 def test_nothing_is_printed_nor_sent_until_the_request_is_committed(monkeypatch):
@@ -240,6 +250,7 @@ def test_the_invoice_and_its_verifactu_record_stay_as_they_were(send):
     invoice = manual()
     before = Invoice.objects.filter(pk=invoice.id).values().get()
     records = list(Record.objects.order_by("pk").values())
+    assert records  # positive control: it has its record
     issued = len(events_of(events.INVOICE_ISSUED))
     send(invoice, to=ANA)
     assert Invoice.objects.filter(pk=invoice.id).values().get() == before

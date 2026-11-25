@@ -77,7 +77,7 @@ def proposed_address(invoice: Invoice) -> str:
 def message_of(ctx: OperationContext, invoice_id) -> Message:
     """The email of an invoice, in its language or else the business's. It prints its PDF: never inside a command."""
     ctx = replace(ctx, language=business_language(ctx))
-    invoice = Invoice.objects.get(pk=invoice_id)
+    invoice = find_invoice(ctx, invoice_id, None)
     content = printed(ctx, invoice, duplicate=source_of(invoice) in COPIES)
     language = invoice.language or ctx.language
     with translation.override(language):
